@@ -163,8 +163,9 @@ apps/api/src/
                        OpenTelemetry setup, third-party SDK initialisation
 ```
 
-- Dependency direction: `frameworks` → `interface-adapters` → `use-cases` → `domain`.
-  Within each layer, code is grouped by bounded context.
+- Dependency direction: `frameworks` → `interface-adapters` → `use-cases` → `domain`. Layers
+  are flat: no sub-folders per bounded context; context membership is expressed by the NestJS
+  module that assembles the providers.
 - NestJS modules are dependency-injection assemblies only. A module binds ports to adapters
   and registers controllers and use cases for one bounded context; it contains no logic and
   is not an architectural layer.
@@ -462,4 +463,4 @@ Supply chain
 - Runtime guidance for engineers and agents: this file first, then `README.md` and
   `apps/*/README.md` for commands and local setup.
 
-**Version**: 2.0.0 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-04
+**Version**: 2.0.1 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-04
