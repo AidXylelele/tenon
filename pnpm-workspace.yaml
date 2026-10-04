@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+
+# pnpm blocks dependency install scripts unless explicitly allowed.
+allowBuilds:
+  '@swc/core': true
+  sharp: false
+  unrs-resolver: false
