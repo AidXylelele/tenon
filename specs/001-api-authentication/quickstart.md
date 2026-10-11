@@ -31,8 +31,7 @@ Expected: `docker compose ps` shows both services healthy; `docker volume ls` li
 `workflow-platform-postgres` and `workflow-platform-mailpit`; `docker network ls` lists
 `workflow-platform`; `GET /api/v1/health` returns 200. Re-running the migrations never seeds a second administrator.
 
-Requests sent directly to the API count against the connecting address: 20 sign-in requests and 20
-recovery requests per 10 minutes per address and endpoint.
+The API has no rate limiter; request rates are limited by the API gateway in deployed environments.
 
 ## Scenario 1: sign in and sign out (US1)
 
@@ -47,7 +46,7 @@ curl -i -b jar.txt http://127.0.0.1:3000/api/v1/invitations
 Expected: 200 with `{ user }` and `Set-Cookie: sid=…; HttpOnly; SameSite=Lax` (the `Secure`
 attribute and the `__Host-` prefix appear with `SESSION_COOKIE_SECURE=true`); 200 list; 204 sign-out; 401 afterwards
 with Nest's standard error body (`statusCode`, `message`, `error`). A wrong password and an unknown email both return 401 with
-the same body. The 21st sign-in request within 10 minutes returns 429 with `Retry-After`.
+the same body.
 
 ## Scenario 2: invite and accept (US2)
 
@@ -105,14 +104,11 @@ pnpm --filter api test                    # unit: entities, policy, presenter, m
 pnpm --filter api test:int                # integration + component on Testcontainers PostgreSQL; relay driven by runOnce()
 docker compose --profile app up -d        # built image + postgres + mailpit for the journeys
 pnpm --filter api test:e2e                # end-to-end persona journeys against http://127.0.0.1:53000 and the Mailpit API
-# Repeated runs within 10 minutes share one in-memory rate-limit budget: restart the api container between runs
-# docker compose --profile app restart api
 pnpm lint && pnpm check-types
 ```
 
 Expected: all suites pass; no skipped tests. Component suites cover every acceptance scenario and
-edge case of the spec; the rate-limit suite sends 21 requests with `x-forwarded-for` and expects the
-last to be 429; the end-to-end suite runs the four quickstart scenarios unattended.
+edge case of the spec; the end-to-end suite runs the four quickstart scenarios unattended.
 
 ## Image and security gates
 

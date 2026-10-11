@@ -5,7 +5,6 @@ import {
 import { AuthorizationModule } from '@nestjs/authorization';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ThrottlerModule } from '@nestjs/throttler';
 import {
   InvitationQueries,
   InvitationRepository,
@@ -60,7 +59,6 @@ import { MailModule } from './mail.module.js';
       }),
     }),
     AuthorizationModule.forRoot({ policies: [InvitationPolicy] }),
-    ThrottlerModule.forRoot({ throttlers: [{ ttl: 600_000, limit: 20 }] }),
   ],
   controllers: [AuthController, InvitationsController],
   providers: [

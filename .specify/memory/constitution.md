@@ -1,16 +1,13 @@
 <!--
 Sync Impact Report
-- Version change: 2.0.1 → 3.0.0
-- Modified principles: II. Documentation-First Implementation (research document clause removed);
-  III. Clean Architecture (layer `use-cases` → `application`; use cases are plain classes; boundary
-  data rule restated); IV. Domain-Driven Design (injected time removed; errors thrown);
-  V. CQS (query abstractions); VI. Verified by Tests (test types per layer per the microservice
-  testing strategy); VII. Security by Design (authorisation by route policies)
-- Added sections: API Rules › Code style; API Rules › Application layer
-- Removed sections: API Rules › Use cases (merged into Application layer); `Result` failures;
-  repository interfaces in `domain`; error envelope `{ code, message, details[] }`
-- Templates: .specify/templates/plan-template.md ✅ (generic gate wording); spec, tasks and
-  checklist templates ✅ (no references to removed clauses)
+- Version change: 3.0.0 → 3.0.1 (PATCH: clarification)
+- Modified sections: API Rules › Stack (`@nestjs/throttler` removed); Verification and Security
+  Requirements › Authentication and authorisation (anonymous endpoints are rate limited at the API
+  gateway, Envoy Gateway in the platform's Helm chart, not inside the applications)
+- Added sections: none
+- Removed sections: none
+- Templates: .specify/templates/plan-template.md ✅, spec-template.md ✅, tasks-template.md ✅,
+  checklist-template.md ✅ (no references to application-level rate limiting)
 - Follow-up TODOs: none
 -->
 
@@ -167,7 +164,7 @@ Sync Impact Report
 ### Stack
 
 NestJS 12 (ESM, SWC) with its first-party modules `@nestjs/authentication`,
-`@nestjs/authorization`, `@nestjs/throttler`, `@nestjs/mail`, `@nestjs/outbox`,
+`@nestjs/authorization`, `@nestjs/mail`, `@nestjs/outbox`,
 `@nestjs/terminus`, `@nestjs/config` and `@nestjs/swagger`; `nestjs-cls` with
 `@nestjs-cls/transactional` for transaction propagation; Drizzle ORM over `pg` on PostgreSQL;
 `zod` for the environment schema; `nestjs-pino` logging; the OpenTelemetry Node SDK with
@@ -449,7 +446,7 @@ Authentication and authorisation
 - Sessions are HttpOnly, SameSite cookies issued by `@nestjs/authentication`; state-changing
   requests are protected against CSRF by the origin check; link secrets are stored only as
   fingerprints; anonymous endpoints that reveal account existence answer identically and are
-  rate limited.
+  rate limited by the API gateway; the applications contain no rate limiter.
 
 Input and output
 - All input (HTTP bodies, query strings, headers, path parameters, webhook payloads,
@@ -506,4 +503,4 @@ Supply chain
 - Runtime guidance for engineers and agents: this file first, then `README.md` and
   `apps/*/README.md` for commands and local setup.
 
-**Version**: 3.0.0 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-11
+**Version**: 3.0.1 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-12

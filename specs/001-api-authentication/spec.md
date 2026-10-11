@@ -18,6 +18,10 @@
 - Q: How does the platform send email in production? → A: SMTP: host, port, credentials and sender address come from configuration; the local environment runs an SMTP capture service with a web inbox.
 - Planning adjustment (native mechanisms only): the rate limiter counts requests, not failed attempts, so the limit is 20 requests per client address per 10 minutes per endpoint; the "password must not equal the email address" rule is dropped because the provider has no native hook for it; the operator command is replaced by a database seed migration and the first password is set through recovery (the provider creates the credential on completion); a newer recovery link does not invalidate earlier unexpired links because the provider keeps each token until its own expiry; recovery-link secrets are stored as the provider issues them, so FR-020 applies to invitation links.
 
+### Session 2026-10-12
+
+- Q: Where are request rates on sign-in and recovery limited? → A: At the API gateway (Envoy Gateway, delivered with the platform's Helm chart), like every public route; the API contains no rate limiter. This supersedes the throttling answer of 2026-10-05 and the rate-limiter part of its planning adjustment.
+
 ## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Sign in with email and password (Priority: P1)
@@ -35,7 +39,7 @@ A registered user opens the platform, enters the email address and password, and
 3. **Given** no user with the submitted email, **When** sign-in is attempted, **Then** the response is identical to a wrong-password response.
 4. **Given** a signed-in user, **When** the user signs out, **Then** the session is ended and subsequent requests with it are refused.
 5. **Given** a suspended user, **When** the user submits correct credentials, **Then** access is refused with a suspension message.
-6. **Given** 20 sign-in requests from the same client address within 10 minutes, **When** the next request arrives from that address, **Then** it is refused with a "try again later" response that states the wait time, and requests from other addresses are unaffected.
+6. **Given** many sign-in requests from one client address, **When** they exceed the rate the API gateway allows, **Then** the gateway refuses them before they reach the API, and requests from other addresses are unaffected (FR-017).
 
 ---
 
@@ -73,8 +77,8 @@ A user who forgot the password requests recovery by email. If an account exists,
 2. **Given** no account for the email, **When** recovery is requested, **Then** the response is the same generic confirmation and no email is sent.
 3. **Given** a valid recovery link, **When** the user submits a password that meets the policy, **Then** the password is replaced, the link is invalidated, and every other session of the user is ended.
 4. **Given** an expired or already used recovery link, **When** it is opened, **Then** the platform refuses it.
-5. **Given** two recovery requests for the same account, **When** both links are issued, **Then** each link works once until its own expiry.
-6. **Given** 20 recovery requests from the same client address within 10 minutes, **When** the next request arrives from that address, **Then** it is refused with a "try again later" response that states the wait time.
+5. **Given** two recovery requests for the same account, **When** both links are issued, **Then** issuing the newer link does not invalidate the earlier one, and once either link sets a new password the other is refused (FR-014).
+6. **Given** many recovery requests from one client address, **When** they exceed the rate the API gateway allows, **Then** the gateway refuses them before they reach the API (FR-017).
 
 ---
 
@@ -117,7 +121,7 @@ A signed-in user changes the password by entering the current password and a new
 ### Functional Requirements
 
 - **FR-001**: Users MUST be able to sign in with an email address and password and sign out.
-- **FR-002**: A session MUST remain valid for 7 days of inactivity and MUST be extended on use; sign-out MUST end the current session.
+- **FR-002**: A session MUST remain valid for 7 days of inactivity and MUST be extended on use, up to an absolute lifetime of 30 days from sign-in; sign-out MUST end the current session.
 - **FR-003**: Sign-in responses MUST NOT disclose whether an email address is registered; wrong-password and unknown-email outcomes MUST be indistinguishable.
 - **FR-004**: Suspended users MUST be refused sign-in and MUST hold no valid session once suspended; the act of suspending is outside this feature (the `suspended` flag of the user record); no administration interface is part of this feature
 - **FR-005**: Self-service registration MUST be disabled; accounts MUST be created only through invitations; the first administrator is created by the database seed migration.
@@ -127,12 +131,12 @@ A signed-in user changes the password by entering the current password and a new
 - **FR-009**: Creating an invitation for an email that already has an account MUST be refused; creating one for an email with a pending invitation MUST revoke the pending one.
 - **FR-010**: Pending invitations MUST be listable and revocable.
 - **FR-011**: Accepting an invitation MUST require a name and a password, MUST create an active account with the invitation's role, MUST mark the invitation accepted, and MUST sign the person in.
-- **FR-012**: Only administrators MUST be able to create, list or revoke invitations (FR-007, FR-010); the restriction MUST be enforced by the operation itself, not only by the endpoint.
+- **FR-012**: Only administrators MUST be able to create, list or revoke invitations (FR-007, FR-010); the restriction MUST be an authorization policy declared on each of these operations (deny by default), not inferred from the route path or from the client hiding the action.
 - **FR-013**: Users MUST be able to request password recovery by email; the response MUST be a generic confirmation regardless of whether an account exists.
 - **FR-014**: A recovery link MUST be single-use and MUST expire 1 hour after issue; several unexpired links MAY exist for one account, and a link issued before the password changed is refused.
 - **FR-015**: Completing recovery MUST replace the password, invalidate the link, and end every other session of the user.
 - **FR-016**: Passwords MUST be 12 to 128 characters; the policy MUST apply to invitation acceptance, recovery and password change.
-- **FR-017**: Sign-in requests and recovery requests MUST be limited per client address to 20 per 10 minutes, counted separately per endpoint; the 21st request within the window MUST be refused with a response that states the wait time in a header or in the body; there MUST be no per-email counting and no account lockout.
+- **FR-017**: Request rates on sign-in and recovery MUST be limited per client address by the API gateway (Envoy Gateway, delivered with the platform's Helm chart), as on every public route; the API itself contains no rate limiter. There MUST be no per-email counting and no account lockout.
 - **FR-018**: Email addresses MUST be compared case-insensitively.
 - **FR-019** (deferred, design review 2026-10-11: no application-level security event log in this iteration; request logs only): The platform MUST record security events (sign-in success and failure, sign-out, password change success and failure, invitation created, accepted, revoked, recovery requested and completed, suspension) as structured application log records carrying the event type, user id and client address, without passwords, links or tokens; no audit table or in-product event history is kept.
 - **FR-020**: Secrets embedded in invitation links MUST be stored only in a form that does not allow the link to be reconstructed from stored data; recovery-link secrets are stored the same way (SHA-256 of the token)
@@ -171,19 +175,19 @@ A signed-in user changes the password by entering the current password and a new
 ## Assumptions
 
 - The platform is self-hosted and single-tenant; roles are `admin`, `editor`, `viewer` as defined in the architecture documentation.
-- Authentication is built on the first-party NestJS packages (`@nestjs/authentication`, `@nestjs/authorization`, `@nestjs/throttler`); their documented mechanisms are used for sessions, password hashing, recovery tokens, CSRF defence and rate limiting
+- Authentication is built on the first-party NestJS packages (`@nestjs/authentication`, `@nestjs/authorization`); their documented mechanisms are used for sessions, password hashing, recovery tokens and CSRF defence; request-rate limits belong to the API gateway
 - Outbound email is sent over SMTP; host, port, credentials and sender address come from configuration; the local environment captures outgoing email in an SMTP capture service with a web inbox instead of delivering it.
 - Links in emails point to the web application; its public base URL comes from configuration, and the API does not depend on the web application being present.
-- Invitation links are valid for 7 days; recovery links for 1 hour; sessions for 7 days of inactivity.
+- Invitation links are valid for 7 days; recovery links for 1 hour; sessions for 7 days of inactivity and at most 30 days from sign-in.
 - Password policy: 12 to 128 characters; no further complexity rules; it applies to invitation acceptance, recovery and password change.
 - Invitation emails carry the link, the inviting administrator's name, the assigned role and the expiry date; recovery emails carry the link and its validity period. The secret travels in the link as the query parameter `token`.
-- Sessions have no absolute maximum lifetime: a session used at least once every 7 days stays valid.
+- A session used at least once every 7 days stays valid until its absolute lifetime of 30 days from sign-in ends (docs/architecture/06-security.md); the user then signs in again.
 - Invitation records are kept indefinitely; used recovery tokens are removed when consumed; expired records are retained until a platform-wide retention job covers them.
 - Recovery links expire at the configured moment (1 hour): refused once the expiry moment has passed; two simultaneous completions of one recovery link follow the provider's behaviour and the link is unusable afterwards.
 - Outbound mail delivery uses a connection timeout and automatic retries with back-off; mail credentials never appear in logs or error messages.
 - User management beyond invitations (changing roles, suspending, deleting users) is out of scope; suspension is referenced only as an existing account state.
 - Email verification is not required: an accepted invitation proves control of the email address.
 - Infrastructure needed at this stage is the database and email capture; object storage and the code sandbox are not part of this feature's local environment.
-- The API is reached only through a trusted proxy (the web application's server or an ingress) that supplies the client address; without a forwarded client address, all clients share one request budget per endpoint.
+- The API is reached only through a trusted proxy (the web application's server or an ingress) that supplies the client address; the gateway limits request rates per client address.
 - Outbound email is queued together with the operation that produces it and delivered afterwards with automatic retries; no email is sent for an operation that did not complete.
 - The implementation plan reads the constitution's testing rules and Martin Fowler's "Testing Strategies in a Microservice Architecture" before test design.

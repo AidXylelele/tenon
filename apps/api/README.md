@@ -40,7 +40,7 @@ pnpm --filter api dev
 
 Sessions, password recovery and invitations are application routes under `/api/v1/auth` and
 `/api/v1/invitations` (documented at `/api/v1/docs`), built on `@nestjs/authentication`,
-`@nestjs/authorization`, `@nestjs/throttler` and `@nestjs/mail` (SMTP; `SMTP_STARTTLS=opportunistic` for Mailpit). The session is the HttpOnly cookie `sid`; browser
+`@nestjs/authorization` and `@nestjs/mail` (SMTP; `SMTP_STARTTLS=opportunistic` for Mailpit). The session is the HttpOnly cookie `sid`; browser
 requests from another origin must be listed in `TRUSTED_ORIGINS`. Accounts are created only through
 invitations; the migrations seed `admin@example.com`, who sets the first password through recovery.
 

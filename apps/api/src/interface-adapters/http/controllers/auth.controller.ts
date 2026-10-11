@@ -15,7 +15,6 @@ import {
   HttpCode,
   Patch,
   Post,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiAcceptedResponse,
@@ -28,7 +27,6 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { Transactional } from '@nestjs-cls/transactional';
 import { AuthenticateUser } from '../../../application/use-cases/authenticate-user.js';
 import { ChangePassword } from '../../../application/use-cases/change-password.js';
@@ -53,7 +51,6 @@ export class AuthController {
 
   @Post('session')
   @Public()
-  @UseGuards(ThrottlerGuard)
   @HttpCode(200)
   @ApiOkResponse({ type: SessionResponse })
   @ApiUnauthorizedResponse()
@@ -84,7 +81,6 @@ export class AuthController {
 
   @Post('password-recovery')
   @Public()
-  @UseGuards(ThrottlerGuard)
   @HttpCode(202)
   @ApiAcceptedResponse()
   @ApiTooManyRequestsResponse()

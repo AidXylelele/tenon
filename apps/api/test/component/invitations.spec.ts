@@ -166,6 +166,22 @@ describe('invitations over HTTP', () => {
     await revoke('00000000-0000-0000-0000-000000000000').expect(404);
   });
 
+  it('simultaneous_acceptances_of_one_link_create_one_account_and_refuse_the_rest', async () => {
+    await invite('new@example.com').expect(201);
+    const token = await invitationTokenFor(t, 'new@example.com');
+    const responses = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        accept(token, { name: `Racer ${i}` }),
+      ),
+    );
+    const statuses = responses.map((response) => response.status);
+    expect(statuses.filter((status) => status === 200)).toHaveLength(1);
+    for (const status of statuses.filter((status) => status !== 200)) {
+      expect([409, 410]).toContain(status);
+    }
+    await signIn(t.server, 'new@example.com');
+  });
+
   it('revoking_an_accepted_invitation_is_refused_and_the_account_keeps_working', async () => {
     const created = await invite('new@example.com').expect(201);
     const token = await invitationTokenFor(t, 'new@example.com');

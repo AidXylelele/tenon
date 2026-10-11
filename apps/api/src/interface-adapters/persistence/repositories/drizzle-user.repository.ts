@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { and, eq, type SQL } from 'drizzle-orm';
-import { UserNotFoundError } from '../../../domain/errors.js';
+import {
+  AccountExistsError,
+  UserNotFoundError,
+} from '../../../domain/errors.js';
 import type { User } from '../../../domain/user.js';
 import type { UserRepository } from '../../../application/interfaces.js';
 import type { DrizzleTx } from '../../interfaces.js';
@@ -13,7 +16,13 @@ export class DrizzleUserRepository implements UserRepository {
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   async add(user: User): Promise<void> {
-    await this.txHost.tx.insert(users).values(UserMapper.toRow(user));
+    const inserted = await this.txHost.tx
+      .insert(users)
+      .values(UserMapper.toRow(user))
+      .onConflictDoNothing()
+      .returning({ id: users.id });
+
+    if (inserted.length === 0) throw new AccountExistsError();
   }
 
   async update(user: User): Promise<void> {

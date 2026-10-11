@@ -64,6 +64,8 @@ metadata }` and `passwordReset: { url: WEB_BASE_URL/reset-password, ttl: '1h' }`
 
 ## R5. Rate limiting and client address
 
+- Superseded on 2026-10-12: request rates are limited at the API gateway (Envoy Gateway, delivered with the platform's Helm chart), and `@nestjs/throttler` was removed from the API. The client address rule (`req.ip` with `trust proxy` from `TRUSTED_PROXIES`) still serves logs and session metadata. The original decision follows.
+
 - Decision: `@nestjs/throttler` 6.7.1: `ThrottlerModule.forRoot({ throttlers: [{ ttl: 600000, limit: 20 }] })`
   and `@UseGuards(ThrottlerGuard)` on `POST /auth/session` and `POST /auth/password-recovery`; the
   client address is Express `req.ip` with `trust proxy` set from `TRUSTED_PROXIES`; the 21st request

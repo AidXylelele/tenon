@@ -1,5 +1,9 @@
 import { UserRepository } from '../../../src/application/interfaces.js';
-import { UserNotFoundError } from '../../../src/domain/errors.js';
+import {
+  AccountExistsError,
+  UserNotFoundError,
+} from '../../../src/domain/errors.js';
+import { User } from '../../../src/domain/user.js';
 import { createUser, suspendUser } from '../../support/auth-helpers.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
 import { truncateAll } from '../../support/db.js';
@@ -32,6 +36,20 @@ describe('DrizzleUserRepository', () => {
     expect(found?.name).toBe('Ed Editor');
     expect(found?.role).toBe('editor');
     expect(await repository.findByEmail('nobody@example.com')).toBeNull();
+  });
+
+  it('a_second_account_for_a_taken_email_is_refused_as_an_existing_account', async () => {
+    await createUser(t, { email: 'taken@example.com' });
+    const duplicate = User.create({
+      email: 'taken@example.com',
+      name: 'Second Comer',
+      role: 'viewer',
+      passwordHash: 'not-a-real-hash',
+    });
+    await expect(repository.add(duplicate)).rejects.toThrow(AccountExistsError);
+    expect((await repository.findByEmail('taken@example.com'))?.name).toBe(
+      'taken',
+    );
   });
 
   it('active_lookups_leave_out_suspended_users_while_plain_lookups_still_find_them', async () => {

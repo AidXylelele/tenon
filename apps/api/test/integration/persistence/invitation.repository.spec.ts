@@ -91,7 +91,7 @@ describe('DrizzleInvitationRepository', () => {
 
   it('only_one_pending_invitation_per_email_can_exist_and_a_revoked_one_frees_the_email', async () => {
     const { invitation } = await stored();
-    await expect(stored()).rejects.toThrow();
+    await expect(stored()).rejects.toThrow(InvitationConflictError);
     const pending = await repository.findPendingByEmail('new@example.com');
     expect(pending?.id).toBe(invitation.id);
     invitation.revoke();
