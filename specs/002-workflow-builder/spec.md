@@ -250,7 +250,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - **FR-020**: Completed nodes MUST NOT be executed again when a run resumes after an interruption of the execution process. A run MUST continue from the first unfinished node, which executes again from its start, so its external requests may be repeated. Sub-workflow calls MUST be identified by run, node and batch, so that a repeated node never starts the same call twice.
 - **FR-021**: The output of every step MUST be readable page by page in production order for as long as the run is retained; test runs MUST use pinned sample output of a node instead of executing it.
 - **FR-022**: A run MUST respect these limits:
-  - a workflow run timeout that covers the whole run including waits: default 1 hour, at most 30 days;
+  - a workflow run timeout that counts from the start request and covers the whole run, including queued time and waits: default 1 hour, at most 30 days;
   - at most 10,000 items and 16 MB per step output;
   - at most 256 MB of step outputs per run.
 
@@ -272,8 +272,8 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   - start exactly one run per delivery identifier when the caller supplies one: a repeated delivery with the same content is answered with the existing run, and one with different content is refused as a conflict.
 - **FR-028**: The Execute Workflow Trigger MUST start a run when another workflow calls this one, with the caller's items as input.
 - **FR-029**: The Error Trigger MUST start a run of the error workflow when a run of a workflow that names it as error workflow fails, with the failed run identifier, workflow, node and error message; test runs and error workflow runs MUST NOT start an error workflow.
-- **FR-030**: The Wait node's resume address MUST be unguessable, valid from the start of the run until it ends, and accept one call: the first accepted call resumes the wait (or is kept until the run reaches the Wait node), and later calls are refused; a call carries at most 1 MB.
-- **FR-031**: An Execute Workflow node MUST make at most 1,000 sub-workflow calls per execution and sub-workflow calls MUST nest at most 5 levels deep; exceeding either fails the node with the limit named.
+- **FR-030**: The Wait node's resume address MUST be unguessable, valid from the start of the run until it ends, and accept one call: the first accepted call resumes the wait (or is kept until the run reaches the Wait node), and later calls are refused; a call carries at most 1 MB. Because the address is per run, a graph MUST contain at most one Wait node in resume mode, and a second one is a validation error.
+- **FR-031**: An Execute Workflow node MUST make at most 1,000 sub-workflow calls per execution, a run MUST make at most 4,000 sub-workflow calls in total, and sub-workflow calls MUST nest at most 5 levels deep; exceeding any of these fails the node with the limit named.
 
 **Code node**
 
@@ -286,7 +286,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   Each language MUST also offer a fixed set of preinstalled libraries for dates and data handling, at pinned versions; scripts cannot install packages.
 
 - **FR-033**: User code MUST run isolated from the platform processes, other runs, the network, the host file system, credentials and the platform's environment and secrets.
-  - Each invocation is limited to at most 10 seconds of CPU time, 30 seconds of wall time, 256 MB of memory, 16 processes and 16 MB of output.
+  - Each invocation is limited to at most 10 seconds of CPU time, 30 seconds of wall time, 256 MB of memory, 32 processes and threads, and 16 MB of output.
   - A breach of a limit or of the isolation MUST fail the node as a user error that is never retried.
 - **FR-034**: The Code node MUST attach the code's console output to the step as diagnostics, at most 64 KB.
 

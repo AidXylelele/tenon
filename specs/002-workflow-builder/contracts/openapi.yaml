@@ -1,0 +1,1278 @@
+openapi: 3.1.0
+info:
+  title: Workflow Platform API - Automation
+  version: 1.0.0
+  description: >-
+    Workflows, versions, activation, runs, credentials and the node catalogue. Sessions are the
+    HttpOnly cookie of the authentication feature; webhook and resume ingress are public and
+    authenticated by their secrets. Error bodies are Nest's standard shape; a refused publication
+    adds `problems`. Lists are cursor-paged.
+servers:
+  - url: /api/v1
+tags:
+  - name: catalogue
+  - name: workflows
+  - name: runs
+  - name: credentials
+  - name: ingress
+  - name: settings
+security:
+  - sessionCookie: []
+paths:
+  /node-types:
+    get:
+      tags: [catalogue]
+      summary: Node and credential type catalogue (any signed-in user); changes only with a release
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+      responses:
+        '200':
+          description: Catalogue
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodeTypes, credentialTypes]
+                properties:
+                  nodeTypes:
+                    type: array
+                    items: { $ref: '#/components/schemas/NodeType' }
+                  credentialTypes:
+                    type: array
+                    items: { $ref: '#/components/schemas/CredentialType' }
+        '304': { description: Not modified }
+        '401': { $ref: '#/components/responses/Error' }
+
+  /workflows:
+    get:
+      tags: [workflows]
+      summary: List workflows (any signed-in user)
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: owner, in: query, schema: { type: string, format: uuid } }
+        - {
+            name: archived,
+            in: query,
+            schema: { type: boolean, default: false },
+          }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Page of workflows, most recently changed first
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Page' }
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/WorkflowSummary' }
+        '401': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [workflows]
+      summary: Create a workflow; the caller becomes its owner (editor, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '201':
+          description: Created with an empty draft
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workflow' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    get:
+      tags: [workflows]
+      summary: Everything the editor needs to open a workflow (any signed-in user)
+      responses:
+        '200':
+          description: Workflow with draft, validation report, node samples and activation
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workflow' }
+        '401': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [workflows]
+      summary: Rename (owner, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '200':
+          description: Renamed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowSummary' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/draft:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    put:
+      tags: [workflows]
+      summary: Replace the whole draft at the given revision (owner, admin); invalid drafts are saved with their report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision, graph, settings]
+              additionalProperties: false
+              properties:
+                revision: { type: integer, minimum: 1 }
+                graph: { $ref: '#/components/schemas/Graph' }
+                settings: { $ref: '#/components/schemas/WorkflowSettings' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [revision, validation]
+                properties:
+                  revision: { type: integer }
+                  validation: { $ref: '#/components/schemas/ValidationReport' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409':
+          description: The draft changed since this revision, or the workflow is archived
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/archive:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    post:
+      tags: [workflows]
+      summary: Archive; deactivates the workflow (owner, admin)
+      responses:
+        '204': { description: Archived }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/restore:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    post:
+      tags: [workflows]
+      summary: Restore an archived workflow (owner, admin)
+      responses:
+        '204': { description: Restored }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/duplicate:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    post:
+      tags: [workflows]
+      summary: Copy the draft into a new workflow owned by the caller (editor, admin)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+      responses:
+        '201':
+          description: Copy; credential references the caller does not own are cleared and reported
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workflow' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/transfer:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    post:
+      tags: [workflows]
+      summary: Transfer ownership to another editor or administrator (owner, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ownerId]
+              additionalProperties: false
+              properties:
+                ownerId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Transferred; an activation that used the previous owner's credentials is ended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workflow' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/samples/{nodeId}:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+      - { $ref: '#/components/parameters/NodeId' }
+    put:
+      tags: [workflows]
+      summary: Pin sample output for a node (owner, admin); used instead of executing it in test runs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              additionalProperties: false
+              properties:
+                items: { $ref: '#/components/schemas/Items100' }
+      responses:
+        '200':
+          description: Pinned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NodeSample' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [workflows]
+      summary: Remove the pinned sample (owner, admin)
+      responses:
+        '204': { description: Unpinned }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/versions:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    get:
+      tags: [workflows]
+      summary: Published versions, newest first (any signed-in user)
+      responses:
+        '200':
+          description: Versions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/VersionSummary' }
+        '404': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [workflows]
+      summary: Publish the draft at the given revision as the next immutable version (owner, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [revision]
+              additionalProperties: false
+              properties:
+                revision: { type: integer, minimum: 1 }
+      responses:
+        '201':
+          description: Published
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VersionSummary' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422':
+          description: The draft is not valid; `problems` lists every error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemsError' }
+
+  /workflows/{id}/versions/{number}:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+      - {
+          name: number,
+          in: path,
+          required: true,
+          schema: { type: integer, minimum: 1 },
+        }
+    get:
+      tags: [workflows]
+      summary: A published version (any signed-in user)
+      responses:
+        '200':
+          description: Version with its graph
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Version' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/activation:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    put:
+      tags: [workflows]
+      summary: Activate a published version, replacing any active one (owner, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              additionalProperties: false
+              properties:
+                version: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Active
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Activation' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [workflows]
+      summary: Deactivate; running runs continue (owner, admin)
+      responses:
+        '204': { description: Deactivated }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/webhooks:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    get:
+      tags: [workflows]
+      summary: Webhook addresses and secrets of the draft's Webhook nodes (owner, admin)
+      responses:
+        '200':
+          description: Endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/WebhookEndpoint' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/webhooks/{nodeId}/secret:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+      - { $ref: '#/components/parameters/NodeId' }
+    post:
+      tags: [workflows]
+      summary: Rotate the endpoint secret (owner, admin)
+      responses:
+        '200':
+          description: New secret
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WebhookEndpoint' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /workflows/{id}/runs:
+    parameters:
+      - { $ref: '#/components/parameters/WorkflowId' }
+    get:
+      tags: [runs]
+      summary: Runs of a workflow, newest first (any signed-in user)
+      parameters:
+        - {
+            name: status,
+            in: query,
+            schema: { $ref: '#/components/schemas/RunStatus' },
+          }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/Limit' }
+      responses:
+        '200':
+          description: Page of runs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - { $ref: '#/components/schemas/Page' }
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/RunSummary' }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /runs:
+    post:
+      tags: [runs]
+      summary: Start a test run of the draft or a run of a published version with Manual Trigger items (owner, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [workflowId, target]
+              additionalProperties: false
+              properties:
+                workflowId: { type: string, format: uuid }
+                target:
+                  oneOf:
+                    - type: object
+                      required: [draft]
+                      additionalProperties: false
+                      properties:
+                        draft:
+                          type: object
+                          required: [revision]
+                          properties:
+                            revision: { type: integer, minimum: 1 }
+                    - type: object
+                      required: [version]
+                      additionalProperties: false
+                      properties:
+                        version: { type: integer, minimum: 1 }
+                triggerNodeId:
+                  {
+                    type: string,
+                    description: Required when the graph has several Manual Triggers,
+                  }
+                items: { $ref: '#/components/schemas/Items1000' }
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runId]
+                properties:
+                  runId: { type: string, format: uuid }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        '413': { $ref: '#/components/responses/Error' }
+        '422':
+          description: The draft is not valid
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemsError' }
+
+  /runs/{runId}:
+    parameters:
+      - { $ref: '#/components/parameters/RunId' }
+    get:
+      tags: [runs]
+      summary: Run status with every step; poll with If-None-Match every 2 s until terminal (any signed-in user)
+      parameters:
+        - { $ref: '#/components/parameters/IfNoneMatch' }
+      responses:
+        '200':
+          description: Run
+          headers:
+            ETag: { schema: { type: string } }
+            Cache-Control: { schema: { type: string, example: no-cache } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Run' }
+        '304': { description: Not modified }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /runs/{runId}/cancel:
+    parameters:
+      - { $ref: '#/components/parameters/RunId' }
+    post:
+      tags: [runs]
+      summary: Cancel a queued, running or waiting run (owner, admin)
+      responses:
+        '202': { description: Cancellation recorded }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409':
+          description: The run already finished
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /runs/{runId}/steps/{nodeId}/output:
+    parameters:
+      - { $ref: '#/components/parameters/RunId' }
+      - { $ref: '#/components/parameters/NodeId' }
+    get:
+      tags: [runs]
+      summary: A page of a step's output items in production order (any signed-in user)
+      parameters:
+        - { name: port, in: query, schema: { type: string, default: main } }
+        - {
+            name: offset,
+            in: query,
+            schema: { type: integer, minimum: 0, default: 0 },
+          }
+        - {
+            name: limit,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 100, default: 50 },
+          }
+      responses:
+        '200':
+          description: Items
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, offset]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Item' }
+                  total: { type: integer }
+                  offset: { type: integer }
+        '404': { $ref: '#/components/responses/Error' }
+
+  /credentials:
+    get:
+      tags: [credentials]
+      summary: Own credentials; administrators may filter by owner (editor, admin)
+      parameters:
+        - { name: owner, in: query, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Credentials without secret values
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Credential' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      tags: [credentials]
+      summary: Create a credential owned by the caller (editor, admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, secret]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                type: { $ref: '#/components/schemas/CredentialTypeName' }
+                secret: { $ref: '#/components/schemas/CredentialSecret' }
+      responses:
+        '201':
+          description: Created; the secret is never returned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Credential' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /credentials/{credentialId}:
+    parameters:
+      - {
+          name: credentialId,
+          in: path,
+          required: true,
+          schema: { type: string, format: uuid },
+        }
+    get:
+      tags: [credentials]
+      summary: A credential with the workflows that reference it (owner, admin)
+      responses:
+        '200':
+          description: Credential
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Credential' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [credentials]
+      summary: Rename or replace the secret (owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 120 }
+                secret: { $ref: '#/components/schemas/CredentialSecret' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Credential' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [credentials]
+      summary: Delete (owner, admin); refused while an active version references it
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+
+  /webhooks/{endpointId}:
+    parameters:
+      - {
+          name: endpointId,
+          in: path,
+          required: true,
+          schema: { type: string, minLength: 43, maxLength: 43 },
+        }
+      - { name: x-webhook-token, in: header, schema: { type: string } }
+      - {
+          name: x-webhook-signature,
+          in: header,
+          description: 'sha256=<hex HMAC of the raw body>',
+          schema: { type: string },
+        }
+      - {
+          name: x-delivery-id,
+          in: header,
+          schema: { type: string, maxLength: 200 },
+        }
+    post:
+      tags: [ingress]
+      summary: Start a run of the active version (public; GET, PUT, PATCH and DELETE behave the same when configured)
+      security: []
+      requestBody:
+        content:
+          '*/*':
+            schema: { type: string, maxLength: 1048576 }
+      responses:
+        '202':
+          description: Run recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runId]
+                properties:
+                  runId: { type: string, format: uuid }
+        '401': { description: Missing or invalid secret }
+        '404':
+          {
+            description: No active endpoint (same answer for unknown and inactive),
+          }
+        '405': { description: Method not configured on the node }
+        '409': { description: Known delivery id with a different body }
+        '413': { description: Body above 1 MB }
+
+  /resume/{token}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [ingress]
+      summary: Resume a run waiting in a Wait node (public; the token is the signed run address)
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '202':
+          {
+            description: Accepted; the run continues when it reaches or is at its Wait node,
+          }
+        '404': { description: Unknown or invalid address }
+        '409': { description: Already resumed, or the run finished }
+        '413': { description: Body above 1 MB }
+
+  /settings/retention:
+    get:
+      tags: [settings]
+      summary: Retention policy (administrators)
+      responses:
+        '200':
+          description: Policy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetentionSettings' }
+        '403': { $ref: '#/components/responses/Error' }
+    put:
+      tags: [settings]
+      summary: Change the retention policy (administrators)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RetentionSettings' }
+      responses:
+        '200':
+          description: Changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetentionSettings' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+
+components:
+  securitySchemes:
+    sessionCookie: { type: apiKey, in: cookie, name: sid }
+  parameters:
+    WorkflowId:
+      {
+        name: id,
+        in: path,
+        required: true,
+        schema: { type: string, format: uuid },
+      }
+    RunId:
+      {
+        name: runId,
+        in: path,
+        required: true,
+        schema: { type: string, format: uuid },
+      }
+    NodeId:
+      {
+        name: nodeId,
+        in: path,
+        required: true,
+        schema: { type: string, format: uuid },
+      }
+    Cursor: { name: cursor, in: query, schema: { type: string } }
+    Limit:
+      {
+        name: limit,
+        in: query,
+        schema: { type: integer, minimum: 1, maximum: 100, default: 25 },
+      }
+    IfNoneMatch: { name: If-None-Match, in: header, schema: { type: string } }
+  responses:
+    Error:
+      description: Standard Nest error body
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        message:
+          oneOf:
+            - { type: string }
+            - { type: array, items: { type: string } }
+        error: { type: string }
+    ProblemsError:
+      allOf:
+        - { $ref: '#/components/schemas/Error' }
+        - type: object
+          required: [problems]
+          properties:
+            problems:
+              type: array
+              items: { $ref: '#/components/schemas/Problem' }
+    Page:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array }
+        nextCursor: { type: [string, 'null'] }
+    Item:
+      type: object
+      description: One JSON item
+      additionalProperties: true
+    Items100:
+      type: array
+      maxItems: 100
+      items: { $ref: '#/components/schemas/Item' }
+    Items1000:
+      type: array
+      maxItems: 1000
+      items: { $ref: '#/components/schemas/Item' }
+    UserRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    ParameterValue:
+      description: A fixed value, a field reference or a formula; collections nest parameter values per sub-parameter
+      oneOf:
+        - type: object
+          required: [fixed]
+          additionalProperties: false
+          properties:
+            fixed: {}
+        - type: object
+          required: [ref]
+          additionalProperties: false
+          properties:
+            ref:
+              type: object
+              required: [node, path]
+              additionalProperties: false
+              properties:
+                node:
+                  {
+                    type: string,
+                    description: 'Upstream node id, or "$item" for the current item',
+                  }
+                path:
+                  {
+                    type: string,
+                    maxLength: 500,
+                    description: Dot notation; empty for the whole item,
+                  }
+        - type: object
+          required: [formula]
+          additionalProperties: false
+          properties:
+            formula:
+              {
+                type: string,
+                maxLength: 65536,
+                example: '{{ $json.price * 1.2 }}',
+              }
+    NodeSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        alwaysOutputData: { type: boolean, default: false }
+        executeOnce: { type: boolean, default: false }
+        retry:
+          type: object
+          additionalProperties: false
+          properties:
+            attempts: { type: integer, minimum: 1, maximum: 5, default: 1 }
+            waitMs: { type: integer, minimum: 0, maximum: 300000, default: 0 }
+        onError:
+          { type: string, enum: [stop, continue, errorOutput], default: stop }
+    Node:
+      type: object
+      required: [id, name, type, typeVersion, position]
+      additionalProperties: false
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, minLength: 1, maxLength: 120 }
+        type: { type: string, example: httpRequest }
+        typeVersion: { type: integer, minimum: 1 }
+        parameters:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/ParameterValue' }
+        credentialId: { type: [string, 'null'], format: uuid }
+        settings: { $ref: '#/components/schemas/NodeSettings' }
+        position:
+          type: array
+          prefixItems: [{ type: number }, { type: number }]
+          minItems: 2
+          maxItems: 2
+        note: { type: string, maxLength: 2000 }
+        disabled: { type: boolean, default: false }
+    Connection:
+      type: object
+      required: [from, to]
+      additionalProperties: false
+      properties:
+        from:
+          type: object
+          required: [node, output]
+          properties:
+            node: { type: string, format: uuid }
+            output: { type: string, example: main }
+        to:
+          type: object
+          required: [node, input]
+          properties:
+            node: { type: string, format: uuid }
+            input: { type: string, example: main }
+    Graph:
+      type: object
+      required: [nodes, connections]
+      additionalProperties: false
+      properties:
+        nodes:
+          type: array
+          maxItems: 200
+          items: { $ref: '#/components/schemas/Node' }
+        connections:
+          type: array
+          maxItems: 1000
+          items: { $ref: '#/components/schemas/Connection' }
+    WorkflowSettings:
+      type: object
+      additionalProperties: false
+      properties:
+        timezone: { type: string, example: Europe/Kyiv, default: UTC }
+        runTimeoutMs:
+          {
+            type: integer,
+            minimum: 1000,
+            maximum: 2592000000,
+            default: 3600000,
+          }
+        errorWorkflowId: { type: [string, 'null'], format: uuid }
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        nodeId: { type: [string, 'null'] }
+        parameter:
+          {
+            type: [string, 'null'],
+            description: Parameter path,
+            e.g. "body.fields.0.value",
+          }
+        code: { type: string, example: cycle }
+        message: { type: string }
+    ValidationReport:
+      type: object
+      required: [errors, warnings]
+      properties:
+        errors: { type: array, items: { $ref: '#/components/schemas/Problem' } }
+        warnings:
+          { type: array, items: { $ref: '#/components/schemas/Problem' } }
+    FieldShape:
+      type: object
+      required: [path, type]
+      properties:
+        path: { type: string }
+        type:
+          {
+            type: string,
+            enum: [string, number, boolean, object, array, 'null'],
+          }
+    NodeSample:
+      type: object
+      required: [nodeId, pinned, fields]
+      properties:
+        nodeId: { type: string }
+        pinned: { type: boolean }
+        fields:
+          { type: array, items: { $ref: '#/components/schemas/FieldShape' } }
+    Activation:
+      type: object
+      required: [version, activatedAt, activatedBy]
+      properties:
+        version: { type: integer }
+        activatedAt: { type: string, format: date-time }
+        activatedBy: { $ref: '#/components/schemas/UserRef' }
+    WorkflowSummary:
+      type: object
+      required:
+        [id, name, owner, archived, latestVersion, activeVersion, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        owner: { $ref: '#/components/schemas/UserRef' }
+        archived: { type: boolean }
+        latestVersion: { type: integer, description: 0 when never published }
+        activeVersion: { type: [integer, 'null'] }
+        updatedAt: { type: string, format: date-time }
+    Workflow:
+      allOf:
+        - { $ref: '#/components/schemas/WorkflowSummary' }
+        - type: object
+          required: [draft, activation, samples, canManage]
+          properties:
+            canManage:
+              {
+                type: boolean,
+                description: Whether the caller may change,
+                publish and run it,
+              }
+            draft:
+              type: object
+              required:
+                [revision, graph, settings, validation, updatedAt, updatedBy]
+              properties:
+                revision: { type: integer }
+                graph: { $ref: '#/components/schemas/Graph' }
+                settings: { $ref: '#/components/schemas/WorkflowSettings' }
+                validation: { $ref: '#/components/schemas/ValidationReport' }
+                updatedAt: { type: string, format: date-time }
+                updatedBy: { $ref: '#/components/schemas/UserRef' }
+            activation:
+              oneOf:
+                - { $ref: '#/components/schemas/Activation' }
+                - { type: 'null' }
+            samples:
+              type: array
+              items: { $ref: '#/components/schemas/NodeSample' }
+    VersionSummary:
+      type: object
+      required: [number, publishedAt, publishedBy]
+      properties:
+        number: { type: integer }
+        publishedAt: { type: string, format: date-time }
+        publishedBy: { $ref: '#/components/schemas/UserRef' }
+    Version:
+      allOf:
+        - { $ref: '#/components/schemas/VersionSummary' }
+        - type: object
+          required: [graph, settings]
+          properties:
+            graph: { $ref: '#/components/schemas/Graph' }
+            settings: { $ref: '#/components/schemas/WorkflowSettings' }
+    WebhookEndpoint:
+      type: object
+      required: [nodeId, url, methods, secret]
+      properties:
+        nodeId: { type: string }
+        url: { type: string, format: uri }
+        methods:
+          {
+            type: array,
+            items: { type: string, enum: [GET, POST, PUT, PATCH, DELETE] },
+          }
+        secret:
+          {
+            type: string,
+            description: Send as x-webhook-token or use for the x-webhook-signature HMAC,
+          }
+    RunStatus:
+      type: string
+      enum: [queued, running, waiting, succeeded, failed, cancelled]
+    RunError:
+      type: object
+      required: [kind, message]
+      properties:
+        nodeId: { type: [string, 'null'] }
+        kind:
+          {
+            type: string,
+            enum: [user, limit, isolation, timeout, platform, cancelled],
+          }
+        message: { type: string }
+    RunSummary:
+      type: object
+      required: [id, status, mode, trigger, version, queuedAt]
+      properties:
+        id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        mode: { type: string, enum: [test, production] }
+        trigger:
+          {
+            type: string,
+            enum: [manual, schedule, webhook, sub-workflow, error],
+          }
+        version: { type: [integer, 'null'] }
+        queuedAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        error:
+          oneOf:
+            - { $ref: '#/components/schemas/RunError' }
+            - { type: 'null' }
+    Step:
+      type: object
+      required: [nodeId, status, attempts, startedAt, outputs]
+      properties:
+        nodeId: { type: string }
+        status: { type: string, enum: [running, succeeded, failed] }
+        attempts: { type: integer }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        outputs:
+          type: array
+          items:
+            type: object
+            required: [port, items, bytes]
+            properties:
+              port: { type: string }
+              items: { type: integer }
+              bytes: { type: integer }
+        error:
+          oneOf:
+            - type: object
+              required: [kind, message]
+              properties:
+                kind:
+                  {
+                    type: string,
+                    enum: [user, limit, isolation, timeout, platform],
+                  }
+                message: { type: string }
+                line: { type: integer }
+                itemIndex: { type: integer }
+            - { type: 'null' }
+        diagnostics:
+          {
+            type: [string, 'null'],
+            maxLength: 65536,
+            description: Code node console output,
+          }
+    Run:
+      allOf:
+        - { $ref: '#/components/schemas/RunSummary' }
+        - type: object
+          required: [workflowId, steps]
+          properties:
+            workflowId: { type: string, format: uuid }
+            parentRunId: { type: [string, 'null'], format: uuid }
+            steps: { type: array, items: { $ref: '#/components/schemas/Step' } }
+    CredentialTypeName:
+      type: string
+      enum: [httpHeader, httpBasic, httpBearer, httpQuery]
+    CredentialSecret:
+      description: Fields of the credential type; write-only
+      oneOf:
+        - type: object
+          title: httpHeader or httpQuery
+          description: Header name and value, or query parameter name and value
+          required: [name, value]
+          additionalProperties: false
+          properties:
+            name: { type: string, maxLength: 200 }
+            value: { type: string, maxLength: 8192 }
+        - type: object
+          title: httpBasic
+          required: [username, password]
+          additionalProperties: false
+          properties:
+            username: { type: string, maxLength: 200 }
+            password: { type: string, maxLength: 8192 }
+        - type: object
+          title: httpBearer
+          required: [token]
+          additionalProperties: false
+          properties:
+            token: { type: string, maxLength: 8192 }
+    Credential:
+      type: object
+      required: [id, name, type, owner, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { $ref: '#/components/schemas/CredentialTypeName' }
+        owner: { $ref: '#/components/schemas/UserRef' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        usedBy:
+          type: array
+          description: Present on the single-credential read
+          items:
+            type: object
+            required: [workflowId, name, active]
+            properties:
+              workflowId: { type: string, format: uuid }
+              name: { type: string }
+              active: { type: boolean }
+    CredentialType:
+      type: object
+      required: [name, displayName, fields]
+      properties:
+        name: { $ref: '#/components/schemas/CredentialTypeName' }
+        displayName: { type: string }
+        fields:
+          {
+            type: object,
+            description: JSON Schema 2020-12 of the secret fields,
+          }
+    NodeType:
+      type: object
+      required:
+        [
+          id,
+          version,
+          kind,
+          category,
+          displayName,
+          description,
+          parameters,
+          inputs,
+          outputs,
+          credentialTypes,
+        ]
+      properties:
+        id: { type: string, example: httpRequest }
+        version: { type: integer }
+        kind: { type: string, enum: [trigger, action, transform] }
+        trigger:
+          {
+            type: [string, 'null'],
+            enum: [manual, schedule, webhook, sub-workflow, error, null],
+          }
+        category: { type: string }
+        displayName: { type: string }
+        description: { type: string }
+        parameters:
+          type: object
+          description: >-
+            JSON Schema 2020-12 of the parameters with form keywords: title, description, default,
+            x-options, x-widget, x-acceptsReference, x-acceptsFormula, x-showWhen
+        inputs: { type: array, items: { type: string } }
+        outputs:
+          description: Fixed port names, or a rule naming the parameter that defines them (Switch)
+          oneOf:
+            - { type: array, items: { type: string } }
+            - type: object
+              required: [fromParameter]
+              properties:
+                fromParameter: { type: string }
+        credentialTypes:
+          {
+            type: array,
+            items: { $ref: '#/components/schemas/CredentialTypeName' },
+          }
+        effects: { type: string, enum: [none, external] }
+    RetentionSettings:
+      type: object
+      required: [retentionDays, maxRunsPerWorkflow]
+      additionalProperties: false
+      properties:
+        retentionDays: { type: integer, minimum: 1, maximum: 3650 }
+        maxRunsPerWorkflow: { type: integer, minimum: 1, maximum: 1000000 }
