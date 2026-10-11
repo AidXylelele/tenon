@@ -91,6 +91,35 @@ Expected:
 - `grep -r s3cr3t-token` over the API and worker logs finds nothing.
 - URLs `http://127.0.0.1:53000/…`, `http://169.254.169.254/latest/meta-data`, `http://[::ffff:127.0.0.1]/` and `http://httpbin:8080/redirect-to?url=http://127.0.0.1/` each fail the node with `kind: isolation` before any connection.
 
+## Scenario 3b: declarative pagination (US3, FR-037)
+
+The `pagination` parameter is described in [contracts/http-request-pagination.schema.yaml](contracts/http-request-pagination.schema.yaml).
+
+1. **Page number without formulas.** An HTTP Request node `GET http://httpbin:8080/anything` with:
+   - `pagination.mode = parameters`;
+   - one parameter `{ in: query, name: page, value: { pageNumber: { start: 1 } } }`;
+   - `maxPages = 3`;
+   - `output = pages`.
+
+   Expected: three output items, whose echoed `args.page` values are `1`, `2` and `3`. Setting `onMaxPages = fail` fails the node with the limit named.
+
+2. **Link header.** URL
+   `http://httpbin:8080/response-headers?Link=%3Chttp%3A%2F%2Fhttpbin%3A8080%2Fresponse-headers%3Fp%3D2%3E%3B%20rel%3D%22next%22`
+   with `pagination.mode = nextLink` and `nextLink = { linkHeader: next }`.
+
+   Expected: two pages; the second page has no `Link` header, so `missingNext` completes pagination.
+
+3. **SSRF on a next link.** A next link pointing to `http://127.0.0.1/` or `http://169.254.169.254/` fails the node with `kind: isolation`.
+
+Expected in the integration suite (`test/integration/outbound/http-request-pagination.spec.ts`), against a local fixture API:
+
+- Each preset (cursor in body or header, page number, offset by records, next link in body or `Link`) collects every record from `records` without a formula.
+- Repeated or cyclic cursors fail with "pagination did not advance".
+- A 429 with `Retry-After: 2` is retried for that page only.
+- A next link to another origin is requested without the credential.
+- `+json` bodies are parsed.
+- Exceeding 10,000 records fails with the step limit.
+
 ## Scenario 4: publish, schedule and webhook (US5)
 
 ```bash

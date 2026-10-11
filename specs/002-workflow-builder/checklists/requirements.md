@@ -37,8 +37,8 @@
   - The skip rule skipped a Merge node when only one of its inputs was empty (FR-019).
   - SC-001 named an undefined "reference environment".
 - Iteration 3, after the clarification session of 2026-10-11, resolved both markers:
-  - The HTTP Request node is in scope, with a minimal store for generic HTTP credentials: User Story 3, FR-035 to FR-041, SC-006 and SC-007.
-  - Workflows are owned by their creator and readable by everyone: FR-001 to FR-005, FR-045, and the ownership edge cases.
+  - The HTTP Request node is in scope, with a minimal store for generic HTTP credentials: User Story 3, FR-035 to FR-042, SC-006 and SC-007.
+  - Workflows are owned by their creator and readable by everyone: FR-001 to FR-005, FR-046, and the ownership edge cases.
   - All checklist items pass.
 - Named technologies are deliberate:
   - The Code node languages (JavaScript, TypeScript) and the HTTP authentication types are user-facing product choices.

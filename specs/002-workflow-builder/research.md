@@ -172,6 +172,8 @@ collected in R21; the documents are corrected by this feature.
 
     Everything else is a parse error reported by the validation report.
 
+  - **Pagination scope**: pagination formulas of the HTTP Request node may also use `$response`, `$pageCount` and `$request` (R23). The engine evaluates them with that scope only, and validation reports these names anywhere else.
+
   - **Bounds**: a step budget and a deadline of 100 ms checked at every node, caps on allocating methods, no regular expressions built from user strings, and the result measured against 1 MB. Inputs are JSON clones, and `node:vm` and `new Function` are never used.
   - **Field references**: `{ ref: { node: <id>, path } }`, resolved without the interpreter. Formulas address nodes by name, and `WorkflowGraph.renameNode` rewrites `$('old')` using the parser positions.
   - **Known fields**: the shapes of a node's pinned output or latest test-run output (first 20 items, at most 500 paths) are stored in `node_sample` and returned with the draft.
@@ -235,7 +237,7 @@ collected in R21; the documents are corrected by this feature.
     - Hosts on the operator allow-list `HTTP_ALLOWED_HOSTS` skip the address check.
   - **Redirects**: `redirect: 'manual'`, at most 5 hops. Each hop re-checks scheme and allow-list, applies the 301, 302 and 303 method rules, and drops credentials on an origin change. Every hop goes through the same Agent, so the address check repeats.
   - **Client and Agent settings**:
-    - `retry: false` (retries belong to the node settings);
+    - `retry: false`: whole-node retries belong to the node settings, and per-page transient retries to the pagination loop (R23);
     - `maxResponseSize` of 10 MiB, plus a decoded-size counter and a `Content-Length` pre-check;
     - `AbortSignal.timeout(nodeTimeout)` combined with the step signal;
     - no proxies, and TLS verification always on.
@@ -382,7 +384,7 @@ This feature updates `docs/architecture`:
   - `execution` and `effects` in the manifest;
   - parameters as zod schemas served as JSON Schema;
   - Python and the shared contract for the Code node (R11);
-  - the HTTP Request node.
+  - the HTTP Request node, including its declarative pagination and the pagination formula scope (R23).
 - **06-security.md**: SSRF controls, credential and webhook secrets, signed resume addresses, and object-level checks.
 - **02-system.md**: Garage, the `workflows:migrate` release step, the unstable KEDA query and the pool sizing.
 
@@ -407,3 +409,48 @@ This feature updates `docs/architecture`:
 Sandbox image: go-judge v1.13.2, Node.js 24.21.0, CPython 3.14, `luxon` 3.7.2, `lodash` 4.18.1, `python-dateutil` 2.9.0.post0, `pendulum` 3.2.0. Compose test target: `mccutchen/go-httpbin` 2.25.0. Object storage: `dxflrs/garage` v2.4.1. All images are pinned by digest.
 
 Every version is re-checked with `pnpm audit` and Trivy when it is added; `minimumReleaseAge` applies.
+
+## R23. HTTP Request pagination
+
+- **Decision**: Declarative pagination in the HTTP Request node (FR-037), with n8n parity plus fixes for its known gaps. The basis is n8n 2.43's `requestWithAuthenticationPaginated` and the `HttpRequestV3` description, read at commit `45938389`.
+  - **Parameter shape**: `pagination` is a zod `strictObject` in the node schema, rendered by the web as a form with these fields:
+    - `mode`: `off`, `parameters` or `nextLink`;
+    - `parameters[]`: each with `in` (`query`, `header` or `body`), `name` (a dot path for `body`), and `value`, one of `{ pageNumber: { start, step } }`, `{ offset: { start, step | 'records' } }`, `{ cursor: { body: path } | { header: name } }` or `{ formula }`;
+    - `nextLink`: one of `{ body: path }`, `{ header: name }`, `{ linkHeader: 'next' }` or `{ formula }`;
+    - `completeWhen[]`: any of `emptyRecords`, `missingNext`, `{ falseField: path }`, `{ totalField: path }`, `{ statusCodes }` or `{ formula }`;
+    - `records`: a path;
+    - `output`: `records` or `pages`;
+    - `maxPages`: 1–1,000, default 100;
+    - `onMaxPages`: `stop` or `fail`;
+    - `intervalMs`: 0–60,000.
+
+    Defaults complete on `missingNext` for cursor and next-link modes and on `emptyRecords` otherwise, so the common cases need no formula.
+
+  - **Loop**, in `interface-adapters/node-types/http-request/pagination.ts`, for each input item:
+    1. Build request 1 from the configured request and the presets' start values. Cursors and next links are absent on request 1.
+    2. Send it through the guarded agent (R12), applying the credential only when the origin equals the original request's origin.
+    3. Parse JSON for `application/json` and every `+json` type.
+    4. Write the page's records, or the page, to the output writer as it arrives.
+    5. Evaluate completion.
+    6. Derive the next request, with `$pageCount` incremented after storing and `$request` set to the request just sent, its credential values removed.
+    7. Wait `intervalMs`.
+  - **Guards**:
+    - a set of request signatures (method, URL, query, body hash) catches repeats and cycles and fails with "pagination did not advance";
+    - a missing cursor or next link completes pagination instead of falling back to the original request;
+    - the page limit is always on;
+    - 429, 502, 503, 504 and connection errors are retried per page up to 3 times, with exponential back-off honouring `Retry-After` (capped at 60 s);
+    - other errors fail the node, discarding the partial output by abandoning the attempt's chunks (R9).
+  - **Durability**: the whole pagination for all items runs inside the node's single step; the node is the checkpoint (FR-020). Items paginate one at a time unless batching is configured, so memory stays bounded by one page plus the chunk writer.
+  - **Link header**: parsed by a small RFC 8288 reader, taking the first `rel="next"` target, quoted or unquoted, among several links.
+- **Rationale**: Ready-made choices cover the styles the n8n research found most common: page number, offset and limit, cursor in body or header, next URL in body, the RFC 8288 `Link` header, and `hasMore` or total flags. Users can therefore paginate without formulas, which the no-code goal requires. Formulas keep n8n's flexibility for unusual APIs, with the same variable names, so n8n recipes transfer. The guards remove the failure modes n8n users report:
+  - restart loops after the last page;
+  - non-consecutive cycles;
+  - whole-node re-runs for one 429;
+  - unreachable nested cursors;
+  - unparsed `+json` bodies;
+  - memory growth from holding every page.
+- **Alternatives considered**:
+  - Copying n8n exactly: two modes and expressions only (rejected: every API would need formulas, and the known loops would be kept).
+  - Pagination as a separate "Paginate" node or a loop in the graph (rejected: graphs are acyclic, and it splits one request's configuration in two).
+  - A checkpoint per page (rejected by the clarification that makes the node the checkpoint; revisit with integration nodes if long paginations prove costly).
+  - A third-party Link header parser (rejected: parsing `rel="next"` from RFC 8288 needs a few lines, and the available packages are unmaintained).

@@ -23,6 +23,10 @@
 - Q: Should the editor be able to test a single node without running the whole workflow? → A: No. Only full test runs of the draft, with pinned sample output standing in for nodes that should not run again.
 - Q: Which languages does the Code node support, and what can scripts use? → A: The goal is to support the popular programming languages conveniently through one contract: items in, a list of objects out, n8n-style helpers in each language, and a fixed set of preinstalled libraries per language. This feature delivers JavaScript, TypeScript and Python; further languages follow later through the same contract.
 
+### Session 2026-10-12
+
+- Q: Should the HTTP Request node paginate? → A: Yes. Pagination is configured as declaratively as possible, with n8n's flexibility. Ready-made choices cover how pages advance (page number, offset, cursor, next link including the `Link` header) and when they end, and formulas with `$response`, `$pageCount` and `$request` cover unusual APIs. n8n's known gaps are closed: restart loops on a missing cursor, no cycle detection, no per-page retry or `Retry-After`, flat parameter names, and `+json` bodies left unparsed (FR-037).
+
 ## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Build a workflow and test-run it (Priority: P1)
@@ -69,11 +73,11 @@ An editor adds a Code node and writes a short script in JavaScript, TypeScript o
 
 ### User Story 3 - Call HTTP APIs with stored credentials (Priority: P3)
 
-An editor stores an API key, a bearer token or a username and password as a credential, and adds an HTTP Request node that calls an external API for every item, authenticating with that credential. The response becomes the node's output. The secret is never shown again after it is saved, never appears in run data or logs, and the node cannot reach the platform's internal network.
+An editor stores an API key, a bearer token or a username and password as a credential, and adds an HTTP Request node that calls an external API for every item, authenticating with that credential. When the API returns its data in pages, the editor picks how the pages advance (page number, offset, cursor, next link) and when they end from ready-made choices, writing a formula only for unusual APIs. The node fetches every page and outputs either the records found in them or one item per page. The secret is never shown again after it is saved, never appears in run data or logs, and the node cannot reach the platform's internal network.
 
 **Why this priority**: Calling HTTP APIs is how automations reach the outside world; it is a core capability of the platform, and it must be safe from the first release because it turns user-defined workflows into outbound network traffic.
 
-**Independent Test**: Create a bearer-token credential; build Manual Trigger → HTTP Request (GET an allow-listed test service with the credential) → run with two items and confirm two requests carried the token and the responses became the output; confirm the credential secret appears in no API response, step output or log; confirm requests to loopback, private and metadata addresses, directly or through a redirect or a host name that resolves to them, fail the node.
+**Independent Test**: Create a bearer-token credential; build Manual Trigger → HTTP Request (GET an allow-listed test service with the credential) → run with two items and confirm two requests carried the token and the responses became the output; confirm the credential secret appears in no API response, step output or log; confirm requests to loopback, private and metadata addresses, directly or through a redirect or a host name that resolves to them, fail the node; against a test API with cursor, page-number, offset and next-link pagination, confirm each preset collects every record without a formula and stops where the API ends.
 
 **Acceptance Scenarios**:
 
@@ -84,6 +88,12 @@ An editor stores an API key, a bearer token or a username and password as a cred
 5. **Given** a credential of another user, **When** an owner references it in a node, **Then** the draft reports a validation problem and the workflow cannot be published.
 6. **Given** a credential referenced by an active version, **When** its owner tries to delete it, **Then** the deletion is refused until no active version references it.
 7. **Given** a request that exceeds the timeout or a response larger than the response limit, **When** the node runs, **Then** the node fails with the limit named.
+8. **Given** pagination by cursor read from a response field, with the records at a field path, **When** the node runs against an API with five pages, **Then** five requests are sent, each carrying the cursor of the previous response, pagination stops when the response has no cursor, and the output holds every record of the five pages in order.
+9. **Given** pagination by page number or by offset and limit, **When** the node runs, **Then** the first request carries the configured start value, each following request carries the next value, and pagination stops at the configured completion condition (an empty page, a `hasMore` flag set to false, the reported total reached, or a terminating status code).
+10. **Given** pagination by next link read from a response field or from the `Link` header (`rel="next"`), **When** the node runs, **Then** each next link, relative or absolute, is requested until none is returned. A next link to another origin is requested without the credential.
+11. **Given** an API that returns the same cursor or next link twice, **When** the node runs, **Then** the node fails with a "pagination did not advance" reason instead of looping.
+12. **Given** a page answered with 429 or a temporary server error, **When** the node runs, **Then** that page is requested again, waiting as `Retry-After` asks (at most 60 seconds), up to 3 times, before the node fails; pages already fetched are not requested again within that attempt.
+13. **Given** a maximum of N pages, **When** pagination has not completed after N pages, **Then** the node stops with the N pages, or fails when it is set to treat the limit as an error.
 
 ---
 
@@ -200,6 +210,10 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - Ownership of a workflow whose nodes reference the previous owner's credentials is transferred: those references become validation problems, and an active version that uses them is deactivated with the reason recorded, so the new owner never runs with the previous owner's secrets.
 - A workflow is duplicated by another editor: the copy keeps only credential references that the copier owns and reports the cleared ones as validation problems.
 - The owner of an active workflow is suspended: the workflow keeps running; an administrator can transfer its ownership.
+- A paginated API returns an empty cursor or next link on the last page: pagination completes; it never restarts from the first page.
+- A paginated API returns cursors that cycle (A, B, A): the repeated request fails the node with "pagination did not advance".
+- A records path that is absent from a page counts as an empty page; a JSON body that is an empty object counts as having no records when no records path is set.
+- Pagination that would exceed the step output limits fails the node with the limit named, and its partial output is discarded.
 - A credential secret appears in a response that the HTTP Request node received: it is treated as response data like any other; the platform never adds secrets to outputs, errors, diagnostics or logs itself.
 
 ## Requirements _(mandatory)_
@@ -300,7 +314,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - **FR-036**: The HTTP Request node MUST support these options:
   - a timeout: default 30 seconds, at most 5 minutes;
   - following redirects: on by default, at most 5;
-  - the response format: automatic, JSON or text;
+  - the response format: automatic (JSON for `application/json` and every `+json` media type, otherwise text), JSON or text;
   - including the response status code and headers in the output;
   - treating every response status as success;
   - batching: N requests per batch with an interval between batches;
@@ -308,21 +322,49 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
   A response larger than 10 MB MUST fail the node.
 
-- **FR-037**: The HTTP Request node MUST refuse a destination before connecting when the host is, or resolves at connection time to, a loopback, private, link-local, multicast, unspecified or otherwise reserved IPv4 or IPv6 address. The check MUST apply again to every redirect, and an operator-configured allow-list MAY permit specific internal hosts. TLS certificates MUST always be verified, and a refusal MUST fail the node as an isolation breach that is never retried.
-- **FR-038**: Editors and administrators MUST be able to create credentials of the types header (name and value), basic (username and password), bearer (token) and query parameter (name and value); the creator owns the credential.
-- **FR-039**: Credential secret values MUST be stored encrypted, MUST be write-only (no read returns them), and MUST NOT appear in validation reports, run inputs, step outputs, errors, diagnostics or logs. They are resolved only while the node that uses them executes.
-- **FR-040**: Owners MUST be able to list, rename, replace the secret of and delete their credentials, and see which workflows reference each one. Administrators MUST be able to list every credential's name, type, owner and references and delete any credential. A credential referenced by an active version MUST NOT be deletable.
-- **FR-041**: A node MUST reference only credentials owned by the workflow's owner and of a type the node accepts.
+- **FR-037**: The HTTP Request node MUST offer declarative pagination for each input item.
+  - **Modes**:
+    - off;
+    - update parameters in each request;
+    - follow the next link.
+  - **Update parameters**: one to five parameters. Each targets the query, a header, or the JSON body by field path, so nested GraphQL variables are reachable. Each takes one of these values:
+    - a page number with a start and a step;
+    - an offset with a start and a step, the step being a fixed number or the number of records received;
+    - a cursor read from a response body field or a response header;
+    - a formula.
+  - **Follow the next link**: the link comes from a response body field, a response header, the `Link` header's `rel="next"` entry, or a formula. Relative links are resolved against the request that returned them.
+  - **Completion**: pagination completes when any of the chosen conditions holds:
+    - the page has no records;
+    - the cursor or next link is missing or empty;
+    - a boolean field is false;
+    - the records received reach a total read from a field;
+    - the response status is one of the listed codes (that page is not output);
+    - a formula is true.
+  - **Records and output**: an optional field path names where each page's records are; a missing path means no records on that page. The output is one item per record (the default) or one item per page.
+  - **Bounds**:
+    - pagination always has a page limit: default 100, at most 1,000. Reaching it stops pagination, or fails the node when so configured;
+    - an interval between requests of 0 to 60 seconds;
+    - the step output limits of FR-022.
+  - **Formulas**: pagination formulas MAY read `$response` (body, headers with lower-case names, status code; null before the first request), `$pageCount` (pages received so far, starting at 0) and `$request` (the previous request as sent, with credential values removed). These variables exist only in pagination formulas.
+  - **Advancing**: a page whose cursor, next link or request repeats one already sent MUST fail the node with "pagination did not advance". A page answered with 429, 502, 503, 504 or a connection error MUST be requested again up to 3 times, waiting as `Retry-After` asks (at most 60 seconds), before the node fails. Any other non-success status fails the node, unless it is a completion status or the node treats every response as success.
+  - **Credentials and isolation**: the credential is applied to every page request on the original origin, and never to a page request on another origin. Every page request passes the destination check of FR-038.
+  - **Retries and failure**: pages are written to the output as they arrive. When the node fails, its partial output is discarded, and a repetition of the node starts again from the first page (FR-020).
+
+- **FR-038**: The HTTP Request node MUST refuse a destination before connecting when the host is, or resolves at connection time to, a loopback, private, link-local, multicast, unspecified or otherwise reserved IPv4 or IPv6 address. The check MUST apply again to every redirect and every pagination request, and an operator-configured allow-list MAY permit specific internal hosts. TLS certificates MUST always be verified, and a refusal MUST fail the node as an isolation breach that is never retried.
+- **FR-039**: Editors and administrators MUST be able to create credentials of the types header (name and value), basic (username and password), bearer (token) and query parameter (name and value); the creator owns the credential.
+- **FR-040**: Credential secret values MUST be stored encrypted, MUST be write-only (no read returns them), and MUST NOT appear in validation reports, run inputs, step outputs, errors, diagnostics or logs. They are resolved only while the node that uses them executes.
+- **FR-041**: Owners MUST be able to list, rename, replace the secret of and delete their credentials, and see which workflows reference each one. Administrators MUST be able to list every credential's name, type, owner and references and delete any credential. A credential referenced by an active version MUST NOT be deletable.
+- **FR-042**: A node MUST reference only credentials owned by the workflow's owner and of a type the node accepts.
 
 **History and retention**
 
-- **FR-042**: Every signed-in user MUST be able to list the runs of a workflow newest first, paged, filtered by status, and read any run with its steps.
-- **FR-043**: Administrators MUST be able to set the retention policy: retention period in days (default 14) and maximum runs kept per workflow (default 10,000).
-- **FR-044**: A retention job MUST run every night and remove finished runs older than the retention period or beyond the per-workflow maximum, together with their step outputs; queued, running and waiting runs MUST NOT be removed.
+- **FR-043**: Every signed-in user MUST be able to list the runs of a workflow newest first, paged, filtered by status, and read any run with its steps.
+- **FR-044**: Administrators MUST be able to set the retention policy: retention period in days (default 14) and maximum runs kept per workflow (default 10,000).
+- **FR-045**: A retention job MUST run every night and remove finished runs older than the retention period or beyond the per-workflow maximum, together with their step outputs; queued, running and waiting runs MUST NOT be removed.
 
 **Access**
 
-- **FR-045**: Access by role:
+- **FR-046**: Access by role:
   - Viewers MUST be able to read workflows, versions, the node catalogue and runs.
   - Editors MUST additionally be able to create workflows and credentials and to change, publish, activate and run the workflows they own.
   - Administrators MUST additionally be able to act on every workflow and credential, transfer ownership and change the retention policy.
@@ -339,7 +381,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 | Trigger   | Webhook                  | Starts a run for each authenticated call; methods GET, POST, PUT, PATCH, DELETE; outputs one item with method, path, headers (secret header removed), query and body.                                                                                  |
 | Trigger   | Execute Workflow Trigger | Entry point of a sub-workflow; accepts all caller items or declared input fields.                                                                                                                                                                      |
 | Trigger   | Error Trigger            | Entry point of an error workflow; outputs the failed run, workflow, node and error message.                                                                                                                                                            |
-| Action    | HTTP Request             | Sends an HTTP request per item with optional stored credentials and outputs the responses (User Story 3, FR-035 to FR-037).                                                                                                                            |
+| Action    | HTTP Request             | Sends an HTTP request per item with optional stored credentials, follows declarative pagination, and outputs the responses or the records they contain (User Story 3, FR-035 to FR-038).                                                               |
 | Flow      | If                       | Conditions on text, number, date, boolean, list and object values joined by AND or OR, optional case-insensitive comparison; outputs "true" and "false".                                                                                               |
 | Flow      | Switch                   | Ordered rules routing each item to the first matching output, or to every matching output; optional fallback output; outputs can be named.                                                                                                             |
 | Flow      | Merge                    | Waits for all inputs; modes: append (two or more inputs), combine by matching fields (keep matches, keep non-matches, keep everything, enrich input 1, enrich input 2), combine by position, all combinations, choose one input; field-clash handling. |
@@ -369,7 +411,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 - **DR-001**: The single command that starts the local environment MUST also start the object storage for step outputs, the code sandbox and an HTTP test service for HTTP Request journeys. The new services MUST use the same project-specific names, loopback-only ports and named volumes as the existing ones.
 - **DR-002**: The API image MUST run in two roles, serving HTTP and executing runs, selected by configuration; the execution role MUST be able to run as several replicas.
 - **DR-003**: Every new container image MUST be pinned by digest and pass the vulnerability scan with zero critical or high findings; every new dependency MUST be pinned exactly.
-- **DR-004**: Automated tests MUST cover every functional requirement, every edge case and every documented mode of every core node, at the test layers the constitution prescribes. The end-to-end suite MUST include building, test-running, an HTTP Request with a credential, publishing, a scheduled run, a webhook run and a resumed run after the execution process restarts.
+- **DR-004**: Automated tests MUST cover every functional requirement, every edge case and every documented mode of every core node, at the test layers the constitution prescribes. The end-to-end suite MUST include building, test-running, an HTTP Request with a credential and with pagination, publishing, a scheduled run, a webhook run and a resumed run after the execution process restarts.
 - **DR-005**: The web application MUST NOT be modified by this feature.
 
 ### Key Entities
@@ -415,7 +457,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
   - n8n core nodes with their own storage or product surface: Data Table, Execution Data, n8n, Track Time Saved;
   - forms and chat, which belong to the web application: Form Trigger, Form, Chat.
 - Credentials of the generic HTTP types have no service to be verified against; they count as verified once saved, which satisfies the domain rule that published versions reference only verified credentials.
-- The HTTP Request node does not offer pagination, proxies, client certificates or disabling TLS verification in this feature.
+- The HTTP Request node does not offer proxies, client certificates or disabling TLS verification in this feature.
 - Workflows exchange data as lists of JSON items; binary data is not part of this feature. Items carry no lineage to the items they came from; field references and formulas reach earlier items by position.
 - Webhook calls are acknowledged as soon as the run is recorded (docs/architecture/04-execution.md); responding to the caller with data produced by the run (Respond to Webhook) is a later feature.
 - Loops are expressed through item-wise processing and batched sub-workflow calls. Graphs stay acyclic, as the domain model requires, so n8n's Loop Over Items, which needs a cycle, is not offered. Neither are the SQL mode of Merge and the code mode of Sort.

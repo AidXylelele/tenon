@@ -12,10 +12,10 @@ Domain tags: Security, Reliability, API.
 
 ## Requirement Completeness
 
-- [ ] CHK001 Do the requirements state who may read and rotate webhook addresses and secrets, rather than only the contract (`GET /workflows/{id}/webhooks`: owner and administrators)? [Gap, Security, Spec §FR-045, Contract /workflows/{id}/webhooks]
-- [ ] CHK002 Do the requirements address that every signed-in user can read step outputs, while a resume address appearing in run data is enough to resume the run? [Gap, Security, Spec §FR-030, §FR-042]
-- [ ] CHK003 Is the HTTP Request operator allow-list specified in terms of what it matches (exact host names, wildcards, address ranges, ports) and who may change it? [Gap, Security, Spec §FR-037, Plan R12]
-- [ ] CHK004 Are requirements for rotating or losing the credential encryption key (versioned keys, re-encryption, behaviour when a stored version's key is missing) documented, or explicitly delegated to operations? [Gap, Security, Spec §FR-039, Plan R13]
+- [ ] CHK001 Do the requirements state who may read and rotate webhook addresses and secrets, rather than only the contract (`GET /workflows/{id}/webhooks`: owner and administrators)? [Gap, Security, Spec §FR-046, Contract /workflows/{id}/webhooks]
+- [ ] CHK002 Do the requirements address that every signed-in user can read step outputs, while a resume address appearing in run data is enough to resume the run? [Gap, Security, Spec §FR-030, §FR-043]
+- [ ] CHK003 Is the HTTP Request operator allow-list specified in terms of what it matches (exact host names, wildcards, address ranges, ports) and who may change it? [Gap, Security, Spec §FR-038, Plan R12]
+- [ ] CHK004 Are requirements for rotating or losing the credential encryption key (versioned keys, re-encryption, behaviour when a stored version's key is missing) documented, or explicitly delegated to operations? [Gap, Security, Spec §FR-040, Plan R13]
 - [ ] CHK005 Are abuse limits defined for the public ingress routes, the webhook and resume calls (per endpoint or per client address)? [Gap, Security, Spec §FR-027, §FR-030]
 - [ ] CHK006 Is the effect of a failed, timed-out or cancelled sub-workflow run on the calling node specified, including the node's on-error setting and the "continue at once" mode? [Gap, Reliability, Spec §FR-031, US6-5]
 - [ ] CHK007 Is cancellation propagation defined for a run with sub-workflow children: are the children cancelled, left to finish, or detached? [Gap, Reliability, Spec §FR-024]
@@ -37,7 +37,7 @@ Domain tags: Security, Reliability, API.
   - A call to a run whose Wait node is never reached (skipped branch, earlier failure).
   - A call that arrives after the run's timeout, during cancellation, or after the run finished.
 - [ ] CHK020 Does FR-029 state whether a run ended by timeout, by the journal limit or by cancellation starts the error workflow? [Clarity, Reliability, Spec §FR-029]
-- [ ] CHK021 Is cursor paging defined when workflows or runs are added between page requests (stability, duplicates, gaps)? [Clarity, API, Spec §FR-002, §FR-042]
+- [ ] CHK021 Is cursor paging defined when workflows or runs are added between page requests (stability, duplicates, gaps)? [Clarity, API, Spec §FR-002, §FR-043]
 
 ## Requirement Consistency (spec, plan, data model, contract)
 
@@ -52,7 +52,7 @@ Domain tags: Security, Reliability, API.
   - FR-036: 10 MB per response.
   - FR-025: the Manual Trigger's 1,000 items and 1 MB.
   - The contract's `Items1000` and 1 MB ingress bodies.
-- [ ] CHK028 Does FR-045 cover every contract operation, with the same roles as the contract summaries? That includes pins, webhooks, transfer, duplicate, and credential reads by administrators. [Consistency, Security, Spec §FR-045, Contract]
+- [ ] CHK028 Does FR-046 cover every contract operation, with the same roles as the contract summaries? That includes pins, webhooks, transfer, duplicate, and credential reads by administrators. [Consistency, Security, Spec §FR-046, Contract]
 - [ ] CHK029 Is the edge-case rule "inactive webhook refused as not found without revealing existence" consistent with answering 401 to a wrong secret on an active endpoint? [Conflict, Security, Spec Edge Cases, Contract /webhooks/{endpointId}]
 - [ ] CHK030 Does the spec's schedule behaviour match the plan's scheduled-trigger design and the engine limits recorded in research? The behaviour in question: overlap skipped across the whole run, missed occurrences skipped, intervals of at least one minute, one schedule per rule. [Consistency, Reliability, Spec §FR-026, Plan R6]
 
@@ -67,18 +67,18 @@ Domain tags: Security, Reliability, API.
 
 - [ ] CHK035 Are recovery requirements stated for a crash during the steps that change run state (registering, entering a wait, finishing), not only during nodes? [Coverage, Recovery, Spec §FR-020, Plan R4]
 - [ ] CHK036 Are requirements defined for schedule registration failing after an activation has committed, and for how the platform converges? [Coverage, Exception Flow, Spec §FR-011, Plan R6]
-- [ ] CHK037 Is the outcome defined for a production run whose credential was deleted, or whose owner was suspended, after the version was published (error kind, run status)? [Coverage, Exception Flow, Spec §FR-040, Edge Cases]
+- [ ] CHK037 Is the outcome defined for a production run whose credential was deleted, or whose owner was suspended, after the version was published (error kind, run status)? [Coverage, Exception Flow, Spec §FR-041, Edge Cases]
 - [ ] CHK038 Is the behaviour defined when an active version references a node type version that the running release no longer contains, for example old and new workers during a rolling deploy? [Coverage, Recovery, Spec Edge Cases, Plan R2]
 - [ ] CHK039 Is the outcome defined when the assigned error workflow is archived, unpublished or deactivated at the time a run fails? [Coverage, Exception Flow, Spec §FR-029]
 
 ## Non-Functional Requirements: Security
 
-- [ ] CHK040 Do the SSRF requirements address DNS failures, host names resolving to a mix of allowed and refused addresses, IPv6-only hosts and non-default ports? [Edge Case, Security, Spec §FR-037]
+- [ ] CHK040 Do the SSRF requirements address DNS failures, host names resolving to a mix of allowed and refused addresses, IPv6-only hosts and non-default ports? [Edge Case, Security, Spec §FR-038]
 
 ## Dependencies and Assumptions
 
 - [ ] CHK041 Is the dependency on an early (0.0.x) durable execution module accompanied by a stated upgrade or fallback policy should its API change? [Assumption, Reliability, Spec Assumptions, Plan R2]
-- [ ] CHK042 Is it recorded as an accepted risk that every signed-in user may read all step outputs, including data fetched with another user's credentials? [Assumption, Security, Spec Clarifications, §FR-042]
+- [ ] CHK042 Is it recorded as an accepted risk that every signed-in user may read all step outputs, including data fetched with another user's credentials? [Assumption, Security, Spec Clarifications, §FR-043]
 - [ ] CHK043 Are the sandbox's operational preconditions documented as a deployment dependency: a privileged sidecar, user namespaces, the Pod Security level? [Dependency, Security, Plan R11, Spec Assumptions]
 
 ## Notes

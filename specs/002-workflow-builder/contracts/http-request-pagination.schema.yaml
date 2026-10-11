@@ -1,0 +1,251 @@
+# The `pagination` parameter of the HTTP Request node, as served by `GET /node-types`.
+# Node parameters, including this one, are written in zod; the catalogue serves them through z.toJSONSchema
+# (research R8). This file is the agreed shape for the web editor.
+# In a draft, every leaf is wrapped as a ParameterValue ({ fixed } or { formula }, see openapi.yaml);
+# the schema below describes the unwrapped values. Semantics: spec FR-037, research R23, data-model.md.
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: urn:workflow-platform:node-types:httpRequest:1:pagination
+title: Pagination
+description: Fetch every page of a paginated API for each input item.
+type: object
+additionalProperties: false
+properties:
+  mode:
+    title: Pagination
+    type: string
+    enum: [off, parameters, nextLink]
+    default: off
+    x-options:
+      - { value: off, label: Off }
+      - { value: parameters, label: Update parameters in each request }
+      - { value: nextLink, label: Follow the next link }
+  parameters:
+    title: Parameters to update
+    type: array
+    minItems: 1
+    maxItems: 5
+    x-showWhen: { mode: [parameters] }
+    items:
+      type: object
+      additionalProperties: false
+      required: [in, name, value]
+      properties:
+        in:
+          title: Send in
+          type: string
+          enum: [query, header, body]
+          x-options:
+            - { value: query, label: Query }
+            - { value: header, label: Header }
+            - { value: body, label: JSON body (field path) }
+        name:
+          title: Name
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: A query or header name, or a dot path into the JSON body such as variables.after
+        value:
+          title: Value
+          x-widget: pagination-value
+          oneOf:
+            - title: Page number
+              type: object
+              additionalProperties: false
+              required: [pageNumber]
+              properties:
+                pageNumber:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    start: { title: First page, type: integer, default: 1 }
+                    step: { title: Step, type: integer, minimum: 1, default: 1 }
+            - title: Offset
+              type: object
+              additionalProperties: false
+              required: [offset]
+              properties:
+                offset:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    start:
+                      {
+                        title: First offset,
+                        type: integer,
+                        minimum: 0,
+                        default: 0,
+                      }
+                    step:
+                      title: Step
+                      description: A fixed number, or "records" to advance by the records received
+                      oneOf:
+                        - { type: integer, minimum: 1 }
+                        - { const: records }
+                      default: records
+            - title: Cursor from the previous response
+              type: object
+              additionalProperties: false
+              required: [cursor]
+              properties:
+                cursor:
+                  oneOf:
+                    - title: Body field
+                      type: object
+                      additionalProperties: false
+                      required: [body]
+                      properties:
+                        body:
+                          {
+                            type: string,
+                            minLength: 1,
+                            x-widget: response-field-path,
+                          }
+                    - title: Response header
+                      type: object
+                      additionalProperties: false
+                      required: [header]
+                      properties:
+                        header: { type: string, minLength: 1 }
+            - title: Formula
+              type: object
+              additionalProperties: false
+              required: [formula]
+              properties:
+                formula:
+                  type: string
+                  x-acceptsFormula: true
+                  examples:
+                    ['{{ $pageCount + 1 }}', '{{ $response.body?.meta?.next }}']
+  nextLink:
+    title: Next link
+    x-showWhen: { mode: [nextLink] }
+    oneOf:
+      - title: Body field
+        type: object
+        additionalProperties: false
+        required: [body]
+        properties:
+          body:
+            {
+              type: string,
+              minLength: 1,
+              x-widget: response-field-path,
+              examples: [links.next],
+            }
+      - title: Response header
+        type: object
+        additionalProperties: false
+        required: [header]
+        properties:
+          header: { type: string, minLength: 1 }
+      - title: Link header (rel="next")
+        type: object
+        additionalProperties: false
+        required: [linkHeader]
+        properties:
+          linkHeader: { const: next }
+      - title: Formula
+        type: object
+        additionalProperties: false
+        required: [formula]
+        properties:
+          formula: { type: string, x-acceptsFormula: true }
+  completeWhen:
+    title: Complete when
+    description: Pagination completes when any condition holds. Default missingNext for cursor and next-link pagination, emptyRecords otherwise.
+    type: array
+    maxItems: 6
+    x-showWhen: { mode: [parameters, nextLink] }
+    items:
+      oneOf:
+        - title: A page has no records
+          const: emptyRecords
+        - title: No cursor or next link is returned
+          const: missingNext
+        - title: A boolean field is false
+          type: object
+          additionalProperties: false
+          required: [falseField]
+          properties:
+            falseField:
+              {
+                type: string,
+                minLength: 1,
+                x-widget: response-field-path,
+                examples: [has_more],
+              }
+        - title: The total is reached
+          type: object
+          additionalProperties: false
+          required: [totalField]
+          properties:
+            totalField:
+              {
+                type: string,
+                minLength: 1,
+                x-widget: response-field-path,
+                examples: [meta.total],
+              }
+        - title: The status code is one of
+          type: object
+          additionalProperties: false
+          required: [statusCodes]
+          properties:
+            statusCodes:
+              type: array
+              minItems: 1
+              items: { type: integer, minimum: 100, maximum: 599 }
+        - title: Formula is true
+          type: object
+          additionalProperties: false
+          required: [formula]
+          properties:
+            formula:
+              {
+                type: string,
+                x-acceptsFormula: true,
+                examples: ['{{ $response.body.page >= $response.body.pages }}'],
+              }
+  records:
+    title: Records are at
+    description: Field path of the records in each page; empty means the whole body
+    type: string
+    maxLength: 500
+    x-widget: response-field-path
+    x-showWhen: { mode: [parameters, nextLink] }
+    examples: [data, data.items]
+  output:
+    title: Output
+    type: string
+    enum: [records, pages]
+    default: records
+    x-showWhen: { mode: [parameters, nextLink] }
+    x-options:
+      - { value: records, label: One item per record }
+      - { value: pages, label: One item per page }
+  maxPages:
+    title: Maximum pages
+    type: integer
+    minimum: 1
+    maximum: 1000
+    default: 100
+    x-showWhen: { mode: [parameters, nextLink] }
+  onMaxPages:
+    title: When the maximum is reached
+    type: string
+    enum: [stop, fail]
+    default: stop
+    x-showWhen: { mode: [parameters, nextLink] }
+  intervalMs:
+    title: Interval between requests (ms)
+    type: integer
+    minimum: 0
+    maximum: 60000
+    default: 0
+    x-showWhen: { mode: [parameters, nextLink] }
+x-formulaScope:
+  description: Variables available only in pagination formulas
+  variables:
+    $response: '{ body, headers (lower-case names), statusCode } of the last page; null before the first request'
+    $pageCount: Pages received so far, starting at 0
+    $request: '{ method, url, query, headers, body } of the last request sent, credential values removed'
