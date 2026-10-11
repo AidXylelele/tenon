@@ -17,9 +17,13 @@ export class DrizzleInvitationRepository implements InvitationRepository {
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   async add(invitation: Invitation): Promise<void> {
-    await this.txHost.tx
+    const inserted = await this.txHost.tx
       .insert(invitations)
-      .values(InvitationMapper.toRow(invitation));
+      .values(InvitationMapper.toRow(invitation))
+      .onConflictDoNothing()
+      .returning({ id: invitations.id });
+
+    if (inserted.length === 0) throw new InvitationConflictError();
   }
 
   async update(invitation: Invitation): Promise<void> {
