@@ -64,8 +64,8 @@ collected in R21; the documents are corrected by this feature.
 
 ## R5. Retries, error categories and crash recovery
 
-- **Decision**: Each node step gets the engine retry option `{ attempts: userAttempts + 2, backoff: { delay: userWaitMs, factor: 1 }, retryIf }`.
-  - `retryIf` retries platform errors always, and user errors only while the attempt number is below the user's setting.
+- **Decision**: Each node step gets the engine retry option `{ attempts: max(userAttempts, 3) + 2, backoff, retryIf }`.
+  - `retryIf` never retries limit and isolation breaches. It retries platform errors (object storage, sandbox, database) while the attempt number is below 3, with exponential back-off from 1 s. It retries user errors while the attempt number is below the user's setting, waiting the user's interval.
   - The two extra attempts absorb crashes: an attempt is recorded before the work runs, so a crash or a lost lease consumes one.
   - Executors throw named subclasses (`NodeUserError`, `NodeLimitError`, `IsolationBreachError`, `PlatformError`), because `StepFailedError` keeps only `name` and `message` of its cause.
   - Limit and isolation breaches are wrapped in `NonRetryableStepError`.
@@ -79,9 +79,12 @@ collected in R21; the documents are corrected by this feature.
 - **Decision**:
   - **Manual**: `POST /runs` writes the trigger items as attempt 0 of the trigger node, inserts the Run row and starts `run-<runId>` in the request transaction.
   - **Webhook**:
-    - Ingress: `ALL /webhooks/:endpointId` (public, raw body, at most 1 MB) loads the `WebhookEndpoint` and the workflow's Activation and verifies the secret in constant time, either from the `x-webhook-token` header or from the HMAC-SHA256 `x-webhook-signature` header over the raw body.
-    - Deduplication: with an `x-delivery-id` header, the run id is derived from `webhook:<endpointId>:<deliveryId>`. The unique `trigger_key` and the engine's id check deduplicate, and a different `payload_hash` for a known key answers 409 (FR-027).
-    - The response is 202 after the commit.
+    - **Ingress**: `ALL /webhooks/:endpointId` (public, raw body, at most 1 MB, request-rate limits at the gateway).
+    - **`WebhookIngressGuard`** loads the `WebhookEndpoint` and the workflow's Activation, checks the method, and verifies the secret in constant time, from either the `x-webhook-token` header or the HMAC-SHA256 `x-webhook-signature` header over the raw body. Every failure throws the same `NotFoundException` (FR-027).
+    - **Why a guard**: guards run before interceptors, so a forged call never reaches the idempotency record of a genuine delivery.
+    - **Deduplication**: the handler carries `@nestjs/idempotency`'s `@Idempotent({ keyFrom: { header: 'x-delivery-id' }, scope: endpointId, fingerprint: rawBody, storeIf: 2xx, ttl: '7d', lockTtl: '30s' })` (R24).
+    - **Recording**: the handler is `@Transactional()`. It writes the trigger items, inserts the Run row (`ON CONFLICT DO NOTHING`, returning the existing run) and starts `run-<runId>` in the transaction. It answers 202 `{ runId }`.
+    - **Backstop**: the run id is derived from `webhook:<endpointId>:<deliveryId>`, so the run primary key and the engine's id check deduplicate in the window the idempotency record does not cover. That window is a crash between the commit and the record, or a repeat after `ttl`.
   - **Schedule**:
     - Activation writes an outbox message `activation` in the same transaction.
     - Its handler calls `ScheduleRegistry.sync(workflowId)`, which upserts one engine schedule per rule (`wf.<workflowId>.<nodeId>.<rule>`, `cron` or `every` with `tz`, `overlap: 'skip'`, `missed: 'skip'`) and removes stale ones. This is needed because `upsert` is not transactional.
@@ -93,15 +96,21 @@ collected in R21; the documents are corrected by this feature.
     - Time modes: `sleepUntil` with the deadline computed in a step.
     - Resume mode: `waitForResume`, which is `waitForSignal('wait:<nodeId>', 'run.resume', { key: runId, timeout })`.
     - The resume address is `/resume/<runId>.<hmac>`, with the HMAC by the `Signer` port. It is derived, so no secret is stored, and it is stable across replays.
-    - `POST /resume/:token` stores the body as `runs/<runId>/resume.json` and signals with `id: 'resume-<runId>'`, so only one call per run is accepted (FR-030).
+    - `POST /resume/:token`:
+      - Stores each call's body under its own key, `runs/<runId>/resume/<callId>.json`, so a refused call never overwrites the accepted one.
+      - Signals `run.resume` with `{ key: runId, id: 'resume-<runId>' }` and the body key in the payload. The engine keeps the first signal ("first payload wins") and answers `created: false` to later ones, which become 409 (FR-030).
+      - Carries `@Idempotent({ required: false, scope: runId })`, so a caller that retries its own accepted call with the same `Idempotency-Key` gets the original 202 back.
+      - When the Wait node requires a header credential, a guard checks it in constant time before anything else.
     - A graph may contain at most one resume-mode Wait (validation error).
   - **Execute Workflow**:
     1. Step `node:<id>:prepare` writes the batch inputs and inserts child Run rows with ids derived from `<parentRunId>/<nodeId>/<batch>`.
-    2. `runChild` per batch runs in windows of 20 (`executeChild`, or `startChild` with `parentClose: 'abandon'` for "continue at once").
+    2. `runChild` per batch runs in windows of 20: `executeChild` with the engine default `parentClose: 'cancel'` for "wait for completion", so cancelling or ending the parent cancels the children it waits for (FR-024); `startChild` with `parentClose: 'abandon'` for "continue at once", whose children are independent.
     3. Step `node:<id>:collect` concatenates the children's last-node output references.
+    - **Child outcomes**: a `ChildWorkflowFailedError` (failed, timed out or cancelled child) fails the node with the child run id and reason, and the node's on-error setting applies (FR-031).
+    - **Retries**: the interpreter runs the user's attempts for this orchestrated node itself. Child ids carry the user attempt number (`<parentRunId>/<nodeId>/<batch>/a<attempt>`), and an attempt re-runs only the batches whose child did not succeed, reusing the journaled results of the rest. A crash replays the same attempt with the same ids, so no call starts twice (FR-020).
     - `depth` travels in the Run row, and depth 6 fails the node.
     - Each child costs two journal entries, so a run may make at most 4,000 sub-workflow calls in total (journal budget 10,000 entries) besides the 1,000 per node (FR-031).
-  - **Error workflow**: started by `finish-run` or by the compensation, with a run id derived from `error:<failedRunId>`. It is never started for test runs or error runs.
+  - **Error workflow**: started by `finish-run` or by the compensation for failed runs (including timeouts and limit breaches), with a run id derived from `error:<failedRunId>`. It is never started for cancelled runs, test runs or error runs. When the error workflow has no active version, the failed run records `errorWorkflow: { skipped: 'unavailable' }` (FR-029).
 - **Rationale**: These are engine-native mechanisms: the transactional `start` and `signal`, schedules with overlap and missed policies, child workflows with deterministic ids, and signals with a cursor that cannot lose a wake-up.
 - **Alternatives considered**: Schedules that start `run` directly (rejected: no per-run timeout and no queued row, and overlap would cover only the instant of the start); deduplicating deliveries in the application only (rejected: the engine's id comparison already gives exactly-once starts).
 
@@ -144,7 +153,7 @@ collected in R21; the documents are corrected by this feature.
   - The Step row stores `items`, `bytes` and `chunkStarts` (the first item index of each chunk) per port.
   - `GET /runs/:id/steps/:nodeId/output?port&offset&limit` (limit at most 100) binary-searches `chunkStarts` and reads one or two chunks.
   - Executors in `item` and `batch` modes receive input chunk by chunk, so worker memory stays bounded. `all` mode receives at most the 16 MB step limit.
-  - SDK: `@aws-sdk/client-s3` 3.1149.0 with `forcePathStyle` and checksums `WHEN_REQUIRED`.
+  - SDK: `@aws-sdk/client-s3` 3.1149.0 with `forcePathStyle` and checksums `WHEN_REQUIRED`. The SDK's standard retry mode (3 attempts, full jitter) is the only retry layer for storage; a `storage` resilience preset adds a per-call timeout and a circuit breaker that counts only transport errors and 5xx, so an unavailable store fails fast as a platform error (R24, FR-021).
   - Local and test server: Garage v2.4.1 (single node, default bucket, digest-pinned image, about 28 MB on scratch). It is AGPL-3.0, but it runs unmodified as a separate service.
 - **Rationale**:
   - Step data stays out of PostgreSQL, so the database does not bloat the way n8n's `execution_data` does.
@@ -165,7 +174,7 @@ collected in R21; the documents are corrected by this feature.
 - **Decision**: `FormulaEngine` port, adapter `interface-adapters/formulas/` with an own tree-walking interpreter over `acorn` 8.19.0 (`parseExpressionAt`, ESTree with positions).
   - **Allowed syntax**:
     - literals (no regular expressions) and template literals;
-    - identifiers restricted to `$json`, `$input`, `$('…')`, `$now`, `$today`, `$run`, `$workflow`, `$execution`, plus allow-listed global helpers;
+    - identifiers restricted to the n8n set `$json`, `$input`, `$('…')`, `$now`, `$today`, `$execution` (`id`, `mode`, `startedAt`, `resumeUrl`) and `$workflow` (`id`, `name`, `version`), plus allow-listed global helpers; spec FR-015 names the same set, and the Code node helpers use the same names;
     - member and optional-chain access to own data properties only (`__proto__`, `constructor` and `prototype` refused, and no function value ever escapes);
     - calls only to allow-listed methods of strings, numbers, arrays, plain objects and Luxon `DateTime` (`luxon` 3.7.2);
     - unary, binary, logical, conditional, array and object expressions.
@@ -212,13 +221,13 @@ collected in R21; the documents are corrected by this feature.
     - Limits: `cpuLimit` 10 s, `clockLimit` 30 s, `memoryLimit` 256 MB (Node also gets `--max-old-space-size` of about 0.75 of it), `procLimit` 32 (it counts threads), and a collector `max` just above the 16 MB output cap.
   - **TypeScript**: transpiled by the worker with `amaro` `transformSync(src, { mode: 'strip-only' })`, the engine Node itself uses. Types become whitespace, so line numbers stay correct. Syntax errors fail before any sandbox call, and the result is cached by source hash. The sandbox only ever runs `node --no-strip-types harness.cjs`.
   - **Harnesses**:
-    - **JavaScript** loads `module.exports = async function ($input, $json, $, require) { … }` and offers `$input.all()`, `$input.first()`, `$json`, `$('Node name').all()` and `.first()`, `$now` (Luxon), `$run`, a `require` limited to the preinstalled libraries, and a capped console to stderr.
-    - **Python** wraps the parsed body into a function with `ast` (line numbers kept) and runs `python3 -I -S -B -X utf8`. It offers `_input.all()`, `_input.first()`, `_json`, `_('Node name').all()`, `_now`, `_run`, and n8n 2.x's `_items` and `_item` as aliases.
+    - **JavaScript** loads `module.exports = async function ($input, $json, $, require) { … }` and offers `$input.all()`, `$input.first()`, `$json`, `$('Node name').all()` and `.first()`, `$now` (Luxon), `$execution`, `$workflow`, a `require` limited to the preinstalled libraries, and a capped console to stderr.
+    - **Python** wraps the parsed body into a function with `ast` (line numbers kept) and runs `python3 -I -S -B -X utf8`. It offers `_input.all()`, `_input.first()`, `_json`, `_('Node name').all()`, `_now`, `_execution`, `_workflow`, and n8n 2.x's `_items` and `_item` as aliases.
     - Both validate that the result is a list of plain JSON objects. They refuse BigInt, NaN, Infinity and non-string keys; a single object is wrapped, as n8n does. They check the size before writing `{ ok, items }` or `{ ok: false, error: { kind, message, line, itemIndex } }` to fd 3 and exit 0, so a non-zero exit always means a crash.
   - **Status mapping**:
     - `Accepted` → validate the result.
     - User errors, never retried: `Nonzero Exit Status`, `Time Limit Exceeded`, `Memory Limit Exceeded`, `Output Limit Exceeded`, `Dangerous Syscall`, `File Error` (a user-caused copy error), and `Signalled` unless the worker aborted the call (a heap OOM aborts with SIGABRT).
-    - Platform errors, retried: `Internal Error`, HTTP 5xx and connection failures.
+    - Platform errors, retried by the engine step (R5): `Internal Error`, HTTP 5xx and connection failures. The gateway calls the sidecar through a `sandbox` resilience preset: a 35 s timeout and a circuit breaker counting only transport failures and 5xx, never user-code or limit outcomes. It has no retry of its own (R24).
 - **Rationale**: go-judge gives one contract for many languages with per-run namespaces, cgroups and seccomp, as 05-node-types.md decided. Its own overhead is about 1 ms per run, and interpreter start (about 30–70 ms) dominates, so one call per node execution keeps throughput at dozens of Code node executions per second per worker.
 - **Alternatives considered**:
   - `isolated-vm` (rejected: maintenance mode, JavaScript only, in process);
@@ -295,6 +304,7 @@ collected in R21; the documents are corrected by this feature.
   - Markdown to HTML: `marked` 18.1.0. HTML to Markdown: `turndown` 7.2.4.
   - Dates: `luxon` 3.7.2. Hashes and random values: `node:crypto`.
   - HTML templates are evaluated by the formula engine with HTML escaping of every substituted value; there is no template engine.
+  - User-supplied regular expressions (Rename Keys, the "matches" conditions of If, Filter and Switch) run on `re2js` 2.8.6 (MIT, pure JavaScript, RE2 semantics, linear time). Patterns are compiled at validation, so a pattern outside RE2 syntax (backreferences, lookaround) or longer than 1,000 characters is a validation error (FR-014). JavaScript-style named groups are translated with `RE2JS.translateRegExp`.
 
   Pure nodes are unit-tested in `test/unit/node-types`.
 
@@ -304,6 +314,8 @@ collected in R21; the documents are corrected by this feature.
 ## R17. Scalability and deployment
 
 - **Decision**:
+  - **Gateway**: Envoy Gateway, delivered with the platform's Helm chart, terminates public traffic and enforces request-rate limits on every public route. The applications contain no rate limiter. Feature 001's throttler on sign-in and recovery predates this decision and is reviewed separately.
+  - **Restarts**: Kubernetes restarts stopped processes and scales replicas. A run interrupted by a stopped worker is reclaimed by another worker after the lease (30 s) plus one poll (1 s), within the 60 s of FR-020.
   - **API**: horizontal, behind the HPA (02-system.md).
   - **Worker**: replicas scaled by KEDA on the engine's due instances. The query reads the engine's internal columns (`wake_at`, `lease_until`, `concurrency_key`), so it is documented as unstable and re-checked whenever the store's `schemaVersion` changes.
   - **Sandbox**: one go-judge sidecar per worker pod, and the worker's step concurrency is bounded by the sandbox's parallelism.
@@ -332,7 +344,7 @@ collected in R21; the documents are corrected by this feature.
 ## R19. Retention and maintenance
 
 - **Decision**:
-  - **`retention`** (nightly): `ApplyRetention` selects finished runs older than the period or beyond the per-workflow maximum (a window function) in batches of 200. Per batch it deletes the artifacts by prefix, the Step and Run rows, and the engine instances `run-<id>` with `delete(id)`. After the loop it calls `purge({ olderThan })` for trigger and maintenance instances. Past the batch limit it continues in a new instance.
+  - **`retention`** (nightly): `ApplyRetention` selects finished runs older than the period or beyond the per-workflow maximum (a window function) in batches of 200. Per batch it deletes the artifacts by prefix, the Step and Run rows, and the engine instances `run-<id>` with `delete(id)`. After the loop it calls `purge({ olderThan })` for trigger and maintenance instances. Past the batch limit it continues in a new instance. It also calls the idempotency store's `prune()` and the outbox inbox `prune()`.
   - **`maintenance`** (every minute): reconciles stale runs (R4) and schedules (R6).
 - **Rationale**: `purge` is global and age-only, so the per-workflow maximum needs per-instance deletes.
 - **Alternatives considered**: Object storage lifecycle rules (deferred: they would not delete the database rows).
@@ -364,7 +376,7 @@ This feature updates `docs/architecture`:
   - Workflow ownership and `NodeSample` are added.
   - `Run` gains `mode` and `depth`.
 - **03-api.md**:
-  - modules `WorkflowsInfraModule`, `StorageModule` and `OutboundHttpModule`;
+  - modules `WorkflowsInfraModule`, `StorageModule`, `OutboundHttpModule`, `IdempotencyModule` (with `DrizzleIdempotencyStore`) and `ResilienceModule` (policies `http-page`, `sandbox`, `storage`);
   - ports `FormulaEngine`, `Signer`, `NodeSampleRepository` and `WebhookEndpointRepository`;
   - controllers;
   - the `ROLE` bootstrap.
@@ -385,26 +397,29 @@ This feature updates `docs/architecture`:
   - parameters as zod schemas served as JSON Schema;
   - Python and the shared contract for the Code node (R11);
   - the HTTP Request node, including its declarative pagination and the pagination formula scope (R23).
-- **06-security.md**: SSRF controls, credential and webhook secrets, signed resume addresses, and object-level checks.
+- **06-security.md**: SSRF controls, credential and webhook secrets, the uniform not-found answer of the webhook guard, delivery deduplication, signed resume addresses with the optional header credential, object-level checks, and request-rate limits at the gateway instead of in the applications.
 - **02-system.md**: Garage, the `workflows:migrate` release step, the unstable KEDA query and the pool sizing.
 
 ## R22. Dependencies added (exact pins)
 
-| Package               | Version                         | Use                                                   |
-| --------------------- | ------------------------------- | ----------------------------------------------------- |
-| `@nestjs/workflows`   | 0.0.2                           | Durable execution                                     |
-| `@nestjs/http-client` | 0.0.2                           | HTTP Request node                                     |
-| `undici`              | 7.30.0                          | Guarded outbound Agent                                |
-| `ipaddr.js`           | 2.5.0                           | Address classification                                |
-| `@aws-sdk/client-s3`  | 3.1149.0                        | Artifact store                                        |
-| `acorn`               | 8.19.0                          | Formula parser                                        |
-| `luxon`               | 3.7.2                           | Dates in formulas and the Date & Time node            |
-| `cheerio`             | 1.2.0                           | HTML node                                             |
-| `fast-xml-parser`     | 5.11.2                          | XML node                                              |
-| `marked`              | 18.1.0                          | Markdown node                                         |
-| `turndown`            | 7.2.4                           | Markdown node                                         |
-| `amaro`               | exact version pinned when added | TypeScript strip-only transpilation for the Code node |
-| `testcontainers`      | 12.2.0 (dev)                    | Garage and sandbox containers                         |
+| Package               | Version                         | Use                                                      |
+| --------------------- | ------------------------------- | -------------------------------------------------------- |
+| `@nestjs/workflows`   | 0.0.2                           | Durable execution                                        |
+| `@nestjs/http-client` | 0.0.2                           | HTTP Request node                                        |
+| `undici`              | 7.30.0                          | Guarded outbound Agent                                   |
+| `ipaddr.js`           | 2.5.0                           | Address classification                                   |
+| `@aws-sdk/client-s3`  | 3.1149.0                        | Artifact store                                           |
+| `acorn`               | 8.19.0                          | Formula parser                                           |
+| `luxon`               | 3.7.2                           | Dates in formulas and the Date & Time node               |
+| `cheerio`             | 1.2.0                           | HTML node                                                |
+| `fast-xml-parser`     | 5.11.2                          | XML node                                                 |
+| `marked`              | 18.1.0                          | Markdown node                                            |
+| `turndown`            | 7.2.4                           | Markdown node                                            |
+| `@nestjs/idempotency` | 0.0.2                           | Webhook delivery and resume-call deduplication (R24)     |
+| `@nestjs/resilience`  | 0.0.2                           | Per-page HTTP retries, sandbox and storage presets (R24) |
+| `re2js`               | 2.8.6                           | Linear-time regular expressions for user patterns        |
+| `amaro`               | exact version pinned when added | TypeScript strip-only transpilation for the Code node    |
+| `testcontainers`      | 12.2.0 (dev)                    | Garage and sandbox containers                            |
 
 Sandbox image: go-judge v1.13.2, Node.js 24.21.0, CPython 3.14, `luxon` 3.7.2, `lodash` 4.18.1, `python-dateutil` 2.9.0.post0, `pendulum` 3.2.0. Compose test target: `mccutchen/go-httpbin` 2.25.0. Object storage: `dxflrs/garage` v2.4.1. All images are pinned by digest.
 
@@ -438,7 +453,7 @@ Every version is re-checked with `pnpm audit` and Trivy when it is added; `minim
     - a set of request signatures (method, URL, query, body hash) catches repeats and cycles and fails with "pagination did not advance";
     - a missing cursor or next link completes pagination instead of falling back to the original request;
     - the page limit is always on;
-    - 429, 502, 503, 504 and connection errors are retried per page up to 3 times, with exponential back-off honouring `Retry-After` (capped at 60 s);
+    - 429, 502, 503, 504 and connection errors are retried per page up to 3 times by an `http-page` policy of `@nestjs/resilience` (R24). Its back-off function reads the error's `Retry-After` (capped at 60 s) and falls back to exponential back-off. When the retries are exhausted, the page error is a `NodeUserError`, so only the user's retry setting re-runs the node, never the crash allowance of R5;
     - other errors fail the node, discarding the partial output by abandoning the attempt's chunks (R9).
   - **Durability**: the whole pagination for all items runs inside the node's single step; the node is the checkpoint (FR-020). Items paginate one at a time unless batching is configured, so memory stays bounded by one page plus the chunk writer.
   - **Link header**: parsed by a small RFC 8288 reader, taking the first `rel="next"` target, quoted or unquoted, among several links.
@@ -454,3 +469,29 @@ Every version is re-checked with `pnpm audit` and Trivy when it is added; `minim
   - Pagination as a separate "Paginate" node or a loop in the graph (rejected: graphs are acyclic, and it splits one request's configuration in two).
   - A checkpoint per page (rejected by the clarification that makes the node the checkpoint; revisit with integration nodes if long paginations prove costly).
   - A third-party Link header parser (rejected: parsing `rel="next"` from RFC 8288 needs a few lines, and the available packages are unmaintained).
+
+## R24. NestJS reliability packages
+
+- **Decision**: The documented NestJS reliability modules: `@nestjs/workflows` (R2), `@nestjs/outbox` (schedule synchronisation, R6), `@nestjs/idempotency` 0.0.2 and `@nestjs/resilience` 0.0.2. `IdempotencyModule` is imported before `ResilienceModule`, as the resilience docs require.
+  - **Idempotency**
+    - **Store**: the package ships no PostgreSQL store. `DrizzleIdempotencyStore` in `interface-adapters/persistence/` implements `IdempotencyStore` (`acquire`, `complete`, `release`, `extend`) as the documentation shows: table `idempotency_key` with `key_hash` primary key, `fingerprint`, `owner`, `response` and `expires_at`, and its own migration. It is checked against the package's `idempotencyStoreContract({ concurrent: true })` in the integration suite.
+    - **Transactions**: records are written outside the business transaction (documented); the deterministic run ids are the backstop (R6).
+    - **Webhooks**: `@Idempotent({ keyFrom: { header: 'x-delivery-id' }, scope: (req) => req.params.endpointId, fingerprint: (_, ctx) => rawBody, storeIf: (status) => status >= 200 && status < 300, ttl: '7d', lockTtl: '30s' })`. Answers: a replay is the original 202 with `Idempotent-Replayed: true`; a different body is 422 `IDEMPOTENCY_KEY_REUSED`; a concurrent duplicate is 409 `IDEMPOTENCY_KEY_IN_USE` with `Retry-After`; a malformed key is 400. These are the IETF Idempotency-Key semantics the package implements.
+    - **Resume calls**: `@Idempotent({ required: false })` replays a caller's own retried call. "One accepted call per run" stays with the engine's signal id (R6).
+    - **Pruning**: `prune()` runs in the retention job (R19).
+  - **Resilience**: policies are created once in the adapters with `ResilienceService.create`:
+    - `http-page`: a retry for pagination pages, with a `Retry-After`-aware back-off function (R23);
+    - `sandbox`: a timeout and a circuit breaker for the go-judge gateway (R11);
+    - `storage`: a timeout and a circuit breaker for the S3 store (R9).
+
+    Each policy receives the step's `AbortSignal`. No outbound rate limiter is configured; request rates belong to the gateway (R17). Breaker state is per process, which fits one sandbox sidecar per worker pod.
+
+  - **Avoiding double retries**: transient retries live in one layer each.
+    - HTTP pages: the `http-page` policy.
+    - Storage: the S3 SDK.
+    - Platform failures across a node: the engine step (R5).
+    - User-requested node retries: the engine step with the user's settings.
+
+    The HTTP client keeps `retry: false`.
+- **Rationale**: These are the first-party mechanisms (constitution II) the user named for webhooks. Idempotency gives IETF-conformant delivery deduplication with response replay and in-flight protection, without custom `trigger_key` and `payload_hash` columns. Resilience gives standard retry, timeout and breaker policies with abort signals and diagnostics channels.
+- **Alternatives considered**: the outbox inbox for webhook ingestion (rejected: no fingerprint, no stored response and no in-flight answer; the contract returns the `runId` at once, and starting the run in the request transaction is already atomic); custom delivery-id columns (replaced by the idempotency module); a resilience retry around S3 (rejected: it would stack on the SDK's own retries).

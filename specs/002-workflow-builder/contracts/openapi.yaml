@@ -574,6 +574,8 @@ paths:
                   total: { type: integer }
                   offset: { type: integer }
         '404': { $ref: '#/components/responses/Error' }
+        '503':
+          description: Object storage is temporarily unavailable; run status and lists stay available
 
   /credentials:
     get:
@@ -683,17 +685,25 @@ paths:
       - {
           name: x-webhook-signature,
           in: header,
-          description: 'sha256=<hex HMAC of the raw body>',
+          description: 'sha256=<hex HMAC-SHA256 of the raw body>',
           schema: { type: string },
         }
-      - {
-          name: x-delivery-id,
-          in: header,
-          schema: { type: string, maxLength: 200 },
-        }
+      - name: x-delivery-id
+        in: header
+        description: Deduplication key (`@nestjs/idempotency`, remembered 7 days, scoped to the endpoint)
+        schema:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 255,
+            pattern: '^[\x21-\x7E]+$',
+          }
     post:
       tags: [ingress]
       summary: Start a run of the active version (public; GET, PUT, PATCH and DELETE behave the same when configured)
+      description: >-
+        Every call that starts no run (unknown, inactive or archived endpoint, missing or wrong secret, method not
+        configured) gets the same 404. Request rates are limited by the API gateway, not by the API.
       security: []
       requestBody:
         content:
@@ -701,7 +711,13 @@ paths:
             schema: { type: string, maxLength: 1048576 }
       responses:
         '202':
-          description: Run recorded
+          description: Run recorded; a replayed delivery returns the original answer
+          headers:
+            Idempotent-Replayed:
+              {
+                description: Present with value true on a replay,
+                schema: { type: string },
+              }
           content:
             application/json:
               schema:
@@ -709,21 +725,36 @@ paths:
                 required: [runId]
                 properties:
                   runId: { type: string, format: uuid }
-        '401': { description: Missing or invalid secret }
+        '400':
+          { description: Malformed x-delivery-id (IDEMPOTENCY_KEY_INVALID) }
         '404':
-          {
-            description: No active endpoint (same answer for unknown and inactive),
-          }
-        '405': { description: Method not configured on the node }
-        '409': { description: Known delivery id with a different body }
+          { description: No run started; the same answer for every refusal }
+        '409':
+          description: The same delivery is still being recorded (IDEMPOTENCY_KEY_IN_USE)
+          headers:
+            Retry-After: { schema: { type: integer } }
         '413': { description: Body above 1 MB }
+        '422':
+          {
+            description: Known delivery id with a different body (IDEMPOTENCY_KEY_REUSED),
+          }
 
   /resume/{token}:
     parameters:
       - { name: token, in: path, required: true, schema: { type: string } }
+      - {
+          name: Idempotency-Key,
+          in: header,
+          required: false,
+          description: Lets a caller retry its own accepted call and get the original answer,
+          schema: { type: string, maxLength: 255 },
+        }
     post:
       tags: [ingress]
       summary: Resume a run waiting in a Wait node (public; the token is the signed run address)
+      description: >-
+        When the Wait node requires a header credential, the call must present its value; otherwise the address alone
+        authorises the call. The first accepted call wins; later calls are refused.
       security: []
       requestBody:
         content:
@@ -734,8 +765,16 @@ paths:
           {
             description: Accepted; the run continues when it reaches or is at its Wait node,
           }
-        '404': { description: Unknown or invalid address }
-        '409': { description: Already resumed, or the run finished }
+        '404':
+          {
+            description: Unknown or invalid address,
+            or a missing or wrong header credential,
+          }
+        '409':
+          {
+            description: Another call was already accepted,
+            or the run finished,
+          }
         '413': { description: Body above 1 MB }
 
   /settings/retention:
@@ -1163,6 +1202,18 @@ components:
           properties:
             workflowId: { type: string, format: uuid }
             parentRunId: { type: [string, 'null'], format: uuid }
+            errorWorkflow:
+              description: Outcome of the error workflow for a failed production run (FR-029)
+              oneOf:
+                - type: object
+                  required: [runId]
+                  properties:
+                    runId: { type: string, format: uuid }
+                - type: object
+                  required: [skipped]
+                  properties:
+                    skipped: { type: string, enum: [unavailable] }
+                - { type: 'null' }
             steps: { type: array, items: { $ref: '#/components/schemas/Step' } }
     CredentialTypeName:
       type: string

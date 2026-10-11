@@ -189,8 +189,8 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - Runs started while the per-workflow concurrency limit is reached wait in `queued` and start in order.
 - A Schedule Trigger in a time zone with daylight-saving changes runs once per scheduled local time, skipping times that do not exist and not repeating times that occur twice.
 - Scheduled occurrences that fall due while the platform is unavailable for more than a minute are skipped, not replayed.
-- A webhook call to an inactive or archived workflow is refused as not found, without revealing whether the workflow exists.
-- A webhook redelivery with a known delivery identifier but a different body is refused as a conflict.
+- A webhook call to an inactive or archived workflow is refused as not found, without revealing whether the workflow exists. Calls with a missing or wrong secret and calls with a method the node does not accept get the same answer, so nothing distinguishes them.
+- A webhook redelivery with a known delivery identifier but a different body is refused (422) while the delivery is remembered, and a forged call that fails the secret check never affects how the genuine delivery is answered.
 - An Execute Workflow node referencing an archived or unpublished workflow fails with a not-found reason.
 - A workflow that calls itself directly or indirectly fails at the depth limit instead of looping forever.
 - An error workflow that itself fails does not start another error workflow.
@@ -241,13 +241,23 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 **Node catalogue and parameters**
 
 - **FR-013**: The platform MUST serve a catalogue of node types; each entry states its identifier, version, kind (trigger, action, transform), category, display name, description, parameter definitions, accepted credential types, input and output ports, and default settings. Each parameter definition states its type, label, description, default, validation rules, allowed options with labels, whether it accepts field references and formulas, and the values of other parameters under which it applies, so that a client renders every node's form without node-specific code.
-- **FR-014**: The catalogue MUST contain the core nodes listed in the "Core node catalogue" section, each behaving as described there.
+- **FR-014**: The catalogue MUST contain the core nodes listed in the "Core node catalogue" section, each behaving as described there. Regular expressions supplied by users (Rename Keys and the "matches" conditions of If, Filter and Switch) MUST be evaluated in time linear in the input: RE2 syntax, without backreferences or lookaround, at most 1,000 characters. A pattern outside that syntax is a validation error. Formulas offer no regular expressions.
 - **FR-015**: Every node parameter value MUST be one of:
   - a fixed value of the parameter's type;
   - a field reference: the current item or an earlier node, named by its identifier, plus a field path;
-  - a formula in a safe subset of n8n-style expressions (`{{ … }}` with `$json`, `$('Node name')`, `$input`, `$now`, `$run`, operators, and allow-listed functions for text, numbers, lists, objects and dates).
+  - a formula in a safe subset of n8n-style expressions (`{{ … }}` with operators and allow-listed functions for text, numbers, lists, objects and dates).
 
-  Field references and formulas MAY read the current item, the first, last, all or same-position items of any upstream node, the trigger input, and run metadata (run identifier, workflow identifier and name, version, start time, current time in the workflow time zone, the run's resume address). Formulas MUST NOT be able to define functions, loop, assign, run arbitrary code, or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named. For every node of a draft, the platform MUST report the field paths and value types seen in its pinned sample output or its latest test-run output, so that clients offer fields to pick instead of having them typed.
+  Field references and formulas MAY read the current item, the first, last, all or same-position items of any upstream node, the trigger input, and run metadata.
+
+  Formulas name these through the n8n variables, the only names offered anywhere, in formulas and in Code node helpers:
+  - `$json`: the current item;
+  - `$input`: the node's input items;
+  - `$('Node name')`: an upstream node's items;
+  - `$now` and `$today`: the current time and date in the workflow time zone;
+  - `$execution`: `id`, `mode` (`test` or `production`), `startedAt` and `resumeUrl`;
+  - `$workflow`: `id`, `name` and `version`.
+
+  Pagination formulas add the variables of FR-037. Formulas MUST NOT be able to define functions, loop, assign, run arbitrary code, or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named. For every node of a draft, the platform MUST report the field paths and value types seen in its pinned sample output or its latest test-run output, so that clients offer fields to pick instead of having them typed.
 
 - **FR-016**: Every node MUST support these settings:
   - disabled: passes items through;
@@ -259,10 +269,12 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 **Runs**
 
 - **FR-017**: The owner or an administrator MUST be able to start a test run of the current draft or a run of any published version, with input items for a Manual Trigger; the run MUST capture the graph it started with and run with the credentials of the workflow's owner.
-- **FR-018**: A run MUST follow the states queued → running → waiting → succeeded, with the terminal alternatives failed and cancelled; every node that runs MUST produce a step with status, start and end time, attempt count, item count, output size and, on failure, the error.
+- **FR-018**: A run MUST follow the states queued → running → waiting → succeeded, with the terminal alternatives failed and cancelled; every node that runs MUST produce a step with status, start and end time, attempt count, item count, output size and, on failure, the error. A run that the execution engine ends on its own (run timeout, engine limits) MUST show its final status within 2 minutes.
 - **FR-019**: Nodes MUST execute in dependency order. A node MUST run only after every upstream node connected to it has finished or been skipped. A node none of whose inputs received items MUST be skipped unless it is set to always output data, and a node with several inputs runs when at least one of them received items.
-- **FR-020**: Completed nodes MUST NOT be executed again when a run resumes after an interruption of the execution process. A run MUST continue from the first unfinished node, which executes again from its start, so its external requests may be repeated. Sub-workflow calls MUST be identified by run, node and batch, so that a repeated node never starts the same call twice.
+- **FR-020**: Completed nodes MUST NOT be executed again when a run resumes after an interruption of the execution process. A run MUST continue from the first unfinished node, which executes again from its start, so its external requests may be repeated. Sub-workflow calls MUST be identified by run, node and batch, so that a repeated node never starts the same call twice. An interrupted run MUST continue on another execution process within 60 seconds after its process stops, provided one is running; restarting stopped processes is the job of the container orchestrator, not of the platform.
 - **FR-021**: The output of every step MUST be readable page by page in production order for as long as the run is retained; test runs MUST use pinned sample output of a node instead of executing it.
+  - **Platform failures while a node runs**: a failure of the platform's own services (object storage, the code sandbox, the database) is a platform error. It is retried automatically with back-off, up to 3 attempts, independently of the node's retry setting. When it persists, the node fails with the error kind `platform`.
+  - **Reads while object storage is unavailable**: reading step output MUST answer "temporarily unavailable" (503), while run status and lists stay available.
 - **FR-022**: A run MUST respect these limits:
   - a workflow run timeout that counts from the start request and covers the whole run, including queued time and waits: default 1 hour, at most 30 days;
   - at most 10,000 items and 16 MB per step output;
@@ -271,7 +283,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   Exceeding a limit MUST fail the run with a reason that names the limit and the node.
 
 - **FR-023**: The executing runs of one workflow MUST be limited to a platform-wide number (default 5) that applies to every workflow alike; runs beyond it MUST wait in queued state and start in order; waiting runs MUST NOT hold a place.
-- **FR-024**: The owner or an administrator MUST be able to cancel a queued, running or waiting run; a node already executing finishes within its own limits, and no further node MUST start after the cancellation is recorded.
+- **FR-024**: The owner or an administrator MUST be able to cancel a queued, running or waiting run; a node already executing finishes within its own limits, and no further node MUST start after the cancellation is recorded. Cancelling a run, or the end of a run for any reason, cancels the sub-workflow runs it is waiting for. Sub-workflow runs started in "continue at once" mode are independent and are not cancelled.
 
 **Triggers, waits and sub-workflows**
 
@@ -280,14 +292,20 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - **FR-027**: The Webhook trigger MUST do all of the following:
   - expose an unguessable address per active trigger node;
   - accept the configured HTTP methods;
-  - require the endpoint secret, as a header token or an HMAC signature of the body;
+  - require the endpoint secret, as a header token or an HMAC signature of the raw body;
+  - answer the same "not found" to every call that starts no run: an unknown, inactive or archived endpoint, a missing or wrong secret, or a method the node does not accept;
   - refuse bodies above 1 MB;
   - acknowledge the call after the run is recorded;
-  - start exactly one run per delivery identifier when the caller supplies one: a repeated delivery with the same content is answered with the existing run, and one with different content is refused as a conflict.
+  - start exactly one run per delivery identifier when the caller supplies one (header `x-delivery-id`, 1–255 printable characters). While the delivery is remembered (7 days):
+    - a repeated delivery with the same body is answered with the original acknowledgement and run;
+    - one with a different body is refused (422);
+    - one arriving while the first is still being recorded is told to retry (409 with `Retry-After`).
+
+    After that window, or after an interruption between recording the run and remembering the delivery, a repeat is answered with the existing run.
 - **FR-028**: The Execute Workflow Trigger MUST start a run when another workflow calls this one, with the caller's items as input.
-- **FR-029**: The Error Trigger MUST start a run of the error workflow when a run of a workflow that names it as error workflow fails, with the failed run identifier, workflow, node and error message; test runs and error workflow runs MUST NOT start an error workflow.
-- **FR-030**: The Wait node's resume address MUST be unguessable, valid from the start of the run until it ends, and accept one call: the first accepted call resumes the wait (or is kept until the run reaches the Wait node), and later calls are refused; a call carries at most 1 MB. Because the address is per run, a graph MUST contain at most one Wait node in resume mode, and a second one is a validation error.
-- **FR-031**: An Execute Workflow node MUST make at most 1,000 sub-workflow calls per execution, a run MUST make at most 4,000 sub-workflow calls in total, and sub-workflow calls MUST nest at most 5 levels deep; exceeding any of these fails the node with the limit named.
+- **FR-029**: The Error Trigger MUST start a run of the error workflow when a run of a workflow that names it as error workflow fails, with the failed run identifier, workflow, node and error message. Failures include run timeouts and limit breaches; cancelled runs, test runs and error workflow runs MUST NOT start an error workflow. When the error workflow is archived, unpublished or inactive, nothing starts, and the failed run records that its error workflow was unavailable.
+- **FR-030**: The Wait node's resume address MUST be unguessable, valid from the start of the run until it ends, and accept one call: the first accepted call resumes the wait (or is kept until the run reaches the Wait node), and later calls are refused; a call carries at most 1 MB. Each call's body is kept separately, so a refused call never replaces the accepted one. A caller that repeats its accepted call with the same `Idempotency-Key` gets the original acceptance again. The Wait node MAY require the resume call to present the value of one of the owner's header credentials. Without that option, the address alone authorises the call, so everyone who can read a run's data and finds the address in it can resume the run (see Assumptions). Because the address is per run, a graph MUST contain at most one Wait node in resume mode, and a second one is a validation error.
+- **FR-031**: In "wait for completion" mode, an Execute Workflow node MUST fail when a sub-workflow run it waits for fails, times out or is cancelled. The node's error names the sub-workflow run and its reason, and the node's on-error setting then applies as for any failure. A retry of the node (retry on fail) runs again only the calls that did not succeed and reuses the output of those that did. In "continue at once" mode, the outcome of the sub-workflow runs never affects the caller. An Execute Workflow node MUST make at most 1,000 sub-workflow calls per execution, a run MUST make at most 4,000 sub-workflow calls in total, and sub-workflow calls MUST nest at most 5 levels deep; exceeding any of these fails the node with the limit named.
 
 **Code node**
 
@@ -434,7 +452,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 ### Measurable Outcomes
 
 - **SC-001**: A test run of a 10-node workflow processing 100 items finishes and its step outputs are readable within 10 seconds of the start request on a developer workstation running the local environment.
-- **SC-002**: In repeated tests that stop the execution process in the middle of a run, 100% of runs complete after a restart and no completed node runs a second time.
+- **SC-002**: In 20 repeated tests that stop the execution process at random points of a run, while another execution process keeps running: 100% of runs complete, each continues within 60 seconds of the stop, and no completed node runs a second time. For Wait and Execute Workflow, "runs a second time" means waiting again from the start or starting a sub-workflow call again.
 - **SC-003**: 99% of scheduled occurrences start their run within 60 seconds of the scheduled time, and no occurrence starts two runs.
 - **SC-004**: 95% of authenticated webhook calls are acknowledged within 1 second, and each delivery identifier yields exactly one run.
 - **SC-005**: 100% of Code node attempts to reach the network, read host files or exceed a limit fail the node with a named cause, while other runs continue unaffected.
@@ -471,4 +489,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
   - It is an early release (0.0.x), so the plan must verify each mechanism against the installed version.
   - Its documented behaviour sets several rules here: the platform-wide per-workflow concurrency limit, waits counted in the run timeout, cancellation letting the current node finish, and missed schedule occurrences being skipped.
 - This feature introduces the execution process role, object storage for step outputs, the code sandbox and the credential encryption key, as the architecture documents describe.
+- No rate limiting is built into the applications. Request rates on every public route (webhooks, resume addresses, sign-in) are limited by the API gateway, Envoy Gateway, which the platform's Helm chart delivers with the other components. The applications enforce only body size limits and their own resource limits.
+- Restarting a stopped API or execution process, and scaling their replicas, is the job of the container orchestrator (Kubernetes). The platform guarantees only that runs interrupted by a stopped process continue on another one (FR-020).
+- A resume address without the header-credential option is a capability: like n8n's resume URL, anyone who has it can resume that one run. Run data is readable by every signed-in user (clarification of 2026-10-11), so workflows that expose the address in their data and need stronger protection use the header-credential option (FR-030).
 - Limits stated as numbers are platform defaults that operators may lower or raise through configuration.

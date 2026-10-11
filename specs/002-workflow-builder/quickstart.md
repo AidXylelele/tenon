@@ -127,9 +127,9 @@ curl -s $C -X POST http://127.0.0.1:53000/api/v1/workflows/$WF/versions -d '{"re
 curl -s $C -X PUT  http://127.0.0.1:53000/api/v1/workflows/$WF/activation -d '{"version":1}'  # 200
 curl -s $C http://127.0.0.1:53000/api/v1/workflows/$WF/webhooks | jq '.items[0]'              # url, secret
 curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -d '{"order":1}'    # 202 { runId }
-curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -d '{"order":1}'    # 202, same runId
-curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -d '{"order":2}'    # 409
-curl -s -X POST "<url>" -d '{}'                                                                    # 401
+curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -d '{"order":1}'    # 202, same runId, Idempotent-Replayed: true
+curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -d '{"order":2}'    # 422 IDEMPOTENCY_KEY_REUSED
+curl -s -X POST "<url>" -d '{}'                                                                    # 404, identical to an unknown endpoint
 ```
 
 With a Schedule Trigger "every 1 minute", one run per minute appears in `GET /workflows/$WF/runs`, all with `version: 1`. Editing the draft does not change them until the next publish and activation. `DELETE /activation` stops new runs.
@@ -143,7 +143,7 @@ With a Schedule Trigger "every 1 minute", one run per minute appears in `GET /wo
 - **Resume mode**:
   1. Read the resume address from a formula `{{ $execution.resumeUrl }}` or from the step output of an Edit Fields node before the Wait.
   2. `POST <resumeUrl> -d '{"approved":true}'` returns 202, and the run continues with `approved`.
-  3. A second POST returns 409.
+  3. A second POST with another body returns 409, and the run keeps the first body. Repeating the first call with the same `Idempotency-Key` returns its original 202. With the header-credential option, a call without the credential returns 404.
 - **Execute Workflow**: a published child workflow starting with Execute Workflow Trigger returns its last-node items to the caller. A workflow calling itself fails at depth 6.
 - **Error workflow**: assigning an error workflow and failing a production run starts one error run with the failed run, node and message. Test runs never start it.
 
