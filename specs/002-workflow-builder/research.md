@@ -320,7 +320,7 @@ collected in R21; the documents are corrected by this feature.
 ## R17. Scalability and deployment
 
 - **Decision**:
-  - **Gateway**: Envoy Gateway, delivered with the platform's Helm chart, terminates public traffic and enforces request-rate limits on every public route. The applications contain no rate limiter. Feature 001's throttler on sign-in and recovery predates this decision and is reviewed separately.
+  - **Gateway**: Envoy Gateway, delivered with the platform's Helm chart, terminates public traffic and enforces request-rate limits on every public route. The applications contain no rate limiter; feature 001's throttler on sign-in and recovery was removed with constitution 3.0.1 (PR #13).
   - **Restarts**: Kubernetes restarts stopped processes and scales replicas. A run interrupted by a stopped worker is reclaimed by another worker after the lease (30 s) plus one poll (1 s), within the 60 s of FR-020.
   - **API**: horizontal, behind the HPA (02-system.md).
   - **Worker**: replicas scaled by KEDA on the engine's due instances. The query reads the engine's internal columns (`wake_at`, `lease_until`, `concurrency_key`), so it is documented as unstable and re-checked whenever the store's `schemaVersion` changes.
