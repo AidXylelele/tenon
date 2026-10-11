@@ -14,6 +14,14 @@
 
 - Q: Is the generic HTTP Request node part of this feature, or does it belong with the external integrations? → A: Part of this feature, because it is a core part of the platform. Authenticated requests therefore need stored credentials, and the constitution requires credentials used by automations to be encrypted at rest and scoped to the owning user. So this feature also delivers a minimal credential store for the generic HTTP authentication types (header, basic, bearer, query parameter); service-specific credential types stay with the integrations.
 - Q: Are workflows shared by everyone, owned by their creator, or private? → A: Owned by their creator: every signed-in user sees every workflow, its versions and its runs; only the owner or an administrator changes, publishes, activates or runs it.
+- Q: How do users write expressions in node parameters? → A: The option that serves a no-code editor best, keeping user errors and the entry barrier low:
+  - A parameter value is typed: a fixed value, a field reference, or a formula.
+  - The editor builds field references by picking from the known output of earlier nodes; they point to the node, not its name, so renames do not break them.
+  - Formulas are a safe subset of n8n-style expressions, kept for advanced cases.
+- Q: How does the editor save changes to a draft? → A: The whole graph and settings in one atomic request that names the revision it was based on; a stale revision is refused as a conflict; the response carries the new revision and the validation report.
+- Q: How much work of a node with external effects may repeat after the execution process fails in the middle of it? → A: The checkpoint is the node, because that is simpler. An unfinished node runs again from its start, so its requests may be sent again. Making those operations idempotent is the integrator's task, and the platform supplies a stable idempotency key per request.
+- Q: Should the editor be able to test a single node without running the whole workflow? → A: No. Only full test runs of the draft, with pinned sample output standing in for nodes that should not run again.
+- Q: Which languages does the Code node support, and what can scripts use? → A: The goal is to support the popular programming languages conveniently through one contract: items in, a list of objects out, n8n-style helpers in each language, and a fixed set of preinstalled libraries per language. This feature delivers JavaScript, TypeScript and Python; further languages follow later through the same contract.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -43,17 +51,17 @@ An editor creates a workflow and becomes its owner. The owner adds a trigger and
 
 ### User Story 2 - Transform data with custom code (Priority: P2)
 
-An editor adds a Code node and writes a short JavaScript or TypeScript function that receives the incoming items and returns new items. The code runs isolated from the platform, the network and other users' data, within time, memory and output limits; its console output is shown next to the result.
+An editor adds a Code node and writes a short script in JavaScript, TypeScript or Python that receives the incoming items and returns new items, using the same helpers in every language to read the input, the output of earlier nodes and the run details, plus a fixed set of preinstalled libraries. The code runs isolated from the platform, the network and other users' data, within time, memory and output limits; its console output is shown next to the result.
 
 **Why this priority**: The Code node covers every transformation the built-in nodes do not; it is the escape hatch that makes the platform useful before the node catalogue is complete.
 
-**Independent Test**: Build Manual Trigger → Code (multiply a field of every item by two) → run with five items and confirm the output; then confirm that code reading a URL, reading a host file, looping forever or allocating excessive memory fails that node with a clear error while the platform stays available.
+**Independent Test**: Build Manual Trigger → Code (multiply a field of every item by two) in each supported language → run with five items and confirm the same output; then confirm that code reading a URL, reading a host file, looping forever or allocating excessive memory fails that node with a clear error while the platform stays available.
 
 **Acceptance Scenarios**:
 
 1. **Given** a Code node in "run once for all items" mode, **When** the run reaches it, **Then** the code receives all incoming items and its returned items become the node output.
 2. **Given** a Code node in "run once for each item" mode, **When** the run reaches it, **Then** the code runs for every item and the outputs are concatenated in input order.
-3. **Given** code written in TypeScript, **When** it runs, **Then** it behaves the same as the equivalent JavaScript.
+3. **Given** the same script written in JavaScript, TypeScript and Python, **When** each runs on the same items, **Then** they produce the same output through the same helpers.
 4. **Given** code that throws, returns something other than a list of JSON objects, exceeds the time, memory or output limit, or attempts network or file access, **When** it runs, **Then** the node fails with a message naming the cause, the platform does not retry it on its own (the node's retry setting may retry a thrown error, never a limit or isolation breach), and diagnostics written by the code are attached to the step.
 5. **Given** code that writes to the console, **When** it runs, **Then** the written lines are attached to the step as diagnostics, bounded in size.
 
@@ -93,7 +101,7 @@ An editor uses the built-in core nodes to filter, branch, merge, sort, aggregate
 2. **Given** a Switch node with rules, **When** items reach it, **Then** each item leaves through the output of the first matching rule, or through the fallback output when configured.
 3. **Given** a Merge node with two inputs, **When** both upstream branches have finished, **Then** the output follows the chosen mode (append, combine by matching fields, combine by position, all combinations, or choose one input).
 4. **Given** any core node, **When** it receives no items, **Then** it produces no items and downstream nodes are skipped, unless the node is set to always output data.
-5. **Given** node parameters that reference fields of the incoming item or the output of an earlier node, **When** the node runs, **Then** the references are resolved per item; a reference to a missing field resolves to empty, and an invalid reference fails the node with the parameter and the reason.
+5. **Given** node parameters set as field references picked from the incoming item or an earlier node, or as formulas, **When** the node runs, **Then** they are resolved per item; a reference to a missing field resolves to empty, and a formula that cannot be evaluated fails the node with the parameter and the reason.
 6. **Given** a Stop and Error node, **When** items reach it, **Then** the run ends `failed` with the configured message.
 
 ---
@@ -167,6 +175,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - A node output exceeding the item or size limit fails that node with a limit error; earlier outputs remain readable.
 - A run exceeding the workflow run timeout ends `failed` with a timeout reason.
 - The execution process stops during a run: the run resumes on another process and completed nodes are not executed again.
+- The execution process stops in the middle of an HTTP Request node: after recovery the node runs again from its first item, so requests sent before the stop are sent again, carrying the same idempotency keys.
 - Runs started while the per-workflow concurrency limit is reached wait in `queued` and start in order.
 - A Schedule Trigger in a time zone with daylight-saving changes runs once per scheduled local time, skipping times that do not exist and not repeating times that occur twice.
 - Scheduled occurrences that fall due while the platform is unavailable for more than a minute are skipped, not replayed.
@@ -181,7 +190,9 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - Saving a draft while a test run of an earlier draft is in progress does not affect that run, which keeps the graph it started with.
 - Archiving a workflow with an active version deactivates it; runs already in progress continue.
 - Code that never returns is stopped at the time limit; code that spawns processes or writes outside its scratch area is refused by the isolation.
-- An expression that references a node that has not run in this run resolves to empty items and does not fail the node.
+- A field reference or formula that reads a node that has not run in this run resolves to empty and does not fail the node.
+- Renaming a node keeps every field reference to it working and rewrites the node name inside formulas that mention it.
+- A field reference to a path that does not appear in the node's known output is saved with a warning, because real data may still contain it; it does not block publishing.
 - A disabled node passes its input items through unchanged.
 - An HTTP Request host that resolves to a public address when the workflow is saved but to a private address at run time is refused at run time.
 - An HTTP Request URL with a scheme other than http or https, or with credentials embedded in the URL, is refused.
@@ -203,8 +214,8 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - **FR-004**: Editors and administrators MUST be able to duplicate any workflow they can read; the copy is owned by the duplicating user and keeps only credential references that user owns.
 - **FR-005**: The owner or an administrator MUST be able to transfer ownership of a workflow to another editor or administrator; references to credentials the new owner does not own MUST become validation problems, and an active version using them MUST be deactivated with the reason recorded.
 - **FR-006**: A draft MUST hold the graph: nodes (identifier, unique display name, node type and type version, parameters, credential reference, settings, position for the editor, optional note, disabled flag, optional pinned sample output) and connections (from node and output, to node and input), plus workflow settings (time zone, run timeout, error workflow).
-- **FR-007**: Saving a draft MUST be accepted even when the graph is invalid and MUST return a validation report listing every problem by node and parameter: unknown node type or version, parameter values that violate the node definition, a missing or foreign credential, a cycle, no trigger, unreachable nodes, connections to ports that do not exist, duplicate node names, and references in expressions to nodes that do not exist.
-- **FR-008**: Saving a draft MUST be refused as a conflict when the draft changed since it was loaded.
+- **FR-007**: Saving a draft MUST be accepted even when the graph is invalid and MUST return a validation report listing every problem by node and parameter: unknown node type or version, parameter values that violate the node definition, a missing or foreign credential, a cycle, no trigger, unreachable nodes, connections to ports that do not exist, duplicate node names, field references or formulas that read nodes that do not exist or are not upstream, and formulas that do not parse. These are errors and block publishing and test runs; field paths missing from a node's known output are warnings and block nothing.
+- **FR-008**: Saving a draft MUST replace its whole graph and settings in one atomic operation that names the revision it was based on; when the draft changed since that revision, the save MUST be refused as a conflict and change nothing; a successful save MUST return the new revision together with the validation report.
 - **FR-009**: A workflow MUST be limited to 200 nodes; parameters of one node MUST be limited to 256 KB.
 
 **Versions and activation**
@@ -215,9 +226,15 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
 **Node catalogue and parameters**
 
-- **FR-013**: The platform MUST serve a catalogue of node types; each entry states its identifier, version, kind (trigger, action, transform), category, display name, description, parameter definitions with their validation rules, accepted credential types, input and output ports, and default settings.
+- **FR-013**: The platform MUST serve a catalogue of node types; each entry states its identifier, version, kind (trigger, action, transform), category, display name, description, parameter definitions, accepted credential types, input and output ports, and default settings. Each parameter definition states its type, label, description, default, validation rules, allowed options with labels, whether it accepts field references and formulas, and the values of other parameters under which it applies, so that a client renders every node's form without node-specific code.
 - **FR-014**: The catalogue MUST contain the core nodes listed in the "Core node catalogue" section, each behaving as described there.
-- **FR-015**: Node parameters MUST support expressions that reference the current item, the first, last, all or same-position items produced by any earlier node of the run, the trigger input, and run metadata (run identifier, workflow identifier and name, version, start time, current time in the workflow time zone, the run's resume address). Expressions MUST NOT be able to run arbitrary code or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named.
+- **FR-015**: Every node parameter value MUST be one of:
+  - a fixed value of the parameter's type;
+  - a field reference: the current item or an earlier node, named by its identifier, plus a field path;
+  - a formula in a safe subset of n8n-style expressions (`{{ … }}` with `$json`, `$('Node name')`, `$input`, `$now`, `$run`, operators, and allow-listed functions for text, numbers, lists, objects and dates).
+
+  Field references and formulas MAY read the current item, the first, last, all or same-position items of any upstream node, the trigger input, and run metadata (run identifier, workflow identifier and name, version, start time, current time in the workflow time zone, the run's resume address). Formulas MUST NOT be able to define functions, loop, assign, run arbitrary code, or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named. For every node of a draft, the platform MUST report the field paths and value types seen in its pinned sample output or its latest test-run output, so that clients offer fields to pick instead of having them typed.
+
 - **FR-016**: Every node MUST support these settings:
   - disabled: passes items through;
   - always output data: emits one empty item when it would emit none;
@@ -230,7 +247,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - **FR-017**: The owner or an administrator MUST be able to start a test run of the current draft or a run of any published version, with input items for a Manual Trigger; the run MUST capture the graph it started with and run with the credentials of the workflow's owner.
 - **FR-018**: A run MUST follow the states queued → running → waiting → succeeded, with the terminal alternatives failed and cancelled; every node that runs MUST produce a step with status, start and end time, attempt count, item count, output size and, on failure, the error.
 - **FR-019**: Nodes MUST execute in dependency order. A node MUST run only after every upstream node connected to it has finished or been skipped. A node none of whose inputs received items MUST be skipped unless it is set to always output data, and a node with several inputs runs when at least one of them received items.
-- **FR-020**: Completed nodes MUST NOT be executed again when a run resumes after an interruption of the execution process; a run MUST continue from the first unfinished node.
+- **FR-020**: Completed nodes MUST NOT be executed again when a run resumes after an interruption of the execution process. A run MUST continue from the first unfinished node, which executes again from its start, so its external requests may be repeated. Sub-workflow calls MUST be identified by run, node and batch, so that a repeated node never starts the same call twice.
 - **FR-021**: The output of every step MUST be readable page by page in production order for as long as the run is retained; test runs MUST use pinned sample output of a node instead of executing it.
 - **FR-022**: A run MUST respect these limits:
   - a workflow run timeout that covers the whole run including waits: default 1 hour, at most 30 days;
@@ -260,7 +277,14 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
 **Code node**
 
-- **FR-032**: The Code node MUST run user code written in JavaScript or TypeScript in "run once for all items" or "run once for each item" mode, receiving the input items and returning a list of JSON objects.
+- **FR-032**: The Code node MUST run user code written in JavaScript, TypeScript or Python in "run once for all items" or "run once for each item" mode, receiving the input items and returning a list of JSON objects. Every language MUST offer the same n8n-style helpers, named by that language's conventions:
+  - the input items: all, first, and the current item in per-item mode;
+  - the output items of upstream nodes by node name, within the sandbox input limit;
+  - the run metadata and the current time in the workflow time zone;
+  - writing diagnostics.
+
+  Each language MUST also offer a fixed set of preinstalled libraries for dates and data handling, at pinned versions; scripts cannot install packages.
+
 - **FR-033**: User code MUST run isolated from the platform processes, other runs, the network, the host file system, credentials and the platform's environment and secrets.
   - Each invocation is limited to at most 10 seconds of CPU time, 30 seconds of wall time, 256 MB of memory, 16 processes and 16 MB of output.
   - A breach of a limit or of the isolation MUST fail the node as a user error that is never retried.
@@ -280,7 +304,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   - including the response status code and headers in the output;
   - treating every response status as success;
   - batching: N requests per batch with an interval between batches;
-  - sending the step's idempotency key as a header.
+  - sending an idempotency key in a header, unique per run, node and item and identical when the node is repeated after a failure or a retry.
 
   A response larger than 10 MB MUST fail the node.
 
@@ -324,7 +348,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 | Flow      | Execute Workflow         | Runs a published workflow that starts with an Execute Workflow Trigger, once with all items or once per batch of N items; waits for and outputs the sub-workflow's last-node items, or continues at once with its input items.                         |
 | Flow      | Stop and Error           | Ends the run `failed` with a configured message.                                                                                                                                                                                                       |
 | Flow      | No Operation             | Passes items through unchanged.                                                                                                                                                                                                                        |
-| Transform | Code                     | Runs JavaScript or TypeScript once for all items or once per item (User Story 2).                                                                                                                                                                      |
+| Transform | Code                     | Runs JavaScript, TypeScript or Python once for all items or once per item, with the same helpers and preinstalled libraries in each language (User Story 2).                                                                                           |
 | Transform | Edit Fields              | Sets, renames or removes fields by mapping or from a JSON template; keeps all, none, selected, or all-but-selected other fields; dot notation for nested fields.                                                                                       |
 | Transform | Rename Keys              | Renames keys by pairs or by a regular expression.                                                                                                                                                                                                      |
 | Transform | Aggregate                | Combines items into one: selected fields into lists, or all item data into one list.                                                                                                                                                                   |
@@ -354,6 +378,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 - **Draft**: the editable graph of a workflow with its revision for conflict detection and its validation report.
 - **Workflow version**: an immutable, numbered snapshot of the graph created by publishing.
 - **Node**: an instance of a node type in a graph; type and type version, display name, parameters, credential reference, settings, position, pinned sample output.
+- **Parameter value**: what a node parameter is set to; a fixed value, a field reference (node identifier or current item, plus field path) or a formula.
 - **Connection**: a link from an output port of one node to an input port of another.
 - **Node type**: a catalogue entry shipped with the platform; identifier, version, kind, category, parameter definitions, accepted credential types, ports.
 - **Credential**: a named secret of a generic HTTP authentication type owned by one user; encrypted secret values, creation and update times, the workflows that reference it.
@@ -391,13 +416,15 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
   - forms and chat, which belong to the web application: Form Trigger, Form, Chat.
 - Credentials of the generic HTTP types have no service to be verified against; they count as verified once saved, which satisfies the domain rule that published versions reference only verified credentials.
 - The HTTP Request node does not offer pagination, proxies, client certificates or disabling TLS verification in this feature.
-- Workflows exchange data as lists of JSON items; binary data is not part of this feature. Items carry no lineage to the items they came from; expressions reach earlier items by position.
+- Workflows exchange data as lists of JSON items; binary data is not part of this feature. Items carry no lineage to the items they came from; field references and formulas reach earlier items by position.
 - Webhook calls are acknowledged as soon as the run is recorded (docs/architecture/04-execution.md); responding to the caller with data produced by the run (Respond to Webhook) is a later feature.
 - Loops are expressed through item-wise processing and batched sub-workflow calls. Graphs stay acyclic, as the domain model requires, so n8n's Loop Over Items, which needs a cycle, is not offered. Neither are the SQL mode of Merge and the code mode of Sort.
-- Expressions use a restricted expression language with field access, operators and built-in functions for text, numbers, dates and lists; arbitrary code runs only in the Code node.
-- The Code node supports JavaScript and TypeScript; other languages are a later feature.
+- The web editor builds field references and conditions with pickers and offers formulas only as an advanced mode, so most users never type a formula; arbitrary code runs only in the Code node.
+- The Code node supports JavaScript, TypeScript and Python. Further popular languages (for example Go, Java, C#, PHP, Ruby) are added later through the same contract. Python extends the Code node runtime described in docs/architecture/05-node-types.md, which names only Node.js; the plan updates that document.
 - Test runs of workflows that start with a Webhook or Schedule Trigger use input items supplied by the owner or pinned sample output; there is no temporary test webhook address.
+- A test run always executes the whole draft from its trigger; executing a single node or running up to a chosen node is not offered. To try a node on known data, the owner pins the output of the nodes before it.
 - New node types and new node type versions ship with platform releases; there is no user-defined node type.
+- External effects are delivered at least once per node execution. Making the receiving operations idempotent is the responsibility of whoever builds the integration; the platform supplies stable idempotency keys and does not deduplicate on the caller's behalf.
 - Run execution builds on the durable execution module of the NestJS ecosystem named by the architecture documents (`@nestjs/workflows`, docs.nestjs.com/reliability/workflows).
   - It is an early release (0.0.x), so the plan must verify each mechanism against the installed version.
   - Its documented behaviour sets several rules here: the platform-wide per-workflow concurrency limit, waits counted in the run timeout, cancellation letting the current node finish, and missed schedule occurrences being skipped.
