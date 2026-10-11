@@ -86,6 +86,7 @@ export class InvitationsController {
   @ApiCookieAuth('sessionCookie')
   @ApiNoContentResponse()
   @ApiNotFoundResponse()
+  @ApiConflictResponse()
   @ApiGoneResponse()
   revoke(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.revokeInvitation.execute(id);

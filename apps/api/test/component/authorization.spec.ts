@@ -58,6 +58,16 @@ describe('authentication, authorization policies and error responses', () => {
     expect(response.body).toMatchObject({ statusCode: 404 });
   });
 
+  it('a_domain_error_without_an_http_mapping_is_answered_as_an_internal_error_without_details', async () => {
+    const response = await request(t.server)
+      .get('/api/v1/probe/unmapped-domain-error')
+      .expect(500);
+    expect(response.body).toEqual({
+      statusCode: 500,
+      message: 'Internal server error',
+    });
+  });
+
   it('responses_carry_the_hardening_headers_and_no_server_banner', async () => {
     const response = await request(t.server).get('/api/v1/health').expect(200);
     expect(response.headers['x-content-type-options']).toBe('nosniff');

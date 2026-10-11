@@ -16,7 +16,10 @@ import {
   InvalidCredentialsError,
   InvalidPasswordError,
   InvitationConflictError,
+  InvitationExpiredError,
   InvitationNotFoundError,
+  InvitationRevokedError,
+  InvitationUsedError,
   UserNotFoundError,
   UserSuspendedError,
 } from '../../../domain/errors.js';
@@ -24,10 +27,10 @@ import {
 @Catch(DomainError)
 export class DomainErrorFilter extends BaseExceptionFilter {
   override catch(error: DomainError, host: ArgumentsHost): void {
-    super.catch(this.toHttpException(error), host);
+    super.catch(this.toHttpException(error) ?? error, host);
   }
 
-  private toHttpException(error: DomainError): HttpException {
+  private toHttpException(error: DomainError): HttpException | undefined {
     if (error instanceof InvalidCredentialsError) {
       return new UnauthorizedException(error.message);
     }
@@ -54,6 +57,14 @@ export class DomainErrorFilter extends BaseExceptionFilter {
       return new ConflictException(error.message);
     }
 
-    return new GoneException(error.message);
+    if (
+      error instanceof InvitationUsedError ||
+      error instanceof InvitationRevokedError ||
+      error instanceof InvitationExpiredError
+    ) {
+      return new GoneException(error.message);
+    }
+
+    return undefined;
   }
 }

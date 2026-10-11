@@ -168,7 +168,7 @@ paths:
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '409':
-          description: An account with this email already exists
+          description: An account with this email already exists, or a simultaneous invitation for it won
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -200,10 +200,20 @@ paths:
           }
       responses:
         '204': { description: Revoked }
+        '400': { $ref: '#/components/responses/Error' }
         '401': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
+        '409':
+          description: The invitation was changed concurrently
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '410':
+          description: Invitation already accepted, revoked or expired; `message` states which
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /invitations/verify:
     post:
       tags: [invitations]
@@ -267,7 +277,9 @@ paths:
                   user: { $ref: '#/components/schemas/User' }
         '400': { $ref: '#/components/responses/Error' }
         '409':
-          description: An account with this email already exists; the invitation stays pending
+          description: >-
+            An account with this email already exists; the invitation stays pending, unless a
+            simultaneous acceptance of the same link created the account and accepted it
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
