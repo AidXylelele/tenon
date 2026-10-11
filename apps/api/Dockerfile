@@ -2,7 +2,7 @@
 # Build context: repository root (docker build -f apps/api/Dockerfile .).
 
 # --- base: pnpm with the pinned Node runtime ---------------------------------
-FROM ghcr.io/pnpm/pnpm:12.8.1@sha256:44cfd11d75b901dc7a83a16812d9134e4bf9d82f6b0eb28af6d666ebbf0fb4fb AS base
+FROM ghcr.io/pnpm/pnpm:12.12.1@sha256:150c9372f3a6d02039f11dc7d1f6070896567038968c97bbb224e3b03ee3cbcc AS base
 ENV CI=true HUSKY=0
 RUN pnpm runtime set node 24.21.0 -g
 WORKDIR /app
