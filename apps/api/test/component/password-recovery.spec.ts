@@ -98,7 +98,7 @@ describe('password recovery over HTTP', () => {
     await complete(token).expect(400);
   });
 
-  it('a_link_issued_before_a_password_change_stops_working_while_each_link_works_once_until_then', async () => {
+  it('an_earlier_link_still_works_after_a_newer_one_is_issued_and_a_link_issued_before_the_password_change_stops_working', async () => {
     await createUser(t, { email: 'user@example.com' });
     await requestRecovery('user@example.com').expect(202);
     const first = await recoveryTokenFor(t, 'user@example.com');
@@ -106,9 +106,9 @@ describe('password recovery over HTTP', () => {
     await requestRecovery('user@example.com').expect(202);
     const second = await recoveryTokenFor(t, 'user@example.com');
     expect(second).not.toBe(first);
-    await complete(second, 'second-new-password-2').expect(204);
-    await complete(first, 'first-new-password-1').expect(400);
-    await signIn(t.server, 'user@example.com', 'second-new-password-2');
+    await complete(first, 'first-new-password-1').expect(204);
+    await complete(second, 'second-new-password-2').expect(400);
+    await signIn(t.server, 'user@example.com', 'first-new-password-1');
   });
 
   it('a_password_outside_the_policy_is_refused_and_the_link_stays_usable', async () => {

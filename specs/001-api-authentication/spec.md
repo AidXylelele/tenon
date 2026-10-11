@@ -73,7 +73,7 @@ A user who forgot the password requests recovery by email. If an account exists,
 2. **Given** no account for the email, **When** recovery is requested, **Then** the response is the same generic confirmation and no email is sent.
 3. **Given** a valid recovery link, **When** the user submits a password that meets the policy, **Then** the password is replaced, the link is invalidated, and every other session of the user is ended.
 4. **Given** an expired or already used recovery link, **When** it is opened, **Then** the platform refuses it.
-5. **Given** two recovery requests for the same account, **When** both links are issued, **Then** each link works once until its own expiry.
+5. **Given** two recovery requests for the same account, **When** both links are issued, **Then** issuing the newer link does not invalidate the earlier one, and once either link sets a new password the other is refused (FR-014).
 6. **Given** 20 recovery requests from the same client address within 10 minutes, **When** the next request arrives from that address, **Then** it is refused with a "try again later" response that states the wait time.
 
 ---
@@ -117,7 +117,7 @@ A signed-in user changes the password by entering the current password and a new
 ### Functional Requirements
 
 - **FR-001**: Users MUST be able to sign in with an email address and password and sign out.
-- **FR-002**: A session MUST remain valid for 7 days of inactivity and MUST be extended on use; sign-out MUST end the current session.
+- **FR-002**: A session MUST remain valid for 7 days of inactivity and MUST be extended on use, up to an absolute lifetime of 30 days from sign-in; sign-out MUST end the current session.
 - **FR-003**: Sign-in responses MUST NOT disclose whether an email address is registered; wrong-password and unknown-email outcomes MUST be indistinguishable.
 - **FR-004**: Suspended users MUST be refused sign-in and MUST hold no valid session once suspended; the act of suspending is outside this feature (the `suspended` flag of the user record); no administration interface is part of this feature
 - **FR-005**: Self-service registration MUST be disabled; accounts MUST be created only through invitations; the first administrator is created by the database seed migration.
@@ -127,7 +127,7 @@ A signed-in user changes the password by entering the current password and a new
 - **FR-009**: Creating an invitation for an email that already has an account MUST be refused; creating one for an email with a pending invitation MUST revoke the pending one.
 - **FR-010**: Pending invitations MUST be listable and revocable.
 - **FR-011**: Accepting an invitation MUST require a name and a password, MUST create an active account with the invitation's role, MUST mark the invitation accepted, and MUST sign the person in.
-- **FR-012**: Only administrators MUST be able to create, list or revoke invitations (FR-007, FR-010); the restriction MUST be enforced by the operation itself, not only by the endpoint.
+- **FR-012**: Only administrators MUST be able to create, list or revoke invitations (FR-007, FR-010); the restriction MUST be an authorization policy declared on each of these operations (deny by default), not inferred from the route path or from the client hiding the action.
 - **FR-013**: Users MUST be able to request password recovery by email; the response MUST be a generic confirmation regardless of whether an account exists.
 - **FR-014**: A recovery link MUST be single-use and MUST expire 1 hour after issue; several unexpired links MAY exist for one account, and a link issued before the password changed is refused.
 - **FR-015**: Completing recovery MUST replace the password, invalidate the link, and end every other session of the user.
@@ -174,10 +174,10 @@ A signed-in user changes the password by entering the current password and a new
 - Authentication is built on the first-party NestJS packages (`@nestjs/authentication`, `@nestjs/authorization`, `@nestjs/throttler`); their documented mechanisms are used for sessions, password hashing, recovery tokens, CSRF defence and rate limiting
 - Outbound email is sent over SMTP; host, port, credentials and sender address come from configuration; the local environment captures outgoing email in an SMTP capture service with a web inbox instead of delivering it.
 - Links in emails point to the web application; its public base URL comes from configuration, and the API does not depend on the web application being present.
-- Invitation links are valid for 7 days; recovery links for 1 hour; sessions for 7 days of inactivity.
+- Invitation links are valid for 7 days; recovery links for 1 hour; sessions for 7 days of inactivity and at most 30 days from sign-in.
 - Password policy: 12 to 128 characters; no further complexity rules; it applies to invitation acceptance, recovery and password change.
 - Invitation emails carry the link, the inviting administrator's name, the assigned role and the expiry date; recovery emails carry the link and its validity period. The secret travels in the link as the query parameter `token`.
-- Sessions have no absolute maximum lifetime: a session used at least once every 7 days stays valid.
+- A session used at least once every 7 days stays valid until its absolute lifetime of 30 days from sign-in ends (docs/architecture/06-security.md); the user then signs in again.
 - Invitation records are kept indefinitely; used recovery tokens are removed when consumed; expired records are retained until a platform-wide retention job covers them.
 - Recovery links expire at the configured moment (1 hour): refused once the expiry moment has passed; two simultaneous completions of one recovery link follow the provider's behaviour and the link is unusable afterwards.
 - Outbound mail delivery uses a connection timeout and automatic retries with back-off; mail credentials never appear in logs or error messages.
