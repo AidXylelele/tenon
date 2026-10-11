@@ -58,6 +58,8 @@ Expected:
 - `GET /workflows/$WF` now lists field shapes for each node under `samples`.
 - Saving with a stale `revision` returns 409.
 - A draft with a cycle saves with an error in `validation` and is refused by `POST /runs` and `POST /versions` with 422.
+- Each problem has a stable `code` (for example `cycle`).
+- Opening the workflow takes two calls (`GET /workflows/$WF` and `GET /node-types`), and the catalogue answers 304 with its `ETag` (SC-011).
 
 ## Scenario 2: Code node in three languages (US2)
 
@@ -130,6 +132,15 @@ curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -
 curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -d '{"order":1}'    # 202, same runId, Idempotent-Replayed: true
 curl -s -X POST "<url>" -H "x-webhook-token: <secret>" -H 'x-delivery-id: d-1' -d '{"order":2}'    # 422 IDEMPOTENCY_KEY_REUSED
 curl -s -X POST "<url>" -d '{}'                                                                    # 404, identical to an unknown endpoint
+```
+
+In signature mode (chosen on the Webhook node), sign `<timestamp>.<body>` with the endpoint secret:
+
+```bash
+TS=$(date +%s); BODY='{"order":3}'
+SIG=$(printf '%s.%s' "$TS" "$BODY" | openssl dgst -sha256 -hmac '<secret>' -hex | cut -d' ' -f2)
+curl -s -X POST "<url>" -H "x-webhook-timestamp: $TS" -H "x-webhook-signature: sha256=$SIG" -d "$BODY"   # 202
+# the same call with a timestamp 6 minutes old → 404, identical to an unknown endpoint
 ```
 
 With a Schedule Trigger "every 1 minute", one run per minute appears in `GET /workflows/$WF/runs`, all with `version: 1`. Editing the draft does not change them until the next publish and activation. `DELETE /activation` stops new runs.

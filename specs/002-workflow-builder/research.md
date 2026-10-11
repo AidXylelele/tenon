@@ -32,6 +32,7 @@ collected in R21; the documents are corrected by this feature.
     - `maintenance`: declared schedule, every minute;
     - `retention`: declared schedule, nightly at 03:00 UTC.
   - Versioning: changing the sequence of context calls in `run` requires `@Workflow('run', { version: n + 1 })`, and the previous version stays registered until no unfinished instance of it remains. Step bodies and step options may change freely.
+  - **Rolling updates**: a node whose type version is unknown to the executing process raises `PlatformError` and is retried with back-off (R5), so it completes once an updated worker takes the run. Type versions referenced by published versions are never removed (05-node-types.md).
 - **Rationale**: The constitution's first-party rule and the architecture documents name this engine. Its PostgreSQL store is the platform's only stateful component besides object storage (02-system.md). Claims use `FOR UPDATE SKIP LOCKED` with lease fencing, so any number of workers is safe.
 - **Alternatives considered**: A drizzle-kit custom migration generated from `PostgresWorkflowStore.migrationSql()` (rejected: every package upgrade would need a hand-written `{ from, to }` migration); BullMQ with Redis, as in n8n queue mode (rejected: a second state store, and no durable step journal, so a crash loses the run's progress).
 
@@ -80,7 +81,7 @@ collected in R21; the documents are corrected by this feature.
   - **Manual**: `POST /runs` writes the trigger items as attempt 0 of the trigger node, inserts the Run row and starts `run-<runId>` in the request transaction.
   - **Webhook**:
     - **Ingress**: `ALL /webhooks/:endpointId` (public, raw body, at most 1 MB, request-rate limits at the gateway).
-    - **`WebhookIngressGuard`** loads the `WebhookEndpoint` and the workflow's Activation, checks the method, and verifies the secret in constant time, from either the `x-webhook-token` header or the HMAC-SHA256 `x-webhook-signature` header over the raw body. Every failure throws the same `NotFoundException` (FR-027).
+    - **`WebhookIngressGuard`** loads the `WebhookEndpoint` and the workflow's Activation and checks the method. It then authenticates in the one mode chosen on the node: the `x-webhook-token` header compared in constant time, or `x-webhook-signature` = HMAC-SHA256 over `<x-webhook-timestamp>.<raw body>`, with the timestamp within 5 minutes of the platform's clock. Every failure, including an unreadable secret, throws the same `NotFoundException` (FR-027). Endpoint ids and secrets are 32 random bytes (base64url), and only owners and administrators read or rotate them.
     - **Why a guard**: guards run before interceptors, so a forged call never reaches the idempotency record of a genuine delivery.
     - **Deduplication**: the handler carries `@nestjs/idempotency`'s `@Idempotent({ keyFrom: { header: 'x-delivery-id' }, scope: endpointId, fingerprint: rawBody, storeIf: 2xx, ttl: '7d', lockTtl: '30s' })` (R24).
     - **Recording**: the handler is `@Transactional()`. It writes the trigger items, inserts the Run row (`ON CONFLICT DO NOTHING`, returning the existing run) and starts `run-<runId>` in the transaction. It answers 202 `{ runId }`.
@@ -120,6 +121,7 @@ collected in R21; the documents are corrected by this feature.
   - **Concurrency**: `@Workflow('run', { concurrency: { limit: RUN_CONCURRENCY_PER_WORKFLOW, key: (input) => input.workflowId } })`.
     - The limit is read from `process.env` when the class is imported, because decorator options are evaluated at import time. The same variable is validated by the configuration schema at startup.
     - A slot is held only while a run executes, never while it waits (FR-023).
+    - **Queue order**: runs carry the same priority, and the engine orders claims by priority, then wake time, then creation. Queued runs therefore start oldest first by the time they were queued, whatever their trigger (FR-023).
   - **Run timeout**: passed per run as `start({ timeout })` from the workflow settings. It counts from the start request and includes queued time, which spec FR-022 now states.
   - **Limits**: item and byte limits are enforced by the output writer, and the per-run total by `ExecuteRun`, from the step results.
 - **Rationale**: These are the engine's own mechanisms. A per-workflow configurable limit would need custom scheduling on top of the engine.
@@ -213,8 +215,8 @@ collected in R21; the documents are corrected by this feature.
     - `-src-prefix` pointing at an empty directory;
     - `-mount-conf` with a read-only bind of `/opt/sandbox` and a 16 MB tmpfs;
     - never `-net-share`, so each run gets its own network namespace with no interface up.
-  - **Placement**: a sidecar of the worker pod. In Compose it uses `network_mode: service:worker` with `privileged: true`; the reduced set is host cgroup namespace, a `/sys/fs/cgroup` rw mount and seccomp/apparmor `unconfined`. In Kubernetes it is a privileged sidecar in a namespace at the `privileged` Pod Security level, on nodes with user namespaces enabled, and the worker's readiness probe calls `/version`.
-  - **Request**: one `POST /run` per node execution. The harness loops over items in per-item mode; all-items mode receives the whole input, and input above the sandbox input limit (8 MB) is a user error.
+  - **Placement**: a sidecar of the worker pod. In Compose it uses `network_mode: service:worker` with `privileged: true`; the reduced set is host cgroup namespace, a `/sys/fs/cgroup` rw mount and seccomp/apparmor `unconfined`. In Kubernetes it is a privileged sidecar in a namespace at the `privileged` Pod Security level, on nodes with user namespaces enabled, and the worker's readiness probe calls `/version`. The worker's readiness probe reports not ready while `/version` does not answer (DR-006).
+  - **Request**: one `POST /run` per node execution. The harness loops over items in per-item mode; all-items mode receives the whole input, and input above the sandbox input limit (8 MB) is a user error. In per-item mode the worker splits the items into invocations below the 8 MB input limit; in all-items mode, input above it is a user error (FR-033).
     - `files[0]` is stdin with `{ items, nodes, run, mode }` as JSON.
     - `files[1]` and `files[2]` are diagnostics collectors (64 KB together).
     - `files[3]` is the `result` collector on fd 3, so the user's `console.log` or `print` can never corrupt the result.
@@ -243,7 +245,8 @@ collected in R21; the documents are corrected by this feature.
   - **Connect guard**: `connect` wraps `buildConnector({ lookup: guardedLookup, timeout: 10_000 })`.
     - IP-literal hosts are classified directly, because Node never calls `lookup` for them; that was a known bypass of `request-filtering-agent`.
     - `guardedLookup` resolves with `all: true` and refuses when any address is not `ipaddr.process(ip).range() === 'unicast'` (`ipaddr.js` 2.5.0). The socket connects only to the checked addresses, so DNS rebinding has no window.
-    - Hosts on the operator allow-list `HTTP_ALLOWED_HOSTS` skip the address check.
+    - The operator allow-list `HTTP_ALLOWED_HOSTS` holds exact host names (case-insensitive, no wildcards) and CIDR ranges and applies to every port. A listed host skips the address check, and an address inside a listed range passes it. It is configuration only, never set through the API.
+    - **Resolution rules**: a host with several addresses is refused when any address is refused. IPv6 follows the same unicast rule. A resolution failure (`ENOTFOUND`, `EAI_AGAIN`) is a network error: the `http-page` policy retries it in pagination, and the node's retry setting applies otherwise.
   - **Redirects**: `redirect: 'manual'`, at most 5 hops. Each hop re-checks scheme and allow-list, applies the 301, 302 and 303 method rules, and drops credentials on an origin change. Every hop goes through the same Agent, so the address check repeats.
   - **Client and Agent settings**:
     - `retry: false`: whole-node retries belong to the node settings, and per-page transient retries to the pagination loop (R23);
@@ -259,6 +262,8 @@ collected in R21; the documents are corrected by this feature.
 
 - **Decision**:
   - **`SecretCipher` port**: AES-256-GCM over `node:crypto`. Keys come from `SECRET_KEYS` (`v1:<base64>,v2:<base64>`), and new ciphertexts use `SECRET_KEY_VERSION`. Each ciphertext stores its key version, so keys rotate without re-encryption.
+  - **Rotation**: the `maintenance` workflow re-encrypts up to 200 secrets per minute whose key version is older than `SECRET_KEY_VERSION` (credentials and webhook endpoints, optimistic `version` checks), so an old key can be removed once the start-up log reports no secret under it.
+  - **Loss**: a secret whose key version is not configured is unreadable. The credential read reports `unreadable: true`; a node using it fails with `NodeUserError` asking for the secret again; its webhook endpoint answers the uniform 404 until the secret is rotated. Processes start regardless (FR-040).
   - **Credentials**: secrets are write-only in the API. `ExecuteNodeStep` decrypts a credential only for the node that references it, after checking that it is owned by the run's acting user (the workflow owner when the run started).
   - **Webhook endpoint secrets**: encrypted with the same port. They are shown to the owner and administrators, and they rotate.
   - **`Signer` port**: HMAC-SHA256 with `SIGNING_KEY`, for the resume addresses.
@@ -289,7 +294,8 @@ collected in R21; the documents are corrected by this feature.
   - **Runs**:
     - `POST /runs` answers `202 { runId }`;
     - `GET /runs/{id}` answers the status and all steps with an `ETag`; polling every 2 s gets 304 while nothing changed (04-execution.md);
-    - lists use cursors (`nextCursor`), and step output uses `offset` and `limit`.
+    - lists use opaque keyset cursors (`nextCursor`): workflows by last change then id, so a workflow changed during paging may appear again; runs by queue time then id, which never changes, so run paging neither repeats nor skips. Step output uses `offset` and `limit`.
+    - every validation problem has a stable `code` (FR-007), and activation answers 422 with `problems` when a referenced credential is missing, unreadable or foreign (FR-011);
   - **Ingress**: webhook and resume routes are outside the cookie session.
   - **Formats**: parameter values are tagged objects (`{ "fixed": … }`, `{ "ref": … }`, `{ "formula": "…" }`), omitted parameters take defaults, and pinned samples are a separate resource, so autosave never resends them.
   - **Errors**: standard Nest bodies, plus `problems` on 422.
@@ -345,7 +351,7 @@ collected in R21; the documents are corrected by this feature.
 
 - **Decision**:
   - **`retention`** (nightly): `ApplyRetention` selects finished runs older than the period or beyond the per-workflow maximum (a window function) in batches of 200. Per batch it deletes the artifacts by prefix, the Step and Run rows, and the engine instances `run-<id>` with `delete(id)`. After the loop it calls `purge({ olderThan })` for trigger and maintenance instances. Past the batch limit it continues in a new instance. It also calls the idempotency store's `prune()` and the outbox inbox `prune()`.
-  - **`maintenance`** (every minute): reconciles stale runs (R4) and schedules (R6).
+  - **`maintenance`** (every minute): reconciles stale runs (R4) and schedules (R6), so triggers converge within a minute of a failed registration (FR-011), and re-encrypts secrets under old key versions (R13).
 - **Rationale**: `purge` is global and age-only, so the per-workflow maximum needs per-instance deletes.
 - **Alternatives considered**: Object storage lifecycle rules (deferred: they would not delete the database rows).
 

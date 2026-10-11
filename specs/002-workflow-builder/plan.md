@@ -66,7 +66,7 @@ This feature builds the core of the automation platform in the Automation bounde
 **Target Platform**: Linux containers.
 
 - One API image in roles `api` and `worker`.
-- The sandbox image as a privileged sidecar of the worker.
+- The sandbox image as a privileged sidecar of the worker, on nodes with user namespaces, in a namespace at the privileged Pod Security level; the worker is not ready while the sandbox does not answer (DR-006).
 - Compose adds `worker`, `sandbox`, `objects` (Garage) and `httpbin` (the HTTP Request test target).
 
 **Project Type**: web-service (API and worker; `apps/web` untouched).

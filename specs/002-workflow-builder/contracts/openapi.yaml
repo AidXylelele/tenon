@@ -61,7 +61,7 @@ paths:
         - { $ref: '#/components/parameters/Limit' }
       responses:
         '200':
-          description: Page of workflows, most recently changed first
+          description: Page of workflows, most recently changed first (keyset cursor on last change, then id; a workflow changed during paging may appear again)
           content:
             application/json:
               schema:
@@ -139,7 +139,7 @@ paths:
       - { $ref: '#/components/parameters/WorkflowId' }
     put:
       tags: [workflows]
-      summary: Replace the whole draft at the given revision (owner, admin); invalid drafts are saved with their report
+      summary: Replace the whole draft at the given revision (owner, admin); invalid drafts are saved with their report; the request is limited to 5 MB
       requestBody:
         required: true
         content:
@@ -373,6 +373,11 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+        '422':
+          description: A referenced credential is missing, unreadable or not owned by the workflow's owner
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProblemsError' }
     delete:
       tags: [workflows]
       summary: Deactivate; running runs continue (owner, admin)
@@ -434,7 +439,7 @@ paths:
         - { $ref: '#/components/parameters/Limit' }
       responses:
         '200':
-          description: Page of runs
+          description: Page of runs, newest queued first (keyset cursor on queue time, then id; paging never repeats or skips a run)
           content:
             application/json:
               schema:
@@ -685,9 +690,13 @@ paths:
       - {
           name: x-webhook-signature,
           in: header,
-          description: 'sha256=<hex HMAC-SHA256 of the raw body>',
+          description: 'Signature mode: sha256=<hex HMAC-SHA256 of "<x-webhook-timestamp>.<raw body>">',
           schema: { type: string },
         }
+      - name: x-webhook-timestamp
+        in: header
+        description: Signature mode; Unix seconds, refused when more than 5 minutes from the platform clock
+        schema: { type: integer }
       - name: x-delivery-id
         in: header
         description: Deduplication key (`@nestjs/idempotency`, remembered 7 days, scoped to the endpoint)
@@ -702,8 +711,10 @@ paths:
       tags: [ingress]
       summary: Start a run of the active version (public; GET, PUT, PATCH and DELETE behave the same when configured)
       description: >-
-        Every call that starts no run (unknown, inactive or archived endpoint, missing or wrong secret, method not
-        configured) gets the same 404. Request rates are limited by the API gateway, not by the API.
+        The node chooses one authentication mode: token (x-webhook-token) or signature (x-webhook-timestamp and
+        x-webhook-signature). Every call that starts no run (unknown, inactive or archived endpoint, missing or wrong
+        secret, stale timestamp, method not configured, unreadable secret) gets the same 404. Request rates are limited by
+        the API gateway, not by the API.
       security: []
       requestBody:
         content:
@@ -1015,7 +1026,32 @@ components:
             description: Parameter path,
             e.g. "body.fields.0.value",
           }
-        code: { type: string, example: cycle }
+        code:
+          type: string
+          description: Stable problem code (spec FR-007); unknown-field is a warning, every other code an error
+          enum:
+            [
+              node-limit,
+              parameters-too-large,
+              duplicate-node-name,
+              unknown-node-type,
+              invalid-parameter,
+              missing-credential,
+              foreign-credential,
+              credential-type-mismatch,
+              cycle,
+              no-trigger,
+              unreachable-node,
+              unknown-port,
+              unknown-node-reference,
+              not-upstream-reference,
+              formula-syntax,
+              formula-scope,
+              invalid-regex,
+              second-resume-wait,
+              invalid-error-workflow,
+              unknown-field,
+            ]
         message: { type: string }
     ValidationReport:
       type: object
@@ -1035,6 +1071,7 @@ components:
             enum: [string, number, boolean, object, array, 'null'],
           }
     NodeSample:
+      description: Pinned sample (at most 100 items and 1 MB) and known fields (first 20 items, at most 500 paths)
       type: object
       required: [nodeId, pinned, fields]
       properties:
@@ -1108,9 +1145,10 @@ components:
             settings: { $ref: '#/components/schemas/WorkflowSettings' }
     WebhookEndpoint:
       type: object
-      required: [nodeId, url, methods, secret]
+      required: [nodeId, url, methods, authentication, secret]
       properties:
         nodeId: { type: string }
+        authentication: { type: string, enum: [token, signature] }
         url: { type: string, format: uri }
         methods:
           {
@@ -1120,7 +1158,7 @@ components:
         secret:
           {
             type: string,
-            description: Send as x-webhook-token or use for the x-webhook-signature HMAC,
+            description: '256 random bits; sent as x-webhook-token or used as the HMAC key, by the authentication mode',
           }
     RunStatus:
       type: string
@@ -1252,6 +1290,9 @@ components:
         owner: { $ref: '#/components/schemas/UserRef' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        unreadable:
+          type: boolean
+          description: True when the key that encrypted the secret is no longer configured; replace the secret (FR-040)
         usedBy:
           type: array
           description: Present on the single-credential read

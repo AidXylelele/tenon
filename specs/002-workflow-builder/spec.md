@@ -181,6 +181,8 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - A workflow with several trigger nodes starts each run from the trigger that fired; nodes not reachable from that trigger do not run.
 - Nodes not connected to any trigger are reported as unreachable and never run.
 - A node type version that is no longer offered for new nodes remains executable for published versions that reference it.
+- During a rolling update, a node whose type version the executing process does not know fails with a platform error and is retried, so it completes once an updated process takes the run.
+- A credential that is missing or unreadable when a node runs fails that node with a user error naming the credential. Activation re-checks credentials, so an active version never starts with a missing one (FR-011).
 - A Merge node whose one input produced no items follows its mode: append outputs the other input, combine modes output nothing.
 - A node output exceeding the item or size limit fails that node with a limit error; earlier outputs remain readable.
 - A run exceeding the workflow run timeout ends `failed` with a timeout reason.
@@ -223,19 +225,29 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 **Workflows, drafts and ownership**
 
 - **FR-001**: Editors and administrators MUST be able to create workflows; the creator becomes the owner.
-- **FR-002**: Every signed-in user MUST be able to list workflows (paged, with name search and archived and owner filters) and read a workflow with its owner, draft, published versions and activation state.
+- **FR-002**: Every signed-in user MUST be able to list workflows (paged, with name search and archived and owner filters) and read a workflow with its owner, draft, published versions and activation state. Lists are paged with opaque cursors over a fixed order (last change, then identifier). A workflow changed while a client is paging may appear again in a later page, and clients restart paging to see the latest order.
 - **FR-003**: Only the owner or an administrator MUST be able to rename, change the draft, publish, activate, deactivate, archive and restore a workflow and start or cancel its runs; archived workflows are hidden from the default list, cannot be run or activated, and keep their versions and run history.
 - **FR-004**: Editors and administrators MUST be able to duplicate any workflow they can read; the copy is owned by the duplicating user and keeps only credential references that user owns.
 - **FR-005**: The owner or an administrator MUST be able to transfer ownership of a workflow to another editor or administrator; references to credentials the new owner does not own MUST become validation problems, and an active version using them MUST be deactivated with the reason recorded.
 - **FR-006**: A draft MUST hold the graph: nodes (identifier, unique display name, node type and type version, parameters, credential reference, settings, position for the editor, optional note, disabled flag, optional pinned sample output) and connections (from node and output, to node and input), plus workflow settings (time zone, run timeout, error workflow).
-- **FR-007**: Saving a draft MUST be accepted even when the graph is invalid and MUST return a validation report listing every problem by node and parameter: unknown node type or version, parameter values that violate the node definition, a missing or foreign credential, a cycle, no trigger, unreachable nodes, connections to ports that do not exist, duplicate node names, field references or formulas that read nodes that do not exist or are not upstream, and formulas that do not parse. These are errors and block publishing and test runs; field paths missing from a node's known output are warnings and block nothing.
+- **FR-007**: Saving a draft MUST be accepted even when the graph is invalid and MUST return a validation report listing every problem by node and parameter, each with a stable code that clients can act on.
+  - **Errors** block publishing, activation and test runs:
+    - `node-limit`, `parameters-too-large`, `duplicate-node-name`;
+    - `unknown-node-type` (type or version), `invalid-parameter`;
+    - `missing-credential`, `foreign-credential`, `credential-type-mismatch`;
+    - `cycle`, `no-trigger`, `unreachable-node`, `unknown-port`;
+    - `unknown-node-reference`, `not-upstream-reference`, `formula-syntax`, `formula-scope`;
+    - `invalid-regex`, `second-resume-wait`, `invalid-error-workflow`.
+  - **Warnings** block nothing: `unknown-field` (a field path missing from a node's known output).
 - **FR-008**: Saving a draft MUST replace its whole graph and settings in one atomic operation that names the revision it was based on; when the draft changed since that revision, the save MUST be refused as a conflict and change nothing; a successful save MUST return the new revision together with the validation report.
-- **FR-009**: A workflow MUST be limited to 200 nodes; parameters of one node MUST be limited to 256 KB.
+- **FR-009**: A workflow MUST be limited to 200 nodes; parameters of one node MUST be limited to 256 KB; a draft save request MUST be limited to 5 MB.
 
 **Versions and activation**
 
-- **FR-010**: Publishing MUST validate the draft and, when it is valid, create an immutable version with the next version number; an invalid draft MUST NOT be published.
+- **FR-010**: Publishing MUST validate the draft and, when it is valid, create an immutable version with the next version number; an invalid draft MUST NOT be published. Publishing MUST name the draft revision it publishes, and a stale revision is refused as a conflict and publishes nothing.
 - **FR-011**: A workflow MUST have at most one active version; activating a version MUST register its triggers (schedules, webhook endpoints) and end the previous activation; deactivating or archiving MUST remove them.
+  - Activating MUST re-check that every credential the version references still exists, can be read and belongs to the workflow's owner, and is refused with the validation report otherwise.
+  - Triggers MUST take effect within 1 minute of the activation. When registering them fails, the platform retries until it succeeds, and every minute it reconciles registered triggers with activations.
 - **FR-012**: Runs started by triggers of an active version MUST use that version's graph, unaffected by later draft edits.
 
 **Node catalogue and parameters**
@@ -257,7 +269,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   - `$execution`: `id`, `mode` (`test` or `production`), `startedAt` and `resumeUrl`;
   - `$workflow`: `id`, `name` and `version`.
 
-  Pagination formulas add the variables of FR-037. Formulas MUST NOT be able to define functions, loop, assign, run arbitrary code, or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named. For every node of a draft, the platform MUST report the field paths and value types seen in its pinned sample output or its latest test-run output, so that clients offer fields to pick instead of having them typed.
+  Pagination formulas add the variables of FR-037. Formulas MUST NOT be able to define functions, loop, assign, run arbitrary code, or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named. For every node of a draft, the platform MUST report the field paths and value types seen in its pinned sample output or its latest test-run output (taken from the first 20 items, at most 500 paths per node), so that clients offer fields to pick instead of having them typed.
 
 - **FR-016**: Every node MUST support these settings:
   - disabled: passes items through;
@@ -268,12 +280,20 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
 **Runs**
 
-- **FR-017**: The owner or an administrator MUST be able to start a test run of the current draft or a run of any published version, with input items for a Manual Trigger; the run MUST capture the graph it started with and run with the credentials of the workflow's owner.
-- **FR-018**: A run MUST follow the states queued → running → waiting → succeeded, with the terminal alternatives failed and cancelled; every node that runs MUST produce a step with status, start and end time, attempt count, item count, output size and, on failure, the error. A run that the execution engine ends on its own (run timeout, engine limits) MUST show its final status within 2 minutes.
+- **FR-017**: The owner or an administrator MUST be able to start a test run of the current draft or a run of any published version, with input items for a Manual Trigger; the run MUST capture the graph it started with and run with the credentials of the workflow's owner. A test run MUST name the draft revision it runs, and a stale revision is refused as a conflict.
+- **FR-018**: A run MUST follow the states queued → running → waiting → succeeded, with the terminal alternatives failed and cancelled; every node that runs MUST produce a step with status, start and end time, attempt count, item count, output size and, on failure, the error. A failed run or step carries exactly one error kind:
+  - `user`: the workflow's configuration, user code or a remote service's answer;
+  - `limit`: a platform limit, including a request timeout;
+  - `isolation`: a sandbox or destination refusal;
+  - `timeout`: the run timeout (runs only);
+  - `platform`: the platform's own services (FR-021).
+
+  A cancelled run carries `cancelled`. A run that the execution engine ends on its own (run timeout, engine limits) MUST show its final status within 2 minutes.
+
 - **FR-019**: Nodes MUST execute in dependency order. A node MUST run only after every upstream node connected to it has finished or been skipped. A node none of whose inputs received items MUST be skipped unless it is set to always output data, and a node with several inputs runs when at least one of them received items.
-- **FR-020**: Completed nodes MUST NOT be executed again when a run resumes after an interruption of the execution process. A run MUST continue from the first unfinished node, which executes again from its start, so its external requests may be repeated. Sub-workflow calls MUST be identified by run, node and batch, so that a repeated node never starts the same call twice. An interrupted run MUST continue on another execution process within 60 seconds after its process stops, provided one is running; restarting stopped processes is the job of the container orchestrator, not of the platform.
-- **FR-021**: The output of every step MUST be readable page by page in production order for as long as the run is retained; test runs MUST use pinned sample output of a node instead of executing it.
-  - **Platform failures while a node runs**: a failure of the platform's own services (object storage, the code sandbox, the database) is a platform error. It is retried automatically with back-off, up to 3 attempts, independently of the node's retry setting. When it persists, the node fails with the error kind `platform`.
+- **FR-020**: Completed nodes MUST NOT be executed again when a run resumes after an interruption of the execution process. A run MUST continue from the first unfinished node, which executes again from its start, so its external requests may be repeated. Sub-workflow calls MUST be identified by run, node and batch, so that a repeated node never starts the same call twice. The steps that record a run's start, its waits and its end also complete exactly once when interrupted. An interrupted run MUST continue on another execution process within 60 seconds after its process stops, provided one is running; restarting stopped processes is the job of the container orchestrator, not of the platform.
+- **FR-021**: The output of every step MUST be readable page by page in production order for as long as the run is retained; test runs MUST use pinned sample output of a node (at most 100 items and 1 MB per node) instead of executing it.
+  - **Platform failures while a node runs**: a failure of the platform's own services or processes (object storage, the code sandbox, the database, the execution engine, an unexpected internal error) is a platform error. Errors caused by the workflow's configuration, user code, remote services or limits are not platform errors. It is retried automatically with back-off, up to 3 attempts, independently of the node's retry setting. When it persists, the node fails with the error kind `platform`.
   - **Reads while object storage is unavailable**: reading step output MUST answer "temporarily unavailable" (503), while run status and lists stay available.
 - **FR-022**: A run MUST respect these limits:
   - a workflow run timeout that counts from the start request and covers the whole run, including queued time and waits: default 1 hour, at most 30 days;
@@ -282,17 +302,20 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
   Exceeding a limit MUST fail the run with a reason that names the limit and the node.
 
-- **FR-023**: The executing runs of one workflow MUST be limited to a platform-wide number (default 5) that applies to every workflow alike; runs beyond it MUST wait in queued state and start in order; waiting runs MUST NOT hold a place.
+- **FR-023**: The executing runs of one workflow MUST be limited to a platform-wide number (default 5) that applies to every workflow alike; runs beyond it MUST wait in queued state and start oldest first, by the time they were queued, whatever their trigger; waiting runs MUST NOT hold a place.
 - **FR-024**: The owner or an administrator MUST be able to cancel a queued, running or waiting run; a node already executing finishes within its own limits, and no further node MUST start after the cancellation is recorded. Cancelling a run, or the end of a run for any reason, cancels the sub-workflow runs it is waiting for. Sub-workflow runs started in "continue at once" mode are independent and are not cancelled.
 
 **Triggers, waits and sub-workflows**
 
 - **FR-025**: The Manual Trigger MUST start a run with the items supplied by the caller (at most 1,000 items and 1 MB).
-- **FR-026**: The Schedule Trigger MUST support intervals (minutes, hours, days, weeks, months at a given time) and cron expressions in a configurable time zone; each occurrence MUST start at most one run, and an occurrence that falls due while the previous run of the same schedule is still active MUST be skipped.
+- **FR-026**: The Schedule Trigger MUST support intervals (minutes, hours, days, weeks, months at a given time) and cron expressions in a configurable time zone; each occurrence MUST start at most one run, and an occurrence that falls due while the previous run of the same rule is still active MUST be skipped. Each rule of a Schedule Trigger is its own schedule, so overlapping is judged per rule.
 - **FR-027**: The Webhook trigger MUST do all of the following:
-  - expose an unguessable address per active trigger node;
+  - expose an address per Webhook node that stays the same across drafts, versions and activations; the address identifier and the endpoint secret each carry 256 random bits;
+  - show the address and the secret only to the workflow's owner and administrators, who can also rotate the secret;
   - accept the configured HTTP methods;
-  - require the endpoint secret, as a header token or an HMAC signature of the raw body;
+  - authenticate every call with the one mode chosen on the node:
+    - a header token (`x-webhook-token`);
+    - an HMAC-SHA256 signature over the timestamp and the raw body (`x-webhook-timestamp`, `x-webhook-signature`). A signed call whose timestamp is more than 5 minutes from the platform's clock is refused, which stops replays of captured calls.
   - answer the same "not found" to every call that starts no run: an unknown, inactive or archived endpoint, a missing or wrong secret, or a method the node does not accept;
   - refuse bodies above 1 MB;
   - acknowledge the call after the run is recorded;
@@ -304,7 +327,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
     After that window, or after an interruption between recording the run and remembering the delivery, a repeat is answered with the existing run.
 - **FR-028**: The Execute Workflow Trigger MUST start a run when another workflow calls this one, with the caller's items as input.
 - **FR-029**: The Error Trigger MUST start a run of the error workflow when a run of a workflow that names it as error workflow fails, with the failed run identifier, workflow, node and error message. Failures include run timeouts and limit breaches; cancelled runs, test runs and error workflow runs MUST NOT start an error workflow. When the error workflow is archived, unpublished or inactive, nothing starts, and the failed run records that its error workflow was unavailable.
-- **FR-030**: The Wait node's resume address MUST be unguessable, valid from the start of the run until it ends, and accept one call: the first accepted call resumes the wait (or is kept until the run reaches the Wait node), and later calls are refused; a call carries at most 1 MB. Each call's body is kept separately, so a refused call never replaces the accepted one. A caller that repeats its accepted call with the same `Idempotency-Key` gets the original acceptance again. The Wait node MAY require the resume call to present the value of one of the owner's header credentials. Without that option, the address alone authorises the call, so everyone who can read a run's data and finds the address in it can resume the run (see Assumptions). Because the address is per run, a graph MUST contain at most one Wait node in resume mode, and a second one is a validation error.
+- **FR-030**: The Wait node's resume address MUST carry an HMAC-SHA256 signature of the run identifier (256 bits), be valid from the start of the run until it ends, and accept one call: the first accepted call resumes the wait (or is kept until the run reaches the Wait node), and later calls are refused; a call carries at most 1 MB. Each call's body is kept separately, so a refused call never replaces the accepted one. A caller that repeats its accepted call with the same `Idempotency-Key` gets the original acceptance again. The Wait node MAY require the resume call to present the value of one of the owner's header credentials. Without that option, the address alone authorises the call, so everyone who can read a run's data and finds the address in it can resume the run (see Assumptions). Because the address is per run, a graph MUST contain at most one Wait node in resume mode, and a second one is a validation error. A call to a run that has finished, timed out or been cancelled is refused (409). A call accepted before the run reaches its Wait node has no effect if the run ends without reaching it.
 - **FR-031**: In "wait for completion" mode, an Execute Workflow node MUST fail when a sub-workflow run it waits for fails, times out or is cancelled. The node's error names the sub-workflow run and its reason, and the node's on-error setting then applies as for any failure. A retry of the node (retry on fail) runs again only the calls that did not succeed and reuses the output of those that did. In "continue at once" mode, the outcome of the sub-workflow runs never affects the caller. An Execute Workflow node MUST make at most 1,000 sub-workflow calls per execution, a run MUST make at most 4,000 sub-workflow calls in total, and sub-workflow calls MUST nest at most 5 levels deep; exceeding any of these fails the node with the limit named.
 
 **Code node**
@@ -318,7 +341,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   Each language MUST also offer a fixed set of preinstalled libraries for dates and data handling, at pinned versions; scripts cannot install packages.
 
 - **FR-033**: User code MUST run isolated from the platform processes, other runs, the network, the host file system, credentials and the platform's environment and secrets.
-  - Each invocation is limited to at most 10 seconds of CPU time, 30 seconds of wall time, 256 MB of memory, 32 processes and threads, and 16 MB of output.
+  - Each invocation is limited to at most 10 seconds of CPU time, 30 seconds of wall time, 256 MB of memory, 32 processes and threads, 8 MB of input and 16 MB of output. Input above 8 MB in "run once for all items" mode fails the node as a user error; "run once for each item" mode is split into invocations below the limit.
   - A breach of a limit or of the isolation MUST fail the node as a user error that is never retried.
 - **FR-034**: The Code node MUST attach the code's console output to the step as diagnostics, at most 64 KB.
 
@@ -336,7 +359,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   - including the response status code and headers in the output;
   - treating every response status as success;
   - batching: N requests per batch with an interval between batches;
-  - sending an idempotency key in a header, unique per run, node and item and identical when the node is repeated after a failure or a retry.
+  - sending an idempotency key, off by default, in the header `Idempotency-Key` unless renamed on the node; the key is unique per run, node and item and identical when the node is repeated after a failure or a retry.
 
   A response larger than 10 MB MUST fail the node.
 
@@ -368,25 +391,66 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   - **Credentials and isolation**: the credential is applied to every page request on the original origin, and never to a page request on another origin. Every page request passes the destination check of FR-038.
   - **Retries and failure**: pages are written to the output as they arrive. When the node fails, its partial output is discarded, and a repetition of the node starts again from the first page (FR-020).
 
-- **FR-038**: The HTTP Request node MUST refuse a destination before connecting when the host is, or resolves at connection time to, a loopback, private, link-local, multicast, unspecified or otherwise reserved IPv4 or IPv6 address. The check MUST apply again to every redirect and every pagination request, and an operator-configured allow-list MAY permit specific internal hosts. TLS certificates MUST always be verified, and a refusal MUST fail the node as an isolation breach that is never retried.
+- **FR-038**: The HTTP Request node MUST refuse a destination before connecting when the host is, or resolves at connection time to, a loopback, private, link-local, multicast, unspecified or otherwise reserved IPv4 or IPv6 address. The check MUST apply again to every redirect and every pagination request, and an operator-configured allow-list MAY permit specific internal hosts.
+  - A host that resolves to several addresses is refused when any of them is refused. IPv6 destinations follow the same rules as IPv4, and any port is allowed to a permitted address.
+  - A name that cannot be resolved fails the request as a network error: in pagination it is retried as a transient page error, otherwise the node's retry setting applies.
+  - The allow-list holds exact host names (case-insensitive, no wildcards) and IP ranges in CIDR notation, and applies to every port. It is set only in the platform's configuration, never through the API.
+
+  TLS certificates MUST always be verified, and a refusal MUST fail the node as an isolation breach that is never retried.
+
 - **FR-039**: Editors and administrators MUST be able to create credentials of the types header (name and value), basic (username and password), bearer (token) and query parameter (name and value); the creator owns the credential.
 - **FR-040**: Credential secret values MUST be stored encrypted, MUST be write-only (no read returns them), and MUST NOT appear in validation reports, run inputs, step outputs, errors, diagnostics or logs. They are resolved only while the node that uses them executes.
+  - **Key rotation**: credential and webhook secrets are encrypted with versioned keys. New and replaced secrets use the current key, and older versions stay usable while they are configured. The maintenance job re-encrypts secrets under older versions with the current key in batches, after which an operator may remove the old key. The platform logs at start how many secrets each key version holds.
+  - **Key loss**: a secret whose key is missing is unreadable. Reads of the credential report it, nodes that use it fail with a user error asking for the secret to be entered again, and webhook calls to an endpoint with an unreadable secret are refused until the secret is rotated. The platform starts regardless.
 - **FR-041**: Owners MUST be able to list, rename, replace the secret of and delete their credentials, and see which workflows reference each one. Administrators MUST be able to list every credential's name, type, owner and references and delete any credential. A credential referenced by an active version MUST NOT be deletable.
 - **FR-042**: A node MUST reference only credentials owned by the workflow's owner and of a type the node accepts.
 
 **History and retention**
 
-- **FR-043**: Every signed-in user MUST be able to list the runs of a workflow newest first, paged, filtered by status, and read any run with its steps.
+- **FR-043**: Every signed-in user MUST be able to list the runs of a workflow newest first, paged, filtered by status, and read any run with its steps. Runs are ordered by the time they were queued, which never changes, so paging never repeats or skips a run; runs queued after paging started appear when paging restarts.
 - **FR-044**: Administrators MUST be able to set the retention policy: retention period in days (default 14) and maximum runs kept per workflow (default 10,000).
 - **FR-045**: A retention job MUST run every night and remove finished runs older than the retention period or beyond the per-workflow maximum, together with their step outputs; queued, running and waiting runs MUST NOT be removed.
 
 **Access**
 
-- **FR-046**: Access by role:
-  - Viewers MUST be able to read workflows, versions, the node catalogue and runs.
-  - Editors MUST additionally be able to create workflows and credentials and to change, publish, activate and run the workflows they own.
-  - Administrators MUST additionally be able to act on every workflow and credential, transfer ownership and change the retention policy.
-  - Every operation MUST declare its authorization policy, and the ownership check MUST be made on the workflow or credential being accessed.
+- **FR-046**: Access by role, for every operation of the contract:
+
+  | Operation                                                                                                   | Viewer | Editor          | Administrator                    |
+  | ----------------------------------------------------------------------------------------------------------- | ------ | --------------- | -------------------------------- |
+  | Read the node catalogue, workflows, versions, runs and step output                                          | yes    | yes             | yes                              |
+  | Create a workflow; duplicate any readable workflow (the copy is theirs)                                     | no     | yes             | yes                              |
+  | Rename, save the draft, pin samples, publish, activate, deactivate, archive, restore, start and cancel runs | no     | own workflows   | every workflow                   |
+  | Read webhook addresses and secrets, rotate a webhook secret                                                 | no     | own workflows   | every workflow                   |
+  | Transfer workflow ownership                                                                                 | no     | own workflows   | every workflow                   |
+  | List, read and create credentials                                                                           | no     | own credentials | every credential (metadata only) |
+  | Rename a credential or replace its secret                                                                   | no     | own credentials | no                               |
+  | Delete a credential                                                                                         | no     | own credentials | every credential                 |
+  | Read and change the retention policy                                                                        | no     | no              | yes                              |
+
+  Every operation MUST declare its authorization policy, and the ownership check MUST be made on the workflow or credential being accessed. Webhook and resume ingress are public and authenticated by their secrets (FR-027, FR-030).
+
+### Platform limits
+
+All numeric limits in one place. Each is a default that operators may change (Assumptions), and the requirement named holds its full rule.
+
+| Limit                                                       | Value                                                                                                            | Requirement    |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------- |
+| Nodes per workflow; parameters per node; draft save request | 200; 256 KB; 5 MB                                                                                                | FR-009         |
+| Pinned sample per node; known fields per node               | 100 items and 1 MB; first 20 items, 500 paths                                                                    | FR-021, FR-015 |
+| Formula evaluation                                          | 100 ms, 1 MB result                                                                                              | FR-015         |
+| User regular expression                                     | 1,000 characters                                                                                                 | FR-014         |
+| Manual Trigger input                                        | 1,000 items, 1 MB                                                                                                | FR-025         |
+| Webhook and resume call body                                | 1 MB                                                                                                             | FR-027, FR-030 |
+| Webhook delivery memory; signature clock skew               | 7 days; 5 minutes                                                                                                | FR-027         |
+| Step output; outputs per run                                | 10,000 items and 16 MB; 256 MB                                                                                   | FR-022         |
+| Run timeout                                                 | default 1 hour, at most 30 days                                                                                  | FR-022         |
+| Executing runs per workflow                                 | 5                                                                                                                | FR-023         |
+| Retry on fail; platform error retries                       | 1–5 attempts, wait up to 5 minutes; 3 attempts                                                                   | FR-016, FR-021 |
+| Sub-workflow calls                                          | 1,000 per node execution, 4,000 per run, depth 5                                                                 | FR-031         |
+| Code node invocation                                        | 10 s CPU, 30 s wall, 256 MB memory, 32 processes and threads, 8 MB input, 16 MB output; 64 KB diagnostics        | FR-033, FR-034 |
+| HTTP request                                                | timeout default 30 s, at most 5 minutes; 5 redirects; 10 MB response                                             | FR-036         |
+| HTTP pagination                                             | 100 pages by default, at most 1,000; interval up to 60 s; 3 transient retries per page, `Retry-After` up to 60 s | FR-037         |
+| Retention defaults                                          | 14 days, 10,000 runs per workflow                                                                                | FR-044         |
 
 ### Core node catalogue
 
@@ -431,6 +495,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 - **DR-003**: Every new container image MUST be pinned by digest and pass the vulnerability scan with zero critical or high findings; every new dependency MUST be pinned exactly.
 - **DR-004**: Automated tests MUST cover every functional requirement, every edge case and every documented mode of every core node, at the test layers the constitution prescribes. The end-to-end suite MUST include building, test-running, an HTTP Request with a credential and with pagination, publishing, a scheduled run, a webhook run and a resumed run after the execution process restarts.
 - **DR-005**: The web application MUST NOT be modified by this feature.
+- **DR-006**: The execution role's deployment MUST run the code sandbox as a privileged sidecar, on nodes with user namespaces enabled, in a namespace whose Pod Security level allows privileged containers. The worker's readiness MUST report not ready while the sandbox does not answer, and Code nodes fail with a platform error until it does.
 
 ### Key Entities
 
@@ -442,7 +507,8 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 - **Connection**: a link from an output port of one node to an input port of another.
 - **Node type**: a catalogue entry shipped with the platform; identifier, version, kind, category, parameter definitions, accepted credential types, ports.
 - **Credential**: a named secret of a generic HTTP authentication type owned by one user; encrypted secret values, creation and update times, the workflows that reference it.
-- **Activation**: the registration of an active version's triggers; schedules and webhook endpoints with their secrets.
+- **Activation**: the registration of an active version's triggers: its schedules and the Webhook nodes it serves.
+- **Webhook endpoint**: the stable address and secret of one Webhook node of a workflow, kept across drafts, versions and activations; its secret can be rotated.
 - **Run**: one execution of a version or draft snapshot; trigger, status, timestamps, input, current node, resume address.
 - **Step**: one execution of a node within a run; status, attempts, item count, output size, error, diagnostics, output items.
 - **Retention policy**: retention period and maximum runs per workflow.
@@ -457,10 +523,17 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 - **SC-004**: 95% of authenticated webhook calls are acknowledged within 1 second, and each delivery identifier yields exactly one run.
 - **SC-005**: 100% of Code node attempts to reach the network, read host files or exceed a limit fail the node with a named cause, while other runs continue unaffected.
 - **SC-006**: 100% of HTTP Request attempts to reach loopback, private, link-local or metadata addresses are refused before a connection is made, including through redirects and host names that resolve to such addresses.
-- **SC-007**: A credential secret value appears in 0 API responses, run inputs, step outputs, errors, diagnostics or log records produced by the platform, verified by searching for known test secrets after the full test suites.
-- **SC-008**: 100 runs started at the same moment all reach a terminal status, none is lost or duplicated, and each workflow's concurrency limit is never exceeded.
+- **SC-007**: A credential secret value appears in 0 places after the full test suites have run, verified by searching for known test secrets in:
+  - the API responses the suites record;
+  - the log records of both process roles;
+  - the engine journal;
+  - every run artifact in object storage;
+  - the run and step rows, including their error messages;
+  - the outbox and idempotency tables.
+- **SC-008**: 100 runs started at the same moment all reach a terminal status within 5 minutes, none is lost or duplicated, and no workflow ever has more than 5 runs executing. The setup is 10 runs on each of 10 workflows, each workflow being Manual Trigger → Edit Fields → If → Code → HTTP Request to the test service, executed by two execution processes with the default settings.
 - **SC-009**: Every core node in the catalogue has automated tests of each documented mode and option, and every functional requirement and edge case is covered by at least one automated test; all suites pass.
 - **SC-010**: Listing runs and paging a step output return within 2 seconds for a workflow with 10,000 retained runs.
+- **SC-011**: Opening a workflow in the editor takes at most 2 API calls (the workflow and the catalogue, the latter answered 304 when cached), saving a draft takes 1 call, and polling an unchanged run is answered 304 without a body.
 
 ## Assumptions
 
@@ -492,4 +565,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 - No rate limiting is built into the applications. Request rates on every public route (webhooks, resume addresses, sign-in) are limited by the API gateway, Envoy Gateway, which the platform's Helm chart delivers with the other components. The applications enforce only body size limits and their own resource limits.
 - Restarting a stopped API or execution process, and scaling their replicas, is the job of the container orchestrator (Kubernetes). The platform guarantees only that runs interrupted by a stopped process continue on another one (FR-020).
 - A resume address without the header-credential option is a capability: like n8n's resume URL, anyone who has it can resume that one run. Run data is readable by every signed-in user (clarification of 2026-10-11), so workflows that expose the address in their data and need stronger protection use the header-credential option (FR-030).
+- Workflows are archived, never deleted, in this feature. Permanent deletion of a workflow with its versions, webhook endpoints, samples and runs is a later feature; retention already removes old runs (FR-045).
+- Every signed-in user can read all run data, including data fetched with another user's credentials. This is an accepted risk of the shared visibility chosen on 2026-10-11; per-workflow visibility is a later feature.
+- The durable execution module is an early release (0.0.x), so upgrades are explicit. Every upgrade is pinned, passes the engine's store contract tests and the platform's crash-recovery tests, and moves the run workflow to a new version when the order of its steps changes. The engine is reached only through the ports `RunEngine`, `StepRunner` and `ScheduleRegistry`, so replacing it touches only the engine adapters; no fallback engine is part of this feature.
 - Limits stated as numbers are platform defaults that operators may lower or raise through configuration.
