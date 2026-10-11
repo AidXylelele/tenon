@@ -2,10 +2,10 @@
 
 ## Bounded contexts
 
-| Context           | Model                                                      | Data                                                              |
-| ----------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
-| Identity & Access | User, Session, Role                                        | Better Auth tables (`user`, `session`, `account`, `verification`) |
-| Automation        | Workflow, Credential, Activation, Run; node type catalogue | Application tables; node types in code                            |
+| Context           | Model                                                      | Data                                                  |
+| ----------------- | ---------------------------------------------------------- | ----------------------------------------------------- |
+| Identity & Access | User, Session, Role; Invitation aggregate                  | Tables `user`, `session`, `email_token`, `invitation` |
+| Automation        | Workflow, Credential, Activation, Run; node type catalogue | Application tables; node types in code                |
 
 Automation covers the whole lifecycle: workflow → published version → activation → run → retention.
 
@@ -43,6 +43,14 @@ flowchart LR
 | Run        | Step (per node), trigger reference, status, timestamps  | State machine `queued → running → waiting → succeeded`, terminal alternatives `failed`, `cancelled`; a step belongs to a node of the executed version |
 
 Node type is a catalogue entry in code, referenced as `nodeTypeId@version`; it is not an aggregate.
+
+### Identity & Access
+
+| Aggregate  | Contents                                                                                                                      | Invariants                                                                                                                                                                                                                                    |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invitation | email, role, `tokenHash` (fingerprint of the link token), status (`pending`, `accepted`, `revoked`), expiry, inviter, version | Single use; accepted only while pending and before expiry (exclusive); rule violations throw domain errors; the link token itself is never stored; at most one pending invitation per email; the repository locks optimistically by `version` |
+
+Sessions and recovery tokens are records of `@nestjs/authentication` stored by the API. Email format, role membership and the password length are validated at the HTTP boundary; `User` (id, email, name, role, `isAdmin`, `suspended`) is the signed-in user as the use cases see it. `InvitationToken` is the value object for the link token: it generates the value, is rebuilt from an incoming link and derives the fingerprint the invitation keeps.
 
 ## Domain events
 
@@ -134,4 +142,42 @@ classDiagram
   Activation "1" *-- "*" PollingSubscription
   Run ..> WorkflowVersion : references by id
   Run "1" *-- "*" Step
+```
+
+```mermaid
+classDiagram
+  class Invitation {
+    -id
+    -email
+    -role
+    -tokenHash
+    -status
+    -expiresAt
+    -invitedBy
+    -version
+    +create(email, role, invitedBy, token)$
+    +isExpired()
+    +assertPending()
+    +accept(userId)
+    +revoke()
+  }
+  class InvitationToken {
+    <<value object>>
+    -value
+    +generate()$
+    +value
+    +hash
+  }
+  class User {
+    -id
+    -email
+    -name
+    -role
+    -passwordHash
+    -suspended
+    +create(email, name, role, passwordHash)$
+    +isAdmin
+    +changePassword(passwordHash)
+  }
+  Invitation ..> InvitationToken : keeps hash
 ```

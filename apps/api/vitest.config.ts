@@ -4,10 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
-    include: ['src/**/*.spec.ts'],
+    include: ['test/unit/**/*.spec.ts'],
     coverage: {
       include: ['src/**/*.ts'],
-      exclude: ['src/main.ts', 'src/**/*.spec.ts'],
+      exclude: ['src/main.ts', 'src/instrumentation.ts'],
     },
   },
 });

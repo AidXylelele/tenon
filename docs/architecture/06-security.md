@@ -2,22 +2,28 @@
 
 ## Authentication
 
-| Aspect        | Value                                                                                                                        |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Provider      | Better Auth in the API; Drizzle adapter; cookie session                                                                      |
-| Browser       | Holds only the session cookie; the Web BFF proxies `/api/auth/*` and forwards the cookie to the API                          |
-| Tokens        | Access tokens never reach the browser                                                                                        |
-| Configuration | `baseURL` and `trustedOrigins` set explicitly; secure, HttpOnly, SameSite cookies                                            |
-| Sign-up       | Self-service registration disabled; the first administrator is created with the Better Auth CLI; administrators create users |
+| Aspect        | Value                                                                                                                                                                                                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mechanism     | `@nestjs/authentication` in the API: server-side sessions (`session` table, hashed ids, idle 7 d, absolute 30 d), scrypt password hashes, hashed single-use recovery tokens                                                                                             |
+| Browser       | Holds only the session cookie; the Web BFF proxies `/api/v1/auth/*` and forwards the cookie to the API                                                                                                                                                                  |
+| Tokens        | Access tokens never reach the browser                                                                                                                                                                                                                                   |
+| Configuration | `trustedOrigins` set once for `app.enableCsrfProtection` and the session provider; cookie `sid` (`__Host-sid` under https) HttpOnly, SameSite=Lax, Secure from `SESSION_COOKIE_SECURE`                                                                                  |
+| Sign-up       | Self-service registration disabled; the first administrator is seeded by a database migration without a password and sets it through recovery; administrators invite users by link                                                                                      |
+| Invitations   | Single-use link valid 7 days; only the SHA-256 of the secret is stored; acceptance creates the account with the invited role and signs the person in; an existing session is ended first                                                                                |
+| Recovery      | Single-use link valid 1 hour, bound to the password it replaces; completion ends every session; requests answered identically and in constant time                                                                                                                      |
+| Password      | 12 to 128 characters; change requires the current password and ends every other session                                                                                                                                                                                 |
+| Rate limit    | 20 requests per client address per 10 minutes on sign-in, recovery request and recovery completion; client address from `x-forwarded-for` behind the trusted proxies listed in `TRUSTED_PROXIES`; without a forwarded address all clients share one budget per endpoint |
+| Suspension    | A suspended (banned) user is refused sign-in and loses every session                                                                                                                                                                                                    |
+| Events        | No dedicated security event log; request logs carry route, status, client address and trace identifiers; `AuthenticationEvents` of `@nestjs/authentication` is the hook for a later event log; logs never contain passwords, tokens or links                            |
 
 ## Authorisation
 
-| Aspect      | Value                                                                                                              |
-| ----------- | ------------------------------------------------------------------------------------------------------------------ |
-| Model       | Admin plugin access control: statement `workflow`, `credential`, `run`, `settings` × actions                       |
-| Roles       | `admin` (all statements plus user administration), `editor` (manage workflows, credentials, runs), `viewer` (read) |
-| Enforcement | Every use case checks the Principal through the authorisation port; route decorators are a pre-filter only         |
-| Scope       | Object-level checks on every workflow, credential and run accessed                                                 |
+| Aspect      | Value                                                                                                                                                                                                                                                                |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Model       | Roles `admin`, `editor`, `viewer` on the user; policies in `application/policies` decide on the facts of `User` (`isAdmin`, `suspended`)                                                                                                                             |
+| Roles       | `admin` (all statements plus user administration and invitations), `editor` (manage workflows, credentials, runs), `viewer` (read)                                                                                                                                   |
+| Enforcement | `@nestjs/authentication` global guard (`@Public()` opts out) sets the current `User`; `@nestjs/authorization` policies in `application/policies` (`@Can(InvitationPolicy, 'manage')`, `@Can.Anyone()`) evaluated afterwards; a route without a declaration is denied |
+| Scope       | Object-level checks on every workflow, credential and run accessed                                                                                                                                                                                                   |
 
 ## Secrets
 
@@ -56,9 +62,11 @@
 
 ## General
 
-| Aspect           | Value                                                                           |
-| ---------------- | ------------------------------------------------------------------------------- |
-| Input validation | Every request validated against a schema that rejects unknown fields            |
-| Errors           | Single envelope `{ code, message, details[] }`; no internal details             |
-| Web headers      | Content Security Policy, HSTS and standard hardening headers set by the Web BFF |
-| Dependencies     | Lockfile committed; dependency audit and secret scanning in CI                  |
+| Aspect           | Value                                                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Input validation | Every request validated against a schema that rejects unknown fields                                                                                             |
+| Errors           | Standard Nest error body `{ statusCode, message, error }`; domain errors mapped to 400, 401, 403, 404, 409, 410; no internal details                             |
+| API headers      | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`; no server banner                          |
+| Web headers      | Content Security Policy, HSTS and standard hardening headers set by the Web BFF                                                                                  |
+| Dependencies     | Exact versions in the root and the API; lockfile committed; `pnpm audit` and Trivy (lockfile and image) in CI; zero critical or high findings, no exception list |
+| Image            | Distroless Node runtime pinned by digest, non-root (uid 65532), runtime files only, configuration from the environment                                           |

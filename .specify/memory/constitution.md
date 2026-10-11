@@ -1,3 +1,19 @@
+<!--
+Sync Impact Report
+- Version change: 2.0.1 → 3.0.0
+- Modified principles: II. Documentation-First Implementation (research document clause removed);
+  III. Clean Architecture (layer `use-cases` → `application`; use cases are plain classes; boundary
+  data rule restated); IV. Domain-Driven Design (injected time removed; errors thrown);
+  V. CQS (query abstractions); VI. Verified by Tests (test types per layer per the microservice
+  testing strategy); VII. Security by Design (authorisation by route policies)
+- Added sections: API Rules › Code style; API Rules › Application layer
+- Removed sections: API Rules › Use cases (merged into Application layer); `Result` failures;
+  repository interfaces in `domain`; error envelope `{ code, message, details[] }`
+- Templates: .specify/templates/plan-template.md ✅ (generic gate wording); spec, tasks and
+  checklist templates ✅ (no references to removed clauses)
+- Follow-up TODOs: none
+-->
+
 # Workflow Platform Constitution
 
 ## Core Principles
@@ -18,14 +34,14 @@
 
 ### II. Documentation-First Implementation
 
-- Before implementing any capability, the implementer MUST consult the official documentation
-  of the framework in use, at the installed version, and MUST use the mechanism the framework
-  documents for that capability.
-- A custom implementation of a capability that the framework or its first-party modules
-  already provide is prohibited. Custom code is permitted only where the documented mechanism
-  does not cover the requirement; the plan states the gap in one sentence.
-- Package selection is an engineering decision made in the plan; no separate research
-  document, comparison table or inventory of chosen packages is produced.
+- Before implementing any capability, the implementer MUST read the official documentation
+  of the framework in use, at the installed version, in full for that capability, and MUST
+  use the mechanism the framework documents.
+- First-party modules of the framework take precedence over third-party packages and over
+  custom code. A custom implementation of a capability that the framework or its first-party
+  modules provide is prohibited; custom code is permitted only where the documented mechanism
+  does not cover the requirement, and the plan states the gap in one sentence.
+- Deprecated APIs of the runtime, the framework or a library MUST NOT be used.
 - Rationale: framework-provided mechanisms are maintained, tested and understood by every
   engineer; re-implementing them increases the volume of owned code and the defect surface.
 
@@ -34,18 +50,20 @@
 - Each application is organised in concentric layers with a strict dependency rule: source
   code dependencies point inward only. Inner layers MUST NOT reference names, types or data
   formats declared in outer layers.
-- API layers, from inner to outer: `domain` (enterprise business rules), `use-cases`
-  (application business rules), `interface-adapters` (controllers, presenters, repositories,
-  gateways, mappers) and `frameworks` (composition root, bootstrap, configuration,
-  third-party SDK wiring).
-- The `domain` layer is framework-free: plain TypeScript, no decorators, no imports from
-  NestJS, Drizzle, SDKs or telemetry APIs.
-- Coupling to frameworks is accepted outside the domain layer. Use cases MAY be NestJS
-  providers; adapters use NestJS, Drizzle and vendor SDKs directly. Wrapper abstractions whose
-  only purpose is to hide a framework are prohibited; the only abstractions are the ports
-  that inner layers declare and outer layers implement.
-- Data crossing a boundary is a simple data structure shaped for the inner layer. Domain
-  entities and database rows MUST NOT cross boundaries outward or inward.
+- API layers, from inner to outer: `domain` (enterprise business rules), `application`
+  (use cases and authorization policies), `interface-adapters` (controllers, presenters,
+  repositories, queries, gateways, mappers, framework extension points) and `frameworks`
+  (dependency assembly, bootstrap, configuration, technology clients).
+- `domain` and `application` are framework-free: plain TypeScript classes with no imports
+  from NestJS, Drizzle, SDKs or telemetry APIs. The single exception is the `@Policy()`
+  marker of `@nestjs/authorization` on policy classes.
+- Every abstraction that crosses a layer boundary is declared in the `interfaces.ts` of the
+  inner layer as an abstract class, which outer layers implement and which serves as the
+  injection token. Wrapper abstractions whose only purpose is to hide a framework are
+  prohibited.
+- Data crossing a boundary inward is a plain command or query object. A use case returns the
+  entity or the read-model rows it worked with; presenters in `interface-adapters` map them
+  into responses. Database rows never cross into `application`.
 - Boundaries are enforced mechanically by lint in both applications; an allow-list of known
   violations MUST NOT exist.
 - Rationale: business rules remain testable without UI, database or web server, while
@@ -54,47 +72,50 @@
 ### IV. Domain-Driven Design, Simply Implemented
 
 - The domain layer is designed with the tactical building blocks of Domain-Driven Design:
-  entities, value objects, aggregates with a single root, domain services, domain events and
-  one repository per aggregate root. Boundaries follow the business (bounded contexts and
-  aggregates), never technical layers.
+  entities, value objects, aggregates with a single root and domain errors. Boundaries follow
+  the business (bounded contexts and aggregates), never technical layers.
 - The model is rich and always valid: behaviour and invariants live inside entities and
-  aggregates; an invalid instance cannot be constructed; state changes occur only through
-  methods named in the ubiquitous language.
-- The model is pure: no I/O, persistence, clock or logging inside domain classes; external
-  data and the current time are passed in as values.
-- Implementation is the simplest that satisfies the principles: plain classes or readonly
-  objects, no base-class hierarchies beyond identity and value equality, no generic
-  repositories, no pattern introduced without a present need.
+  aggregates; state changes occur only through methods named in the ubiquitous language; a
+  rule violation throws a domain error.
+- Entities state facts (`isAdmin`, `suspended`); access decisions belong to policies in
+  `application`.
+- The model is pure: no I/O, persistence, logging or framework inside domain classes. Reading
+  the current time and generating identifiers or secrets with the Node runtime is permitted.
+- Implementation is the simplest that satisfies the principles: plain classes, no base-class
+  hierarchies, no generic repositories, no pattern introduced without a present need.
 - Rationale: concentrated invariants cannot be bypassed; a pure, simple model is cheap to
   test and to change.
 
 ### V. Command–Query Separation (CQS)
 
-- Every operation exposed by a use case is either a command, which changes state and returns
-  at most an acknowledgement or the identifier of what it created, or a query, which returns
-  data and has no observable side effect. An operation MUST NOT do both.
-- Commands execute through the domain model and its repositories inside one transaction.
-  Queries read through dedicated read adapters or repositories and return DTOs; they MUST NOT
-  mutate state.
-- No command bus, mediator, event-sourcing or separate read database is required by this
+- Every operation exposed by a use case is either a command, which changes state, or a
+  query, which returns data and has no observable side effect. An operation MUST NOT do both.
+- Commands load aggregates through repositories, invoke aggregate behaviour and persist
+  through repositories inside one transaction. Queries read raw rows through query
+  abstractions whose filtering, ordering and aggregation happen in SQL; they MUST NOT load
+  aggregates or filter in memory.
+- No command bus, mediator, event sourcing or separate read database is required by this
   principle. Use cases are invoked directly through dependency injection.
 - Rationale: separating state changes from reads keeps writes under the domain model's
   invariants and keeps reads simple and side-effect free.
 
 ### VI. Verified by Tests
 
-- Every behaviour is covered by the test type appropriate to its layer: domain logic by unit
-  tests without test doubles; use cases, repositories and adapters by integration tests
-  against a real PostgreSQL instance; HTTP endpoints by component tests through the HTTP
-  layer; user journeys by a small end-to-end suite.
+- Tests follow the microservice testing strategy: sociable unit tests for the domain,
+  solitary unit tests for use cases and policies, integration tests for persistence and
+  outbound adapters, in-process component tests for the HTTP interface, and a small
+  end-to-end suite of persona journeys. The pyramid is wide at the bottom; a behaviour is
+  tested at the lowest level that can observe it and not repeated above.
 - Tests verify observable behaviour through public interfaces, never structure or internal
-  interactions. Only unmanaged out-of-process dependencies (external services, brokers,
-  email) MAY be replaced by test doubles behind the application's own ports. The database is
-  never mocked.
-- Tests are deterministic and isolated: no sleeps or delays; time is injected; data is
-  self-provisioned; suites run in any order.
-- Work is complete only when every suite (unit, integration, end-to-end) runs and passes and
-  the evidence is presented; a failing or skipped test blocks completion.
+  interactions: state and output assertions, no interaction verification on mocks, no
+  recomputation of expected values with the production algorithm.
+- Only unmanaged out-of-process dependencies (SMTP, external services) are replaced by test
+  doubles, behind the application's own ports or the framework's documented test transport.
+  The database is never mocked.
+- Tests are deterministic and isolated: no fixed delays; a wait is a bounded poll on
+  observable state; data is self-provisioned; suites run in any order.
+- Work is complete only when every suite runs and passes and the evidence is presented; a
+  failing or skipped test blocks completion.
 - Rationale: the value of a test is its ability to catch regressions without false alarms;
   coupling tests to implementation details removes that value.
 
@@ -103,9 +124,9 @@
 - Every change is designed and reviewed against the attack vectors listed in Verification and
   Security Requirements. Security controls are part of the specification and the acceptance
   criteria, not an afterthought.
-- Deny by default: every API endpoint requires authentication and explicit authorisation;
-  every input is validated against a schema at the boundary; every secret is externalised;
-  every outbound call from user-defined automations is constrained.
+- Deny by default: every API endpoint declares its access (public, any signed-in user, or a
+  policy); every input is validated against a schema at the boundary; every secret is
+  externalised; every outbound call from user-defined automations is constrained.
 - Static analysis, dependency audit and secret scanning are mandatory gates; a known high or
   critical vulnerability blocks merge.
 - Rationale: the platform executes user-defined automations and holds user credentials; its
@@ -116,12 +137,12 @@
 - OpenTelemetry is the single telemetry API for traces, metrics and logs in both
   applications. Only stable, actively maintained OpenTelemetry components and the official
   instrumentation of the frameworks in use are permitted.
-- Telemetry is configured in the outermost layer of each application (`frameworks` in the
-  API; the Next.js instrumentation hook in the web application) and relies on automatic
+- Telemetry is configured in the outermost layer of each application (`instrumentation.ts`
+  preloaded with `--import` in the API; the Next.js instrumentation hook in the web
+  application), configured only through `OTEL_*` variables, and relies on automatic
   instrumentation. Manual spans are added only where automatic instrumentation leaves a gap
-  that matters for diagnosis, and only in interface adapters or infrastructure-level
-  libraries; domain, use-case, module, feature and operation code contains no telemetry
-  calls.
+  that matters for diagnosis, and only in interface adapters; domain, application, module,
+  feature and operation code contains no telemetry calls.
 - Trace context is propagated from browser to BFF to API using the W3C Trace Context
   standard; every log record carries the trace and span identifiers.
 - Telemetry attributes and log records MUST NOT contain secrets, credentials, tokens or
@@ -135,8 +156,8 @@
   patterns and packages are introduced only when a rule of this constitution or a present
   requirement demands them, and each such addition is justified in the plan's Complexity
   Tracking table.
-- Program flow is explicit: results are returned and passed on; interfaces exist only for
-  ports and genuine polymorphism; dependencies are explicit constructor or method parameters.
+- Program flow is explicit and linear: results are returned and passed on; interfaces exist
+  only for ports and genuine polymorphism; dependencies are explicit constructor parameters.
 - Dependency cycles between modules, tiers or classes are prohibited.
 - Rationale: simplicity is the primary defence against defects and the primary enabler of
   change.
@@ -145,32 +166,40 @@
 
 ### Stack
 
-NestJS (ESM, SWC), Drizzle ORM, PostgreSQL, Vitest, supertest, OpenTelemetry. Node and
-TypeScript versions are pinned at the repository root.
+NestJS 12 (ESM, SWC) with its first-party modules `@nestjs/authentication`,
+`@nestjs/authorization`, `@nestjs/throttler`, `@nestjs/mail`, `@nestjs/outbox`,
+`@nestjs/terminus`, `@nestjs/config` and `@nestjs/swagger`; `nestjs-cls` with
+`@nestjs-cls/transactional` for transaction propagation; Drizzle ORM over `pg` on PostgreSQL;
+`zod` for the environment schema; `nestjs-pino` logging; the OpenTelemetry Node SDK with
+auto-instrumentations; Vitest, supertest and Testcontainers for tests. Versions are pinned
+exactly; Node and pnpm are pinned at the repository root.
 
 ### Layers and layout
 
 ```text
 apps/api/src/
-  domain/              entities, value objects, aggregates, domain services, domain events,
-                       repository interfaces
-  use-cases/           one interactor per use case (command or query), input and output
-                       models, output ports for external services
-  interface-adapters/  HTTP controllers and presenters, repositories and read adapters on
-                       Drizzle, Drizzle schema and migrations, gateways to external services,
-                       mappers
-  frameworks/          NestJS modules (dependency assembly), bootstrap, configuration,
-                       OpenTelemetry setup, third-party SDK initialisation
+  main.ts              bootstrap
+  instrumentation.ts   OpenTelemetry Node SDK, preloaded with --import
+  domain/              entities, value objects, errors.ts, interfaces.ts (props and types)
+  application/         use-cases/ (one interactor per command or query), policies/
+                       (authorization policies), interfaces.ts (commands, outputs, ports)
+  interface-adapters/  http/ (controllers, dto, presenters, filters, middleware),
+                       auth/ (framework extension points and stores of the authentication
+                       module), mailing/ (gateway, outbox transport, handler, templates),
+                       persistence/ (repositories, mappers, queries, schema),
+                       interfaces.ts (what frameworks provide)
+  frameworks/          di/ (NestJS modules: dependency assembly only) and one folder per
+                       technology with its factory function
 ```
 
-- Dependency direction: `frameworks` → `interface-adapters` → `use-cases` → `domain`. Layers
-  are flat: no sub-folders per bounded context; context membership is expressed by the NestJS
-  module that assembles the providers.
+- Dependency direction: `frameworks` → `interface-adapters` → `application` → `domain`.
+  Layers are flat: no sub-folders per bounded context; context membership is expressed by the
+  NestJS module that assembles the providers.
 - NestJS modules are dependency-injection assemblies only. A module binds ports to adapters
   and registers controllers and use cases for one bounded context; it contains no logic and
-  is not an architectural layer.
-- All SQL, Drizzle usage and HTTP mapping are confined to `interface-adapters`. Use cases
-  depend on ports; the domain depends on nothing.
+  is not an architectural layer. Use cases are assembled by factory providers.
+- All SQL, Drizzle usage and HTTP mapping are confined to `interface-adapters`. Adapters are
+  grouped by what they adapt (inbound and outbound together), not by direction.
 - Nest CLI scaffolds MAY be used to generate files, which are then placed into this layout.
   Nest's own monorepo mode (`nest g app|library`) is prohibited.
 
@@ -178,73 +207,86 @@ apps/api/src/
 
 - Naming follows the ubiquitous language of the bounded context; core-domain classes carry no
   technical suffixes.
-- Entities have a surrogate, immutable identity and identity-based equality. Value objects are
-  immutable, compared by value, created through a factory that validates its input, and
-  persisted inline in the owning entity's table.
-- An aggregate is a consistency boundary with exactly one root. Child entities and value
-  objects are created, modified and removed only through root methods; collections are
-  exposed read-only; properties have no public setters. Aggregates are kept small and
-  reference other aggregates by identifier only.
-- Invariants are enforced in constructors and mutating methods; a mutation validates all
-  inputs before changing any state. Invalid input yields a `Result` failure carrying a domain
-  error code; an invariant violation inside the domain throws, because it is a defect.
-- Domain services hold stateless rules that span aggregates. Domain events are immutable
-  past-tense facts raised by aggregates and collected on the root.
-- Repository interfaces are declared in `domain`, one per aggregate root, exposing only the
-  operations commands need.
+- Entities have `#private` fields, getters, a public constructor taking the props declared in
+  `interfaces.ts` (used by mappers to reconstitute) and a static factory returning the
+  entity. Properties have no setters; state changes go through behaviour methods.
+- Secrets handed to users (link tokens) are value objects that generate the value and derive
+  its fingerprint; the entity keeps only the fingerprint.
+- Aggregates are kept small, reference other aggregates by identifier and carry the
+  `version` used by the repository for optimistic concurrency; they contain no persistence
+  logic.
+- Validation constants of the transport (lengths, formats) live in the request models, not
+  in the domain.
 
-### Use cases
+### Application layer
 
-- A use case is one class with one public method. A command use case loads or creates the
-  aggregate through its repository, invokes aggregate behaviour, persists through the
-  repository and returns a `Result`; it contains no domain logic. A query use case returns
-  DTOs through a read port.
-- Input validation at the HTTP boundary is schema-based and executed before the use case;
-  domain invariants are enforced by the aggregate regardless.
-- Use cases MAY be NestJS providers. They MUST NOT import HTTP, Drizzle, SDK or telemetry
-  types.
+- A use case is one class with one `execute` method and a linear body: load through a
+  repository, invoke entity behaviour, persist, return the entity or nothing. Rule violations
+  are domain errors thrown by the entity, the use case or the repository; use cases contain
+  no `try`/`catch`, no framework imports and no transport concerns.
+- Recurring conditions on stored data are repository query methods (for example
+  `findActiveById`), not conditions repeated in use cases or adapters.
+- Authorization policies are plain classes in `application/policies` marked with
+  `@Policy()`; they decide on facts exposed by entities and are declared on routes with
+  `@Can`. Routes open to every signed-in user declare `@Can.Anyone()`; anonymous routes
+  declare `@Public()`.
+- Output ports (repositories, queries, hasher, mailing) are abstract classes in
+  `application/interfaces.ts`; the framework's own services (session issue, password reset
+  tokens) are used from adapters, not re-declared as ports.
 
-### Transactions and events
+### Transactions and outbound effects
 
-- One command equals one transaction, scoped to the request and opened by the mechanism the
-  framework documents for transaction propagation.
-- Domain events are dispatched in process after the aggregate is persisted and, by default,
-  within the same transaction. Dispatching before commit is the default; eventual
-  consistency requires an explicit decision in the plan.
-- Effects that leave the process (email, webhooks, message brokers, notifications to other
-  systems) are published through a transactional outbox so that a message is sent if and
-  only if the transaction committed. Consumers are idempotent.
-- Long-running or multi-step automations use the durable execution mechanisms documented by
-  the framework; hand-written state machines over timers are prohibited.
-- Concurrency control is optimistic through a version column on aggregate-root tables; a
-  conflict is returned to the caller as HTTP 409 and is not retried automatically.
-- Application-wide uniqueness is guaranteed by a database unique index; the adapter maps the
-  specific constraint violation to a `Result` failure and rethrows everything else.
+- One command equals one transaction, opened at the controller with `@Transactional()` and
+  propagated by `nestjs-cls`; repositories write through `TransactionHost.tx`.
+- Effects that leave the process (email, webhooks, notifications) are written to the
+  `@nestjs/outbox` store in the same transaction and delivered by its relay, so a message is
+  sent if and only if the transaction committed. Handlers are idempotent; permanent failures
+  go to the dead letter table.
+- Concurrency control is optimistic through the `version` column on aggregate-root tables; a
+  stale update is a domain conflict error (HTTP 409) and is not retried automatically.
+- Application-wide uniqueness is guaranteed by a database unique index.
 
 ### HTTP interface
 
-- Routes are versioned under `/api/v1`. Controllers are thin: they validate transport input,
-  invoke one use case, and map the `Result` to an HTTP status and the single error envelope
-  `{ code, message, details[] }`. All validation errors are returned at once.
-- The OpenAPI document is generated from explicit DTO classes. Breaking changes follow
-  parallel change: expand, migrate consumers, contract.
-- Unexpected exceptions are handled only by the global exception filter, which logs them with
-  the trace identifier and returns HTTP 500 without internal details.
+- Routes are versioned under `/api/v1`. Controllers are thin: they validate transport input
+  with explicit DTO classes (`ValidationPipe` with whitelist, forbid-non-whitelisted and
+  transform; all validation errors returned at once), invoke one use case and return the
+  presenter's response model.
+- Errors are standard Nest `HttpException` bodies: `DomainErrorFilter` maps each domain error
+  class to an HTTP exception; no custom error envelope exists.
+- Health checks (`@nestjs/terminus`) report process liveness only and never query the
+  database; shutdown is graceful through Terminus and `enableShutdownHooks()`.
+- The OpenAPI document is generated from the DTO classes. Breaking changes follow parallel
+  change: expand, migrate consumers, contract.
+
+### Code style
+
+- No comments in code; names carry the meaning. Names reveal the abstraction type
+  (`…Repository`, `…Queries`, `…Gateway`, `…Presenter`, `…Handler`, `…Mail`).
+- Readability over compactness: an awaited call is assigned to a named variable before it is
+  used in a condition or as an argument; it is never inlined.
+- A guard clause (`if (…) throw …`, `if (…) return …`) is separated from the surrounding
+  statements by blank lines so that every point where execution can stop is visible.
+- No tiny private helpers without repetition; no `Symbol` injection tokens; no `let` or
+  `null` checks where a repository query method can carry the condition.
 
 ### Testing
 
-| Element | Test type | Constraints |
-|---|---|---|
-| Domain | Unit tests | Real domain objects, output or state verification, the aggregate is the unit |
-| Use cases, repositories, read adapters | Integration tests | Real PostgreSQL; one happy path per use case plus edge cases unit tests cannot reach; assert by reading the database back |
-| Controllers | Component tests | Whole application in process through HTTP; real database; test doubles only for unmanaged dependencies |
-| Gateways to external services | Unit and gateway integration tests | Request building and response mapping; failure modes via a controllable stub |
-| System | End-to-end | Few persona journeys, minutes-scale budget, self-provisioned data |
+| Layer                                      | Test type                   | Location and constraints                                                                                                                                                 |
+| ------------------------------------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Domain                                     | Sociable unit tests         | `test/unit/domain`: real entities and value objects, no doubles, state and output assertions, hard-coded expected values                                                 |
+| Use cases, policies                        | Solitary unit tests         | `test/unit/application`: in-memory fakes of the ports from `test/support`, state verification through the fakes, no interaction assertions                               |
+| Mail templates                             | Unit tests                  | `test/unit/mailing`: rendered content                                                                                                                                    |
+| Repositories, queries, stores, migrations  | Persistence integration     | `test/integration/persistence`: real PostgreSQL (Testcontainers); round trips, SQL filtering, optimistic concurrency, constraints, seed migrations                        |
+| Outbox transport and handler               | Integration                 | `test/integration/mailing`: rollback and commit semantics, relay delivery, retry on failure, with the framework's in-memory mail transport in place of SMTP               |
+| Controllers, guards, filters, policies     | Component tests             | `test/component`: the whole application in process through HTTP (supertest), real database, SMTP replaced by the in-memory transport, relay driven explicitly            |
+| System                                     | End-to-end                  | `test/e2e`: few persona journeys against the Compose stack and the built image, self-provisioned data, minutes-scale budget                                              |
+| Consumers of the API                       | Consumer-driven contracts   | Added when a consumer exists; the OpenAPI document is the contract until then                                                                                            |
 
 Tests are named as plain-English statements of fact with underscores and never include the
-name of the method under test. Expected values are hard-coded facts, never recomputed with
-the production algorithm. Production code contains no members or switches that exist only
-for tests.
+name of the method under test. Production code contains no members or switches that exist
+only for tests. Unit test commands: `pnpm --filter api test`; persistence, mailing and
+component suites: `pnpm --filter api test:int`; journeys: `pnpm --filter api test:e2e`.
 
 ## Web Rules (apps/web)
 
@@ -385,9 +427,9 @@ A change is complete only when all of the following have been executed and their
 presented as evidence:
 
 1. `pnpm lint` and `pnpm check-types` pass with no warnings suppressed.
-2. `pnpm test` (unit), the integration and component suites against a real PostgreSQL, and
-   `pnpm test:e2e` pass with zero failures and zero skipped tests; `.only` and `.skip`
-   markers are not committed.
+2. `pnpm --filter api test`, `pnpm --filter api test:int` (persistence, mailing and
+   component suites on a real PostgreSQL) and `pnpm --filter api test:e2e` pass with zero
+   failures and zero skipped tests; `.only` and `.skip` markers are not committed.
 3. The security gates below pass.
 4. The OpenAPI document and affected documentation are regenerated or updated.
 
@@ -401,21 +443,22 @@ deserialisation, race conditions, denial of service, information leakage, supply
 compromise and secret exposure.
 
 Authentication and authorisation
-- Every API endpoint requires an authenticated principal unless explicitly declared public in
-  the specification. Authorisation is enforced in the use case for every object accessed
-  (object-level) and every operation invoked (function-level); identifiers supplied by the
-  client are never trusted as proof of access.
-- The BFF holds the session in a secure, HttpOnly, SameSite cookie; access tokens never reach
-  the browser. State-changing requests are protected against CSRF.
+- Every API endpoint declares its access: `@Public()`, `@Can.Anyone()` or a policy with
+  `@Can`; a route without a declaration is denied. Object-level rules are policy decisions
+  on the aggregate; identifiers supplied by the client are never trusted as proof of access.
+- Sessions are HttpOnly, SameSite cookies issued by `@nestjs/authentication`; state-changing
+  requests are protected against CSRF by the origin check; link secrets are stored only as
+  fingerprints; anonymous endpoints that reveal account existence answer identically and are
+  rate limited.
 
 Input and output
 - All input (HTTP bodies, query strings, headers, path parameters, webhook payloads,
   automation definitions) is validated against an explicit schema that rejects unknown
   fields; size limits and timeouts apply to every request.
 - Database access uses parameterised queries only; string-built SQL is prohibited.
-- Responses contain no stack traces, SQL, internal paths or secrets. The web application sets
-  Content Security Policy, HSTS and the standard hardening headers and escapes all rendered
-  user content.
+- Responses contain no stack traces, SQL, internal paths or secrets. The API sets the
+  hardening headers and no server banner; the web application sets Content Security Policy,
+  HSTS and the standard hardening headers and escapes all rendered user content.
 
 Secrets and data
 - Secrets are supplied only through the environment, never stored in the repository, logs,
@@ -432,8 +475,8 @@ Automation execution
 
 Supply chain
 - The lockfile is committed; dependency install scripts are allowed per package only;
-  dependencies are kept current, and a dependency with a known high or critical vulnerability
-  blocks merge until updated or removed.
+  dependencies are kept current, every declared dependency is used, and a dependency with a
+  known high or critical vulnerability blocks merge until updated or removed.
 
 ### Security gates
 
@@ -463,4 +506,4 @@ Supply chain
 - Runtime guidance for engineers and agents: this file first, then `README.md` and
   `apps/*/README.md` for commands and local setup.
 
-**Version**: 2.0.1 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-04
+**Version**: 3.0.0 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-11

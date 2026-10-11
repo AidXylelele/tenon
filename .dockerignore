@@ -1,0 +1,14 @@
+# Build context is the repository root (apps/api/Dockerfile).
+**/node_modules
+.git
+**/dist
+**/.next
+**/coverage
+.env*
+!.env.example
+*.md
+.husky
+.specify
+.claude
+specs
+docs

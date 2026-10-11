@@ -1,0 +1,334 @@
+openapi: 3.1.0
+info:
+  title: Workflow Platform API - Authentication
+  version: 1.0.0
+  description: >-
+    Endpoints of the authentication feature: sessions, password recovery and change, invitations.
+    Sessions are HttpOnly cookies; state-changing requests from a browser pass the CSRF check
+    (same origin or a trusted origin). Error bodies are Nest's standard shape.
+servers:
+  - url: /api/v1
+tags:
+  - name: auth
+  - name: invitations
+  - name: health
+paths:
+  /auth/session:
+    post:
+      tags: [auth]
+      summary: Sign in with email and password; issues the session cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              additionalProperties: false
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, maxLength: 128 }
+      responses:
+        '200':
+          description: Signed in (Set-Cookie)
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401':
+          description: Wrong password or unknown email; identical bodies
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: The account is suspended
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: More than 20 requests from the client address within 10 minutes (Retry-After)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [auth]
+      summary: The signed-in user
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [auth]
+      summary: Sign out; ends the session and clears the cookie
+      security: [{ sessionCookie: [] }]
+      responses:
+        '204': { description: Signed out }
+        '401': { $ref: '#/components/responses/Error' }
+  /auth/password-recovery:
+    post:
+      tags: [auth]
+      summary: Request a recovery link; the answer does not reveal whether the address is registered
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              additionalProperties: false
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          {
+            description: Accepted; a link is emailed when an active account exists,
+          }
+        '400': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/password-recovery/complete:
+    post:
+      tags: [auth]
+      summary: Set a new password with the emailed token; ends every session of the user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              additionalProperties: false
+              properties:
+                token: { type: string, minLength: 32 }
+                newPassword: { type: string, minLength: 12, maxLength: 128 }
+      responses:
+        '204': { description: Password replaced }
+        '400':
+          description: Validation failed, or the link is invalid, used, expired or issued before the password changed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /auth/password:
+    patch:
+      tags: [auth]
+      summary: Change the own password; rotates the caller's session and ends the others
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              additionalProperties: false
+              properties:
+                currentPassword: { type: string, maxLength: 128 }
+                newPassword: { type: string, minLength: 12, maxLength: 128 }
+      responses:
+        '204':
+          description: Password changed (Set-Cookie with the rotated session)
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+        '400':
+          description: Validation failed or the current password is wrong
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+  /invitations:
+    post:
+      tags: [invitations]
+      summary: Create an invitation (admin)
+      security: [{ sessionCookie: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, role]
+              additionalProperties: false
+              properties:
+                email: { type: string, format: email }
+                role: { $ref: '#/components/schemas/Role' }
+      responses:
+        '201':
+          description: Invitation created; the link is emailed to the invited address
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Invitation' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '409':
+          description: An account with this email already exists
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    get:
+      tags: [invitations]
+      summary: List pending invitations (admin)
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Pending invitations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Invitation' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /invitations/{id}:
+    delete:
+      tags: [invitations]
+      summary: Revoke a pending invitation (admin)
+      security: [{ sessionCookie: [] }]
+      parameters:
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
+      responses:
+        '204': { description: Revoked }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /invitations/verify:
+    post:
+      tags: [invitations]
+      summary: Check an invitation link before showing the acceptance form (anonymous)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              additionalProperties: false
+              properties:
+                token: { type: string, minLength: 32 }
+      responses:
+        '200':
+          description: Invitation is pending and not expired
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email, role, expiresAt]
+                properties:
+                  email: { type: string, format: email }
+                  role: { $ref: '#/components/schemas/Role' }
+                  expiresAt: { type: string, format: date-time }
+        '410':
+          description: Invitation accepted, revoked or expired; `message` states which
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /invitations/accept:
+    post:
+      tags: [invitations]
+      summary: Accept an invitation; creates the account and signs the person in (anonymous)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, name, password]
+              additionalProperties: false
+              properties:
+                token: { type: string, minLength: 32 }
+                name: { type: string, minLength: 1, maxLength: 120 }
+                password: { type: string, minLength: 12, maxLength: 128 }
+      responses:
+        '200':
+          description: Account created and session issued (Set-Cookie)
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409':
+          description: An account with this email already exists; the invitation stays pending
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '410':
+          description: Invitation accepted, revoked or expired; `message` states which
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /health:
+    get:
+      tags: [health]
+      summary: Liveness and readiness
+      responses:
+        '200': { description: Healthy }
+        '503': { description: Shutting down (Terminus graceful shutdown delay) }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: sid
+  schemas:
+    Role:
+      type: string
+      enum: [admin, editor, viewer]
+    User:
+      type: object
+      required: [id, email, name, role]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        name: { type: string }
+        role: { $ref: '#/components/schemas/Role' }
+    Session:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+    Invitation:
+      type: object
+      required: [id, email, role, status, expiresAt, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { $ref: '#/components/schemas/Role' }
+        status: { type: string, enum: [pending, accepted, revoked, expired] }
+        expiresAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        message:
+          oneOf:
+            - { type: string }
+            - { type: array, items: { type: string } }
+        error: { type: string }
+  responses:
+    Error:
+      description: Standard Nest error body
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

@@ -10,17 +10,24 @@ a strict UI / API split: the apps are fully independent and share no code.
 
 ## Requirements
 
-- Node.js `>=24.15` (see [`.nvmrc`](.nvmrc))
-- pnpm `12.8.1` — enable with `corepack enable pnpm`
+- pnpm `12.8.1` (https://pnpm.io/installation); Node.js `24.21.0` is downloaded by pnpm from
+  `devEngines.runtime` (see [`.nvmrc`](.nvmrc))
+- Docker with Compose v2 for the local stack and the integration tests
 
 ## Getting started
 
 ```sh
-nvm use
-corepack enable pnpm
 pnpm install
-pnpm dev        # api on :3000, web on :3001
+cp .env.example .env      # set POSTGRES_PASSWORD
+docker compose up -d      # PostgreSQL (127.0.0.1:55432) and Mailpit (SMTP 51025, UI http://127.0.0.1:58025)
+set -a; . ./.env; set +a
+pnpm --filter api db:migrate && pnpm --filter api outbox:migrate
+pnpm dev                  # api on :3000, web on :3001
 ```
+
+The Compose project is named `workflow-platform`; its containers, network and volumes carry that
+name and all host ports bind to `127.0.0.1`. `docker compose --profile app up -d --build` adds the
+API container on `127.0.0.1:53000`.
 
 ## Commands
 
@@ -33,7 +40,7 @@ Root scripts run the task in every app via `pnpm -r`.
 | `pnpm lint`        | Lint all packages                   |
 | `pnpm check-types` | Type check all packages             |
 | `pnpm test`        | Unit tests (Vitest)                 |
-| `pnpm test:e2e`    | E2E tests                           |
+| `pnpm test:e2e`    | End-to-end tests                    |
 | `pnpm format`      | Format the repository with Prettier |
 
 Run a task for a single app with `pnpm --filter api <task>` (or `cd apps/api`).
@@ -43,6 +50,8 @@ Run a task for a single app with `pnpm --filter api <task>` (or `cd apps/api`).
 - **Commits** follow [Conventional Commits](https://www.conventionalcommits.org),
   enforced by commitlint in the `commit-msg` hook, e.g. `feat(api): add workflow module`.
 - **Pre-commit**: lint-staged runs ESLint `--fix` and Prettier on staged files.
+- **Dependencies** are pinned to exact versions in the root and the API; `pnpm audit` and Trivy
+  (lockfile and image) run in CI with zero tolerance for critical and high findings.
 - **Apps are self-contained**: each has its own dependencies, `tsconfig`, ESLint
   and test config. Only repo tooling (Prettier, husky, lint-staged, commitlint)
   lives in the root.

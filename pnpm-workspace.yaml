@@ -1,8 +1,24 @@
 packages:
   - apps/*
 
+# Exact versions only: `pnpm add` writes "1.2.3", never "^1.2.3" (DR-004).
+savePrefix: ''
+# Refuse to install when the running Node does not satisfy `engines`.
+engineStrict: true
+# Supply-chain: ignore versions published less than 24 hours ago.
+minimumReleaseAge: 1440
+# Supply-chain: block transitive dependencies that resolve outside the registry.
+blockExoticSubdeps: true
+audit:
+  level: high
+
 # pnpm blocks dependency install scripts unless explicitly allowed.
 allowBuilds:
+  '@scarf/scarf': false
   '@swc/core': true
+  esbuild: true
+  cpu-features: false
+  protobufjs: false
   sharp: false
+  ssh2: false
   unrs-resolver: false
