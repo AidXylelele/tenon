@@ -126,6 +126,8 @@ describe('sign in and sign out over HTTP', () => {
       '198.51.100.1',
     ).expect(429);
     expect(Number(throttled.headers['retry-after'])).toBeGreaterThan(0);
+    expect(throttled.body).toMatchObject({ statusCode: 429 });
+    expect(throttled.body.message).not.toContain('Exception');
     await attempt(
       'user@example.com',
       'definitely-not-the-password',

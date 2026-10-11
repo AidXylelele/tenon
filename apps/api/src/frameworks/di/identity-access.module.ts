@@ -60,7 +60,10 @@ import { MailModule } from './mail.module.js';
       }),
     }),
     AuthorizationModule.forRoot({ policies: [InvitationPolicy] }),
-    ThrottlerModule.forRoot({ throttlers: [{ ttl: 600_000, limit: 20 }] }),
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: 600_000, limit: 20 }],
+      errorMessage: 'Too many requests, try again later',
+    }),
   ],
   controllers: [AuthController, InvitationsController],
   providers: [
