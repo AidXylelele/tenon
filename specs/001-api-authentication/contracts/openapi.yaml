@@ -48,11 +48,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-        '429':
-          description: More than 20 requests from the client address within 10 minutes (Retry-After)
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
     get:
       tags: [auth]
       summary: The signed-in user
@@ -91,7 +86,6 @@ paths:
             description: Accepted; a link is emailed when an active account exists,
           }
         '400': { $ref: '#/components/responses/Error' }
-        '429': { $ref: '#/components/responses/Error' }
   /auth/password-recovery/complete:
     post:
       tags: [auth]

@@ -48,17 +48,11 @@ export async function signIn(
   server: App,
   email: string,
   password = PASSWORD,
-  forwardedFor?: string,
 ): Promise<string> {
-  let req = request(server)
+  const response = await request(server)
     .post('/api/v1/auth/session')
-    .send({ email, password });
-
-  if (forwardedFor) {
-    req = req.set('x-forwarded-for', forwardedFor);
-  }
-
-  const response = await req.expect(200);
+    .send({ email, password })
+    .expect(200);
   return cookieHeader(response.headers['set-cookie']);
 }
 

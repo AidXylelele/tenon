@@ -26,13 +26,8 @@ describe('sign in and sign out over HTTP', () => {
     await truncateAll(t.db);
   });
 
-  const attempt = (email: string, password: string, address?: string) => {
-    let req = request(t.server).post('/api/v1/auth/session');
-
-    if (address) req = req.set('x-forwarded-for', address);
-
-    return req.send({ email, password });
-  };
+  const attempt = (email: string, password: string) =>
+    request(t.server).post('/api/v1/auth/session').send({ email, password });
 
   it('correct_credentials_establish_an_http_only_lax_session_cookie_and_return_the_user', async () => {
     await createUser(t, { email: 'user@example.com', name: 'User' });
@@ -109,29 +104,5 @@ describe('sign in and sign out over HTTP', () => {
   it('email_addresses_are_compared_case_insensitively', async () => {
     await createUser(t, { email: 'user@example.com' });
     await attempt('User@Example.COM', PASSWORD).expect(200);
-  });
-
-  it('the_twenty_first_sign_in_request_from_one_client_address_within_ten_minutes_is_refused_while_other_addresses_continue', async () => {
-    await createUser(t, { email: 'user@example.com' });
-    for (let i = 0; i < 20; i += 1) {
-      await attempt(
-        'user@example.com',
-        'definitely-not-the-password',
-        '198.51.100.1',
-      ).expect(401);
-    }
-    const throttled = await attempt(
-      'user@example.com',
-      'definitely-not-the-password',
-      '198.51.100.1',
-    ).expect(429);
-    expect(Number(throttled.headers['retry-after'])).toBeGreaterThan(0);
-    expect(throttled.body).toMatchObject({ statusCode: 429 });
-    expect(throttled.body.message).not.toContain('Exception');
-    await attempt(
-      'user@example.com',
-      'definitely-not-the-password',
-      '198.51.100.2',
-    ).expect(401);
   });
 });
