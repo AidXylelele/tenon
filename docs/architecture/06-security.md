@@ -2,19 +2,19 @@
 
 ## Authentication
 
-| Aspect        | Value                                                                                                                                                                                                                                                                   |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mechanism     | `@nestjs/authentication` in the API: server-side sessions (`session` table, hashed ids, idle 7 d, absolute 30 d), scrypt password hashes, hashed single-use recovery tokens                                                                                             |
-| Browser       | Holds only the session cookie; the Web BFF proxies `/api/v1/auth/*` and forwards the cookie to the API                                                                                                                                                                  |
-| Tokens        | Access tokens never reach the browser                                                                                                                                                                                                                                   |
-| Configuration | `trustedOrigins` set once for `app.enableCsrfProtection` and the session provider; cookie `sid` (`__Host-sid` under https) HttpOnly, SameSite=Lax, Secure from `SESSION_COOKIE_SECURE`                                                                                  |
-| Sign-up       | Self-service registration disabled; the first administrator is seeded by a database migration without a password and sets it through recovery; administrators invite users by link                                                                                      |
-| Invitations   | Single-use link valid 7 days; only the SHA-256 of the secret is stored; acceptance creates the account with the invited role and signs the person in; an existing session is ended first                                                                                |
-| Recovery      | Single-use link valid 1 hour, bound to the password it replaces; completion ends every session; requests answered identically and in constant time                                                                                                                      |
-| Password      | 12 to 128 characters; change requires the current password and ends every other session                                                                                                                                                                                 |
-| Rate limit    | 20 requests per client address per 10 minutes on sign-in, recovery request and recovery completion; client address from `x-forwarded-for` behind the trusted proxies listed in `TRUSTED_PROXIES`; without a forwarded address all clients share one budget per endpoint |
-| Suspension    | A suspended (banned) user is refused sign-in and loses every session                                                                                                                                                                                                    |
-| Events        | No dedicated security event log; request logs carry route, status, client address and trace identifiers; `AuthenticationEvents` of `@nestjs/authentication` is the hook for a later event log; logs never contain passwords, tokens or links                            |
+| Aspect        | Value                                                                                                                                                                                                                                                                                                                 |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mechanism     | `@nestjs/authentication` in the API: server-side sessions (`session` table, hashed ids, idle 7 d, absolute 30 d), scrypt password hashes, hashed single-use recovery tokens                                                                                                                                           |
+| Browser       | Holds only the session cookie; the Web BFF proxies `/api/v1/auth/*` and forwards the cookie to the API                                                                                                                                                                                                                |
+| Tokens        | Access tokens never reach the browser                                                                                                                                                                                                                                                                                 |
+| Configuration | `trustedOrigins` set once for `app.enableCsrfProtection` and the session provider; cookie `sid` (`__Host-sid` under https) HttpOnly, SameSite=Lax, Secure from `SESSION_COOKIE_SECURE`                                                                                                                                |
+| Sign-up       | Self-service registration disabled; the first administrator is seeded by a database migration without a password and sets it through recovery; administrators invite users by link                                                                                                                                    |
+| Invitations   | Single-use link valid 7 days; only the SHA-256 of the secret is stored; acceptance creates the account with the invited role and signs the person in; an existing session is ended first                                                                                                                              |
+| Recovery      | Single-use link valid 1 hour, bound to the password it replaces; completion ends every session; requests answered identically and in constant time                                                                                                                                                                    |
+| Password      | 12 to 128 characters; change requires the current password and ends every other session                                                                                                                                                                                                                               |
+| Rate limit    | Enforced by the API gateway (Envoy Gateway, delivered with the platform's Helm chart) per client address on every public route, sign-in and recovery included; the API contains no rate limiter. `TRUSTED_PROXIES` decides which `x-forwarded-for` the API trusts for the client address in logs and session metadata |
+| Suspension    | A suspended (banned) user is refused sign-in and loses every session                                                                                                                                                                                                                                                  |
+| Events        | No dedicated security event log; request logs carry route, status, client address and trace identifiers; `AuthenticationEvents` of `@nestjs/authentication` is the hook for a later event log; logs never contain passwords, tokens or links                                                                          |
 
 ## Authorisation
 
@@ -35,12 +35,12 @@
 
 ## Webhooks
 
-| Aspect        | Value                                                       |
-| ------------- | ----------------------------------------------------------- |
-| Secret        | One secret per webhook endpoint                             |
-| Verification  | Signature over the raw body; unverified deliveries rejected |
-| Deduplication | Instance id derived from the delivery id                    |
-| Limits        | Request size limit and rate limit per endpoint              |
+| Aspect        | Value                                                                  |
+| ------------- | ---------------------------------------------------------------------- |
+| Secret        | One secret per webhook endpoint                                        |
+| Verification  | Signature over the raw body; unverified deliveries rejected            |
+| Deduplication | Instance id derived from the delivery id                               |
+| Limits        | Request size limits in the API; request-rate limits at the API gateway |
 
 ## Code Sandbox
 
