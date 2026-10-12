@@ -12,74 +12,74 @@ Domain tags: Security, Reliability, API.
 
 ## Requirement Completeness
 
-- [ ] CHK001 Do the requirements state who may read and rotate webhook addresses and secrets, rather than only the contract (`GET /workflows/{id}/webhooks`: owner and administrators)? [Gap, Security, Spec §FR-046, Contract /workflows/{id}/webhooks]
-- [ ] CHK002 Do the requirements address that every signed-in user can read step outputs, while a resume address appearing in run data is enough to resume the run? [Gap, Security, Spec §FR-030, §FR-043]
-- [ ] CHK003 Is the HTTP Request operator allow-list specified in terms of what it matches (exact host names, wildcards, address ranges, ports) and who may change it? [Gap, Security, Spec §FR-038, Plan R12]
-- [ ] CHK004 Are requirements for rotating or losing the credential encryption key (versioned keys, re-encryption, behaviour when a stored version's key is missing) documented, or explicitly delegated to operations? [Gap, Security, Spec §FR-040, Plan R13]
-- [ ] CHK005 Are abuse limits defined for the public ingress routes, the webhook and resume calls (per endpoint or per client address)? [Gap, Security, Spec §FR-027, §FR-030]
-- [ ] CHK006 Is the effect of a failed, timed-out or cancelled sub-workflow run on the calling node specified, including the node's on-error setting and the "continue at once" mode? [Gap, Reliability, Spec §FR-031, US6-5]
-- [ ] CHK007 Is cancellation propagation defined for a run with sub-workflow children: are the children cancelled, left to finish, or detached? [Gap, Reliability, Spec §FR-024]
-- [ ] CHK008 Are requirements defined for object storage being unavailable or slow while nodes read or write outputs (error kind, automatic retry, run outcome)? [Gap, Exception Flow, Spec §FR-021]
-- [ ] CHK009 Are recovery-time requirements stated? Two are missing: how soon a run interrupted by a worker crash continues elsewhere, and how stale a run's status may be after an engine-side termination (timeout, journal limit). [Gap, Reliability, Spec §SC-002, Plan R4, R17]
-- [ ] CHK010 Are the codes of validation problems enumerated, so that clients can react without parsing messages? Examples: cycle, unknown type or version, foreign credential, unreachable node, formula parse error, second resume-mode Wait. [Completeness, API, Spec §FR-007, Contract Problem]
-- [ ] CHK011 Is a maximum request size specified for saving a draft, given 200 nodes with up to 256 KB of parameters each? [Gap, API, Spec §FR-009, Contract PUT /workflows/{id}/draft 413]
-- [ ] CHK012 Are the bounds of pinned sample output (100 items, 1 MB) and of the reported known fields (first 20 items, 500 paths) stated in the spec, matching the data model? [Gap, Consistency, Spec §FR-015, §FR-021, Data Model NodeSample, FieldShape]
-- [ ] CHK013 Is permanent deletion of workflows, together with their webhook endpoints, samples and runs, intentionally excluded and stated as such? [Gap, Assumption, Spec §FR-003]
+- [x] CHK001 Do the requirements state who may read and rotate webhook addresses and secrets, rather than only the contract (`GET /workflows/{id}/webhooks`: owner and administrators)? [Gap, Security, Spec §FR-046, Contract /workflows/{id}/webhooks]
+- [x] CHK002 Do the requirements address that every signed-in user can read step outputs, while a resume address appearing in run data is enough to resume the run? [Gap, Security, Spec §FR-030, §FR-043]
+- [x] CHK003 Is the HTTP Request operator allow-list specified in terms of what it matches (exact host names, wildcards, address ranges, ports) and who may change it? [Gap, Security, Spec §FR-038, Plan R12]
+- [x] CHK004 Are requirements for rotating or losing the credential encryption key (versioned keys, re-encryption, behaviour when a stored version's key is missing) documented, or explicitly delegated to operations? [Gap, Security, Spec §FR-040, Plan R13]
+- [x] CHK005 Are abuse limits defined for the public ingress routes, the webhook and resume calls (per endpoint or per client address)? [Gap, Security, Spec §FR-027, §FR-030]
+- [x] CHK006 Is the effect of a failed, timed-out or cancelled sub-workflow run on the calling node specified, including the node's on-error setting and the "continue at once" mode? [Gap, Reliability, Spec §FR-031, US6-5]
+- [x] CHK007 Is cancellation propagation defined for a run with sub-workflow children: are the children cancelled, left to finish, or detached? [Gap, Reliability, Spec §FR-024]
+- [x] CHK008 Are requirements defined for object storage being unavailable or slow while nodes read or write outputs (error kind, automatic retry, run outcome)? [Gap, Exception Flow, Spec §FR-021]
+- [x] CHK009 Are recovery-time requirements stated? Two are missing: how soon a run interrupted by a worker crash continues elsewhere, and how stale a run's status may be after an engine-side termination (timeout, journal limit). [Gap, Reliability, Spec §SC-002, Plan R4, R17]
+- [x] CHK010 Are the codes of validation problems enumerated, so that clients can react without parsing messages? Examples: cycle, unknown type or version, foreign credential, unreachable node, formula parse error, second resume-mode Wait. [Completeness, API, Spec §FR-007, Contract Problem]
+- [x] CHK011 Is a maximum request size specified for saving a draft, given 200 nodes with up to 256 KB of parameters each? [Gap, API, Spec §FR-009, Contract PUT /workflows/{id}/draft 413]
+- [x] CHK012 Are the bounds of pinned sample output (100 items, 1 MB) and of the reported known fields (first 20 items, 500 paths) stated in the spec, matching the data model? [Gap, Consistency, Spec §FR-015, §FR-021, Data Model NodeSample, FieldShape]
+- [x] CHK013 Is permanent deletion of workflows, together with their webhook endpoints, samples and runs, intentionally excluded and stated as such? [Gap, Assumption, Spec §FR-003]
 
 ## Requirement Clarity
 
-- [ ] CHK014 Does FR-027 state whether a Webhook node accepts both the header token and the HMAC signature, or one mode chosen per node, and whether signatures carry a timestamp against replay? [Clarity, Security, Spec §FR-027]
-- [ ] CHK015 Is "unguessable" quantified (entropy or length) for webhook addresses, webhook secrets and resume addresses? [Clarity, Security, Spec §FR-027, §FR-030]
-- [ ] CHK016 Is "start in order" for queued runs defined: by queuing time, per workflow, and across different triggers? [Clarity, Reliability, Spec §FR-023]
-- [ ] CHK017 Is it stated whether the idempotency key header is sent by default or only when the option is enabled, and under which header name? [Clarity, Reliability, Spec §FR-036]
-- [ ] CHK018 Is "platform error" defined, together with how many times the platform retries one on its own, as distinct from the user's retry setting? [Clarity, Reliability, Spec §FR-016, US2-4, Plan R5]
-- [ ] CHK019 Does each of these resume calls have a defined outcome? [Clarity, Edge Case, Spec §FR-030]
+- [x] CHK014 Does FR-027 state whether a Webhook node accepts both the header token and the HMAC signature, or one mode chosen per node, and whether signatures carry a timestamp against replay? [Clarity, Security, Spec §FR-027]
+- [x] CHK015 Is "unguessable" quantified (entropy or length) for webhook addresses, webhook secrets and resume addresses? [Clarity, Security, Spec §FR-027, §FR-030]
+- [x] CHK016 Is "start in order" for queued runs defined: by queuing time, per workflow, and across different triggers? [Clarity, Reliability, Spec §FR-023]
+- [x] CHK017 Is it stated whether the idempotency key header is sent by default or only when the option is enabled, and under which header name? [Clarity, Reliability, Spec §FR-036]
+- [x] CHK018 Is "platform error" defined, together with how many times the platform retries one on its own, as distinct from the user's retry setting? [Clarity, Reliability, Spec §FR-016, US2-4, Plan R5]
+- [x] CHK019 Does each of these resume calls have a defined outcome? [Clarity, Edge Case, Spec §FR-030]
   - A call to a run whose Wait node is never reached (skipped branch, earlier failure).
   - A call that arrives after the run's timeout, during cancellation, or after the run finished.
-- [ ] CHK020 Does FR-029 state whether a run ended by timeout, by the journal limit or by cancellation starts the error workflow? [Clarity, Reliability, Spec §FR-029]
-- [ ] CHK021 Is cursor paging defined when workflows or runs are added between page requests (stability, duplicates, gaps)? [Clarity, API, Spec §FR-002, §FR-043]
+- [x] CHK020 Does FR-029 state whether a run ended by timeout, by the journal limit or by cancellation starts the error workflow? [Clarity, Reliability, Spec §FR-029]
+- [x] CHK021 Is cursor paging defined when workflows or runs are added between page requests (stability, duplicates, gaps)? [Clarity, API, Spec §FR-002, §FR-043]
 
 ## Requirement Consistency (spec, plan, data model, contract)
 
-- [ ] CHK022 Are the run metadata names available to formulas consistent across the documents? FR-015 says `$run` and "the run's resume address", research R10 lists `$workflow` and `$execution`, and quickstart scenario 5 uses `$execution.resumeUrl`. [Conflict, API, Spec §FR-015, Plan R10, Quickstart Scenario 5]
-- [ ] CHK023 Is Rename Keys' "regular expression" mode consistent with the plan's rule that no regular expression is built from user input, because a catastrophic pattern cannot be interrupted? [Conflict, Security, Spec Core node catalogue, Plan R10]
-- [ ] CHK024 Do FR-010 and FR-017 require the draft revision for publishing and for test runs, as the contract does (`revision` in `POST /workflows/{id}/versions` and `POST /runs`)? [Consistency, API, Spec §FR-010, §FR-017, Contract]
-- [ ] CHK025 Do the Key Entities describe the webhook endpoint as outliving activations, matching the data model's separate WebhookEndpoint aggregate? [Consistency, Spec Key Entities, Data Model WebhookEndpoint, Plan Complexity Tracking]
-- [ ] CHK026 Are run states and error kinds identical across the spec, the data model and the contract? Spec: FR-018 and the edge cases. Data model: the Run status and RunError kinds. Contract: `RunStatus`, `RunError.kind`, `Step.error.kind`. [Consistency, Spec §FR-018, Data Model Run status, Contract]
-- [ ] CHK027 Are size limits consistent across the spec and the contract schemas? [Consistency, Spec §FR-022, §FR-025, §FR-033, §FR-036, Contract]
+- [x] CHK022 Are the run metadata names available to formulas consistent across the documents? FR-015 says `$run` and "the run's resume address", research R10 lists `$workflow` and `$execution`, and quickstart scenario 5 uses `$execution.resumeUrl`. [Conflict, API, Spec §FR-015, Plan R10, Quickstart Scenario 5]
+- [x] CHK023 Is Rename Keys' "regular expression" mode consistent with the plan's rule that no regular expression is built from user input, because a catastrophic pattern cannot be interrupted? [Conflict, Security, Spec Core node catalogue, Plan R10]
+- [x] CHK024 Do FR-010 and FR-017 require the draft revision for publishing and for test runs, as the contract does (`revision` in `POST /workflows/{id}/versions` and `POST /runs`)? [Consistency, API, Spec §FR-010, §FR-017, Contract]
+- [x] CHK025 Do the Key Entities describe the webhook endpoint as outliving activations, matching the data model's separate WebhookEndpoint aggregate? [Consistency, Spec Key Entities, Data Model WebhookEndpoint, Plan Complexity Tracking]
+- [x] CHK026 Are run states and error kinds identical across the spec, the data model and the contract? Spec: FR-018 and the edge cases. Data model: the Run status and RunError kinds. Contract: `RunStatus`, `RunError.kind`, `Step.error.kind`. [Consistency, Spec §FR-018, Data Model Run status, Contract]
+- [x] CHK027 Are size limits consistent across the spec and the contract schemas? [Consistency, Spec §FR-022, §FR-025, §FR-033, §FR-036, Contract]
   - FR-022: 16 MB per step output.
   - FR-033: 16 MB of code output.
   - FR-036: 10 MB per response.
   - FR-025: the Manual Trigger's 1,000 items and 1 MB.
   - The contract's `Items1000` and 1 MB ingress bodies.
-- [ ] CHK028 Does FR-046 cover every contract operation, with the same roles as the contract summaries? That includes pins, webhooks, transfer, duplicate, and credential reads by administrators. [Consistency, Security, Spec §FR-046, Contract]
-- [ ] CHK029 Is the edge-case rule "inactive webhook refused as not found without revealing existence" consistent with answering 401 to a wrong secret on an active endpoint? [Conflict, Security, Spec Edge Cases, Contract /webhooks/{endpointId}]
-- [ ] CHK030 Does the spec's schedule behaviour match the plan's scheduled-trigger design and the engine limits recorded in research? The behaviour in question: overlap skipped across the whole run, missed occurrences skipped, intervals of at least one minute, one schedule per rule. [Consistency, Reliability, Spec §FR-026, Plan R6]
+- [x] CHK028 Does FR-046 cover every contract operation, with the same roles as the contract summaries? That includes pins, webhooks, transfer, duplicate, and credential reads by administrators. [Consistency, Security, Spec §FR-046, Contract]
+- [x] CHK029 Is the edge-case rule "inactive webhook refused as not found without revealing existence" consistent with answering 401 to a wrong secret on an active endpoint? [Conflict, Security, Spec Edge Cases, Contract /webhooks/{endpointId}]
+- [x] CHK030 Does the spec's schedule behaviour match the plan's scheduled-trigger design and the engine limits recorded in research? The behaviour in question: overlap skipped across the whole run, missed occurrences skipped, intervals of at least one minute, one schedule per rule. [Consistency, Reliability, Spec §FR-026, Plan R6]
 
 ## Acceptance Criteria Quality
 
-- [ ] CHK031 Can SC-002 be measured as written? It needs the number of crash repetitions and the points in a run where they happen. It must also say what "a completed node runs a second time" means for orchestrated nodes (Wait, Execute Workflow). [Measurability, Reliability, Spec §SC-002]
-- [ ] CHK032 Is SC-008 (100 simultaneous runs) defined with the number of workflows, workers and node types involved? [Measurability, Spec §SC-008]
-- [ ] CHK033 Does SC-007 define where the search for secrets looks: logs of both process roles, the engine journal, object storage, error messages? [Measurability, Security, Spec §SC-007]
-- [ ] CHK034 Do the success criteria capture the contract goals (calls needed to open, save and run a workflow; conditional polling), or are these intentionally left to the plan? [Gap, API, Plan R15, Spec Clarifications]
+- [x] CHK031 Can SC-002 be measured as written? It needs the number of crash repetitions and the points in a run where they happen. It must also say what "a completed node runs a second time" means for orchestrated nodes (Wait, Execute Workflow). [Measurability, Reliability, Spec §SC-002]
+- [x] CHK032 Is SC-008 (100 simultaneous runs) defined with the number of workflows, workers and node types involved? [Measurability, Spec §SC-008]
+- [x] CHK033 Does SC-007 define where the search for secrets looks: logs of both process roles, the engine journal, object storage, error messages? [Measurability, Security, Spec §SC-007]
+- [x] CHK034 Do the success criteria capture the contract goals (calls needed to open, save and run a workflow; conditional polling), or are these intentionally left to the plan? [Gap, API, Plan R15, Spec Clarifications]
 
 ## Scenario Coverage: Exception and Recovery Flows
 
-- [ ] CHK035 Are recovery requirements stated for a crash during the steps that change run state (registering, entering a wait, finishing), not only during nodes? [Coverage, Recovery, Spec §FR-020, Plan R4]
-- [ ] CHK036 Are requirements defined for schedule registration failing after an activation has committed, and for how the platform converges? [Coverage, Exception Flow, Spec §FR-011, Plan R6]
-- [ ] CHK037 Is the outcome defined for a production run whose credential was deleted, or whose owner was suspended, after the version was published (error kind, run status)? [Coverage, Exception Flow, Spec §FR-041, Edge Cases]
-- [ ] CHK038 Is the behaviour defined when an active version references a node type version that the running release no longer contains, for example old and new workers during a rolling deploy? [Coverage, Recovery, Spec Edge Cases, Plan R2]
-- [ ] CHK039 Is the outcome defined when the assigned error workflow is archived, unpublished or deactivated at the time a run fails? [Coverage, Exception Flow, Spec §FR-029]
+- [x] CHK035 Are recovery requirements stated for a crash during the steps that change run state (registering, entering a wait, finishing), not only during nodes? [Coverage, Recovery, Spec §FR-020, Plan R4]
+- [x] CHK036 Are requirements defined for schedule registration failing after an activation has committed, and for how the platform converges? [Coverage, Exception Flow, Spec §FR-011, Plan R6]
+- [x] CHK037 Is the outcome defined for a production run whose credential was deleted, or whose owner was suspended, after the version was published (error kind, run status)? [Coverage, Exception Flow, Spec §FR-041, Edge Cases]
+- [x] CHK038 Is the behaviour defined when an active version references a node type version that the running release no longer contains, for example old and new workers during a rolling deploy? [Coverage, Recovery, Spec Edge Cases, Plan R2]
+- [x] CHK039 Is the outcome defined when the assigned error workflow is archived, unpublished or deactivated at the time a run fails? [Coverage, Exception Flow, Spec §FR-029]
 
 ## Non-Functional Requirements: Security
 
-- [ ] CHK040 Do the SSRF requirements address DNS failures, host names resolving to a mix of allowed and refused addresses, IPv6-only hosts and non-default ports? [Edge Case, Security, Spec §FR-038]
+- [x] CHK040 Do the SSRF requirements address DNS failures, host names resolving to a mix of allowed and refused addresses, IPv6-only hosts and non-default ports? [Edge Case, Security, Spec §FR-038]
 
 ## Dependencies and Assumptions
 
-- [ ] CHK041 Is the dependency on an early (0.0.x) durable execution module accompanied by a stated upgrade or fallback policy should its API change? [Assumption, Reliability, Spec Assumptions, Plan R2]
-- [ ] CHK042 Is it recorded as an accepted risk that every signed-in user may read all step outputs, including data fetched with another user's credentials? [Assumption, Security, Spec Clarifications, §FR-043]
-- [ ] CHK043 Are the sandbox's operational preconditions documented as a deployment dependency: a privileged sidecar, user namespaces, the Pod Security level? [Dependency, Security, Plan R11, Spec Assumptions]
+- [x] CHK041 Is the dependency on an early (0.0.x) durable execution module accompanied by a stated upgrade or fallback policy should its API change? [Assumption, Reliability, Spec Assumptions, Plan R2]
+- [x] CHK042 Is it recorded as an accepted risk that every signed-in user may read all step outputs, including data fetched with another user's credentials? [Assumption, Security, Spec Clarifications, §FR-043]
+- [x] CHK043 Are the sandbox's operational preconditions documented as a deployment dependency: a privileged sidecar, user namespaces, the Pod Security level? [Dependency, Security, Plan R11, Spec Assumptions]
 
 ## Notes
 
