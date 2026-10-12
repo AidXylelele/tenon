@@ -1,13 +1,15 @@
 <!--
 Sync Impact Report
-- Version change: 3.0.0 → 3.0.1 (PATCH: clarification)
-- Modified sections: API Rules › Stack (`@nestjs/throttler` removed); Verification and Security
-  Requirements › Authentication and authorisation (anonymous endpoints are rate limited at the API
-  gateway, Envoy Gateway in the platform's Helm chart, not inside the applications)
+- Version change: 3.0.1 → 3.1.0 (MINOR: materially expanded guidance)
+- Modified sections: Verification and Security Requirements › Input and output (data users feed
+  into their automations is opaque, accepted within size and nesting-depth limits, with the
+  envelope still schema-validated); › Automation execution (scripts run in a sandbox process;
+  expressions run in a non-executing, allow-listed, bounded interpreter, which is the expression
+  sandbox)
 - Added sections: none
 - Removed sections: none
 - Templates: .specify/templates/plan-template.md ✅, spec-template.md ✅, tasks-template.md ✅,
-  checklist-template.md ✅ (no references to application-level rate limiting)
+  checklist-template.md ✅ (no references to input schemas or sandboxes)
 - Follow-up TODOs: none
 -->
 
@@ -452,6 +454,11 @@ Input and output
 - All input (HTTP bodies, query strings, headers, path parameters, webhook payloads,
   automation definitions) is validated against an explicit schema that rejects unknown
   fields; size limits and timeouts apply to every request.
+- Data that users feed into their own automations (webhook and resume call bodies, trigger
+  items, pinned sample items) is opaque to the platform: it is accepted only as well-formed
+  JSON, or as text where the trigger allows it, within size and nesting-depth limits, and it
+  is never interpreted as platform configuration. The envelope around it (route, headers,
+  identifiers, parameters) is still validated against an explicit schema.
 - Database access uses parameterised queries only; string-built SQL is prohibited.
 - Responses contain no stack traces, SQL, internal paths or secrets. The API sets the
   hardening headers and no server banner; the web application sets Content Security Policy,
@@ -466,9 +473,13 @@ Secrets and data
 Automation execution
 - User-defined automations run with explicit resource and time limits. Outbound HTTP from
   automations is restricted by an allow-list or by blocking private and link-local address
-  ranges, with DNS resolution checked at connect time. Expression or script evaluation, where
-  offered, executes in an isolated sandbox with no access to process state or secrets beyond
-  its scope.
+  ranges, with DNS resolution checked at connect time.
+- Scripts written by users execute in an isolated sandbox process with no access to process
+  state or secrets beyond their scope.
+- Expressions in automation parameters are evaluated by an interpreter that executes no host
+  code (no `eval`, `Function` or `vm`), reaches only allow-listed operations on copies of the
+  data, and is bounded in time and result size; such an interpreter is the expression
+  sandbox.
 
 Supply chain
 - The lockfile is committed; dependency install scripts are allowed per package only;
@@ -503,4 +514,4 @@ Supply chain
 - Runtime guidance for engineers and agents: this file first, then `README.md` and
   `apps/*/README.md` for commands and local setup.
 
-**Version**: 3.0.1 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-12
+**Version**: 3.1.0 | **Ratified**: 2026-10-04 | **Last Amended**: 2026-10-12
