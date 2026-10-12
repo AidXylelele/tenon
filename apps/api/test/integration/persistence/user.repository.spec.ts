@@ -1,4 +1,5 @@
 import { UserRepository } from '../../../src/application/interfaces.js';
+import { Role, UserStatus } from '../../../src/domain/enums.js';
 import {
   AccountExistsError,
   UserNotFoundError,
@@ -29,22 +30,22 @@ describe('DrizzleUserRepository', () => {
     const created = await createUser(t, {
       email: 'editor@example.com',
       name: 'Ed Editor',
-      role: 'editor',
+      role: Role.Editor,
     });
     const found = await repository.findByEmail('Editor@Example.COM');
     expect(found?.id).toBe(created.id);
     expect(found?.name).toBe('Ed Editor');
-    expect(found?.role).toBe('editor');
+    expect(found?.role).toBe(Role.Editor);
+    expect(found?.status).toBe(UserStatus.Active);
     expect(await repository.findByEmail('nobody@example.com')).toBeNull();
   });
 
-  it('a_second_account_for_a_taken_email_is_refused_as_an_existing_account', async () => {
+  it('a_second_user_for_a_taken_email_is_refused_as_an_existing_account', async () => {
     await createUser(t, { email: 'taken@example.com' });
     const duplicate = User.create({
       email: 'taken@example.com',
       name: 'Second Comer',
-      role: 'viewer',
-      passwordHash: 'not-a-real-hash',
+      role: Role.Viewer,
     });
     await expect(repository.add(duplicate)).rejects.toThrow(AccountExistsError);
     expect((await repository.findByEmail('taken@example.com'))?.name).toBe(
@@ -58,22 +59,15 @@ describe('DrizzleUserRepository', () => {
     await suspendUser(t.db, user.id);
     expect(await repository.findActiveById(user.id)).toBeNull();
     expect(await repository.findActiveByEmail('user@example.com')).toBeNull();
-    expect((await repository.findByEmail('user@example.com'))?.suspended).toBe(
-      true,
+    expect((await repository.findByEmail('user@example.com'))?.status).toBe(
+      UserStatus.Suspended,
     );
-    expect((await repository.getById(user.id)).suspended).toBe(true);
+    expect((await repository.getById(user.id)).isActive).toBe(false);
   });
 
   it('an_unknown_id_is_reported_as_not_found', async () => {
     await expect(
       repository.getById(crypto.randomUUID()),
     ).rejects.toBeInstanceOf(UserNotFoundError);
-  });
-
-  it('a_changed_password_hash_is_read_back', async () => {
-    const user = await createUser(t, { email: 'user@example.com' });
-    user.changePassword('new-hash');
-    await repository.update(user);
-    expect((await repository.getById(user.id)).passwordHash).toBe('new-hash');
   });
 });

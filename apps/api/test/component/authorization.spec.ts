@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { Role } from '../../src/domain/enums.js';
 import { authHeaders, createUser, signIn } from '../support/auth-helpers.js';
 import { createTestApp, type TestApp } from '../support/create-test-app.js';
 import { truncateAll } from '../support/db.js';
@@ -31,7 +32,7 @@ describe('authentication, authorization policies and error responses', () => {
   });
 
   it('an_editor_passes_a_route_open_to_anyone_signed_in_but_not_the_administrator_policy', async () => {
-    await createUser(t, { email: 'editor@example.com', role: 'editor' });
+    await createUser(t, { email: 'editor@example.com', role: Role.Editor });
     const cookie = await signIn(t.server, 'editor@example.com');
     await request(t.server)
       .get('/api/v1/probe/user')
@@ -45,7 +46,7 @@ describe('authentication, authorization policies and error responses', () => {
   });
 
   it('an_administrator_passes_the_administrator_policy', async () => {
-    await createUser(t, { email: 'admin@example.com', role: 'admin' });
+    await createUser(t, { email: 'admin@example.com', role: Role.Admin });
     const cookie = await signIn(t.server, 'admin@example.com');
     await request(t.server)
       .get('/api/v1/probe/admin')

@@ -1,3 +1,4 @@
+import { InvitationStatus } from '../../../domain/enums.js';
 import type { Invitation } from '../../../domain/invitation.js';
 import type {
   AcceptedInvitation,
@@ -23,7 +24,7 @@ export class InvitationPresenter {
   }
 
   static pending(invitation: PendingInvitation): InvitationResponse {
-    return { ...invitation, status: 'pending' };
+    return { ...invitation, status: InvitationStatus.Pending };
   }
 
   static verified(invitation: Invitation): VerifiedInvitationResponse {

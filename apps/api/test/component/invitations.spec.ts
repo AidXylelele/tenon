@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { Role } from '../../src/domain/enums.js';
 import {
   authHeaders,
   cookieHeader,
@@ -27,7 +28,7 @@ describe('invitations over HTTP', () => {
     t.mail.clear();
     await createUser(t, {
       email: 'admin@example.com',
-      role: 'admin',
+      role: Role.Admin,
       name: 'Ada Admin',
     });
     adminCookie = await signIn(t.server, 'admin@example.com');
@@ -74,7 +75,7 @@ describe('invitations over HTTP', () => {
   });
 
   it('an_editor_and_an_anonymous_caller_are_refused', async () => {
-    await createUser(t, { email: 'editor@example.com', role: 'editor' });
+    await createUser(t, { email: 'editor@example.com', role: Role.Editor });
     const editorCookie = await signIn(t.server, 'editor@example.com');
     const forbidden = await invite(
       'new@example.com',

@@ -16,9 +16,9 @@ export class InviteUser {
   ) {}
 
   async execute(command: InviteUserCommand): Promise<Invitation> {
-    const account = await this.users.findByEmail(command.email);
+    const existing = await this.users.findByEmail(command.email);
 
-    if (account) throw new AccountExistsError();
+    if (existing) throw new AccountExistsError();
 
     const previous = await this.invitations.findPendingByEmail(command.email);
 

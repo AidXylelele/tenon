@@ -5,10 +5,12 @@ import { eq, sql } from 'drizzle-orm';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import {
+  AccountRepository,
   PasswordHasher,
   UserRepository,
 } from '../../src/application/interfaces.js';
-import type { RoleName } from '../../src/domain/interfaces.js';
+import { Account } from '../../src/domain/account.js';
+import { Role, UserStatus } from '../../src/domain/enums.js';
 import { User } from '../../src/domain/user.js';
 import type { Database } from '../../src/interface-adapters/interfaces.js';
 import {
@@ -27,20 +29,20 @@ export async function createUser(
   input: {
     email: string;
     password?: string;
-    role?: RoleName;
+    role?: Role;
     name?: string;
   },
 ): Promise<User> {
-  const passwordHash = await t.app
-    .get(PasswordHasher)
-    .hash(input.password ?? PASSWORD);
   const user = User.create({
     email: input.email,
     name: input.name ?? input.email.split('@')[0] ?? 'user',
-    role: input.role ?? 'viewer',
-    passwordHash,
+    role: input.role ?? Role.Viewer,
   });
+  const passwordHash = await t.app
+    .get(PasswordHasher)
+    .hash(input.password ?? PASSWORD);
   await t.app.get(UserRepository).add(user);
+  await t.app.get(AccountRepository).add(Account.password(user, passwordHash));
   return user;
 }
 
@@ -89,7 +91,10 @@ export async function expireSession(
 }
 
 export async function suspendUser(db: Database, userId: string): Promise<void> {
-  await db.update(users).set({ suspended: true }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ status: UserStatus.Suspended })
+    .where(eq(users.id, userId));
 }
 
 export async function seedAdministrator(db: Database): Promise<void> {

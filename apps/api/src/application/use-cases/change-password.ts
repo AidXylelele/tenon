@@ -1,27 +1,31 @@
+import { AccountType } from '../../domain/enums.js';
 import { InvalidPasswordError } from '../../domain/errors.js';
 import type {
+  AccountRepository,
   ChangePasswordCommand,
   PasswordHasher,
-  UserRepository,
 } from '../interfaces.js';
 
 export class ChangePassword {
   constructor(
-    private readonly users: UserRepository,
+    private readonly accounts: AccountRepository,
     private readonly passwords: PasswordHasher,
   ) {}
 
   async execute(command: ChangePasswordCommand): Promise<void> {
-    const user = await this.users.getById(command.userId);
+    const account = await this.accounts.findByUserId(
+      command.userId,
+      AccountType.Password,
+    );
     const matches = await this.passwords.verify(
       command.currentPassword,
-      user.passwordHash,
+      account?.passwordHash ?? null,
     );
 
-    if (!matches) throw new InvalidPasswordError();
+    if (!account || !matches) throw new InvalidPasswordError();
 
     const passwordHash = await this.passwords.hash(command.newPassword);
-    user.changePassword(passwordHash);
-    await this.users.update(user);
+    account.changePassword(passwordHash);
+    await this.accounts.update(account);
   }
 }

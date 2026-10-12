@@ -2,10 +2,10 @@
 
 ## Bounded contexts
 
-| Context           | Model                                                      | Data                                                  |
-| ----------------- | ---------------------------------------------------------- | ----------------------------------------------------- |
-| Identity & Access | User, Session, Role; Invitation aggregate                  | Tables `user`, `session`, `email_token`, `invitation` |
-| Automation        | Workflow, Credential, Activation, Run; node type catalogue | Application tables; node types in code                |
+| Context           | Model                                                      | Data                                                             |
+| ----------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
+| Identity & Access | User, Account, Session, Role; Invitation aggregate         | Tables `user`, `account`, `session`, `email_token`, `invitation` |
+| Automation        | Workflow, Credential, Activation, Run; node type catalogue | Application tables; node types in code                           |
 
 Automation covers the whole lifecycle: workflow → published version → activation → run → retention.
 
@@ -49,8 +49,9 @@ Node type is a catalogue entry in code, referenced as `nodeTypeId@version`; it i
 | Aggregate  | Contents                                                                                                                      | Invariants                                                                                                                                                                                                                                    |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Invitation | email, role, `tokenHash` (fingerprint of the link token), status (`pending`, `accepted`, `revoked`), expiry, inviter, version | Single use; accepted only while pending and before expiry (exclusive); rule violations throw domain errors; the link token itself is never stored; at most one pending invitation per email; the repository locks optimistically by `version` |
+| Account    | user, type (`password`, `oidc`), identifier (the email for a password; issuer and subject for SSO), password hash, version    | One account per type and identifier; at most one password account per user; only a password account changes its password; the repository locks optimistically by `version`                                                                    |
 
-Sessions and recovery tokens are records of `@nestjs/authentication` stored by the API. Email format, role membership and the password length are validated at the HTTP boundary; `User` (id, email, name, role, `isAdmin`, `suspended`) is the signed-in user as the use cases see it. `InvitationToken` is the value object for the link token: it generates the value, is rebuilt from an incoming link and derives the fingerprint the invitation keeps.
+Sessions and recovery tokens are records of `@nestjs/authentication` stored by the API. Email format, role membership and the password length are validated at the HTTP boundary; `User` (id, email, name, role, status `active` or `suspended`, `isAdmin`, `isActive`) is the person and the signed-in user as the use cases see it; it knows nothing about signing in. `Account` is a way to sign in that belongs to a user: a password today, an SSO identity later. The password hash lives on the account, so changing or resetting a password is the account's job; the seeded administrator has no account until recovery creates one. `InvitationToken` is the value object for the link token: it generates the value, is rebuilt from an incoming link and derives the fingerprint the invitation keeps.
 
 ## Domain events
 
@@ -173,11 +174,21 @@ classDiagram
     -email
     -name
     -role
-    -passwordHash
-    -suspended
-    +create(email, name, role, passwordHash)$
+    -status
+    +create(email, name, role)$
     +isAdmin
+    +isActive
+  }
+  class Account {
+    -id
+    -userId
+    -type
+    -identifier
+    -passwordHash
+    -version
+    +password(user, passwordHash)$
     +changePassword(passwordHash)
   }
   Invitation ..> InvitationToken : keeps hash
+  Account --> User : belongs to
 ```

@@ -8,6 +8,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { InvitationStatus, type Role } from '../../../domain/enums.js';
 import { user } from './user.js';
 
 export const invitation = pgTable(
@@ -15,9 +16,12 @@ export const invitation = pgTable(
   {
     id: uuid('id').primaryKey(),
     email: text('email').notNull(),
-    role: text('role').notNull(),
+    role: text('role').$type<Role>().notNull(),
     tokenHash: text('token_hash').notNull().unique(),
-    status: text('status').notNull().default('pending'),
+    status: text('status')
+      .$type<InvitationStatus>()
+      .notNull()
+      .default(InvitationStatus.Pending),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     invitedBy: uuid('invited_by')
       .notNull()

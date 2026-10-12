@@ -29,6 +29,18 @@ export class AccountExistsError extends DomainError {
   }
 }
 
+export class AccountWithoutPasswordError extends DomainError {
+  constructor() {
+    super('The account does not sign in with a password');
+  }
+}
+
+export class AccountConflictError extends DomainError {
+  constructor() {
+    super('The account was changed concurrently');
+  }
+}
+
 export class InvalidPasswordError extends DomainError {
   constructor() {
     super('The current password is wrong');

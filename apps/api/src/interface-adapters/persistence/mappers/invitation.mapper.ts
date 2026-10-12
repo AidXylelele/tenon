@@ -1,4 +1,3 @@
-import type { InvitationStatus, RoleName } from '../../../domain/interfaces.js';
 import { Invitation } from '../../../domain/invitation.js';
 import type { InvitationRow } from '../../interfaces.js';
 
@@ -21,10 +20,6 @@ export class InvitationMapper {
   }
 
   static toEntity(row: InvitationRow): Invitation {
-    return new Invitation({
-      ...row,
-      role: row.role as RoleName,
-      status: row.status as InvitationStatus,
-    });
+    return new Invitation(row);
   }
 }

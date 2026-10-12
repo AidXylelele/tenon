@@ -1,4 +1,3 @@
-import type { RoleName } from '../../../domain/interfaces.js';
 import { User } from '../../../domain/user.js';
 import type { UserRow } from '../../interfaces.js';
 
@@ -9,13 +8,12 @@ export class UserMapper {
       email: user.email,
       name: user.name,
       role: user.role,
-      passwordHash: user.passwordHash,
-      suspended: user.suspended,
+      status: user.status,
       createdAt: user.createdAt,
     };
   }
 
   static toEntity(row: UserRow): User {
-    return new User({ ...row, role: row.role as RoleName });
+    return new User(row);
   }
 }

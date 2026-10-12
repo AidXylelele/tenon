@@ -6,6 +6,7 @@ import { AuthorizationModule } from '@nestjs/authorization';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AccountRepository,
   InvitationQueries,
   InvitationRepository,
   Mailing,
@@ -27,6 +28,7 @@ import { DrizzleEmailTokenStore } from '../../interface-adapters/auth/stores/dri
 import { DrizzleSessionStore } from '../../interface-adapters/auth/stores/drizzle-session.store.js';
 import { AuthController } from '../../interface-adapters/http/controllers/auth.controller.js';
 import { InvitationsController } from '../../interface-adapters/http/controllers/invitations.controller.js';
+import { DrizzleAccountRepository } from '../../interface-adapters/persistence/repositories/drizzle-account.repository.js';
 import { DrizzleInvitationQueries } from '../../interface-adapters/persistence/queries/drizzle-invitation.queries.js';
 import { DrizzleInvitationRepository } from '../../interface-adapters/persistence/repositories/drizzle-invitation.repository.js';
 import { DrizzleUserRepository } from '../../interface-adapters/persistence/repositories/drizzle-user.repository.js';
@@ -66,6 +68,8 @@ import { MailModule } from './mail.module.js';
     DrizzleEmailTokenStore,
     DrizzleUserRepository,
     { provide: UserRepository, useExisting: DrizzleUserRepository },
+    DrizzleAccountRepository,
+    { provide: AccountRepository, useExisting: DrizzleAccountRepository },
     DrizzleInvitationRepository,
     { provide: InvitationRepository, useExisting: DrizzleInvitationRepository },
     DrizzleInvitationQueries,
@@ -75,20 +79,24 @@ import { MailModule } from './mail.module.js';
     PasswordRecoveryHandler,
     {
       provide: AuthenticateUser,
-      inject: [UserRepository, PasswordHasher],
-      useFactory: (users: UserRepository, passwords: PasswordHasher) =>
-        new AuthenticateUser(users, passwords),
+      inject: [AccountRepository, UserRepository, PasswordHasher],
+      useFactory: (
+        accounts: AccountRepository,
+        users: UserRepository,
+        passwords: PasswordHasher,
+      ) => new AuthenticateUser(accounts, users, passwords),
     },
     {
       provide: ChangePassword,
-      inject: [UserRepository, PasswordHasher],
-      useFactory: (users: UserRepository, passwords: PasswordHasher) =>
-        new ChangePassword(users, passwords),
+      inject: [AccountRepository, PasswordHasher],
+      useFactory: (accounts: AccountRepository, passwords: PasswordHasher) =>
+        new ChangePassword(accounts, passwords),
     },
     {
       provide: ResetPassword,
-      inject: [UserRepository],
-      useFactory: (users: UserRepository) => new ResetPassword(users),
+      inject: [AccountRepository, UserRepository],
+      useFactory: (accounts: AccountRepository, users: UserRepository) =>
+        new ResetPassword(accounts, users),
     },
     {
       provide: InviteUser,
@@ -119,12 +127,18 @@ import { MailModule } from './mail.module.js';
     },
     {
       provide: AcceptInvitation,
-      inject: [InvitationRepository, UserRepository, PasswordHasher],
+      inject: [
+        InvitationRepository,
+        UserRepository,
+        AccountRepository,
+        PasswordHasher,
+      ],
       useFactory: (
         invitations: InvitationRepository,
         users: UserRepository,
+        accounts: AccountRepository,
         passwords: PasswordHasher,
-      ) => new AcceptInvitation(invitations, users, passwords),
+      ) => new AcceptInvitation(invitations, users, accounts, passwords),
     },
   ],
 })

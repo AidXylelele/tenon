@@ -1,5 +1,6 @@
 import { InvitationMail } from '../../../src/interface-adapters/mailing/templates/invitation.mail.js';
 import { PasswordResetMail } from '../../../src/interface-adapters/mailing/templates/password-reset.mail.js';
+import { Role } from '../../../src/domain/enums.js';
 import { InvitationToken } from '../../../src/domain/invitation-token.js';
 
 describe('mail templates', () => {
@@ -8,7 +9,7 @@ describe('mail templates', () => {
       to: 'new@example.com',
       token: new InvitationToken('the-token'),
       inviterName: 'Ada <Admin>',
-      role: 'editor',
+      role: Role.Editor,
       expiresAt: new Date('2026-10-18T10:00:00.000Z'),
     });
     expect(content.subject).toContain('Ada <Admin>');

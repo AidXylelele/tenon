@@ -1,4 +1,5 @@
 import { InviteUser } from '../../../src/application/use-cases/invite-user.js';
+import { InvitationStatus, Role } from '../../../src/domain/enums.js';
 import { AccountExistsError } from '../../../src/domain/errors.js';
 import { anInvitation, aUser } from '../../support/builders.js';
 import {
@@ -9,7 +10,7 @@ import {
 
 const command = {
   email: 'invitee@example.com',
-  role: 'editor' as const,
+  role: Role.Editor,
   invitedBy: 'admin-1',
   inviterName: 'Ada Admin',
 };
@@ -23,14 +24,14 @@ describe('InviteUser', () => {
       new InMemoryUserRepository(),
       mailing,
     ).execute(command);
-    expect(invitation.status).toBe('pending');
-    expect(invitation.role).toBe('editor');
+    expect(invitation.status).toBe(InvitationStatus.Pending);
+    expect(invitation.role).toBe(Role.Editor);
     expect(mailing.sent).toHaveLength(1);
     const [email] = mailing.sent;
     expect(email).toMatchObject({
       to: 'invitee@example.com',
       inviterName: 'Ada Admin',
-      role: 'editor',
+      role: Role.Editor,
       expiresAt: invitation.expiresAt,
     });
     const opened = await invitations.getByToken(email!.token);
@@ -38,14 +39,14 @@ describe('InviteUser', () => {
   });
 
   it('a_new_invitation_for_an_email_with_a_pending_one_revokes_the_previous', async () => {
-    const previous = anInvitation({ role: 'viewer' });
+    const previous = anInvitation({ role: Role.Viewer });
     const invitations = new InMemoryInvitationRepository(previous.invitation);
     const invitation = await new InviteUser(
       invitations,
       new InMemoryUserRepository(),
       new RecordingMailing(),
     ).execute(command);
-    expect(previous.invitation.status).toBe('revoked');
+    expect(previous.invitation.status).toBe(InvitationStatus.Revoked);
     expect(await invitations.findPendingByEmail('invitee@example.com')).toBe(
       invitation,
     );

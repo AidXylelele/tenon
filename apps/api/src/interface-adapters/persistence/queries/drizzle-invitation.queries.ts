@@ -4,6 +4,7 @@ import type {
   InvitationQueries,
   PendingInvitation,
 } from '../../../application/interfaces.js';
+import { InvitationStatus } from '../../../domain/enums.js';
 import { Database } from '../../interfaces.js';
 import { invitation as invitations } from '../schema/index.js';
 
@@ -23,7 +24,7 @@ export class DrizzleInvitationQueries implements InvitationQueries {
       .from(invitations)
       .where(
         and(
-          eq(invitations.status, 'pending'),
+          eq(invitations.status, InvitationStatus.Pending),
           gt(invitations.expiresAt, sql`now()`),
         ),
       )

@@ -1,30 +1,41 @@
+import type {
+  AccountType,
+  InvitationStatus,
+  Role,
+  UserStatus,
+} from './enums.js';
 import type { InvitationToken } from './invitation-token.js';
-
-export type RoleName = 'admin' | 'editor' | 'viewer';
-
-export type InvitationStatus = 'pending' | 'accepted' | 'revoked';
 
 export interface UserProps {
   readonly id: string;
   readonly email: string;
   readonly name: string;
-  readonly role: RoleName;
-  readonly passwordHash: string | null;
-  readonly suspended: boolean;
+  readonly role: Role;
+  readonly status: UserStatus;
   readonly createdAt: Date;
 }
 
 export interface NewUser {
   readonly email: string;
   readonly name: string;
-  readonly role: RoleName;
-  readonly passwordHash: string;
+  readonly role: Role;
+}
+
+export interface AccountProps {
+  readonly id: string;
+  readonly userId: string;
+  readonly type: AccountType;
+  readonly identifier: string;
+  readonly passwordHash: string | null;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+  readonly version: number;
 }
 
 export interface InvitationProps {
   readonly id: string;
   readonly email: string;
-  readonly role: RoleName;
+  readonly role: Role;
   readonly tokenHash: string;
   readonly status: InvitationStatus;
   readonly expiresAt: Date;
@@ -38,7 +49,7 @@ export interface InvitationProps {
 
 export interface NewInvitation {
   readonly email: string;
-  readonly role: RoleName;
+  readonly role: Role;
   readonly invitedBy: string;
   readonly token: InvitationToken;
 }

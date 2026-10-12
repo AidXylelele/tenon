@@ -1,46 +1,51 @@
 import { ChangePassword } from '../../../src/application/use-cases/change-password.js';
+import { InvalidPasswordError } from '../../../src/domain/errors.js';
 import {
-  InvalidPasswordError,
-  UserNotFoundError,
-} from '../../../src/domain/errors.js';
-import { aUser, PASSWORD, passwords } from '../../support/builders.js';
-import { InMemoryUserRepository } from '../../support/fakes.js';
+  aPasswordAccount,
+  PASSWORD,
+  passwords,
+} from '../../support/builders.js';
+import { InMemoryAccountRepository } from '../../support/fakes.js';
 
 describe('ChangePassword', () => {
   it('the_correct_current_password_lets_the_new_one_replace_it', async () => {
-    const users = new InMemoryUserRepository(aUser());
-    await new ChangePassword(users, passwords).execute({
+    const account = aPasswordAccount();
+    await new ChangePassword(
+      new InMemoryAccountRepository(account),
+      passwords,
+    ).execute({
       userId: 'user-1',
       currentPassword: PASSWORD,
       newPassword: 'another-long-password',
     });
-    const user = await users.getById('user-1');
     expect(
-      await passwords.verify('another-long-password', user.passwordHash),
+      await passwords.verify('another-long-password', account.passwordHash),
     ).toBe(true);
-    expect(await passwords.verify(PASSWORD, user.passwordHash)).toBe(false);
+    expect(await passwords.verify(PASSWORD, account.passwordHash)).toBe(false);
   });
 
   it('a_wrong_current_password_is_refused_and_the_password_stays', async () => {
-    const users = new InMemoryUserRepository(aUser());
+    const account = aPasswordAccount();
     await expect(
-      new ChangePassword(users, passwords).execute({
+      new ChangePassword(
+        new InMemoryAccountRepository(account),
+        passwords,
+      ).execute({
         userId: 'user-1',
         currentPassword: 'not-the-password',
         newPassword: 'another-long-password',
       }),
     ).rejects.toBeInstanceOf(InvalidPasswordError);
-    const user = await users.getById('user-1');
-    expect(await passwords.verify(PASSWORD, user.passwordHash)).toBe(true);
+    expect(await passwords.verify(PASSWORD, account.passwordHash)).toBe(true);
   });
 
-  it('an_unknown_user_is_reported_as_not_found', async () => {
+  it('a_user_without_a_password_account_is_refused_as_a_wrong_password', async () => {
     await expect(
-      new ChangePassword(new InMemoryUserRepository(), passwords).execute({
-        userId: 'nobody',
+      new ChangePassword(new InMemoryAccountRepository(), passwords).execute({
+        userId: 'user-1',
         currentPassword: PASSWORD,
         newPassword: 'another-long-password',
       }),
-    ).rejects.toBeInstanceOf(UserNotFoundError);
+    ).rejects.toBeInstanceOf(InvalidPasswordError);
   });
 });

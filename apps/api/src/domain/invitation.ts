@@ -4,19 +4,15 @@ import {
   InvitationRevokedError,
   InvitationUsedError,
 } from './errors.js';
-import type {
-  InvitationProps,
-  InvitationStatus,
-  NewInvitation,
-  RoleName,
-} from './interfaces.js';
+import { InvitationStatus, type Role } from './enums.js';
+import type { InvitationProps, NewInvitation } from './interfaces.js';
 
 export class Invitation {
   static readonly LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 
   readonly #id: string;
   readonly #email: string;
-  readonly #role: RoleName;
+  readonly #role: Role;
   readonly #tokenHash: string;
   readonly #expiresAt: Date;
   readonly #invitedBy: string;
@@ -49,7 +45,7 @@ export class Invitation {
       email: input.email,
       role: input.role,
       tokenHash: input.token.hash,
-      status: 'pending',
+      status: InvitationStatus.Pending,
       expiresAt: new Date(now.getTime() + Invitation.LIFETIME_MS),
       invitedBy: input.invitedBy,
       acceptedAt: null,
@@ -68,7 +64,7 @@ export class Invitation {
     return this.#email;
   }
 
-  get role(): RoleName {
+  get role(): Role {
     return this.#role;
   }
 
@@ -110,14 +106,17 @@ export class Invitation {
 
   isExpired(): boolean {
     return (
-      this.#status === 'pending' && this.#expiresAt.getTime() <= Date.now()
+      this.#status === InvitationStatus.Pending &&
+      this.#expiresAt.getTime() <= Date.now()
     );
   }
 
   assertPending(): void {
-    if (this.#status === 'accepted') throw new InvitationUsedError();
+    if (this.#status === InvitationStatus.Accepted)
+      throw new InvitationUsedError();
 
-    if (this.#status === 'revoked') throw new InvitationRevokedError();
+    if (this.#status === InvitationStatus.Revoked)
+      throw new InvitationRevokedError();
 
     if (this.isExpired()) throw new InvitationExpiredError();
   }
@@ -125,17 +124,19 @@ export class Invitation {
   accept(userId: string): void {
     this.assertPending();
 
-    this.#status = 'accepted';
+    this.#status = InvitationStatus.Accepted;
     this.#acceptedAt = new Date();
     this.#acceptedUserId = userId;
   }
 
   revoke(): void {
-    if (this.#status === 'accepted') throw new InvitationUsedError();
+    if (this.#status === InvitationStatus.Accepted)
+      throw new InvitationUsedError();
 
-    if (this.#status === 'revoked') throw new InvitationRevokedError();
+    if (this.#status === InvitationStatus.Revoked)
+      throw new InvitationRevokedError();
 
-    this.#status = 'revoked';
+    this.#status = InvitationStatus.Revoked;
     this.#revokedAt = new Date();
   }
 }

@@ -10,6 +10,12 @@ export type DrizzleTx = TransactionalAdapterDrizzleOrm<Database>;
 
 export type UserRow = typeof schema.user.$inferSelect;
 
+export type AccountRow = typeof schema.account.$inferSelect;
+
+export interface AccountConfig {
+  readonly passwordHash?: string;
+}
+
 export type InvitationRow = typeof schema.invitation.$inferSelect;
 
 declare module '@nestjs/authentication' {

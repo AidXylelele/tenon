@@ -1,4 +1,5 @@
-import type { RoleName } from '../domain/interfaces.js';
+import type { Account } from '../domain/account.js';
+import type { AccountType, Role } from '../domain/enums.js';
 import type { Invitation } from '../domain/invitation.js';
 import type { InvitationToken } from '../domain/invitation-token.js';
 import type { User } from '../domain/user.js';
@@ -21,7 +22,7 @@ export interface ResetPasswordCommand {
 
 export interface InviteUserCommand {
   readonly email: string;
-  readonly role: RoleName;
+  readonly role: Role;
   readonly invitedBy: string;
   readonly inviterName: string;
 }
@@ -40,7 +41,7 @@ export interface AcceptedInvitation {
 export interface PendingInvitation {
   readonly id: string;
   readonly email: string;
-  readonly role: string;
+  readonly role: Role;
   readonly expiresAt: Date;
   readonly createdAt: Date;
 }
@@ -49,17 +50,29 @@ export interface InvitationEmail {
   readonly to: string;
   readonly token: InvitationToken;
   readonly inviterName: string;
-  readonly role: RoleName;
+  readonly role: Role;
   readonly expiresAt: Date;
 }
 
 export abstract class UserRepository {
   abstract add(user: User): Promise<void>;
-  abstract update(user: User): Promise<void>;
   abstract getById(id: string): Promise<User>;
   abstract findByEmail(email: string): Promise<User | null>;
   abstract findActiveById(id: string): Promise<User | null>;
   abstract findActiveByEmail(email: string): Promise<User | null>;
+}
+
+export abstract class AccountRepository {
+  abstract add(account: Account): Promise<void>;
+  abstract update(account: Account): Promise<void>;
+  abstract findByIdentifier(
+    type: AccountType,
+    identifier: string,
+  ): Promise<Account | null>;
+  abstract findByUserId(
+    userId: string,
+    type: AccountType,
+  ): Promise<Account | null>;
 }
 
 export abstract class InvitationRepository {

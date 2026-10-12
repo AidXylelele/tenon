@@ -1,6 +1,11 @@
 import { AcceptInvitation } from '../../../src/application/use-cases/accept-invitation.js';
 import { VerifyInvitationLink } from '../../../src/application/use-cases/verify-invitation-link.js';
 import {
+  AccountType,
+  InvitationStatus,
+  Role,
+} from '../../../src/domain/enums.js';
+import {
   AccountExistsError,
   InvitationExpiredError,
   InvitationNotFoundError,
@@ -15,6 +20,7 @@ import {
   passwords,
 } from '../../support/builders.js';
 import {
+  InMemoryAccountRepository,
   InMemoryInvitationRepository,
   InMemoryUserRepository,
 } from '../../support/fakes.js';
@@ -22,20 +28,22 @@ import {
 const accepting = (
   invitations: InMemoryInvitationRepository,
   users = new InMemoryUserRepository(),
-) => new AcceptInvitation(invitations, users, passwords);
+  accounts = new InMemoryAccountRepository(),
+) => new AcceptInvitation(invitations, users, accounts, passwords);
 
 describe('AcceptInvitation and VerifyInvitationLink', () => {
-  it('the_link_shows_who_is_invited_and_accepting_creates_the_account_with_the_role', async () => {
-    const { invitation, token } = anInvitation({ role: 'editor' });
+  it('the_link_shows_who_is_invited_and_accepting_creates_the_user_with_the_role_and_a_password_account', async () => {
+    const { invitation, token } = anInvitation({ role: Role.Editor });
     const invitations = new InMemoryInvitationRepository(invitation);
     const users = new InMemoryUserRepository();
+    const accounts = new InMemoryAccountRepository();
 
     const verified = await new VerifyInvitationLink(invitations).execute(
       token.value,
     );
     expect(verified.email).toBe('invitee@example.com');
 
-    const accepted = await accepting(invitations, users).execute({
+    const accepted = await accepting(invitations, users, accounts).execute({
       token: token.value,
       name: 'Newcomer',
       password: PASSWORD,
@@ -43,13 +51,18 @@ describe('AcceptInvitation and VerifyInvitationLink', () => {
     expect(accepted.user).toMatchObject({
       email: 'invitee@example.com',
       name: 'Newcomer',
-      role: 'editor',
+      role: Role.Editor,
     });
-    expect(await passwords.verify(PASSWORD, accepted.user.passwordHash)).toBe(
-      true,
-    );
     expect(await users.findByEmail('invitee@example.com')).toBe(accepted.user);
-    expect(invitation.status).toBe('accepted');
+    const account = await accounts.findByIdentifier(
+      AccountType.Password,
+      'invitee@example.com',
+    );
+    expect(account?.userId).toBe(accepted.user.id);
+    expect(
+      await passwords.verify(PASSWORD, account?.passwordHash ?? null),
+    ).toBe(true);
+    expect(invitation.status).toBe(InvitationStatus.Accepted);
     expect(invitation.acceptedUserId).toBe(accepted.user.id);
   });
 
@@ -104,7 +117,7 @@ describe('AcceptInvitation and VerifyInvitationLink', () => {
         password: PASSWORD,
       }),
     ).rejects.toBeInstanceOf(AccountExistsError);
-    expect(invitation.status).toBe('pending');
+    expect(invitation.status).toBe(InvitationStatus.Pending);
     expect(users.users.size).toBe(1);
   });
 });

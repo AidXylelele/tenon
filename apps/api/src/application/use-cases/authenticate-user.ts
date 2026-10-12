@@ -1,9 +1,11 @@
+import { AccountType } from '../../domain/enums.js';
 import {
   InvalidCredentialsError,
   UserSuspendedError,
 } from '../../domain/errors.js';
 import type { User } from '../../domain/user.js';
 import type {
+  AccountRepository,
   AuthenticateUserCommand,
   PasswordHasher,
   UserRepository,
@@ -11,20 +13,26 @@ import type {
 
 export class AuthenticateUser {
   constructor(
+    private readonly accounts: AccountRepository,
     private readonly users: UserRepository,
     private readonly passwords: PasswordHasher,
   ) {}
 
   async execute(command: AuthenticateUserCommand): Promise<User> {
-    const user = await this.users.findByEmail(command.email);
+    const account = await this.accounts.findByIdentifier(
+      AccountType.Password,
+      command.email,
+    );
     const matches = await this.passwords.verify(
       command.password,
-      user?.passwordHash ?? null,
+      account?.passwordHash ?? null,
     );
 
-    if (!user || !matches) throw new InvalidCredentialsError();
+    if (!account || !matches) throw new InvalidCredentialsError();
 
-    if (user.suspended) throw new UserSuspendedError();
+    const user = await this.users.getById(account.userId);
+
+    if (!user.isActive) throw new UserSuspendedError();
 
     return user;
   }

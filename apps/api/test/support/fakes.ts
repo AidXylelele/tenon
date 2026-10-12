@@ -1,10 +1,13 @@
 import type {
+  AccountRepository,
   InvitationEmail,
   InvitationRepository,
   Mailing,
   PasswordHasher,
   UserRepository,
 } from '../../src/application/interfaces.js';
+import type { Account } from '../../src/domain/account.js';
+import { type AccountType, InvitationStatus } from '../../src/domain/enums.js';
 import {
   InvitationNotFoundError,
   UserNotFoundError,
@@ -24,10 +27,6 @@ export class InMemoryUserRepository implements UserRepository {
     this.users.set(user.id, user);
   }
 
-  async update(user: User): Promise<void> {
-    this.users.set(user.id, user);
-  }
-
   async getById(id: string): Promise<User> {
     const user = this.users.get(id);
 
@@ -41,19 +40,61 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   async findActiveById(id: string): Promise<User | null> {
-    return this.all().find((user) => user.id === id && !user.suspended) ?? null;
+    return this.all().find((user) => user.id === id && user.isActive) ?? null;
   }
 
   async findActiveByEmail(email: string): Promise<User | null> {
     const user = await this.findByEmail(email);
 
-    if (!user || user.suspended) return null;
+    if (!user?.isActive) return null;
 
     return user;
   }
 
   private all(): User[] {
     return [...this.users.values()];
+  }
+}
+
+export class InMemoryAccountRepository implements AccountRepository {
+  readonly accounts = new Map<string, Account>();
+
+  constructor(...accounts: Account[]) {
+    for (const account of accounts) this.accounts.set(account.id, account);
+  }
+
+  async add(account: Account): Promise<void> {
+    this.accounts.set(account.id, account);
+  }
+
+  async update(account: Account): Promise<void> {
+    this.accounts.set(account.id, account);
+  }
+
+  async findByIdentifier(
+    type: AccountType,
+    identifier: string,
+  ): Promise<Account | null> {
+    return (
+      this.all().find(
+        (account) => account.type === type && account.identifier === identifier,
+      ) ?? null
+    );
+  }
+
+  async findByUserId(
+    userId: string,
+    type: AccountType,
+  ): Promise<Account | null> {
+    return (
+      this.all().find(
+        (account) => account.userId === userId && account.type === type,
+      ) ?? null
+    );
+  }
+
+  private all(): Account[] {
+    return [...this.accounts.values()];
   }
 }
 
@@ -93,7 +134,8 @@ export class InMemoryInvitationRepository implements InvitationRepository {
   async findPendingByEmail(email: string): Promise<Invitation | null> {
     return (
       this.all().find(
-        (item) => item.email === email && item.status === 'pending',
+        (item) =>
+          item.email === email && item.status === InvitationStatus.Pending,
       ) ?? null
     );
   }

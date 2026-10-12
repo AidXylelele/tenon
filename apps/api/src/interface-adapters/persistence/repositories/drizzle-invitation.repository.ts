@@ -5,6 +5,7 @@ import {
   InvitationConflictError,
   InvitationNotFoundError,
 } from '../../../domain/errors.js';
+import { InvitationStatus } from '../../../domain/enums.js';
 import type { Invitation } from '../../../domain/invitation.js';
 import type { InvitationToken } from '../../../domain/invitation-token.js';
 import type { InvitationRepository } from '../../../application/interfaces.js';
@@ -71,7 +72,10 @@ export class DrizzleInvitationRepository implements InvitationRepository {
       .select()
       .from(invitations)
       .where(
-        and(eq(invitations.email, email), eq(invitations.status, 'pending')),
+        and(
+          eq(invitations.email, email),
+          eq(invitations.status, InvitationStatus.Pending),
+        ),
       );
 
     if (!row) return null;

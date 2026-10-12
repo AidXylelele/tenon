@@ -1,8 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsEmail, IsIn } from 'class-validator';
-import type { RoleName } from '../../../domain/interfaces.js';
-import { User } from '../../../domain/user.js';
+import { IsEmail, IsEnum } from 'class-validator';
+import { Role } from '../../../domain/enums.js';
 
 export class CreateInvitationDto {
   @ApiProperty({ format: 'email' })
@@ -12,7 +11,7 @@ export class CreateInvitationDto {
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ enum: User.ROLES })
-  @IsIn(User.ROLES)
-  role!: RoleName;
+  @ApiProperty({ enum: Role })
+  @IsEnum(Role)
+  role!: Role;
 }

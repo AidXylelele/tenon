@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import {
+  AccountConflictError,
   AccountExistsError,
   DomainError,
   InvalidCredentialsError,
@@ -52,6 +53,7 @@ export class DomainErrorFilter extends BaseExceptionFilter {
 
     if (
       error instanceof AccountExistsError ||
+      error instanceof AccountConflictError ||
       error instanceof InvitationConflictError
     ) {
       return new ConflictException(error.message);

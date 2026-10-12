@@ -5,6 +5,7 @@ import {
   AccountExistsError,
   UserNotFoundError,
 } from '../../../domain/errors.js';
+import { UserStatus } from '../../../domain/enums.js';
 import type { User } from '../../../domain/user.js';
 import type { UserRepository } from '../../../application/interfaces.js';
 import type { DrizzleTx } from '../../interfaces.js';
@@ -25,13 +26,6 @@ export class DrizzleUserRepository implements UserRepository {
     if (inserted.length === 0) throw new AccountExistsError();
   }
 
-  async update(user: User): Promise<void> {
-    await this.txHost.tx
-      .update(users)
-      .set(UserMapper.toRow(user))
-      .where(eq(users.id, user.id));
-  }
-
   async getById(id: string): Promise<User> {
     const user = await this.findOne(eq(users.id, id));
 
@@ -45,12 +39,17 @@ export class DrizzleUserRepository implements UserRepository {
   }
 
   findActiveById(id: string): Promise<User | null> {
-    return this.findOne(and(eq(users.id, id), eq(users.suspended, false)));
+    return this.findOne(
+      and(eq(users.id, id), eq(users.status, UserStatus.Active)),
+    );
   }
 
   findActiveByEmail(email: string): Promise<User | null> {
     return this.findOne(
-      and(eq(users.email, email.toLowerCase()), eq(users.suspended, false)),
+      and(
+        eq(users.email, email.toLowerCase()),
+        eq(users.status, UserStatus.Active),
+      ),
     );
   }
 

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import request from 'supertest';
+import { Role } from '../../src/domain/enums.js';
 import {
   authHeaders,
   createUser,
@@ -124,7 +125,7 @@ describe('password recovery over HTTP', () => {
   });
 
   it('an_email_with_only_a_pending_invitation_gets_the_generic_answer_and_the_invitation_is_untouched', async () => {
-    await createUser(t, { email: 'admin@example.com', role: 'admin' });
+    await createUser(t, { email: 'admin@example.com', role: Role.Admin });
     const adminCookie = await signIn(t.server, 'admin@example.com');
     await request(t.server)
       .post('/api/v1/invitations')

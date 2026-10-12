@@ -1,5 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { Role, UserStatus } from '../../../src/domain/enums.js';
 import * as schema from '../../../src/interface-adapters/persistence/schema/index.js';
 import {
   seedAdministrator,
@@ -15,7 +16,7 @@ const db = drizzle({
 describe('bootstrap administrator migration', () => {
   beforeEach(async () => {
     await db.execute(
-      sql`truncate table invitation, email_token, session, "user" cascade`,
+      sql`truncate table invitation, email_token, session, account, "user" cascade`,
     );
   });
 
@@ -28,14 +29,14 @@ describe('bootstrap administrator migration', () => {
     const admins = await db
       .select()
       .from(schema.user)
-      .where(eq(schema.user.role, 'admin'));
+      .where(eq(schema.user.role, Role.Admin));
     expect(admins).toHaveLength(1);
     expect(admins[0]).toMatchObject({
       email: SEED_ADMIN_EMAIL,
       name: 'Administrator',
-      passwordHash: null,
-      suspended: false,
+      status: UserStatus.Active,
     });
+    expect(await db.select().from(schema.account)).toHaveLength(0);
   });
 
   it('does_nothing_while_an_administrator_exists', async () => {

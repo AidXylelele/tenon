@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { User } from '../../../domain/user.js';
+import { InvitationStatus, Role } from '../../../domain/enums.js';
 
 export class UserResponse {
   @ApiProperty({ format: 'uuid' })
@@ -11,8 +11,8 @@ export class UserResponse {
   @ApiProperty()
   name!: string;
 
-  @ApiProperty({ enum: User.ROLES })
-  role!: string;
+  @ApiProperty({ enum: Role })
+  role!: Role;
 }
 
 export class SessionResponse {
@@ -27,11 +27,11 @@ export class InvitationResponse {
   @ApiProperty({ format: 'email' })
   email!: string;
 
-  @ApiProperty({ enum: User.ROLES })
-  role!: string;
+  @ApiProperty({ enum: Role })
+  role!: Role;
 
-  @ApiProperty({ enum: ['pending', 'accepted', 'revoked', 'expired'] })
-  status!: string;
+  @ApiProperty({ enum: InvitationStatus })
+  status!: InvitationStatus;
 
   @ApiProperty({ format: 'date-time' })
   expiresAt!: Date;
@@ -44,8 +44,8 @@ export class VerifiedInvitationResponse {
   @ApiProperty({ format: 'email' })
   email!: string;
 
-  @ApiProperty({ enum: User.ROLES })
-  role!: string;
+  @ApiProperty({ enum: Role })
+  role!: Role;
 
   @ApiProperty({ format: 'date-time' })
   expiresAt!: Date;

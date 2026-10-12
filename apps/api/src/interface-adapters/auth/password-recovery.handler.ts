@@ -5,14 +5,19 @@ import {
   type PasswordResetLink,
 } from '@nestjs/authentication';
 import { Injectable } from '@nestjs/common';
-import { UserRepository } from '../../application/interfaces.js';
+import {
+  AccountRepository,
+  UserRepository,
+} from '../../application/interfaces.js';
 import { ResetPassword } from '../../application/use-cases/reset-password.js';
+import { AccountType } from '../../domain/enums.js';
 import { MailGateway } from '../mailing/mail.gateway.js';
 
 @Injectable()
 export class PasswordRecoveryHandler extends PasswordResetHandler {
   constructor(
     private readonly users: UserRepository,
+    private readonly accounts: AccountRepository,
     private readonly resetPassword: ResetPassword,
     private readonly mail: MailGateway,
     registry: AuthenticationRegistry,
@@ -26,7 +31,15 @@ export class PasswordRecoveryHandler extends PasswordResetHandler {
 
     if (!user) return null;
 
-    return { id: user.id, email: user.email, passwordHash: user.passwordHash };
+    const account = await this.accounts.findByUserId(
+      user.id,
+      AccountType.Password,
+    );
+    return {
+      id: user.id,
+      email: user.email,
+      passwordHash: account?.passwordHash ?? null,
+    };
   }
 
   send(link: PasswordResetLink): Promise<void> {

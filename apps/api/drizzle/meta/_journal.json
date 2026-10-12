@@ -15,6 +15,13 @@
       "when": 1791719951546,
       "tag": "0001_bootstrap_administrator",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791840696837,
+      "tag": "0002_account",
+      "breakpoints": true
     }
   ]
 }

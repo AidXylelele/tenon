@@ -1,24 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import type { NewUser, RoleName, UserProps } from './interfaces.js';
+import { Role, UserStatus } from './enums.js';
+import type { NewUser, UserProps } from './interfaces.js';
 
 export class User {
-  static readonly ROLES: readonly RoleName[] = ['admin', 'editor', 'viewer'];
-
   readonly #id: string;
   readonly #email: string;
   readonly #name: string;
-  readonly #role: RoleName;
-  readonly #suspended: boolean;
+  readonly #role: Role;
+  readonly #status: UserStatus;
   readonly #createdAt: Date;
-  #passwordHash: string | null;
 
   constructor(props: UserProps) {
     this.#id = props.id;
     this.#email = props.email;
     this.#name = props.name;
     this.#role = props.role;
-    this.#passwordHash = props.passwordHash;
-    this.#suspended = props.suspended;
+    this.#status = props.status;
     this.#createdAt = props.createdAt;
   }
 
@@ -28,8 +25,7 @@ export class User {
       email: input.email,
       name: input.name,
       role: input.role,
-      passwordHash: input.passwordHash,
-      suspended: false,
+      status: UserStatus.Active,
       createdAt: new Date(),
     });
   }
@@ -46,16 +42,12 @@ export class User {
     return this.#name;
   }
 
-  get role(): RoleName {
+  get role(): Role {
     return this.#role;
   }
 
-  get passwordHash(): string | null {
-    return this.#passwordHash;
-  }
-
-  get suspended(): boolean {
-    return this.#suspended;
+  get status(): UserStatus {
+    return this.#status;
   }
 
   get createdAt(): Date {
@@ -63,10 +55,10 @@ export class User {
   }
 
   get isAdmin(): boolean {
-    return this.#role === 'admin';
+    return this.#role === Role.Admin;
   }
 
-  changePassword(passwordHash: string): void {
-    this.#passwordHash = passwordHash;
+  get isActive(): boolean {
+    return this.#status === UserStatus.Active;
   }
 }

@@ -6,6 +6,7 @@ import {
 } from '../../../src/domain/errors.js';
 import { InvitationToken } from '../../../src/domain/invitation-token.js';
 import { invitation as invitationTable } from '../../../src/interface-adapters/persistence/schema/index.js';
+import { Role } from '../../../src/domain/enums.js';
 import { createUser } from '../../support/auth-helpers.js';
 import { anInvitation } from '../../support/builders.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
@@ -29,7 +30,7 @@ describe('DrizzleInvitationRepository', () => {
     await truncateAll(t.db);
     const admin = await createUser(t, {
       email: 'admin@example.com',
-      role: 'admin',
+      role: Role.Admin,
     });
     adminId = admin.id;
   });
