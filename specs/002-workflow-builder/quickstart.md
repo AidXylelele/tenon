@@ -75,7 +75,8 @@ Expected:
 
 - All three produce the same items.
 - Diagnostics show console output.
-- `fetch('http://example.com')`, `open('/etc/passwd')`, `while(true){}` and a 1 GB allocation each fail the node with `kind: user` (or `isolation`) and a named cause, and are not retried.
+- `while(true){}` and a 1 GB allocation fail the node with `kind: limit`; a forbidden system call or file fails it with `kind: isolation`; neither is retried.
+- `fetch('http://example.com')` and `open('/etc/passwd')` reach neither the network nor host files. The code receives the refusal as an error, so an unhandled one fails the node with `kind: user` and the system error in the message.
 
 ## Scenario 3: HTTP Request with a credential (US3)
 
@@ -153,7 +154,7 @@ With a Schedule Trigger "every 1 minute", one run per minute appears in `GET /wo
   3. The run continues after the wait and succeeds.
 - **Resume mode**:
   1. Read the resume address from a formula `{{ $execution.resumeUrl }}` or from the step output of an Edit Fields node before the Wait.
-  2. `POST <resumeUrl> -d '{"approved":true}'` returns 202, and the run continues with `approved`.
+  2. `POST <resumeUrl> -d '{"approved":true}'` returns 202, and the run continues; each item carries `resume.body.approved`.
   3. A second POST with another body returns 409, and the run keeps the first body. Repeating the first call with the same `Idempotency-Key` returns its original 202. With the header-credential option, a call without the credential returns 404.
 - **Execute Workflow**: a published child workflow starting with Execute Workflow Trigger returns its last-node items to the caller. A workflow calling itself fails at depth 6.
 - **Error workflow**: assigning an error workflow and failing a production run starts one error run with the failed run, node and message. Test runs never start it.
@@ -183,7 +184,7 @@ Expected:
 ## Automated tests
 
 ```bash
-pnpm --filter api test        # unit: domain, use cases (inline StepRunner), node executors, formula engine
+pnpm --filter api test        # unit: domain (RunExecution, validation), use cases, node executors, formula engine
 pnpm --filter api test:int    # PostgreSQL, Garage and sandbox containers: repositories, artifact store, engine gateways
                               #   (ManualWorkflowClock + drain, two-instance crash test), Code node in three languages,
                               #   HTTP Request with SSRF refusals; component suites through HTTP with the worker drained

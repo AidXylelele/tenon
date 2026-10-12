@@ -238,7 +238,7 @@ paths:
                 ownerId: { type: string, format: uuid }
       responses:
         '200':
-          description: Transferred; an activation that used the previous owner's credentials is ended
+          description: Transferred; the activation stays, and nodes that use credentials the new owner does not own fail with a user error until they are replaced
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Workflow' }
@@ -719,7 +719,12 @@ paths:
       requestBody:
         content:
           '*/*':
-            schema: { type: string, maxLength: 1048576 }
+            schema:
+              {
+                type: string,
+                maxLength: 1048576,
+                description: Opaque user data; JSON bodies may nest at most 64 levels (constitution 3.1.0),
+              }
       responses:
         '202':
           description: Run recorded; a replayed delivery returns the original answer
@@ -737,7 +742,10 @@ paths:
                 properties:
                   runId: { type: string, format: uuid }
         '400':
-          { description: Malformed x-delivery-id (IDEMPOTENCY_KEY_INVALID) }
+          {
+            description: Malformed x-delivery-id (IDEMPOTENCY_KEY_INVALID),
+            or a JSON body nested more than 64 levels,
+          }
         '404':
           { description: No run started; the same answer for every refusal }
         '409':
@@ -770,7 +778,11 @@ paths:
       requestBody:
         content:
           application/json:
-            schema: { type: object }
+            schema:
+              {
+                type: object,
+                description: Opaque user data nested at most 64 levels; each item of the Wait node carries it under resume.body,
+              }
       responses:
         '202':
           {
@@ -786,6 +798,7 @@ paths:
             description: Another call was already accepted,
             or the run finished,
           }
+        '400': { description: A JSON body nested more than 64 levels }
         '413': { description: Body above 1 MB }
 
   /settings/retention:
@@ -883,7 +896,7 @@ components:
         nextCursor: { type: [string, 'null'] }
     Item:
       type: object
-      description: One JSON item
+      description: One JSON item; opaque user data nested at most 64 levels (constitution 3.1.0)
       additionalProperties: true
     Items100:
       type: array
@@ -1328,6 +1341,7 @@ components:
           inputs,
           outputs,
           credentialTypes,
+          defaultSettings,
         ]
       properties:
         id: { type: string, example: httpRequest }
@@ -1361,6 +1375,10 @@ components:
             items: { $ref: '#/components/schemas/CredentialTypeName' },
           }
         effects: { type: string, enum: [none, external] }
+        defaultSettings:
+          allOf:
+            - { $ref: '#/components/schemas/NodeSettings' }
+          description: Settings that new nodes and omitted settings of this type take (FR-013, FR-016)
     RetentionSettings:
       type: object
       required: [retentionDays, maxRunsPerWorkflow]

@@ -2,14 +2,14 @@
 
 **Input**: Design documents from `/specs/002-workflow-builder/`
 
-**Prerequisites**: plan.md, spec.md, research.md (R1–R24), data-model.md, contracts/openapi.yaml, contracts/http-request-pagination.schema.yaml, quickstart.md. The branch includes `master` after PR #13 (constitution 3.0.1, no in-app rate limiter).
+**Prerequisites**: plan.md, spec.md, research.md (R1–R24), data-model.md, contracts/openapi.yaml, contracts/http-request-pagination.schema.yaml, quickstart.md. The branch includes `master` after PR #13 (no in-app rate limiter) and amends the constitution to 3.1.0 (opaque user payloads, the expression sandbox).
 
 **Tests**: Requested by the specification (DR-004, SC-009) and constitution principle VI. Test tasks come before the implementation they cover and must fail first. Each names the requirement, scenario or research decision it covers.
 
 **Organization**:
 
 - Phase 1 adds dependencies, configuration and local services.
-- Phase 2 builds the execution core that every story needs: the domain kernel, persistence, the artifact store, the formula engine, the node registry and the durable run interpreter.
+- Phase 2 builds the execution core that every story needs: the domain kernel, persistence, the artifact store, the formula engine, the node registry, the run rules in the domain and the run loop in the engine adapter.
 - Phases 3–9 are the seven user stories in priority order.
 - Phase 10 closes the success criteria, documentation and delivery gates.
 
@@ -88,18 +88,22 @@
     - `healthcheck: { disable: true }` until T097, and `stop_grace_period: 30s`, longer than the 20 s worker shutdown plus 5 s.
   - Add the new variables to `api`. `api` and `worker` depend on `objects` being healthy.
 - [ ] T008 [P] Extend `.github/workflows/ci.yml`. In the `image` job, run `pnpm --filter api workflows:migrate` after `outbox:migrate`, and change the failure step to `docker compose logs --no-color api worker`.
+- [ ] T009 Add the constitution's security gates to `.github/workflows/ci.yml` and `apps/api/eslint.config.js` (Security gates: static analysis with security rules and secret scanning on every pull request; analysis C9).
+  - A `secrets` job checks out the full history (`fetch-depth: 0`) and runs gitleaks from `ghcr.io/gitleaks/gitleaks:<version>@sha256:…` with `detect --redact --exit-code 1`.
+  - `eslint-plugin-security` (the eslint-community package, exact version) joins `apps/api/package.json`, with its recommended rules for `src/**/*.ts` except `security/detect-object-injection`, which flags every typed index access.
+  - Every finding is fixed; no allow-list of known violations is added.
 
 ---
 
 ## Phase 2: Foundational (execution core)
 
-**Purpose**: The domain kernel, ports, persistence, artifact store, formula engine, parameter schemas, node registry and the durable run interpreter on `@nestjs/workflows`
+**Purpose**: The domain kernel, ports, persistence, artifact store, formula engine, parameter schemas, node registry, the run rules (`RunExecution`) and the run loop on `@nestjs/workflows`
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
 ### Tests for the domain kernel ⚠️
 
-- [ ] T009 [P] Write `apps/api/test/unit/domain/workflow-graph.spec.ts` first (data-model WorkflowGraph; FR-007, FR-009, FR-019).
+- [ ] T010 [P] Write `apps/api/test/unit/domain/workflow-graph.spec.ts` first (data-model WorkflowGraph; FR-007, FR-009, FR-019).
   - `problems()` reports:
     - `node-limit` for 201 nodes, `parameters-too-large` for a node whose parameters exceed 256 KB serialised, and `duplicate-node-name`;
     - `unknown-port` for a connection to an unknown node or port, and `cycle` (Kahn's algorithm; every node on the cycle);
@@ -109,39 +113,68 @@
   - `upstreamOf(nodeId)` returns every transitive upstream node.
   - `renamedNodes(previous)` lists `{ id, from, to }` for renamed nodes.
   - `mapFormulas(rewrite)` returns a graph with every `{ formula }` value rewritten, nested collection values included.
-- [ ] T010 [P] Write `apps/api/test/unit/domain/workflow.spec.ts` first (data-model Workflow and WorkflowVersion; FR-001, FR-003–FR-005, FR-008, FR-010).
-  - `create(name, ownerId)` gives an empty draft with settings `timezone: 'UTC'`, `runTimeoutMs: 3600000` and `errorWorkflowId: null`, `latestVersion` 0 and `version` 1. Names are 1–120 characters.
-  - `saveDraft(draft, actorId)` replaces the whole draft and records `draftUpdatedAt` and `draftUpdatedBy`.
-  - `publish(report, actorId)` throws `DraftInvalidError` carrying the report when it has errors. Otherwise it returns the `WorkflowVersion` numbered `latestVersion + 1` and increments `latestVersion`.
+- [ ] T011 [P] Write `apps/api/test/unit/domain/workflow.spec.ts` first (data-model Workflow, WorkflowDraft and WorkflowVersion; FR-001, FR-003–FR-005, FR-008, FR-010).
+  - `create(name, ownerId)` gives an empty draft with settings `timezone: 'UTC'`, `runTimeoutMs: 3600000` and `errorWorkflowId: null`, `latestVersion` 0 and `version` 1. Name lengths are transport rules checked by the request DTOs, not here (constitution: Domain layer).
+  - `saveDraft(draft, facts, actorId)` replaces the whole draft, records `draftUpdatedAt`, `draftUpdatedBy` and `updatedAt`, and exposes the report of `WorkflowDraft.validate(facts)`. In this phase the report holds the graph problems and each node type's parameter problems; T077 adds the remaining checks.
+  - `publish(facts, actorId)` throws `DraftInvalidError` carrying the report when the draft has errors. Otherwise it returns the `WorkflowVersion` numbered `latestVersion + 1` and increments `latestVersion`.
   - `archive()` and `restore()` toggle `archivedAt`. `rename`, `saveDraft`, `publish` and `transferTo` on an archived workflow throw `WorkflowArchivedError`.
   - `duplicate(name, ownerId, ownedCredentialIds)` returns a workflow owned by `ownerId` whose foreign `credentialId` values are null.
-- [ ] T011 [P] Write `apps/api/test/unit/domain/run.spec.ts` first (data-model Run status and Step; FR-018, FR-024).
+  - `transferTo(ownerId)` changes the owner and nothing else; it never touches the activation (FR-005).
+- [ ] T012 [P] Write `apps/api/test/unit/domain/run.spec.ts` first (data-model Run status and Step; FR-018, FR-024; research R4).
   - Transitions:
     - `queued → running` (`start`);
     - `running → waiting` (`enterWait`) and `waiting → running` (`leaveWait`);
     - `running → succeeded | failed` (`finish`);
     - `queued | running | waiting → cancelled` (`cancel`, which sets `cancelRequestedAt`);
     - `queued | running | waiting → failed` (`fail` with kind `timeout`, `limit` or `platform`).
-  - Any change of a terminal run throws `RunFinishedError`.
-  - `createTest` and `createProduction` set `mode`, `versionNumber` (null for test runs), `trigger`, `depth` (0–5; 6 throws) and `actingUserId`.
+  - Any change of a terminal run throws `RunFinishedError`, and `isFinished` is true for the three terminal states.
+  - `createTest` and `createProduction` set `mode`, `versionNumber` (null for test runs), `trigger`, `depth` (0–5; 6 throws), `actingUserId` and `timeoutMs`.
+  - `project(engineState)`:
+    - engine `failed` with a timeout gives `failed` with kind `timeout`;
+    - other `failed`, `compensation_failed` and a missing instance give `failed` with kind `platform`;
+    - `cancelled` gives `cancelled`;
+    - `pending`, `running` and `suspended` leave the run unchanged, and so does any state for a terminal run.
   - `Step.start(attempt)` overwrites an earlier attempt of the same node, and `succeed(outputs)` and `failWith(error)` set `finishedAt`.
-- [ ] T012 [P] Write `apps/api/test/unit/domain/run-id.spec.ts` and `apps/api/test/unit/domain/node-type.spec.ts` first, and extend `apps/api/test/unit/domain/user.spec.ts`.
+- [ ] T013 [P] Write `apps/api/test/unit/domain/run-id.spec.ts` and `apps/api/test/unit/domain/node-type.spec.ts` first, and extend `apps/api/test/unit/domain/user.spec.ts`.
   - `deriveRunId(key)` is deterministic and distinct for distinct keys. It is a UUID with version nibble `8` and variant `10`, built from the SHA-256 of the key (data-model Engine instances).
   - `NodeType.validate(node)` returns the problems of its `ParameterSchema` with the node id.
   - `outputsFor(parameters)` returns the fixed ports or the ports named by the rule parameter, plus the `error` port when `settings.onError` is `errorOutput`.
+  - `NodeType.defaultSettings` fill the settings a node omits (FR-013, FR-016).
   - `User.canAuthor` is true for `editor` and `admin` only.
+- [ ] T014 [P] Write `apps/api/test/unit/domain/node-settings.spec.ts` first (FR-016, FR-021; research R5). `retryDecision(kind, attempt)`:
+  - `limit` and `isolation` are never retried;
+  - `platform` is retried while the attempt is below 3, after 1 s and then 2 s;
+  - `NodeTypeUnavailableError` is retried with back-off from 5 s, capped at 60 s, until 15 minutes have passed;
+  - `user` is retried while the attempt is below the configured attempts, after `waitMs`.
+- [ ] T015 [P] Write `apps/api/test/unit/domain/run-execution.spec.ts` first (FR-012, FR-016, FR-019, FR-022; research R3).
+  - **Order**: `next()` follows `WorkflowGraph.order` from the run's trigger node; nodes the firing trigger does not reach never come up.
+  - **Skipping and inputs**:
+    - a node none of whose inputs received items is skipped, so its downstream nodes see no items;
+    - `alwaysOutputData` makes it emit one empty item instead;
+    - a node with several inputs comes up once every connected upstream node has finished or been skipped, if at least one input received items.
+  - **Settings**: `disabled` passes the input items through on `main`, and `executeOnce` passes only the first input item.
+  - **Failure and limits**:
+    - a failure with `onError: stop` ends the execution with result `failed`, naming the node, kind and message, and nothing downstream comes up;
+    - step outputs above 256 MB in total end it with kind `limit`.
+  - **Completion**: when no node remains, the result is `succeeded`.
+  - **Determinism**: rebuilding from the same plan and the same recorded outcomes gives the same sequence of nodes.
+- [ ] T016 [P] Write `apps/api/test/unit/domain/parameter-values.spec.ts` first (FR-015; edge cases).
+  - `{ ref: { node: '$item', path } }` reads the current item, and `{ ref: { node: <id>, path } }` reads the same-position item of that upstream node.
+  - A missing path, or a node that has not run in this run, resolves to `undefined`.
+  - Formulas go through the `evaluate` function passed in, with the run metadata and the workflow time zone in scope.
+  - Nested collection values are resolved recursively, and the result is handed to the node type's `ParameterSchema.parse`.
 
 ### Implementation of the domain kernel
 
-- [ ] T013 [P] Add the domain errors of data-model "Domain errors (new)" to `apps/api/src/domain/errors.ts`:
+- [ ] T017 [P] Add the domain errors of data-model "Domain errors (new)" to `apps/api/src/domain/errors.ts`:
   - `WorkflowNotFoundError`, `WorkflowVersionNotFoundError`, `RunNotFoundError`, `CredentialNotFoundError`, `WebhookEndpointNotFoundError`, `NodeNotFoundError`;
   - `WorkflowAccessDeniedError`, `CredentialAccessDeniedError`;
   - `WorkflowConflictError`, `ActivationConflictError`, `RunConflictError`, `CredentialInUseError`, `DeliveryConflictError`, `ResumeRefusedError`, `WorkflowArchivedError`, `RunFinishedError`;
   - `DraftInvalidError`, holding `report`.
 
-  Also add the node failure classes that executors throw (research R5), subclasses of `DomainError`, each with a readonly `kind`, `nodeId`, an optional `line` and an optional `itemIndex`: `NodeUserError` (`user`), `NodeLimitError` (`limit`), `IsolationBreachError` (`isolation`) and `PlatformError` (`platform`). Their messages are built from codes and never contain credential values (FR-040).
+  Also add the node failure classes that executors throw (research R5), subclasses of `DomainError`, each with a readonly `kind`, `nodeId`, an optional `line` and an optional `itemIndex`: `NodeUserError` (`user`), `NodeLimitError` (`limit`), `IsolationBreachError` (`isolation`) and `PlatformError` (`platform`), with the subclass `NodeTypeUnavailableError` of `PlatformError` for an unknown node type version. Their messages are built from codes and never contain credential values (FR-040).
 
-- [ ] T014 [P] Add the props and value types to `apps/api/src/domain/interfaces.ts`:
+- [ ] T018 [P] Add the props and value types to `apps/api/src/domain/interfaces.ts`:
   - workflow: `WorkflowProps`, `WorkflowVersionProps`, `WorkflowDraft`;
   - `GraphNodeProps`: `id` (UUID), `name` (1–120 characters), `type`, `typeVersion`, `parameters`, `credentialId`, `settings`, `position: [number, number]`, `note` (at most 2,000 characters), `disabled`;
   - `ConnectionProps`: `from: { node, output }`, `to: { node, input }`;
@@ -152,23 +185,27 @@
   - runs: `RunStatus`, `RunMode`, `RunTrigger`, `RunErrorKind` (`user`, `limit`, `isolation`, `timeout`, `platform`, `cancelled`), `RunError`, `ErrorWorkflowOutcome`, `RunProps`, `StepProps`, `StepOutput` (`port`, `items`, `bytes`, `chunkStarts`, `attempt`), `FieldShape`;
   - secrets and triggers: `EncryptedSecret` (`ciphertext`, `keyVersion`), `ScheduleRegistration`, `ActivationProps`, `WebhookEndpointProps`;
   - credentials: `CredentialProps`, and `CredentialTypeName` (`httpHeader`, `httpBasic`, `httpBearer`, `httpQuery`);
-  - the rest: `NodeSampleProps`, `RetentionSettingsProps`, `NodeTypeProps`, `PortDefinition`.
-- [ ] T015 [P] Create `apps/api/src/domain/limits.ts` with `PlatformLimits` and `DEFAULT_LIMITS`, holding every value of spec "Platform limits".
+  - the rest: `NodeSampleProps`, `RetentionSettingsProps`, `NodeTypeProps`, `PortDefinition`;
+  - execution and validation: `RunPlan`, `NodeOutcome`, `RunResult`, `EngineState`, `DraftFacts`, and the function types `FormulaEvaluator` and `FormulaInspector`. `RunProps` carries `timeoutMs`, and `NodeTypeProps` carries `defaultSettings`.
+- [ ] T019 [P] Create `apps/api/src/domain/limits.ts` with `PlatformLimits` and `DEFAULT_LIMITS`, holding every value of spec "Platform limits".
   - Add `PLATFORM_LIMITS` to the schema in `apps/api/src/frameworks/di/config.module.ts`: optional JSON, a strict partial object of positive integers merged over `DEFAULT_LIMITS`, so operators can change any default (spec Assumptions).
-- [ ] T016 Implement `apps/api/src/domain/validation-report.ts` and `apps/api/src/domain/workflow-graph.ts` until T009 passes.
+- [ ] T020 Implement `apps/api/src/domain/validation-report.ts` and `apps/api/src/domain/workflow-graph.ts` until T010 passes.
   - `ValidationReport` has `errors`, `warnings`, `hasErrors` and `merge`. `unknown-field` is the only warning code.
   - `WorkflowGraph`, `GraphNode` and `Connection` take a `NodeTypeLookup` domain interface that gives ports, trigger kinds and `usesResumeAddress`.
-- [ ] T017 Implement `apps/api/src/domain/node-type.ts` until T012 passes for `NodeType`.
-  - The fields of data-model NodeType: `id`, `version`, `kind`, `trigger`, `category`, `displayName`, `description`, `parameters`, `credentialTypes`, `inputs`, `outputs` (ports or `{ fromParameter }`), `dataMode` (`item`, `batch`, `all`), `execution` (`step`, `orchestrated`), `effects` (`none`, `external`) and `limits.timeoutMs`.
+- [ ] T021 Implement `apps/api/src/domain/node-type.ts` until T013 passes for `NodeType`.
+  - The fields of data-model NodeType: `id`, `version`, `kind`, `trigger`, `category`, `displayName`, `description`, `parameters`, `credentialTypes`, `inputs`, `outputs` (ports or `{ fromParameter }`), `dataMode` (`item`, `batch`, `all`), `execution` (`step`, `orchestrated`), `effects` (`none`, `external`), `limits.timeoutMs` and `defaultSettings`.
   - Methods `validate(node)`, `outputsFor(parameters)` and `usesResumeAddress(parameters)`, which is false unless the manifest supplies it.
   - The `ParameterSchema` interface lives here: `validate(parameters): Problem[]`, `describe(): object` and `parse(resolved): unknown`.
-- [ ] T018 Implement `apps/api/src/domain/workflow.ts` and `apps/api/src/domain/workflow-version.ts` in the `Invitation` style until T010 passes.
-- [ ] T019 Implement `apps/api/src/domain/run.ts` and `apps/api/src/domain/step.ts` until T011 passes.
-- [ ] T020 [P] Implement `apps/api/src/domain/run-id.ts` (`deriveRunId(key)` over `node:crypto`) and `canAuthor` in `apps/api/src/domain/user.ts` until T012 passes.
+- [ ] T022 Implement `apps/api/src/domain/workflow.ts`, `apps/api/src/domain/workflow-draft.ts` and `apps/api/src/domain/workflow-version.ts` in the `Invitation` style until T011 passes.
+- [ ] T023 Implement `apps/api/src/domain/run.ts` and `apps/api/src/domain/step.ts` until T012 passes.
+- [ ] T024 [P] Implement `apps/api/src/domain/run-id.ts` (`deriveRunId(key)` over `node:crypto`) and `canAuthor` in `apps/api/src/domain/user.ts` until T013 passes.
+- [ ] T025 [P] Implement `apps/api/src/domain/node-settings.ts` until T014 passes.
+- [ ] T026 [P] Implement `apps/api/src/domain/parameter-values.ts` until T016 passes.
+- [ ] T027 Implement `apps/api/src/domain/run-execution.ts` until T015 passes.
 
 ### Ports and policies
 
-- [ ] T021 Declare the Automation commands, outputs and ports in `apps/api/src/application/interfaces.ts` as abstract classes (plan.md Source Code; research R3, R9, R10, R13).
+- [ ] T028 Declare the Automation commands, outputs and ports in `apps/api/src/application/interfaces.ts` as abstract classes (plan.md Source Code; research R3, R9, R10, R13).
   - **Repositories and queries**:
     - `WorkflowRepository`: `add`, `update` with the optimistic `version`, `getById`, `addVersion`, `getVersion`, `listVersions`;
     - `WorkflowQueries`: `list`, `getView`;
@@ -182,41 +219,34 @@
     - `Signer`: `sign`, `verify`;
     - `NodeTypeCatalog`: `get(id, version)`, `list()`, `credentialTypes()`, `etag()`;
     - `NodeExecutor`: `execute(context)`.
-  - **Engine**:
-    - `StepRunner`: `step(name, work, options)` with `{ attempts, backoff, retryIf, compensate }`, `sleepUntil(name, until)`, `waitForResume(name, runId, timeoutMs)` and `runChild(id, input, { wait, timeoutMs })`. `work` receives `{ idempotencyKey, attempt, signal }`;
-    - `RunEngine`: `start`, `cancel`, `signal`, `status`, `delete`;
-    - `ScheduleRegistry`: `sync`, `removeAll`;
-    - `FormulaEngine`: `parse`, `evaluate`, `references`, `renameNode`.
+  - **Formulas and facts**:
+    - `FormulaEngine`: `parse`, `evaluate`, `references`, `renameNode`;
+    - `DraftFacts`: `load(workflowId, ownerId, draft)`, which returns the owner's credentials by id and type, the known fields of each node and the error workflow's state, for `WorkflowDraft.validate`.
+  - **No engine ports**: the workflow classes, controllers and handlers in `interface-adapters` use `@nestjs/workflows` directly (constitution: Application layer; research R3).
   - **`NodeExecutionContext`**, which executors receive:
     - the input reader, `triggerInput()` (the attempt-0 items), a per-item parameter resolver and the upstream node outputs;
     - run metadata (`$execution`, `$workflow`), the output writer, `writeDiagnostics(text)` and a credential accessor;
-    - the `StepRunner` for orchestrated nodes, `idempotencyKey(itemIndex)` and `signal`.
-- [ ] T022 [P] Write `apps/api/test/unit/application/workflow.policy.spec.ts` first. Then implement `apps/api/src/application/policies/workflow.policy.ts` with `@Policy()` (research R14; FR-046):
+    - `idempotencyKey(itemIndex)` and `signal`. Orchestrated nodes (Wait, Execute Workflow) are adapters that get the engine context from the `run` workflow instead (T173).
+- [ ] T029 [P] Write `apps/api/test/unit/application/workflow.policy.spec.ts` first. Then implement `apps/api/src/application/policies/workflow.policy.ts` with `@Policy()` (research R14; FR-046):
   - `author(user)` is `user?.canAuthor`;
-  - `manage(user, workflow)` is true for administrators, and for authors who own the workflow.
+  - `manage(user, owned)` is true for administrators, and for authors whose id equals `owned.ownerId`. `owned` is the aggregate in commands and the query row in owner-only queries, so queries never load aggregates (analysis U4).
 
 ### Test support
 
-- [ ] T023 Extend `apps/api/test/support/global-setup.ts` and `apps/api/test/support/setup-env.ts` for the Automation suites (research R20).
+- [ ] T030 Extend `apps/api/test/support/global-setup.ts` and `apps/api/test/support/setup-env.ts` for the Automation suites (research R20).
   - `apps/api/test/support/global-setup.ts`:
     - also start Garage with `GenericContainer('dxflrs/garage:v2.4.1@sha256:…')`, mounting `infra/garage/garage.toml` and using `--single-node --default-bucket` with fixed test keys;
     - run `nest-workflows migrate --url <DATABASE_URL>` after the Drizzle migrations;
     - provide the `S3_*` values.
   - `apps/api/test/support/setup-env.ts`: set `ROLE=api` and test values for `SECRET_KEYS`, `SECRET_KEY_VERSION`, `SIGNING_KEY`, `SANDBOX_URL`, `SANDBOX_TOKEN`, `PUBLIC_API_URL` and `HTTP_ALLOWED_HOSTS`.
-- [ ] T024 [P] Create `apps/api/test/support/graphs.ts` and `apps/api/test/support/step-runner.ts`:
-  - `graphs.ts`, with builders `graph()`, `manualTrigger()`, `node(type, parameters, settings?)`, `connect(from, to, output?, input?)`, `fixed()`, `ref()` and `formula()`;
-  - `step-runner.ts`, an inline `StepRunner` fake. It runs `work` at once, records step names and attempts, applies `attempts` and `retryIf` synchronously, and resolves `sleepUntil`, `waitForResume` and `runChild` from a script.
-- [ ] T025 [P] Add in-memory fakes to `apps/api/test/support/fakes.ts`:
-  - `WorkflowRepository`, `RunRepository`, `NodeSampleRepository`, `CredentialQueries`, `ArtifactStore` and `RunEngine`;
+- [ ] T031 [P] Create `apps/api/test/support/graphs.ts`, with the builders `graph()`, `manualTrigger()`, `node(type, parameters, settings?)`, `connect(from, to, output?, input?)`, `fixed()`, `ref()` and `formula()`.
+- [ ] T032 [P] Add in-memory fakes to `apps/api/test/support/fakes.ts`:
+  - `WorkflowRepository`, `RunRepository`, `NodeSampleRepository`, `CredentialQueries`, `DraftFacts`, `StepData` and `ArtifactStore`;
   - `NodeTypeCatalog`, with the test executors `test.pass`, `test.fail` (throws a chosen node error) and `test.hang` (waits for its abort signal on attempt 1 and passes on later attempts).
-- [ ] T026 Add the engine helpers to `apps/api/test/support/create-test-app.ts` and a new `apps/api/test/support/workflows.ts`.
-  - In `apps/api/test/support/create-test-app.ts`, add `createTestApp({ worker: true })`, which replaces the engine clock with `ManualWorkflowClock` and enables the worker in process.
-  - Create `apps/api/test/support/workflows.ts` with `drain(app)` (`WorkflowWorker.drain()`), `advance(app, ms)` and `waitForRun(app, runId, status)`.
-  - Add `apps/api/test/support/test-nodes.module.ts`, which registers the test executors of T025 with `@NodeTypeExecutor`, so integration and component suites can run them through the real registry.
 
 ### Persistence
 
-- [ ] T027 [P] Create `apps/api/src/interface-adapters/persistence/schema/workflow.ts` (data-model Tables).
+- [ ] T033 [P] Create `apps/api/src/interface-adapters/persistence/schema/workflow.ts` (data-model Tables).
   - **`workflow`**:
     - `id` uuid "primary key";
     - `name` text "not null, 1–120 characters; index on `lower(name)`";
@@ -232,7 +262,7 @@
     - (`workflow_id`, `number`) "primary key; `workflow_id` references `workflow.id`";
     - `graph`, `settings` jsonb "not null; never updated";
     - `published_at`, `published_by` "not null".
-- [ ] T028 [P] Create `apps/api/src/interface-adapters/persistence/schema/activation.ts` and `apps/api/src/interface-adapters/persistence/schema/webhook-endpoint.ts`.
+- [ ] T034 [P] Create `apps/api/src/interface-adapters/persistence/schema/activation.ts` and `apps/api/src/interface-adapters/persistence/schema/webhook-endpoint.ts`.
   - **`activation`**:
     - `id` uuid "primary key";
     - `workflow_id` "unique; references `workflow.id`";
@@ -247,7 +277,7 @@
     - `secret_ciphertext`, `secret_key_version` "not null";
     - `created_at`, `rotated_at`;
     - `version` integer "optimistic concurrency".
-- [ ] T029 [P] Create `apps/api/src/interface-adapters/persistence/schema/credential.ts` with **`credential`**:
+- [ ] T035 [P] Create `apps/api/src/interface-adapters/persistence/schema/credential.ts` with **`credential`**:
   - `id` uuid "primary key";
   - `owner_id` "references `user.id`; unique with `lower(name)`";
   - `name` text "1–120 characters";
@@ -256,7 +286,7 @@
   - `verified` boolean "not null";
   - `created_at`, `updated_at` "not null";
   - `version` integer "optimistic concurrency".
-- [ ] T030 [P] Create `apps/api/src/interface-adapters/persistence/schema/run.ts`.
+- [ ] T036 [P] Create `apps/api/src/interface-adapters/persistence/schema/run.ts`.
   - **`run`**:
     - `id` uuid "primary key";
     - `workflow_id` "references `workflow.id`; index (`workflow_id`, `queued_at` desc)", extended with `id` desc for the keyset of FR-043;
@@ -281,27 +311,27 @@
     - `outputs` jsonb (StepOutput[]);
     - `error` "StepError or null";
     - `diagnostics` "artifact key or null".
-- [ ] T031 [P] Create `apps/api/src/interface-adapters/persistence/schema/node-sample.ts`, `retention-settings.ts` and `idempotency-key.ts` in the same directory.
-  - `node-sample.ts`, table **`node_sample`**:
+- [ ] T037 [P] Create `apps/api/src/interface-adapters/persistence/schema/node-sample.ts`, `retention-settings.ts` and `idempotency-key.ts` in the same directory.
+  - `apps/api/src/interface-adapters/persistence/schema/node-sample.ts`, table **`node_sample`**:
     - (`workflow_id`, `node_id`) "primary key; `workflow_id` references `workflow.id` on delete cascade";
     - `pinned` "items or null";
     - `fields` (FieldShape[]);
     - `fields_source` "`pin` or `test-run`";
     - `updated_at` "not null".
-  - `retention-settings.ts`, table **`retention_settings`**:
+  - `apps/api/src/interface-adapters/persistence/schema/retention-settings.ts`, table **`retention_settings`**:
     - `id` smallint "primary key, check `id = 1`; seeded by migration";
     - `retention_days`, `max_runs_per_workflow` "not null";
     - `updated_at`, `updated_by`.
-  - `idempotency-key.ts`, table **`idempotency_key`**:
+  - `apps/api/src/interface-adapters/persistence/schema/idempotency-key.ts`, table **`idempotency_key`**:
     - `key_hash` "primary key; hash of scope and key";
     - `fingerprint`, `owner` text;
     - `response` "stored status, headers and body, or null while in flight";
     - `expires_at` bigint "epoch milliseconds; pruned nightly".
-- [ ] T032 Export the new tables from `apps/api/src/interface-adapters/persistence/schema/index.ts`, and add their row types to `apps/api/src/interface-adapters/interfaces.ts`.
+- [ ] T038 Export the new tables from `apps/api/src/interface-adapters/persistence/schema/index.ts`, and add their row types to `apps/api/src/interface-adapters/interfaces.ts`.
   - Run `pnpm --filter api db:generate --name automation` to create `apps/api/drizzle/0002_automation.sql`.
   - Run `drizzle-kit generate --custom --name retention_settings_seed` and write the insert of `(1, 14, 10000, now(), null)` into it (FR-044 defaults).
   - Check `pnpm --filter api db:migrate` on an empty database.
-- [ ] T033 [P] Write `apps/api/test/integration/persistence/workflow.repository.spec.ts` and `apps/api/test/integration/persistence/run.repository.spec.ts` first.
+- [ ] T039 [P] Write `apps/api/test/integration/persistence/workflow.repository.spec.ts` and `apps/api/test/integration/persistence/run.repository.spec.ts` first.
   - Workflows:
     - draft JSON round trip;
     - a stale `version` update throws `WorkflowConflictError`;
@@ -313,23 +343,23 @@
     - `saveStep` upserts by (`run_id`, `node_id`), so a later attempt overwrites;
     - `listStale(olderThan)` returns only non-terminal runs;
     - deleting a run removes its steps.
-- [ ] T034 Implement `apps/api/src/interface-adapters/persistence/repositories/drizzle-workflow.repository.ts` and `apps/api/src/interface-adapters/persistence/repositories/drizzle-run.repository.ts` with their mappers until T033 passes. They use `TransactionHost.tx`; an update with a stale `version` matches no row and raises the conflict error; inserts use `on conflict do nothing returning`.
+- [ ] T040 Implement `apps/api/src/interface-adapters/persistence/repositories/drizzle-workflow.repository.ts` and `apps/api/src/interface-adapters/persistence/repositories/drizzle-run.repository.ts` with their mappers until T039 passes. They use `TransactionHost.tx`; an update with a stale `version` matches no row and raises the conflict error; inserts use `on conflict do nothing returning`.
   - The mappers are `apps/api/src/interface-adapters/persistence/mappers/workflow.mapper.ts` and `apps/api/src/interface-adapters/persistence/mappers/run.mapper.ts`.
 
 ### Artifact store and step data
 
-- [ ] T035 [P] Write `apps/api/test/integration/storage/s3-artifact.store.spec.ts` first, against the Garage container (FR-021):
+- [ ] T041 [P] Write `apps/api/test/integration/storage/s3-artifact.store.spec.ts` first, against the Garage container (FR-021):
   - a chunk round trip as `application/x-ndjson`, and `putJson` and `getJson`;
   - `deleteRun(runId)` removes every key under `runs/<runId>/`, across more than 1,000 objects;
   - an unreachable endpoint fails within the policy timeout with `PlatformError` and opens the breaker, so later calls fail at once.
-- [ ] T036 Implement `apps/api/src/interface-adapters/storage/s3-artifact.store.ts` and its client factory until T035 passes (research R9, R24).
+- [ ] T042 Implement `apps/api/src/interface-adapters/storage/s3-artifact.store.ts` and its client factory until T041 passes (research R9, R24).
   - `apps/api/src/frameworks/s3/client.ts`: `new S3Client({ endpoint, region, credentials, forcePathStyle: true, requestChecksumCalculation: 'WHEN_REQUIRED', responseChecksumValidation: 'WHEN_REQUIRED', retryMode: 'standard', maxAttempts: 3 })`.
   - `apps/api/src/interface-adapters/storage/s3-artifact.store.ts` (`ArtifactStore`):
     - every call goes through a `storage` policy created once with `ResilienceService.create`: a 10 s timeout and a circuit breaker that counts only transport errors and 5xx;
     - failures raise `PlatformError`.
   - `apps/api/src/frameworks/di/storage.module.ts`.
   - Register `ResilienceModule.forRoot()` in `apps/api/src/frameworks/di/app.module.ts`.
-- [ ] T037 [P] Write `apps/api/test/unit/node-types/io.spec.ts` first (research R9; FR-022).
+- [ ] T043 [P] Write `apps/api/test/unit/node-types/io.spec.ts` first (research R9; FR-022).
   - The output writer:
     - closes a chunk at 500 items or 4 MiB, and puts a single larger item in its own chunk;
     - writes keys `runs/<runId>/nodes/<nodeId>/a<attempt>/<port>/<chunk>.jsonl`;
@@ -339,11 +369,11 @@
     - iterates items chunk by chunk;
     - `all()` refuses more than 16 MB;
     - `page(offset, limit)` binary-searches `chunkStarts` and reads at most two chunks.
-- [ ] T038 Implement `apps/api/src/interface-adapters/node-types/io/output-writer.ts`, `apps/api/src/interface-adapters/node-types/io/input-reader.ts` and `apps/api/src/interface-adapters/node-types/io/limits.ts` until T037 passes, and `apps/api/src/interface-adapters/node-types/io/step-data.ts`, which implements the `StepData` port over them and `ArtifactStore`.
+- [ ] T044 Implement `apps/api/src/interface-adapters/node-types/io/output-writer.ts`, `apps/api/src/interface-adapters/node-types/io/input-reader.ts` and `apps/api/src/interface-adapters/node-types/io/limits.ts` until T043 passes, and `apps/api/src/interface-adapters/node-types/io/step-data.ts`, which implements the `StepData` port over them and `ArtifactStore`.
 
 ### Formula engine
 
-- [ ] T039 [P] Write `apps/api/test/unit/formulas/acorn-formula.engine.spec.ts` first (FR-015, research R10).
+- [ ] T045 [P] Write `apps/api/test/unit/formulas/acorn-formula.engine.spec.ts` first (FR-015, research R10).
   - **Templates**: they mix text and `{{ … }}` segments; a template of a single segment returns the value with its type.
   - **Allowed syntax**: literals except regular expressions, template literals, member and optional-chain access, unary, binary, logical and conditional operators, and array and object expressions.
   - **Variables**:
@@ -355,126 +385,95 @@
   - **`parse()` errors**:
     - `formula-syntax`, with the position, for functions, arrow functions, assignment, update, `new`, `this`, tagged templates, regular expression literals and `delete`;
     - `formula-scope` for unknown identifiers, and for `$response`, `$pageCount` and `$request` outside the pagination scope.
-  - **Safety**: access to `__proto__`, `constructor` or `prototype` fails, and no function value escapes as a result.
+  - **Safety** (the expression sandbox of constitution 3.1.0): `process`, `globalThis`, `require` and `Function` are unknown identifiers (`formula-scope`), access to `__proto__`, `constructor` or `prototype` fails, and no function value escapes as a result.
   - **Bounds**: an evaluation above the step budget or 100 ms, or with a result above 1 MB, throws `NodeUserError` naming the parameter.
   - **References**: `references()` returns the node names used in `$('…')`. `renameNode(formula, from, to)` rewrites only `$('from')` arguments, at the parser's positions, and keeps the quote style.
-- [ ] T040 Implement `apps/api/src/interface-adapters/formulas/acorn-formula.engine.ts` until T039 passes. It never uses `node:vm` or `new Function`, and its inputs are JSON clones.
+- [ ] T046 Implement `apps/api/src/interface-adapters/formulas/acorn-formula.engine.ts` until T045 passes. It never uses `node:vm` or `new Function`, and its inputs are JSON clones.
   - The engine is an own tree-walking interpreter over `acorn` `parseExpressionAt` (`FormulaEngine`).
   - `apps/api/src/interface-adapters/formulas/allowed-members.ts` and `apps/api/src/interface-adapters/formulas/luxon-helpers.ts`.
 
 ### Parameters and node type registry
 
-- [ ] T041 [P] Write `apps/api/test/unit/node-types/parameters.spec.ts` first (FR-013, FR-015, research R8).
+- [ ] T047 [P] Write `apps/api/test/unit/node-types/parameters.spec.ts` first (FR-013, FR-015, research R8).
   - `param(z.string())` accepts `{ fixed }`, `{ ref: { node, path } }` and `{ formula }`, and nothing else.
   - `describe()` returns JSON Schema 2020-12 from `z.toJSONSchema(schema, { target: 'draft-2020-12', io: 'input', unrepresentable: 'throw' })`, with `title`, `description`, `default`, `x-options`, `x-widget`, `x-acceptsReference`, `x-acceptsFormula` and `x-showWhen` taken from `.meta()`.
   - `validate()` maps `safeParse` issues of the draft values to problems with code `invalid-parameter` and the parameter path, for example `body.fields.0.value`.
   - `parse(resolved)` validates resolved plain values against the same schema, applies the defaults of omitted parameters, and throws `NodeUserError` naming the parameter path.
-- [ ] T042 Implement `apps/api/src/interface-adapters/node-types/parameters.ts` until T041 passes:
+- [ ] T048 Implement `apps/api/src/interface-adapters/node-types/parameters.ts` until T047 passes:
   - `ZodParameterSchema`, implementing the domain `ParameterSchema`;
   - `param()`, which builds the `ParameterValue` union, and `collection()` for nested sub-parameters;
   - the metadata helpers `options()`, `widget()` and `showWhen()`.
-- [ ] T043 [P] Write `apps/api/test/unit/application/resolve-parameters.spec.ts` first (FR-015; edge cases).
-  - `{ ref: { node: '$item', path } }` reads the current item, and `{ ref: { node: <id>, path } }` reads the same-position item of that upstream node.
-  - A missing path, or a node that has not run in this run, resolves to `undefined`.
-  - Formulas are evaluated per item through `FormulaEngine`, with the run metadata and the workflow time zone.
-  - Nested collection values are resolved recursively, and the result is passed to the node type's `ParameterSchema.parse`.
-- [ ] T044 Implement `apps/api/src/application/use-cases/resolve-parameters.ts`, the helper `ExecuteNodeStep` uses, until T043 passes.
-- [ ] T045 [P] Write `apps/api/test/unit/node-types/registry.spec.ts` first.
+- [ ] T049 [P] Write `apps/api/test/unit/node-types/registry.spec.ts` first.
   - `NodeTypeRegistry` collects every class decorated with `@NodeTypeExecutor(manifest)` through `DiscoveryService`.
   - `get(id, version)` returns the manifest and the executor. An unknown type or version raises `PlatformError` (rolling update edge case; research R2).
   - `list()` returns every offered type version with its JSON Schema.
   - `etag()` is stable across calls and changes when a manifest changes.
-- [ ] T046 Implement `apps/api/src/interface-adapters/node-types/node-type.decorator.ts` (`DiscoveryService.createDecorator`) and `apps/api/src/interface-adapters/node-types/registry.ts` (`NodeTypeCatalog`) until T045 passes.
+- [ ] T050 Implement `apps/api/src/interface-adapters/node-types/node-type.decorator.ts` (`DiscoveryService.createDecorator`) and `apps/api/src/interface-adapters/node-types/registry.ts` (`NodeTypeCatalog`) until T049 passes.
 
 ### Durable execution
 
-- [ ] T047 Create `apps/api/src/frameworks/di/workflows-infra.module.ts` (research R2).
+- [ ] T051 Create `apps/api/src/frameworks/di/workflows-infra.module.ts` (research R2).
   - `WorkflowsModule.forRootAsync({ inject: [ConfigService], useFactory })`:
     - `worker: false` when `ROLE` is `api`;
     - `{ concurrency: WORKER_CONCURRENCY, shutdownTimeout: '20s' }` when it is `worker`;
     - `retry: { attempts: 1 }`.
   - Provide `PostgresWorkflowStore` as `new PostgresWorkflowStore({ executor: fromDrizzle(db) }, storage)`, as `apps/api/src/frameworks/di/outbox.module.ts` provides the outbox store.
   - Set `max: DATABASE_POOL_MAX` on the pool in `apps/api/src/frameworks/di/database.module.ts`.
-- [ ] T048 Rewrite `apps/api/src/main.ts` for the two roles (research R1; DR-002). The factory is chosen from `process.env.ROLE`, which the config schema also validates.
-  - `ROLE=api` keeps the HTTP bootstrap, created with `bodyParser: false` (see T049).
+- [ ] T052 Rewrite `apps/api/src/main.ts` for the two roles (research R1; DR-002). The factory is chosen from `process.env.ROLE`, which the config schema also validates.
+  - `ROLE=api` keeps the HTTP bootstrap, created with `bodyParser: false` (see T053).
   - `ROLE=worker` uses `NestFactory.createApplicationContext(AppModule, { bufferLogs: true })` with `useLogger`, `enableShutdownHooks()` and no listener.
-- [ ] T049 Replace the global body parser with per-route limits. Write `apps/api/src/interface-adapters/http/middleware/body-limits.middleware.ts`, applied by `AppModule.configure` in `apps/api/src/frameworks/di/app.module.ts`.
+- [ ] T053 Replace the global body parser with per-route limits. Write `apps/api/src/interface-adapters/http/middleware/body-limits.middleware.ts`, applied by `AppModule.configure` in `apps/api/src/frameworks/di/app.module.ts`.
   - JSON up to 100 kB by default.
   - 5 MB for `PUT /workflows/:id/draft` (FR-009).
   - 1 MB for `POST /runs` and `PUT /workflows/:id/samples/:nodeId` (FR-021, FR-025).
   - A raw body up to 1 MB, kept as `req.rawBody`, for `/webhooks/:endpointId` and `/resume/:token` (FR-027, FR-030).
-  - A larger body answers 413.
+  - A larger body answers 413, and a JSON body nested more than 64 levels answers 400 (constitution 3.1.0; FR-025, FR-027, FR-030).
 
   Create the test app with `bodyParser: false` in `apps/api/test/support/create-test-app.ts`, and keep the 001 component suites green.
 
-- [ ] T050 [P] Write `apps/api/test/unit/application/retry-policy.spec.ts` first (research R5; FR-016, FR-021). `nodeStepOptions(settings)` returns:
-  - `attempts: max(userAttempts, 3) + 2`;
-  - a `retryIf` that:
-    - never retries `limit` or `isolation`;
-    - retries `platform` while the attempt is below 3, with exponential back-off from 1 s;
-    - retries `user` while the attempt is below the user's attempts, waiting `retry.waitMs`.
-- [ ] T051 Implement `apps/api/src/application/use-cases/retry-policy.ts` until T050 passes.
-- [ ] T052 [P] Write `apps/api/test/unit/application/execute-run.spec.ts` first, with the inline `StepRunner` (FR-012, FR-018, FR-019, FR-022, FR-024; research R3, R4).
-  - **Steps and order**:
-    - `register-run` is the first step: it sets the run `running` and returns the plan;
-    - nodes run in `WorkflowGraph.order` from the run's trigger node, each as step `node:<nodeId>`;
-    - nodes the firing trigger does not reach never run.
-  - **Skipping and inputs**:
-    - a node none of whose inputs received items is skipped without a Step row, so its downstream nodes see no items;
-    - `alwaysOutputData` makes it emit one empty item instead;
-    - a node with several inputs runs once every connected upstream node has finished or been skipped, if at least one input received items.
-  - **Settings**: `disabled` passes the input items through on `main`, and `executeOnce` passes only the first input item.
-  - **Failure and limits**:
-    - a node error with `onError: stop` ends the run `failed` with the node id, kind and message, and nothing downstream runs;
-    - step outputs above 256 MB in total fail the run with kind `limit`.
-  - **Completion and graphs**:
-    - `finish-run` writes `succeeded`;
-    - a test run reads `graph_snapshot`, and a production run reads its version's graph;
-    - an `orchestrated` node receives the `StepRunner` instead of being wrapped in a step.
-- [ ] T053 [P] Write `apps/api/test/unit/application/execute-node-step.spec.ts` first (research R3, R5, R9).
+- [ ] T054 [P] Write `apps/api/test/unit/application/run-steps.spec.ts` first, on in-memory fakes (FR-012, FR-018; research R3, R4).
+  - `RegisterRun` sets the run `running` and returns the plan: the order from the run's trigger node, the upstream map, the node settings with the node types' defaults, and the trigger output reference. A test run reads `graph_snapshot`, and a production run reads its version's graph.
+  - `RecordNodeFailure` writes the failed Step row with `{ kind, message, line?, itemIndex? }`.
+  - `FinishRun` writes `succeeded`, or `failed` with the node, kind and message from `RunExecution.result()`.
+  - `TerminateRun` sets `cancelled` for a cancellation and `failed` with kind `timeout` or `platform` otherwise, and leaves a run that is already terminal unchanged (analysis U2).
+  - `ProjectRunState` applies `Run.project(engineState)`, and `ListStaleRuns` returns the non-terminal runs unchanged for one minute.
+- [ ] T055 [P] Write `apps/api/test/unit/application/execute-node-step.spec.ts` first (research R3, R5, R9).
   - **Inputs and parameters**:
     - upstream outputs are read through `StepData` per connected input, and a trigger node reads `triggerInput()`;
-    - parameters are resolved per item with `resolveParameters` and parsed by the node type's schema.
+    - parameters are resolved per item with `ParameterValues.resolve`, using `FormulaEngine.evaluate`, and parsed by the node type's schema.
   - **Execution**: the executor is called by `dataMode`: once per item for `item`, in batches for `batch`, and once for `all`.
   - **Outputs and Step row**:
     - outputs are written under the current attempt;
-    - the Step row is written `running`, then `succeeded` with outputs, or `failed` with `{ kind, message, line?, itemIndex? }`;
+    - the Step row is written `running`, then `succeeded` with outputs;
     - the step returns `{ outputs }`.
   - **Keys and errors**:
     - the idempotency key of item `i` is `run-<runId>:node:<nodeId>:<i>`;
-    - an unknown node type version raises `PlatformError`.
-- [ ] T054 Implement `apps/api/src/application/use-cases/execute-run.ts` until T052 passes. Node steps use `nodeStepOptions`, and `register-run` registers the compensation described in T058.
-- [ ] T055 Implement `apps/api/src/application/use-cases/execute-node-step.ts` until T053 passes.
-- [ ] T056 Implement `apps/api/src/interface-adapters/workflows/workflow-context.step-runner.ts`, the `StepRunner` over the engine context (research R3, R5, R18).
-  - `step(name, work, options)` calls `ctx.step` with `{ attempts, backoff, retryIf, compensate }` and passes `{ idempotencyKey, attempt, signal }` to `work`.
-  - Errors:
-    - a `StepFailedError` becomes `NodeUserError`, `NodeLimitError`, `IsolationBreachError` or `PlatformError` again, chosen by the cause's `name`;
-    - limit and isolation breaches are thrown inside `NonRetryableStepError`.
-  - Each node step opens one span `node.execute` with `run.id`, `node.id`, `node.type`, `attempt` and `items.out`, and no item data or credentials.
-
-  `sleepUntil`, `waitForResume` and `runChild` throw "not supported" until T173.
-
-- [ ] T057 Implement `apps/api/src/interface-adapters/workflows/workflow-client.run-engine.ts` (`RunEngine`).
-  - `start(runId, workflowId, { timeoutMs })` calls `client.start('run', { runId, workflowId }, { id: 'run-<runId>', timeout, transaction: txHost.tx })`.
-  - `cancel`, `status` (`getStatus`) and `delete`.
-- [ ] T058 Implement `apps/api/src/interface-adapters/workflows/run.workflow.ts` (research R4, R7).
+    - an unknown node type version raises `NodeTypeUnavailableError`;
+    - an executor error propagates unchanged, and the Step row stays `running` until the adapter records the failure with `RecordNodeFailure`.
+- [ ] T056 Implement `apps/api/src/application/use-cases/register-run.ts`, `record-node-failure.ts`, `finish-run.ts`, `terminate-run.ts`, `project-run-state.ts` and `list-stale-runs.ts` in the same directory until T054 passes. Each is linear and contains no `try`/`catch` (constitution: Application layer).
+- [ ] T057 Implement `apps/api/src/application/use-cases/execute-node-step.ts` until T055 passes.
+- [ ] T058 Implement `apps/api/src/interface-adapters/workflows/run.workflow.ts`, the adapter that drives a run with engine steps (research R3, R4, R5, R7, R18).
   - Decorator: `@Workflow('run', { version: 1, concurrency: { limit: Number(process.env.RUN_CONCURRENCY_PER_WORKFLOW ?? 5), key: (input) => input.workflowId } })`.
-  - `run(ctx, input)` calls `ExecuteRun.execute(input.runId, new WorkflowContextStepRunner(ctx))`.
-  - The `register-run` compensation sets `cancelled` when the engine reason is `WorkflowCancelledError`. Otherwise it sets `failed`, with kind `timeout` for a run timeout and `platform` for anything else.
-- [ ] T059 [P] Write `apps/api/test/unit/application/reconcile-runs.spec.ts` first (research R4; FR-018).
-  - Non-terminal runs unchanged for 2 minutes are compared with `RunEngine.status` and projected:
-    - engine `failed` with a timeout becomes `failed` `timeout`;
-    - other `failed`, `compensation_failed` and a missing instance become `failed` `platform`;
-    - `cancelled` becomes `cancelled`;
-    - `pending`, `running` and `suspended` leave the row unchanged.
-  - The same `projectRun` function serves read repair.
-- [ ] T060 Implement `apps/api/src/application/use-cases/reconcile-runs.ts` and `apps/api/src/interface-adapters/workflows/maintenance.workflow.ts` until T059 passes. The maintenance workflow is a declared schedule that runs every minute and calls `ReconcileRuns`.
-- [ ] T061 Create `apps/api/src/frameworks/di/automation.module.ts`, shaped like `IdentityAccessModule`, and import it with `WorkflowsInfraModule` and `StorageModule` in `apps/api/src/frameworks/di/app.module.ts`.
-  - Bind the repositories to their ports with `useExisting`.
-  - Bind `AcornFormulaEngine` as `FormulaEngine`, `NodeTypeRegistry` as `NodeTypeCatalog` (with `DiscoveryModule`) and `WorkflowClientRunEngine` as `RunEngine`.
+  - Loop:
+    - step `register-run` calls `RegisterRun`, and `RunExecution` is built from the plan;
+    - for each node from `RunExecution.next()`, step `node:<nodeId>` calls `ExecuteNodeStep` with `{ attempts, backoff, retryIf }` from `NodeSettings.retryDecision` and passes `{ idempotencyKey, attempt, signal }`;
+    - the attempt budget is raised for a node whose type this process does not know (R5);
+    - an exhausted `StepFailedError` becomes `NodeUserError`, `NodeLimitError`, `IsolationBreachError` or `PlatformError` again by the cause's `name`, is recorded with `RecordNodeFailure` in step `node:<nodeId>:failure`, and goes to `RunExecution.record`;
+    - step `finish-run` calls `FinishRun` with `RunExecution.result()`.
+  - The step body wraps limit and isolation breaches in `NonRetryableStepError`.
+  - The `register-run` compensation calls `TerminateRun` with the engine reason.
+  - Each node step opens one span `node.execute` with `run.id`, `node.id`, `node.type`, `attempt` and `items.out`, and no item data or credentials.
+- [ ] T059 Implement `apps/api/src/interface-adapters/workflows/maintenance.workflow.ts`, a declared schedule that runs every minute. It calls `ListStaleRuns`, reads each run's engine state with `getStatus('run-<id>')`, and calls `ProjectRunState` (research R4; FR-018).
+- [ ] T060 Create `apps/api/src/frameworks/di/automation.module.ts`, shaped like `IdentityAccessModule`, and import it with `WorkflowsInfraModule` and `StorageModule` in `apps/api/src/frameworks/di/app.module.ts`.
+  - Bind the repositories and `StepData` to their ports with `useExisting`.
+  - Bind `AcornFormulaEngine` as `FormulaEngine` and `NodeTypeRegistry` as `NodeTypeCatalog` (with `DiscoveryModule`).
   - Provide `PlatformLimits`: `DEFAULT_LIMITS` merged with `PLATFORM_LIMITS`.
-  - Build `ExecuteRun`, `ExecuteNodeStep` and `ReconcileRuns` with factory providers.
+  - Build `RegisterRun`, `ExecuteNodeStep`, `RecordNodeFailure`, `FinishRun`, `TerminateRun`, `ProjectRunState` and `ListStaleRuns` with factory providers.
   - Register `RunWorkflow` and `MaintenanceWorkflow`.
+- [ ] T061 Add the engine helpers to `apps/api/test/support/create-test-app.ts` and a new `apps/api/test/support/workflows.ts`.
+  - In `apps/api/test/support/create-test-app.ts`, add `createTestApp({ worker: true })`, which replaces the engine clock with `ManualWorkflowClock` and enables the worker in process.
+  - Create `apps/api/test/support/workflows.ts` with `drain(app)` (`WorkflowWorker.drain()`), `advance(app, ms)` and `waitForRun(app, runId, status)`.
+  - Add `apps/api/test/support/test-nodes.module.ts`, which registers the test executors of T032 with `@NodeTypeExecutor`, so integration and component suites can run them through the real registry.
 - [ ] T062 Write `apps/api/test/unit/http/domain-error.filter.spec.ts` first, then map the new errors explicitly in `apps/api/src/interface-adapters/http/filters/domain-error.filter.ts` (data-model Domain errors). Unmapped errors keep answering 500.
   - 404: `WorkflowNotFoundError`, `WorkflowVersionNotFoundError`, `RunNotFoundError`, `CredentialNotFoundError`, `WebhookEndpointNotFoundError`, `NodeNotFoundError`.
   - 403: `WorkflowAccessDeniedError`, `CredentialAccessDeniedError`.
@@ -488,9 +487,11 @@
     - with `RUN_CONCURRENCY_PER_WORKFLOW=5`, the sixth run of a workflow stays `queued` while a run of another workflow executes;
     - queued runs start oldest first.
   - Ending (FR-018, FR-024):
-    - a run timeout ends `failed` with kind `timeout`;
+    - a run timeout ends `failed` with kind `timeout`, counted from the start request, so a run queued behind the concurrency limit can time out before it starts (FR-022);
     - the maintenance sweep repairs a row whose compensation was lost, within 2 minutes;
-    - `cancel` ends `cancelled` and starts no further node.
+    - `cancel` ends `cancelled` and starts no further node;
+    - cancelling a running run and letting the engine compensate leaves it `cancelled`, with no `compensation_failed` instance (analysis U2).
+  - Rolling update (FR-021): an instance without the `test.pass` type fails the node with `NodeTypeUnavailableError` and keeps retrying; an instance that knows the type finishes it within 15 minutes of clock time.
   - **Crash test** (FR-020, SC-002): two app instances share one database and one clock. Close the first while `test.hang` runs, advance past the 30 s lease and drain the second. The nodes before the hanging one keep `attempts: 1`, the hanging node shows `attempts: 2`, and the run succeeds.
 
 **Checkpoint**: the run interpreter executes test graphs durably; unit and integration suites pass; user story work can begin
@@ -533,24 +534,25 @@
   - **Output**: step output pages keep production order with `offset` and `limit` (at most 100). An unknown run or node answers 404.
   - **Failure**: a node whose formula fails ends the run `failed`, naming the node and the parameter, and downstream nodes have no step.
   - **Cancel**: cancelling a queued or running run gives `cancelled` with no new step; a finished run answers 409.
-  - **Refusals**: a non-owner gets 403; a stale revision answers 409; an invalid draft answers 422 with `problems`; more than 1,000 items answer 400.
+  - **Refusals**: a non-owner gets 403; a stale revision answers 409; an archived workflow answers 409 (FR-003); an invalid draft answers 422 with `problems`; more than 1,000 items answer 400.
   - **Samples and fields**: a pinned sample replaces the node's execution. After a test run, `GET /workflows/{id}` lists the field shapes of every node.
   - **Isolation from drafts**: saving the draft during a test run does not change that run.
   - **Storage**: with object storage stopped, the step output answers 503 while `GET /runs/{id}` answers 200.
-- [ ] T067 [P] [US1] Write `apps/api/test/unit/application/validate-draft.spec.ts` first (FR-007, FR-014, FR-015, FR-042). One problem of each code:
+- [ ] T067 [P] [US1] Write `apps/api/test/unit/domain/workflow-draft.spec.ts` first (FR-007, FR-014, FR-015, FR-042). `WorkflowDraft.validate(facts)`, with the facts built in the test (a formula inspector function, the owner's credentials, known fields and the error workflow's state), reports one problem of each code:
   - `unknown-node-type` (an unknown type or version) and `invalid-parameter`;
   - `missing-credential`, `foreign-credential` and `credential-type-mismatch`;
   - `unknown-node-reference` (a `ref` or `$('…')` to an unknown node) and `not-upstream-reference` (a node that is not upstream);
   - `formula-syntax` and `formula-scope`;
   - `invalid-error-workflow` (the workflow itself, or an unknown or archived workflow);
   - an `unknown-field` warning for a `ref` path missing from the referenced node's known fields;
-  - the graph codes of T009, merged in.
-- [ ] T068 [P] [US1] Write `apps/api/test/unit/application/save-draft.spec.ts` and `apps/api/test/unit/domain/node-sample.spec.ts` first.
+  - the graph codes of T010, merged in.
+- [ ] T068 [P] [US1] Write `apps/api/test/unit/application/save-draft.spec.ts`, `apps/api/test/unit/application/get-workflow.spec.ts` and `apps/api/test/unit/domain/node-sample.spec.ts` first.
   - `SaveDraft`:
     - checks `WorkflowPolicy.manage`;
     - refuses a stale revision with `WorkflowConflictError`;
     - rewrites formulas for renamed nodes through `FormulaEngine.renameNode`;
-    - stores the draft and returns `{ revision, validation }`.
+    - loads the facts through `DraftFacts`, stores the draft, and returns the saved `Workflow`, whose `validation` is the report (analysis U3).
+  - `GetWorkflow` computes the report from fresh facts, so a credential deleted after the save appears as `missing-credential`.
   - `FieldShape.from(items)`: dot paths with types from the first 20 items, at most 500 paths.
   - `NodeSample.pin(items)`: refuses more than 100 items or 1 MB.
 - [ ] T069 [P] [US1] Write `apps/api/test/unit/node-types/conditions.spec.ts` and `apps/api/test/unit/node-types/if.spec.ts` first (catalogue If; FR-014).
@@ -588,50 +590,60 @@
   - `apps/api/src/interface-adapters/node-types/if/{manifest.ts,executor.ts}`: outputs `true` and `false`.
   - `apps/api/src/interface-adapters/node-types/no-op/{manifest.ts,executor.ts}`.
 
-  Every manifest has version 1 and a zod schema with `.meta()` form keywords.
+  Every manifest has version 1, a zod schema with `.meta()` form keywords, and `defaultSettings` with the core defaults (FR-016).
 
 - [ ] T076 [US1] Implement `apps/api/src/interface-adapters/persistence/queries/drizzle-workflow.queries.ts` and the other US1 persistence adapters until T072 passes.
   - `drizzle-workflow.queries.ts` implements `WorkflowQueries`.
   - `apps/api/src/interface-adapters/persistence/repositories/drizzle-node-sample.repository.ts` with its mapper.
-  - `apps/api/src/interface-adapters/persistence/queries/drizzle-credential.queries.ts`: `findByIds` and `ownedIds(ownerId)` for validation and duplication. The credential table is empty until US3.
+  - `apps/api/src/interface-adapters/persistence/queries/drizzle-credential.queries.ts`: `ownedIds(ownerId)` for duplication. The credential table is empty until US3.
   - `apps/api/src/interface-adapters/persistence/queries/drizzle-run-history.reader.ts` (`RunHistoryReader.getRun`, with its steps).
-- [ ] T077 [US1] Implement `apps/api/src/application/use-cases/validate-draft.ts` until T067 passes. It merges the `WorkflowGraph.problems`, the `NodeType.validate` results, formula parse problems and references from `FormulaEngine`, credential checks through `CredentialQueries`, error-workflow checks through `WorkflowRepository`, and `unknown-field` warnings from `NodeSampleRepository`.
+- [ ] T077 [US1] Complete `apps/api/src/domain/workflow-draft.ts` until T067 passes: formula problems and references from the formula inspector, credential checks, the error-workflow check and `unknown-field` warnings, merged with the graph and parameter problems. Implement `apps/api/src/interface-adapters/persistence/queries/drizzle-draft-facts.queries.ts` (`DraftFacts`), writing `apps/api/test/integration/persistence/draft-facts.queries.spec.ts` first.
 - [ ] T078 [US1] Implement the workflow use cases in `apps/api/src/application/use-cases/` until T068 passes. Each command loads the aggregate and calls `WorkflowPolicy.manage`, which throws `WorkflowAccessDeniedError`.
-  - `create-workflow.ts`, `rename-workflow.ts`, and `save-draft.ts` (returns the report from `ValidateDraft`).
+  - `create-workflow.ts`, `rename-workflow.ts`, and `save-draft.ts`, which returns the saved `Workflow` with its report.
   - `archive-workflow.ts` and `restore-workflow.ts`.
   - `duplicate-workflow.ts`, which keeps only credentials from `CredentialQueries.ownedIds(caller)` (FR-004).
   - `transfer-workflow.ts`, whose target must be an active editor or administrator, else 400.
-  - `get-workflow.ts` and `list-workflows.ts`.
+  - `get-workflow.ts`, a query that reads the view through `WorkflowQueries` and computes the report from `DraftFacts`, and `list-workflows.ts`.
 - [ ] T079 [US1] Implement `apps/api/src/application/use-cases/pin-node-sample.ts`, `apps/api/src/application/use-cases/unpin-node-sample.ts` and `apps/api/src/application/use-cases/list-node-types.ts` (catalogue and `etag`).
-- [ ] T080 [US1] Implement the run use cases in `apps/api/src/application/use-cases/`.
+- [ ] T080 [US1] Implement the run use cases in `apps/api/src/application/use-cases/`. None calls the engine; the controllers do (T084).
   - `start-manual-run.ts`, for a test run of the draft at the named revision (FR-017, FR-025):
-    - refuse a stale revision (409) and a draft with errors (422 `DraftInvalidError`);
+    - refuse a stale revision (409), an archived workflow (409) and a draft with errors (422 `DraftInvalidError`);
     - choose the Manual Trigger, or `triggerNodeId` when there are several;
-    - insert the run `queued` with `graph_snapshot` and `actingUserId` set to the owner;
+    - insert the run `queued` with `graph_snapshot`, `timeoutMs` from the settings and `actingUserId` set to the owner;
     - write the items as attempt 0 of the trigger node with `StepData.writeTriggerInput`;
-    - call `RunEngine.start` with `runTimeoutMs` in the request transaction, as the last call.
-  - `cancel-run.ts` (FR-024): sets `cancelled`, then calls `RunEngine.cancel` in the same transaction, as the last call.
-  - `get-run.ts`: repairs a stale row with `projectRun`.
+    - return the `Run`.
+  - `cancel-run.ts` (FR-024): sets `cancelled` and returns the `Run`; a finished run throws `RunFinishedError`.
+  - `get-run.ts`: a pure query through `RunHistoryReader` that never writes (constitution V).
   - `get-step-output.ts`: reads one page through `StepData.page`.
 - [ ] T081 [US1] Extend `apps/api/src/application/use-cases/execute-node-step.ts` for test runs (FR-015, FR-021).
   - A node with a pinned sample outputs the pinned items without executing.
   - Each executed node's known fields (`FieldShape.from` of its first 20 output items) are stored with `fieldsSource: 'test-run'` unless the node is pinned.
-- [ ] T082 [P] [US1] Create the HTTP input types in `apps/api/src/interface-adapters/http/dto/` and `apps/api/src/interface-adapters/http/pipes/`.
-  - `apps/api/src/interface-adapters/http/dto/draft.schema.ts`: `z.strictObject` schemas mirroring the contract's `Graph` (at most 200 nodes and 1,000 connections), `Node`, `Connection`, `ParameterValue`, `NodeSettings` and `WorkflowSettings`.
-  - `apps/api/src/interface-adapters/http/pipes/zod-validation.pipe.ts`, which answers 400 with the issue paths.
-  - class-validator DTOs in `apps/api/src/interface-adapters/http/dto/workflow.dto.ts` (create, rename, duplicate, transfer, samples with `Items100`) and `apps/api/src/interface-adapters/http/dto/run.dto.ts` (`StartRun` with `target` and `Items1000`).
+- [ ] T082 [P] [US1] Create the request DTO classes in `apps/api/src/interface-adapters/http/dto/`. The global `ValidationPipe` validates them, and `@nestjs/swagger` generates the OpenAPI document from them (constitution: HTTP interface; analysis C1).
+  - `draft.dto.ts`:
+    - `SaveDraftDto` (`revision` at least 1), `GraphDto` (at most 200 nodes and 1,000 connections), `ConnectionDto`, `NodeSettingsDto` and `WorkflowSettingsDto`, nested with `@ValidateNested` and `@Type`;
+    - `NodeDto`: `id` (UUID), `name` (1–120 characters), `type`, `typeVersion` (at least 1), `credentialId`, `position`, `note` (at most 2,000 characters) and `disabled`.
+  - `parameters` is checked by a custom `@IsParameterValues()` decorator in `apps/api/src/interface-adapters/http/dto/validators/parameter-values.validator.ts`:
+    - each value is exactly one of `{ fixed }`, `{ ref: { node, path } }` (path at most 500 characters) or `{ formula }` (at most 65,536 characters), recursively for collections;
+    - node-specific rules stay with the node types' schemas in the domain validation.
+  - `workflow.dto.ts`: create, rename and duplicate (`name` 1–120 characters), transfer (`ownerId` UUID) and samples (`items`, at most 100 objects).
+  - `run.dto.ts`: `StartRunDto` with `target` (`draft.revision` or `version`), `triggerNodeId` and `items` (at most 1,000 objects).
+  - Item arrays use `@IsOpaqueItems({ max })` from `apps/api/src/interface-adapters/http/dto/validators/opaque-items.validator.ts`: plain objects whose fields are not validated (constitution 3.1.0). Nesting depth is checked by the body middleware (T053).
 - [ ] T083 [P] [US1] Create the presenters in `apps/api/src/interface-adapters/http/presenters/`, matching the contract schemas.
   - `apps/api/src/interface-adapters/http/presenters/workflow.presenter.ts`: `Workflow` and `WorkflowSummary`.
   - `apps/api/src/interface-adapters/http/presenters/run.presenter.ts`: `Run` and `Step`, plus a weak `ETag` hashed from the presented body.
-  - `apps/api/src/interface-adapters/http/presenters/node-type.presenter.ts`: `NodeType`.
+  - `apps/api/src/interface-adapters/http/presenters/node-type.presenter.ts`: `NodeType`, including `defaultSettings`.
 - [ ] T084 [US1] Implement the US1 controllers in `apps/api/src/interface-adapters/http/controllers/`.
-  - `apps/api/src/interface-adapters/http/controllers/workflows.controller.ts`: `GET`/`POST /workflows`, `GET`/`PATCH /workflows/:id`, `PUT /workflows/:id/draft`, `POST /workflows/:id/{archive,restore,duplicate,transfer}`, `PUT`/`DELETE /workflows/:id/samples/:nodeId`.
-  - `apps/api/src/interface-adapters/http/controllers/runs.controller.ts`: `POST /runs`, `GET /runs/:runId` with `ETag`, `Cache-Control: no-cache` and 304, `POST /runs/:runId/cancel`, `GET /runs/:runId/steps/:nodeId/output`.
-  - `apps/api/src/interface-adapters/http/controllers/node-types.controller.ts`: `GET /node-types` with `ETag` and 304.
+  - `workflows.controller.ts`: `GET`/`POST /workflows`, `GET`/`PATCH /workflows/:id`, `PUT /workflows/:id/draft`, `POST /workflows/:id/{archive,restore,duplicate,transfer}`, `PUT`/`DELETE /workflows/:id/samples/:nodeId`.
+  - `runs.controller.ts`:
+    - `POST /runs` calls `StartManualRun`, then the engine's `start('run', { runId, workflowId }, { id: 'run-<runId>', timeout: run.timeoutMs, transaction })` in the same transaction, and answers 202 `{ runId }`;
+    - `GET /runs/:runId` answers with `ETag`, `Cache-Control: no-cache` and 304;
+    - `POST /runs/:runId/cancel` calls `CancelRun`, then the engine's `cancel('run-<runId>')` in the same transaction, as the last call;
+    - `GET /runs/:runId/steps/:nodeId/output`.
+  - `node-types.controller.ts`: `GET /node-types` with `ETag` and 304.
 
-  Reads use `@Can.Anyone()`, and commands use `@Can(WorkflowPolicy, 'author')` and `@Transactional()` (research R14). Add Swagger decorators that match `contracts/openapi.yaml`.
+  Reads use `@Can.Anyone()`, and commands use `@Can(WorkflowPolicy, 'author')` and `@Transactional()` (research R14). The OpenAPI document comes from the DTO classes and must match `contracts/openapi.yaml`.
 
-- [ ] T085 [US1] Register the US1 use cases (factory providers), repositories, queries, controllers and node types in `apps/api/src/frameworks/di/automation.module.ts`, and add `WorkflowPolicy` to `AuthorizationModule.forRoot({ policies })`, so that T064, T065 and T066 pass.
+- [ ] T085 [US1] Register the US1 use cases (factory providers), repositories, queries, `DraftFacts`, controllers and node types in `apps/api/src/frameworks/di/automation.module.ts`, and add `WorkflowPolicy` to `AuthorizationModule.forRoot({ policies })`, so that T064, T065 and T066 pass.
 - [ ] T086 [P] [US1] Create `specs/002-workflow-builder/examples/orders-draft.json` for quickstart Scenario 1: Manual Trigger → Edit Fields (`net = {{ $json.total * 0.8 }}`) → If (`total > 50`), with fixed UUID node ids.
 - [ ] T087 [US1] Write `apps/api/test/e2e/build-and-test-run.spec.ts`, with helpers in `apps/api/test/e2e/support/automation.ts` (DR-004). Against the Compose stack, with the `worker` container executing:
   - create a workflow, save `orders-draft.json` and test-run it with three items;
@@ -655,13 +667,15 @@
 ### Tests for User Story 2 ⚠️
 
 - [ ] T088 [P] [US2] Write `apps/api/test/unit/node-types/code.spec.ts` first, with a fake `CodeSandboxGateway` (FR-032–FR-034; research R11).
-  - **Status mapping**:
-    - `Accepted` leads to validation of the result;
-    - `Nonzero Exit Status`, `Time Limit Exceeded`, `Memory Limit Exceeded`, `Output Limit Exceeded`, `Dangerous Syscall`, `File Error`, and `Signalled` (unless the worker aborted the call) are user errors that are never retried;
+  - **Status mapping** (FR-033; research R11):
+    - `Accepted` leads to validation of the result, and an `{ ok: false }` result is a `NodeUserError` with its line and item index;
+    - `Time Limit Exceeded`, `Memory Limit Exceeded`, `Output Limit Exceeded`, the process limit, and `Signalled` with SIGABRT are `NodeLimitError`;
+    - `Dangerous Syscall` and `File Error` are `IsolationBreachError`;
+    - `Nonzero Exit Status` and other signals are `NodeUserError`;
     - `Internal Error`, HTTP 5xx and connection failures are `PlatformError`.
   - **Modes and limits**:
     - "run once for each item" splits the items into invocations below 8 MB of input and concatenates the outputs in input order;
-    - "run once for all items" with more than 8 MB of input fails as a user error.
+    - "run once for all items" with more than 8 MB of input fails with `NodeLimitError`.
   - **TypeScript**: a syntax error fails before any sandbox call, and transpiled code is cached by source hash.
   - **Diagnostics**: at most 64 KB, stored at `runs/<runId>/nodes/<nodeId>/diagnostics.txt`, with the key on the Step row.
 - [ ] T089 [P] [US2] Write `apps/api/test/unit/sandbox/typescript.transpiler.spec.ts` first. `amaro` `transformSync(src, { mode: 'strip-only' })` keeps line numbers, and an unsupported construct (`enum`) is reported with its line.
@@ -674,9 +688,8 @@
     - a single object is wrapped in a list, while BigInt, NaN and non-object results fail;
     - a thrown error reports its line and item index;
     - `console.log` and `print` output becomes diagnostics, capped at 64 KB.
-  - **Refusals**, each failing the node as a user error that is not retried:
-    - `fetch('http://example.com')` or a raw `connect()`, and `open('/etc/passwd')`;
-    - `while (true) {}`, a 1 GB allocation, 64 threads, and output above 16 MB.
+  - **Limits**: `while (true) {}`, a 1 GB allocation, 64 threads and output above 16 MB fail with kind `limit` and are never retried.
+  - **Isolation**: `fetch('http://example.com')`, a raw `connect()` and `open('/etc/passwd')` reach neither the network nor host files. When the sandbox stops the code, the kind is `isolation`; when the code receives the refusal as an error, an unhandled one is a `user` error carrying the system error.
 - [ ] T091 [P] [US2] Write `apps/api/test/component/code-node.spec.ts` first, with the fake gateway. A test run with a Code node returns its outputs, and `GET /runs/{id}` shows the step's `diagnostics`. With the gateway unreachable, the node fails with kind `platform` after 3 attempts.
 
 ### Implementation for User Story 2
@@ -741,7 +754,7 @@
 ### Tests for User Story 3 ⚠️
 
 - [ ] T100 [P] [US3] Write `apps/api/test/unit/domain/credential.spec.ts` and `apps/api/test/unit/storage/aes-gcm.secret-cipher.spec.ts` first (FR-039, FR-040; research R13).
-  - **`Credential`**: `create` sets `verified = true`; `rename`; `replaceSecret`; names are 1–120 characters.
+  - **`Credential`**: `create` sets `verified = true`; `rename`; `replaceSecret`. Name lengths are checked by the DTO (T112).
   - **Cipher**:
     - AES-256-GCM round trip under `SECRET_KEY_VERSION`;
     - a ciphertext under an older configured version still decrypts;
@@ -831,10 +844,10 @@
     - `get(id)` with `usedBy`, the workflows whose draft or active version references the credential;
     - `isReferencedByActiveVersion(id)`, which joins `activation` and `workflow_version`.
 - [ ] T111 [US3] Implement the credential use cases and their policy in `apps/api/src/application/`.
-  - `policies/credential.policy.ts`: `manage(user, credential)` is true for the owner; administrators may read metadata and delete.
+  - `policies/credential.policy.ts`: `manage(user, owned)` is true for the owner of `owned.ownerId` (the aggregate or a query row); administrators may read metadata and delete.
   - `use-cases/create-credential.ts`, `update-credential.ts` (rename or replace the secret, owner only), `delete-credential.ts` (`CredentialInUseError` while an active version references it), `list-credentials.ts` and `get-credential.ts`.
 - [ ] T112 [US3] Implement `apps/api/src/interface-adapters/http/controllers/credentials.controller.ts` with its DTO and presenter.
-  - `apps/api/src/interface-adapters/http/dto/credential.dto.ts`, validating the secret by type.
+  - `apps/api/src/interface-adapters/http/dto/credential.dto.ts`: `name` (1–120 characters), `type`, and the secret validated by type (names at most 200 characters, values at most 8,192).
   - `apps/api/src/interface-adapters/http/presenters/credential.presenter.ts`, which never includes the secret and includes `unreadable`.
   - The controller: `GET`/`POST /credentials`, `GET`/`PATCH`/`DELETE /credentials/:credentialId`.
 
@@ -991,8 +1004,8 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
   - **Activate**:
     - a missing, unreadable or foreign credential refuses activation with problems;
     - a new activation replaces the previous one and enqueues the outbox message `activation` in the same transaction.
-  - **Archive**: deactivates.
-  - **Transfer**: deactivates when the version uses the previous owner's credentials, and records the reason in the log.
+  - **Archive**: deactivates; activating an archived workflow throws `WorkflowArchivedError` (FR-003).
+  - **Transfer**: keeps the activation; references to credentials the new owner does not own become `foreign-credential` problems (FR-005).
 - [ ] T147 [P] [US5] Write `apps/api/test/component/publish.spec.ts` first (FR-010, FR-012, FR-017; US5 scenarios 1, 2, 7).
   - `POST /workflows/{id}/versions` with the revision answers 201 `{ number }`, and the draft stays editable.
   - `GET /versions` lists versions newest first, and `GET /versions/{n}` returns the graph.
@@ -1000,7 +1013,7 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
   - `POST /runs` with `target.version` runs that version's graph after the draft has changed.
   - Activating a newer version ends the previous activation.
 - [ ] T148 [P] [US5] Write `apps/api/test/component/activation.spec.ts` first (FR-011, FR-027, FR-046).
-  - `PUT /activation` and `DELETE /activation` answer 200 and 204, and archiving deactivates.
+  - `PUT /activation` and `DELETE /activation` answer 200 and 204, archiving deactivates, and activating an archived workflow answers 409 (FR-003).
   - Activation answers 422 when a referenced credential was deleted (rows inserted directly).
   - `GET /workflows/{id}/webhooks` returns `url`, `methods`, `authentication` and `secret` to the owner and administrators, and 403 to others.
   - Rotation changes the secret and keeps the URL. Webhook endpoints survive new drafts, versions and activations.
@@ -1014,7 +1027,7 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
     - an unknown, inactive or archived endpoint;
     - a method not configured;
     - an endpoint whose secret is unreadable.
-  - **Size**: a body above 1 MB answers 413.
+  - **Size and depth**: a body above 1 MB answers 413; an authenticated JSON body nested more than 64 levels answers 400.
   - **Deliveries with `x-delivery-id`**:
     - a repeat returns the same `runId` with `Idempotent-Replayed: true`;
     - a different body gives 422 `IDEMPOTENCY_KEY_REUSED`;
@@ -1024,8 +1037,7 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
   - **Run input**: the run's input item has `method`, `path`, `headers` without the secret headers, `query` and `body`.
 - [ ] T150 [P] [US5] Write `apps/api/test/integration/persistence/idempotency.store.spec.ts` first. It runs `idempotencyStoreContract({ concurrent: true })` from `@nestjs/idempotency` against the Drizzle store (research R24).
 - [ ] T151 [P] [US5] Write `apps/api/test/integration/workflows/schedules.spec.ts` first, with the real store and `ManualWorkflowClock` (FR-026; US5 scenario 3; SC-003; research R6).
-  - `ScheduleRegistry.sync` upserts one schedule per rule with `overlap: 'skip'` and `missed: 'skip'`, and removes stale schedules.
-  - The outbox `activation` handler calls `sync`.
+  - The outbox `activation` handler upserts one engine schedule per rule from `SyncWorkflowSchedules`, with `overlap: 'skip'` and `missed: 'skip'`, and removes stale schedules with the prefix `wf.<workflowId>.`.
   - An occurrence starts exactly one run, whose id is derived from the occurrence id, with `version` set.
   - An occurrence due while the previous run of the same rule is active is skipped; another rule still fires.
   - Missed occurrences are not replayed.
@@ -1039,21 +1051,17 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
 - [ ] T153 [US5] Implement `apps/api/src/interface-adapters/persistence/repositories/drizzle-activation.repository.ts` and `apps/api/src/interface-adapters/persistence/repositories/drizzle-webhook-endpoint.repository.ts`, both with optimistic `version`.
   - Their mappers are `apps/api/src/interface-adapters/persistence/mappers/activation.mapper.ts` and `apps/api/src/interface-adapters/persistence/mappers/webhook-endpoint.mapper.ts`.
 - [ ] T154 [P] [US5] Implement `apps/api/src/interface-adapters/persistence/drizzle-idempotency.store.ts` (`IdempotencyStore`: `acquire`, `complete`, `release`, `extend`, `prune`) over `idempotency_key` until T150 passes.
-- [ ] T155 [US5] Implement the version use cases in `apps/api/src/application/use-cases/`: `publish-workflow-version.ts`, `list-workflow-versions.ts` and `get-workflow-version.ts`. Extend `apps/api/src/application/use-cases/start-manual-run.ts` with `target.version`, for a production run of that version.
+- [ ] T155 [US5] Implement the version use cases in `apps/api/src/application/use-cases/`: `publish-workflow-version.ts`, `list-workflow-versions.ts` and `get-workflow-version.ts`. Extend `apps/api/src/application/use-cases/start-manual-run.ts` with `target.version`, for a production run of that version that the controller starts.
 - [ ] T156 [US5] Implement the activation use cases in `apps/api/src/application/use-cases/` until T146 passes.
   - `activate-workflow-version.ts` and `deactivate-workflow.ts`, each with an outbox message `activation` in the transaction.
-  - `sync-workflow-schedules.ts`.
+  - `sync-workflow-schedules.ts`: a query that returns the `ScheduleRegistration`s of the active version, or none.
   - Extend `archive-workflow.ts` to deactivate.
-  - Extend `transfer-workflow.ts` to deactivate when the version uses credentials the new owner does not own.
 - [ ] T157 [US5] Implement the webhook use cases in `apps/api/src/application/use-cases/`.
   - `list-webhook-endpoints.ts`, which decrypts the secrets for owners and administrators.
   - `rotate-webhook-secret.ts`.
   - Extend `save-draft.ts` to create a `WebhookEndpoint` the first time a Webhook node is saved (FR-027).
   - Extend `apps/api/src/application/use-cases/reencrypt-secrets.ts` to webhook endpoints.
-- [ ] T158 [US5] Implement `apps/api/src/interface-adapters/workflows/workflow-client.schedule-registry.ts` and `apps/api/src/interface-adapters/workflows/activation-outbox.handler.ts`.
-  - The registry implements `ScheduleRegistry` with `upsert`, and `remove` for stale ids with the prefix `wf.<workflowId>.`.
-  - The outbox handler calls `SyncWorkflowSchedules` for each `activation` message.
-  - Extend `apps/api/src/application/use-cases/reconcile-runs.ts`, or add `reconcile-schedules.ts` called by maintenance, to compare schedules with activations.
+- [ ] T158 [US5] Implement `apps/api/src/interface-adapters/workflows/activation-outbox.handler.ts`. For each `activation` message it calls `SyncWorkflowSchedules` and applies the result through the engine client: `upsert` per registration, and `remove` for stale ids with the prefix `wf.<workflowId>.`. Extend `apps/api/src/interface-adapters/workflows/maintenance.workflow.ts` to apply the same synchronisation to every workflow whose engine schedules differ from its activation (FR-011).
 - [ ] T159 [US5] Implement `apps/api/src/interface-adapters/workflows/scheduled-trigger.workflow.ts` and `apps/api/src/application/use-cases/start-scheduled-run.ts` (research R6).
   - The workflow:
     - its step `register-run` calls `StartScheduledRun`;
@@ -1066,11 +1074,11 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
     - throws the same `NotFoundException` for every refusal.
   - `StartWebhookRun`:
     - inserts the run with `deriveRunId('webhook:<endpointId>:<deliveryId>')`, or a random id without a delivery id, with `ON CONFLICT DO NOTHING`;
-    - only for a new run, writes the request item as attempt 0 and starts it in the transaction.
+    - only for a new run, writes the request item as attempt 0; it returns the run with `created`.
   - The controller route `@All('webhooks/:endpointId')`:
     - `@Public()`, `@UseGuards(WebhookIngressGuard)` and `@Transactional()`;
     - `@Idempotent({ keyFrom: { header: 'x-delivery-id' }, scope: (req) => req.params.endpointId, fingerprint: rawBody, storeIf: (status) => status >= 200 && status < 300, ttl: '7d', lockTtl: '30s' })`;
-    - answers 202.
+    - starts `run-<runId>` through the engine client in the transaction when the run is new, and answers 202.
 - [ ] T161 [P] [US5] Implement `apps/api/src/interface-adapters/node-types/schedule-trigger/` and `apps/api/src/interface-adapters/node-types/webhook/`.
   - Schedule Trigger: rules for every N minutes, hours, days, weeks or months at a time, and cron, with an optional time zone; intervals below one minute are invalid.
   - Webhook: methods GET, POST, PUT, PATCH and DELETE, `authentication` set to `token` or `signature`; its output removes the secret headers.
@@ -1110,19 +1118,18 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
 
 ### Tests for User Story 6 ⚠️
 
-- [ ] T165 [P] [US6] Write `apps/api/test/unit/application/execute-run.errors.spec.ts` first (FR-016; US6 scenarios 3 and 4).
-  - Retry on fail with N attempts and `waitMs` runs a user error N times.
-  - A limit or isolation breach runs once.
-  - `onError: continue` passes the node's input items on.
-  - `onError: errorOutput` sends the failed items through the `error` port, each with `error: { kind, message }`.
-- [ ] T166 [P] [US6] Write `apps/api/test/unit/node-types/wait.spec.ts` first (FR-030; US6 scenarios 1 and 2; edge cases).
-  - **Time modes**: an interval or a date computes the deadline in a step, then `sleepUntil`. The run is `waiting` in between and the items continue unchanged.
+- [ ] T165 [P] [US6] Write `apps/api/test/unit/domain/run-execution.on-error.spec.ts` and extend `apps/api/test/unit/application/run-steps.spec.ts` first (FR-016; US6 scenarios 3 and 4).
+  - With retry on fail set to N attempts and `waitMs`, `NodeSettings.retryDecision` allows N attempts of a user error and one attempt of a limit or isolation breach.
+  - `onError: continue`: `RunExecution.record` passes the node's input items on.
+  - `onError: errorOutput`: `RecordNodeFailure` writes the failed items to the `error` port, each with `error: { kind, message }`, and `RunExecution` routes them to the nodes connected to that port.
+- [ ] T166 [P] [US6] Write `apps/api/test/integration/workflows/wait-node.spec.ts` first, with the real store and `ManualWorkflowClock` (FR-030; US6 scenarios 1 and 2; edge cases).
+  - **Time modes**: an interval or a date computes the deadline in a step, then sleeps until it. The run is `waiting` in between, and the items continue unchanged.
   - **Resume mode**:
-    - `waitForResume` honours the optional maximum wait, after which the run continues or fails as configured;
-    - each output item carries the call's body under `resume`;
+    - the node waits for the `run.resume` signal and honours the optional maximum wait, after which the run continues or fails as configured;
+    - each output item carries the call's data under `resume` (`body`, `receivedAt`);
     - `usesResumeAddress` is true.
   - **Run timeout**: a wait longer than the remaining run timeout fails at the timeout.
-- [ ] T167 [P] [US6] Write `apps/api/test/unit/node-types/execute-workflow.spec.ts` first (FR-028, FR-031; US6 scenarios 5 and 7; edge cases).
+- [ ] T167 [P] [US6] Write `apps/api/test/integration/workflows/execute-workflow-node.spec.ts` first, with the real store and `ManualWorkflowClock` (FR-028, FR-031; US6 scenarios 5 and 7; edge cases).
   - **Calls**:
     - the node calls once with all items or once per batch of N;
     - calls run in windows of 20;
@@ -1166,37 +1173,35 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
 ### Implementation for User Story 6
 
 - [ ] T172 [P] [US6] Implement `apps/api/src/interface-adapters/storage/hmac.signer.ts` (`Signer`, with `SIGNING_KEY`) and register it in `apps/api/src/frameworks/di/storage.module.ts` until T169 passes.
-- [ ] T173 [US6] Complete `apps/api/src/interface-adapters/workflows/workflow-context.step-runner.ts` and `apps/api/src/interface-adapters/workflows/workflow-client.run-engine.ts` (research R3, R6).
-  - In `apps/api/src/interface-adapters/workflows/workflow-context.step-runner.ts`:
-    - `sleepUntil` is `ctx.sleepUntil`;
-    - `waitForResume` is `ctx.waitForSignal('wait:<nodeId>', 'run.resume', { key: runId, timeout })`;
-    - `runChild` is `executeChild` with `parentClose: 'cancel'` when waiting, or `startChild` with `parentClose: 'abandon'`, with id `run-<childRunId>`.
-  - In `apps/api/src/interface-adapters/workflows/workflow-client.run-engine.ts`, add `signal('run.resume', { key: runId, id: 'resume-<runId>', payload })`, which returns `created`.
-- [ ] T174 [US6] Extend `apps/api/src/application/use-cases/execute-run.ts` and `apps/api/src/application/use-cases/execute-node-step.ts` with `onError: continue` and `errorOutput` (data-model PortDefinition `error`) until T165 passes.
-- [ ] T175 [US6] Implement `apps/api/src/interface-adapters/node-types/wait/{manifest.ts,executor.ts}` (`execution: 'orchestrated'`) until T166 passes.
-  - The steps `wait:<nodeId>:enter` and `wait:<nodeId>:leave` set `waiting` and `running`.
-  - The resume body is read from the key carried in the signal payload.
+- [ ] T173 [US6] Extend `apps/api/src/interface-adapters/workflows/run.workflow.ts` for orchestrated nodes (research R3, R6). Declare `OrchestratedNode` in `apps/api/src/interface-adapters/interfaces.ts`: `run({ ctx, runId, node, inputs })`, returning the node's outcome. The loop hands every node whose manifest says `execution: 'orchestrated'` to its adapter with the engine context, instead of wrapping it in one step.
+- [ ] T174 [US6] Extend `apps/api/src/domain/run-execution.ts` and `apps/api/src/application/use-cases/record-node-failure.ts` with `onError: continue` and `errorOutput` (data-model PortDefinition `error`) until T165 passes.
+- [ ] T175 [US6] Implement `apps/api/src/interface-adapters/node-types/wait/{manifest.ts,executor.ts}` (`execution: 'orchestrated'`) as an `OrchestratedNode` until T166 passes.
+  - The steps `wait:<nodeId>:enter` and `wait:<nodeId>:leave` call use cases that set `waiting` and `running`.
+  - Time modes call `ctx.sleepUntil`; resume mode calls `ctx.waitForSignal('wait:<nodeId>', 'run.resume', { key: runId, timeout })`.
+  - The resume body is read from the key carried in the signal payload and added to each item under `resume`.
   - An optional `headerCredentialId` refers to one of the owner's `httpHeader` credentials.
 - [ ] T176 [US6] Implement `apps/api/src/application/use-cases/resume-run.ts`, `apps/api/src/interface-adapters/http/guards/resume.guard.ts` and the resume route until T171 passes.
   - `ResumeRun`:
     - verify the token, else 404;
     - refuse a finished run with 409;
-    - store the body at `runs/<runId>/resume/<callId>.json`;
-    - signal, turning `created: false` into `ResumeRefusedError`.
+    - store the body at `runs/<runId>/resume/<callId>.json` and return the key.
   - The guard: when the run's resume Wait requires a header credential, compare its value in constant time, and answer 404 on a mismatch.
-  - The route `POST /resume/:token` in `apps/api/src/interface-adapters/http/controllers/ingress.controller.ts`, with `@Public()`, `@Idempotent({ required: false, scope: (req) => runIdFrom(req.params.token) })` and an answer of 202.
+  - The route `POST /resume/:token` in `apps/api/src/interface-adapters/http/controllers/ingress.controller.ts`:
+    - `@Public()` and `@Idempotent({ required: false, scope: (req) => runIdFrom(req.params.token) })`;
+    - after `ResumeRun`, it signals `run.resume` with `{ key: runId, id: 'resume-<runId>' }` and the body key through the engine client;
+    - it answers 202, or 409 when the engine reports `created: false`.
   - `$execution.resumeUrl` is set in the run metadata used by formulas and Code node helpers.
 - [ ] T177 [US6] Implement `apps/api/src/interface-adapters/node-types/execute-workflow-trigger/` and `apps/api/src/interface-adapters/node-types/execute-workflow/` until T167 passes.
   - Execute Workflow Trigger: accepts all caller items or declared input fields.
-  - Execute Workflow (`execution: 'orchestrated'`):
-    - the step `node:<id>:prepare` writes the batch inputs and inserts the child runs with derived ids and `depth + 1`;
-    - `runChild` runs per batch in windows of 20;
-    - the step `node:<id>:collect` concatenates the last-node output references;
+  - Execute Workflow, an `OrchestratedNode`:
+    - the step `node:<id>:prepare` calls `PrepareSubWorkflowCalls` (`apps/api/src/application/use-cases/prepare-sub-workflow-calls.ts`), which writes the batch inputs and inserts the child runs with derived ids and `depth + 1`;
+    - per batch, in windows of 20, it calls `ctx.executeChild` (`parentClose: 'cancel'`) for "wait for completion" or `ctx.startChild` (`parentClose: 'abandon'`) for "continue at once";
+    - the step `node:<id>:collect` calls `CollectSubWorkflowOutputs`, which concatenates the last-node output references;
     - the user's retry attempts are counted by the executor.
 - [ ] T178 [US6] Implement `apps/api/src/application/use-cases/start-error-run.ts` and `apps/api/src/interface-adapters/node-types/error-trigger/` until T168 passes.
-  - `StartErrorRun` is called from `finish-run`, from the `register-run` compensation and from `ReconcileRuns`.
+  - `StartErrorRun` is called by `FinishRun`, `TerminateRun` and `ProjectRunState` when a production run fails. It inserts the error run's row and returns it, and the calling adapter (the `run` or the `maintenance` workflow) starts it through the engine client in the same step.
   - The Error Trigger outputs the failed run, workflow, node and error message.
-- [ ] T179 [US6] Register the Wait, Execute Workflow, Execute Workflow Trigger and Error Trigger nodes, `ResumeRun`, `StartErrorRun`, the resume guard and the signer in `apps/api/src/frameworks/di/automation.module.ts` until T170 passes.
+- [ ] T179 [US6] Register the Wait, Execute Workflow, Execute Workflow Trigger and Error Trigger nodes, `ResumeRun`, `StartErrorRun`, `PrepareSubWorkflowCalls`, `CollectSubWorkflowOutputs`, the resume guard and the signer in `apps/api/src/frameworks/di/automation.module.ts` until T170 passes.
 - [ ] T180 [US6] Write `apps/api/test/e2e/wait-and-recovery.spec.ts` (DR-004; quickstart Scenarios 5 and 6; SC-002).
   - A two-minute Wait, then `docker compose restart worker`; the run succeeds after the wait.
   - Resuming through `$execution.resumeUrl`.
@@ -1246,7 +1251,7 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
   - `SettingsPolicy.manage(user)` is true for administrators.
   - In `apps/api/src/application/use-cases/`: `list-runs.ts`, `get-retention-settings.ts` and `update-retention-settings.ts`.
 - [ ] T189 [US7] Implement `apps/api/src/application/use-cases/apply-retention.ts` and `apps/api/src/interface-adapters/workflows/retention.workflow.ts` until T184 passes.
-  - The retention workflow is a declared schedule nightly at 03:00 UTC.
+  - The retention workflow is a declared schedule nightly at 03:00 UTC. It calls `ApplyRetention` per batch and deletes the engine instances `run-<id>` of the removed runs with `delete(id)`; `purge`, the idempotency store's `prune()` and the outbox inbox `prune()` run after the loop.
 - [ ] T190 [US7] Create `apps/api/src/interface-adapters/http/controllers/settings.controller.ts` and add the run list route to `apps/api/src/interface-adapters/http/controllers/workflows.controller.ts`.
   - The settings controller (`GET`/`PUT /settings/retention`, `@Can(SettingsPolicy, 'manage')`) and `apps/api/src/interface-adapters/http/dto/retention.dto.ts`.
   - Add `GET /workflows/:id/runs` to `apps/api/src/interface-adapters/http/controllers/workflows.controller.ts`.
@@ -1267,20 +1272,20 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
 - [ ] T193 [P] Update `docs/architecture/02-system.md` (R21): Garage, the `workflows:migrate` release step, the KEDA query (documented as unstable), pool sizing, the worker and sandbox sidecar, and the gateway rate limits.
 - [ ] T194 [P] Update `docs/architecture/03-api.md` (R21):
   - the modules `WorkflowsInfraModule`, `StorageModule`, `OutboundHttpModule`, `IdempotencyModule` and `ResilienceModule` (policies `http-page`, `sandbox`, `storage`);
-  - the ports `FormulaEngine`, `Signer`, `NodeSampleRepository` and `WebhookEndpointRepository`;
+  - the ports `FormulaEngine`, `Signer`, `StepData`, `DraftFacts`, `NodeSampleRepository` and `WebhookEndpointRepository`, and the rule that the engine is used only in adapters;
   - the controllers, and the `ROLE` bootstrap.
 - [ ] T195 [P] Update `docs/architecture/04-execution.md` with every item of research R21:
   - the status projection replaces `events$`, and queued rows are inserted with the start;
   - the scheduled-trigger workflow, and concurrency keyed by a function of the input;
   - the timeout includes queued time, and the retry accounting;
-  - waits and children go through `StepRunner`, and the resume signal id is per run;
+  - the run loop lives in the `run` workflow adapter over the domain's `RunExecution`, waits and children in the node adapters, and the resume signal id is per run;
   - status rows replace `setStatus`, and retention uses `delete(id)`;
   - signals serialise behind a global lock.
 - [ ] T196 [P] Update `docs/architecture/05-node-types.md` (R21): `execution` and `effects` in manifests, zod parameters served as JSON Schema, Python and the shared Code node contract, and the HTTP Request node with pagination and its formula scope.
 - [ ] T197 [P] Update `docs/architecture/06-security.md` (R21):
   - SSRF controls, and credential and webhook secrets with key rotation and loss;
   - the uniform webhook 404, delivery deduplication, and signed resume addresses with the optional header credential;
-  - object-level checks, and gateway rate limits.
+  - object-level checks, gateway rate limits, opaque user payloads within size and depth limits, and the formula interpreter as the expression sandbox (constitution 3.1.0).
 - [ ] T198 [P] Update `apps/api/README.md`:
   - the two roles and the new scripts (`workflows:migrate`);
   - the new environment variables;
@@ -1292,7 +1297,15 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
   - Setup: 10 workflows, each Manual Trigger → Edit Fields → If → Code → HTTP Request to httpbin, with 10 runs started at once on each.
   - All 100 runs end within 5 minutes, and none is lost or duplicated.
   - Sampling the engine state every second, no workflow ever has more than 5 runs executing.
-- [ ] T202 Create `apps/api/scripts/scan-secrets.ts` and run it in CI after the end-to-end journeys (SC-007). It searches for the known test secrets of every suite in:
+- [ ] T202 [P] Write `apps/api/test/integration/workflows/crash-recovery.spec.ts` (SC-002; FR-020).
+  - Twenty seeded runs, each stopped at a random point: inside a node step, between steps, in `register-run`, entering or leaving a Wait, between sub-workflow starts, or in `finish-run`.
+  - Two app instances share one database and one clock. After each stop the clock passes the lease, and the second instance drains.
+  - Every run completes and continues within 60 s of clock time. No completed node runs again: only the stopped node's attempts grow, no Wait waits again from its start, and no sub-workflow call starts twice.
+- [ ] T203 [P] Write `apps/api/test/e2e/latency.spec.ts` against the Compose stack (SC-003, SC-004).
+  - 200 authenticated webhook calls with distinct delivery ids: the 95th percentile of acknowledgement times is at most 1 s, and each delivery id has exactly one run.
+  - A Schedule Trigger every minute, observed over 10 consecutive occurrences: each run's `queuedAt` is within 60 s of its scheduled time, and no occurrence has two runs.
+  - The measured values are printed in the test output.
+- [ ] T204 Create `apps/api/scripts/scan-secrets.ts` and run it in CI after the end-to-end journeys (SC-007). It searches for the known test secrets of every suite in:
   - the recorded API responses;
   - `docker compose logs api worker`;
   - the `nest_workflows` journal tables;
@@ -1302,9 +1315,9 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
 
   It fails on any match. Add the step to `.github/workflows/ci.yml`.
 
-- [ ] T203 Extend the `image` job in `.github/workflows/ci.yml` so that `docker compose --profile app up -d --wait` starts `worker` and `sandbox` too, and the end-to-end journeys of every story run against them.
-- [ ] T204 Run `specs/002-workflow-builder/quickstart.md` Scenarios 1–7 and its image and security gates against the Compose stack. Fix any divergence in the code, or in the quickstart when the code is right.
-- [ ] T205 Run the final verification and record it in `specs/002-workflow-builder/tasks.md`:
+- [ ] T205 Extend the `image` job in `.github/workflows/ci.yml` so that `docker compose --profile app up -d --wait` starts `worker` and `sandbox` too, and the end-to-end journeys of every story run against them.
+- [ ] T206 Run `specs/002-workflow-builder/quickstart.md` Scenarios 1–7 and its image and security gates against the Compose stack. Fix any divergence in the code, or in the quickstart when the code is right.
+- [ ] T207 Run the final verification and record it in `specs/002-workflow-builder/tasks.md`:
   - `pnpm lint`, `pnpm check-types`, `pnpm --filter api test`, `pnpm --filter api test:int` and `pnpm --filter api test:e2e` all pass with no skipped tests;
   - Trivy finds no critical or high issues in `workflow-platform/api:dev` and `workflow-platform/sandbox:dev`;
   - `pnpm audit --prod --audit-level=high` is clean, and `apps/api/package.json` has only exact versions.
@@ -1324,7 +1337,7 @@ Each node is `apps/api/src/interface-adapters/node-types/<type>/{manifest.ts,exe
 - **User Story 1 (Phase 3)**: depends on Foundational. It is the MVP and the base the other stories build on: workflows, drafts, test runs and run reads.
 - **User Stories 2, 3, 4, 5 and 7**: each depends only on US1. They can proceed in parallel.
 - **User Story 6 (Phase 8)**: depends on US5, because Execute Workflow, error workflows and the resume ingress need published, active versions and the ingress controller. Its worker-kill journey (T180) also uses the Code node from US2.
-- **Polish (Phase 10)**: depends on every story it measures. T201 needs US2 and US3, and T203 needs US2 and US6.
+- **Polish (Phase 10)**: depends on every story it measures. T201 needs US2 and US3, T202 needs US6, T203 needs US5, and T205 needs US2 and US6.
 
 ### User Story Dependencies
 
@@ -1340,16 +1353,16 @@ Setup → Foundational → US1 ─┬─ US2 ───────────�
 
 - Tests are written first and must fail before the implementation.
 - Domain before persistence, persistence before use cases, use cases before controllers. Module registration and the end-to-end journey come last.
-- `automation.module.ts`, `workflows.controller.ts`, `execute-run.ts` and `execute-node-step.ts` are shared files: tasks that edit them are never marked [P], and stories that run in parallel serialise their edits to them.
+- `automation.module.ts`, `workflows.controller.ts`, `run.workflow.ts`, `run-execution.ts` and `execute-node-step.ts` are shared files: tasks that edit them are never marked [P], and stories that run in parallel serialise their edits to them.
 
 ### Parallel Opportunities
 
 - **Setup**: T003, T004, T005, T006, T007 and T008 run in parallel after T001 and T002.
 - **Foundational**:
-  - the four domain test tasks and T013, T014 and T015;
+  - the seven domain test tasks and T017, T018 and T019;
   - the five schema tasks;
-  - the store, IO, formula, parameter, resolution and registry test tasks;
-  - T024 and T025.
+  - the store, IO, formula, parameter and registry test tasks, and T054 and T055;
+  - T031 and T032.
 - **US1**: all nine test tasks, then T073, T074, T082, T083 and T086.
 - **US4**: the 12 test tasks and the 11 node implementation tasks, which are independent folders.
 - **Across stories**: once US1 is done, US2, US3, US4, US5 and US7 can be staffed in parallel.
@@ -1363,7 +1376,7 @@ Setup → Foundational → US1 ─┬─ US2 ───────────�
 Task: "T064 Write apps/api/test/component/workflows.spec.ts"
 Task: "T065 Write apps/api/test/component/drafts.spec.ts"
 Task: "T066 Write apps/api/test/component/runs.spec.ts"
-Task: "T067 Write apps/api/test/unit/application/validate-draft.spec.ts"
+Task: "T067 Write apps/api/test/unit/domain/workflow-draft.spec.ts"
 Task: "T069 Write conditions.spec.ts and if.spec.ts"
 
 # Independent implementation files, together:
@@ -1423,6 +1436,7 @@ Task: "T131 Write html, xml and markdown specs" then "T143 Implement html/, xml/
 
 - Tests precede the implementation in every phase (constitution VI; DR-004). Each test task names the FR, scenario or decision it covers.
 - `checklists/review-gate.md` is reviewer-owned; no task changes its checkboxes.
-- Data-model refinements made by these tasks (`workflow.updated_at`, `run.parent_run_id` on delete set null) are written back to `data-model.md` in T027 and T030.
+- Data-model refinements made by these tasks (`workflow.updated_at`, `run.parent_run_id` on delete set null) are written back to `data-model.md` in T033 and T036.
 - `apps/web` is not modified (DR-005).
+- Constitution 3.1.0, amended in this branch, makes user payloads opaque data and the formula interpreter the expression sandbox. The run loop lives in an adapter, so no port re-declares the engine, and use cases contain no `try`/`catch` (analysis C2, C4, C5, C7, C8).
 - Commit after each task or logical group with the repository's commit conventions. `master` changes only through pull requests.

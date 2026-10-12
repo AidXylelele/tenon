@@ -32,44 +32,54 @@ collected in R21; the documents are corrected by this feature.
     - `maintenance`: declared schedule, every minute;
     - `retention`: declared schedule, nightly at 03:00 UTC.
   - Versioning: changing the sequence of context calls in `run` requires `@Workflow('run', { version: n + 1 })`, and the previous version stays registered until no unfinished instance of it remains. Step bodies and step options may change freely.
-  - **Rolling updates**: a node whose type version is unknown to the executing process raises `PlatformError` and is retried with back-off (R5), so it completes once an updated worker takes the run. Type versions referenced by published versions are never removed (05-node-types.md).
+  - **Rolling updates**: a node whose type version is unknown to the executing process raises `PlatformError` and is retried with back-off for up to 15 minutes (R5), so it completes once an updated worker takes the run. Type versions referenced by published versions are never removed (05-node-types.md).
 - **Rationale**: The constitution's first-party rule and the architecture documents name this engine. Its PostgreSQL store is the platform's only stateful component besides object storage (02-system.md). Claims use `FOR UPDATE SKIP LOCKED` with lease fencing, so any number of workers is safe.
 - **Alternatives considered**: A drizzle-kit custom migration generated from `PostgresWorkflowStore.migrationSql()` (rejected: every package upgrade would need a hand-written `{ from, to }` migration); BullMQ with Redis, as in n8n queue mode (rejected: a second state store, and no durable step journal, so a crash loses the run's progress).
 
 ## R3. Run interpreter
 
-- **Decision**: The `run` workflow class is the entry adapter. It wraps the engine context in `WorkflowContextStepRunner`, which implements the `StepRunner` port, and calls the use case `ExecuteRun`.
-  - `ExecuteRun.execute(runId, steps)` does the following:
-    1. Step `register-run` sets the run to running and returns a compact plan: the topological order, the upstream map, the node types, the settings and the trigger output reference. The full graph is read inside this step, so `run()` performs no I/O outside the context (an engine rule).
-    2. It visits nodes in topological order, one at a time.
-    3. It records skipped branches without steps.
-    4. Step `finish-run` writes the terminal status.
-  - Each node is executed according to its manifest's `execution` mode:
-    - `step`: one durable step `node:<nodeId>` that invokes the use case `ExecuteNodeStep`. That use case reads the inputs chunk by chunk, resolves parameters per item, runs the executor, writes the output chunks and the Step row, and returns `{ outputs: [{ port, items, bytes, chunkStarts, attempt }] }`.
-    - `orchestrated`: the executor receives the `StepRunner` and composes durable steps, sleeps, waits and child runs itself. Wait and Execute Workflow use this mode, and so will future AI agent nodes: a model call becomes one durable step, so a crash never repeats a paid call and a step result works as a cache.
-  - The `StepRunner` port exposes `step(name, work, options)`, `sleepUntil(name, until)`, `waitForResume(name, runId, timeoutMs)` and `runChild(id, input, { wait, timeoutMs })`. The work function receives `{ idempotencyKey, attempt, signal }`.
+- **Decision**: The rules of a run live in the domain, and the engine is used only in interface adapters. The constitution says the framework's own services are used from adapters, not re-declared as ports, so there is no `StepRunner`, `RunEngine` or `ScheduleRegistry` port.
+  - **Domain**: `RunExecution` is built from the run's plan: the topological order from the firing trigger, the upstream map, the node settings and the output ports.
+    - `next()` returns the next node to execute, or the run's result.
+    - `record(nodeId, outcome)` takes a node's outputs or failure and applies skips, multi-input readiness, `disabled`, `executeOnce`, `alwaysOutputData`, `onError` and the 256 MB run limit.
+    - It is pure and deterministic, so every rule is unit-tested without the engine, and a replay rebuilds the same decisions from the journaled step results.
+  - **Application**: linear use cases without `try`/`catch`, each called inside one engine step:
+    - `RegisterRun` sets the run running and returns the plan. The full graph is read inside this step, so `run()` performs no I/O outside the context (an engine rule).
+    - `ExecuteNodeStep` reads the inputs chunk by chunk, resolves parameters per item, runs the executor, writes the output chunks and the Step row, and returns `{ outputs: [{ port, items, bytes, chunkStarts, attempt }] }`.
+    - `RecordNodeFailure` writes the failed Step row and, for `onError: errorOutput`, the error port's items.
+    - `FinishRun` writes the terminal status from `RunExecution.result()`.
+    - `TerminateRun` is the compensation of `register-run`.
+  - **Adapter**: the `run` workflow class drives the loop.
+    1. Step `register-run`.
+    2. For each node from `RunExecution.next()`, a step `node:<nodeId>` that calls `ExecuteNodeStep` with the retry options from `NodeSettings` (R5). The adapter catches the `StepFailedError` of an exhausted node, records it with `RecordNodeFailure` in a step, and hands the outcome to `RunExecution.record`.
+    3. Step `finish-run`.
+  - **Orchestrated nodes**: Wait and Execute Workflow, and later AI agent nodes, are adapters that receive the engine context from the loop. They compose durable steps, sleeps, signals and child runs, and call use cases inside those steps. A model call of an AI agent becomes one durable step, so a crash never repeats a paid call and a step result works as a cache.
 - **Rationale**: Sequential topological execution is deterministic and matches n8n's v1 execution order. A Wait or a retry back-off pauses the whole run in any case, because the engine starts no new step while one branch is suspended. Journal entries hold only references, so a 200-node graph stays near 300 entries and under 100 KB.
-- **Alternatives considered**: Parallel branches with `Promise.all` (deferred: more throughput per run, but a suspension in one branch stalls the others, and the plan must name every step deterministically; throughput comes from running many runs in parallel instead); one engine workflow per node type (rejected: it multiplies instances and loses the per-run journal).
+- **Alternatives considered**: A `StepRunner` port so that a use case drives the loop (rejected: it re-declares the engine's services as ports, which the constitution prohibits). Parallel branches with `Promise.all` (deferred: more throughput per run, but a suspension in one branch stalls the others, and the plan must name every step deterministically; throughput comes from running many runs in parallel instead); one engine workflow per node type (rejected: it multiplies instances and loses the per-run journal).
 
 ## R4. Run status projection and reconciliation
 
 - **Decision**: The Run row is the source of truth for clients, and the steps that change state write it:
-  - The command that starts a run inserts the row as `queued` in the same transaction as `RunEngine.start(..., { transaction: txHost.tx })`.
-  - Step `register-run` sets `running`. Its compensation sets `cancelled` when the engine reason is `WorkflowCancelledError` and `failed` otherwise (timeout, journal limit, interruption), and starts the error workflow. Compensation runs on failure, cancel and timeout.
+  - The command that starts a run inserts the row as `queued`, and the controller then calls the engine's `start(..., { transaction: txHost.tx })` in the same request transaction.
+  - Step `register-run` sets `running`. Its compensation calls `TerminateRun`, which sets `cancelled` when the engine reason is `WorkflowCancelledError` and `failed` otherwise (timeout, journal limit, interruption), and starts the error workflow. A run that is already terminal, for example one cancelled by `CancelRun`, is left unchanged. Compensation runs on failure, cancel and timeout.
   - The steps around a Wait set `waiting` and then `running`.
-  - Step `finish-run` writes `succeeded` or `failed`. A node failure with `onError: stop` is caught in `ExecuteRun`, which finishes the run as `failed` instead of throwing.
-  - `CancelRun` sets `cancelled` and calls `cancel()` in the same request transaction (engine call last).
-  - The `maintenance` workflow lists non-terminal rows older than two minutes, compares them with `getStatus()` and projects the engine state. `GET /runs/:id` repairs a stale row on read in the same way.
+  - Step `finish-run` writes `succeeded` or `failed` from `RunExecution.result()`. A node failure with `onError: stop` reaches the domain as an outcome, so nothing throws.
+  - `CancelRun` sets `cancelled`, and the controller calls the engine's `cancel()` in the same request transaction (engine call last).
+  - The `maintenance` workflow lists non-terminal rows unchanged for one minute (`ListStaleRuns`), reads their engine state with `getStatus()`, and hands it to `ProjectRunState`, which applies `Run.project(engineState)`. A row is therefore final within two minutes of an engine-side end (FR-018).
+  - `GET /runs/:id` is a pure query and never writes (constitution V).
 - **Rationale**: `WorkflowEvents.events$` is an in-process subject. It emits only in the worker that executed the instance, after the store write, so the API never sees it, and a crash between the write and the emit loses the event. 04-execution.md relied on it.
-- **Alternatives considered**: Subscribing to `events$` in the worker (kept out: it is not durable and is redundant with the steps); polling the engine on every read (rejected: it couples reads to the engine schema and multiplies queries).
+- **Alternatives considered**: Subscribing to `events$` in the worker (kept out: it is not durable and is redundant with the steps); polling the engine on every read (rejected: it couples reads to the engine schema and multiplies queries); repairing a stale row on `GET /runs/:id` (rejected: a query with a side effect breaks CQS).
 
 ## R5. Retries, error categories and crash recovery
 
-- **Decision**: Each node step gets the engine retry option `{ attempts: max(userAttempts, 3) + 2, backoff, retryIf }`.
-  - `retryIf` never retries limit and isolation breaches. It retries platform errors (object storage, sandbox, database) while the attempt number is below 3, with exponential back-off from 1 s. It retries user errors while the attempt number is below the user's setting, waiting the user's interval.
+- **Decision**: Each node step gets the engine retry option `{ attempts: max(userAttempts, 3) + 2, backoff, retryIf }`. The decisions come from the domain value object `NodeSettings` (`retryDecision(kind, attempt)`), and the `run` workflow adapter translates them into the engine options.
+  - Limit and isolation breaches are never retried.
+  - Platform errors (object storage, sandbox, database) are retried while the attempt number is below 3, with exponential back-off from 1 s.
+  - An unknown node type version (`NodeTypeUnavailableError`, a platform error) is retried with back-off from 5 s, capped at 60 s, for up to 15 minutes. The adapter raises the attempt budget of such a node when this process does not know its type; step options may change between replays (R2), so an updated worker continues with the normal budget.
+  - User errors are retried while the attempt number is below the user's setting, waiting the user's interval.
   - The two extra attempts absorb crashes: an attempt is recorded before the work runs, so a crash or a lost lease consumes one.
   - Executors throw named subclasses (`NodeUserError`, `NodeLimitError`, `IsolationBreachError`, `PlatformError`), because `StepFailedError` keeps only `name` and `message` of its cause.
-  - Limit and isolation breaches are wrapped in `NonRetryableStepError`.
+  - The adapter's step body wraps limit and isolation breaches in `NonRetryableStepError`, and the adapter turns an exhausted `StepFailedError` back into the named class by its `name`.
   - Idempotency keys are `run-<runId>:node:<nodeId>:<itemIndex>`. They are stable across attempts and recovery and are sent by the HTTP Request node when asked (FR-036).
   - Output chunks are written under the attempt number, so a repeated attempt never mixes with a crashed one.
 - **Rationale**: FR-020 makes the node the checkpoint and accepts repeated external effects. The engine's attempt accounting would otherwise fail a node with `StepInterruptedError` after a crash when the user asked for one attempt.
@@ -78,40 +88,40 @@ collected in R21; the documents are corrected by this feature.
 ## R6. Triggers, waits and sub-workflows
 
 - **Decision**:
-  - **Manual**: `POST /runs` writes the trigger items as attempt 0 of the trigger node, inserts the Run row and starts `run-<runId>` in the request transaction.
+  - **Manual**: `StartManualRun` writes the trigger items as attempt 0 of the trigger node and inserts the Run row; the controller then starts `run-<runId>` in the same request transaction.
   - **Webhook**:
     - **Ingress**: `ALL /webhooks/:endpointId` (public, raw body, at most 1 MB, request-rate limits at the gateway).
     - **`WebhookIngressGuard`** loads the `WebhookEndpoint` and the workflow's Activation and checks the method. It then authenticates in the one mode chosen on the node: the `x-webhook-token` header compared in constant time, or `x-webhook-signature` = HMAC-SHA256 over `<x-webhook-timestamp>.<raw body>`, with the timestamp within 5 minutes of the platform's clock. Every failure, including an unreadable secret, throws the same `NotFoundException` (FR-027). Endpoint ids and secrets are 32 random bytes (base64url), and only owners and administrators read or rotate them.
     - **Why a guard**: guards run before interceptors, so a forged call never reaches the idempotency record of a genuine delivery.
     - **Deduplication**: the handler carries `@nestjs/idempotency`'s `@Idempotent({ keyFrom: { header: 'x-delivery-id' }, scope: endpointId, fingerprint: rawBody, storeIf: 2xx, ttl: '7d', lockTtl: '30s' })` (R24).
-    - **Recording**: the handler is `@Transactional()`. It writes the trigger items, inserts the Run row (`ON CONFLICT DO NOTHING`, returning the existing run) and starts `run-<runId>` in the transaction. It answers 202 `{ runId }`.
+    - **Recording**: the handler is `@Transactional()`. `StartWebhookRun` inserts the Run row (`ON CONFLICT DO NOTHING`, returning the existing run) and, only for a new run, writes the request as attempt 0; the handler then starts `run-<runId>` in the transaction. It answers 202 `{ runId }`.
     - **Backstop**: the run id is derived from `webhook:<endpointId>:<deliveryId>`, so the run primary key and the engine's id check deduplicate in the window the idempotency record does not cover. That window is a crash between the commit and the record, or a repeat after `ttl`.
   - **Schedule**:
     - Activation writes an outbox message `activation` in the same transaction.
-    - Its handler calls `ScheduleRegistry.sync(workflowId)`, which upserts one engine schedule per rule (`wf.<workflowId>.<nodeId>.<rule>`, `cron` or `every` with `tz`, `overlap: 'skip'`, `missed: 'skip'`) and removes stale ones. This is needed because `upsert` is not transactional.
+    - Its handler asks `SyncWorkflowSchedules` for the registrations of the active version and, through the engine client, upserts one engine schedule per rule (`wf.<workflowId>.<nodeId>.<rule>`, `cron` or `every` with `tz`, `overlap: 'skip'`, `missed: 'skip'`) and removes stale ones. This is needed because `upsert` is not transactional.
     - The maintenance sweep reconciles schedules with activations.
     - Each occurrence starts `scheduled-trigger`:
       1. Its step `register-run` inserts the Run row with an id derived from the occurrence id.
       2. It then calls `executeChild(run, ..., { id: 'run-<runId>', timeout })`, so overlap skipping covers the whole run and every scheduled run gets its own timeout.
   - **Wait**:
-    - Time modes: `sleepUntil` with the deadline computed in a step.
-    - Resume mode: `waitForResume`, which is `waitForSignal('wait:<nodeId>', 'run.resume', { key: runId, timeout })`.
+    - Time modes: the Wait adapter calls `ctx.sleepUntil` with the deadline computed in a step.
+    - Resume mode: the Wait adapter calls `ctx.waitForSignal('wait:<nodeId>', 'run.resume', { key: runId, timeout })`. Each output item carries the call's data under `resume` (`body`, `receivedAt`).
     - The resume address is `/resume/<runId>.<hmac>`, with the HMAC by the `Signer` port. It is derived, so no secret is stored, and it is stable across replays.
     - `POST /resume/:token`:
       - Stores each call's body under its own key, `runs/<runId>/resume/<callId>.json`, so a refused call never overwrites the accepted one.
-      - Signals `run.resume` with `{ key: runId, id: 'resume-<runId>' }` and the body key in the payload. The engine keeps the first signal ("first payload wins") and answers `created: false` to later ones, which become 409 (FR-030).
+      - `ResumeRun` verifies the address and the run's state, and the controller signals `run.resume` with `{ key: runId, id: 'resume-<runId>' }` and the body key in the payload. The engine keeps the first signal ("first payload wins") and answers `created: false` to later ones, which become 409 (FR-030).
       - Carries `@Idempotent({ required: false, scope: runId })`, so a caller that retries its own accepted call with the same `Idempotency-Key` gets the original 202 back.
       - When the Wait node requires a header credential, a guard checks it in constant time before anything else.
     - A graph may contain at most one resume-mode Wait (validation error).
   - **Execute Workflow**:
     1. Step `node:<id>:prepare` writes the batch inputs and inserts child Run rows with ids derived from `<parentRunId>/<nodeId>/<batch>`.
-    2. `runChild` per batch runs in windows of 20: `executeChild` with the engine default `parentClose: 'cancel'` for "wait for completion", so cancelling or ending the parent cancels the children it waits for (FR-024); `startChild` with `parentClose: 'abandon'` for "continue at once", whose children are independent.
+    2. Per batch, in windows of 20, the Execute Workflow adapter calls `executeChild` with the engine default `parentClose: 'cancel'` for "wait for completion", so cancelling or ending the parent cancels the children it waits for (FR-024); `startChild` with `parentClose: 'abandon'` for "continue at once", whose children are independent.
     3. Step `node:<id>:collect` concatenates the children's last-node output references.
     - **Child outcomes**: a `ChildWorkflowFailedError` (failed, timed out or cancelled child) fails the node with the child run id and reason, and the node's on-error setting applies (FR-031).
     - **Retries**: the interpreter runs the user's attempts for this orchestrated node itself. Child ids carry the user attempt number (`<parentRunId>/<nodeId>/<batch>/a<attempt>`), and an attempt re-runs only the batches whose child did not succeed, reusing the journaled results of the rest. A crash replays the same attempt with the same ids, so no call starts twice (FR-020).
     - `depth` travels in the Run row, and depth 6 fails the node.
     - Each child costs two journal entries, so a run may make at most 4,000 sub-workflow calls in total (journal budget 10,000 entries) besides the 1,000 per node (FR-031).
-  - **Error workflow**: started by `finish-run` or by the compensation for failed runs (including timeouts and limit breaches), with a run id derived from `error:<failedRunId>`. It is never started for cancelled runs, test runs or error runs. When the error workflow has no active version, the failed run records `errorWorkflow: { skipped: 'unavailable' }` (FR-029).
+  - **Error workflow**: started by the `finish-run` step or by the compensation for failed runs, where `FinishRun` or `TerminateRun` inserts the error run's row and the step's adapter starts it in the same transaction (including timeouts and limit breaches), with a run id derived from `error:<failedRunId>`. It is never started for cancelled runs, test runs or error runs. When the error workflow has no active version, the failed run records `errorWorkflow: { skipped: 'unavailable' }` (FR-029).
 - **Rationale**: These are engine-native mechanisms: the transactional `start` and `signal`, schedules with overlap and missed policies, child workflows with deterministic ids, and signals with a cursor that cannot lose a wake-up.
 - **Alternatives considered**: Schedules that start `run` directly (rejected: no per-run timeout and no queued row, and overlap would cover only the instant of the start); deduplicating deliveries in the application only (rejected: the engine's id comparison already gives exactly-once starts).
 
@@ -123,7 +133,7 @@ collected in R21; the documents are corrected by this feature.
     - A slot is held only while a run executes, never while it waits (FR-023).
     - **Queue order**: runs carry the same priority, and the engine orders claims by priority, then wake time, then creation. Queued runs therefore start oldest first by the time they were queued, whatever their trigger (FR-023).
   - **Run timeout**: passed per run as `start({ timeout })` from the workflow settings. It counts from the start request and includes queued time, which spec FR-022 now states.
-  - **Limits**: item and byte limits are enforced by the output writer, and the per-run total by `ExecuteRun`, from the step results.
+  - **Limits**: item and byte limits are enforced by the output writer, and the per-run total by the domain's `RunExecution`, from the step results.
 - **Rationale**: These are the engine's own mechanisms. A per-workflow configurable limit would need custom scheduling on top of the engine.
 - **Alternatives considered**: A `concurrencyKey` with per-key limits stored per workflow (rejected: the engine has one static per-key limit, so per-workflow values would need custom admission control).
 
@@ -141,7 +151,8 @@ collected in R21; the documents are corrected by this feature.
   - Manifest fields:
     - `execution`: `step` or `orchestrated` (R3);
     - `effects`: `none` or `external`, which marks nodes whose repetition after a crash is visible outside (R5);
-    - `credentialTypes`.
+    - `credentialTypes`;
+    - `defaultSettings`: the node settings that new nodes and omitted settings take (FR-013, FR-016).
 
   Credential types form a catalogue of their own. The generic HTTP types now (header, basic, bearer, query parameter); OAuth2 and service types come with the integrations, through the same catalogue and an `apply` strategy per type.
 
@@ -186,6 +197,7 @@ collected in R21; the documents are corrected by this feature.
   - **Pagination scope**: pagination formulas of the HTTP Request node may also use `$response`, `$pageCount` and `$request` (R23). The engine evaluates them with that scope only, and validation reports these names anywhere else.
 
   - **Bounds**: a step budget and a deadline of 100 ms checked at every node, caps on allocating methods, no regular expressions built from user strings, and the result measured against 1 MB. Inputs are JSON clones, and `node:vm` and `new Function` are never used.
+  - **Expression sandbox**: this interpreter is the expression sandbox of constitution 3.1.0. It executes no host code, reaches only allow-listed operations on JSON clones, and is bounded in time and result size. A test asserts that `process`, `globalThis`, `require`, `constructor` and `__proto__` are unreachable.
   - **Field references**: `{ ref: { node: <id>, path } }`, resolved without the interpreter. Formulas address nodes by name, and `WorkflowGraph.renameNode` rewrites `$('old')` using the parser positions.
   - **Known fields**: the shapes of a node's pinned output or latest test-run output (first 20 items, at most 500 paths) are stored in `node_sample` and returned with the draft.
 - **Rationale**: The syntax is the n8n one users already know (clarification), while evaluation stays safe and fast in process. NestJS offers no expression evaluator; this custom code fills a stated gap (constitution II).
@@ -216,7 +228,7 @@ collected in R21; the documents are corrected by this feature.
     - `-mount-conf` with a read-only bind of `/opt/sandbox` and a 16 MB tmpfs;
     - never `-net-share`, so each run gets its own network namespace with no interface up.
   - **Placement**: a sidecar of the worker pod. In Compose it uses `network_mode: service:worker` with `privileged: true`; the reduced set is host cgroup namespace, a `/sys/fs/cgroup` rw mount and seccomp/apparmor `unconfined`. In Kubernetes it is a privileged sidecar in a namespace at the `privileged` Pod Security level, on nodes with user namespaces enabled, and the worker's readiness probe calls `/version`. The worker's readiness probe reports not ready while `/version` does not answer (DR-006).
-  - **Request**: one `POST /run` per node execution. The harness loops over items in per-item mode; all-items mode receives the whole input, and input above the sandbox input limit (8 MB) is a user error. In per-item mode the worker splits the items into invocations below the 8 MB input limit; in all-items mode, input above it is a user error (FR-033).
+  - **Request**: one `POST /run` per node execution. The harness loops over items in per-item mode; all-items mode receives the whole input, and input above the sandbox input limit (8 MB) fails with the kind `limit`. In per-item mode the worker splits the items into invocations below the 8 MB input limit; in all-items mode, input above it fails with the kind `limit` (FR-033).
     - `files[0]` is stdin with `{ items, nodes, run, mode }` as JSON.
     - `files[1]` and `files[2]` are diagnostics collectors (64 KB together).
     - `files[3]` is the `result` collector on fd 3, so the user's `console.log` or `print` can never corrupt the result.
@@ -228,7 +240,9 @@ collected in R21; the documents are corrected by this feature.
     - Both validate that the result is a list of plain JSON objects. They refuse BigInt, NaN, Infinity and non-string keys; a single object is wrapped, as n8n does. They check the size before writing `{ ok, items }` or `{ ok: false, error: { kind, message, line, itemIndex } }` to fd 3 and exit 0, so a non-zero exit always means a crash.
   - **Status mapping**:
     - `Accepted` → validate the result.
-    - User errors, never retried: `Nonzero Exit Status`, `Time Limit Exceeded`, `Memory Limit Exceeded`, `Output Limit Exceeded`, `Dangerous Syscall`, `File Error` (a user-caused copy error), and `Signalled` unless the worker aborted the call (a heap OOM aborts with SIGABRT).
+    - Limit breaches (kind `limit`, never retried): `Time Limit Exceeded`, `Memory Limit Exceeded`, `Output Limit Exceeded`, the process limit, and `Signalled` with SIGABRT (a heap OOM) unless the worker aborted the call.
+    - Isolation breaches (kind `isolation`, never retried): `Dangerous Syscall` and `File Error` (a file outside the scratch area).
+    - User errors (kind `user`, retried only by the node's retry setting): `Nonzero Exit Status`, other signals, and an `{ ok: false }` result from the harness. That covers a thrown error, including a network or permission error the code received and did not handle.
     - Platform errors, retried by the engine step (R5): `Internal Error`, HTTP 5xx and connection failures. The gateway calls the sidecar through a `sandbox` resilience preset: a 35 s timeout and a circuit breaker counting only transport failures and 5xx, never user-code or limit outcomes. It has no retry of its own (R24).
 - **Rationale**: go-judge gives one contract for many languages with per-run namespaces, cgroups and seccomp, as 05-node-types.md decided. Its own overhead is about 1 ms per run, and interpreter start (about 30–70 ms) dominates, so one call per node execution keeps throughput at dozens of Code node executions per second per worker.
 - **Alternatives considered**:
@@ -282,6 +296,7 @@ collected in R21; the documents are corrected by this feature.
     - `@Public()` for webhook and resume ingress.
   - **Object level** (ownership): the command use cases receive the actor and call `WorkflowPolicy.manage(actor, workflow)` or `CredentialPolicy.manage(actor, credential)` on the loaded aggregate. A denial throws `WorkflowAccessDeniedError` or `CredentialAccessDeniedError`, which `DomainErrorFilter` maps to 403.
   - The policies are the same `@Policy()` classes the routes use, injected into the use case factories.
+  - Policies decide on ownership facts: `manage(user, owned)` takes anything with an `ownerId`. The same rule therefore serves commands (the loaded aggregate) and owner-only queries such as webhook secrets or a credential's references (the query row), and queries never load aggregates (constitution V).
 - **Rationale**: `@nestjs/authorization` documents that record checks do not belong in `@Can` resolvers, because they would load the record twice and answer 403 before 404. Calling `AuthorizationService` would put a framework import into the application layer (constitution III). Calling the plain policy class keeps one decision per rule and the layering intact.
 - **Alternatives considered**: An `@Can` resolver that loads the workflow (rejected: double load, wrong 403 or 404 order); `AuthorizationService.authorize` in an adapter in front of each use case (rejected: the use case would need a second port for the same decision).
 
@@ -289,7 +304,7 @@ collected in R21; the documents are corrected by this feature.
 
 - **Decision**: The contract is `contracts/openapi.yaml`, designed for few, coarse calls.
   - **Editor load**: `GET /workflows/{id}` returns the draft, its revision, the validation report, the activation, the latest version and the node samples. `GET /node-types` returns node and credential types with an `ETag`.
-  - **Saving**: `PUT /workflows/{id}/draft` with the revision; the response carries the new revision and the report.
+  - **Saving**: `PUT /workflows/{id}/draft` with the revision; the response carries the new revision and the report. The report is computed by the domain (`WorkflowDraft.validate`) from facts the use case gathers through the `DraftFacts` port: owned credentials, known fields and the error workflow's state. It is returned with the saved workflow and computed again by `GET /workflows/{id}`, so it reflects later changes such as a deleted credential.
   - **Publishing**: `POST /workflows/{id}/versions` with the revision. A stale revision answers 409, and an invalid draft answers 422 with the report.
   - **Runs**:
     - `POST /runs` answers `202 { runId }`;
@@ -299,6 +314,7 @@ collected in R21; the documents are corrected by this feature.
   - **Ingress**: webhook and resume routes are outside the cookie session.
   - **Formats**: parameter values are tagged objects (`{ "fixed": … }`, `{ "ref": … }`, `{ "formula": "…" }`), omitted parameters take defaults, and pinned samples are a separate resource, so autosave never resends them.
   - **Errors**: standard Nest bodies, plus `problems` on 422.
+  - **Validation**: transport input is validated by DTO classes with `ValidationPipe`, from which the OpenAPI document is generated. Parameter values are checked structurally by a DTO validator and semantically by the node types' zod schemas in the domain validation. User payloads are opaque JSON nested at most 64 levels (constitution 3.1.0).
 - **Rationale**: The editor needs two calls to open and one to save, and status polling is cheap with conditional requests. These are the "not chatty" and "no garbage" requirements of the clarification.
 - **Alternatives considered**: Per-node endpoints (rejected in clarification); server-sent events for run progress (rejected: the architecture chose polling with `ETag`, and SSE needs sticky connections through the BFF).
 
@@ -350,7 +366,7 @@ collected in R21; the documents are corrected by this feature.
 ## R19. Retention and maintenance
 
 - **Decision**:
-  - **`retention`** (nightly): `ApplyRetention` selects finished runs older than the period or beyond the per-workflow maximum (a window function) in batches of 200. Per batch it deletes the artifacts by prefix, the Step and Run rows, and the engine instances `run-<id>` with `delete(id)`. After the loop it calls `purge({ olderThan })` for trigger and maintenance instances. Past the batch limit it continues in a new instance. It also calls the idempotency store's `prune()` and the outbox inbox `prune()`.
+  - **`retention`** (nightly): `ApplyRetention` selects finished runs older than the period or beyond the per-workflow maximum (a window function) in batches of 200. Per batch, `ApplyRetention` deletes the artifacts by prefix and the Step and Run rows, and the `retention` workflow adapter deletes the engine instances `run-<id>` with `delete(id)`. After the loop it calls `purge({ olderThan })` for trigger and maintenance instances. Past the batch limit it continues in a new instance. It also calls the idempotency store's `prune()` and the outbox inbox `prune()`.
   - **`maintenance`** (every minute): reconciles stale runs (R4) and schedules (R6), so triggers converge within a minute of a failed registration (FR-011), and re-encrypts secrets under old key versions (R13).
 - **Rationale**: `purge` is global and age-only, so the per-workflow maximum needs per-instance deletes.
 - **Alternatives considered**: Object storage lifecycle rules (deferred: they would not delete the database rows).
@@ -359,14 +375,14 @@ collected in R21; the documents are corrected by this feature.
 
 - **Decision**: The constitution's layer mapping, applied to this feature:
 
-  | Layer                                  | Location                                     | What it covers                                                                                                                                                                                                                                                                                            |
-  | -------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | Domain                                 | `test/unit/domain`                           | Workflow, WorkflowGraph validation (cycles, reachability, rename rewrite), Run state machine, Activation, Credential, WebhookEndpoint and NodeType, with real objects                                                                                                                                     |
-  | Use cases                              | `test/unit/application`                      | In-memory fakes of the ports and an inline `StepRunner` fake; covers the `ExecuteRun` traversal, skips, onError and limits                                                                                                                                                                                |
-  | Pure node executors and formula engine | `test/unit/node-types`, `test/unit/formulas` | Fixed items in, literal expectations out                                                                                                                                                                                                                                                                  |
-  | Integration                            | `test/integration/`                          | Repositories and queries on PostgreSQL; the S3 artifact store on Garage (GenericContainer); the engine gateways on the real PostgreSQL store with `ManualWorkflowClock` and `drain()`; the Code node on the real sandbox container; the HTTP Request node against a local server, including SSRF refusals |
-  | Component                              | `test/component/`                            | The whole app in process with the worker drained in process; the sandbox replaced by a fake gateway (an unmanaged dependency), PostgreSQL and Garage real                                                                                                                                                 |
-  | End-to-end                             | `test/e2e/`                                  | Journeys against Compose, including killing the worker container in the middle of a run                                                                                                                                                                                                                   |
+  | Layer                                  | Location                                     | What it covers                                                                                                                                                                                                                                                                                                          |
+  | -------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Domain                                 | `test/unit/domain`                           | Workflow, WorkflowDraft and WorkflowGraph validation (cycles, reachability, rename rewrite), `RunExecution` traversal (skips, onError, limits), `NodeSettings` retry decisions, `ParameterValues` resolution, Run state machine and projection, Activation, Credential, WebhookEndpoint and NodeType, with real objects |
+  | Use cases                              | `test/unit/application`                      | In-memory fakes of the ports; covers `RegisterRun`, `ExecuteNodeStep`, `RecordNodeFailure`, `FinishRun`, `TerminateRun` and the commands                                                                                                                                                                                |
+  | Pure node executors and formula engine | `test/unit/node-types`, `test/unit/formulas` | Fixed items in, literal expectations out                                                                                                                                                                                                                                                                                |
+  | Integration                            | `test/integration/`                          | Repositories and queries on PostgreSQL; the S3 artifact store on Garage (GenericContainer); the engine gateways on the real PostgreSQL store with `ManualWorkflowClock` and `drain()`; the Code node on the real sandbox container; the HTTP Request node against a local server, including SSRF refusals               |
+  | Component                              | `test/component/`                            | The whole app in process with the worker drained in process; the sandbox replaced by a fake gateway (an unmanaged dependency), PostgreSQL and Garage real                                                                                                                                                               |
+  | End-to-end                             | `test/e2e/`                                  | Journeys against Compose, including killing the worker container in the middle of a run                                                                                                                                                                                                                                 |
 
   The crash test uses two app instances on one database and clock: close the first while a step hangs, advance the clock past the lease, drain the second, and assert that completed nodes did not run again.
 
@@ -383,7 +399,7 @@ This feature updates `docs/architecture`:
   - `Run` gains `mode` and `depth`.
 - **03-api.md**:
   - modules `WorkflowsInfraModule`, `StorageModule`, `OutboundHttpModule`, `IdempotencyModule` (with `DrizzleIdempotencyStore`) and `ResilienceModule` (policies `http-page`, `sandbox`, `storage`);
-  - ports `FormulaEngine`, `Signer`, `NodeSampleRepository` and `WebhookEndpointRepository`;
+  - ports `FormulaEngine`, `Signer`, `StepData`, `DraftFacts`, `NodeSampleRepository` and `WebhookEndpointRepository`, and the rule that the engine is used only in adapters;
   - controllers;
   - the `ROLE` bootstrap.
 - **04-execution.md**:
@@ -393,7 +409,7 @@ This feature updates `docs/architecture`:
   - concurrency is keyed by a function of the input (R7);
   - the timeout includes queued time;
   - retry accounting (R5);
-  - waits and children through `StepRunner` (R3);
+  - the run loop in the `run` workflow adapter over the domain's `RunExecution`, with waits and children in the node adapters (R3);
   - the resume signal id per run;
   - status rows replace `setStatus` progress;
   - retention uses `delete(id)`;
