@@ -31,6 +31,22 @@
 - Q: Do node types declare their own default settings? → A: Yes. Each catalogue entry states the default values of the node settings that new nodes and omitted settings take (FR-013, FR-016).
 - Q: How does the platform treat the data users send into their automations? → A: As opaque data: well-formed JSON, or text where the trigger allows it, checked only for size and a nesting depth of at most 64 levels, never for its fields (constitution 3.1.0).
 
+### Session 2026-10-16
+
+- Q: Where is the data a node receives checked, and are connections between nodes checked? → A: A connection carries items without a type, and the contract belongs to the node that receives them.
+  - The contract is the node type's parameter definitions together with the user's bindings: fixed values, field references and formulas.
+  - The node checks the values its parameters resolve to for each item when it runs (FR-015).
+  - Known output shapes only help the editor offer fields.
+  - Explicit schemas exist only at boundaries the user declares: the declared input fields of an Execute Workflow Trigger, and webhook body schemas in a later feature.
+- Q: Which graph problems does the API report? → A: Three kinds (FR-007):
+  - a malformed graph is refused on save;
+  - node configuration problems are reported and block publishing, activation and test runs;
+  - editor hints (unreachable nodes, references that are not upstream, unknown fields, a missing error workflow) are the editor's job and block nothing.
+
+  A draft without a trigger is not a problem: a test run names its trigger node, and only activation needs a release with a trigger.
+
+- Q: What is the published, immutable copy of a draft called? → A: A release. A workflow has one draft and numbered releases, at most one of which is active. Earlier sessions say "version" for it. `$workflow.version` keeps its n8n name and holds the release number.
+
 ## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Build a workflow and test-run it (Priority: P1)
@@ -44,7 +60,7 @@ An editor creates a workflow and becomes its owner. The owner adds a trigger and
 **Acceptance Scenarios**:
 
 1. **Given** an editor, **When** the editor creates a workflow with a name, **Then** an empty draft exists, the editor is its owner, and it appears in every signed-in user's workflow list.
-2. **Given** a draft, **When** the owner saves a graph of nodes and connections, **Then** reading the workflow returns the same graph, and a validation report lists every problem by node and parameter without blocking the save.
+2. **Given** a draft, **When** the owner saves a graph of nodes and connections, **Then** reading the workflow returns the same graph, and the response lists every node configuration problem by node and parameter without blocking the save.
 3. **Given** a saved draft with a Manual Trigger, **When** the owner starts a test run with input items, **Then** a run is created at once, executes the nodes in dependency order, and reaches `succeeded` with a step per executed node.
 4. **Given** a running or finished run, **When** any signed-in user reads it, **Then** the response shows the run status, the current node while running, and per node the status, item count, duration and error.
 5. **Given** a finished step, **When** a user reads its output, **Then** the items are returned page by page in the order the node produced them.
@@ -89,8 +105,8 @@ An editor stores an API key, a bearer token or a username and password as a cred
 2. **Given** an HTTP Request node with a method, URL, query parameters, headers, body and a credential of the workflow's owner, **When** the run reaches it, **Then** one request per item is sent with the credential applied, and each response becomes an output item with the parsed body and, when asked for, the status code and headers.
 3. **Given** a response with a non-success status, **When** the node runs, **Then** the node fails with the status and a bounded excerpt of the body, unless it is set to treat every response as success.
 4. **Given** a URL whose host is or resolves to a loopback, private, link-local, multicast or other reserved address, or that redirects to one, **When** the node runs, **Then** the request is refused before any connection to that address, the node fails with a destination-not-allowed reason, and the refusal is never retried.
-5. **Given** a credential of another user, **When** an owner references it in a node, **Then** the draft reports a validation problem and the workflow cannot be published.
-6. **Given** a credential referenced by an active version, **When** its owner tries to delete it, **Then** the deletion is refused until no active version references it.
+5. **Given** a credential of another user, **When** an owner references it in a node, **Then** the node reports a `foreign-credential` problem and the workflow cannot be published.
+6. **Given** a credential referenced by an active release, **When** its owner tries to delete it, **Then** the deletion is refused until no active release references it.
 7. **Given** a request that exceeds the timeout or a response larger than the response limit, **When** the node runs, **Then** the node fails with the limit named.
 8. **Given** pagination by cursor read from a response field, with the records at a field path, **When** the node runs against an API with five pages, **Then** five requests are sent, each carrying the cursor of the previous response, pagination stops when the response has no cursor, and the output holds every record of the five pages in order.
 9. **Given** pagination by page number or by offset and limit, **When** the node runs, **Then** the first request carries the configured start value, each following request carries the next value, and pagination stops at the configured completion condition (an empty page, a `hasMore` flag set to false, the reported total reached, or a terminating status code).
@@ -120,23 +136,23 @@ An editor uses the built-in core nodes to filter, branch, merge, sort, aggregate
 
 ---
 
-### User Story 5 - Publish a version and run it automatically (Priority: P5)
+### User Story 5 - Publish a release and run it automatically (Priority: P5)
 
-The owner publishes the draft as an immutable numbered version and activates it. Schedule triggers then start runs at the configured times in the configured time zone, and webhook triggers start a run for every authenticated call to the workflow's webhook address. Editing the draft afterwards does not change what runs until the next publish.
+The owner publishes the draft as an immutable numbered release and activates it. Schedule triggers then start runs at the configured times in the configured time zone, and webhook triggers start a run for every authenticated call to the workflow's webhook address. Editing the draft afterwards does not change what runs until the next publish.
 
-**Why this priority**: Automatic execution is what turns a tested workflow into an automation; it requires a validated, immutable version to run against.
+**Why this priority**: Automatic execution is what turns a tested workflow into an automation; it requires an immutable release without configuration problems to run against.
 
-**Independent Test**: Publish a workflow with a Schedule Trigger every minute and a webhook workflow; activate both; confirm one run per scheduled minute and one run per webhook call carrying the request body, all against the published version; edit the draft and confirm new runs still use the published version until it is republished.
+**Independent Test**: Publish a workflow with a Schedule Trigger every minute and a webhook workflow; activate both; confirm one run per scheduled minute and one run per webhook call carrying the request body, all against the release; edit the draft and confirm new runs still use that release until the draft is published again.
 
 **Acceptance Scenarios**:
 
-1. **Given** a valid draft, **When** the owner publishes it, **Then** a new immutable version with the next number exists and the draft stays editable.
-2. **Given** a draft with a cycle, no trigger, a node of an unknown type, parameters that violate the node definition, or a credential the owner does not own, **When** the owner publishes it, **Then** publishing is refused with the full validation report.
-3. **Given** a published version with a Schedule Trigger, **When** the owner activates it, **Then** runs start at each scheduled time in the trigger's time zone, and an occurrence that is due while the previous run of the same schedule is still running is skipped.
-4. **Given** an active version with a Webhook trigger, **When** a client calls the webhook address with the endpoint secret, **Then** the call is acknowledged after the run is recorded and the run receives the request method, headers, query and body as its input item.
+1. **Given** a draft without node configuration problems, **When** the owner publishes it, **Then** a new immutable release with the next number exists and the draft stays editable.
+2. **Given** a draft with a node of an unknown type, parameters that violate the node definition, or a credential the owner does not own, **When** the owner publishes it, **Then** publishing is refused with every node configuration problem.
+3. **Given** a release with a Schedule Trigger, **When** the owner activates it, **Then** runs start at each scheduled time in the trigger's time zone, and an occurrence that is due while the previous run of the same schedule is still running is skipped.
+4. **Given** an active release with a Webhook trigger, **When** a client calls the webhook address with the endpoint secret, **Then** the call is acknowledged after the run is recorded and the run receives the request method, headers, query and body as its input item.
 5. **Given** a webhook call without a valid secret or above the size limit, **When** it arrives, **Then** it is refused and no run starts.
 6. **Given** the same webhook delivery received twice with the same delivery identifier, **When** both arrive, **Then** exactly one run exists for it.
-7. **Given** an active version, **When** a newer version is published and activated, **Then** the previous activation ends and only the newer version starts runs.
+7. **Given** an active release, **When** a newer release is published and activated, **Then** the previous activation ends and only the newer release starts runs.
 8. **Given** an active workflow, **When** the owner deactivates or archives it, **Then** no further runs start and running runs continue to completion.
 
 ---
@@ -171,7 +187,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
 **Acceptance Scenarios**:
 
-1. **Given** a workflow with runs, **When** a user lists them, **Then** they are returned newest first, page by page, with status, trigger type, version, start and end time, and can be filtered by status.
+1. **Given** a workflow with runs, **When** a user lists them, **Then** they are returned newest first, page by page, with status, trigger type, release, start and end time, and can be filtered by status.
 2. **Given** a retention policy, **When** the nightly retention job runs, **Then** finished runs older than the retention period, and finished runs beyond the per-workflow maximum, are removed together with their step outputs.
 3. **Given** a run that is queued, running or waiting, **When** the retention job runs, **Then** the run is kept regardless of its age.
 4. **Given** a viewer or an editor, **When** they try to change the retention policy, **Then** the change is refused.
@@ -180,13 +196,13 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
 ### Edge Cases
 
-- A graph with a cycle is saved as a draft with a validation problem and cannot be published.
-- A draft with no trigger node is saved with a validation problem and cannot be published or test-run.
+- Saving a graph with a cycle is refused with the code `cycle`; graphs stay acyclic.
+- A draft with no trigger node is saved and can be published, but it cannot be test-run, and a release without a trigger node cannot be activated.
 - A workflow with several trigger nodes starts each run from the trigger that fired; nodes not reachable from that trigger do not run.
-- Nodes not connected to any trigger are reported as unreachable and never run.
-- A node type version that is no longer offered for new nodes remains executable for published versions that reference it.
+- Nodes not connected to any trigger never run; the editor marks them.
+- A node type version that is no longer offered for new nodes remains executable for releases that reference it.
 - During a rolling update, a node whose type version the executing process does not know fails with a platform error and is retried with back-off for up to 15 minutes, so it completes once an updated process takes the run; after that it fails with the kind `platform`.
-- A credential that is missing or unreadable when a node runs fails that node with a user error naming the credential. Activation re-checks credentials, so an active version never starts with a missing one (FR-011).
+- A credential that is missing or unreadable when a node runs fails that node with a user error naming the credential. Activation re-checks credentials, so an active release never starts with a missing one (FR-011).
 - A Merge node whose one input produced no items follows its mode: append outputs the other input, combine modes output nothing.
 - A node output exceeding the item or size limit fails that node with a limit error; earlier outputs remain readable.
 - A run exceeding the workflow run timeout ends `failed` with a timeout reason.
@@ -204,17 +220,17 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - A resume call that arrives before the run reaches its Wait node resumes the run as soon as it gets there; a second resume call is refused.
 - Cancelling a waiting run ends it `cancelled` without resuming the wait; cancelling while a node executes lets that node finish within its limits, keeps its output, and starts nothing after it.
 - Saving a draft while a test run of an earlier draft is in progress does not affect that run, which keeps the graph it started with.
-- Archiving a workflow with an active version deactivates it; runs already in progress continue.
+- Archiving a workflow with an active release deactivates it; runs already in progress continue.
 - Code that never returns is stopped at the time limit; code that spawns processes or writes outside its scratch area is refused by the isolation.
 - A field reference or formula that reads a node that has not run in this run resolves to empty and does not fail the node.
 - Renaming a node keeps every field reference to it working and rewrites the node name inside formulas that mention it.
-- A field reference to a path that does not appear in the node's known output is saved with a warning, because real data may still contain it; it does not block publishing.
+- A field reference to a path that does not appear in the node's known output is saved, and the editor marks it, because real data may still contain it; it does not block publishing.
 - A disabled node passes its input items through unchanged.
 - An HTTP Request host that resolves to a public address when the workflow is saved but to a private address at run time is refused at run time.
 - An HTTP Request URL with a scheme other than http or https, or with credentials embedded in the URL, is refused.
-- A credential referenced by a draft is deleted: the draft reports a validation problem; the deletion is refused while an active version references it.
-- Ownership of a workflow whose nodes reference the previous owner's credentials is transferred: those references become validation problems; an active version keeps running, and its nodes that use them fail with a user error naming the credential, so the new owner never runs with the previous owner's secrets.
-- A workflow is duplicated by another editor: the copy keeps only credential references that the copier owns and reports the cleared ones as validation problems.
+- A credential referenced by a draft is deleted: the node reports a `missing-credential` problem; the deletion is refused while an active release references it.
+- Ownership of a workflow whose nodes reference the previous owner's credentials is transferred: those references become node configuration problems; an active release keeps running, and its nodes that use them fail with a user error naming the credential, so the new owner never runs with the previous owner's secrets.
+- A workflow is duplicated by another editor: the copy keeps only credential references that the copier owns, and its nodes that lose one report a `missing-credential` problem.
 - The owner of an active workflow is suspended: the workflow keeps running; an administrator can transfer its ownership.
 - A paginated API returns an empty cursor or next link on the last page: pagination completes; it never restarts from the first page.
 - A paginated API returns cursors that cycle (A, B, A): the repeated request fails the node with "pagination did not advance".
@@ -229,30 +245,46 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 **Workflows, drafts and ownership**
 
 - **FR-001**: Editors and administrators MUST be able to create workflows; the creator becomes the owner.
-- **FR-002**: Every signed-in user MUST be able to list workflows (paged, with name search and archived and owner filters) and read a workflow with its owner, draft, published versions and activation state. Lists are paged with opaque cursors over a fixed order (last change, then identifier). A workflow changed while a client is paging may appear again in a later page, and clients restart paging to see the latest order.
-- **FR-003**: Only the owner or an administrator MUST be able to rename, change the draft, publish, activate, deactivate, archive and restore a workflow and start or cancel its runs; archived workflows are hidden from the default list, cannot be run or activated, and keep their versions and run history.
+- **FR-002**: Every signed-in user MUST be able to list workflows (paged, with name search and archived and owner filters) and read a workflow with its owner, draft, releases and active release. Lists are paged with opaque cursors over a fixed order (last change, then identifier). A workflow changed while a client is paging may appear again in a later page, and clients restart paging to see the latest order.
+- **FR-003**: Only the owner or an administrator MUST be able to rename, change the draft, publish, activate, deactivate, archive and restore a workflow and start or cancel its runs; archived workflows are hidden from the default list, cannot be run or activated, and keep their releases and run history.
 - **FR-004**: Editors and administrators MUST be able to duplicate any workflow they can read; the copy is owned by the duplicating user and keeps only credential references that user owns.
-- **FR-005**: The owner or an administrator MUST be able to transfer ownership of a workflow to another editor or administrator; references to credentials the new owner does not own MUST become validation problems. An active version stays active: its nodes that use such credentials fail with a user error naming the credential until the new owner replaces them and publishes again, because credentials are resolved only for the current owner (FR-040).
+- **FR-005**: The owner or an administrator MUST be able to transfer ownership of a workflow to another editor or administrator; references to credentials the new owner does not own MUST become node configuration problems. An active release stays active: its nodes that use such credentials fail with a user error naming the credential until the new owner replaces them and publishes again, because credentials are resolved only for the current owner (FR-040).
 - **FR-006**: A draft MUST hold the graph: nodes (identifier, unique display name, node type and type version, parameters, credential reference, settings, position for the editor, optional note, disabled flag, optional pinned sample output) and connections (from node and output, to node and input), plus workflow settings (time zone, run timeout, error workflow).
-- **FR-007**: Saving a draft MUST be accepted even when the graph is invalid and MUST return a validation report listing every problem by node and parameter, each with a stable code that clients can act on.
-  - **Errors** block publishing, activation and test runs:
-    - `node-limit`, `parameters-too-large`, `duplicate-node-name`;
-    - `unknown-node-type` (type or version), `invalid-parameter`;
+- **FR-007**: Saving a draft MUST sort what can be wrong with a graph into three kinds. The first two carry stable codes that clients can act on.
+  - **A malformed graph** is refused with every reason, and the save changes nothing:
+    - `duplicate-node-id`, `unknown-connection-node` (a connection to a node that is not in the graph);
+    - `duplicate-node-name` (formulas name nodes);
+    - `cycle` (graphs are acyclic).
+
+    The size limits of FR-009 are refused as invalid requests.
+
+  - **Node configuration problems** do not block the save. The response lists every problem by node and parameter, and the problems block publishing, activation and test runs:
+    - `unknown-node-type` (type or version), `invalid-parameter`, `invalid-regex`;
+    - `formula-syntax`, `formula-scope`;
+    - `unknown-port`;
     - `missing-credential`, `foreign-credential`, `credential-type-mismatch`;
-    - `cycle`, `no-trigger`, `unreachable-node`, `unknown-port`;
-    - `unknown-node-reference`, `not-upstream-reference`, `formula-syntax`, `formula-scope`;
-    - `invalid-regex`, `second-resume-wait`, `invalid-error-workflow`.
-  - **Warnings** block nothing: `unknown-field` (a field path missing from a node's known output).
-- **FR-008**: Saving a draft MUST replace its whole graph and settings in one atomic operation that names the revision it was based on; when the draft changed since that revision, the save MUST be refused as a conflict and change nothing; a successful save MUST return the new revision together with the validation report.
+    - `second-resume-wait`.
+  - **Editor hints** are computed by clients from the graph, the node catalogue and the known fields, and the API does not report them. They are:
+    - a node that no trigger reaches;
+    - a field reference or formula naming a node that is missing or not upstream;
+    - a field path missing from a node's known output;
+    - an error workflow that does not exist.
+
+    No hint blocks anything, and each has a defined run-time behaviour: an unreachable node never runs, a reference to a node that has not run resolves to empty, and an unavailable error workflow is recorded on the failed run (FR-029).
+
+  Connections carry items without a type. The data a node receives is checked when the node runs, against the node's own parameter definitions (FR-015), not when the graph is saved.
+
+- **FR-008**: Saving a draft MUST replace its whole graph and settings in one atomic operation that names the revision it was based on; when the draft changed since that revision, the save MUST be refused as a conflict and change nothing; a successful save MUST return the new revision together with the node configuration problems.
 - **FR-009**: A workflow MUST be limited to 200 nodes; parameters of one node MUST be limited to 256 KB; a draft save request MUST be limited to 5 MB.
 
-**Versions and activation**
+**Releases and activation**
 
-- **FR-010**: Publishing MUST validate the draft and, when it is valid, create an immutable version with the next version number; an invalid draft MUST NOT be published. Publishing MUST name the draft revision it publishes, and a stale revision is refused as a conflict and publishes nothing.
-- **FR-011**: A workflow MUST have at most one active version; activating a version MUST register its triggers (schedules, webhook endpoints) and end the previous activation; deactivating or archiving MUST remove them.
-  - Activating MUST re-check that every credential the version references still exists, can be read and belongs to the workflow's owner, and is refused with the validation report otherwise.
+- **FR-010**: Publishing MUST create an immutable release of the draft with the next release number. A draft with node configuration problems (FR-007) MUST NOT be published, and the refusal lists every problem. Publishing MUST name the draft revision it publishes, and a stale revision is refused as a conflict and publishes nothing.
+- **FR-011**: A workflow MUST have at most one active release; activating a release MUST register its triggers (schedules, webhook endpoints) and end the previous activation; deactivating or archiving MUST remove them.
+  - A release without a trigger node cannot be activated.
+  - Activating MUST re-check that every credential the release references still exists, can be read and belongs to the workflow's owner, and is refused with the node configuration problems otherwise.
   - Triggers MUST take effect within 1 minute of the activation. When registering them fails, the platform retries until it succeeds, and every minute it reconciles registered triggers with activations.
-- **FR-012**: Runs started by triggers of an active version MUST use that version's graph, unaffected by later draft edits.
+- **FR-012**: Runs started by triggers of an active release MUST use that release's graph, unaffected by later draft edits.
 
 **Node catalogue and parameters**
 
@@ -271,9 +303,9 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   - `$('Node name')`: an upstream node's items;
   - `$now` and `$today`: the current time and date in the workflow time zone;
   - `$execution`: `id`, `mode` (`test` or `production`), `startedAt` and `resumeUrl`;
-  - `$workflow`: `id`, `name` and `version`.
+  - `$workflow`: `id`, `name` and `version` (the release number).
 
-  Pagination formulas add the variables of FR-037. Formulas MUST NOT be able to define functions, loop, assign, run arbitrary code, or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named. For every node of a draft, the platform MUST report the field paths and value types seen in its pinned sample output or its latest test-run output (taken from the first 20 items, at most 500 paths per node), so that clients offer fields to pick instead of having them typed.
+  Pagination formulas add the variables of FR-037. When a node runs, the value each of its parameters resolves to for an item MUST be checked against the parameter's definition, and a value that does not fit fails the node with a user error naming the parameter and the item; this is the only check of the data flowing between nodes. Formulas MUST NOT be able to define functions, loop, assign, run arbitrary code, or reach the network, the file system, credentials or platform secrets. One evaluation MUST be bounded to 100 milliseconds and 1 MB of result, and exceeding a bound MUST fail the node with the parameter named. For every node of a draft, the platform MUST report the field paths and value types seen in its pinned sample output or its latest test-run output (taken from the first 20 items, at most 500 paths per node), so that clients offer fields to pick instead of having them typed.
 
 - **FR-016**: Every node MUST support these settings:
   - disabled: passes items through;
@@ -286,7 +318,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
 **Runs**
 
-- **FR-017**: The owner or an administrator MUST be able to start a test run of the current draft or a run of any published version, with input items for a Manual Trigger; the run MUST capture the graph it started with and run with the credentials of the workflow's owner. A test run MUST name the draft revision it runs, and a stale revision is refused as a conflict.
+- **FR-017**: The owner or an administrator MUST be able to start a test run of the current draft or a run of any release, from a trigger node the request names, with input items for a Manual Trigger; the run MUST capture the graph it started with and run with the credentials of the workflow's owner. A test run MUST name the draft revision it runs, and a stale revision is refused as a conflict; a draft with node configuration problems (FR-007) cannot be test-run.
 - **FR-018**: A run MUST follow the states queued → running → waiting → succeeded, with the terminal alternatives failed and cancelled; every node that runs MUST produce a step with status, start and end time, attempt count, item count, output size and, on failure, the error. A failed run or step carries exactly one error kind:
   - `user`: the workflow's configuration, user code or a remote service's answer;
   - `limit`: a platform limit, including a request timeout;
@@ -316,7 +348,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 - **FR-025**: The Manual Trigger MUST start a run with the items supplied by the caller (at most 1,000 items and 1 MB). Items, like every payload users send into their automations, are opaque JSON objects nested at most 64 levels deep; their fields are not validated (constitution 3.1.0).
 - **FR-026**: The Schedule Trigger MUST support intervals (minutes, hours, days, weeks, months at a given time) and cron expressions in a configurable time zone; each occurrence MUST start at most one run, and an occurrence that falls due while the previous run of the same rule is still active MUST be skipped. Each rule of a Schedule Trigger is its own schedule, so overlapping is judged per rule.
 - **FR-027**: The Webhook trigger MUST do all of the following:
-  - expose an address per Webhook node that stays the same across drafts, versions and activations; the address identifier and the endpoint secret each carry 256 random bits;
+  - expose an address per Webhook node that stays the same across drafts, releases and activations; the address identifier and the endpoint secret each carry 256 random bits;
   - show the address and the secret only to the workflow's owner and administrators, who can also rotate the secret;
   - accept the configured HTTP methods;
   - authenticate every call with the one mode chosen on the node:
@@ -405,10 +437,10 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
   TLS certificates MUST always be verified, and a refusal MUST fail the node as an isolation breach that is never retried.
 
 - **FR-039**: Editors and administrators MUST be able to create credentials of the types header (name and value), basic (username and password), bearer (token) and query parameter (name and value); the creator owns the credential.
-- **FR-040**: Credential secret values MUST be stored encrypted, MUST be write-only (no read returns them), and MUST NOT appear in validation reports, run inputs, step outputs, errors, diagnostics or logs. They are resolved only while the node that uses them executes.
+- **FR-040**: Credential secret values MUST be stored encrypted, MUST be write-only (no read returns them), and MUST NOT appear in node configuration problems, run inputs, step outputs, errors, diagnostics or logs. They are resolved only while the node that uses them executes.
   - **Key rotation**: credential and webhook secrets are encrypted with versioned keys. New and replaced secrets use the current key, and older versions stay usable while they are configured. The maintenance job re-encrypts secrets under older versions with the current key in batches, after which an operator may remove the old key. The platform logs at start how many secrets each key version holds.
   - **Key loss**: a secret whose key is missing is unreadable. Reads of the credential report it, nodes that use it fail with a user error asking for the secret to be entered again, and webhook calls to an endpoint with an unreadable secret are refused until the secret is rotated. The platform starts regardless.
-- **FR-041**: Owners MUST be able to list, rename, replace the secret of and delete their credentials, and see which workflows reference each one. Administrators MUST be able to list every credential's name, type, owner and references and delete any credential. A credential referenced by an active version MUST NOT be deletable.
+- **FR-041**: Owners MUST be able to list, rename, replace the secret of and delete their credentials, and see which workflows reference each one. Administrators MUST be able to list every credential's name, type, owner and references and delete any credential. A credential referenced by an active release MUST NOT be deletable.
 - **FR-042**: A node MUST reference only credentials owned by the workflow's owner and of a type the node accepts.
 
 **History and retention**
@@ -423,7 +455,7 @@ Any signed-in user lists the runs of a workflow with their status, trigger and t
 
   | Operation                                                                                                   | Viewer | Editor          | Administrator                    |
   | ----------------------------------------------------------------------------------------------------------- | ------ | --------------- | -------------------------------- |
-  | Read the node catalogue, workflows, versions, runs and step output                                          | yes    | yes             | yes                              |
+  | Read the node catalogue, workflows, releases, runs and step output                                          | yes    | yes             | yes                              |
   | Create a workflow; duplicate any readable workflow (the copy is theirs)                                     | no     | yes             | yes                              |
   | Rename, save the draft, pin samples, publish, activate, deactivate, archive, restore, start and cancel runs | no     | own workflows   | every workflow                   |
   | Read webhook addresses and secrets, rotate a webhook secret                                                 | no     | own workflows   | every workflow                   |
@@ -465,7 +497,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 
 | Group     | Node                     | Behaviour and options                                                                                                                                                                                                                                          |
 | --------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Trigger   | Manual Trigger           | Starts a test run or a run of a published version with caller-supplied items.                                                                                                                                                                                  |
+| Trigger   | Manual Trigger           | Starts a test run or a run of a release with caller-supplied items.                                                                                                                                                                                            |
 | Trigger   | Schedule Trigger         | Starts runs on intervals (every N minutes, hours, days, weeks or months at a given time; at least one minute) or cron expressions; several rules per node; time zone of the workflow unless set on the node.                                                   |
 | Trigger   | Webhook                  | Starts a run for each authenticated call; methods GET, POST, PUT, PATCH, DELETE; outputs one item with method, path, headers (secret header removed), query and body.                                                                                          |
 | Trigger   | Execute Workflow Trigger | Entry point of a sub-workflow; accepts all caller items or declared input fields.                                                                                                                                                                              |
@@ -506,17 +538,18 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 
 ### Key Entities
 
-- **Workflow**: a named automation; owner, status (active, archived), draft, published versions, settings, activation.
-- **Draft**: the editable graph of a workflow with its revision for conflict detection and its validation report.
-- **Workflow version**: an immutable, numbered snapshot of the graph created by publishing.
-- **Node**: an instance of a node type in a graph; type and type version, display name, parameters, credential reference, settings, position, pinned sample output.
+- **Workflow**: a named automation; owner, status (active, archived), draft, releases, settings, active release.
+- **Draft**: the editable graph of a workflow with its revision for conflict detection; the node configuration problems are computed from it.
+- **Release**: an immutable, numbered copy of the draft's graph and settings created by publishing; production runs execute releases.
+- **Node**: an instance of a node type in a graph; type and type version, trigger kind taken from the catalogue, display name, parameters, credential reference, settings, position, pinned sample output.
+- **Node configuration problem**: why a node cannot run as configured; a stable code, the node and the parameter (FR-007).
 - **Parameter value**: what a node parameter is set to; a fixed value, a field reference (node identifier or current item, plus field path) or a formula.
 - **Connection**: a link from an output port of one node to an input port of another.
 - **Node type**: a catalogue entry shipped with the platform; identifier, version, kind, category, parameter definitions, accepted credential types, ports, default settings.
 - **Credential**: a named secret of a generic HTTP authentication type owned by one user; encrypted secret values, creation and update times, the workflows that reference it.
-- **Activation**: the registration of an active version's triggers: its schedules and the Webhook nodes it serves.
-- **Webhook endpoint**: the stable address and secret of one Webhook node of a workflow, kept across drafts, versions and activations; its secret can be rotated.
-- **Run**: one execution of a version or draft snapshot; trigger, status, timestamps, input, current node, resume address.
+- **Active release**: the one release whose triggers start runs; activating it registers its schedules and the Webhook nodes it serves.
+- **Webhook endpoint**: the stable address and secret of one Webhook node of a workflow, kept across drafts, releases and activations; its secret can be rotated.
+- **Run**: one execution of a release or a draft snapshot; trigger, status, timestamps, input, current node, resume address.
 - **Step**: one execution of a node within a run; status, attempts, item count, output size, error, diagnostics, output items.
 - **Retention policy**: retention period and maximum runs per workflow.
 
@@ -554,7 +587,7 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
   - n8n core nodes that speak external protocols: Send Email, SSH, FTP, Git, GraphQL, RSS, LDAP, Email Trigger;
   - n8n core nodes with their own storage or product surface: Data Table, Execution Data, n8n, Track Time Saved;
   - forms and chat, which belong to the web application: Form Trigger, Form, Chat.
-- Credentials of the generic HTTP types have no service to be verified against; they count as verified once saved, which satisfies the domain rule that published versions reference only verified credentials.
+- Credentials of the generic HTTP types have no service to be verified against; they count as verified once saved, which satisfies the domain rule that releases reference only verified credentials.
 - The HTTP Request node does not offer proxies, client certificates or disabling TLS verification in this feature.
 - Workflows exchange data as lists of JSON items; binary data is not part of this feature. Items carry no lineage to the items they came from; field references and formulas reach earlier items by position.
 - Webhook calls are acknowledged as soon as the run is recorded (docs/architecture/04-execution.md); responding to the caller with data produced by the run (Respond to Webhook) is a later feature.
@@ -563,15 +596,15 @@ The catalogue follows the n8n core nodes that work on the platform's own data an
 - The Code node supports JavaScript, TypeScript and Python. Further popular languages (for example Go, Java, C#, PHP, Ruby) are added later through the same contract. Python extends the Code node runtime described in docs/architecture/05-node-types.md, which names only Node.js; the plan updates that document.
 - Test runs of workflows that start with a Webhook or Schedule Trigger use input items supplied by the owner or pinned sample output; there is no temporary test webhook address.
 - A test run always executes the whole draft from its trigger; executing a single node or running up to a chosen node is not offered. To try a node on known data, the owner pins the output of the nodes before it.
-- New node types and new node type versions ship with platform releases; there is no user-defined node type.
+- New node types and new node type versions ship with platform updates; there is no user-defined node type.
 - External effects are delivered at least once per node execution. Making the receiving operations idempotent is the responsibility of whoever builds the integration; the platform supplies stable idempotency keys and does not deduplicate on the caller's behalf.
 - Run execution builds on the durable execution module of the NestJS ecosystem named by the architecture documents (`@nestjs/workflows`, docs.nestjs.com/reliability/workflows).
-  - It is an early release (0.0.x): the plan verifies each mechanism against the installed version, and upgrades are explicit. Every upgrade is pinned, passes the engine's store contract tests and the platform's crash-recovery tests, and moves the run workflow to a new version when the order of its steps changes.
+  - It is an early package version (0.0.x): the plan verifies each mechanism against the installed version, and upgrades are explicit. Every upgrade is pinned, passes the engine's store contract tests and the platform's crash-recovery tests, and moves the run workflow to a new version when the order of its steps changes.
   - Its documented behaviour sets several rules here: the platform-wide per-workflow concurrency limit, waits counted in the run timeout, cancellation letting the current node finish, and missed schedule occurrences being skipped.
   - The rules of a run live in the domain, and the engine is used only by interface adapters (the run workflow, controllers and handlers), so replacing it touches only those adapters; no fallback engine is part of this feature.
 - This feature introduces the execution process role, object storage for step outputs, the code sandbox and the credential encryption key, as the architecture documents describe.
 - No rate limiting is built into the applications. Request rates on every public route (webhooks, resume addresses, sign-in) are limited by the API gateway, Envoy Gateway, which the platform's Helm chart delivers with the other components. The applications enforce only body size limits and their own resource limits.
 - Restarting a stopped API or execution process, and scaling their replicas, is the job of the container orchestrator (Kubernetes). The platform guarantees only that runs interrupted by a stopped process continue on another one (FR-020).
-- Workflows are archived, never deleted, in this feature. Permanent deletion of a workflow with its versions, webhook endpoints, samples and runs is a later feature; retention already removes old runs (FR-045).
+- Workflows are archived, never deleted, in this feature. Permanent deletion of a workflow with its releases, webhook endpoints, samples and runs is a later feature; retention already removes old runs (FR-045).
 - Every signed-in user can read all run data, including data fetched with another user's credentials and resume addresses. This is an accepted risk of the shared visibility chosen on 2026-10-11; per-workflow visibility is a later feature. A resume address without the header-credential option is therefore a capability: like n8n's resume URL, anyone who has it can resume that one run, and workflows that need stronger protection use the header-credential option (FR-030).
 - Limits stated as numbers are platform defaults that operators may lower or raise through configuration.

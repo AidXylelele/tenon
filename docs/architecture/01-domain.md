@@ -2,12 +2,12 @@
 
 ## Bounded contexts
 
-| Context           | Model                                                      | Data                                                             |
-| ----------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| Identity & Access | User, Account, Session, Role; Invitation aggregate         | Tables `user`, `account`, `session`, `email_token`, `invitation` |
-| Automation        | Workflow, Credential, Activation, Run; node type catalogue | Application tables; node types in code                           |
+| Context           | Model                                               | Data                                                             |
+| ----------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
+| Identity & Access | User, Account, Session, Role; Invitation aggregate  | Tables `user`, `account`, `session`, `email_token`, `invitation` |
+| Automation        | Workflow, Release, Run, Credential, WebhookEndpoint | Application tables; node types in code                           |
 
-Automation covers the whole lifecycle: workflow → published version → activation → run → retention.
+Automation covers the whole lifecycle: workflow → release → activation → run → retention.
 
 ## Context map
 
@@ -35,14 +35,22 @@ flowchart LR
 
 ## Aggregates
 
-| Aggregate  | Contents                                                | Invariants                                                                                                                                            |
-| ---------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workflow   | WorkflowVersion (draft, published), Node, Connection    | Graph is acyclic and connected to a trigger node; node parameters satisfy the node type manifest; a published version is immutable                    |
-| Credential | type, encrypted secret, verification status             | Secret is stored encrypted; only verified credentials are referenced by published versions                                                            |
-| Activation | Schedule, WebhookEndpoint, PollingSubscription (cursor) | Belongs to exactly one published version; at most one activation per version                                                                          |
-| Run        | Step (per node), trigger reference, status, timestamps  | State machine `queued → running → waiting → succeeded`, terminal alternatives `failed`, `cancelled`; a step belongs to a node of the executed version |
+### Automation
 
-Node type is a catalogue entry in code, referenced as `nodeTypeId@version`; it is not an aggregate.
+| Aggregate       | Contents                                                                                                    | Invariants                                                                                                                                                                                                                                                                                                                   |
+| --------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workflow        | Draft (Graph of Nodes and Connections, settings, revision), pinned nodes, latest and active release numbers | A save names the current revision; the graph has unique node identifiers and names, connections between its nodes and no cycle; publishing, test runs and activation are refused while nodes have configuration problems; at most one active release, which has a trigger; an archived workflow is neither run nor activated |
+| Release         | An immutable copy of the draft's graph and settings, numbered 1, 2, 3…                                      | Created only by publishing; never changes; production runs execute it                                                                                                                                                                                                                                                        |
+| Run             | Graph snapshot, Steps (one per node), trigger, acting user, status, timestamps                              | State machine `queued → running → waiting → succeeded`, terminal alternatives `failed`, `cancelled`; nodes in dependency order from the firing trigger; a finished node never runs again; on-error settings; 256 MB per run; one accepted resume call; sub-workflow depth and call limits                                    |
+| Credential      | Type, encrypted secret, owner                                                                               | The secret is stored encrypted and never returned; it opens only for runs whose acting user owns it                                                                                                                                                                                                                          |
+| WebhookEndpoint | Public identifier, encrypted secret, workflow and node                                                      | One address per webhook node, stable across drafts, releases and activations; its secret rotates                                                                                                                                                                                                                             |
+
+A connection carries items without a type. The contract belongs to the node that receives the items: its
+node type's parameter definitions and the user's bindings. The node executor checks it for each item when
+the node runs. Node types are catalogue entries in code (interface adapters), referenced as
+`nodeTypeId@version`. They are not aggregates, and they report the configuration problems of their nodes.
+Editor hints, such as unreachable nodes or unknown fields, are computed by clients. The full model,
+including the owner of every rule, is in `specs/002-workflow-builder/data-model.md`.
 
 ### Identity & Access
 
@@ -55,94 +63,187 @@ Sessions and recovery tokens are records of `@nestjs/authentication` stored by t
 
 ## Domain events
 
-| Event                      | Raised by | Effect                                         |
-| -------------------------- | --------- | ---------------------------------------------- |
-| WorkflowVersionPublished   | Workflow  | Activation is created for the version          |
-| WorkflowVersionUnpublished | Workflow  | Activation is removed                          |
-| RunFinished                | Run       | Run status projection and retention accounting |
+| Event             | Raised by | Effect                                                                                     |
+| ----------------- | --------- | ------------------------------------------------------------------------------------------ |
+| ActivationChanged | Workflow  | Through the outbox, the engine schedules converge to the workflow's current active release |
+
+Domain events are used only for effects that leave the database transaction. Every other reaction is an
+explicit flow in a use case.
 
 ## Class diagram
 
 ```mermaid
 classDiagram
+  direction LR
   class Workflow {
-    +WorkflowId id
-    +String name
-    +WorkflowStatus status
-    +createDraft()
-    +updateDraft(graph)
-    +publish(versionNumber)
+    <<aggregate root>>
+    -id
+    -name
+    -ownerId
+    -graph Graph
+    -settings WorkflowSettings
+    -revision
+    -pinnedNodeIds
+    -latestRelease
+    -activeRelease
+    -archivedAt
+    -version
+    -events
+    +create(NewWorkflow)$ Workflow
+    +rename(name)
+    +saveDraft(revision, graph, settings)
+    +pin(nodeId)
+    +unpin(nodeId)
+    +publish(revision, problems, publishedBy) Release
+    +activate(release, problems)
+    +deactivate()
     +archive()
+    +restore()
+    +transferTo(ownerId)
+    +duplicate(name, ownerId, ownedCredentialIds) Workflow
+    +startTestRun(NewTestRun) Run
+    +startManualRun(release, NewManualRun) Run
+    +startTriggeredRun(release, RunTrigger) Run
+    +startSubWorkflowRun(release, parent, batch) Run
   }
-  class WorkflowVersion {
-    +VersionNumber number
-    +VersionState state
-    +publishedAt
+  class Release {
+    <<aggregate root>>
+    -workflowId
+    -number
+    -graph Graph
+    -settings WorkflowSettings
+    -publishedAt
+    -publishedBy
+    +credentialIds
+    +hasTrigger
+  }
+  class Graph {
+    <<value object>>
+    -nodes Node[]
+    -connections Connection[]
+    +node(id) Node
+    +triggers Node[]
+    +credentialIds
+    +orderFrom(trigger) Node[]
+    +incoming(node) Connection[]
+    +keepCredentials(ids) Graph
+    +renamedNodes(previous) Node[]
   }
   class Node {
-    +NodeId id
-    +NodeTypeRef type
-    +Parameters parameters
-    +CredentialId credentialId
+    <<entity>>
+    -id
+    -name
+    -type
+    -trigger TriggerType
+    -parameters
+    -credentialId
+    -settings NodeSettings
+    -disabled
+    -position
+    -note
+    +isTrigger
+    +retryDelay(failure, attempt)
   }
   class Connection {
-    +NodeId from
-    +Port fromPort
-    +NodeId to
-    +Port toPort
-  }
-  class Credential {
-    +CredentialId id
-    +CredentialType type
-    +EncryptedSecret secret
-    +VerificationStatus status
-  }
-  class Activation {
-    +ActivationId id
-    +WorkflowVersionRef version
-    +enable()
-    +disable()
-    +advanceCursor(subscription, cursor)
-  }
-  class Schedule {
-    +Cron expression
-    +Timezone tz
-  }
-  class WebhookEndpoint {
-    +EndpointId id
-    +Secret secret
-  }
-  class PollingSubscription {
-    +NodeId triggerNode
-    +Cursor cursor
+    <<value object>>
+    -from
+    -output
+    -to
+    -input
   }
   class Run {
-    +RunId id
-    +WorkflowVersionRef version
-    +TriggerRef trigger
-    +RunStatus status
-    +start()
-    +recordStep(step)
-    +finish(outcome)
+    <<aggregate root>>
+    -id
+    -workflowId
+    -releaseNumber
+    -mode RunMode
+    -trigger RunTrigger
+    -graph Graph
+    -pinnedNodeIds
+    -actingUserId
+    -parentRunId
+    -depth
+    -status RunStatus
+    -error NodeFailure
+    -steps Step[]
+    -resumeCall
+    -subWorkflowCalls
+    -errorWorkflow
+    -timeoutMs
+    -queuedAt
+    -startedAt
+    -finishedAt
+    -version
+    +queue(NewRun)$ Run
+    +begin()
+    +order Node[]
+    +reach(nodeId) Arrival
+    +inputOf(nodeId) NodeInput
+    +complete(nodeId, outputs, limits)
+    +fail(nodeId, failure, outputs)
+    +wait(nodeId, until)
+    +wake(nodeId)
+    +acceptResumeCall(call)
+    +callSubWorkflows(nodeId, count)
     +cancel()
+    +terminate(reason)
+    +finish()
+    +needsErrorWorkflow
+    +recordErrorWorkflow(outcome)
   }
   class Step {
-    +NodeId nodeId
-    +StepStatus status
-    +ArtifactRef input
-    +ArtifactRef output
-    +ItemCount items
+    <<entity>>
+    -nodeId
+    -status StepStatus
+    -attempts
+    -startedAt
+    -finishedAt
+    -outputs StepOutput[]
+    -error NodeFailure
+    -diagnostics
   }
-  Workflow "1" *-- "*" WorkflowVersion
-  WorkflowVersion "1" *-- "*" Node
-  WorkflowVersion "1" *-- "*" Connection
-  Node ..> Credential : references by id
-  Activation ..> WorkflowVersion : references by id
-  Activation "1" *-- "*" Schedule
-  Activation "1" *-- "*" WebhookEndpoint
-  Activation "1" *-- "*" PollingSubscription
-  Run ..> WorkflowVersion : references by id
-  Run "1" *-- "*" Step
+  class Credential {
+    <<aggregate root>>
+    -id
+    -ownerId
+    -name
+    -type CredentialType
+    -secret EncryptedSecret
+    -version
+    +create(NewCredential)$ Credential
+    +rename(name)
+    +replaceSecret(secret)
+    +isOwnedBy(userId)
+  }
+  class WebhookEndpoint {
+    <<aggregate root>>
+    -id
+    -workflowId
+    -nodeId
+    -secret EncryptedSecret
+    -rotatedAt
+    -version
+    +open(workflowId, nodeId, secret)$ WebhookEndpoint
+    +rotate(secret)
+  }
+  class WebhookSecret {
+    <<value object>>
+    +generate()$ WebhookSecret
+    +value
+  }
+  Workflow *-- Graph : draft
+  Release *-- Graph : snapshot
+  Run *-- Graph : snapshot
+  Graph *-- Node
+  Graph *-- Connection
+  Run *-- Step
+  Workflow ..> Release : publish creates
+  Workflow ..> Run : start creates
+  Run ..> Workflow : workflowId
+  Release ..> Workflow : workflowId
+  Node ..> Credential : credentialId
+  WebhookEndpoint ..> Workflow : workflowId and nodeId
+  WebhookEndpoint ..> WebhookSecret : encrypted value
 ```
 
 ```mermaid
