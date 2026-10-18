@@ -9,6 +9,7 @@ import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from '../../interface-adapters/http/controllers/health.controller.js';
 import { DomainErrorFilter } from '../../interface-adapters/http/filters/domain-error.filter.js';
 import { SecurityHeadersMiddleware } from '../../interface-adapters/http/middleware/security-headers.middleware.js';
+import { AutomationModule } from './automation.module.js';
 import { ConfigModule } from './config.module.js';
 import { DatabaseModule } from './database.module.js';
 import { IdentityAccessModule } from './identity-access.module.js';
@@ -24,6 +25,7 @@ import { OutboxModule } from './outbox.module.js';
     OutboxModule,
     MailModule,
     IdentityAccessModule,
+    AutomationModule,
     TerminusModule.forRoot({ gracefulShutdownTimeoutMs: 5_000 }),
   ],
   controllers: [HealthController],

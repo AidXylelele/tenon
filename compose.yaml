@@ -1,4 +1,4 @@
-# Local stack for the API: PostgreSQL and an SMTP capture service.
+# Local stack for the API: PostgreSQL, an SMTP capture service and S3-compatible object storage.
 # Every resource carries the project name so it cannot collide with other projects.
 name: workflow-platform
 
@@ -11,6 +11,34 @@ volumes:
     name: workflow-platform-postgres
   mailpit-data:
     name: workflow-platform-mailpit
+  garage-data:
+    name: workflow-platform-garage
+
+x-api-environment: &api-environment
+  DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+  SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+  WEB_BASE_URL: ${WEB_BASE_URL:-http://127.0.0.1:3001}
+  TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://127.0.0.1:3001}
+  TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+  OUTBOX_RELAY: ${OUTBOX_RELAY:-on}
+  SMTP_HOST: mailpit
+  SMTP_PORT: 1025
+  SMTP_STARTTLS: opportunistic
+  SMTP_USER: ''
+  SMTP_PASSWORD: ''
+  SMTP_FROM: ${SMTP_FROM:-Workflow Platform <no-reply@workflow.local>}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://127.0.0.1:53000}
+  STORAGE_ENDPOINT: http://objects:3900
+  STORAGE_REGION: garage
+  STORAGE_BUCKET: ${STORAGE_BUCKET:?set STORAGE_BUCKET in .env}
+  STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?set STORAGE_ACCESS_KEY in .env}
+  STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?set STORAGE_SECRET_KEY in .env}
+  SECRET_KEYS: ${SECRET_KEYS:?set SECRET_KEYS in .env}
+  SECRET_KEY_CURRENT: ${SECRET_KEY_CURRENT:?set SECRET_KEY_CURRENT in .env}
+  OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
+  OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-workflow-platform-api}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
 
 services:
   postgres:
@@ -49,6 +77,25 @@ services:
       timeout: 3s
       retries: 12
 
+  objects:
+    image: dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
+    command: ['/garage', 'server', '--single-node', '--default-bucket']
+    environment:
+      GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET:?set GARAGE_RPC_SECRET in .env}
+      GARAGE_DEFAULT_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?set STORAGE_ACCESS_KEY in .env}
+      GARAGE_DEFAULT_SECRET_KEY: ${STORAGE_SECRET_KEY:?set STORAGE_SECRET_KEY in .env}
+      GARAGE_DEFAULT_BUCKET: ${STORAGE_BUCKET:?set STORAGE_BUCKET in .env}
+    volumes:
+      - ./infra/garage/garage.toml:/etc/garage.toml:ro
+      - garage-data:/var/lib/garage
+    ports:
+      - '127.0.0.1:${GARAGE_S3_PORT:-53900}:3900'
+    healthcheck:
+      test: ['CMD', '/garage', 'status']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   api:
     profiles: [app]
     build:
@@ -60,26 +107,35 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
+      objects:
+        condition: service_healthy
     environment:
+      <<: *api-environment
       PORT: 3000
-      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
-      WEB_BASE_URL: ${WEB_BASE_URL:-http://127.0.0.1:3001}
-      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://127.0.0.1:3001}
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
-      OUTBOX_RELAY: ${OUTBOX_RELAY:-on}
-      SMTP_HOST: mailpit
-      SMTP_PORT: 1025
-      SMTP_STARTTLS: opportunistic
-      SMTP_USER: ''
-      SMTP_PASSWORD: ''
-      SMTP_FROM: ${SMTP_FROM:-Workflow Platform <no-reply@workflow.local>}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
-      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-workflow-platform-api}
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      ROLE: api
     ports:
       - '127.0.0.1:${API_PORT:-53000}:3000'
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  worker:
+    profiles: [app]
+    image: workflow-platform/api:dev
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      <<: *api-environment
+      ROLE: worker
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-10}
+    healthcheck:
+      disable: true
     init: true
     read_only: true
     tmpfs:

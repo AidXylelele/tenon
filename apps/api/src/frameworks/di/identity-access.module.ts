@@ -141,5 +141,6 @@ import { MailModule } from './mail.module.js';
       ) => new AcceptInvitation(invitations, users, accounts, passwords),
     },
   ],
+  exports: [UserRepository],
 })
 export class IdentityAccessModule {}

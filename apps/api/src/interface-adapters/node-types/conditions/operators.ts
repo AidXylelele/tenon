@@ -1,0 +1,41 @@
+export const OPERATORS = [
+  'exists',
+  'notExists',
+  'string:equals',
+  'string:notEquals',
+  'string:contains',
+  'string:notContains',
+  'string:startsWith',
+  'string:endsWith',
+  'string:matches',
+  'string:notMatches',
+  'string:isEmpty',
+  'string:isNotEmpty',
+  'number:equals',
+  'number:notEquals',
+  'number:gt',
+  'number:gte',
+  'number:lt',
+  'number:lte',
+  'date:equals',
+  'date:after',
+  'date:before',
+  'boolean:isTrue',
+  'boolean:isFalse',
+  'array:contains',
+  'array:notContains',
+  'array:lengthEquals',
+  'array:lengthGt',
+  'array:lengthLt',
+  'array:isEmpty',
+  'array:isNotEmpty',
+  'object:isEmpty',
+  'object:isNotEmpty',
+] as const;
+
+export type Operator = (typeof OPERATORS)[number];
+
+export const PATTERN_OPERATORS: readonly Operator[] = [
+  'string:matches',
+  'string:notMatches',
+];

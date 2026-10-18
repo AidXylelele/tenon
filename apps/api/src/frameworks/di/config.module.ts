@@ -39,6 +39,18 @@ const envSchema = z.object({
   LOG_LEVEL: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .default('info'),
+  ROLE: z.enum(['api', 'worker']).default('api'),
+  WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
+  PUBLIC_BASE_URL: z.url(),
+  STORAGE_ENDPOINT: z.url(),
+  STORAGE_REGION: z.string().min(1).default('garage'),
+  STORAGE_BUCKET: z.string().min(1),
+  STORAGE_ACCESS_KEY: z.string().min(1),
+  STORAGE_SECRET_KEY: z.string().min(1),
+  SECRET_KEYS: list.pipe(
+    z.array(z.string().regex(/^[\w-]+:[A-Za-z0-9+/]{43}=$/)).min(1),
+  ),
+  SECRET_KEY_CURRENT: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

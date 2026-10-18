@@ -9,6 +9,12 @@ describe('User', () => {
     expect(aUser({ role: Role.Viewer }).isAdmin).toBe(false);
   });
 
+  it('only_the_editor_role_is_an_editor', () => {
+    expect(aUser({ role: Role.Editor }).isEditor).toBe(true);
+    expect(aUser({ role: Role.Admin }).isEditor).toBe(false);
+    expect(aUser({ role: Role.Viewer }).isEditor).toBe(false);
+  });
+
   it('a_created_user_is_active_and_gets_a_fresh_identity', () => {
     const user = User.create({
       email: 'new@example.com',

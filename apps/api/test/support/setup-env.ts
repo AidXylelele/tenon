@@ -1,4 +1,9 @@
 import { inject } from 'vitest';
+import {
+  STORAGE_ACCESS_KEY,
+  STORAGE_BUCKET,
+  STORAGE_SECRET_KEY,
+} from './object-storage.js';
 
 Object.assign(process.env, {
   NODE_ENV: 'test',
@@ -16,4 +21,13 @@ Object.assign(process.env, {
   SMTP_PASSWORD: '',
   SMTP_FROM: 'Workflow Platform <no-reply@test.local>',
   LOG_LEVEL: 'silent',
+  ROLE: 'api',
+  PUBLIC_BASE_URL: 'http://127.0.0.1:3000',
+  STORAGE_ENDPOINT: inject('STORAGE_ENDPOINT'),
+  STORAGE_REGION: 'garage',
+  STORAGE_BUCKET,
+  STORAGE_ACCESS_KEY,
+  STORAGE_SECRET_KEY,
+  SECRET_KEYS: 'test-1:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
+  SECRET_KEY_CURRENT: 'test-1',
 });

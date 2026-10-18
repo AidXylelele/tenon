@@ -18,6 +18,16 @@ export interface AccountConfig {
 
 export type InvitationRow = typeof schema.invitation.$inferSelect;
 
+export type WorkflowRow = typeof schema.workflow.$inferSelect;
+
+export type ReleaseRow = typeof schema.release.$inferSelect;
+
+export type RunRow = typeof schema.run.$inferSelect;
+
+export type StepRow = typeof schema.step.$inferSelect;
+
+export type WebhookEndpointRow = typeof schema.webhookEndpoint.$inferSelect;
+
 declare module '@nestjs/authentication' {
   interface AuthenticationTypes {
     user: User;

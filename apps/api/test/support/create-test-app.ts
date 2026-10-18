@@ -31,6 +31,12 @@ export async function createTestApp(
   const moduleRef = await customise(builder).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     logger: false,
+    rawBody: true,
+  });
+  app.useBodyParser('json', { limit: '5mb' });
+  app.useBodyParser('text', {
+    type: ['text/*', 'application/xml', 'application/*+xml'],
+    limit: '1mb',
   });
   app.set('trust proxy', ['127.0.0.1']);
   app.enableCsrfProtection({ trustedOrigins: ['http://127.0.0.1:3001'] });

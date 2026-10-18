@@ -58,6 +58,10 @@ export class User {
     return this.#role === Role.Admin;
   }
 
+  get isEditor(): boolean {
+    return this.#role === Role.Editor;
+  }
+
   get isActive(): boolean {
     return this.#status === UserStatus.Active;
   }

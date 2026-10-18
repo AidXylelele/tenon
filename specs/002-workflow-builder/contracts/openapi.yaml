@@ -3,10 +3,11 @@ info:
   title: Workflow Platform API - Automation
   version: 1.0.0
   description: >-
-    Workflows, versions, activation, runs, credentials and the node catalogue. Sessions are the
+    Workflows, releases, activation, runs, credentials and the node catalogue. Sessions are the
     HttpOnly cookie of the authentication feature; webhook and resume ingress are public and
-    authenticated by their secrets. Error bodies are Nest's standard shape; a refused publication
-    adds `problems`. Lists are cursor-paged.
+    authenticated by their secrets. Error bodies are Nest's standard shape; a malformed graph adds
+    `faults`, and a refused publication, test run or activation adds `problems`. Lists are
+    cursor-paged.
 servers:
   - url: /api/v1
 tags:
@@ -139,7 +140,7 @@ paths:
       - { $ref: '#/components/parameters/WorkflowId' }
     put:
       tags: [workflows]
-      summary: Replace the whole draft at the given revision (owner, admin); invalid drafts are saved with their report; the request is limited to 5 MB
+      summary: Replace the whole draft at the given revision (owner, admin); a draft with node configuration problems is saved and answered with them; the request is limited to 5 MB
       requestBody:
         required: true
         content:
@@ -159,19 +160,26 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [revision, validation]
+                required: [revision, problems]
                 properties:
                   revision: { type: integer }
-                  validation: { $ref: '#/components/schemas/ValidationReport' }
+                  problems:
+                    type: array
+                    items: { $ref: '#/components/schemas/Problem' }
         '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409':
-          description: The draft changed since this revision, or the workflow is archived
+          description: The draft changed since this revision
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '413': { $ref: '#/components/responses/Error' }
+        '422':
+          description: The graph is malformed (repeated identifiers or names, a connection to a missing node, a cycle); `faults` lists every reason
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FaultsError' }
 
   /workflows/{id}/archive:
     parameters:
@@ -281,15 +289,15 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
 
-  /workflows/{id}/versions:
+  /workflows/{id}/releases:
     parameters:
       - { $ref: '#/components/parameters/WorkflowId' }
     get:
       tags: [workflows]
-      summary: Published versions, newest first (any signed-in user)
+      summary: Published releases, newest first (any signed-in user)
       responses:
         '200':
-          description: Versions
+          description: Releases
           content:
             application/json:
               schema:
@@ -298,11 +306,11 @@ paths:
                 properties:
                   items:
                     type: array
-                    items: { $ref: '#/components/schemas/VersionSummary' }
+                    items: { $ref: '#/components/schemas/ReleaseSummary' }
         '404': { $ref: '#/components/responses/Error' }
     post:
       tags: [workflows]
-      summary: Publish the draft at the given revision as the next immutable version (owner, admin)
+      summary: Publish the draft at the given revision as the next immutable release (owner, admin)
       requestBody:
         required: true
         content:
@@ -318,17 +326,17 @@ paths:
           description: Published
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/VersionSummary' }
+              schema: { $ref: '#/components/schemas/ReleaseSummary' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         '422':
-          description: The draft is not valid; `problems` lists every error
+          description: Nodes have configuration problems; `problems` lists every one
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemsError' }
 
-  /workflows/{id}/versions/{number}:
+  /workflows/{id}/releases/{number}:
     parameters:
       - { $ref: '#/components/parameters/WorkflowId' }
       - {
@@ -339,13 +347,13 @@ paths:
         }
     get:
       tags: [workflows]
-      summary: A published version (any signed-in user)
+      summary: A published release (any signed-in user)
       responses:
         '200':
-          description: Version with its graph
+          description: Release with its graph
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Version' }
+              schema: { $ref: '#/components/schemas/Release' }
         '404': { $ref: '#/components/responses/Error' }
 
   /workflows/{id}/activation:
@@ -353,17 +361,17 @@ paths:
       - { $ref: '#/components/parameters/WorkflowId' }
     put:
       tags: [workflows]
-      summary: Activate a published version, replacing any active one (owner, admin)
+      summary: Activate a published release, replacing any active one (owner, admin)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [version]
+              required: [release]
               additionalProperties: false
               properties:
-                version: { type: integer, minimum: 1 }
+                release: { type: integer, minimum: 1 }
       responses:
         '200':
           description: Active
@@ -372,9 +380,13 @@ paths:
               schema: { $ref: '#/components/schemas/Activation' }
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
+        '409':
+          description: The workflow is archived
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '422':
-          description: A referenced credential is missing, unreadable or not owned by the workflow's owner
+          description: The release has no trigger, or its nodes have configuration problems now (a credential missing, unreadable or not owned by the workflow's owner); `problems` lists them
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemsError' }
@@ -455,14 +467,14 @@ paths:
   /runs:
     post:
       tags: [runs]
-      summary: Start a test run of the draft or a run of a published version with Manual Trigger items (owner, admin)
+      summary: Start a test run of the draft or a run of a published release with the trigger's items (owner, admin)
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [workflowId, target]
+              required: [workflowId, target, triggerNodeId]
               additionalProperties: false
               properties:
                 workflowId: { type: string, format: uuid }
@@ -478,14 +490,15 @@ paths:
                           properties:
                             revision: { type: integer, minimum: 1 }
                     - type: object
-                      required: [version]
+                      required: [release]
                       additionalProperties: false
                       properties:
-                        version: { type: integer, minimum: 1 }
+                        release: { type: integer, minimum: 1 }
                 triggerNodeId:
                   {
                     type: string,
-                    description: Required when the graph has several Manual Triggers,
+                    format: uuid,
+                    description: The trigger node whose items start the run,
                   }
                 items: { $ref: '#/components/schemas/Items1000' }
       responses:
@@ -504,7 +517,7 @@ paths:
         '409': { $ref: '#/components/responses/Error' }
         '413': { $ref: '#/components/responses/Error' }
         '422':
-          description: The draft is not valid
+          description: Nodes of the draft have configuration problems (`problems`), or the named node is not a trigger
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProblemsError' }
@@ -709,7 +722,7 @@ paths:
           }
     post:
       tags: [ingress]
-      summary: Start a run of the active version (public; GET, PUT, PATCH and DELETE behave the same when configured)
+      summary: Start a run of the active release (public; GET, PUT, PATCH and DELETE behave the same when configured)
       description: >-
         The node chooses one authentication mode: token (x-webhook-token) or signature (x-webhook-timestamp and
         x-webhook-signature). Every call that starts no run (unknown, inactive or archived endpoint, missing or wrong
@@ -888,6 +901,32 @@ components:
             problems:
               type: array
               items: { $ref: '#/components/schemas/Problem' }
+    FaultsError:
+      allOf:
+        - { $ref: '#/components/schemas/Error' }
+        - type: object
+          required: [faults]
+          properties:
+            faults:
+              type: array
+              items: { $ref: '#/components/schemas/GraphFault' }
+    GraphFault:
+      type: object
+      required: [code, nodeId, message]
+      properties:
+        code:
+          {
+            type: string,
+            enum:
+              [
+                duplicate-node-id,
+                duplicate-node-name,
+                unknown-connection-node,
+                cycle,
+              ],
+          }
+        nodeId: { type: [string, 'null'] }
+        message: { type: string }
     Page:
       type: object
       required: [items]
@@ -973,6 +1012,13 @@ components:
         name: { type: string, minLength: 1, maxLength: 120 }
         type: { type: string, example: httpRequest }
         typeVersion: { type: integer, minimum: 1 }
+        trigger:
+          {
+            type: [string, 'null'],
+            readOnly: true,
+            description: The trigger kind,
+            taken from the catalogue on save; never sent by the client,
+          }
         parameters:
           type: object
           additionalProperties: { $ref: '#/components/schemas/ParameterValue' }
@@ -1029,50 +1075,33 @@ components:
           }
         errorWorkflowId: { type: [string, 'null'], format: uuid }
     Problem:
+      description: A node configuration problem (FR-007); it blocks publishing, test runs and activation. Editor hints (unreachable nodes, references that are not upstream, unknown fields) are the client's and never sent
       type: object
-      required: [code, message]
+      required: [nodeId, parameter, code, message]
       properties:
         nodeId: { type: [string, 'null'] }
         parameter:
           {
             type: [string, 'null'],
             description: Parameter path,
-            e.g. "body.fields.0.value",
+            e.g. "conditions.rules.0.right",
           }
         code:
           type: string
-          description: Stable problem code (spec FR-007); unknown-field is a warning, every other code an error
           enum:
             [
-              node-limit,
-              parameters-too-large,
-              duplicate-node-name,
               unknown-node-type,
               invalid-parameter,
+              invalid-regex,
+              formula-syntax,
+              formula-scope,
+              unknown-port,
               missing-credential,
               foreign-credential,
               credential-type-mismatch,
-              cycle,
-              no-trigger,
-              unreachable-node,
-              unknown-port,
-              unknown-node-reference,
-              not-upstream-reference,
-              formula-syntax,
-              formula-scope,
-              invalid-regex,
               second-resume-wait,
-              invalid-error-workflow,
-              unknown-field,
             ]
         message: { type: string }
-    ValidationReport:
-      type: object
-      required: [errors, warnings]
-      properties:
-        errors: { type: array, items: { $ref: '#/components/schemas/Problem' } }
-        warnings:
-          { type: array, items: { $ref: '#/components/schemas/Problem' } }
     FieldShape:
       type: object
       required: [path, type]
@@ -1094,28 +1123,26 @@ components:
           { type: array, items: { $ref: '#/components/schemas/FieldShape' } }
     Activation:
       type: object
-      required: [version, activatedAt, activatedBy]
+      required: [release]
       properties:
-        version: { type: integer }
-        activatedAt: { type: string, format: date-time }
-        activatedBy: { $ref: '#/components/schemas/UserRef' }
+        release: { type: integer }
     WorkflowSummary:
       type: object
       required:
-        [id, name, owner, archived, latestVersion, activeVersion, updatedAt]
+        [id, name, owner, archived, latestRelease, activeRelease, updatedAt]
       properties:
         id: { type: string, format: uuid }
         name: { type: string }
         owner: { $ref: '#/components/schemas/UserRef' }
         archived: { type: boolean }
-        latestVersion: { type: integer, description: 0 when never published }
-        activeVersion: { type: [integer, 'null'] }
+        latestRelease: { type: integer, description: 0 when never published }
+        activeRelease: { type: [integer, 'null'] }
         updatedAt: { type: string, format: date-time }
     Workflow:
       allOf:
         - { $ref: '#/components/schemas/WorkflowSummary' }
         - type: object
-          required: [draft, activation, samples, canManage]
+          required: [draft, samples, canManage]
           properties:
             canManage:
               {
@@ -1125,32 +1152,27 @@ components:
               }
             draft:
               type: object
-              required:
-                [revision, graph, settings, validation, updatedAt, updatedBy]
+              required: [revision, graph, settings, problems]
               properties:
                 revision: { type: integer }
                 graph: { $ref: '#/components/schemas/Graph' }
                 settings: { $ref: '#/components/schemas/WorkflowSettings' }
-                validation: { $ref: '#/components/schemas/ValidationReport' }
-                updatedAt: { type: string, format: date-time }
-                updatedBy: { $ref: '#/components/schemas/UserRef' }
-            activation:
-              oneOf:
-                - { $ref: '#/components/schemas/Activation' }
-                - { type: 'null' }
+                problems:
+                  type: array
+                  items: { $ref: '#/components/schemas/Problem' }
             samples:
               type: array
               items: { $ref: '#/components/schemas/NodeSample' }
-    VersionSummary:
+    ReleaseSummary:
       type: object
       required: [number, publishedAt, publishedBy]
       properties:
         number: { type: integer }
         publishedAt: { type: string, format: date-time }
         publishedBy: { $ref: '#/components/schemas/UserRef' }
-    Version:
+    Release:
       allOf:
-        - { $ref: '#/components/schemas/VersionSummary' }
+        - { $ref: '#/components/schemas/ReleaseSummary' }
         - type: object
           required: [graph, settings]
           properties:
@@ -1161,7 +1183,12 @@ components:
       required: [nodeId, url, methods, authentication, secret]
       properties:
         nodeId: { type: string }
-        authentication: { type: string, enum: [token, signature] }
+        authentication:
+          {
+            type: [string, 'null'],
+            enum: [token, signature, null],
+            description: null while the node's settings are invalid,
+          }
         url: { type: string, format: uri }
         methods:
           {
@@ -1170,8 +1197,8 @@ components:
           }
         secret:
           {
-            type: string,
-            description: '256 random bits; sent as x-webhook-token or used as the HMAC key, by the authentication mode',
+            type: [string, 'null'],
+            description: '256 random bits; sent as x-webhook-token or used as the HMAC key, by the authentication mode; null while the key that encrypted it is not configured',
           }
     RunStatus:
       type: string
@@ -1189,7 +1216,7 @@ components:
         message: { type: string }
     RunSummary:
       type: object
-      required: [id, status, mode, trigger, version, queuedAt]
+      required: [id, status, mode, trigger, release, queuedAt]
       properties:
         id: { type: string, format: uuid }
         status: { $ref: '#/components/schemas/RunStatus' }
@@ -1199,7 +1226,7 @@ components:
             type: string,
             enum: [manual, schedule, webhook, sub-workflow, error],
           }
-        version: { type: [integer, 'null'] }
+        release: { type: [integer, 'null'] }
         queuedAt: { type: string, format: date-time }
         startedAt: { type: [string, 'null'], format: date-time }
         finishedAt: { type: [string, 'null'], format: date-time }
@@ -1212,7 +1239,7 @@ components:
       required: [nodeId, status, attempts, startedAt, outputs]
       properties:
         nodeId: { type: string }
-        status: { type: string, enum: [running, succeeded, failed] }
+        status: { type: string, enum: [running, succeeded, failed, skipped] }
         attempts: { type: integer }
         startedAt: { type: string, format: date-time }
         finishedAt: { type: [string, 'null'], format: date-time }
@@ -1236,8 +1263,13 @@ components:
                     enum: [user, limit, isolation, timeout, platform],
                   }
                 message: { type: string }
-                line: { type: integer }
-                itemIndex: { type: integer }
+                parameter:
+                  {
+                    type: [string, 'null'],
+                    description: The parameter whose binding broke the node's contract,
+                  }
+                itemIndex: { type: [integer, 'null'] }
+                line: { type: integer, description: Code node only }
             - { type: 'null' }
         diagnostics:
           {

@@ -2,61 +2,62 @@
 
 ## Run start
 
-Every run starts through `RunEngine.start(RunWorkflow, input, { id: 'run-<runId>', transaction })`. The input is the snapshot of the published version and the trigger payload.
+A use case decides and saves a queued `Run`; the adapter that serves the entry then starts one engine instance of `RunWorkflow` whose id is the run id. A run started by a trigger takes its id from the trigger key (`Run.newId(key)`: a UUIDv8 from the SHA-256 of the key), so a retried start finds the run it already made.
 
-| Trigger  | Entry                                                                           | Instance id                  | Response           |
-| -------- | ------------------------------------------------------------------------------- | ---------------------------- | ------------------ |
-| Manual   | `POST /runs`                                                                    | generated run id             | `202 { runId }`    |
-| Schedule | Runtime schedule `activation-<id>` on the run workflow, `overlap: 'skip'`       | `<scheduleId>@<time>`        | —                  |
-| Webhook  | `POST /webhooks/:endpointId`; endpoint and signature verified                   | derived from the delivery id | `2xx` after commit |
-| Polling  | Runtime schedule on the polling trigger job: poll → start runs → advance cursor | derived from the item key    | —                  |
+| Trigger      | Entry                                                                                                                                                      | Run id                                                      | Response                     |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------- |
+| Test, Manual | `POST /runs` (`target: { draft: { revision } }` or `{ release }`); `RunLauncher.launch` in the request's transaction                                       | random                                                      | `202 { runId }`              |
+| Schedule     | Engine schedule `wf.<workflow>.<node>.<rule>` → `ScheduledTriggerWorkflow`: step `start` (`StartScheduledRun`), then `ctx.executeChild(RunWorkflow)`       | from `schedule:<occurrence instance id>`                    | —                            |
+| Webhook      | `ALL /webhooks/:endpointId` → `WebhookIngressGuard` → `@Idempotent` (`x-delivery-id`, 7 days) → `StartWebhookRun`, `RunLauncher.launch` in the transaction | from `webhook:<endpoint>:<delivery id>`, random without one | `202 { runId }` after commit |
+
+Schedules follow activation: activating, deactivating or archiving records `ActivationChanged`, the outbox delivers it to `ActivationHandler`, and `ScheduleRegistrar` upserts one engine schedule per rule of each Schedule Trigger of the active release (`missed: 'skip'`, `overlap: 'skip'`) and removes the others. Because the scheduled instance waits for its run, an occurrence due while the rule's previous run is active is skipped (FR-026).
+
+Webhook ingress answers every refusal with the same `404` (unknown endpoint, inactive or archived workflow, node not in the active release, wrong method, wrong token, bad or stale signature, unreadable secret). Only an authenticated call learns of `413` (body above 1 MB) or `400` (JSON nested deeper than 64 levels).
 
 ## Execute run
 
-The run workflow class is the engine entry adapter: it hands the input and a `StepRunner` to the use case _execute run_. The use case performs I/O only inside steps, so every replay repeats the same decisions.
+`RunWorkflow` is the engine entry adapter. Each engine step runs its use cases inside a CLS context; every write runs in its own transaction, and the node execution runs outside one.
 
-1. Step `register-run` creates the Run row.
-2. The use case visits nodes in topological order; each node is one durable step `node:<nodeId>` that invokes the use case _execute node step_:
-   read inputs by artifact reference → execute the node type executor → write the output artifact under a key derived from the step idempotency key → write the Step row → return `{ ref, itemCount, bytes }` to the journal.
-3. The run progress (current node, completed nodes) is published through `StepRunner.setStatus`.
-4. Retry, timeout and backoff per step come from the node type manifest. Invalid user data raises `NonRetryableStepError`. The step idempotency key is passed to the external service where supported.
+1. `begin` — `BeginRun` marks the run running and returns the node order from the firing trigger (Kahn's algorithm, ties by position). Its compensation calls `TerminateRun`: a timeout ends the run as `timeout`, a cancel as `cancelled`, any other engine failure as `platform`.
+2. For each node:
+   - `reach:<node>` — `ReachNode` decides in the domain: `Execute`, `Done` (trigger, skipped, disabled, pinned in a test run, already finished) or `Stop` (the run finished or was cancelled).
+   - `execute:<node>` — `ExecuteNode` runs `NodeExecutor` outside a transaction (never for a run that already ended) and asks `Node.retryDelay`; a wait becomes a `NodeRetry` error whose backoff is that wait (up to 100 engine attempts; any other error is retried 3 times). In the same engine step `RecordNode` completes or fails the step in a transaction (a version conflict re-runs only the record); `onError` decides whether the run continues, except that a `limit` failure always ends it; a test run records the fields of the output for the editor.
+3. `finish` — `FinishRun` marks the run succeeded unless it already ended.
 
-| Limit       | Source                                                        |
-| ----------- | ------------------------------------------------------------- |
-| Concurrency | `concurrency: { limit, key: workflowId }` on the run workflow |
-| Run timeout | Workflow setting, bounded by a platform maximum               |
-| Journal     | Engine limits; a long loop continues in a new instance        |
+| Limit       | Source                                                                                              |
+| ----------- | --------------------------------------------------------------------------------------------------- |
+| Concurrency | `@Workflow('automation.run', { concurrency: { limit: 5, key: workflowId } })`, in order of queueing |
+| Run timeout | The workflow setting (1 s to 30 days), the instance's `timeout`                                     |
+| Step output | 10,000 items and 16 MB per port (`limit` failure)                                                   |
+| Run output  | 256 MB over all executed steps (`Run.complete`)                                                     |
+| Journal     | Two entries per node plus `begin` and `finish`; far below the engine's 10,000                       |
 
 ## Data between nodes
 
-| Aspect        | Rule                                                                                                                                  |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Format        | Node output is an array of JSON items stored as JSON Lines in Object Storage                                                          |
-| Executor mode | `item`, `batch` or `all`, declared in the manifest                                                                                    |
-| Paging        | The worker reads inputs page by page and forms batches by item count and byte size; Code Node batches respect the sandbox input limit |
-| Limits        | Maximum items and bytes per step and per run; exceeding returns a user-facing error                                                   |
-| Database      | Step rows hold metadata and artifact references only                                                                                  |
+| Aspect       | Rule                                                                                                                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Format       | A node output is a list of JSON items per port, stored as JSON Lines chunks of 500 items or 4 MiB under `runs/<run>/nodes/<node>/a<attempt>/<port>/<i>.jsonl`                                 |
+| Database     | Step rows hold output references only (`port`, `items`, `bytes`, `key`, `chunkStarts`)                                                                                                        |
+| Contract     | Connections carry no types. The consuming node's parameter schema with the user's bindings is checked per item when it runs; a mismatch is a `user` failure naming the parameter and the item |
+| Bindings     | A fixed value, a field of an upstream node (`{ ref: { node, path } }`) or a formula (`{{ }}`); only the upstream nodes a parameter names are read                                             |
+| Error output | With `onError: errorOutput`, a failing node sends its input items to port `error` with the message                                                                                            |
+| Known fields | A test run records the field paths of each node's main output (first 20 items, at most 500 paths) for the editor; a pin keeps its own fields                                                  |
 
 ## Status and reads
 
-| Aspect         | Rule                                                                                                          |
-| -------------- | ------------------------------------------------------------------------------------------------------------- |
-| Run status     | `queued → running → waiting → succeeded`; terminal alternatives `failed`, `cancelled`                         |
-| Writes         | Run and Step rows are written inside steps; terminal transitions are projected from `WorkflowEvents.events$`  |
-| Reconciliation | `GET /runs/:id` for a non-terminal run compares the row with `getStatus()` and updates the row                |
-| Cancel         | `POST /runs/:id/cancel` calls the engine `cancel()` and marks the cancel request on the row                   |
-| Polling        | `GET /runs/:id` returns `ETag` and `Cache-Control`; the client polls every 2 s until a terminal status        |
-| Lists          | `GET /workflows/:id/runs` is paged                                                                            |
-| Step output    | `GET /runs/:id/steps/:nodeId/output?page=` pages items from the artifact; clients never access Object Storage |
+| Aspect      | Rule                                                                                                                                                                                                                                                                 |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run status  | `queued → running → succeeded`; terminal alternatives `failed`, `cancelled`                                                                                                                                                                                          |
+| Writes      | Run and step rows are written by the engine steps; optimistic `version` checks; only changed steps are written                                                                                                                                                       |
+| Cancel      | `POST /runs/:id/cancel` commits `Run.cancel` first, then calls the engine `cancel()`; no further node starts, a node already executing records its output, and a step left running (a node waiting for a retry) is closed as `cancelled`                             |
+| Maintenance | Every minute: an unfinished run untouched for a minute whose engine instance ended is ended by that instance's error (`timeout`, `cancelled`, else `platform`), or as `platform` when the instance is gone; engine schedules are reconciled with the active releases |
+| Polling     | `GET /runs/:id` returns a weak `ETag` and `Cache-Control: no-cache`; `If-None-Match` answers `304`                                                                                                                                                                   |
+| Lists       | `GET /workflows/:id/runs` is keyset-paged by queue time                                                                                                                                                                                                              |
+| Step output | `GET /runs/:id/steps/:nodeId/output?port=&offset=&limit=` pages items across the step's chunks; clients never access Object Storage; `503` while storage is down                                                                                                     |
 
 ## Retention
 
-| Aspect   | Rule                                                                                                           |
-| -------- | -------------------------------------------------------------------------------------------------------------- |
-| Policy   | Global: retention days and maximum runs per workflow                                                           |
-| Job      | Retention job on a declared nightly schedule; one instance per occurrence                                      |
-| Order    | Delete artifacts under `runs/<runId>/` → delete Step and Run rows → `purge({ olderThan })` on the engine store |
-| Batching | Fixed batch size per step; the job continues in a new instance when the batch limit is reached                 |
+Planned (feature F): a nightly job deletes the artifacts under `runs/<runId>/`, then step and run rows, then purges the engine store, by retention days and runs per workflow.
 
 ## Sequences
 
@@ -68,32 +69,34 @@ sequenceDiagram
   participant W as Worker process
   participant S3 as Object Storage
   UI->>API: POST /runs
-  API->>PG: transaction with RunEngine.start, instance id run-runId
+  API->>S3: write trigger items (attempt 0)
+  API->>PG: transaction: run row, engine instance (id = run id)
   API-->>UI: 202 with runId
-  W->>PG: claim instance
-  W->>PG: step register-run
-  loop each node
-    W->>S3: read input artifact
-    W->>W: execute node type executor
-    W->>S3: write output artifact
-    W->>PG: Step row and journal entry (ref, itemCount, bytes)
+  W->>PG: claim instance, step begin
+  loop each node in order
+    W->>PG: step reach (decide)
+    W->>S3: step execute: read inputs and named upstream outputs
+    W->>W: resolve parameters per item, execute the type
+    W->>S3: write outputs per port
+    W->>PG: same step: record (step row, run limits, onError)
   end
-  W->>PG: terminal status (projection)
-  UI->>API: GET /runs/:id (ETag)
-  API->>PG: Run, Steps
-  API-->>UI: 200 status, steps
+  W->>PG: step finish
+  UI->>API: GET /runs/:id (If-None-Match)
+  API-->>UI: 200 or 304
 ```
 
 ```mermaid
 sequenceDiagram
-  participant E as Engine schedule
-  participant W as Worker process
-  participant X as External service
+  participant O as Owner
+  participant API as API process
   participant PG as PostgreSQL
-  E->>W: occurrence of schedule activation-id (polling trigger job)
-  W->>PG: step poll: read cursor
-  W->>X: poll since cursor
-  X-->>W: new items
-  W->>PG: step start-runs: RunEngine.start per item key
-  W->>PG: step advance-cursor
+  participant R as Outbox relay
+  participant E as Engine schedules
+  participant W as Worker process
+  O->>API: PUT /workflows/:id/activation
+  API->>PG: transaction: activeRelease, outbox ActivationChanged
+  R->>E: upsert wf.workflow.node.rule (rrule or cron, tz)
+  E->>W: occurrence: ScheduledTriggerWorkflow
+  W->>PG: step start: run row (id from the occurrence)
+  W->>W: executeChild RunWorkflow (id = run id)
 ```

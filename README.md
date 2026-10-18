@@ -21,7 +21,7 @@ pnpm install
 cp .env.example .env      # set POSTGRES_PASSWORD
 docker compose up -d      # PostgreSQL (127.0.0.1:55432) and Mailpit (SMTP 51025, UI http://127.0.0.1:58025)
 set -a; . ./.env; set +a
-pnpm --filter api db:migrate && pnpm --filter api outbox:migrate
+pnpm --filter api db:migrate && pnpm --filter api outbox:migrate && pnpm --filter api workflows:migrate
 pnpm dev                  # api on :3000, web on :3001
 ```
 
