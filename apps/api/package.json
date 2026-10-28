@@ -23,7 +23,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "outbox:migrate": "nest-outbox migrate --url \"$DATABASE_URL\"",
-    "test:int": "vitest run --config ./vitest.config.int.ts"
+    "engine:migrate": "nest-workflows migrate --url \"$DATABASE_URL\"",
+    "test:int": "vitest run --config ./vitest.config.int.ts",
+    "test:ctk": "vitest run --config ./vitest.config.ctk.ts"
   },
   "dependencies": {
     "@apidevtools/json-schema-ref-parser": "16.0.5",

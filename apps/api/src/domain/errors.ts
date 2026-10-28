@@ -88,3 +88,9 @@ export class InvitationConflictError extends ConflictError {
     super('The invitation was changed concurrently');
   }
 }
+
+export class StaleWriteError extends ConflictError {
+  constructor() {
+    super('The resource was changed meanwhile; read it again and retry');
+  }
+}

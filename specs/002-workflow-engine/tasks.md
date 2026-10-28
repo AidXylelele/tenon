@@ -24,12 +24,12 @@
 ## Phase 1: Setup
 
 - [x] T001 Amend the constitution to 3.1.0 with the R19 points and the R21 modules in `.specify/memory/constitution.md`, on its own branch for a separate PR
-- [ ] T002 The user installs the R21 packages and upgrades `@nestjs/outbox` to 0.1.3 in `apps/api/package.json`
+- [x] T002 The user installs the R21 packages and upgrades `@nestjs/outbox` to 0.1.3 in `apps/api/package.json`
 - [x] T003 [P] Build a custom go-judge image, pinned by digest, with Node.js and Python 3 in `docker/go-judge/Dockerfile`, and add the privileged `go-judge` service with a health check to `compose.yaml`
-- [ ] T004 [P] Add the scripts `engine:migrate` (`nest-workflows migrate --url "$DATABASE_URL"`) and `test:ctk` to `apps/api/package.json`, with the CTK project in `apps/api/vitest.config.ctk.ts`
+- [x] T004 [P] Add the scripts `engine:migrate` (`nest-workflows migrate --url "$DATABASE_URL"`) and `test:ctk` to `apps/api/package.json`, with the CTK project in `apps/api/vitest.config.ctk.ts`
 - [x] T005 [P] Add `SECRETS_KEY`, `OUTBOUND_ALLOW_LIST`, `SANDBOX_URL` and the role flags `HTTP`, `ENGINE_WORKER`, `OUTBOX_RELAY` to the env schema in `src/frameworks/di/config.module.ts` and to `.env.example`
-- [ ] T006 Move `Database` and `DrizzleTx` from `src/interface-adapters/persistence/interfaces.ts` to `src/interface-adapters/interfaces.ts`, declare `EndpointDispatcher`, `SandboxPool`, `JqPool`, `JsonSchemaCompilers` and `DslSchema` there, and update the imports
-- [ ] T007 [P] Copy the CTK 1.0.3 feature files unchanged into `test/conformance/features/` with the upstream commit in `test/conformance/features/COMMIT`, and run one scenario through quickpickle in `test/conformance/steps/workflow.steps.ts` (fallback `@cucumber/cucumber`, R18)
+- [x] T006 Move `Database` and `DrizzleTx` from `src/interface-adapters/persistence/interfaces.ts` to `src/interface-adapters/interfaces.ts`, declare `EndpointDispatcher`, `SandboxPool`, `JqPool`, `JsonSchemaCompilers` and `DslSchema` there, and update the imports
+- [x] T007 [P] Copy the CTK 1.0.3 feature files unchanged into `test/conformance/features/` with the upstream commit in `test/conformance/features/COMMIT`, and run one scenario through quickpickle in `test/conformance/steps/workflow.steps.ts` (fallback `@cucumber/cucumber`, R18)
 
 ---
 
@@ -37,15 +37,15 @@
 
 **⚠️ No user story starts before this phase is complete.**
 
-- [ ] T008 Add `StaleWriteError` to `src/domain/errors.ts` and map it to 409 in `src/interface-adapters/http/filters/domain-error.filter.ts`
-- [ ] T009 [P] Engine module (Postgres store, `leaseDuration` 120 s, heartbeat 40 s, worker only under `ENGINE_WORKER`) in `src/frameworks/di/engine.module.ts`. Tests in `test/integration/automation/engine.spec.ts`: `start` and `signal` inside a nestjs-cls transaction; the lease renewed during a long step; a signal sent during `advance-N` consumed by `park-N`
-- [ ] T010 [P] Outbox 0.1.3 with the relay only under `OUTBOX_RELAY` in `src/frameworks/di/outbox.module.ts`; the mailing suite stays green
-- [ ] T011 [P] Idempotency: the `idempotency_key` table in `src/interface-adapters/persistence/schema/idempotency-key.ts`, `src/interface-adapters/persistence/stores/drizzle-idempotency.store.ts` and `src/frameworks/di/idempotency.module.ts`, with `idempotencyStoreContract` in `test/integration/automation/idempotency.store.spec.ts`
-- [ ] T012 [P] The resilience presets of R15 (`service-calls`, `subscriber-delivery`, `processes`, `jq`; bulkheads reject when full) in `src/frameworks/di/resilience.module.ts`
-- [ ] T013 [P] The jq pool (Piscina; a 1 s timeout terminates the worker) in `src/frameworks/jq/jq-pool.ts`, with the worker and prelude in `src/interface-adapters/expressions/{jq.worker,prelude}.ts`. Tests for the disabled builtins, the timeout and runaway input in `test/integration/automation/jq-pool.spec.ts`
-- [ ] T014 [P] `EndpointDispatcher` (undici `connect.lookup` against a `node:net` `BlockList` on every connect and redirect; `OUTBOUND_ALLOW_LIST`) in `src/frameworks/undici/endpoint-dispatcher.ts` and `SandboxPool` in `src/frameworks/undici/sandbox-pool.ts`, with tests in `test/integration/automation/endpoint-dispatcher.spec.ts`
-- [ ] T015 [P] `JsonSchemaCompilers` and `DslSchema` (Ajv with formats, `allErrors`) in `src/frameworks/ajv/{json-schema-compilers,dsl-schema}.ts`
-- [ ] T016 [P] `StepErrorClassifier` in `src/interface-adapters/engine/step-error.classifier.ts` and `OutboxErrorClassifier` in `src/interface-adapters/messaging/outbox-error.classifier.ts`, for the rows of architecture §8 that exist now, with tests in `test/unit/automation/error-classifiers.spec.ts`
+- [x] T008 Add `StaleWriteError` to `src/domain/errors.ts` and map it to 409 in `src/interface-adapters/http/filters/domain-error.filter.ts`
+- [x] T009 [P] Engine module (Postgres store, `leaseDuration` 120 s, heartbeat 40 s, worker only under `ENGINE_WORKER`) in `src/frameworks/di/engine.module.ts`. Tests in `test/integration/automation/engine.spec.ts`: `start` and `signal` inside a nestjs-cls transaction; the lease renewed during a long step; a signal sent during `advance-N` consumed by `park-N`
+- [x] T010 [P] Outbox 0.1.3 with the relay only under `OUTBOX_RELAY` in `src/frameworks/di/outbox.module.ts`; the mailing suite stays green
+- [x] T011 [P] Idempotency: the `idempotency_key` table in `src/interface-adapters/persistence/schema/idempotency-key.ts`, `src/interface-adapters/persistence/stores/drizzle-idempotency.store.ts` and `src/frameworks/di/idempotency.module.ts`, with `idempotencyStoreContract` in `test/integration/automation/idempotency.store.spec.ts`
+- [x] T012 [P] The resilience presets of R15 (`service-calls`, `subscriber-delivery`, `processes`, `jq`; bulkheads reject when full) in `src/frameworks/di/resilience.module.ts`
+- [x] T013 [P] The jq pool (Piscina; a 1 s timeout terminates the worker) in `src/frameworks/jq/jq-pool.ts`, with the worker and prelude in `src/interface-adapters/expressions/{jq.worker,prelude}.ts`. Tests for the disabled builtins, the timeout and runaway input in `test/integration/automation/jq-pool.spec.ts`
+- [x] T014 [P] `EndpointDispatcher` (undici `connect.lookup` against a `node:net` `BlockList` on every connect and redirect; `OUTBOUND_ALLOW_LIST`) in `src/frameworks/undici/endpoint-dispatcher.ts` and `SandboxPool` in `src/frameworks/undici/sandbox-pool.ts`, with tests in `test/integration/automation/endpoint-dispatcher.spec.ts`
+- [x] T015 [P] `JsonSchemaCompilers` and `DslSchema` (Ajv with formats, `allErrors`) in `src/frameworks/ajv/{json-schema-compilers,dsl-schema}.ts`
+- [x] T016 [P] `ErrorClassifier` (transient and settled errors, architecture §8) in `src/interface-adapters/error-classifier.ts`, with tests in `test/unit/automation/error-classifier.spec.ts`
 
 **Checkpoint**: the libraries are proven, and the stories can begin.
 
@@ -167,7 +167,7 @@
 - [ ] T075 [US4] `Workflow.turnOn`, `turnOff`, the epoch and `assertStartable`; `StaleStartError` in `src/domain/errors.ts`; the origins `RecurringOrigin`, `AfterOrigin` and `TriggerOrigin`; `TriggerOwner` with `Correlation.forTrigger` (no self-trigger) and `TriggerSatisfied`. Tests for US4 scenarios 1–6
 - [ ] T076 [US4] Run the DDD and CA critics on T074–T075; apply the fixes, and record the verdict in `specs/002-workflow-engine/research.md` R22
 - [ ] T077 [US4] `RecurringStarts` in `src/application/automation/workflows/ports.ts`, and `getForStart` (`FOR SHARE`) and trigger candidates in `WorkflowQueries`. Use cases, with tests: `TurnWorkflowOn`, `TurnWorkflowOff`, `RegisterRecurringStarts` and `RemoveRecurringStarts`; `StartScheduledInstance` and `StartTriggeredInstance` (derived ids, guards); `OfferTrigger`; `RouteEvent` extended with trigger candidates
-- [ ] T078 [P] [US4] `ScheduledStartWorkflow` and `RecurringStartsGateway` in `src/interface-adapters/engine/{scheduled-start.workflow,recurring-starts.gateway}.ts`; cron syntax checked with `parseSchedule` in `SdkDocumentReader`; `StaleStartError` rows in both classifiers
+- [ ] T078 [P] [US4] `ScheduledStartWorkflow` and `RecurringStartsGateway` in `src/interface-adapters/engine/{scheduled-start.workflow,recurring-starts.gateway}.ts`; cron syntax checked with `parseSchedule` in `SdkDocumentReader`; `StaleStartError` settled in `src/interface-adapters/error-classifier.ts`
 - [ ] T079 [P] [US4] The `trigger_types` column (GIN) on `workflow`, with a migration. Outbox handlers `recurring-schedule-set`, `recurring-schedule-cleared`, `next-start-due`, `trigger-offer` and `trigger-satisfied` in `src/interface-adapters/messaging/`. Tests
 - [ ] T080 [US4] On and off endpoints in `workflows.controller.ts`
 - [ ] T081 [US4] Integration tests in `test/integration/automation/schedules.spec.ts`: exactly once across two workers on `ManualWorkflowClock`; one missed occurrence; stale epochs. Component tests for US4 scenarios in `test/component/automation/schedules.spec.ts`
@@ -220,7 +220,7 @@
 - [ ] T101 [US9] Control in the domain, with tests for US9 scenarios 1–5 and the control edge cases: `suspend`, `resume` and `cancel` on `WorkflowInstance`, with `InvalidControlError` in `src/domain/errors.ts`; events that arrive during a suspension are consumed on resume; `SubWorkflowProgress.abandon()` raises `CancelRequested`
 - [ ] T102 [US9] Run the DDD and CA critics on T101; apply the fixes, and record the verdict in `specs/002-workflow-engine/research.md` R22
 - [ ] T103 [US9] `SuspendInstance`, `ResumeInstance` and `CancelInstance` (with wakes) in `src/application/automation/instances/`, with tests
-- [ ] T104 [US9] Adapters for control: the suspend, resume and cancel endpoints in `instances.controller.ts`; `cancel-requested-outbox.handler.ts` in `src/interface-adapters/messaging/`; `InvalidControlError` rows in both classifiers
+- [ ] T104 [US9] Adapters for control: the suspend, resume and cancel endpoints in `instances.controller.ts`; `cancel-requested-outbox.handler.ts` in `src/interface-adapters/messaging/`; `InvalidControlError` settled in `src/interface-adapters/error-classifier.ts`
 - [ ] T105 [US9] Component tests for US9 scenarios 1–5 in `test/component/automation/control.spec.ts`
 - [ ] T106 [US9] CA critic on the US9 diff; apply the fixes, and record notable findings in `specs/002-workflow-engine/research.md` R22
 

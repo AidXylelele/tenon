@@ -19,8 +19,8 @@ The dependency rule: frameworks → interface adapters → application → domai
 | -------------- | ------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `http/`        | REST clients                   | In         | Controllers, parsers (DSL body, CloudEvents), zod schemas, presenters, filters                                                                                              |
 | `persistence/` | PostgreSQL                     | Out        | Repositories (secrets encrypted at rest), queries, mappers, schema, outbox writers (`DomainEventOutbox`, `OutboxEventOffers`), idempotency store                            |
-| `engine/`      | `@nestjs/workflows`            | In and out | `InstanceWorkflow`, `ScheduledStartWorkflow`, `InstanceRounds` (in); `InstanceRunsGateway`, `RecurringStartsGateway` (out); `StepErrorClassifier`                           |
-| `messaging/`   | Outbox relay                   | In         | One `*OutboxHandler` per domain event, each calling one use case; `OutboxErrorClassifier`                                                                                   |
+| `engine/`      | `@nestjs/workflows`            | In and out | `InstanceWorkflow`, `ScheduledStartWorkflow`, `InstanceRounds` (in); `InstanceRunsGateway`, `RecurringStartsGateway` (out)                                                  |
+| `messaging/`   | Outbox relay                   | In         | One `*OutboxHandler` per domain event, each calling one use case                                                                                                            |
 | `documents/`   | DSL documents (official SDK)   | Out        | `SdkDocumentReader`: parses and validates against the standard's schema, then maps to a ParsedDocument                                                                      |
 | `expressions/` | jq                             | Out        | `JqExpressionEvaluator`: evaluations, pattern matches and syntax checks, plus the worker script and the sandbox prelude                                                     |
 | `json-schema/` | Ajv                            | Out        | `AjvSchemaValidator`                                                                                                                                                        |
@@ -32,7 +32,7 @@ Rules:
 
 - **Shared types.** `interface-adapters/interfaces.ts` declares what the frameworks provide: `Database`, `DrizzleTx`, `EndpointDispatcher`, `SandboxPool`, `JqPool`, `JsonSchemaCompilers` and `DslSchema`.
 - **Contracts.** Outbox topics and payloads are the domain events in `domain/automation/*/events.ts`.
-- **Isolation.** No adapter folder imports another.
+- **Isolation.** No adapter folder imports another. `ErrorClassifier` (`interface-adapters/error-classifier.ts`), shared like `interfaces.ts`, recognises transient and settled errors for the engine workflows and the outbox handlers.
 
 **Naming.** One convention per kind:
 
@@ -192,11 +192,11 @@ Every non-HTTP start derives its id, so a repeated message finds the instance an
 
 ## 8. Errors at non-HTTP inbound adapters
 
-| Error                                                        | Outbox handler (`OutboxErrorClassifier`) | `InstanceWorkflow` step            | `ScheduledStartWorkflow` |
-| ------------------------------------------------------------ | ---------------------------------------- | ---------------------------------- | ------------------------ |
-| NotFoundError, StaleStartError, InvalidControlError          | Acknowledge                              | `fault` step                       | End the run              |
-| StaleWriteError, database or network errors, a full bulkhead | Retry                                    | Transient: retry                   | Retry                    |
-| Anything else                                                | Dead-letter                              | `fault` → `FaultInstance` (masked) | Fail the run             |
+| Error                                                        | Outbox handler | `InstanceWorkflow` step            | `ScheduledStartWorkflow` |
+| ------------------------------------------------------------ | -------------- | ---------------------------------- | ------------------------ |
+| NotFoundError, StaleStartError, InvalidControlError          | Acknowledge    | `fault` step                       | End the run              |
+| StaleWriteError, database or network errors, a full bulkhead | Retry          | Transient: retry                   | Retry                    |
+| Anything else                                                | Dead-letter    | `fault` → `FaultInstance` (masked) | Fail the run             |
 
 Use cases never catch.
 

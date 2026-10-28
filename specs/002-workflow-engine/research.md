@@ -272,7 +272,7 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 **Decision:**
 
-- `OutboxErrorClassifier`, `StepErrorClassifier` and the `ScheduledStartWorkflow` column apply the table in architecture.md §8.
+- One `ErrorClassifier` at the root of `interface-adapters` tells transient errors (stale writes, full bulkheads, PostgreSQL SQLSTATE classes 08, 40, 53 and 57, socket errors, through `cause`) from settled ones (not found, stale start, invalid control). Outbox handlers acknowledge settled errors, rethrow transient ones and turn the rest into `NonRetryableMessageError`; the module-level `retryIf` is not used, so the mail handler keeps its retries. Engine steps retry only transient errors. The table is architecture.md §8.
 - Duplicate creations stop at a guard because their ids are derived.
 - Use cases never catch.
 
