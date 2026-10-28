@@ -2,7 +2,7 @@
 
 Workflow platform API: a NestJS modular monolith (ESM, SWC builder) organised in Clean
 Architecture layers (`domain`, `application`, `interface-adapters`, `frameworks`; see
-[docs/architecture/03-api.md](../../docs/architecture/03-api.md)).
+the constitution's [Layers and layout](../../.specify/memory/constitution.md#layers-and-layout)).
 
 ## Scripts
 
