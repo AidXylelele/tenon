@@ -14,6 +14,14 @@ const list = z
 
 const optional = z.string().default('');
 
+const role = z.enum(['on', 'off']).default('on');
+
+const encryptionKey = z
+  .base64()
+  .refine((value) => Buffer.from(value, 'base64').length === 32, {
+    message: 'SECRETS_KEY must be 32 bytes in base64',
+  });
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -24,7 +32,12 @@ const envSchema = z.object({
   TRUSTED_ORIGINS: list,
   TRUSTED_PROXIES: list,
   SESSION_COOKIE_SECURE: z.stringbool().default(true),
-  OUTBOX_RELAY: z.enum(['on', 'off']).default('on'),
+  HTTP: role,
+  ENGINE_WORKER: role,
+  OUTBOX_RELAY: role,
+  SECRETS_KEY: encryptionKey,
+  OUTBOUND_ALLOW_LIST: list,
+  SANDBOX_URL: z.url(),
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int().positive(),
   SMTP_STARTTLS: z

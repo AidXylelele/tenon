@@ -1,0 +1,4 @@
+open-workflow-specification/specification ctk/features
+tag v1.0.3
+commit 9b5b1da29e9d4fff2358580241e11aab22704a16
+license Apache-2.0

@@ -33,4 +33,10 @@ SwaggerModule.setup(
   },
 );
 
-await app.listen(config.get('PORT', { infer: true }));
+const servesHttp = config.get('HTTP', { infer: true }) === 'on';
+
+if (servesHttp) {
+  await app.listen(config.get('PORT', { infer: true }));
+} else {
+  await app.init();
+}

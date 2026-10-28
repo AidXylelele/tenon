@@ -1,4 +1,4 @@
-# Local stack for the API: PostgreSQL and an SMTP capture service.
+# Local stack for the API: PostgreSQL, an SMTP capture service and the go-judge sandbox.
 # Every resource carries the project name so it cannot collide with other projects.
 name: workflow-platform
 
@@ -49,6 +49,26 @@ services:
       timeout: 3s
       retries: 12
 
+  go-judge:
+    build:
+      context: docker/go-judge
+    image: workflow-platform/go-judge:local
+    privileged: true
+    shm_size: 256m
+    ports:
+      - '127.0.0.1:${SANDBOX_PORT:-55050}:5050'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:5050/version').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
   api:
     profiles: [app]
     build:
@@ -60,6 +80,8 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_healthy
+      go-judge:
+        condition: service_healthy
     environment:
       PORT: 3000
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -68,6 +90,11 @@ services:
       TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-http://127.0.0.1:3001}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       OUTBOX_RELAY: ${OUTBOX_RELAY:-on}
+      SANDBOX_URL: http://go-judge:5050
+      HTTP: ${HTTP:-on}
+      ENGINE_WORKER: ${ENGINE_WORKER:-on}
+      SECRETS_KEY: ${SECRETS_KEY:?set SECRETS_KEY in .env}
+      OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST:-}
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       SMTP_STARTTLS: opportunistic

@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { sql } from 'drizzle-orm';
-import type { Database } from '../../src/interface-adapters/persistence/interfaces.js';
+import type { Database } from '../../src/interface-adapters/interfaces.js';
 
 export async function truncateAll(db: Database): Promise<void> {
   await db.execute(

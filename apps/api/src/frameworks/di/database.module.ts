@@ -4,7 +4,7 @@ import { ClsPluginTransactional } from '@nestjs-cls/transactional';
 import { TransactionalAdapterDrizzleOrm } from '@nestjs-cls/transactional-adapter-drizzle-orm';
 import { ClsModule } from 'nestjs-cls';
 import pg from 'pg';
-import { Database } from '../../interface-adapters/persistence/interfaces.js';
+import { Database } from '../../interface-adapters/interfaces.js';
 import { createDatabase } from '../drizzle/client.js';
 import type { Env } from './config.module.js';
 

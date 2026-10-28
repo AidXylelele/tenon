@@ -7,7 +7,7 @@ import {
 } from '@nestjs/mail';
 import { Outbox } from '@nestjs/outbox';
 import type { StoredMail } from './interfaces.js';
-import type { DrizzleTx } from '../persistence/interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 
 @Injectable()
 export class OutboxMailTransport extends MailTransport {

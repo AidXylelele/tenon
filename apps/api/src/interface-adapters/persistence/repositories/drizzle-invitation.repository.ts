@@ -13,7 +13,7 @@ import { InvitationStatus } from '../../../domain/identity/enums.js';
 import type { Invitation } from '../../../domain/identity/invitation.js';
 import type { InvitationToken } from '../../../domain/identity/invitation-token.js';
 import type { InvitationRepository } from '../../../application/identity/ports.js';
-import type { DrizzleTx } from '../interfaces.js';
+import type { DrizzleTx } from '../../interfaces.js';
 import { InvitationMapper } from '../mappers/invitation.mapper.js';
 import { invitation as invitations } from '../schema/index.js';
 import { isUniqueViolation } from '../unique-violation.js';

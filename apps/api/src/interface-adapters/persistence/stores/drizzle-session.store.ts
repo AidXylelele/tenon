@@ -6,7 +6,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { eq } from 'drizzle-orm';
-import type { DrizzleTx } from '../interfaces.js';
+import type { DrizzleTx } from '../../interfaces.js';
 import { session as sessions } from '../schema/index.js';
 
 @Injectable()

@@ -12,7 +12,7 @@ import {
 import { UserStatus } from '../../../domain/identity/enums.js';
 import type { User } from '../../../domain/identity/user.js';
 import type { UserRepository } from '../../../application/identity/ports.js';
-import type { DrizzleTx } from '../interfaces.js';
+import type { DrizzleTx } from '../../interfaces.js';
 import { user as users } from '../schema/index.js';
 import { UserMapper } from '../mappers/user.mapper.js';
 
