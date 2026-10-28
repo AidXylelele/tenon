@@ -124,7 +124,7 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 - **Owner.** `Delivery` owns delivered, pending, failed after 24 hours, and the masked `lastError`.
 - **Planning.** `OfferDelivery` plans one delivery per matching subscription.
-- **Sending.** `CloudEventSubscriberGateway` sends structured mode (`cloudevents` 10) with a 10-second timeout and a breaker per subscription.
+- **Sending.** `CloudEventSubscriberGateway` sends structured mode (`application/cloudevents+json`) with a 10-second timeout and a breaker per subscription.
 - **Retries.** The handler throws while the delivery is pending. The outbox backoff is capped at 60 s, and `attempts` covers 24 hours.
 
 **Rationale:** The 24-hour rule is visible to users, and structured mode is the standard's recommendation.
@@ -140,7 +140,7 @@ It hands out four kinds of work, which are the four things Synapse's executors c
   - structural limits;
   - script `source`, which is outside the subset.
 - **Other checks.** `ExpressionEvaluator.check` validates expression syntax. `DocumentReferences.check(facts)` validates the references, with the facts coming from `SecretQueries.namesOwnedBy` and `WorkflowQueries.publishedTargets`.
-- **Durations.** Static durations become milliseconds with `temporal-polyfill`.
+- **Durations.** `Duration` (`language`) takes the standard's three forms and turns them into a deadline with the built-in `Temporal`, relative to the start time it is given. A fraction in years, months, weeks or days (`P1.5Y`) is refused at publish, because the standard does not define it.
 
 **Rationale:**
 
@@ -155,7 +155,7 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 - **Templates.** A template is evaluated recursively: a `${ }` leaf is an expression.
 - **Bare expressions.** Fields typed as expressions are evaluated without `${ }` (CTK).
 - **Arguments.** Passed with `--argjson`. `$secrets` is available only in `input.from`.
-- **Expected type `duration`.** An ISO 8601 result is converted to milliseconds.
+- **Expected type `duration`.** The result must be an ISO 8601 string or an inline duration; `Duration` converts it.
 - **Pattern matches** run as jq `test()`, written by the adapter.
 - **Timeout:** 1 s, after which the worker is terminated.
 
@@ -175,7 +175,7 @@ It hands out four kinds of work, which are the four things Synapse's executors c
   - `redirect`;
   - basic, bearer and oauth2/oidc client-credentials authentication, including credentials taken from secrets.
 - **Authorization descriptor.** It returns the `$authorization` descriptor, masked.
-- **`call: openapi`.** It fetches the document through `EndpointDispatcher` and parses it with `@apidevtools/swagger-parser` (resolvers off), without caching or retries. It then resolves the `operationId`.
+- **`call: openapi`.** It fetches the document through `EndpointDispatcher` and dereferences it with `@apidevtools/json-schema-ref-parser` (external resolution off), without caching or retries. It then resolves the `operationId`.
 - **Limits.** The `service-calls` preset caps the deadline at 30 s and adds a bulkhead.
 
 ## R12. Scripts and shell commands (go-judge)
@@ -244,26 +244,27 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 ## R16. Interpretation of the standard and the CTK
 
-| Point                                      | Decision                                                                                                                       |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `$secrets`                                 | Only in `input.from`                                                                                                           |
-| `$authorization`                           | From the call's ServiceResult, for `output.as` and `export.as`                                                                 |
-| `$runtime`                                 | `{ name, version }` of the platform                                                                                            |
-| `$task.definition`, `$workflow.definition` | The parsed JSON kept in the Definition                                                                                         |
-| `set`                                      | Replaces the data                                                                                                              |
-| `emit`                                     | The runtime generates `id`, `time` and `specversion`; the output is the event                                                  |
-| Task reference                             | `/do/<index>/<name>[…]` (CTK)                                                                                                  |
-| Communication error                        | Type `…/spec/1.0.0/errors/communication`; the HTTP status, or 500; a title                                                     |
-| Missing workflow input                     | `{}`                                                                                                                           |
-| `status-changed` events                    | Not produced                                                                                                                   |
-| Lifecycle `output`                         | Left out above 64 KiB (the LifecycleEvent VO)                                                                                  |
-| Lifecycle `source`                         | `/workflows/{namespace}/{name}/instances/{id}`                                                                                 |
-| `run.workflow.version`                     | `latest` by default, resolved when the task starts                                                                             |
-| Fork                                       | Output is an array, or the winner's output with `compete`; exports apply in declaration order                                  |
-| `after`                                    | Next start only after **completion**                                                                                           |
-| Script language                            | `js` / `javascript` → Node.js; `python` → Python 3; `source` is outside the subset                                             |
-| Process output                             | stdout and stderr as strings; a non-zero exit is not an error; time-out → timeout error; other sandbox failure → runtime error |
-| `await: false`                             | Transformed input; the process is detached                                                                                     |
+| Point                                                 | Decision                                                                                                                       |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `$secrets`                                            | Only in `input.from`                                                                                                           |
+| `$authorization`                                      | From the call's ServiceResult, for `output.as` and `export.as`                                                                 |
+| `$runtime`                                            | `{ name, version }` of the platform                                                                                            |
+| `$task.definition`, `$workflow.definition`            | The parsed JSON kept in the Definition                                                                                         |
+| `set`                                                 | Replaces the data                                                                                                              |
+| `emit`                                                | The runtime generates `id`, `time` and `specversion`; the output is the event                                                  |
+| Task reference                                        | `/do/<index>/<name>[…]` (CTK)                                                                                                  |
+| Communication error                                   | Type `…/spec/1.0.0/errors/communication`; the HTTP status, or 500; a title                                                     |
+| Missing workflow input                                | `{}`                                                                                                                           |
+| `status-changed` events                               | Not produced                                                                                                                   |
+| Lifecycle `output`                                    | Left out above 64 KiB (the LifecycleEvent VO)                                                                                  |
+| Lifecycle `source`                                    | `/workflows/{namespace}/{name}/instances/{id}`                                                                                 |
+| `run.workflow.version`                                | `latest` by default, resolved when the task starts                                                                             |
+| Fork                                                  | Output is an array, or the winner's output with `compete`; exports apply in declaration order                                  |
+| `after`                                               | Next start only after **completion**                                                                                           |
+| Script language                                       | `js` / `javascript` → Node.js; `python` → Python 3; `source` is outside the subset                                             |
+| Process output                                        | stdout and stderr as strings; a non-zero exit is not an error; time-out → timeout error; other sandbox failure → runtime error |
+| `await: false`                                        | Transformed input; the process is detached                                                                                     |
+| Fractional years, months, weeks or days in a duration | Refused at publish; listed in the conformance statement                                                                        |
 
 **Recorded contradiction.** In CTK `try.feature`, "Try Handle Caught Error" filters on `…/dsl/errors/types/communication`, but the specification requires `…/spec/1.0.0/errors/communication`. We follow the specification, and the scenario is recorded in FR-032 and SC-001.
 
@@ -317,23 +318,32 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 ## R21. Dependencies
 
-| Package                                   | Purpose                                                                      |
-| ----------------------------------------- | ---------------------------------------------------------------------------- |
-| `@nestjs/workflows` 0.0.4                 | Runs, parks, signals, schedules, leases                                      |
-| `@nestjs/outbox` 0.1.3 (upgrade)          | Reactions after commit, delivery                                             |
-| `@nestjs/idempotency` 0.0.3               | Idempotent starts and webhook calls                                          |
-| `@nestjs/resilience` 0.0.3                | Timeouts, bulkheads, delivery breakers                                       |
-| `@openworkflowspec/sdk` 1.0.3-alpha8      | Parsing and validating documents                                             |
-| `ajv` 8.20, `ajv-formats` 3.0.1           | Data schemas, the full document report                                       |
-| `jq-wasm` 3.0.0-jq-1.8.2, `piscina` 5.3.2 | Expressions in workers that can be terminated                                |
-| `temporal-polyfill` 1.0.6                 | ISO 8601 durations                                                           |
-| `cloudevents` 10.0.0                      | CloudEvents HTTP binding                                                     |
-| `@apidevtools/swagger-parser` 13.1.0      | OpenAPI 2.0 / 3.x                                                            |
-| `undici` 8.12.3                           | Endpoint dispatcher, go-judge pool, MockAgent                                |
-| `quickpickle` 1.11.2 (dev)                | CTK runner                                                                   |
-| `testcontainers` 12.2.0 (dev)             | go-judge in integration tests (`@testcontainers/postgresql` is already used) |
+Each package exists because nothing built in covers it:
 
-The user installs them. Infrastructure: a custom go-judge image, pinned, with Node.js and Python 3.
+| Package                                      | Purpose                                                                                                          | Why nothing built in suffices                                                                                                                                                           |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/workflows` 0.0.4                    | Runs, parks, signals, schedules, leases                                                                          | User requirement; first-party                                                                                                                                                           |
+| `@nestjs/outbox` 0.1.3                       | Reactions after commit, deliveries                                                                               | User requirement; first-party                                                                                                                                                           |
+| `@nestjs/idempotency` 0.0.3                  | Idempotent starts and webhook calls                                                                              | User requirement; first-party                                                                                                                                                           |
+| `@nestjs/resilience` 0.0.3                   | Timeouts, bulkheads, delivery breakers                                                                           | User requirement; first-party                                                                                                                                                           |
+| `@openworkflowspec/sdk` 1.0.3-alpha8         | YAML and JSON parsing, the official 1.0.3 schema (`workflowSchema`)                                              | The standard's own SDK; no vendored schema. `latest` is a 0.0.1 placeholder, so the alpha is pinned                                                                                     |
+| `ajv` 8.20.0, `ajv-formats` 3.0.1            | The full document report (`allErrors`) and the data schemas of FR-010                                            | zod's `fromJSONSchema` refuses `unevaluatedProperties`, `if`/`then`, `dependentSchemas` and external `$ref`, which the DSL schema and user schemas use. The SDK depends on both already |
+| `jq-wasm` 3.0.0-jq-1.8.2                     | jq, which the standard mandates                                                                                  | Node has no jq                                                                                                                                                                          |
+| `piscina` 5.3.2                              | Worker pool; aborting a task terminates its worker                                                               | A runaway expression cannot be interrupted on the main thread. No dependencies                                                                                                          |
+| `@apidevtools/json-schema-ref-parser` 16.0.5 | Dereferences the external OpenAPI document of `call: openapi`                                                    | `@nestjs/swagger` generates our own document and reads none. `swagger-parser` only adds validation of the document, which the call does not need                                        |
+| `undici` 8.12.3                              | The SSRF-checking dispatcher (`connect` lookup on every connection and redirect), the go-judge pool, `MockAgent` | Node 26 runs `fetch` on an internal undici but exposes neither `Agent` nor `MockAgent`                                                                                                  |
+| `quickpickle` 1.11.2 (dev)                   | Runs the CTK Gherkin features in Vitest                                                                          | —                                                                                                                                                                                       |
+| `testcontainers` 12.2.1 (dev)                | go-judge in integration tests                                                                                    | Already a dependency of `@testcontainers/postgresql`                                                                                                                                    |
+
+**Removed:**
+
+- `temporal-polyfill`: Node 26 has `Temporal`.
+- `cloudevents`: zod schemas at the boundary cover the HTTP binding, as for every other body. The SDK pulled `uuid` 8, which has an advisory, plus browser polyfills and a second `ajv-formats`.
+- `@apidevtools/swagger-parser`: see above.
+
+**Advisories.** NestJS 12.3.2 (`multer`) and zod 4.6.7. Overrides pin `@cucumber/messages>uuid` to 11.1.1 and `@esbuild-kit/core-utils>esbuild` to 0.25.12. `pnpm audit` reports no known vulnerabilities.
+
+**Runtime.** Node.js 26.13.0 LTS. go-judge 1.13.3 with Node.js 26 and Python 3, from a custom image pinned by digest.
 
 ## R22. Critic verdicts
 

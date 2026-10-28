@@ -10,7 +10,7 @@ a strict UI / API split: the apps are fully independent and share no code.
 
 ## Requirements
 
-- pnpm `12.8.1` (https://pnpm.io/installation); Node.js `24.21.0` is downloaded by pnpm from
+- pnpm `12.8.1` (https://pnpm.io/installation); Node.js `26.13.0` (LTS) is downloaded by pnpm from
   `devEngines.runtime` (see [`.nvmrc`](.nvmrc))
 - Docker with Compose v2 for the local stack and the integration tests
 

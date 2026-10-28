@@ -93,7 +93,7 @@ services:
       SANDBOX_URL: http://go-judge:5050
       HTTP: ${HTTP:-on}
       ENGINE_WORKER: ${ENGINE_WORKER:-on}
-      SECRETS_KEY: ${SECRETS_KEY:?set SECRETS_KEY in .env}
+      SECRETS_KEY: ${SECRETS_KEY:-}
       OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST:-}
       SMTP_HOST: mailpit
       SMTP_PORT: 1025

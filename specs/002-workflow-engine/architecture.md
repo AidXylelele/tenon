@@ -163,7 +163,7 @@ Every non-HTTP start derives its id, so a repeated message finds the instance an
 
 1. **Produced events** (lifecycle, emit) are added in the round's transaction (§3). Each Event raises `EventAccepted`.
 2. **Intake.**
-   - `POST /api/v1/events` (`cloudevents`; structured or binary; batch refused) → `AcceptEvent`.
+   - `POST /api/v1/events` (zod schemas of the CloudEvents 1.0 HTTP binding; structured or binary; batch refused) → `AcceptEvent`.
    - `POST /api/v1/hooks/{token}` → `ReceiveWebhookCall`: `webhook.receive(call, now)` → `Event.accept` → `events.add`. A duplicate is acknowledged.
 3. **Routing.** `EventAccepted` → `RouteEvent`. It finds the candidates whose `filter_types` hold the event's type or `*`, across correlations, trigger workflows and subscriptions. `EventOffers` then writes one outbox message per candidate.
 4. **Offers.** Each loads, evaluates its filter through `expressions.evaluateAll(filter.evaluationsFor(event))`, decides and saves:

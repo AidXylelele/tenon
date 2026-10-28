@@ -4,7 +4,7 @@
 # --- base: pnpm with the pinned Node runtime ---------------------------------
 FROM ghcr.io/pnpm/pnpm:12.8.1@sha256:44cfd11d75b901dc7a83a16812d9134e4bf9d82f6b0eb28af6d666ebbf0fb4fb AS base
 ENV CI=true HUSKY=0
-RUN pnpm runtime set node 24.21.0 -g
+RUN pnpm runtime set node 26.13.0 -g
 WORKDIR /app
 
 # --- deps: the dependency layer depends only on the lockfile ------------------
@@ -23,7 +23,7 @@ RUN --mount=type=cache,id=pnpm,target=/var/cache/pnpm \
     pnpm --filter api --prod deploy /prod/api --store-dir /var/cache/pnpm
 
 # --- runtime: distroless, non-root, runtime files only ------------------------
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:9eeb7f5887d0e239e78264b06f7f11d2e14be534050481803a9e4728fcdd278e AS runtime
+FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:a51c5d631b90e1b298e17a88a307b77f0b959b47de942d033acce0c96be3fb83 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000
 COPY --from=build --chown=65532:65532 /prod/api/ ./

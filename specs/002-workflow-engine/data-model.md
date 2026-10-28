@@ -228,7 +228,7 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
   - `SandboxFailed` gives a runtime error.
 - **`EventFilter`:** `evaluationsFor(event)` (PatternMatch and Evaluation work) and `accepts(results)`. It is the only owner of `with` and `correlate` matching, for correlations and subscriptions alike.
 - **Values:**
-  - `TaskList`, `FlowDirective`, `Expression`, `DataSpec`;
+  - `TaskList`, `FlowDirective`, `Expression`, `DataSpec`, `Duration` (on the built-in `Temporal`);
   - `CatchClause`, `ErrorFilter`, `RetryPolicy` (`allows`, `delayFor(attempt, jitterSample)`), `Backoff` kinds;
   - `ErrorType`, `WorkflowError`;
   - `Schedule` kinds, `ConsumptionStrategy`, `SemanticVersion`, `SupportedSubset`;
@@ -240,7 +240,7 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
 
 | Work           | Content                                                                                        | Result                                                                                                                                |
 | -------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `Evaluation`   | Work id; expression or template; data; arguments; expected type (any, boolean, duration); mode | `EvaluationResult`: a value (durations in ms), or a failure                                                                           |
+| `Evaluation`   | Work id; expression or template; data; arguments; expected type (any, boolean, duration); mode | `EvaluationResult`: a value, or a failure                                                                                             |
 | `PatternMatch` | Work id; value; regular expression                                                             | `EvaluationResult`: a boolean                                                                                                         |
 | `Validation`   | Work id, schema, data                                                                          | `ValidationResult`                                                                                                                    |
 | `ServiceCall`  | Work id; an evaluated HTTP or OpenAPI request; authentication policy; deadline                 | `ServiceResult`: the content or response plus the `$authorization` descriptor (masked); or `TimedOut` / `CommunicationFailed(status)` |

@@ -22,7 +22,7 @@ Structure and behaviour: [architecture.md](architecture.md). Model: [data-model.
 
 |                          |                                                                                                                                                                                 |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language/Version**     | TypeScript 6.0.3, Node 24 (ESM, SWC)                                                                                                                                            |
+| **Language/Version**     | TypeScript 6.0.3, Node 26.13.0 LTS (ESM, SWC)                                                                                                                                   |
 | **Primary Dependencies** | NestJS 12 with `@nestjs/workflows`, `@nestjs/outbox`, `@nestjs/idempotency`, `@nestjs/resilience`; DSL and HTTP tooling as listed in research R21; the go-judge sandbox service |
 | **Storage**              | PostgreSQL through Drizzle 0.45, plus the `nest_workflows` and `nest_outbox` schemas                                                                                            |
 | **Testing**              | Vitest 5, supertest, Testcontainers, `quickpickle` (CTK), undici `MockAgent`, `ManualWorkflowClock` with `drain`, `OutboxRelay.runOnce`                                         |
