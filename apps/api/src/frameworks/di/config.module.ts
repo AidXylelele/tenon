@@ -12,10 +12,7 @@ const list = z
       .filter((item) => item.length > 0),
   );
 
-const optional = z
-  .string()
-  .default('')
-  .transform((value) => (value.length > 0 ? value : undefined));
+const optional = z.string().default('');
 
 const envSchema = z.object({
   NODE_ENV: z

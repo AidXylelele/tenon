@@ -28,15 +28,17 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Transactional } from '@nestjs-cls/transactional';
-import { AuthenticateUser } from '../../../application/use-cases/authenticate-user.js';
-import { ChangePassword } from '../../../application/use-cases/change-password.js';
-import type { User } from '../../../domain/user.js';
-import { ChangePasswordDto } from '../dto/change-password.dto.js';
-import { CompletePasswordRecoveryDto } from '../dto/complete-password-recovery.dto.js';
-import { RequestPasswordRecoveryDto } from '../dto/request-password-recovery.dto.js';
-import { SessionResponse } from '../dto/responses.dto.js';
-import { SignInDto } from '../dto/sign-in.dto.js';
+import { AuthenticateUser } from '../../../application/identity/authenticate-user.js';
+import { ChangePassword } from '../../../application/identity/change-password.js';
+import type { User } from '../../../domain/identity/user.js';
 import { UserPresenter } from '../presenters/user.presenter.js';
+import {
+  ChangePasswordBody,
+  CompletePasswordRecoveryBody,
+  PasswordRecoveryBody,
+  SessionResponse,
+  SignInBody,
+} from '../schemas/auth.schemas.js';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -52,12 +54,14 @@ export class AuthController {
   @Post('session')
   @Public()
   @HttpCode(200)
-  @ApiOkResponse({ type: SessionResponse })
+  @ApiOkResponse({ standardSchema: SessionResponse })
   @ApiUnauthorizedResponse()
   @ApiForbiddenResponse()
   @ApiTooManyRequestsResponse()
-  async signIn(@Body() dto: SignInDto): Promise<SessionResponse> {
-    const user = await this.authenticateUser.execute(dto);
+  async signIn(
+    @Body({ schema: SignInBody }) body: SignInBody,
+  ): Promise<SessionResponse> {
+    const user = await this.authenticateUser.execute(body);
     await this.signInService.signIn(user.id, { method: 'password' });
     return { user: UserPresenter.user(user) };
   }
@@ -65,7 +69,7 @@ export class AuthController {
   @Get('session')
   @Can.Anyone()
   @ApiCookieAuth('sessionCookie')
-  @ApiOkResponse({ type: SessionResponse })
+  @ApiOkResponse({ standardSchema: SessionResponse })
   currentSession(@CurrentUser() user: User): SessionResponse {
     return { user: UserPresenter.user(user) };
   }
@@ -84,8 +88,10 @@ export class AuthController {
   @HttpCode(202)
   @ApiAcceptedResponse()
   @ApiTooManyRequestsResponse()
-  requestRecovery(@Body() dto: RequestPasswordRecoveryDto): void {
-    this.passwordReset.request(dto.email);
+  requestRecovery(
+    @Body({ schema: PasswordRecoveryBody }) body: PasswordRecoveryBody,
+  ): void {
+    this.passwordReset.request(body.email);
   }
 
   @Post('password-recovery/complete')
@@ -95,9 +101,10 @@ export class AuthController {
   @ApiNoContentResponse()
   @ApiBadRequestResponse()
   async completeRecovery(
-    @Body() dto: CompletePasswordRecoveryDto,
+    @Body({ schema: CompletePasswordRecoveryBody })
+    body: CompletePasswordRecoveryBody,
   ): Promise<void> {
-    const result = await this.passwordReset.reset(dto.token, dto.newPassword);
+    const result = await this.passwordReset.reset(body.token, body.newPassword);
 
     if (!result) {
       throw new BadRequestException('The link is invalid or expired');
@@ -112,10 +119,14 @@ export class AuthController {
   @ApiNoContentResponse()
   @ApiBadRequestResponse()
   async updatePassword(
-    @Body() dto: ChangePasswordDto,
+    @Body({ schema: ChangePasswordBody }) body: ChangePasswordBody,
     @CurrentUser() user: User,
   ): Promise<void> {
-    await this.changePassword.execute({ userId: user.id, ...dto });
+    await this.changePassword.execute({
+      userId: user.id,
+      currentPassword: body.currentPassword,
+      newPassword: body.newPassword,
+    });
     const rotated = await this.signInService.rotateSession();
     await this.sessions.revokeAll(user.id, { except: rotated?.session.id });
   }

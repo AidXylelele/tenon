@@ -1,17 +1,24 @@
 import type {
+  AccountRepository,
   InvitationEmail,
   InvitationRepository,
   Mailing,
   PasswordHasher,
+  PasswordResetEmail,
   UserRepository,
-} from '../../src/application/interfaces.js';
+} from '../../src/application/identity/ports.js';
+import type { Account } from '../../src/domain/identity/account.js';
+import {
+  type AccountType,
+  InvitationStatus,
+} from '../../src/domain/identity/enums.js';
 import {
   InvitationNotFoundError,
   UserNotFoundError,
 } from '../../src/domain/errors.js';
-import type { Invitation } from '../../src/domain/invitation.js';
-import type { InvitationToken } from '../../src/domain/invitation-token.js';
-import type { User } from '../../src/domain/user.js';
+import type { Invitation } from '../../src/domain/identity/invitation.js';
+import type { InvitationToken } from '../../src/domain/identity/invitation-token.js';
+import type { User } from '../../src/domain/identity/user.js';
 
 export class InMemoryUserRepository implements UserRepository {
   readonly users = new Map<string, User>();
@@ -21,10 +28,6 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   async add(user: User): Promise<void> {
-    this.users.set(user.id, user);
-  }
-
-  async update(user: User): Promise<void> {
     this.users.set(user.id, user);
   }
 
@@ -41,19 +44,57 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   async findActiveById(id: string): Promise<User | null> {
-    return this.all().find((user) => user.id === id && !user.suspended) ?? null;
+    return this.all().find((user) => user.id === id && user.isActive) ?? null;
   }
 
   async findActiveByEmail(email: string): Promise<User | null> {
     const user = await this.findByEmail(email);
 
-    if (!user || user.suspended) return null;
+    if (!user?.isActive) return null;
 
     return user;
   }
 
   private all(): User[] {
     return [...this.users.values()];
+  }
+}
+
+export class InMemoryAccountRepository implements AccountRepository {
+  readonly accounts = new Map<string, Account>();
+
+  constructor(...accounts: Account[]) {
+    for (const account of accounts) this.accounts.set(account.id, account);
+  }
+
+  async save(account: Account): Promise<void> {
+    this.accounts.set(account.id, account);
+  }
+
+  async findByIdentifier(
+    type: AccountType,
+    identifier: string,
+  ): Promise<Account | null> {
+    return (
+      this.all().find(
+        (account) => account.type === type && account.identifier === identifier,
+      ) ?? null
+    );
+  }
+
+  async findByUserId(
+    userId: string,
+    type: AccountType,
+  ): Promise<Account | null> {
+    return (
+      this.all().find(
+        (account) => account.userId === userId && account.type === type,
+      ) ?? null
+    );
+  }
+
+  private all(): Account[] {
+    return [...this.accounts.values()];
   }
 }
 
@@ -66,11 +107,7 @@ export class InMemoryInvitationRepository implements InvitationRepository {
     }
   }
 
-  async add(invitation: Invitation): Promise<void> {
-    this.invitations.set(invitation.id, invitation);
-  }
-
-  async update(invitation: Invitation): Promise<void> {
+  async save(invitation: Invitation): Promise<void> {
     this.invitations.set(invitation.id, invitation);
   }
 
@@ -93,7 +130,8 @@ export class InMemoryInvitationRepository implements InvitationRepository {
   async findPendingByEmail(email: string): Promise<Invitation | null> {
     return (
       this.all().find(
-        (item) => item.email === email && item.status === 'pending',
+        (item) =>
+          item.email === email && item.status === InvitationStatus.Pending,
       ) ?? null
     );
   }
@@ -115,9 +153,14 @@ export class FakePasswordHasher implements PasswordHasher {
 
 export class RecordingMailing implements Mailing {
   readonly sent: InvitationEmail[] = [];
+  readonly resets: PasswordResetEmail[] = [];
 
   async sendInvitation(email: InvitationEmail): Promise<void> {
     this.sent.push(email);
+  }
+
+  async sendPasswordReset(email: PasswordResetEmail): Promise<void> {
+    this.resets.push(email);
   }
 }
 

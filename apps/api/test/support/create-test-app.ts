@@ -4,7 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/frameworks/di/app.module.js';
-import { Database } from '../../src/interface-adapters/interfaces.js';
+import { Database } from '../../src/interface-adapters/persistence/interfaces.js';
 import { queuedMailCount } from './db.js';
 import { Mailbox } from './mailbox.js';
 import { ProbeModule } from './probe.module.js';

@@ -1,15 +1,17 @@
 import { eq } from 'drizzle-orm';
-import { InvitationRepository } from '../../../src/application/interfaces.js';
+import { InvitationRepository } from '../../../src/application/identity/ports.js';
 import {
   InvitationConflictError,
   InvitationNotFoundError,
 } from '../../../src/domain/errors.js';
-import { InvitationToken } from '../../../src/domain/invitation-token.js';
+import type { Invitation } from '../../../src/domain/identity/invitation.js';
+import { InvitationToken } from '../../../src/domain/identity/invitation-token.js';
 import { invitation as invitationTable } from '../../../src/interface-adapters/persistence/schema/index.js';
+import { Role } from '../../../src/domain/identity/enums.js';
 import { createUser } from '../../support/auth-helpers.js';
 import { anInvitation } from '../../support/builders.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
-import { truncateAll } from '../../support/db.js';
+import { inTransaction, truncateAll } from '../../support/db.js';
 
 describe('DrizzleInvitationRepository', () => {
   let t: TestApp;
@@ -29,14 +31,17 @@ describe('DrizzleInvitationRepository', () => {
     await truncateAll(t.db);
     const admin = await createUser(t, {
       email: 'admin@example.com',
-      role: 'admin',
+      role: Role.Admin,
     });
     adminId = admin.id;
   });
 
+  const save = (invitation: Invitation) =>
+    inTransaction(t.app, () => repository.save(invitation));
+
   const stored = async (email = 'new@example.com') => {
     const issued = anInvitation({ email, invitedBy: adminId });
-    await repository.add(issued.invitation);
+    await save(issued.invitation);
     return issued;
   };
 
@@ -53,6 +58,7 @@ describe('DrizzleInvitationRepository', () => {
       expect(found.status).toBe('pending');
       expect(found.invitedBy).toBe(adminId);
       expect(found.expiresAt).toEqual(invitation.expiresAt);
+      expect(found.version).toBe(1);
     }
   });
 
@@ -80,11 +86,9 @@ describe('DrizzleInvitationRepository', () => {
     const first = await repository.getById(invitation.id);
     const second = await repository.getById(invitation.id);
     first.accept(adminId);
-    await repository.update(first);
+    await save(first);
     second.revoke();
-    await expect(repository.update(second)).rejects.toBeInstanceOf(
-      InvitationConflictError,
-    );
+    await expect(save(second)).rejects.toBeInstanceOf(InvitationConflictError);
     const current = await repository.getById(invitation.id);
     expect(current.status).toBe('accepted');
   });
@@ -94,8 +98,9 @@ describe('DrizzleInvitationRepository', () => {
     await expect(stored()).rejects.toThrow(InvitationConflictError);
     const pending = await repository.findPendingByEmail('new@example.com');
     expect(pending?.id).toBe(invitation.id);
-    invitation.revoke();
-    await repository.update(invitation);
+    const current = await repository.getById(invitation.id);
+    current.revoke();
+    await save(current);
     expect(await repository.findPendingByEmail('new@example.com')).toBeNull();
     await expect(stored()).resolves.toBeDefined();
   });

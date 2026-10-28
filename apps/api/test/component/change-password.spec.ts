@@ -67,7 +67,7 @@ describe('change own password over HTTP', () => {
     const caller = await signIn(t.server, 'user@example.com');
     const response = await change(caller, {
       currentPassword: 'not-the-current-password',
-    }).expect(400);
+    }).expect(422);
     expect(response.body).toMatchObject({
       message: 'The current password is wrong',
     });

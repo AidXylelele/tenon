@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailModule as NestMailModule, SmtpTransport } from '@nestjs/mail';
-import { Mailing } from '../../application/interfaces.js';
+import { Mailing } from '../../application/identity/ports.js';
 import { MailOutboxHandler } from '../../interface-adapters/mailing/mail-outbox.handler.js';
 import { MailGateway } from '../../interface-adapters/mailing/mail.gateway.js';
 import { OutboxMailTransport } from '../../interface-adapters/mailing/outbox-mail.transport.js';
@@ -32,7 +32,7 @@ import type { Env } from './config.module.js';
           auth: config.get('SMTP_USER', { infer: true })
             ? {
                 user: config.get('SMTP_USER', { infer: true }),
-                pass: config.get('SMTP_PASSWORD', { infer: true }) ?? '',
+                pass: config.get('SMTP_PASSWORD', { infer: true }),
               }
             : undefined,
         }),

@@ -1,13 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionHost } from '@nestjs-cls/transactional';
+import {
+  Propagation,
+  Transactional,
+  TransactionHost,
+} from '@nestjs-cls/transactional';
 import { and, eq, type SQL } from 'drizzle-orm';
 import {
   AccountExistsError,
   UserNotFoundError,
 } from '../../../domain/errors.js';
-import type { User } from '../../../domain/user.js';
-import type { UserRepository } from '../../../application/interfaces.js';
-import type { DrizzleTx } from '../../interfaces.js';
+import { UserStatus } from '../../../domain/identity/enums.js';
+import type { User } from '../../../domain/identity/user.js';
+import type { UserRepository } from '../../../application/identity/ports.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { user as users } from '../schema/index.js';
 import { UserMapper } from '../mappers/user.mapper.js';
 
@@ -15,6 +20,7 @@ import { UserMapper } from '../mappers/user.mapper.js';
 export class DrizzleUserRepository implements UserRepository {
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
+  @Transactional(Propagation.Mandatory)
   async add(user: User): Promise<void> {
     const inserted = await this.txHost.tx
       .insert(users)
@@ -23,13 +29,6 @@ export class DrizzleUserRepository implements UserRepository {
       .returning({ id: users.id });
 
     if (inserted.length === 0) throw new AccountExistsError();
-  }
-
-  async update(user: User): Promise<void> {
-    await this.txHost.tx
-      .update(users)
-      .set(UserMapper.toRow(user))
-      .where(eq(users.id, user.id));
   }
 
   async getById(id: string): Promise<User> {
@@ -45,12 +44,17 @@ export class DrizzleUserRepository implements UserRepository {
   }
 
   findActiveById(id: string): Promise<User | null> {
-    return this.findOne(and(eq(users.id, id), eq(users.suspended, false)));
+    return this.findOne(
+      and(eq(users.id, id), eq(users.status, UserStatus.Active)),
+    );
   }
 
   findActiveByEmail(email: string): Promise<User | null> {
     return this.findOne(
-      and(eq(users.email, email.toLowerCase()), eq(users.suspended, false)),
+      and(
+        eq(users.email, email.toLowerCase()),
+        eq(users.status, UserStatus.Active),
+      ),
     );
   }
 

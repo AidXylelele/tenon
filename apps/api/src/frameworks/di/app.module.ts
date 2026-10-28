@@ -2,7 +2,7 @@ import {
   type MiddlewareConsumer,
   Module,
   type NestModule,
-  ValidationPipe,
+  StandardSchemaValidationPipe,
 } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { TerminusModule } from '@nestjs/terminus';
@@ -11,7 +11,7 @@ import { DomainErrorFilter } from '../../interface-adapters/http/filters/domain-
 import { SecurityHeadersMiddleware } from '../../interface-adapters/http/middleware/security-headers.middleware.js';
 import { ConfigModule } from './config.module.js';
 import { DatabaseModule } from './database.module.js';
-import { IdentityAccessModule } from './identity-access.module.js';
+import { IdentityModule } from './identity.module.js';
 import { LoggingModule } from './logging.module.js';
 import { MailModule } from './mail.module.js';
 import { OutboxModule } from './outbox.module.js';
@@ -23,19 +23,12 @@ import { OutboxModule } from './outbox.module.js';
     DatabaseModule,
     OutboxModule,
     MailModule,
-    IdentityAccessModule,
+    IdentityModule,
     TerminusModule.forRoot({ gracefulShutdownTimeoutMs: 5_000 }),
   ],
   controllers: [HealthController],
   providers: [
-    {
-      provide: APP_PIPE,
-      useValue: new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    },
+    { provide: APP_PIPE, useValue: new StandardSchemaValidationPipe() },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
   ],
 })

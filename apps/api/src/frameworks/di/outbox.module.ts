@@ -5,7 +5,7 @@ import {
   OutboxStorage,
 } from '@nestjs/outbox';
 import { fromDrizzle, PostgresOutboxStore } from '@nestjs/outbox/postgres';
-import { Database } from '../../interface-adapters/interfaces.js';
+import { Database } from '../../interface-adapters/persistence/interfaces.js';
 import type { Env } from './config.module.js';
 
 @Module({

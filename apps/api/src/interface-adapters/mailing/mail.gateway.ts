@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { Mailer } from '@nestjs/mail';
-import type { InvitationEmail, Mailing } from '../../application/interfaces.js';
-import type { PasswordResetEmail } from '../interfaces.js';
+import type {
+  InvitationEmail,
+  Mailing,
+  PasswordResetEmail,
+} from '../../application/identity/ports.js';
 import { InvitationMail } from './templates/invitation.mail.js';
 import { PasswordResetMail } from './templates/password-reset.mail.js';
 

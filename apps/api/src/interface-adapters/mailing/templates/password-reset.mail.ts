@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { html, type Mailable, type MailContent } from '@nestjs/mail';
-import type { PasswordResetEmail } from '../../interfaces.js';
+import type { PasswordResetEmail } from '../../../application/identity/ports.js';
 
 @Injectable()
 export class PasswordResetMail implements Mailable<PasswordResetEmail> {

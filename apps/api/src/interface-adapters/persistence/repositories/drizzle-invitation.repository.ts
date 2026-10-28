@@ -1,47 +1,56 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionHost } from '@nestjs-cls/transactional';
-import { and, eq } from 'drizzle-orm';
+import {
+  Propagation,
+  Transactional,
+  TransactionHost,
+} from '@nestjs-cls/transactional';
+import { and, eq, sql } from 'drizzle-orm';
 import {
   InvitationConflictError,
   InvitationNotFoundError,
 } from '../../../domain/errors.js';
-import type { Invitation } from '../../../domain/invitation.js';
-import type { InvitationToken } from '../../../domain/invitation-token.js';
-import type { InvitationRepository } from '../../../application/interfaces.js';
-import type { DrizzleTx } from '../../interfaces.js';
+import { InvitationStatus } from '../../../domain/identity/enums.js';
+import type { Invitation } from '../../../domain/identity/invitation.js';
+import type { InvitationToken } from '../../../domain/identity/invitation-token.js';
+import type { InvitationRepository } from '../../../application/identity/ports.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { InvitationMapper } from '../mappers/invitation.mapper.js';
 import { invitation as invitations } from '../schema/index.js';
+import { isUniqueViolation } from '../unique-violation.js';
 
 @Injectable()
 export class DrizzleInvitationRepository implements InvitationRepository {
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
-  async add(invitation: Invitation): Promise<void> {
-    const inserted = await this.txHost.tx
+  @Transactional(Propagation.Mandatory)
+  async save(invitation: Invitation): Promise<void> {
+    const row = InvitationMapper.toRow(invitation);
+    const version = invitation.version + 1;
+    const upsert = this.txHost.tx
       .insert(invitations)
-      .values(InvitationMapper.toRow(invitation))
-      .onConflictDoNothing()
-      .returning({ id: invitations.id });
-
-    if (inserted.length === 0) throw new InvitationConflictError();
-  }
-
-  async update(invitation: Invitation): Promise<void> {
-    const updated = await this.txHost.tx
-      .update(invitations)
-      .set({
-        ...InvitationMapper.toRow(invitation),
-        version: invitation.version + 1,
+      .values({ ...row, version })
+      .onConflictDoUpdate({
+        target: invitations.id,
+        set: {
+          status: sql`excluded.status`,
+          acceptedAt: sql`excluded.accepted_at`,
+          acceptedUserId: sql`excluded.accepted_user_id`,
+          revokedAt: sql`excluded.revoked_at`,
+          version: sql`excluded.version`,
+        },
+        setWhere: eq(invitations.version, invitation.version),
       })
-      .where(
-        and(
-          eq(invitations.id, invitation.id),
-          eq(invitations.version, invitation.version),
-        ),
-      )
       .returning({ id: invitations.id });
 
-    if (updated.length === 0) throw new InvitationConflictError();
+    try {
+      const saved = await upsert;
+
+      if (saved.length === 0) throw new InvitationConflictError();
+    } catch (error) {
+      if (isUniqueViolation(error)) throw new InvitationConflictError();
+
+      throw error;
+    }
   }
 
   async getById(id: string): Promise<Invitation> {
@@ -71,7 +80,10 @@ export class DrizzleInvitationRepository implements InvitationRepository {
       .select()
       .from(invitations)
       .where(
-        and(eq(invitations.email, email), eq(invitations.status, 'pending')),
+        and(
+          eq(invitations.email, email),
+          eq(invitations.status, InvitationStatus.Pending),
+        ),
       );
 
     if (!row) return null;

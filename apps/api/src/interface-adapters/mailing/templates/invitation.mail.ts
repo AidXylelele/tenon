@@ -1,5 +1,5 @@
 import { html, type Mailable, type MailContent } from '@nestjs/mail';
-import type { InvitationEmail } from '../../../application/interfaces.js';
+import type { InvitationEmail } from '../../../application/identity/ports.js';
 
 export class InvitationMail implements Mailable<InvitationEmail> {
   constructor(private readonly webBaseUrl: string) {}

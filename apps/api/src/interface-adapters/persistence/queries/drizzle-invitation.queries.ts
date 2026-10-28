@@ -3,8 +3,9 @@ import { and, eq, gt, sql } from 'drizzle-orm';
 import type {
   InvitationQueries,
   PendingInvitation,
-} from '../../../application/interfaces.js';
-import { Database } from '../../interfaces.js';
+} from '../../../application/identity/queries.js';
+import { InvitationStatus } from '../../../domain/identity/enums.js';
+import { Database } from '../interfaces.js';
 import { invitation as invitations } from '../schema/index.js';
 
 @Injectable()
@@ -23,7 +24,7 @@ export class DrizzleInvitationQueries implements InvitationQueries {
       .from(invitations)
       .where(
         and(
-          eq(invitations.status, 'pending'),
+          eq(invitations.status, InvitationStatus.Pending),
           gt(invitations.expiresAt, sql`now()`),
         ),
       )

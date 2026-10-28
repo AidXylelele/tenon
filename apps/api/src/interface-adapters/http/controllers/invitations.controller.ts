@@ -21,29 +21,30 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Transactional } from '@nestjs-cls/transactional';
-import { InvitationPolicy } from '../../../application/policies/invitation.policy.js';
-import { AcceptInvitation } from '../../../application/use-cases/accept-invitation.js';
-import { InviteUser } from '../../../application/use-cases/invite-user.js';
-import { ListPendingInvitations } from '../../../application/use-cases/list-pending-invitations.js';
-import { RevokeInvitation } from '../../../application/use-cases/revoke-invitation.js';
-import { VerifyInvitationLink } from '../../../application/use-cases/verify-invitation-link.js';
-import type { User } from '../../../domain/user.js';
-import { AcceptInvitationDto } from '../dto/accept-invitation.dto.js';
-import { CreateInvitationDto } from '../dto/create-invitation.dto.js';
+import { z } from 'zod';
+import { InvitationPolicy } from '../../../application/identity/invitation.policy.js';
+import { AcceptInvitation } from '../../../application/identity/accept-invitation.js';
+import { InviteUser } from '../../../application/identity/invite-user.js';
+import { InvitationQueries } from '../../../application/identity/queries.js';
+import { RevokeInvitation } from '../../../application/identity/revoke-invitation.js';
+import { VerifyInvitationLink } from '../../../application/identity/verify-invitation-link.js';
+import type { User } from '../../../domain/identity/user.js';
+import { InvitationPresenter } from '../presenters/invitation.presenter.js';
 import {
   AcceptedInvitationResponse,
+  AcceptInvitationBody,
+  CreateInvitationBody,
   InvitationResponse,
+  InvitationTokenBody,
   VerifiedInvitationResponse,
-} from '../dto/responses.dto.js';
-import { VerifyInvitationDto } from '../dto/verify-invitation.dto.js';
-import { InvitationPresenter } from '../presenters/invitation.presenter.js';
+} from '../schemas/invitation.schemas.js';
 
 @ApiTags('invitations')
 @Controller('invitations')
 export class InvitationsController {
   constructor(
     private readonly inviteUser: InviteUser,
-    private readonly listPendingInvitations: ListPendingInvitations,
+    private readonly invitations: InvitationQueries,
     private readonly revokeInvitation: RevokeInvitation,
     private readonly verifyInvitationLink: VerifyInvitationLink,
     private readonly acceptInvitation: AcceptInvitation,
@@ -52,18 +53,17 @@ export class InvitationsController {
 
   @Post()
   @Can(InvitationPolicy, 'manage')
-  @Transactional()
   @HttpCode(201)
   @ApiCookieAuth('sessionCookie')
-  @ApiCreatedResponse({ type: InvitationResponse })
+  @ApiCreatedResponse({ standardSchema: InvitationResponse })
   @ApiConflictResponse()
   async create(
-    @Body() dto: CreateInvitationDto,
+    @Body({ schema: CreateInvitationBody }) body: CreateInvitationBody,
     @CurrentUser() user: User,
   ): Promise<InvitationResponse> {
     const invitation = await this.inviteUser.execute({
-      email: dto.email,
-      role: dto.role,
+      email: body.email,
+      role: body.role,
       invitedBy: user.id,
       inviterName: user.name,
     });
@@ -73,15 +73,14 @@ export class InvitationsController {
   @Get()
   @Can(InvitationPolicy, 'manage')
   @ApiCookieAuth('sessionCookie')
-  @ApiOkResponse({ type: [InvitationResponse] })
+  @ApiOkResponse({ standardSchema: z.array(InvitationResponse) })
   async list(): Promise<InvitationResponse[]> {
-    const pending = await this.listPendingInvitations.execute();
+    const pending = await this.invitations.listPending();
     return pending.map((invitation) => InvitationPresenter.pending(invitation));
   }
 
   @Delete(':id')
   @Can(InvitationPolicy, 'manage')
-  @Transactional()
   @HttpCode(204)
   @ApiCookieAuth('sessionCookie')
   @ApiNoContentResponse()
@@ -95,13 +94,13 @@ export class InvitationsController {
   @Post('verify')
   @Public()
   @HttpCode(200)
-  @ApiOkResponse({ type: VerifiedInvitationResponse })
+  @ApiOkResponse({ standardSchema: VerifiedInvitationResponse })
   @ApiNotFoundResponse()
   @ApiGoneResponse()
   async verify(
-    @Body() dto: VerifyInvitationDto,
+    @Body({ schema: InvitationTokenBody }) body: InvitationTokenBody,
   ): Promise<VerifiedInvitationResponse> {
-    const invitation = await this.verifyInvitationLink.execute(dto.token);
+    const invitation = await this.verifyInvitationLink.execute(body.token);
     return InvitationPresenter.verified(invitation);
   }
 
@@ -109,15 +108,15 @@ export class InvitationsController {
   @Public()
   @Transactional()
   @HttpCode(200)
-  @ApiOkResponse({ type: AcceptedInvitationResponse })
+  @ApiOkResponse({ standardSchema: AcceptedInvitationResponse })
   @ApiNotFoundResponse()
   @ApiConflictResponse()
   @ApiGoneResponse()
   async accept(
-    @Body() dto: AcceptInvitationDto,
+    @Body({ schema: AcceptInvitationBody }) body: AcceptInvitationBody,
   ): Promise<AcceptedInvitationResponse> {
     await this.signInService.signOut();
-    const accepted = await this.acceptInvitation.execute(dto);
+    const accepted = await this.acceptInvitation.execute(body);
     await this.signInService.signIn(accepted.user.id, { method: 'invitation' });
     return InvitationPresenter.accepted(accepted);
   }

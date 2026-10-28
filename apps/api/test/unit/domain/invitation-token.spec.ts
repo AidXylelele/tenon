@@ -1,4 +1,4 @@
-import { InvitationToken } from '../../../src/domain/invitation-token.js';
+import { InvitationToken } from '../../../src/domain/identity/invitation-token.js';
 
 describe('InvitationToken', () => {
   it('generated_tokens_are_unique_and_safe_to_put_in_a_url', () => {

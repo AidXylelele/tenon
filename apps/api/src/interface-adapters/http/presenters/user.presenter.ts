@@ -1,5 +1,5 @@
-import type { User } from '../../../domain/user.js';
-import type { UserResponse } from '../dto/responses.dto.js';
+import type { User } from '../../../domain/identity/user.js';
+import type { UserResponse } from '../schemas/auth.schemas.js';
 
 export class UserPresenter {
   static user(user: User): UserResponse {

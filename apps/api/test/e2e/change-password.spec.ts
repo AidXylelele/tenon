@@ -42,7 +42,7 @@ describe('journey: change own password (US4)', () => {
         newPassword: 'yet-another-long-password',
       },
     });
-    expect(wrong.status).toBe(400);
+    expect(wrong.status).toBe(422);
     await api.call('/api/v1/auth/session', { method: 'DELETE', cookie: fresh });
   });
 });

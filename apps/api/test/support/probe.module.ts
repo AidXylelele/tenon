@@ -1,7 +1,7 @@
 import { Public } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
 import { Controller, Get, Module } from '@nestjs/common';
-import { InvitationPolicy } from '../../src/application/policies/invitation.policy.js';
+import { InvitationPolicy } from '../../src/application/identity/invitation.policy.js';
 import { DomainError } from '../../src/domain/errors.js';
 
 class UnmappedDomainError extends DomainError {

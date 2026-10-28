@@ -5,7 +5,7 @@ import {
   OnOutboxMessage,
   type OutboxHandlerContext,
 } from '@nestjs/outbox';
-import type { StoredMail } from '../interfaces.js';
+import type { StoredMail } from './interfaces.js';
 import { OutboxMailTransport } from './outbox-mail.transport.js';
 
 @Injectable()

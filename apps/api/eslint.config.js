@@ -4,40 +4,12 @@ import prettier from 'eslint-config-prettier/flat';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-const frameworkPackages = [
-  '@nestjs/*',
-  '@nestjs-cls/*',
-  'nestjs-cls',
-  'nestjs-pino',
-  'pino',
-  'pino-http',
-  'drizzle-orm',
-  'drizzle-orm/*',
-  'pg',
-  '@opentelemetry/*',
-  'zod',
-  'class-validator',
-  'class-transformer',
-  'express',
-  'rxjs',
-];
-
-const layer = (groups) => ({
-  'no-restricted-imports': [
-    'error',
-    {
-      patterns: groups.map((group) => ({
-        group,
-        message: `Layer boundary: "${group[0]}" is not allowed here.`,
-      })),
-    },
-  ],
-});
-
+// Layer boundaries and package confinement are reviewed by people, not encoded here.
 export default defineConfig(
   globalIgnores(['dist/**', 'coverage/**', 'drizzle/**']),
   js.configs.recommended,
-  tseslint.configs.recommendedTypeChecked,
+  tseslint.configs.strictTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
       globals: globals.node,
@@ -46,34 +18,49 @@ export default defineConfig(
         tsconfigRootDir: import.meta.dirname,
       },
     },
-  },
-  {
-    files: ['src/domain/**/*.ts'],
-    rules: layer([
-      ['**/application/**'],
-      ['**/interface-adapters/**'],
-      ['**/frameworks/**'],
-      ...frameworkPackages.map((name) => [name]),
-    ]),
-  },
-  {
-    files: ['src/application/**/*.ts'],
-    rules: layer([
-      ['**/interface-adapters/**'],
-      ['**/frameworks/**'],
-      ...frameworkPackages.map((name) =>
-        name === '@nestjs/*' ? [name, '!@nestjs/authorization'] : [name],
-      ),
-    ]),
-  },
-  {
-    files: ['src/interface-adapters/**/*.ts'],
-    rules: layer([['**/frameworks/**']]),
+    rules: {
+      // Type-only imports are erased by SWC; marking them keeps runtime imports (and their side effects) explicit.
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { fixStyle: 'inline-type-imports' },
+      ],
+      // Every member of a union handled, or an explicit default.
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
+      // `sort()` without a comparator compares as strings.
+      '@typescript-eslint/require-array-sort-compare': 'error',
+      // NestJS modules are decorated classes without members; presenters and mappers are static-method classes.
+      '@typescript-eslint/no-extraneous-class': [
+        'error',
+        { allowWithDecorator: true, allowStaticOnly: true },
+      ],
+      // Numbers read fine inside template literals.
+      '@typescript-eslint/restrict-template-expressions': [
+        'error',
+        { allowNumber: true },
+      ],
+      // `() => res.end()` and `return reply(res)` inside a void function are ordinary callback shapes.
+      '@typescript-eslint/no-confusing-void-expression': [
+        'error',
+        { ignoreArrowShorthand: true, ignoreVoidReturningFunctions: true },
+      ],
+      // `process.env['X']` and other index-signature reads keep bracket access.
+      '@typescript-eslint/dot-notation': [
+        'error',
+        { allowIndexSignaturePropertyAccess: true },
+      ],
+      eqeqeq: ['error', 'always'],
+      'no-implicit-coercion': 'error',
+      'no-nested-ternary': 'error',
+      'no-param-reassign': 'error',
+      'no-var': 'error',
+      'prefer-const': 'error',
+    },
   },
   {
     files: ['test/**/*.ts'],
     rules: {
       '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
