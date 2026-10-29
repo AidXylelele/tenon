@@ -1,3 +1,27 @@
+import type { ExpressionEvaluator } from '../../src/application/automation/language/ports.js';
+import type {
+  DocumentReader,
+  WorkflowRepository,
+  WorkflowVersionRepository,
+} from '../../src/application/automation/workflows/ports.js';
+import type {
+  VersionDocument,
+  VersionSummary,
+  WorkflowPage,
+  WorkflowQueries,
+  WorkflowSummary,
+} from '../../src/application/automation/workflows/queries.js';
+import { DocumentReading } from '../../src/domain/automation/language/document-reading.js';
+import type { Expression } from '../../src/domain/automation/language/expression.js';
+import type {
+  ParsedDocument,
+  PublishedTargets,
+} from '../../src/domain/automation/language/interfaces.js';
+import { Problem } from '../../src/domain/automation/language/problem.js';
+import type { WorkflowName } from '../../src/domain/automation/language/workflow-name.js';
+import type { SourceDocument } from '../../src/domain/automation/workflows/source-document.js';
+import type { Workflow } from '../../src/domain/automation/workflows/workflow.js';
+import type { WorkflowVersion } from '../../src/domain/automation/workflows/workflow-version.js';
 import type {
   AccountRepository,
   InvitationEmail,
@@ -166,3 +190,98 @@ export class RecordingMailing implements Mailing {
 
 const sameEmail = (user: User, email: string): boolean =>
   user.email.toLowerCase() === email.toLowerCase();
+
+export class JsonDocumentReader implements DocumentReader {
+  read(source: SourceDocument): DocumentReading {
+    try {
+      const parsed = JSON.parse(source.text) as ParsedDocument;
+      return new DocumentReading(parsed, []);
+    } catch {
+      const problem = new Problem('', 'The document is not JSON');
+      return new DocumentReading(null, [problem]);
+    }
+  }
+}
+
+export class FakeExpressionEvaluator implements ExpressionEvaluator {
+  constructor(private readonly refused: ReadonlySet<string> = new Set()) {}
+
+  async check(expressions: readonly Expression[]): Promise<readonly Problem[]> {
+    return expressions
+      .filter((expression) => this.refused.has(expression.program))
+      .map((expression) => new Problem(expression.pointer, 'syntax error'));
+  }
+}
+
+export class InMemoryWorkflowRepository implements WorkflowRepository {
+  readonly workflows = new Map<string, Workflow>();
+
+  async findByName(name: WorkflowName): Promise<Workflow | null> {
+    const found = [...this.workflows.values()].find((workflow) =>
+      workflow.workflowName.equals(name),
+    );
+    return found ?? null;
+  }
+
+  async save(workflow: Workflow): Promise<void> {
+    this.workflows.set(workflow.id, workflow);
+  }
+}
+
+export class InMemoryWorkflowVersionRepository implements WorkflowVersionRepository {
+  readonly versions: WorkflowVersion[] = [];
+
+  async find(
+    name: WorkflowName,
+    semver: string,
+  ): Promise<WorkflowVersion | null> {
+    const found = this.versions.find(
+      (version) =>
+        version.definition.workflow.equals(name) && version.semver === semver,
+    );
+    return found ?? null;
+  }
+
+  async add(version: WorkflowVersion): Promise<void> {
+    this.versions.push(version);
+  }
+}
+
+export class InMemoryWorkflowQueries implements WorkflowQueries {
+  constructor(
+    private readonly versionRepository: InMemoryWorkflowVersionRepository,
+  ) {}
+
+  async list(): Promise<WorkflowPage> {
+    return { items: [], next: null };
+  }
+
+  async get(): Promise<WorkflowSummary | null> {
+    return null;
+  }
+
+  async versions(): Promise<readonly VersionSummary[]> {
+    return [];
+  }
+
+  async document(): Promise<VersionDocument | null> {
+    return null;
+  }
+
+  async referenceFacts(): Promise<PublishedTargets> {
+    const published = this.versionRepository.versions.map(
+      (version) => version.definition,
+    );
+    return {
+      workflows: published.map((definition) => ({
+        namespace: definition.workflow.namespace,
+        name: definition.workflow.name,
+      })),
+      versions: published.map((definition) => ({
+        namespace: definition.workflow.namespace,
+        name: definition.workflow.name,
+        version: definition.version,
+      })),
+    };
+  }
+}

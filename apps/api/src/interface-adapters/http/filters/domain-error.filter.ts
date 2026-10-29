@@ -10,9 +10,11 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
+import { WorkflowPresenter } from '../presenters/workflow.presenter.js';
 import {
   AuthenticationError,
   ConflictError,
+  DefinitionRejectedError,
   DomainError,
   ExpiredError,
   ForbiddenError,
@@ -34,6 +36,15 @@ export class DomainErrorFilter extends BaseExceptionFilter {
 
     if (error instanceof ConflictError) {
       return new ConflictException(error.message);
+    }
+
+    if (error instanceof DefinitionRejectedError) {
+      const problems = WorkflowPresenter.problems(error.problems);
+      return new UnprocessableEntityException({
+        statusCode: 422,
+        message: error.message,
+        problems,
+      });
     }
 
     if (error instanceof RuleViolationError) {

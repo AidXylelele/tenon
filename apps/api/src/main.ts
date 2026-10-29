@@ -5,6 +5,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './frameworks/di/app.module.js';
 import type { Env } from './frameworks/di/config.module.js';
+import { configureHttpApp } from './frameworks/http/configure-http-app.js';
 
 const app = await NestFactory.create<NestExpressApplication>(AppModule, {
   bufferLogs: true,
@@ -12,11 +13,10 @@ const app = await NestFactory.create<NestExpressApplication>(AppModule, {
 const config = app.get(ConfigService<Env, true>);
 
 app.useLogger(app.get(Logger));
-app.set('trust proxy', config.get('TRUSTED_PROXIES', { infer: true }));
-app.enableCsrfProtection({
+configureHttpApp(app, {
+  trustedProxies: config.get('TRUSTED_PROXIES', { infer: true }),
   trustedOrigins: config.get('TRUSTED_ORIGINS', { infer: true }),
 });
-app.setGlobalPrefix('api/v1');
 app.enableShutdownHooks();
 
 const openApi = new DocumentBuilder()

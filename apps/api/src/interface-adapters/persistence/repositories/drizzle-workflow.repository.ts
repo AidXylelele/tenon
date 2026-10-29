@@ -1,0 +1,74 @@
+import { Injectable } from '@nestjs/common';
+import {
+  Propagation,
+  Transactional,
+  TransactionHost,
+} from '@nestjs-cls/transactional';
+import { and, eq, sql } from 'drizzle-orm';
+import type { WorkflowRepository } from '../../../application/automation/workflows/ports.js';
+import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
+import type { Workflow } from '../../../domain/automation/workflows/workflow.js';
+import { StaleWriteError } from '../../../domain/errors.js';
+import type { DrizzleTx } from '../../interfaces.js';
+import { WorkflowMapper } from '../mappers/workflow.mapper.js';
+import { workflow as workflows } from '../schema/index.js';
+import { isUniqueViolation } from '../unique-violation.js';
+
+@Injectable()
+export class DrizzleWorkflowRepository implements WorkflowRepository {
+  constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
+
+  async findByName(name: WorkflowName): Promise<Workflow | null> {
+    const [row] = await this.txHost.tx
+      .select()
+      .from(workflows)
+      .where(
+        and(
+          eq(workflows.namespace, name.namespace),
+          eq(workflows.name, name.name),
+        ),
+      );
+
+    if (!row) return null;
+
+    return WorkflowMapper.toEntity(row);
+  }
+
+  @Transactional(Propagation.Mandatory)
+  async save(workflow: Workflow): Promise<void> {
+    const row = WorkflowMapper.toRow(workflow);
+    const nextVersion = workflow.version + 1;
+    const upsert = this.txHost.tx
+      .insert(workflows)
+      .values({
+        id: row.id,
+        namespace: row.namespace,
+        name: row.name,
+        isOn: row.isOn,
+        currentVersionId: row.currentVersionId,
+        version: nextVersion,
+      })
+      .onConflictDoUpdate({
+        target: workflows.id,
+        set: {
+          isOn: sql`excluded.is_on`,
+          currentVersionId: sql`excluded.current_version_id`,
+          version: sql`excluded.version`,
+        },
+        setWhere: eq(workflows.version, workflow.version),
+      })
+      .returning({ id: workflows.id });
+
+    try {
+      const saved = await upsert;
+
+      if (saved.length === 0) throw new StaleWriteError();
+    } catch (error) {
+      const raced = isUniqueViolation(error);
+
+      if (raced) throw new StaleWriteError();
+
+      throw error;
+    }
+  }
+}

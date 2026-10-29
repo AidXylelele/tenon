@@ -3,6 +3,7 @@ import type { Ajv, ValidateFunction } from 'ajv';
 import type { Ajv2019 } from 'ajv/dist/2019.js';
 import type { Ajv2020 } from 'ajv/dist/2020.js';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import type { ParsedDocument } from '../domain/automation/language/interfaces.js';
 import { Piscina } from 'piscina';
 import { Dispatcher, Pool } from 'undici';
 import type * as schema from './persistence/schema/index.js';
@@ -22,7 +23,7 @@ export abstract class JsonSchemaCompilers {
 }
 
 export abstract class DslSchema {
-  abstract readonly validate: ValidateFunction;
+  abstract readonly validate: ValidateFunction<ParsedDocument>;
 }
 
 export interface JqTask {

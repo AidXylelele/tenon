@@ -2,7 +2,6 @@ import {
   AuthenticationModule,
   PasswordHasher as ScryptPasswordHasher,
 } from '@nestjs/authentication';
-import { AuthorizationModule } from '@nestjs/authorization';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -11,8 +10,8 @@ import {
   PasswordHasher,
   UserRepository,
 } from '../../application/identity/ports.js';
-import { InvitationQueries } from '../../application/identity/queries.js';
 import { InvitationPolicy } from '../../application/identity/invitation.policy.js';
+import { InvitationQueries } from '../../application/identity/queries.js';
 import { AuthenticateUser } from '../../application/identity/authenticate-user.js';
 import { AcceptInvitation } from '../../application/identity/accept-invitation.js';
 import { ChangePassword } from '../../application/identity/change-password.js';
@@ -58,10 +57,10 @@ import { MailModule } from './mail.module.js';
         },
       }),
     }),
-    AuthorizationModule.forRoot({ policies: [InvitationPolicy] }),
   ],
   controllers: [AuthController, InvitationsController],
   providers: [
+    InvitationPolicy,
     DrizzleSessionStore,
     DrizzleEmailTokenStore,
     DrizzleUserRepository,

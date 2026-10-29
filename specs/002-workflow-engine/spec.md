@@ -438,7 +438,7 @@ An author can pause an instance, resume it later, or cancel it.
   - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error.
   - `run` with the `script` type (JavaScript or Python, with inline `code`) and the `shell` type, executed as FR-012 defines. A script `source` (an external resource) is outside the subset.
 
-  These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; and `use.extensions`.
+  These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; `use.extensions`; digest authentication and OAuth2 or OIDC grants other than `client_credentials`; a runtime expression as a retry delay, jitter or limit; and a fraction of years, months, weeks or days in a duration, which the standard does not define. The tasks `wait` and `listen`, `schedule` and `use.secrets` join the subset with the stories that run them.
 
   The platform MUST refuse any construct outside the subset at publish and MUST never ignore a construct silently.
 

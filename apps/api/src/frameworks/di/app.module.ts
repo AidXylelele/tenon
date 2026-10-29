@@ -5,16 +5,19 @@ import {
   StandardSchemaValidationPipe,
 } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
+import { AuthorizationModule } from '@nestjs/authorization';
 import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from '../../interface-adapters/http/controllers/health.controller.js';
 import { DomainErrorFilter } from '../../interface-adapters/http/filters/domain-error.filter.js';
 import { SecurityHeadersMiddleware } from '../../interface-adapters/http/middleware/security-headers.middleware.js';
+import { AutomationModule } from './automation.module.js';
 import { ConfigModule } from './config.module.js';
 import { DatabaseModule } from './database.module.js';
 import { IdentityModule } from './identity.module.js';
 import { LoggingModule } from './logging.module.js';
 import { MailModule } from './mail.module.js';
 import { OutboxModule } from './outbox.module.js';
+import { ResilienceModule } from './resilience.module.js';
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { OutboxModule } from './outbox.module.js';
     OutboxModule,
     MailModule,
     IdentityModule,
+    AuthorizationModule.forRoot(),
+    ResilienceModule,
+    AutomationModule,
     TerminusModule.forRoot({ gracefulShutdownTimeoutMs: 5_000 }),
   ],
   controllers: [HealthController],

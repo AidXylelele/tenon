@@ -88,8 +88,8 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
 ### WorkflowVersion (write-once)
 
 - **Protects:** a published document never changes.
-- **Fields:** `id`, `workflowId`, `semver`, `dslVersion`, `source` (SourceDocument: format, text, fingerprint), `definition`, `publisherId`, `publishedAt`.
-- **Behaviour:** `publish({ workflow, build, report, publisher })` throws `DefinitionRejectedError` with every problem when the report is not clean. `SourceDocument.confirmSame` owns the conflict between two documents under one identity.
+- **Fields:** `id`, `workflowId`, `semver`, `source` (SourceDocument: format, text, fingerprint), `definition` (its `dslVersion` comes from the document), `publisherId`, `publishedAt`.
+- **Behaviour:** `publish({ workflow, definition, source, publisherId, now })` refuses a definition of another workflow; the definition comes from `report.publishable()`, which throws `DefinitionRejectedError` with every problem. `confirmSame(source)` delegates to `SourceDocument.confirmSame`, which owns the conflict between two documents under one identity.
 
 ### WorkflowInstance
 
@@ -205,7 +205,7 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
 
 ## 6. Language model (module `language`)
 
-- **`Definition.build(parsed)`.** The factory takes the reader's ParsedDocument, a plain tree in the standard's shape that holds no SDK types. It returns a `DefinitionBuild`: the Definition, or none, plus **every** problem with its JSON Pointer:
+- **`Definition.build(parsed)`.** The factory takes the reader's ParsedDocument: typed interfaces in the standard's shape, validated by the reader, with no SDK types. A `Scope` is a place in the document: it knows its JSON Pointer, the reusable components and the task names its flow directives may name, and it records problems and expressions in the build's `Findings`. The result is an immutable `DefinitionBuild`: the Definition, or none, plus **every** problem with its JSON Pointer:
   - constructs outside `SupportedSubset` (including script `source`);
   - duplicate names in a scope;
   - a reusable component (function, retry policy, error, timeout, authentication) named but not declared in `use`;
@@ -213,10 +213,10 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
   - a fork with no branches;
   - negative limits.
 
-  Constructors keep guard clauses only, as a second line of defence (Khorikov, "Always-Valid Domain Model").
+  `DefinitionBuild.report(expressionProblems, published)` is the one owner of the report that checking and publishing give: it adds the expression problems and the reference problems (`DocumentReferences`, `ReferenceFacts`). `Report.publishable()` returns the Definition or throws `DefinitionRejectedError`. `Definition.restore(parsed)` rebuilds a stored version.
 
-- **`Definition`:** `dslVersion`, `input`/`output` (DataSpec), `timeout`, `schedule`, `evaluation`, `authentications`, `secretNames`, `body`. Each task keeps its parsed JSON for `$task.definition` and `$workflow.definition`.
-- **`Task`** (an interface): `name`, `reference`, `condition`, `data`, `timeout`, `then`, `secretNames`, `begin(rawInput)`.
+- **`Definition`:** its `document` (the ParsedDocument, stored as jsonb and used for `$workflow.definition`), `workflow` (WorkflowName), `version`, `dslVersion`, `input`/`output` (DataSpec), `timeout`, `components` (ReusableComponents: the document's `use`, which refuse an undeclared name themselves), `body`. Later stories add `schedule` (US4) and `secretNames` (US8); tasks keep their parsed JSON for `$task.definition` when US2 needs it.
+- **`Task`** (an interface): `name`, `reference`, `settings` (TaskSettings: `condition`, `input`, `output`, `export`, `timeout`, `then`). US2 adds `begin(rawInput)`. `TaskFactory` chooses the kind; `TaskList` refuses duplicate names and gives its tasks a scope that knows their names.
 - **Task kinds:**
   - `DoTask`, `ForTask`, `ForkTask`, `SwitchTask` (`select`), `TryTask`;
   - `SetTask`, `RaiseTask`, `CallTask`, `EmitTask`, `WaitTask`, `ListenTask`;
@@ -228,11 +228,11 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
   - `SandboxFailed` gives a runtime error.
 - **`EventFilter`:** `evaluationsFor(event)` (PatternMatch and Evaluation work) and `accepts(results)`. It is the only owner of `with` and `correlate` matching, for correlations and subscriptions alike.
 - **Values:**
-  - `TaskList`, `FlowDirective`, `Expression`, `DataSpec`, `Duration` (on the built-in `Temporal`);
-  - `CatchClause`, `ErrorFilter`, `RetryPolicy` (`allows`, `delayFor(attempt, jitterSample)`), `Backoff` kinds;
+  - `TaskList`, `FlowDirective`, `Expression`, `Template`, `DataSpec`, `FixedDuration` and `ExpressionDuration` (on the built-in `Temporal`, chosen by `DurationFactory`);
+  - `CatchClause`, `ErrorFilter`, `RetryPolicy` (`allows(attempt, elapsedMs, now)`, `delayFor(attempt, jitterSample, now)`), `Backoff` kinds chosen by `BackoffFactory`, `AuthenticationPolicy`, `Endpoint`;
   - `ErrorType`, `WorkflowError`;
-  - `Schedule` kinds, `ConsumptionStrategy`, `SemanticVersion`, `SupportedSubset`;
-  - `DocumentReferences` (`check(facts)`: only the publisher's secrets, published targets).
+  - `Schedule` kinds, `ConsumptionStrategy`, `SupportedSubset` (the one owner of the subset: every refusal and the conformance statement come from its lists), `RuntimeArguments`;
+  - `WorkflowName`, `WorkflowTarget` (`latest` by default), `WorkflowReference`, `ReferenceFacts`, `DocumentReferences` (`check(facts)`: published targets; the publisher's secrets in US8).
 
 ## 7. Execution model
 
@@ -299,10 +299,10 @@ Composites run lines 1, 4 and 5 around their children. `wait`, `listen` and `run
 | A published document never changes; conflict under the same identity                              | SourceDocument, plus the unique index                            |
 | Current version, on/off, schedule replacement, epoch, stale starts                                | Workflow and the Schedule kinds                                  |
 | Document syntax and the standard's schema                                                         | DocumentReader (adapter, input contract)                         |
-| Subset, duplicate names, directive scope, structural limits, every problem with its pointer       | Definition.build                                                 |
+| Subset, duplicate names, directive scope, structural limits, every problem with its pointer       | Definition.build, SupportedSubset, Scope                         |
 | Expression syntax                                                                                 | ExpressionEvaluator.check (adapter), reported through the report |
-| Only the publisher's secrets; published targets                                                   | DocumentReferences.check                                         |
-| A report with problems rejects publication                                                        | WorkflowVersion.publish                                          |
+| Published targets (US1); only the publisher's secrets (US8)                                       | DocumentReferences.check                                         |
+| A report with problems rejects publication                                                        | DefinitionBuild.report, Report.publishable                       |
 | The input schema; missing input means `{}`; a rejected child input                                | WorkflowInstance.start                                           |
 | A missing secret is an authorization error                                                        | WorkflowInstance.beginRound                                      |
 | Stages, skip, next task, limits, timeouts, phases, control, result accepted once, lifecycle order | WorkflowInstance, TaskList, progress objects                     |

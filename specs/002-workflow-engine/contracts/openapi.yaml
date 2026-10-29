@@ -701,24 +701,10 @@ components:
       }
     Problem:
       type: object
-      required: [pointer, message, kind]
+      required: [pointer, message]
       properties:
         pointer:
           { type: string, description: RFC 6901 JSON Pointer into the document }
-        kind:
-          {
-            type: string,
-            enum:
-              [
-                syntax,
-                schema,
-                subset,
-                reference,
-                expression,
-                argument,
-                version,
-              ],
-          }
         message: { type: string }
     CheckReport:
       type: object
@@ -956,5 +942,7 @@ components:
             items: { type: string },
             examples: [[workflow, script, shell]],
           }
+        scriptLanguages: { type: array, items: { type: string } }
+        authentications: { type: array, items: { type: string } }
         excluded: { type: array, items: { type: string } }
         contradictions: { type: array, items: { type: string } }

@@ -133,14 +133,14 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 **Decision:**
 
-- **Parsing.** `SdkDocumentReader` parses with the official SDK `@openworkflowspec/sdk` 1.0.3-alpha8, pinned exactly because `latest` points to 0.0.1. It validates dsl 1.0.0–1.0.3 against the standard's schema, compiled with Ajv `allErrors` (`DslSchema`), and maps the result to a ParsedDocument: a plain tree in the standard's shape, with no SDK types.
+- **Parsing.** `DslDocumentReader` parses YAML or JSON with `js-yaml`, the SDK's own parser, and validates the raw tree against the standard's 1.0.3 schema from `@openworkflowspec/sdk` 1.0.3-alpha8 (pinned, because `latest` is a 0.0.1 placeholder), compiled with Ajv `allErrors` (`DslSchema`, a type guard for ParsedDocument). The SDK's own deserialization is not used: its hydration drops unknown properties, which would ignore a construct silently. `SchemaProblems` reduces Ajv's `oneOf` noise: summaries go, branches whose `const` discriminator failed go, and a task keeps the errors of its own kind. The schema allows unknown top-level properties, so `SupportedSubset` refuses them.
 - **Domain checks.** `Definition.build` reports, with JSON Pointers, everything the domain owns:
   - the subset;
   - names and scopes;
   - structural limits;
   - script `source`, which is outside the subset.
-- **Other checks.** `ExpressionEvaluator.check` validates expression syntax. `DocumentReferences.check(facts)` validates the references, with the facts coming from `SecretQueries.namesOwnedBy` and `WorkflowQueries.publishedTargets`.
-- **Durations.** `Duration` (`language`) takes the standard's three forms and turns them into a deadline with the built-in `Temporal`, relative to the start time it is given. A fraction in years, months, weeks or days (`P1.5Y`) is refused at publish, because the standard does not define it.
+- **Other checks.** `ExpressionEvaluator.check` validates expression syntax. `DefinitionBuild.report` checks the references against `WorkflowQueries.referenceFacts(targets)` (and `SecretQueries.namesOwnedBy` in US8). When the document breaks the standard's schema, the report holds the schema problems only, because the other checks need a well-formed document.
+- **Durations.** `DurationFactory` reads the standard's three forms into a `FixedDuration` (a deadline from a start time, on the built-in `Temporal`) or an `ExpressionDuration` (evaluated at run time). A fraction in years, months, weeks or days (`P1.5Y`) is refused at publish, because the standard does not define it; so is a runtime expression as a retry delay, jitter or limit.
 
 **Rationale:**
 
@@ -244,27 +244,29 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 ## R16. Interpretation of the standard and the CTK
 
-| Point                                                 | Decision                                                                                                                       |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `$secrets`                                            | Only in `input.from`                                                                                                           |
-| `$authorization`                                      | From the call's ServiceResult, for `output.as` and `export.as`                                                                 |
-| `$runtime`                                            | `{ name, version }` of the platform                                                                                            |
-| `$task.definition`, `$workflow.definition`            | The parsed JSON kept in the Definition                                                                                         |
-| `set`                                                 | Replaces the data                                                                                                              |
-| `emit`                                                | The runtime generates `id`, `time` and `specversion`; the output is the event                                                  |
-| Task reference                                        | `/do/<index>/<name>[…]` (CTK)                                                                                                  |
-| Communication error                                   | Type `…/spec/1.0.0/errors/communication`; the HTTP status, or 500; a title                                                     |
-| Missing workflow input                                | `{}`                                                                                                                           |
-| `status-changed` events                               | Not produced                                                                                                                   |
-| Lifecycle `output`                                    | Left out above 64 KiB (the LifecycleEvent VO)                                                                                  |
-| Lifecycle `source`                                    | `/workflows/{namespace}/{name}/instances/{id}`                                                                                 |
-| `run.workflow.version`                                | `latest` by default, resolved when the task starts                                                                             |
-| Fork                                                  | Output is an array, or the winner's output with `compete`; exports apply in declaration order                                  |
-| `after`                                               | Next start only after **completion**                                                                                           |
-| Script language                                       | `js` / `javascript` → Node.js; `python` → Python 3; `source` is outside the subset                                             |
-| Process output                                        | stdout and stderr as strings; a non-zero exit is not an error; time-out → timeout error; other sandbox failure → runtime error |
-| `await: false`                                        | Transformed input; the process is detached                                                                                     |
-| Fractional years, months, weeks or days in a duration | Refused at publish; listed in the conformance statement                                                                        |
+| Point                                                 | Decision                                                                                                                               |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `$secrets`                                            | Only in `input.from`                                                                                                                   |
+| `$authorization`                                      | From the call's ServiceResult, for `output.as` and `export.as`                                                                         |
+| `$runtime`                                            | `{ name, version }` of the platform                                                                                                    |
+| `$task.definition`, `$workflow.definition`            | The parsed JSON kept in the Definition                                                                                                 |
+| `set`                                                 | Replaces the data                                                                                                                      |
+| `emit`                                                | The runtime generates `id`, `time` and `specversion`; the output is the event                                                          |
+| Task reference                                        | `/do/<index>/<name>[…]` (CTK)                                                                                                          |
+| Communication error                                   | Type `…/spec/1.0.0/errors/communication`; the HTTP status, or 500; a title                                                             |
+| Missing workflow input                                | `{}`                                                                                                                                   |
+| `status-changed` events                               | Not produced                                                                                                                           |
+| Lifecycle `output`                                    | Left out above 64 KiB (the LifecycleEvent VO)                                                                                          |
+| Lifecycle `source`                                    | `/workflows/{namespace}/{name}/instances/{id}`                                                                                         |
+| `run.workflow.version`                                | `latest` by default, resolved when the task starts                                                                                     |
+| Fork                                                  | Output is an array, or the winner's output with `compete`; exports apply in declaration order                                          |
+| `after`                                               | Next start only after **completion**                                                                                                   |
+| Script language                                       | `js` / `javascript` → Node.js; `python` → Python 3; `source` is outside the subset                                                     |
+| Process output                                        | stdout and stderr as strings; a non-zero exit is not an error; time-out → timeout error; other sandbox failure → runtime error         |
+| `await: false`                                        | Transformed input; the process is detached                                                                                             |
+| Backoff                                               | `constant`: the delay; `linear`: delay × attempt; `exponential`: delay × 2^(attempt − 1); jitter adds a share of `[from, to]`          |
+| Retry limits                                          | `limit.attempt.count` bounds the attempts; `limit.attempt.duration` bounds one attempt; `limit.duration` bounds the whole retry window |
+| Fractional years, months, weeks or days in a duration | Refused at publish; listed in the conformance statement                                                                                |
 
 **Recorded contradiction.** In CTK `try.feature`, "Try Handle Caught Error" filters on `…/dsl/errors/types/communication`, but the specification requires `…/spec/1.0.0/errors/communication`. We follow the specification, and the scenario is recorded in FR-032 and SC-001.
 
@@ -326,7 +328,8 @@ Each package exists because nothing built in covers it:
 | `@nestjs/outbox` 0.1.3                       | Reactions after commit, deliveries                                                                               | User requirement; first-party                                                                                                                                                           |
 | `@nestjs/idempotency` 0.0.3                  | Idempotent starts and webhook calls                                                                              | User requirement; first-party                                                                                                                                                           |
 | `@nestjs/resilience` 0.0.3                   | Timeouts, bulkheads, delivery breakers                                                                           | User requirement; first-party                                                                                                                                                           |
-| `@openworkflowspec/sdk` 1.0.3-alpha8         | YAML and JSON parsing, the official 1.0.3 schema (`workflowSchema`)                                              | The standard's own SDK; no vendored schema. `latest` is a 0.0.1 placeholder, so the alpha is pinned                                                                                     |
+| `@openworkflowspec/sdk` 1.0.3-alpha8         | The official 1.0.3 schema (`workflowSchema`)                                                                     | The standard's own SDK; no vendored schema. `latest` is a 0.0.1 placeholder, so the alpha is pinned                                                                                     |
+| `js-yaml` 5.4.2                              | Parsing YAML and JSON documents into the raw tree                                                                | The SDK's own parser, already in the tree; the SDK's hydration drops unknown properties                                                                                                 |
 | `ajv` 8.20.0, `ajv-formats` 3.0.1            | The full document report (`allErrors`) and the data schemas of FR-010                                            | zod's `fromJSONSchema` refuses `unevaluatedProperties`, `if`/`then`, `dependentSchemas` and external `$ref`, which the DSL schema and user schemas use. The SDK depends on both already |
 | `jq-wasm` 3.0.0-jq-1.8.2                     | jq, which the standard mandates                                                                                  | Node has no jq                                                                                                                                                                          |
 | `piscina` 5.3.2                              | Worker pool; aborting a task terminates its worker                                                               | A runaway expression cannot be interrupted on the main thread. No dependencies                                                                                                          |
@@ -371,3 +374,14 @@ Each package exists because nothing built in covers it:
 - **Webhook headers.** `Webhook.receive` drops them.
 - **Errors.** `StaleWriteError`.
 - **Contract.** Fixes listed in the contract itself.
+
+**Round 3** (2026-10-29, the US1 domain and the intended US1 application): both gave _approve with fixes_. Applied:
+
+- **One report owner.** `DefinitionBuild` is immutable; `DefinitionBuild.report` adds expression and reference problems; `Report.publishable()` returns the Definition or throws; `WorkflowVersion.publish` takes the definition and refuses one of another workflow.
+- **One subset owner.** `SupportedSubset` makes every refusal and the statement from the same lists; `ReusableComponents` refuses undeclared names itself; `Scope` knows the task names, so a flow directive checks its own target.
+- **Values.** `WorkflowName` and `WorkflowTarget` (with `latest`) are value objects; `FixedDuration` and `ExpressionDuration` replace one class with two states; props live in `interfaces.ts`; `WorkflowError.property` replaces `valueOf`.
+- **Persistence.** `Definition` keeps its ParsedDocument; the repository stores it as jsonb and `Definition.restore` rebuilds it, so persistence never parses YAML.
+- **Ports.** `ExpressionEvaluator` and `SchemaValidator` live in `application/automation/language/ports.ts`, which removes a cycle between modules; `RuntimeArguments` names the standard's arguments in the domain.
+- **Constitution 3.1.0.** Stale writes are retried by outbox handlers and engine steps only; `error-classifier.ts` and unit tests of adapter logic are named in the layout.
+- **The US1 diff (T033).** _Approve with fixes_, applied: the domain says whether a returned version is current (`Workflow.isCurrent`); the 1 MiB text parser runs only on `POST /workflows` and `/workflows/check`, so the default limits stay on every other route and a malformed JSON document reaches the reader; policies are providers of their modules; not-found answers come from domain errors; `mediaTypeOf` owns format and media type; `PublishVersion` composes `CheckDocument`; path parameters are zod schemas; one `configureHttpApp` serves `main.ts` and the tests; the reader is `DslDocumentReader`. Accepted as they are: `found ?? Workflow.register(...)`, which was approved with the design; queries read committed rows outside the command's transaction; the reader keeps the 1.0.3 task kinds to reduce Ajv noise.
+- **Not applied.** Ids are generated in the aggregates, as constitution IV and `Invitation.create` allow. `RetryPolicy.allows/delayFor`, `ErrorFilter.matches` and `WorkflowError.of` stay: they were approved with the design and US2 uses them.

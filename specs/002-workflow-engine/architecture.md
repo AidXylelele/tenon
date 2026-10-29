@@ -21,7 +21,7 @@ The dependency rule: frameworks → interface adapters → application → domai
 | `persistence/` | PostgreSQL                     | Out        | Repositories (secrets encrypted at rest), queries, mappers, schema, outbox writers (`DomainEventOutbox`, `OutboxEventOffers`), idempotency store                            |
 | `engine/`      | `@nestjs/workflows`            | In and out | `InstanceWorkflow`, `ScheduledStartWorkflow`, `InstanceRounds` (in); `InstanceRunsGateway`, `RecurringStartsGateway` (out)                                                  |
 | `messaging/`   | Outbox relay                   | In         | One `*OutboxHandler` per domain event, each calling one use case                                                                                                            |
-| `documents/`   | DSL documents (official SDK)   | Out        | `SdkDocumentReader`: parses and validates against the standard's schema, then maps to a ParsedDocument                                                                      |
+| `documents/`   | DSL documents (official SDK)   | Out        | `DslDocumentReader`: parses and validates against the standard's schema, then maps to a ParsedDocument                                                                      |
 | `expressions/` | jq                             | Out        | `JqExpressionEvaluator`: evaluations, pattern matches and syntax checks, plus the worker script and the sandbox prelude                                                     |
 | `json-schema/` | Ajv                            | Out        | `AjvSchemaValidator`                                                                                                                                                        |
 | `endpoints/`   | HTTP endpoints chosen by users | Out        | `HttpServiceCaller` (DSL `call: http/openapi` with the standard's authentication policies) and `CloudEventSubscriberGateway` (deliveries), both on the SSRF-safe dispatcher |
@@ -51,12 +51,13 @@ Rules:
 
 **Ports.** Abstract classes in `application/automation/*/ports.ts` and `queries.ts`:
 
-| Module    | Ports                                                                                                                                 | Queries                                                                   |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| workflows | WorkflowRepository, WorkflowVersionRepository, DocumentReader, RecurringStarts                                                        | WorkflowQueries (lists, documents, published targets, trigger candidates) |
-| instances | WorkflowInstanceRepository, InstanceRuns, ExpressionEvaluator, SchemaValidator, ServiceCaller, ProcessRunner                          | InstanceQueries (lists, history, progress)                                |
-| events    | EventRepository, CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway | EventQueries (candidates, catch-up), ConnectionQueries                    |
-| secrets   | SecretRepository                                                                                                                      | SecretQueries (`valuesFor`, `namesOwnedBy`)                               |
+| Module    | Ports                                                                                                                                 | Queries                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| workflows | WorkflowRepository, WorkflowVersionRepository, DocumentReader, RecurringStarts                                                        | WorkflowQueries (lists, documents, `referenceFacts(targets)`, trigger candidates) |
+| language  | ExpressionEvaluator, SchemaValidator (every module uses them, as every module uses the `language` domain)                             | —                                                                                 |
+| instances | WorkflowInstanceRepository, InstanceRuns, ServiceCaller, ProcessRunner                                                                | InstanceQueries (lists, history, progress)                                        |
+| events    | EventRepository, CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway | EventQueries (candidates, catch-up), ConnectionQueries                            |
+| secrets   | SecretRepository                                                                                                                      | SecretQueries (`valuesFor`, `namesOwnedBy`)                                       |
 
 **Time.** A use case reads the clock once per operation (`new Date()`) and passes it as a value. Jitter samples come from `node:crypto`, also passed as values. The domain reads neither.
 
@@ -229,7 +230,7 @@ Use cases never catch.
   - Only the definition's declared names are decrypted, and only for its rounds and deliveries.
   - Values are masked in records, faults, delivery errors and logs.
 - **Webhooks.** SHA-256 fingerprints; unknown and deleted tokens give the same 404; rates limited at the gateway.
-- **Input.** zod on every body, unknown fields rejected. Documents up to 1 MiB; events and webhook calls up to 256 KiB.
+- **Input.** zod on every body, query and path, unknown fields rejected. Documents up to 1 MiB, read as text only on the two document routes; events and webhook calls up to 256 KiB; the default limit everywhere else.
 
 ## 11. Conformance harness
 

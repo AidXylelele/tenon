@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/frameworks/di/app.module.js';
+import { configureHttpApp } from '../../src/frameworks/http/configure-http-app.js';
 import { Database } from '../../src/interface-adapters/interfaces.js';
 import { queuedMailCount } from './db.js';
 import { Mailbox } from './mailbox.js';
@@ -32,9 +33,10 @@ export async function createTestApp(
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     logger: false,
   });
-  app.set('trust proxy', ['127.0.0.1']);
-  app.enableCsrfProtection({ trustedOrigins: ['http://127.0.0.1:3001'] });
-  app.setGlobalPrefix('api/v1');
+  configureHttpApp(app, {
+    trustedProxies: ['127.0.0.1'],
+    trustedOrigins: ['http://127.0.0.1:3001'],
+  });
   await app.init();
   const db = app.get(Database);
   return {

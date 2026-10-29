@@ -1,3 +1,5 @@
+import type { Problem } from './automation/language/problem.js';
+
 export abstract class DomainError extends Error {
   constructor(message: string) {
     super(message);
@@ -92,5 +94,34 @@ export class InvitationConflictError extends ConflictError {
 export class StaleWriteError extends ConflictError {
   constructor() {
     super('The resource was changed meanwhile; read it again and retry');
+  }
+}
+
+export class DefinitionRejectedError extends RuleViolationError {
+  readonly problems: readonly Problem[];
+
+  constructor(problems: readonly Problem[]) {
+    super('The document has problems');
+    this.problems = problems;
+  }
+}
+
+export class VersionConflictError extends ConflictError {
+  constructor() {
+    super(
+      'A different document is already published under this namespace, name and version',
+    );
+  }
+}
+
+export class WorkflowNotFoundError extends NotFoundError {
+  constructor() {
+    super('The workflow does not exist');
+  }
+}
+
+export class VersionNotFoundError extends NotFoundError {
+  constructor() {
+    super('The workflow version does not exist');
   }
 }
