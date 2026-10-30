@@ -25,6 +25,11 @@
 - Q: How far should the NestJS ecosystem be used? → A: To the maximum: `@nestjs/schedule`, `@nestjs/locks`, `@nestjs/idempotency` and `@nestjs/resilience`, alongside `@nestjs/workflows` and `@nestjs/outbox`.
 - Q: What must this feature prepare for? → A: It builds the core. Later iterations add AI agents with tools and work with files, both through the standard's own constructs. The core must be designed so that those iterations extend it without reworking it.
 
+### Session 2026-10-29
+
+- Q: Must a refused document report every problem at once? → A: No. The standard requires no such report, and its SDK stops at the first schema error. Publishing works like request validation: the first problem refuses the document, with its location and reason. The standard's SDK checks the schema, the DSL range and duplicate task names. The platform checks only what the schema accepts and the platform cannot run.
+- Q: Should publishing check other workflows, secrets, or which variables an expression can use? → A: No. Publishing checks the document as a compiler would: the schema, the subset, the references inside the document and the syntax of expressions. Like AWS Step Functions and Camunda, the platform resolves other workflows, secrets and variable values when a run needs them.
+
 ## User Scenarios & Testing _(mandatory)_
 
 Two kinds of people use the platform, and both produce the same thing: a workflow document in the Open Workflow Specification DSL.
@@ -95,7 +100,7 @@ Every planned iteration maps to constructs the standard already defines. The cor
 | No-code editor (web)               | Documents, task `metadata` for layout                                                                                                                                                                     | Checking without publishing, with JSON Pointer locations; execution history                                                     |
 | Catalog of reusable functions      | The default catalog: `call: name:version@default`                                                                                                                                                         | A subset declared in one place (ER-001); `use.functions` already resolves named calls                                           |
 | AI agents with tools               | `call: a2a` for agents; `call: mcp` over the `http` transport for tools; `call: http` or `call: openapi` to model APIs; agent loops with `switch` and `then`; tools as sub-workflows or catalog functions | Secrets for API keys; outbound safeguards and limits; durable long runs; lifecycle events for observing agent steps             |
-| An assistant that builds workflows | An agent that writes standard documents                                                                                                                                                                   | The check report as its feedback loop (FR-003)                                                                                  |
+| An assistant that builds workflows | An agent that writes standard documents                                                                                                                                                                   | The check as its feedback loop (FR-003)                                                                                         |
 | Files                              | External resources by URI with an authentication policy; `call: http` with `output: raw`; the claim-check `outputUri` of DSL 1.0.4                                                                        | JSON instance data that carries URIs, size limits, secrets for storage credentials                                              |
 | Containers and local tools         | `run: container`, and the MCP `stdio` transport                                                                                                                                                           | Sandboxed processes behind one port, which a container runtime can implement; a subset extended construct by construct (ER-001) |
 | DSL 1.0.4                          | Runtime-generated `emit` id and source, `outputUri`, `catch.then`, `schedule.read`, the new event namespace                                                                                               | Each version keeps the DSL version it declares (ER-002)                                                                         |
@@ -106,32 +111,32 @@ Every planned iteration maps to constructs the standard already defines. The cor
 An author publishes a workflow document in YAML or JSON. The platform checks the whole document before it accepts it:
 
 - A valid document becomes a new immutable version and the workflow's current version.
-- An invalid document is refused, and every problem is reported with its location.
+- An invalid document is refused at its first problem, which is reported with its location and the reason.
 
-Authors can also check a document without publishing it, so an editor or an assistant can show the problems while the document is being built.
+Authors can also check a document without publishing it, so an editor or an assistant can show the problem while the document is being built.
 
 **Why this priority**: Nothing runs without a published workflow. Because the platform checks everything before a run, an automation does not fail later for a reason that publishing could have found.
 
 **Independent Test**:
 
 1. Publish a valid document and read it back.
-2. Publish documents with these defects, and confirm that each one is refused with every defect located:
+2. Publish documents with these defects, and confirm that each one is refused with its defect located:
    - a schema violation;
    - an unsupported task;
    - a flow directive pointing to a missing task;
    - an undeclared reusable component;
    - a malformed expression.
-3. Check a defective document without publishing it. Confirm that the report is the same and that nothing is stored.
+3. Check a defective document without publishing it. Confirm that the refusal is the same and that nothing is stored.
 
 **Acceptance Scenarios**:
 
 1. **Given** a valid document, **When** an author publishes it, **Then** a version with the document's namespace, name and version exists, becomes the workflow's current version, and returns the document as submitted.
-2. **Given** a document with several defects, **When** it is published, **Then** it is refused, nothing is stored, and the response lists every defect with its location in the document and the reason.
+2. **Given** a document with a defect, **When** it is published, **Then** it is refused, nothing is stored, and the response gives the defect's location in the document and the reason. A document with several defects is refused at the first one.
 3. **Given** a published version, **When** the identical document is published again, **Then** the existing version is returned and nothing changes.
 4. **Given** a published version, **When** a document with the same namespace, name and version but different content is published, **Then** it is refused as a conflict.
 5. **Given** a document that uses a construct outside the supported subset (FR-011), **When** it is published, **Then** it is refused, and the response names the construct and its location.
 6. **Given** a document that declares a DSL version the platform does not support, **When** it is published, **Then** it is refused.
-7. **Given** any document, **When** an author checks it without publishing, **Then** the response is the report that publishing would give, and nothing is stored.
+7. **Given** any document, **When** an author checks it without publishing, **Then** the response is the refusal that publishing would give, or a confirmation that the document is valid, and nothing is stored.
 8. **Given** a viewer, **When** the viewer tries to publish, **Then** the operation is refused.
 
 ---
@@ -372,6 +377,7 @@ An author can pause an instance, resume it later, or cancel it.
 - A retry policy is exhausted: the error propagates to the enclosing scope as the standard defines.
 - A runtime expression fails at run time: the task raises an expression error, which `try` can catch.
 - A sub-workflow instance faults: the `run` task faults with the sub-workflow's error.
+- A `run` task names a workflow or a version that is not published: the task faults with a configuration error when it starts.
 - A script exits with code 1 and `return: code`: the task completes with the output `1`.
 - A script runs past its time limit: it is stopped, and the task faults with a timeout error.
 
@@ -392,20 +398,20 @@ An author can pause an instance, resume it later, or cancel it.
 
 **Definitions**
 
-- **FR-001**: The platform MUST accept workflow documents in YAML or JSON that declare a DSL version from 1.0.0 through 1.0.3 of the Open Workflow Specification, and MUST refuse any other `document.dsl` value.
+- **FR-001**: The platform MUST accept workflow documents in YAML or JSON that declare a DSL version from 1.0.0 through 1.0.3 of the Open Workflow Specification, pre-releases of these versions included, and MUST refuse any other `document.dsl` value.
 - **FR-002**: Before it accepts a document, the platform MUST check:
   - (a) conformance to the standard's schema for the declared version;
   - (b) use of the supported subset only (FR-011);
   - (c) references:
     - every flow directive targets a task in its own scope;
     - every reusable component a task names (function, retry policy, error, timeout, authentication policy) is declared in the document's `use`;
-    - every sub-workflow a `run` task names exists, and a version it names explicitly is published (`latest`, the standard's default, is resolved when the task starts);
-    - every secret in `use.secrets` is owned by the publisher;
   - (d) the syntax of every runtime expression in the evaluation language.
 
-  The platform MUST report every problem in one response, each with its location as a JSON Pointer into the document and a reason. It MUST store nothing for a refused document.
+  The platform MUST refuse a document at its first problem, with the problem's location as a JSON Pointer into the document and a reason. It MUST store nothing for a refused document.
 
-- **FR-003**: Authors MUST be able to check a document without publishing it. The check MUST give the same report as publishing would and MUST store nothing.
+  What depends on the platform's state is resolved when a run needs it, not at publish: the workflows that `run` tasks name (FR-011), the publisher's secrets (FR-007), and which runtime arguments and variables an expression can use at its place (FR-010).
+
+- **FR-003**: Authors MUST be able to check a document without publishing it. The check MUST give the same outcome as publishing would and MUST store nothing.
 - **FR-004**: A version MUST be identified by the document's namespace, name and version, and a published version MUST never change. Publishing an identical document again MUST return the existing version. Publishing different content under an existing identity MUST be refused as a conflict. A newly published version MUST become the workflow's current version.
 - **FR-005**: Signed-in users MUST be able to list workflows and their versions and to read a version's document exactly as submitted.
 - **FR-006**: An author MUST be able to turn a workflow on and off. Only while a workflow is on MUST the schedule of its current version start instances. Turning a workflow off MUST NOT affect running instances or manual starts.
@@ -435,10 +441,10 @@ An author can pause an instance, resume it later, or cancel it.
 - **FR-011**: The supported subset MUST be the following:
   - the tasks `do`, `set`, `switch`, `for`, `fork`, `try`, `raise`, `wait`, `listen` and `emit`;
   - `call` with the `http` and `openapi` types, used directly or through a function declared in the document's `use.functions`;
-  - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error.
+  - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error. A target that does not exist, or an explicit version that is not published, faults the task with a configuration error when it starts.
   - `run` with the `script` type (JavaScript or Python, with inline `code`) and the `shell` type, executed as FR-012 defines. A script `source` (an external resource) is outside the subset.
 
-  These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; `use.extensions`; digest authentication and OAuth2 or OIDC grants other than `client_credentials`; a runtime expression as a retry delay, jitter or limit; and a fraction of years, months, weeks or days in a duration, which the standard does not define. The tasks `wait` and `listen`, `schedule` and `use.secrets` join the subset with the stories that run them.
+  These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; `use.extensions`; digest authentication and OAuth2 or OIDC grants other than `client_credentials`; a runtime expression as a retry delay, jitter or limit; and a fraction in a duration other than in the smallest of its hours, minutes or seconds (`P1.5D`, `PT1.5H30M`), which the platform cannot compute. The tasks `wait` and `listen`, `schedule` and `use.secrets` join the subset with the stories that run them.
 
   The platform MUST refuse any construct outside the subset at publish and MUST never ignore a construct silently.
 
@@ -595,7 +601,7 @@ These constraints come from the request. They shape the plan, not the user-visib
 ### Measurable Outcomes
 
 - **SC-001**: 100% of the conformance-kit scenarios inside the supported subset pass unmodified, except the recorded contradiction of FR-032, and 0 scenarios outside the subset are accepted for execution.
-- **SC-002**: In a corpus of at least 30 defective documents that covers schema, subset, reference and expression defects, 100% are refused at publish with every defect located. 0 documents from a corpus of valid ones are refused.
+- **SC-002**: In a corpus of at least 30 defective documents that covers schema, subset, reference and expression defects, 100% are refused at publish with the defect located. 0 documents from a corpus of valid ones are refused.
 - **SC-003**: In a fault-injection run of 1,000 instances, with a random worker killed every 10 seconds, 100% of the instances reach the same terminal phase and output as in an undisturbed run. 0 tasks recorded as completed execute again, as counted by an external test endpoint.
 - **SC-004**: Under the same load of workflows whose calls take 200 ms, doubling the workers from 2 to 4 raises completed instances per minute by at least 1.7×.
 - **SC-005**: With 10,000 instances waiting on timers or events at once, newly started short instances complete within 10% of the time they take with no waiting instances.

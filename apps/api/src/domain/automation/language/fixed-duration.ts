@@ -1,3 +1,10 @@
+import {
+  NegativeDurationError,
+  UncomputableDurationError,
+} from '../../errors.js';
+import type { Expression } from './expression.js';
+import type { InlineDurationParts } from './interfaces.js';
+
 export class FixedDuration {
   readonly #value: Temporal.Duration;
 
@@ -5,16 +12,30 @@ export class FixedDuration {
     this.#value = value;
   }
 
-  endFrom(start: Date): Date {
-    const startMs = start.getTime();
-    const instant = Temporal.Instant.fromEpochMilliseconds(startMs);
-    const zoned = instant.toZonedDateTimeISO('UTC');
-    const end = zoned.add(this.#value);
-    return new Date(end.epochMilliseconds);
+  static inline(parts: InlineDurationParts): FixedDuration {
+    const values = Object.values(parts);
+    const negative = values.some((value) => value !== undefined && value < 0);
+
+    if (negative) throw new NegativeDurationError();
+
+    const value = Temporal.Duration.from(parts);
+    return new FixedDuration(value);
   }
 
-  milliseconds(start: Date): number {
-    const end = this.endFrom(start);
-    return end.getTime() - start.getTime();
+  static literal(text: string): FixedDuration {
+    try {
+      const value = Temporal.Duration.from(text);
+      return new FixedDuration(value);
+    } catch {
+      throw new UncomputableDurationError();
+    }
+  }
+
+  get value(): Temporal.Duration {
+    return this.#value;
+  }
+
+  get expressions(): readonly Expression[] {
+    return [];
   }
 }

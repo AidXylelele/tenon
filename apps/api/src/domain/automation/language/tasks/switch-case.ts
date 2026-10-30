@@ -1,7 +1,6 @@
-import { Expression } from '../expression.js';
-import { FlowDirective } from '../flow-directive.js';
-import type { ParsedSwitchCase, SwitchCaseProps } from '../interfaces.js';
-import type { Scope } from '../scope.js';
+import type { Expression } from '../expression.js';
+import type { FlowDirective } from '../flow-directive.js';
+import type { SwitchCaseProps } from '../interfaces.js';
 
 export class SwitchCase {
   readonly #name: string;
@@ -12,18 +11,6 @@ export class SwitchCase {
     this.#name = props.name;
     this.#when = props.when;
     this.#then = props.then;
-  }
-
-  static read(
-    name: string,
-    parsed: ParsedSwitchCase,
-    scope: Scope,
-  ): SwitchCase {
-    const whenAt = scope.at('when');
-    const thenAt = scope.at('then');
-    const when = Expression.read(parsed.when, whenAt);
-    const then = FlowDirective.read(parsed.then, thenAt);
-    return new SwitchCase({ name, when, then });
   }
 
   get name(): string {

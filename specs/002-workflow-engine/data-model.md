@@ -22,7 +22,7 @@ The terms are the standard's unless marked _platform_.
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Workflow                                     | A named automation (namespace + name) with versions, a current version, an active schedule and an on/off state (_platform_)                                                                                         |
 | Workflow version                             | One immutable published DSL document                                                                                                                                                                                |
-| Definition                                   | Our model of a document, built by its factory together with the list of every problem found                                                                                                                         |
+| Definition                                   | Our model of a document, mapped from the document the standard's SDK validated; its value objects keep the invariants of a runnable model                                                                           |
 | Task                                         | `do`, `for`, `fork`, `switch`, `try`, `set`, `raise`, `call`, `emit`, `wait`, `listen`, `run` (workflow, script, shell)                                                                                             |
 | Task reference                               | A JSON Pointer such as `/do/0/tryGetPet/try/0/getPet`                                                                                                                                                               |
 | Stages                                       | `if`, input schema, `input.from`, the work, `output.as`, output schema, `export.as`, export schema                                                                                                                  |
@@ -88,8 +88,8 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
 ### WorkflowVersion (write-once)
 
 - **Protects:** a published document never changes.
-- **Fields:** `id`, `workflowId`, `semver`, `source` (SourceDocument: format, text, fingerprint), `definition` (its `dslVersion` comes from the document), `publisherId`, `publishedAt`.
-- **Behaviour:** `publish({ workflow, definition, source, publisherId, now })` refuses a definition of another workflow; the definition comes from `report.publishable()`, which throws `DefinitionRejectedError` with every problem. `confirmSame(source)` delegates to `SourceDocument.confirmSame`, which owns the conflict between two documents under one identity.
+- **Fields:** `id`, `workflowId`, `semver`, `dslVersion`, `source` (SourceDocument: format, text, fingerprint), `publisherId`, `publishedAt`.
+- **Behaviour:** `publish({ workflow, definition, source, publisherId, now })` refuses a definition of another workflow and takes `semver` and `dslVersion` from it; the definition comes from `CheckDocument`. `confirmSame(source)` delegates to `SourceDocument.confirmSame`, which owns the conflict between two documents under one identity. A run reads the version's Definition from its source through `DefinitionReader` (US2).
 
 ### WorkflowInstance
 
@@ -205,34 +205,64 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
 
 ## 6. Language model (module `language`)
 
-- **`Definition.build(parsed)`.** The factory takes the reader's ParsedDocument: typed interfaces in the standard's shape, validated by the reader, with no SDK types. A `Scope` is a place in the document: it knows its JSON Pointer, the reusable components and the task names its flow directives may name, and it records problems and expressions in the build's `Findings`. The result is an immutable `DefinitionBuild`: the Definition, or none, plus **every** problem with its JSON Pointer:
-  - constructs outside `SupportedSubset` (including script `source`);
-  - duplicate names in a scope;
-  - a reusable component (function, retry policy, error, timeout, authentication) named but not declared in `use`;
-  - flow directives outside their scope;
-  - a fork with no branches;
-  - negative limits.
+The names follow the standard. Where a library export or the platform's access policies already use a name (`Policy`, `Retry`, `RetryPolicy`, `Duration`, `Catch`), the domain picks another one.
 
-  `DefinitionBuild.report(expressionProblems, published)` is the one owner of the report that checking and publishing give: it adds the expression problems and the reference problems (`DocumentReferences`, `ReferenceFacts`). `Report.publishable()` returns the Definition or throws `DefinitionRejectedError`. `Definition.restore(parsed)` rebuilds a stored version.
+**What publishing checks.** Publishing checks a document the way a compiler checks code. The split follows Khorikov's "Always-Valid Domain Model": input is validated at the boundary with the domain's knowledge, and invariants stay in the domain.
 
-- **`Definition`:** its `document` (the ParsedDocument, stored as jsonb and used for `$workflow.definition`), `workflow` (WorkflowName), `version`, `dslVersion`, `input`/`output` (DataSpec), `timeout`, `components` (ReusableComponents: the document's `use`, which refuse an undeclared name themselves), `body`. Later stories add `schedule` (US4) and `secretNames` (US8); tasks keep their parsed JSON for `$task.definition` when US2 needs it.
-- **`Task`** (an interface): `name`, `reference`, `settings` (TaskSettings: `condition`, `input`, `output`, `export`, `timeout`, `then`). US2 adds `begin(rawInput)`. `TaskFactory` chooses the kind; `TaskList` refuses duplicate names and gives its tasks a scope that knows their names.
-- **Task kinds:**
-  - `DoTask`, `ForTask`, `ForkTask`, `SwitchTask` (`select`), `TryTask`;
-  - `SetTask`, `RaiseTask`, `CallTask`, `EmitTask`, `WaitTask`, `ListenTask`;
-  - `RunWorkflowTask`, `RunScriptTask`, `RunShellTask`, which differ only in how they build a `ProcessRun`.
-- **Templates.** Each leaf kind holds its spec as a template: JSON with `${}` leaves.
-- **Process results** are polymorphic:
-  - `ProcessExited.outcome(ProcessReturn)`: the output follows `return`, stdout and stderr are strings, and a non-zero exit is not an error;
+- **Input validation (documents adapter).** The first problem found refuses the document:
+  - the standard's SDK checks the schema, the DSL range and duplicate task names (`InvalidDocumentError`);
+  - the mappers refuse what the domain cannot represent (`UnsupportedConstructError`);
+  - `ReusableComponents` refuses a name that `use` does not declare (`UndeclaredComponentError`);
+  - `ExpressionEvaluator.check` checks the syntax of every expression (`InvalidExpressionError`).
+- **Invariants (domain).** An object that would break one is never created:
+  - `TaskList`: task names are unique, and every flow directive names `continue`, `exit`, `end` or a task of the list (`DuplicateTaskError`, `UnknownTaskError`);
+  - `ForkTask`: a competing fork has a branch (`EmptyCompetingForkError`);
+  - `FixedDuration`: a duration is not negative, and a fraction appears only in the smallest of its hours, minutes or seconds;
+  - `RetryStrategy`: an attempt count is not negative.
+
+  The `FixedDuration` and `RetryStrategy` errors carry no location, because the same values are also built at run time. The mapper turns them into an `InvalidDocumentValueError` at the value's place.
+
+- **Run time, not publish.** These are resolved when a run needs them (US2, US8):
+  - the workflows that `run` tasks name;
+  - the publisher's secrets;
+  - which runtime arguments and variables an expression can use at its place.
+
+**Model:**
+
+- **`Definition`:** `workflow` (WorkflowName), `version`, `dslVersion`, `input`, `output`, `timeout`, `body` (TaskList) and `components` (ReusableComponents). It also gives `expressions`: every expression in the document, the declared components included.
+- **`Task`** (abstract): `name`, `reference` (JsonPointer), `base` (TaskBase), `directives` and `expressions`. US2 adds `begin(rawInput)`.
+- **`TaskBase`** (the standard's common task properties): `if`, `input`, `output`, `export`, `timeout`, `then`.
+- **Task kinds** (`tasks/`):
+  - flow: `DoTask`, `ForTask`, `ForkTask`, `SwitchTask` with `SwitchCase`, `TryTask` with `CatchClause`;
+  - data: `SetTask`, `RaiseTask`, `EmitTask`;
+  - the standard's call types: `HttpCallTask` (`endpoint`, `arguments`), `OpenApiCallTask` (`document`, `arguments`, `authentication`), `FunctionCallTask` (the name of a declared `function`, which `Definition` confirms, and its `arguments`);
+  - runs: `RunWorkflowTask` (`target`, `input`), `RunScriptTask` (`language`, `script`), `RunShellTask` (`shell`).
+
+  `WaitTask` and `ListenTask` join with US3. The constructors apply the standard's defaults: `item`, `index`, `error`, `continue`, `stdout`, `await: true`, `compete: false`.
+
+- **Values:**
+  - `TaskList`, `FlowDirective`;
+  - `Expression` (`pointer`, `program`), `Template` (JSON whose `${}` leaves are expressions);
+  - `Input`, `Output`, `Export`;
+  - `FixedDuration`, `ExpressionDuration`;
+  - `RetryStrategy` with its `BackoffKind`;
+  - `CatchClause`, `ErrorFilter`;
+  - `Endpoint`, `Authentication`;
+  - `ReusableComponents` (the declared `use`, with lookups by name);
+  - `WorkflowName`, `WorkflowTarget`, `JsonPointer`;
+  - `ConformanceStatement` (ER-001), made from the enums.
+- **Later stories:** `Schedule` kinds (US4), `ConsumptionStrategy` and `EventFilter` (US7).
+- **Enums** (`enums.ts`): `TaskKind`, `CallKind`, `ExcludedCallKind`, `RunKind`, `ScriptLanguage`, `ProcessReturn`, `AuthenticationScheme`, `OAuth2Grant`, `BackoffKind`, `FlowKeyword`, `DefaultVariable`, `ErrorProperty`, `FunctionReference`, `Component`, `UnsupportedConstruct`, `DslVersion`, `Contradiction`.
+
+  An enum holds a closed set of values. When values come to steer behaviour, the domain replaces the enum with polymorphism or an enumeration class (MS Learn, "Use enumeration classes instead of enum types"). `FlowDirective`, `ProcessReturn` and `BackoffKind` change this way in US2.
+
+  Behaviour comes with the story that runs it. US1 holds the standard's values and checks them; US2 adds the run-time behaviour (`WorkflowError`, `ErrorType` as an enumeration class that carries a status, `ErrorFilter.matches`, retry delays and backoffs, duration arithmetic, `latest` resolution).
+
+- **Process results** (US2) are polymorphic:
+  - `ProcessExited.outcome(ProcessReturn)`: the output follows `return`; stdout and stderr are strings; a non-zero exit is not an error;
   - `ProcessTimedOut` gives a timeout error;
   - `SandboxFailed` gives a runtime error.
-- **`EventFilter`:** `evaluationsFor(event)` (PatternMatch and Evaluation work) and `accepts(results)`. It is the only owner of `with` and `correlate` matching, for correlations and subscriptions alike.
-- **Values:**
-  - `TaskList`, `FlowDirective`, `Expression`, `Template`, `DataSpec`, `FixedDuration` and `ExpressionDuration` (on the built-in `Temporal`, chosen by `DurationFactory`);
-  - `CatchClause`, `ErrorFilter`, `RetryPolicy` (`allows(attempt, elapsedMs, now)`, `delayFor(attempt, jitterSample, now)`), `Backoff` kinds chosen by `BackoffFactory`, `AuthenticationPolicy`, `Endpoint`;
-  - `ErrorType`, `WorkflowError`;
-  - `Schedule` kinds, `ConsumptionStrategy`, `SupportedSubset` (the one owner of the subset: every refusal and the conformance statement come from its lists), `RuntimeArguments`;
-  - `WorkflowName`, `WorkflowTarget` (`latest` by default), `WorkflowReference`, `ReferenceFacts`, `DocumentReferences` (`check(facts)`: published targets; the publisher's secrets in US8).
+- **`EventFilter`** (US7): `evaluationsFor(event)` and `accepts(results)`. It is the only owner of `with` and `correlate` matching, for correlations and subscriptions alike.
 
 ## 7. Execution model
 
@@ -243,7 +273,7 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
 | `Evaluation`   | Work id; expression or template; data; arguments; expected type (any, boolean, duration); mode | `EvaluationResult`: a value, or a failure                                                                                             |
 | `PatternMatch` | Work id; value; regular expression                                                             | `EvaluationResult`: a boolean                                                                                                         |
 | `Validation`   | Work id, schema, data                                                                          | `ValidationResult`                                                                                                                    |
-| `ServiceCall`  | Work id; an evaluated HTTP or OpenAPI request; authentication policy; deadline                 | `ServiceResult`: the content or response plus the `$authorization` descriptor (masked); or `TimedOut` / `CommunicationFailed(status)` |
+| `ServiceCall`  | Work id; an evaluated HTTP or OpenAPI request; its authentications; deadline                   | `ServiceResult`: the content or response plus the `$authorization` descriptor (masked); or `TimedOut` / `CommunicationFailed(status)` |
 | `ProcessRun`   | Work id; script (language, code) or shell command; arguments; environment; stdin; deadline     | `ProcessExited`, `ProcessTimedOut` or `SandboxFailed`                                                                                 |
 
 **Stage plan of a leaf task.** One line per round. Independent pure items share a round:
@@ -266,7 +296,7 @@ Composites run lines 1, 4 and 5 around their children. `wait`, `listen` and `run
 | `TimedOut`, `CommunicationFailed` | timeout or communication error      | ErrorType                                |
 | Process result                    | completion or fault                 | the ProcessResult kind, ProcessReturn    |
 | Case values                       | the branch                          | SwitchTask.select                        |
-| Fault                             | catch, retry, delay                 | ErrorFilter, RetryPolicy, TryProgress    |
+| Fault                             | catch, retry, delay                 | ErrorFilter, RetryStrategy, TryProgress  |
 | Branch outputs                    | join, compete, export order         | ForkProgress                             |
 | Any cancelled task                | close its correlation or child      | the task's progress, through `abandon()` |
 
@@ -294,40 +324,42 @@ Composites run lines 1, 4 and 5 around their children. `wait`, `listen` and `run
 
 ## 9. Rule owners
 
-| Rule                                                                                              | Owner                                                            |
-| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| A published document never changes; conflict under the same identity                              | SourceDocument, plus the unique index                            |
-| Current version, on/off, schedule replacement, epoch, stale starts                                | Workflow and the Schedule kinds                                  |
-| Document syntax and the standard's schema                                                         | DocumentReader (adapter, input contract)                         |
-| Subset, duplicate names, directive scope, structural limits, every problem with its pointer       | Definition.build, SupportedSubset, Scope                         |
-| Expression syntax                                                                                 | ExpressionEvaluator.check (adapter), reported through the report |
-| Published targets (US1); only the publisher's secrets (US8)                                       | DocumentReferences.check                                         |
-| A report with problems rejects publication                                                        | DefinitionBuild.report, Report.publishable                       |
-| The input schema; missing input means `{}`; a rejected child input                                | WorkflowInstance.start                                           |
-| A missing secret is an authorization error                                                        | WorkflowInstance.beginRound                                      |
-| Stages, skip, next task, limits, timeouts, phases, control, result accepted once, lifecycle order | WorkflowInstance, TaskList, progress objects                     |
-| Abandoned listens and children are closed                                                         | progress `abandon()`                                             |
-| `await: false` detaches the process                                                               | WorkflowInstance (ProcessDetached)                               |
-| Lifecycle event shape, sequence, 64 KiB output                                                    | LifecycleEvent                                                   |
-| Masking: records, faults, delivery errors                                                         | SecretValues, used by WorkflowInstance, Delivery                 |
-| Encryption at rest                                                                                | DrizzleSecretRepository                                          |
-| What follows an instance's end                                                                    | Origin kinds                                                     |
-| Event acceptance once                                                                             | the Event index and `add`                                        |
-| `with` and `correlate` matching                                                                   | EventFilter                                                      |
-| Consumption, `since`, `until`, no self-trigger                                                    | Correlation and its owner                                        |
-| Header drop on webhook calls                                                                      | Webhook.receive                                                  |
-| Subscription authenticates only with owner's secrets                                              | Subscription.create                                              |
-| Delivery outcome and 24-hour limit                                                                | Delivery                                                         |
-| Access by role                                                                                    | `@Can` policies                                                  |
+| Rule                                                                                              | Owner                                                               |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| A published document never changes; conflict under the same identity                              | SourceDocument, plus the unique index                               |
+| Current version, on/off, schedule replacement, epoch, stale starts                                | Workflow and the Schedule kinds                                     |
+| Document syntax, the standard's schema, the DSL range, duplicate task names                       | The standard's SDK, through `SdkOpenWorkflowClient` (frameworks)    |
+| Constructs and values outside the subset; names declared in `use`                                 | The documents mappers with the domain's enums; `ReusableComponents` |
+| Unique task names, directive targets, competing fork branches, durations, attempt counts          | TaskList, ForkTask, FixedDuration, RetryStrategy                    |
+| Expression syntax                                                                                 | ExpressionEvaluator.check (adapter)                                 |
+| Run targets exist and are published (US2); only the publisher's secrets (US8)                     | Resolved when a run needs them                                      |
+| The first problem refuses the document, with its pointer                                          | a `DefinitionRejectedError` kind, thrown by the rule's owner        |
+| The input schema; missing input means `{}`; a rejected child input                                | WorkflowInstance.start                                              |
+| A missing secret is an authorization error                                                        | WorkflowInstance.beginRound                                         |
+| Stages, skip, next task, limits, timeouts, phases, control, result accepted once, lifecycle order | WorkflowInstance, TaskList, progress objects                        |
+| Abandoned listens and children are closed                                                         | progress `abandon()`                                                |
+| `await: false` detaches the process                                                               | WorkflowInstance (ProcessDetached)                                  |
+| Lifecycle event shape, sequence, 64 KiB output                                                    | LifecycleEvent                                                      |
+| Masking: records, faults, delivery errors                                                         | SecretValues, used by WorkflowInstance, Delivery                    |
+| Encryption at rest                                                                                | DrizzleSecretRepository                                             |
+| What follows an instance's end                                                                    | Origin kinds                                                        |
+| Event acceptance once                                                                             | the Event index and `add`                                           |
+| `with` and `correlate` matching                                                                   | EventFilter                                                         |
+| Consumption, `since`, `until`, no self-trigger                                                    | Correlation and its owner                                           |
+| Header drop on webhook calls                                                                      | Webhook.receive                                                     |
+| Subscription authenticates only with owner's secrets                                              | Subscription.create                                                 |
+| Delivery outcome and 24-hour limit                                                                | Delivery                                                            |
+| Access by role                                                                                    | `@Can` policies                                                     |
 
 ## 10. Domain errors
 
-| Error                                                                                                                                    | Base               | HTTP |
-| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---- |
-| DefinitionRejectedError (report), InputRejectedError (WorkflowError), ForeignSecretError                                                 | RuleViolationError | 422  |
-| StaleWriteError (any optimistic conflict), VersionConflictError, InvalidControlError                                                     | ConflictError      | 409  |
-| WorkflowNotFoundError, VersionNotFoundError, InstanceNotFoundError, WebhookNotFoundError, SubscriptionNotFoundError, SecretNotFoundError | NotFoundError      | 404  |
-| StaleStartError                                                                                                                          | RuleViolationError | —    |
+| Error                                                                                                                                                                                                                                                                                                | Base               | HTTP |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---- |
+| DefinitionRejectedError (pointer) and its kinds: InvalidDocumentError, UnsupportedConstructError, UndeclaredComponentError, InvalidExpressionError, DuplicateTaskError, UnknownTaskError, EmptyCompetingForkError, InvalidDocumentValueError; InputRejectedError (WorkflowError); ForeignSecretError | RuleViolationError | 422  |
+| InvalidValueError and its kinds (NegativeDurationError, UncomputableDurationError, NegativeAttemptCountError): a value rule without a location; the caller gives it a meaning                                                                                                                        | RuleViolationError | —    |
+| StaleWriteError (any optimistic conflict), VersionConflictError, InvalidControlError                                                                                                                                                                                                                 | ConflictError      | 409  |
+| WorkflowNotFoundError, VersionNotFoundError, InstanceNotFoundError, WebhookNotFoundError, SubscriptionNotFoundError, SecretNotFoundError                                                                                                                                                             | NotFoundError      | 404  |
+| StaleStartError                                                                                                                                                                                                                                                                                      | RuleViolationError | —    |
 
 Run-time workflow errors are WorkflowError values.
 
@@ -336,7 +368,7 @@ Run-time workflow errors are WorkflowError values.
 | Table               | Key columns                                                                                                                                                              | Notes                                                                                     |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | `workflow`          | id, namespace, name, is_on, current_version_id, schedule, trigger_types text[], epoch, version                                                                           | unique (namespace, name); GIN on trigger_types                                            |
-| `workflow_version`  | id, workflow_id, semver, dsl_version, source_format, source_text, fingerprint, definition, publisher_id, published_at                                                    | unique (workflow_id, semver)                                                              |
+| `workflow_version`  | id, workflow_id, semver, dsl_version, source_format, source_text, fingerprint, publisher_id, published_at                                                                | unique (workflow_id, semver)                                                              |
 | `workflow_instance` | id, workflow_id, version_id, phase, input, output, error, context, origin, limits, started_at, ended_at, deadline, executions, sequence, progress_kind, wake_at, version | the progress columns serve GetProgress                                                    |
 | `task_instance`     | id, instance_id, reference, name, kind, parent_id, status, raw_input, input, output, error, attempts, progress, started_at, ended_at, deadline                           | active rows load with the aggregate; `attempts` is a read column written from TryProgress |
 | `event`             | id, source, event_id, type, time, subject, data_content_type, data_schema, data, extensions, origin_kind, origin_workflow_id, origin_instance_id, sequence, accepted_at  | unique (source, event_id); indexes (type, accepted_at) and (origin_instance_id, sequence) |
@@ -359,6 +391,7 @@ The libraries own `nest_workflows` and `nest_outbox`.
 | Domain events            | only across separately advancing aggregates or beyond the database (research R4); produced Events are written explicitly in the round's transaction | "Domain events: simple and reliable solution"                                                                |
 | Application services     | linear orchestration                                                                                                                                | "Domain services vs Application services"                                                                    |
 | Purity                   | work out, results in; time, jitter samples, limits and secrets passed as values                                                                     | "Domain model purity vs. completeness"; "Domain model purity and the current time"; "Immutable architecture" |
-| Always valid             | factories return every problem; constructors guard                                                                                                  | "Always-Valid Domain Model"                                                                                  |
+| Always valid             | input validation in the documents adapter with the domain's knowledge; invariants in constructors and factories                                     | "Always-Valid Domain Model"; "Validation and DDD"                                                            |
+| Enumerations             | enums for closed sets; polymorphism or an enumeration class where values steer behaviour                                                            | MS Learn, "Use enumeration classes instead of enum types"; "Functional C#: Primitive obsession"              |
 | Repositories, CQS        | one repository per aggregate; queries read into read models                                                                                         | "Having the domain model separated from the persistence model"; "Types of CQRS"                              |
 | Encapsulation            | progress objects, owners, schedule kinds, origins and filters decide for themselves                                                                 | "Encapsulation revisited"                                                                                    |

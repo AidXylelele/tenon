@@ -1,7 +1,5 @@
-import type { PublishedTargets } from '../../../domain/automation/language/interfaces.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import type { WorkflowTarget } from '../../../domain/automation/language/workflow-target.js';
-import type { DocumentFormat } from '../../../domain/automation/workflows/interfaces.js';
+import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
 
 export interface WorkflowSummary {
   readonly namespace: string;
@@ -43,7 +41,4 @@ export abstract class WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionDocument | null>;
-  abstract referenceFacts(
-    targets: readonly WorkflowTarget[],
-  ): Promise<PublishedTargets>;
 }

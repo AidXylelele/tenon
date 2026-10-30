@@ -1,78 +1,92 @@
 import { CheckDocument } from '../../../../../src/application/automation/workflows/check-document.js';
+import { DocumentFormat } from '../../../../../src/domain/automation/workflows/enums.js';
+import {
+  type DefinitionRejectedError,
+  InvalidDocumentError,
+  InvalidExpressionError,
+  UnsupportedConstructError,
+} from '../../../../../src/domain/errors.js';
 import {
   FakeExpressionEvaluator,
-  InMemoryWorkflowQueries,
-  InMemoryWorkflowVersionRepository,
-  JsonDocumentReader,
+  JsonDefinitionReader,
 } from '../../../../support/fakes.js';
 
-const valid = JSON.stringify({
-  document: {
-    dsl: '1.0.3',
-    namespace: 'default',
-    name: 'greet',
-    version: '1.0.0',
-  },
-  do: [{ hello: { set: { greeting: '${ .name }' } } }],
-});
+function documentText(tasks: readonly object[]): string {
+  return JSON.stringify({
+    document: {
+      dsl: '1.0.3',
+      namespace: 'default',
+      name: 'greet',
+      version: '1.0.0',
+    },
+    do: tasks,
+  });
+}
 
 function checker(refused: ReadonlySet<string> = new Set()): CheckDocument {
-  const versions = new InMemoryWorkflowVersionRepository();
-  const queries = new InMemoryWorkflowQueries(versions);
+  const definitions = new JsonDefinitionReader();
   const expressions = new FakeExpressionEvaluator(refused);
-  return new CheckDocument(new JsonDocumentReader(), expressions, queries);
+  return new CheckDocument(definitions, expressions);
+}
+
+async function rejectionOf(
+  check: Promise<unknown>,
+): Promise<DefinitionRejectedError> {
+  try {
+    await check;
+  } catch (error) {
+    return error as DefinitionRejectedError;
+  }
+
+  throw new Error('The document was not rejected');
 }
 
 describe('CheckDocument', () => {
-  it('a_valid_document_gives_a_clean_report', async () => {
-    const report = await checker().execute({ format: 'json', text: valid });
+  it('a_valid_document_gives_its_definition', async () => {
+    const text = documentText([{ hello: { set: { greeting: '${ .name }' } } }]);
 
-    expect(report.isClean()).toBe(true);
-    expect(report.problems).toEqual([]);
+    const definition = await checker().execute({
+      format: DocumentFormat.Json,
+      text,
+    });
+
+    expect(definition.workflow.toString()).toBe('default/greet');
+    expect(definition.version).toBe('1.0.0');
   });
 
-  it('subset_expression_and_reference_problems_come_in_one_report', async () => {
-    const text = JSON.stringify({
-      document: {
-        dsl: '1.0.3',
-        namespace: 'default',
-        name: 'broken',
-        version: '1.0.0',
-      },
-      do: [
-        { pause: { wait: 'PT1S' } },
-        { compute: { set: { value: '${ .a + }' } } },
-        {
-          child: {
-            run: { workflow: { namespace: 'billing', name: 'invoice' } },
-          },
-        },
-      ],
-    });
+  it('a_construct_outside_the_subset_is_refused_before_any_expression', async () => {
+    const text = documentText([
+      { pause: { wait: 'PT1S' } },
+      { compute: { set: { value: '${ .a + }' } } },
+    ]);
     const refused = new Set(['.a +']);
 
-    const report = await checker(refused).execute({ format: 'json', text });
-    const located = report.problems.map((problem) => [
-      problem.pointer,
-      problem.reason,
-    ]);
+    const rejection = await rejectionOf(
+      checker(refused).execute({ format: DocumentFormat.Json, text }),
+    );
 
-    expect(report.isClean()).toBe(false);
-    expect(located).toEqual([
-      ['/do/0/pause/wait', 'the wait task is outside the supported subset'],
-      ['/do/1/compute/set/value', 'syntax error'],
-      ['/do/2/child/run/workflow', 'No workflow billing/invoice exists'],
-    ]);
+    expect(rejection).toBeInstanceOf(UnsupportedConstructError);
+    expect(rejection.pointer).toBe('/do/0/pause/wait');
   });
 
-  it('an_unreadable_document_reports_why_it_cannot_be_read', async () => {
-    const report = await checker().execute({
-      format: 'json',
-      text: 'not json',
-    });
+  it('an_invalid_expression_is_refused_where_it_stands', async () => {
+    const text = documentText([{ compute: { set: { value: '${ .a + }' } } }]);
+    const refused = new Set(['.a +']);
 
-    expect(report.problems.map((problem) => problem.reason)).toEqual([
-      'The document is not JSON',
-    ]);
+    const rejection = await rejectionOf(
+      checker(refused).execute({ format: DocumentFormat.Json, text }),
+    );
+
+    expect(rejection).toBeInstanceOf(InvalidExpressionError);
+    expect(rejection.pointer).toBe('/do/0/compute/set/value');
+  });
+
+  it('an_unreadable_document_is_refused', async () => {
+    const rejection = await rejectionOf(
+      checker().execute({ format: DocumentFormat.Json, text: 'not json' }),
+    );
+
+    expect(rejection).toBeInstanceOf(InvalidDocumentError);
+    expect(rejection.message).toBe('The document is not JSON');
   });
 });

@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -13,6 +14,7 @@ import {
   ApiConflictResponse,
   ApiCookieAuth,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiTags,
@@ -30,14 +32,9 @@ import {
   WorkflowNotFoundError,
 } from '../../../domain/errors.js';
 import type { User } from '../../../domain/identity/user.js';
-import {
-  DslDocument,
-  mediaTypeOf,
-  type SubmittedDocument,
-} from '../parsers/dsl-document.parser.js';
+import { DocumentBody } from '../parsers/document-body.parser.js';
 import { WorkflowPresenter } from '../presenters/workflow.presenter.js';
 import {
-  CheckReportResponse,
   ListWorkflowsQuery,
   VersionParams,
   VersionResponse,
@@ -58,13 +55,11 @@ export class WorkflowsController {
 
   @Post('check')
   @Can(WorkflowPolicy, 'author')
-  @HttpCode(200)
-  @ApiOkResponse({ standardSchema: CheckReportResponse })
-  async check(
-    @DslDocument() document: SubmittedDocument,
-  ): Promise<CheckReportResponse> {
-    const report = await this.checkDocument.execute(document);
-    return WorkflowPresenter.report(report);
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @ApiUnprocessableEntityResponse()
+  async check(@DocumentBody() document: DocumentBody): Promise<void> {
+    await this.checkDocument.execute(document);
   }
 
   @Post()
@@ -74,7 +69,7 @@ export class WorkflowsController {
   @ApiConflictResponse()
   @ApiUnprocessableEntityResponse()
   async publish(
-    @DslDocument() document: SubmittedDocument,
+    @DocumentBody() document: DocumentBody,
     @CurrentUser() user: User,
     @Res({ passthrough: true }) response: Response,
   ): Promise<VersionResponse> {
@@ -141,7 +136,7 @@ export class WorkflowsController {
 
     if (document === null) throw new VersionNotFoundError();
 
-    const mediaType = mediaTypeOf(document.format);
+    const mediaType = WorkflowPresenter.mediaType(document.format);
     response.type(mediaType);
     return document.text;
   }

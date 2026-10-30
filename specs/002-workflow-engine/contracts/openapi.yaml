@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: >
     Automation context of the platform API. Errors are standard Nest HttpException bodies
-    ({ statusCode, message, error }); a refused document adds `problems`. Starting an instance and calling a
+    ({ statusCode, message, error }); a refusal adds the `pointer` of its first problem. Starting an instance and calling a
     webhook accept the `Idempotency-Key` header (replay, 409 in flight, 422 on reuse with
     another body).
 servers:
@@ -27,15 +27,8 @@ paths:
       summary: Check a document without publishing it (FR-003)
       requestBody: { $ref: '#/components/requestBodies/Document' }
       responses:
-        '200':
-          {
-            description: Report,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/CheckReport' } },
-              },
-          }
+        '204': { description: The document would be published }
+        '422': { $ref: '#/components/responses/Rejected' }
   /workflows:
     get:
       tags: [workflows]
@@ -681,17 +674,21 @@ components:
               error: { $ref: '#/components/schemas/WorkflowError' }
     Conflict: { description: Conflict }
     Rejected:
-      description: Refused; every problem located
+      description: Refused at the first problem, located
       content:
         application/json:
           schema:
             type: object
-            required: [statusCode, message, problems]
+            required: [statusCode, error, message, pointer]
             properties:
               statusCode: { const: 422 }
-              message: { type: string }
-              problems:
-                { type: array, items: { $ref: '#/components/schemas/Problem' } }
+              error: { const: Unprocessable Entity }
+              message: { type: string, description: The reason }
+              pointer:
+                {
+                  type: string,
+                  description: RFC 6901 JSON Pointer into the document,
+                }
   schemas:
     Phase:
       {
@@ -699,20 +696,6 @@ components:
         enum:
           [pending, running, waiting, suspended, cancelled, faulted, completed],
       }
-    Problem:
-      type: object
-      required: [pointer, message]
-      properties:
-        pointer:
-          { type: string, description: RFC 6901 JSON Pointer into the document }
-        message: { type: string }
-    CheckReport:
-      type: object
-      required: [valid, problems]
-      properties:
-        valid: { type: boolean }
-        problems:
-          { type: array, items: { $ref: '#/components/schemas/Problem' } }
     Workflow:
       type: object
       required: [namespace, name, on, currentVersion]

@@ -1,71 +1,62 @@
-import type { ParsedTaskList } from './interfaces.js';
-import type { Scope } from './scope.js';
+import { DuplicateTaskError } from '../../errors.js';
+import type { Expression } from './expression.js';
+import type { TaskListProps } from './interfaces.js';
+import type { JsonPointer } from './json-pointer.js';
+import type { ReusableComponents } from './reusable-components.js';
 import type { Task } from './task.js';
-import { TaskFactory } from './task-factory.js';
 
 export class TaskList {
-  readonly #pointer: string;
+  readonly #reference: JsonPointer;
   readonly #tasks: readonly Task[];
 
-  constructor(pointer: string, tasks: readonly Task[]) {
-    this.#pointer = pointer;
-    this.#tasks = tasks;
+  constructor(props: TaskListProps) {
+    const names = this.#namesOf(props.tasks);
+    this.#confirmDirectives(props.tasks, names);
+    this.#reference = props.reference;
+    this.#tasks = props.tasks;
   }
 
-  static build(parsed: ParsedTaskList, scope: Scope): TaskList {
-    const names = new Set<string>();
-
-    parsed.forEach((item, index) => {
-      for (const name of Object.keys(item)) {
-        const duplicate = names.has(name);
-
-        if (duplicate)
-          scope
-            .at(index)
-            .at(name)
-            .refuse(`Another task in this list is named "${name}"`);
-
-        names.add(name);
-      }
-    });
-
-    const listed = scope.within(names);
-    const tasks: Task[] = [];
-
-    parsed.forEach((item, index) => {
-      for (const name of Object.keys(item)) {
-        const parsedTask = item[name];
-
-        if (parsedTask === undefined) continue;
-
-        const taskAt = listed.at(index).at(name);
-        const task = TaskFactory.build(name, parsedTask, taskAt);
-
-        if (task !== null) tasks.push(task);
-      }
-    });
-
-    return new TaskList(scope.pointer, tasks);
-  }
-
-  static read(
-    parsed: ParsedTaskList | undefined,
-    scope: Scope,
-  ): TaskList | null {
-    if (parsed === undefined) return null;
-
-    return TaskList.build(parsed, scope);
-  }
-
-  get pointer(): string {
-    return this.#pointer;
+  get reference(): JsonPointer {
+    return this.#reference;
   }
 
   get tasks(): readonly Task[] {
     return this.#tasks;
   }
 
+  get expressions(): readonly Expression[] {
+    const found: Expression[] = [];
+
+    for (const task of this.#tasks)
+      for (const expression of task.expressions) found.push(expression);
+
+    return found;
+  }
+
   isEmpty(): boolean {
     return this.#tasks.length === 0;
+  }
+
+  confirmCalls(components: ReusableComponents): void {
+    for (const task of this.#tasks) task.confirmCalls(components);
+  }
+
+  #namesOf(tasks: readonly Task[]): ReadonlySet<string> {
+    const names = new Set<string>();
+
+    for (const task of tasks) {
+      const duplicate = names.has(task.name);
+
+      if (duplicate) throw new DuplicateTaskError(task.name, task.reference);
+
+      names.add(task.name);
+    }
+
+    return names;
+  }
+
+  #confirmDirectives(tasks: readonly Task[], names: ReadonlySet<string>): void {
+    for (const task of tasks)
+      for (const directive of task.directives) directive.confirmWithin(names);
   }
 }

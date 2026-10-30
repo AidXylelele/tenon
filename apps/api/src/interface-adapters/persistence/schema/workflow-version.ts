@@ -1,13 +1,11 @@
 import {
-  jsonb,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import type { ParsedDocument } from '../../../domain/automation/language/interfaces.js';
-import type { DocumentFormat } from '../../../domain/automation/workflows/interfaces.js';
+import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
 import { user } from './user.js';
 import { workflow } from './workflow.js';
 
@@ -23,7 +21,6 @@ export const workflowVersion = pgTable(
     sourceFormat: text('source_format').$type<DocumentFormat>().notNull(),
     sourceText: text('source_text').notNull(),
     fingerprint: text('fingerprint').notNull(),
-    definition: jsonb('definition').$type<ParsedDocument>().notNull(),
     publisherId: uuid('publisher_id')
       .notNull()
       .references(() => user.id),

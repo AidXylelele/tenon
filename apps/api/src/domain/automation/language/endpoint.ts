@@ -1,32 +1,28 @@
-import { AuthenticationPolicy } from './authentication-policy.js';
-import type { ParsedEndpoint } from './interfaces.js';
-import type { Scope } from './scope.js';
+import type { Authentication } from './authentication.js';
+import type { Expression } from './expression.js';
+import type { EndpointProps } from './interfaces.js';
+import type { Template } from './template.js';
 
 export class Endpoint {
-  readonly #authentication: AuthenticationPolicy | null;
+  readonly #uri: Template;
+  readonly #authentication: Authentication | null;
 
-  constructor(authentication: AuthenticationPolicy | null) {
-    this.#authentication = authentication;
+  constructor(props: EndpointProps) {
+    this.#uri = props.uri;
+    this.#authentication = props.authentication;
   }
 
-  static read(
-    parsed: string | ParsedEndpoint | undefined,
-    scope: Scope,
-  ): Endpoint | null {
-    if (parsed === undefined) return null;
-
-    if (typeof parsed === 'string') return new Endpoint(null);
-
-    const declared = parsed.authentication;
-    const authenticationAt = scope.at('authentication');
-    const authentication =
-      declared === undefined
-        ? null
-        : AuthenticationPolicy.read(declared, authenticationAt);
-    return new Endpoint(authentication);
+  get uri(): Template {
+    return this.#uri;
   }
 
-  get authentication(): AuthenticationPolicy | null {
+  get authentication(): Authentication | null {
     return this.#authentication;
+  }
+
+  get expressions(): readonly Expression[] {
+    const uri = this.#uri.expressions;
+    const authentication = this.#authentication?.expressions ?? [];
+    return uri.concat(authentication);
   }
 }

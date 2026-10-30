@@ -21,7 +21,6 @@ import { ResilienceModule as NestResilienceModule } from '@nestjs/resilience';
           timeout: '35s',
           bulkhead: { maxConcurrent: 8, maxQueue: 0 },
         },
-        jq: { timeout: '1s' },
       },
     }),
   ],

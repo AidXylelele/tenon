@@ -25,8 +25,7 @@ export class PublishVersion {
   ): Promise<PublishedVersionResult> {
     const now = new Date();
     const source = SourceDocument.of(command.format, command.text);
-    const report = await this.checkDocument.execute(command);
-    const definition = report.publishable();
+    const definition = await this.checkDocument.execute(command);
     const found = await this.workflows.findByName(definition.workflow);
     const workflow = found ?? Workflow.register(definition.workflow);
     const existing = await this.versions.find(
@@ -37,7 +36,7 @@ export class PublishVersion {
     if (existing) {
       existing.confirmSame(source);
       const current = workflow.isCurrent(existing);
-      return { version: existing, created: false, current };
+      return { workflow, version: existing, created: false, current };
     }
 
     const version = WorkflowVersion.publish({
@@ -51,6 +50,6 @@ export class PublishVersion {
     await this.workflows.save(workflow);
     await this.versions.add(version);
     const current = workflow.isCurrent(version);
-    return { version, created: true, current };
+    return { workflow, version, created: true, current };
   }
 }

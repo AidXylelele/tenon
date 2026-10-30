@@ -20,17 +20,17 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
   },
   {
     defect: 'set with a number',
-    pointer: '/do/0/a',
+    pointer: '/do/0/a/set',
     tasks: '  - a:\n      set: 5\n',
   },
   {
     defect: 'an http call without an endpoint',
-    pointer: '/do/0/a',
+    pointer: '/do/0/a/with',
     tasks: '  - a:\n      call: http\n      with:\n        method: get\n',
   },
   {
     defect: 'a for loop over a number',
-    pointer: '/do/0/a',
+    pointer: '/do/0/a/for/in',
     tasks:
       '  - a:\n      for:\n        in: 5\n      do:\n        - b:\n            set: { y: 1 }\n',
   },
@@ -41,20 +41,14 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
   },
   {
     defect: 'a raise without an error',
-    pointer: '/do/0/a',
+    pointer: '/do/0/a/raise',
     tasks: '  - a:\n      raise: {}\n',
   },
   {
     defect: 'an error without a status',
-    pointer: '/do/0/a',
+    pointer: '/do/0/a/raise/error',
     tasks:
       '  - a:\n      raise:\n        error:\n          type: https://example.com/x\n',
-  },
-  {
-    defect: 'an unknown top-level property',
-    pointer: '/surprise',
-    tasks: '  - a:\n      set: { x: 1 }\n',
-    extra: 'surprise: 1\n',
   },
   {
     defect: 'a task list that is not a list',
@@ -69,7 +63,7 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
   },
   {
     defect: 'an unsupported DSL version',
-    pointer: '/document/dsl',
+    pointer: '',
     tasks: '  - a:\n      set: { x: 1 }\n',
     dsl: '1.0.4',
   },
@@ -138,6 +132,29 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
       '  - a:\n      set: { x: 1 }\n      timeout:\n        after: P1.5D\n',
   },
   {
+    defect: 'a competing fork without branches',
+    pointer: '/do/0/a/fork/branches',
+    tasks: '  - a:\n      fork:\n        compete: true\n        branches: []\n',
+  },
+  {
+    defect: 'authentication taken from a secret',
+    pointer: '/do/0/a/with/endpoint/authentication/bearer/use',
+    tasks:
+      '  - a:\n      call: http\n      with:\n        method: get\n        endpoint:\n          uri: https://example.com\n          authentication:\n            bearer:\n              use: token\n',
+  },
+  {
+    defect: 'a runtime expression as a retry delay',
+    pointer: '/do/0/a/catch/retry/delay',
+    tasks:
+      "  - a:\n      try:\n        - b:\n            set: { y: 1 }\n      catch:\n        retry:\n          delay: '${ .delay }'\n",
+  },
+  {
+    defect: 'a negative attempt count',
+    pointer: '/do/0/a/catch/retry/limit/attempt/count',
+    tasks:
+      '  - a:\n      try:\n        - b:\n            set: { y: 1 }\n      catch:\n        retry:\n          limit:\n            attempt:\n              count: -1\n',
+  },
+  {
     defect: 'a directive to a missing task',
     pointer: '/do/0/a/then',
     tasks: '  - a:\n      set: { x: 1 }\n      then: nowhere\n',
@@ -150,7 +167,7 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
   },
   {
     defect: 'two tasks with one name',
-    pointer: '/do/1/a',
+    pointer: '/do',
     tasks: '  - a:\n      set: { x: 1 }\n  - a:\n      set: { x: 2 }\n',
   },
   {
@@ -175,12 +192,6 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
     tasks: '  - a:\n      set: { x: 1 }\n      timeout: missing\n',
   },
   {
-    defect: 'a sub-workflow that does not exist',
-    pointer: '/do/0/a/run/workflow',
-    tasks:
-      '  - a:\n      run:\n        workflow:\n          namespace: billing\n          name: missing\n          version: 1.0.0\n',
-  },
-  {
     defect: 'a malformed expression in a template',
     pointer: '/do/0/a/set/x',
     tasks: "  - a:\n      set:\n        x: '${ .a + }'\n",
@@ -189,11 +200,6 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
     defect: 'a malformed condition',
     pointer: '/do/0/a/if',
     tasks: "  - a:\n      if: '.a ==='\n      set: { x: 1 }\n",
-  },
-  {
-    defect: 'an unknown variable',
-    pointer: '/do/0/a/set/x',
-    tasks: "  - a:\n      set:\n        x: '${ $nope }'\n",
   },
   {
     defect: 'a malformed loop collection',

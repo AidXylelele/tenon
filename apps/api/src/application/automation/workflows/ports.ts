@@ -1,7 +1,5 @@
-import type { DocumentReading } from '../../../domain/automation/language/document-reading.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import type { DocumentFormat } from '../../../domain/automation/workflows/interfaces.js';
-import type { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
+import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
 import type { Workflow } from '../../../domain/automation/workflows/workflow.js';
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 
@@ -17,13 +15,10 @@ export interface PublishVersionCommand {
 }
 
 export interface PublishedVersionResult {
+  readonly workflow: Workflow;
   readonly version: WorkflowVersion;
   readonly created: boolean;
   readonly current: boolean;
-}
-
-export abstract class DocumentReader {
-  abstract read(source: SourceDocument): DocumentReading;
 }
 
 export abstract class WorkflowRepository {

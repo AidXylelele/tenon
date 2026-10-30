@@ -1,42 +1,25 @@
-import type { ParsedDoTask, DoTaskProps } from '../interfaces.js';
-import type { Scope } from '../scope.js';
-import type { Task } from '../task.js';
-import { TaskList } from '../task-list.js';
-import { TaskSettings } from '../task-settings.js';
+import type { Expression } from '../expression.js';
+import type { DoTaskProps } from '../interfaces.js';
+import { Task } from '../task.js';
+import type { TaskList } from '../task-list.js';
 
-export class DoTask implements Task {
-  readonly #name: string;
-  readonly #reference: string;
-  readonly #settings: TaskSettings;
+export class DoTask extends Task {
   readonly #body: TaskList;
 
   constructor(props: DoTaskProps) {
-    this.#name = props.name;
-    this.#reference = props.reference;
-    this.#settings = props.settings;
+    super(props);
     this.#body = props.body;
-  }
-
-  static build(name: string, parsed: ParsedDoTask, scope: Scope): DoTask {
-    const bodyAt = scope.at('do');
-    const settings = TaskSettings.read(parsed, scope);
-    const body = TaskList.build(parsed.do, bodyAt);
-    return new DoTask({ name, reference: scope.pointer, settings, body });
-  }
-
-  get name(): string {
-    return this.#name;
-  }
-
-  get reference(): string {
-    return this.#reference;
-  }
-
-  get settings(): TaskSettings {
-    return this.#settings;
   }
 
   get body(): TaskList {
     return this.#body;
+  }
+
+  override get children(): readonly TaskList[] {
+    return [this.#body];
+  }
+
+  protected override get ownExpressions(): readonly Expression[] {
+    return this.#body.expressions;
   }
 }

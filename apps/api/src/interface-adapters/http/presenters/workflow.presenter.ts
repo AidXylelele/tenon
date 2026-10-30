@@ -4,34 +4,20 @@ import type {
   WorkflowPage,
   WorkflowSummary,
 } from '../../../application/automation/workflows/queries.js';
-import type { ConformanceStatement } from '../../../domain/automation/language/interfaces.js';
-import type { Problem } from '../../../domain/automation/language/problem.js';
-import type { Report } from '../../../domain/automation/language/report.js';
+import type { ConformanceStatement } from '../../../domain/automation/language/conformance-statement.js';
+import { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
+import { DocumentMediaType } from '../enums.js';
 import type {
-  CheckReportResponse,
   ConformanceResponse,
-  ProblemResponse,
   VersionResponse,
   WorkflowPageResponse,
   WorkflowResponse,
 } from '../schemas/workflow.schemas.js';
 
 export class WorkflowPresenter {
-  static report(report: Report): CheckReportResponse {
-    const problems = WorkflowPresenter.problems(report.problems);
-    return { valid: report.isClean(), problems };
-  }
-
-  static problems(problems: readonly Problem[]): ProblemResponse[] {
-    return problems.map((problem) => ({
-      pointer: problem.pointer,
-      message: problem.reason,
-    }));
-  }
-
   static published(result: PublishedVersionResult): VersionResponse {
     const version = result.version;
-    const workflow = version.definition.workflow;
+    const workflow = result.workflow;
     return {
       namespace: workflow.namespace,
       name: workflow.name,
@@ -82,5 +68,11 @@ export class WorkflowPresenter {
       excluded: statement.excluded.slice(),
       contradictions: statement.contradictions.slice(),
     };
+  }
+
+  static mediaType(format: DocumentFormat): DocumentMediaType {
+    if (format === DocumentFormat.Json) return DocumentMediaType.Json;
+
+    return DocumentMediaType.Yaml;
   }
 }

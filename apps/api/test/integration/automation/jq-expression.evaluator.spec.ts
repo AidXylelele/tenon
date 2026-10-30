@@ -1,63 +1,39 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { Expression } from '../../../src/domain/automation/language/expression.js';
-import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.js';
-import { createJqPool } from '../../../src/frameworks/jq/jq-pool.js';
+import { JsonPointer } from '../../../src/domain/automation/language/json-pointer.js';
+import { InvalidExpressionError } from '../../../src/domain/errors.js';
+import { InProcessJqClient } from '../../../src/frameworks/jq/in-process-jq.client.js';
 import { JqExpressionEvaluator } from '../../../src/interface-adapters/expressions/jq-expression.evaluator.js';
-import { JqPool } from '../../../src/interface-adapters/interfaces.js';
 
-function expression(
-  pointer: string,
-  program: string,
-  variables: readonly string[] = [],
-): Expression {
-  return new Expression({ pointer, program, variables });
+const set = JsonPointer.root().at('do').at(0).at('compute').at('set');
+
+function expression(field: string, program: string): Expression {
+  const pointer = set.at(field);
+  return new Expression({ pointer, program });
 }
 
 describe('JqExpressionEvaluator', () => {
-  let app: INestApplication;
-  let evaluator: JqExpressionEvaluator;
+  const evaluator = new JqExpressionEvaluator(new InProcessJqClient());
 
-  beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      imports: [ResilienceModule],
-      providers: [
-        JqExpressionEvaluator,
-        { provide: JqPool, useFactory: createJqPool },
-      ],
-    }).compile();
-    app = moduleRef.createNestApplication({ logger: false });
-    await app.init();
-    evaluator = app.get(JqExpressionEvaluator);
-  });
-
-  afterAll(async () => {
-    await app.get(JqPool).destroy();
-    await app.close();
-  });
-
-  it('expressions_that_use_the_runtime_arguments_and_their_own_variables_pass', async () => {
-    const problems = await evaluator.check([
-      expression('/do/0/a/set/x', '.a + $input.b'),
-      expression('/do/0/a/set/y', '$context.total * 2'),
-      expression('/do/1/loop/do/0/b/set/z', '$item.price', ['item', 'index']),
-      expression('/do/2/guarded/catch/when', '$error.status == 503', ['error']),
+  it('expressions_of_valid_syntax_pass', async () => {
+    const check = evaluator.check([
+      expression('total', '.a + $input.b'),
+      expression('price', '$item.price * 2'),
     ]);
 
-    expect(problems).toEqual([]);
+    await expect(check).resolves.toBeUndefined();
   });
 
-  it('a_syntax_error_and_an_unknown_variable_are_reported_where_they_stand', async () => {
-    const problems = await evaluator.check([
-      expression('/do/0/a/set/x', '.a | map(. + )'),
-      expression('/do/0/a/set/y', '$nope + 1'),
+  it('the_first_invalid_expression_is_refused_where_it_stands', async () => {
+    const check = evaluator.check([
+      expression('total', '.a + 1'),
+      expression('price', '.a | map(. + )'),
+      expression('other', '.b |'),
     ]);
 
-    expect(
-      problems.map((problem) => [problem.pointer, problem.reason]),
-    ).toEqual([
-      ['/do/0/a/set/x', "Invalid expression: syntax error, unexpected ')'"],
-      ['/do/0/a/set/y', 'Invalid expression: $nope is not defined'],
-    ]);
+    await expect(check).rejects.toThrow(InvalidExpressionError);
+    await expect(check).rejects.toMatchObject({
+      pointer: '/do/0/compute/set/price',
+      message: "Invalid expression: syntax error, unexpected ')'",
+    });
   });
 });

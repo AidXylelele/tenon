@@ -1,8 +1,7 @@
 import type { Definition } from '../language/definition.js';
+import type { DocumentFormat } from './enums.js';
 import type { SourceDocument } from './source-document.js';
 import type { Workflow } from './workflow.js';
-
-export type DocumentFormat = 'yaml' | 'json';
 
 export interface SourceDocumentProps {
   readonly format: DocumentFormat;
@@ -23,8 +22,8 @@ export interface WorkflowVersionProps {
   readonly id: string;
   readonly workflowId: string;
   readonly semver: string;
+  readonly dslVersion: string;
   readonly source: SourceDocument;
-  readonly definition: Definition;
   readonly publisherId: string;
   readonly publishedAt: Date;
 }

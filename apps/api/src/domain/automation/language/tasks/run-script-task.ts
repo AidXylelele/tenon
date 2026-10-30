@@ -1,77 +1,28 @@
-import type {
-  ParsedRunTask,
-  ParsedScript,
-  RunScriptTaskProps,
-} from '../interfaces.js';
-import type { Scope } from '../scope.js';
-import { SupportedSubset } from '../supported-subset.js';
-import type { Task } from '../task.js';
-import { TaskSettings } from '../task-settings.js';
-import { Template } from '../template.js';
+import { ProcessReturn, type ScriptLanguage } from '../enums.js';
+import type { Expression } from '../expression.js';
+import type { RunScriptTaskProps } from '../interfaces.js';
+import { Task } from '../task.js';
+import type { Template } from '../template.js';
 
-export class RunScriptTask implements Task {
-  readonly #name: string;
-  readonly #reference: string;
-  readonly #settings: TaskSettings;
-  readonly #language: string;
-  readonly #script: Template | null;
+export class RunScriptTask extends Task {
+  readonly #language: ScriptLanguage;
+  readonly #script: Template;
   readonly #awaits: boolean;
-  readonly #returns: string;
+  readonly #returns: ProcessReturn;
 
   constructor(props: RunScriptTaskProps) {
-    this.#name = props.name;
-    this.#reference = props.reference;
-    this.#settings = props.settings;
+    super(props);
     this.#language = props.language;
     this.#script = props.script;
-    this.#awaits = props.awaits;
-    this.#returns = props.returns;
+    this.#awaits = props.awaits ?? true;
+    this.#returns = props.returns ?? ProcessReturn.Stdout;
   }
 
-  static build(
-    name: string,
-    parsed: ParsedRunTask,
-    script: ParsedScript,
-    scope: Scope,
-  ): RunScriptTask | null {
-    const scriptAt = scope.at('run').at('script');
-    const settings = TaskSettings.read(parsed, scope);
-    const language = script.language;
-    const accepted = SupportedSubset.acceptsScript(script, scriptAt);
-
-    if (!accepted) return null;
-
-    const template = Template.read(script, scriptAt);
-    const awaits = parsed.run.await ?? true;
-    const returns = parsed.run.return ?? 'stdout';
-    return new RunScriptTask({
-      name,
-      reference: scope.pointer,
-      settings,
-      language,
-      script: template,
-      awaits,
-      returns,
-    });
-  }
-
-  get name(): string {
-    return this.#name;
-  }
-
-  get reference(): string {
-    return this.#reference;
-  }
-
-  get settings(): TaskSettings {
-    return this.#settings;
-  }
-
-  get language(): string {
+  get language(): ScriptLanguage {
     return this.#language;
   }
 
-  get script(): Template | null {
+  get script(): Template {
     return this.#script;
   }
 
@@ -79,7 +30,11 @@ export class RunScriptTask implements Task {
     return this.#awaits;
   }
 
-  get returns(): string {
+  get returns(): ProcessReturn {
     return this.#returns;
+  }
+
+  protected override get ownExpressions(): readonly Expression[] {
+    return this.#script.expressions;
   }
 }

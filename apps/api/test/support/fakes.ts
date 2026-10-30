@@ -1,25 +1,14 @@
-import type { ExpressionEvaluator } from '../../src/application/automation/language/ports.js';
 import type {
-  DocumentReader,
+  DefinitionReader,
+  ExpressionEvaluator,
+} from '../../src/application/automation/language/ports.js';
+import type {
   WorkflowRepository,
   WorkflowVersionRepository,
 } from '../../src/application/automation/workflows/ports.js';
-import type {
-  VersionDocument,
-  VersionSummary,
-  WorkflowPage,
-  WorkflowQueries,
-  WorkflowSummary,
-} from '../../src/application/automation/workflows/queries.js';
-import { DocumentReading } from '../../src/domain/automation/language/document-reading.js';
+import type { Definition } from '../../src/domain/automation/language/definition.js';
 import type { Expression } from '../../src/domain/automation/language/expression.js';
-import type {
-  ParsedDocument,
-  PublishedTargets,
-} from '../../src/domain/automation/language/interfaces.js';
-import { Problem } from '../../src/domain/automation/language/problem.js';
 import type { WorkflowName } from '../../src/domain/automation/language/workflow-name.js';
-import type { SourceDocument } from '../../src/domain/automation/workflows/source-document.js';
 import type { Workflow } from '../../src/domain/automation/workflows/workflow.js';
 import type { WorkflowVersion } from '../../src/domain/automation/workflows/workflow-version.js';
 import type {
@@ -37,12 +26,16 @@ import {
   InvitationStatus,
 } from '../../src/domain/identity/enums.js';
 import {
+  InvalidDocumentError,
+  InvalidExpressionError,
   InvitationNotFoundError,
   UserNotFoundError,
 } from '../../src/domain/errors.js';
 import type { Invitation } from '../../src/domain/identity/invitation.js';
 import type { InvitationToken } from '../../src/domain/identity/invitation-token.js';
 import type { User } from '../../src/domain/identity/user.js';
+import { DefinitionMapper } from '../../src/interface-adapters/documents/mappers/definition.mapper.js';
+import type * as Dsl from '../../src/interface-adapters/documents/interfaces.js';
 
 export class InMemoryUserRepository implements UserRepository {
   readonly users = new Map<string, User>();
@@ -191,14 +184,16 @@ export class RecordingMailing implements Mailing {
 const sameEmail = (user: User, email: string): boolean =>
   user.email.toLowerCase() === email.toLowerCase();
 
-export class JsonDocumentReader implements DocumentReader {
-  read(source: SourceDocument): DocumentReading {
+export class JsonDefinitionReader implements DefinitionReader {
+  read(text: string): Definition {
     try {
-      const parsed = JSON.parse(source.text) as ParsedDocument;
-      return new DocumentReading(parsed, []);
-    } catch {
-      const problem = new Problem('', 'The document is not JSON');
-      return new DocumentReading(null, [problem]);
+      const workflow = JSON.parse(text) as Dsl.Workflow;
+      return DefinitionMapper.toDomain(workflow);
+    } catch (error) {
+      if (error instanceof SyntaxError)
+        throw new InvalidDocumentError('', 'The document is not JSON');
+
+      throw error;
     }
   }
 }
@@ -206,10 +201,13 @@ export class JsonDocumentReader implements DocumentReader {
 export class FakeExpressionEvaluator implements ExpressionEvaluator {
   constructor(private readonly refused: ReadonlySet<string> = new Set()) {}
 
-  async check(expressions: readonly Expression[]): Promise<readonly Problem[]> {
-    return expressions
-      .filter((expression) => this.refused.has(expression.program))
-      .map((expression) => new Problem(expression.pointer, 'syntax error'));
+  async check(expressions: readonly Expression[]): Promise<void> {
+    const invalid = expressions.find((expression) =>
+      this.refused.has(expression.program),
+    );
+
+    if (invalid !== undefined)
+      throw new InvalidExpressionError(invalid.pointer, 'syntax error');
   }
 }
 
@@ -231,57 +229,21 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
 export class InMemoryWorkflowVersionRepository implements WorkflowVersionRepository {
   readonly versions: WorkflowVersion[] = [];
 
+  constructor(private readonly workflows: InMemoryWorkflowRepository) {}
+
   async find(
     name: WorkflowName,
     semver: string,
   ): Promise<WorkflowVersion | null> {
+    const workflow = await this.workflows.findByName(name);
     const found = this.versions.find(
       (version) =>
-        version.definition.workflow.equals(name) && version.semver === semver,
+        version.workflowId === workflow?.id && version.semver === semver,
     );
     return found ?? null;
   }
 
   async add(version: WorkflowVersion): Promise<void> {
     this.versions.push(version);
-  }
-}
-
-export class InMemoryWorkflowQueries implements WorkflowQueries {
-  constructor(
-    private readonly versionRepository: InMemoryWorkflowVersionRepository,
-  ) {}
-
-  async list(): Promise<WorkflowPage> {
-    return { items: [], next: null };
-  }
-
-  async get(): Promise<WorkflowSummary | null> {
-    return null;
-  }
-
-  async versions(): Promise<readonly VersionSummary[]> {
-    return [];
-  }
-
-  async document(): Promise<VersionDocument | null> {
-    return null;
-  }
-
-  async referenceFacts(): Promise<PublishedTargets> {
-    const published = this.versionRepository.versions.map(
-      (version) => version.definition,
-    );
-    return {
-      workflows: published.map((definition) => ({
-        namespace: definition.workflow.namespace,
-        name: definition.workflow.name,
-      })),
-      versions: published.map((definition) => ({
-        namespace: definition.workflow.namespace,
-        name: definition.workflow.name,
-        version: definition.version,
-      })),
-    };
   }
 }

@@ -165,6 +165,7 @@ settings:
 overrides:
   '@cucumber/messages>uuid': 11.1.1
   '@esbuild-kit/core-utils>esbuild': 0.25.12
+  '@opentelemetry/instrumentation-host-metrics>systeminformation': 5.33.18
 
 importers:
 
@@ -266,9 +267,6 @@ importers:
       jq-wasm:
         specifier: 3.0.0-jq-1.8.2
         version: 3.0.0-jq-1.8.2
-      js-yaml:
-        specifier: 5.4.2
-        version: 5.4.2
       nestjs-cls:
         specifier: 7.0.1
         version: 7.0.1(@nestjs/common@12.3.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.3.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -284,9 +282,6 @@ importers:
       pino-http:
         specifier: 11.0.0
         version: 11.0.0
-      piscina:
-        specifier: 5.3.2
-        version: 5.3.2
       reflect-metadata:
         specifier: 0.2.2
         version: 0.2.2
@@ -5700,10 +5695,6 @@ packages:
   piscina@4.9.4:
     resolution: {integrity: sha512-RyBDr2VheQ8ZfH3N8SzQZHztqVyOtadTwLnUYof6gdj5161/eu2wNhCbGl5GHnNKDpnkicJYpKtL2J+y/gk6XA==}
 
-  piscina@5.3.2:
-    resolution: {integrity: sha512-vv7l/mM7B9WgrhDaudIqv1x6v4LOBRYYmpWGdWushhpbCmVHp11sUB2v4hj1CAeTGXVxuZFz6xOU1RalAiPKfQ==}
-    engines: {node: '>=20.x'}
-
   pluralize@8.0.0:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
     engines: {node: '>=4'}
@@ -6274,8 +6265,8 @@ packages:
     resolution: {integrity: sha512-0OJWD12D7XX3KUg1DYkMaTTjSTo2k/mhIYI3HlBlceXSMcJhW/1qO735fPKS5prcyjvn57Ub151vvASYXpQrEw==}
     engines: {node: '>=18'}
 
-  systeminformation@5.33.15:
-    resolution: {integrity: sha512-s5RloL0F7xhN0ZjfHtLGnbf7EW74EI0N8NFL+1xR7Oxz9QA33obNZsl7lyfnJOhN04E/kGFPoJPlvY7TZ5fzmw==}
+  systeminformation@5.33.18:
+    resolution: {integrity: sha512-SF8DBQx3ypa8zDqZlezpHQ6M2g7TrqSEWpAtC4OsHCdLmi7J2WdxaSbA8/DJyEn2l/CHPrW0VFenoqoDccrw6g==}
     engines: {node: '>=10.0.0'}
     os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
     hasBin: true
@@ -8230,7 +8221,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.1
       '@opentelemetry/instrumentation': 0.223.0(@opentelemetry/api@1.9.1)(supports-color@7.2.0)
-      systeminformation: 5.33.15
+      systeminformation: 5.33.18
     transitivePeerDependencies:
       - supports-color
 
@@ -11822,10 +11813,6 @@ snapshots:
     optionalDependencies:
       '@napi-rs/nice': 1.1.1
 
-  piscina@5.3.2:
-    optionalDependencies:
-      '@napi-rs/nice': 1.1.1
-
   pluralize@8.0.0: {}
 
   pngjs@7.0.0: {}
@@ -12522,7 +12509,7 @@ snapshots:
 
   system-architecture@1.0.0: {}
 
-  systeminformation@5.33.15: {}
+  systeminformation@5.33.18: {}
 
   tailwindcss@4.3.3: {}
 

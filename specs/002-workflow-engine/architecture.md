@@ -6,58 +6,61 @@ This document covers structure and behaviour. The model is in [data-model.md](da
 
 The dependency rule: frameworks → interface adapters → application → domain (Martin, 2012). One grouping criterion per layer:
 
-| Layer              | Grouped by                       | Folders                                                                                                         |
-| ------------------ | -------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Domain             | Bounded context, then module     | `domain/automation/{language, workflows, instances, events, secrets}`                                           |
-| Application        | The same modules                 | `application/automation/{workflows, instances, events, secrets}`: use cases, `ports.ts`, `queries.ts`, policies |
-| Interface adapters | The external agency they talk to | see below                                                                                                       |
-| Frameworks         | Technology                       | `frameworks/{di, drizzle, pino, jq, undici, ajv}`                                                               |
+| Layer              | Grouped by                                                        | Folders                                                                                                                   |
+| ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Domain             | Bounded context, then module                                      | `domain/automation/{language, workflows, instances, events, secrets}`                                                     |
+| Application        | The same modules, plus `language` for the ports every module uses | `application/automation/{language, workflows, instances, events, secrets}`: use cases, `ports.ts`, `queries.ts`, policies |
+| Interface adapters | The external agency they talk to                                  | see below                                                                                                                 |
+| Frameworks         | Technology                                                        | `frameworks/{di, http, drizzle, pino, jq, undici, ajv, openworkflowspec}`                                                 |
 
 **Adapters.** Each one converts between the application and one external agency:
 
-| Folder         | Agency                         | Direction  | Contents                                                                                                                                                                    |
-| -------------- | ------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `http/`        | REST clients                   | In         | Controllers, parsers (DSL body, CloudEvents), zod schemas, presenters, filters                                                                                              |
-| `persistence/` | PostgreSQL                     | Out        | Repositories (secrets encrypted at rest), queries, mappers, schema, outbox writers (`DomainEventOutbox`, `OutboxEventOffers`), idempotency store                            |
-| `engine/`      | `@nestjs/workflows`            | In and out | `InstanceWorkflow`, `ScheduledStartWorkflow`, `InstanceRounds` (in); `InstanceRunsGateway`, `RecurringStartsGateway` (out)                                                  |
-| `messaging/`   | Outbox relay                   | In         | One `*OutboxHandler` per domain event, each calling one use case                                                                                                            |
-| `documents/`   | DSL documents (official SDK)   | Out        | `DslDocumentReader`: parses and validates against the standard's schema, then maps to a ParsedDocument                                                                      |
-| `expressions/` | jq                             | Out        | `JqExpressionEvaluator`: evaluations, pattern matches and syntax checks, plus the worker script and the sandbox prelude                                                     |
-| `json-schema/` | Ajv                            | Out        | `AjvSchemaValidator`                                                                                                                                                        |
-| `endpoints/`   | HTTP endpoints chosen by users | Out        | `HttpServiceCaller` (DSL `call: http/openapi` with the standard's authentication policies) and `CloudEventSubscriberGateway` (deliveries), both on the SSRF-safe dispatcher |
-| `sandbox/`     | go-judge                       | Out        | `GoJudgeProcessRunner`, `GoJudgeCommand`                                                                                                                                    |
-| `mailing/`     | SMTP                           | Out        | Unchanged                                                                                                                                                                   |
+| Folder         | Agency                         | Direction  | Contents                                                                                                                                                            |
+| -------------- | ------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `http/`        | REST clients                   | In         | Controllers, parsers (DSL body, CloudEvents), zod schemas, presenters, filters                                                                                      |
+| `persistence/` | PostgreSQL                     | Out        | Repositories (secrets encrypted at rest), queries, mappers, schema, outbox writers (`DomainEventOutbox`, `OutboxEventOffers`), idempotency store                    |
+| `engine/`      | `@nestjs/workflows`            | In and out | `InstanceWorkflow`, `ScheduledStartWorkflow`, `InstanceRounds` (in); `InstanceRunsGateway`, `RecurringStartsGateway` (out)                                          |
+| `messaging/`   | Outbox relay                   | In         | One `*OutboxHandler` per domain event, each calling one use case                                                                                                    |
+| `documents/`   | DSL documents                  | Out        | `OpenWorkflowDefinitionReader`: turns the client's outcome into the Definition through pure mappers (`mappers/`), or into a refusal                                 |
+| `expressions/` | jq                             | Out        | `JqExpressionEvaluator`: syntax checks through `JqClient` (US1); evaluations and pattern matches with the sandbox prelude (US2, US7)                                |
+| `json-schema/` | Ajv                            | Out        | `AjvSchemaValidator`                                                                                                                                                |
+| `endpoints/`   | HTTP endpoints chosen by users | Out        | `HttpServiceCaller` (DSL `call: http/openapi` with the standard's authentications) and `CloudEventSubscriberGateway` (deliveries), both on the SSRF-safe dispatcher |
+| `sandbox/`     | go-judge                       | Out        | `GoJudgeProcessRunner`, `GoJudgeCommand`                                                                                                                            |
+| `mailing/`     | SMTP                           | Out        | Unchanged                                                                                                                                                           |
 
 Rules:
 
-- **Shared types.** `interface-adapters/interfaces.ts` declares what the frameworks provide: `Database`, `DrizzleTx`, `EndpointDispatcher`, `SandboxPool`, `JqPool`, `JsonSchemaCompilers` and `DslSchema`.
+- **Shared types.** An adapter folder declares in its `interfaces.ts` and `enums.ts` the client the frameworks provide for it and its simple outcomes: `documents/` has `OpenWorkflowClient`, `DslOutcome` and the standard's document shape (`Dsl.*`); `expressions/` has `JqClient` and `JqCompilation`. `interface-adapters/interfaces.ts` keeps what several adapters share (`Database`, `DrizzleTx`) and, until their adapters arrive in US2, `EndpointDispatcher`, `SandboxPool` and `JsonSchemaCompilers`.
 - **Contracts.** Outbox topics and payloads are the domain events in `domain/automation/*/events.ts`.
-- **Isolation.** No adapter folder imports another. `ErrorClassifier` (`interface-adapters/error-classifier.ts`), shared like `interfaces.ts`, recognises transient and settled errors for the engine workflows and the outbox handlers.
+- **Isolation.** No adapter folder imports another.
 
 **Naming.** One convention per kind:
 
-| Kind             | Pattern                                                                         |
-| ---------------- | ------------------------------------------------------------------------------- |
-| Controllers      | `*.controller.ts`                                                               |
-| Repositories     | `drizzle-*.repository.ts`                                                       |
-| Queries          | `drizzle-*.queries.ts`                                                          |
-| Stores           | `drizzle-*.store.ts`                                                            |
-| Outbox handlers  | `*-outbox.handler.ts`                                                           |
-| Gateways         | `*.gateway.ts`                                                                  |
-| Engine workflows | `*.workflow.ts`                                                                 |
-| Computations     | `*.reader.ts`, `*.evaluator.ts`, `*.validator.ts`, `*.caller.ts`, `*.runner.ts` |
+| Kind                           | Pattern                                                                                                                                                                                               |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Controllers                    | `*.controller.ts`                                                                                                                                                                                     |
+| Repositories                   | `drizzle-*.repository.ts`                                                                                                                                                                             |
+| Queries                        | `drizzle-*.queries.ts`                                                                                                                                                                                |
+| Stores                         | `drizzle-*.store.ts`                                                                                                                                                                                  |
+| Outbox handlers                | `*-outbox.handler.ts`                                                                                                                                                                                 |
+| Gateways                       | `*.gateway.ts`                                                                                                                                                                                        |
+| Engine workflows               | `*.workflow.ts`                                                                                                                                                                                       |
+| Computations                   | `*.reader.ts`, `*.evaluator.ts`, `*.validator.ts`, `*.caller.ts`, `*.runner.ts`                                                                                                                       |
+| Document mappers               | `documents/mappers/*.mapper.ts`, static `toDomain`: one-way into value objects, while persistence mappers use `toEntity`/`toRow` for aggregates                                                       |
+| Library factories (frameworks) | `create*`, for library objects that adapters use as they are                                                                                                                                          |
+| Library clients (frameworks)   | `<mechanism>-<agency>.client.ts` (`sdk-open-workflow`, `in-process-jq`, later `piscina-jq`), behind a client declared in its adapter's `interfaces.ts`; the folder is named after the wrapped library |
 
 **DI.** `frameworks/di/automation.module.ts` assembles the context. There is one module per library: `engine`, `outbox`, `idempotency`, `resilience` (presets).
 
 **Ports.** Abstract classes in `application/automation/*/ports.ts` and `queries.ts`:
 
-| Module    | Ports                                                                                                                                 | Queries                                                                           |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| workflows | WorkflowRepository, WorkflowVersionRepository, DocumentReader, RecurringStarts                                                        | WorkflowQueries (lists, documents, `referenceFacts(targets)`, trigger candidates) |
-| language  | ExpressionEvaluator, SchemaValidator (every module uses them, as every module uses the `language` domain)                             | —                                                                                 |
-| instances | WorkflowInstanceRepository, InstanceRuns, ServiceCaller, ProcessRunner                                                                | InstanceQueries (lists, history, progress)                                        |
-| events    | EventRepository, CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway | EventQueries (candidates, catch-up), ConnectionQueries                            |
-| secrets   | SecretRepository                                                                                                                      | SecretQueries (`valuesFor`, `namesOwnedBy`)                                       |
+| Module    | Ports                                                                                                                                                          | Queries                                                |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| workflows | WorkflowRepository, WorkflowVersionRepository, RecurringStarts                                                                                                 | WorkflowQueries (lists, documents, trigger candidates) |
+| language  | DefinitionReader (document text in, Definition out), ExpressionEvaluator, SchemaValidator (every module uses them, as every module uses the `language` domain) | —                                                      |
+| instances | WorkflowInstanceRepository, InstanceRuns, ServiceCaller, ProcessRunner                                                                                         | InstanceQueries (lists, history, progress)             |
+| events    | EventRepository, CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway                          | EventQueries (candidates, catch-up), ConnectionQueries |
+| secrets   | SecretRepository                                                                                                                                               | SecretQueries (`valuesFor`, `namesOwnedBy`)            |
 
 **Time.** A use case reads the clock once per operation (`new Date()`) and passes it as a value. Jitter samples come from `node:crypto`, also passed as values. The domain reads neither.
 
@@ -71,17 +74,17 @@ go-judge is a separate, stateless service. Both scale by adding processes. The d
 
 ## 2. Where Synapse's DSL processing lands
 
-| Synapse                                                               | Here                                                         | Layer           |
-| --------------------------------------------------------------------- | ------------------------------------------------------------ | --------------- |
-| SDK `WorkflowDefinition` executed directly                            | `Definition.build` → value objects                           | Domain          |
-| `TaskExecutor` lifecycle, stages, `GetTaskAfter`, composite executors | `WorkflowInstance`, task kinds, progress objects, `TaskList` | Domain          |
-| `IExpressionEvaluator` (a jq process per evaluation), recursive `${}` | `ExpressionEvaluator` → jq-wasm in a worker pool             | Port; adapter   |
-| `ISchemaHandler`                                                      | `SchemaValidator` → Ajv                                      | Port; adapter   |
-| `HttpCallExecutor`, `OpenApiCallExecutor`, `AuthorizationInfo`        | `ServiceCaller` → `HttpServiceCaller`                        | Port; adapter   |
-| Script and shell executors on the runner host                         | `ProcessRunner` → go-judge, with no network                  | Port; adapter   |
-| `SecretsManager` (files)                                              | `Secret`, encrypted by its repository                        | Domain; adapter |
-| Correlator (regex / `${}`, keys)                                      | `EventFilter` and `Correlation` decide; matching is work     | Domain          |
-| Runner process per instance; Operator timers                          | One engine run per instance; engine schedules                | Adapter         |
+| Synapse                                                               | Here                                                                            | Layer           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------- |
+| SDK `WorkflowDefinition` executed directly                            | SDK validation, then `DefinitionMapper` → value objects                         | Adapter; domain |
+| `TaskExecutor` lifecycle, stages, `GetTaskAfter`, composite executors | `WorkflowInstance`, task kinds, progress objects, `TaskList`                    | Domain          |
+| `IExpressionEvaluator` (a jq process per evaluation), recursive `${}` | `ExpressionEvaluator` → `JqClient` (in-process compile; a worker pool from US2) | Port; adapter   |
+| `ISchemaHandler`                                                      | `SchemaValidator` → Ajv                                                         | Port; adapter   |
+| `HttpCallExecutor`, `OpenApiCallExecutor`, `AuthorizationInfo`        | `ServiceCaller` → `HttpServiceCaller`                                           | Port; adapter   |
+| Script and shell executors on the runner host                         | `ProcessRunner` → go-judge, with no network                                     | Port; adapter   |
+| `SecretsManager` (files)                                              | `Secret`, encrypted by its repository                                           | Domain; adapter |
+| Correlator (regex / `${}`, keys)                                      | `EventFilter` and `Correlation` decide; matching is work                        | Domain          |
+| Runner process per instance; Operator timers                          | One engine run per instance; engine schedules                                   | Adapter         |
 
 Gaps this closes:
 
@@ -224,7 +227,7 @@ Use cases never catch.
 
   They receive only the evaluated code, arguments, environment and stdin.
 
-- **jq.** It runs in Piscina workers with a prelude that disables `env`, `$ENV`, `input`, `inputs`, `input_filename`, `debug`, `stderr`, `halt`, `halt_error` and local time. Each evaluation times out after 1 s and terminates its worker. Expressions in data are never evaluated.
+- **jq.** Publishing only compiles expressions. From US2, evaluations run in Piscina workers (`frameworks/jq`), with the evaluator's prelude that disables `env`, `$ENV`, `input`, `inputs`, `input_filename`, `debug`, `stderr`, `halt`, `halt_error` and local time. Each evaluation times out after 1 s and terminates its worker. Expressions in data are never evaluated.
 - **Secrets.**
   - At rest: AES-256-GCM in the repository (`SECRETS_KEY`).
   - Only the definition's declared names are decrypted, and only for its rounds and deliveries.

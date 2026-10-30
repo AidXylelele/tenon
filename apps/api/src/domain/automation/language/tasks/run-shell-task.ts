@@ -1,64 +1,22 @@
-import type {
-  ParsedRunTask,
-  ParsedShell,
-  RunShellTaskProps,
-} from '../interfaces.js';
-import type { Scope } from '../scope.js';
-import type { Task } from '../task.js';
-import { TaskSettings } from '../task-settings.js';
-import { Template } from '../template.js';
+import { ProcessReturn } from '../enums.js';
+import type { Expression } from '../expression.js';
+import type { RunShellTaskProps } from '../interfaces.js';
+import { Task } from '../task.js';
+import type { Template } from '../template.js';
 
-export class RunShellTask implements Task {
-  readonly #name: string;
-  readonly #reference: string;
-  readonly #settings: TaskSettings;
-  readonly #shell: Template | null;
+export class RunShellTask extends Task {
+  readonly #shell: Template;
   readonly #awaits: boolean;
-  readonly #returns: string;
+  readonly #returns: ProcessReturn;
 
   constructor(props: RunShellTaskProps) {
-    this.#name = props.name;
-    this.#reference = props.reference;
-    this.#settings = props.settings;
+    super(props);
     this.#shell = props.shell;
-    this.#awaits = props.awaits;
-    this.#returns = props.returns;
+    this.#awaits = props.awaits ?? true;
+    this.#returns = props.returns ?? ProcessReturn.Stdout;
   }
 
-  static build(
-    name: string,
-    parsed: ParsedRunTask,
-    shell: ParsedShell,
-    scope: Scope,
-  ): RunShellTask {
-    const shellAt = scope.at('run').at('shell');
-    const settings = TaskSettings.read(parsed, scope);
-    const template = Template.read(shell, shellAt);
-    const awaits = parsed.run.await ?? true;
-    const returns = parsed.run.return ?? 'stdout';
-    return new RunShellTask({
-      name,
-      reference: scope.pointer,
-      settings,
-      shell: template,
-      awaits,
-      returns,
-    });
-  }
-
-  get name(): string {
-    return this.#name;
-  }
-
-  get reference(): string {
-    return this.#reference;
-  }
-
-  get settings(): TaskSettings {
-    return this.#settings;
-  }
-
-  get shell(): Template | null {
+  get shell(): Template {
     return this.#shell;
   }
 
@@ -66,7 +24,11 @@ export class RunShellTask implements Task {
     return this.#awaits;
   }
 
-  get returns(): string {
+  get returns(): ProcessReturn {
     return this.#returns;
+  }
+
+  protected override get ownExpressions(): readonly Expression[] {
+    return this.#shell.expressions;
   }
 }

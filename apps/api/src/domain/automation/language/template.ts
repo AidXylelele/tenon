@@ -1,9 +1,9 @@
 import { Expression } from './expression.js';
 import type { JsonValue, TemplateProps } from './interfaces.js';
-import type { Scope } from './scope.js';
+import type { JsonPointer } from './json-pointer.js';
 
 export class Template {
-  readonly #pointer: string;
+  readonly #pointer: JsonPointer;
   readonly #value: JsonValue;
 
   constructor(props: TemplateProps) {
@@ -11,15 +11,7 @@ export class Template {
     this.#value = props.value;
   }
 
-  static read(value: JsonValue | undefined, scope: Scope): Template | null {
-    if (value === undefined) return null;
-
-    const template = new Template({ pointer: scope.pointer, value });
-    template.#registerExpressions(value, scope);
-    return template;
-  }
-
-  get pointer(): string {
+  get pointer(): JsonPointer {
     return this.#pointer;
   }
 
@@ -27,32 +19,45 @@ export class Template {
     return this.#value;
   }
 
-  #registerExpressions(value: JsonValue, scope: Scope): void {
+  get expressions(): readonly Expression[] {
+    return this.#expressionsIn(this.#value, this.#pointer);
+  }
+
+  #expressionsIn(value: JsonValue, at: JsonPointer): readonly Expression[] {
     if (typeof value === 'string') {
-      const isExpression = Expression.isRuntime(value);
+      const runtime = Expression.isRuntime(value);
 
-      if (isExpression) Expression.read(value, scope);
+      if (!runtime) return [];
 
-      return;
+      const expression = Expression.of({ text: value, pointer: at });
+      return [expression];
     }
+
+    if (value === null || typeof value !== 'object') return [];
+
+    const found: Expression[] = [];
 
     if (Array.isArray(value)) {
       value.forEach((item, index) => {
-        const at = scope.at(index);
-        this.#registerExpressions(item, at);
-      });
-      return;
-    }
+        const itemAt = at.at(index);
+        const inner = this.#expressionsIn(item, itemAt);
 
-    if (value === null || typeof value !== 'object') return;
+        for (const expression of inner) found.push(expression);
+      });
+      return found;
+    }
 
     for (const key of Object.keys(value)) {
       const item = value[key];
 
       if (item === undefined) continue;
 
-      const at = scope.at(key);
-      this.#registerExpressions(item, at);
+      const itemAt = at.at(key);
+      const inner = this.#expressionsIn(item, itemAt);
+
+      for (const expression of inner) found.push(expression);
     }
+
+    return found;
   }
 }

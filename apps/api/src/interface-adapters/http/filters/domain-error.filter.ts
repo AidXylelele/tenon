@@ -1,3 +1,4 @@
+import { STATUS_CODES } from 'node:http';
 import {
   type ArgumentsHost,
   Catch,
@@ -5,12 +6,12 @@ import {
   ForbiddenException,
   GoneException,
   type HttpException,
+  HttpStatus,
   NotFoundException,
   UnauthorizedException,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
-import { WorkflowPresenter } from '../presenters/workflow.presenter.js';
 import {
   AuthenticationError,
   ConflictError,
@@ -39,11 +40,13 @@ export class DomainErrorFilter extends BaseExceptionFilter {
     }
 
     if (error instanceof DefinitionRejectedError) {
-      const problems = WorkflowPresenter.problems(error.problems);
+      const statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
+      const reason = STATUS_CODES[statusCode];
       return new UnprocessableEntityException({
-        statusCode: 422,
+        statusCode,
+        error: reason,
         message: error.message,
-        problems,
+        pointer: error.pointer,
       });
     }
 

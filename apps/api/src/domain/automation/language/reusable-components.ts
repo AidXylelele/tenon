@@ -1,155 +1,116 @@
-import { AuthenticationPolicy } from './authentication-policy.js';
-import { type Duration, DurationFactory } from './duration-factory.js';
-import type { ParsedUse } from './interfaces.js';
-import { RetryPolicy } from './retry-policy.js';
-import type { Scope } from './scope.js';
-import { SupportedSubset } from './supported-subset.js';
+import { UndeclaredComponentError } from '../../errors.js';
+import type { Authentication } from './authentication.js';
+import { Component } from './enums.js';
+import type { Expression } from './expression.js';
+import type { ExpressionDuration } from './expression-duration.js';
+import type { FixedDuration } from './fixed-duration.js';
+import type { ReusableComponentsProps } from './interfaces.js';
+import type { JsonPointer } from './json-pointer.js';
+import type { RetryStrategy } from './retry-strategy.js';
 import type { Task } from './task.js';
-import { TaskFactory } from './task-factory.js';
-import { Template } from './template.js';
+import type { Template } from './template.js';
 
 export class ReusableComponents {
-  readonly #authentications = new Map<string, AuthenticationPolicy>();
-  readonly #errors = new Map<string, Template>();
-  readonly #retries = new Map<string, RetryPolicy>();
-  readonly #timeouts = new Map<string, Duration>();
-  readonly #functions = new Map<string, Task>();
+  readonly #authentications: ReadonlyMap<string, Authentication>;
+  readonly #errors: ReadonlyMap<string, Template>;
+  readonly #retries: ReadonlyMap<string, RetryStrategy>;
+  readonly #timeouts: ReadonlyMap<string, FixedDuration | ExpressionDuration>;
+  readonly #functions: ReadonlyMap<string, Task>;
+
+  constructor(props: ReusableComponentsProps) {
+    this.#authentications = props.authentications;
+    this.#errors = props.errors;
+    this.#retries = props.retries;
+    this.#timeouts = props.timeouts;
+    this.#functions = props.functions;
+  }
 
   static none(): ReusableComponents {
-    return new ReusableComponents();
+    const authentications = new Map<string, Authentication>();
+    const errors = new Map<string, Template>();
+    const retries = new Map<string, RetryStrategy>();
+    const timeouts = new Map<string, FixedDuration | ExpressionDuration>();
+    const functions = new Map<string, Task>();
+    return new ReusableComponents({
+      authentications,
+      errors,
+      retries,
+      timeouts,
+      functions,
+    });
   }
 
-  static read(parsed: ParsedUse | undefined, scope: Scope): ReusableComponents {
-    const components = new ReusableComponents();
-    const use = parsed ?? {};
-    SupportedSubset.acceptsUse(use, scope);
-    components.#readAuthentications(use, scope);
-    components.#readErrors(use, scope);
-    components.#readRetries(use, scope);
-    components.#readTimeouts(use, scope);
-    components.#readFunctions(use, scope);
-    return components;
+  get expressions(): readonly Expression[] {
+    const found: Expression[] = [];
+    const authentications = Array.from(this.#authentications.values());
+    const errors = Array.from(this.#errors.values());
+    const retries = Array.from(this.#retries.values());
+    const timeouts = Array.from(this.#timeouts.values());
+    const functions = Array.from(this.#functions.values());
+    const components = [authentications, errors, retries, timeouts, functions];
+
+    for (const declared of components)
+      for (const component of declared)
+        for (const expression of component.expressions) found.push(expression);
+
+    return found;
   }
 
-  authentication(name: string, scope: Scope): AuthenticationPolicy | null {
-    const declared = this.#authentications.get(name) ?? null;
+  confirmCalls(): void {
+    for (const declared of this.#functions.values())
+      declared.confirmCalls(this);
+  }
 
-    if (declared === null)
-      scope.refuse(
-        `No authentication named "${name}" is declared in use.authentications`,
-      );
+  authentication(name: string, at: JsonPointer): Authentication {
+    const declared = this.#authentications.get(name);
+
+    if (declared === undefined)
+      throw this.#undeclared(Component.Authentications, name, at);
 
     return declared;
   }
 
-  error(name: string, scope: Scope): Template | null {
-    const declared = this.#errors.get(name) ?? null;
+  error(name: string, at: JsonPointer): Template {
+    const declared = this.#errors.get(name);
 
-    if (declared === null)
-      scope.refuse(`No error named "${name}" is declared in use.errors`);
-
-    return declared;
-  }
-
-  retry(name: string, scope: Scope): RetryPolicy | null {
-    const declared = this.#retries.get(name) ?? null;
-
-    if (declared === null)
-      scope.refuse(
-        `No retry policy named "${name}" is declared in use.retries`,
-      );
+    if (declared === undefined)
+      throw this.#undeclared(Component.Errors, name, at);
 
     return declared;
   }
 
-  timeout(name: string, scope: Scope): Duration | null {
-    const declared = this.#timeouts.get(name) ?? null;
+  retry(name: string, at: JsonPointer): RetryStrategy {
+    const declared = this.#retries.get(name);
 
-    if (declared === null)
-      scope.refuse(`No timeout named "${name}" is declared in use.timeouts`);
-
-    return declared;
-  }
-
-  function(name: string, scope: Scope): Task | null {
-    const declared = this.#functions.get(name) ?? null;
-
-    if (declared === null)
-      scope.refuse(`No function named "${name}" is declared in use.functions`);
+    if (declared === undefined)
+      throw this.#undeclared(Component.Retries, name, at);
 
     return declared;
   }
 
-  #readAuthentications(use: ParsedUse, scope: Scope): void {
-    const declared = use.authentications ?? {};
-    const section = scope.at('authentications');
+  timeout(name: string, at: JsonPointer): FixedDuration | ExpressionDuration {
+    const declared = this.#timeouts.get(name);
 
-    for (const name of Object.keys(declared)) {
-      const parsed = declared[name];
+    if (declared === undefined)
+      throw this.#undeclared(Component.Timeouts, name, at);
 
-      if (parsed === undefined) continue;
-
-      const named = section.at(name);
-      const policy = AuthenticationPolicy.read(parsed, named);
-
-      if (policy !== null) this.#authentications.set(name, policy);
-    }
+    return declared;
   }
 
-  #readErrors(use: ParsedUse, scope: Scope): void {
-    const declared = use.errors ?? {};
-    const section = scope.at('errors');
+  function(name: string, at: JsonPointer): Task {
+    const declared = this.#functions.get(name);
 
-    for (const name of Object.keys(declared)) {
-      const parsed = declared[name];
-      const named = section.at(name);
-      const error = Template.read(parsed, named);
+    if (declared === undefined)
+      throw this.#undeclared(Component.Functions, name, at);
 
-      if (error !== null) this.#errors.set(name, error);
-    }
+    return declared;
   }
 
-  #readRetries(use: ParsedUse, scope: Scope): void {
-    const declared = use.retries ?? {};
-    const section = scope.at('retries');
-
-    for (const name of Object.keys(declared)) {
-      const parsed = declared[name];
-
-      if (parsed === undefined) continue;
-
-      const named = section.at(name);
-      const policy = RetryPolicy.read(parsed, named);
-      this.#retries.set(name, policy);
-    }
-  }
-
-  #readTimeouts(use: ParsedUse, scope: Scope): void {
-    const declared = use.timeouts ?? {};
-    const section = scope.at('timeouts');
-
-    for (const name of Object.keys(declared)) {
-      const parsed = declared[name];
-      const afterAt = section.at(name).at('after');
-      const timeout = DurationFactory.read(parsed?.after, afterAt);
-
-      if (timeout !== null) this.#timeouts.set(name, timeout);
-    }
-  }
-
-  #readFunctions(use: ParsedUse, scope: Scope): void {
-    const declared = use.functions ?? {};
-    const section = scope.using(this).at('functions');
-
-    for (const name of Object.keys(declared)) {
-      const parsed = declared[name];
-
-      if (parsed === undefined) continue;
-
-      const named = section.at(name);
-      const task = TaskFactory.build(name, parsed, named);
-
-      if (task !== null) this.#functions.set(name, task);
-    }
+  #undeclared(
+    component: Component,
+    name: string,
+    at: JsonPointer,
+  ): UndeclaredComponentError {
+    return new UndeclaredComponentError(component, name, at);
   }
 }

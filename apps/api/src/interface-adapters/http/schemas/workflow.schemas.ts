@@ -1,19 +1,5 @@
 import { z } from 'zod';
 
-export const ProblemResponse = z.object({
-  pointer: z.string(),
-  message: z.string(),
-});
-
-export type ProblemResponse = z.infer<typeof ProblemResponse>;
-
-export const CheckReportResponse = z.object({
-  valid: z.boolean(),
-  problems: z.array(ProblemResponse),
-});
-
-export type CheckReportResponse = z.infer<typeof CheckReportResponse>;
-
 export const VersionResponse = z.object({
   namespace: z.string(),
   name: z.string(),

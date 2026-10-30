@@ -1,52 +1,23 @@
-import type { ParsedForkTask, ForkTaskProps } from '../interfaces.js';
-import type { Scope } from '../scope.js';
-import type { Task } from '../task.js';
-import { TaskList } from '../task-list.js';
-import { TaskSettings } from '../task-settings.js';
+import { EmptyCompetingForkError } from '../../../errors.js';
+import type { Expression } from '../expression.js';
+import type { ForkTaskProps } from '../interfaces.js';
+import { Task } from '../task.js';
+import type { TaskList } from '../task-list.js';
 
-export class ForkTask implements Task {
-  readonly #name: string;
-  readonly #reference: string;
-  readonly #settings: TaskSettings;
+export class ForkTask extends Task {
   readonly #branches: TaskList;
   readonly #compete: boolean;
 
   constructor(props: ForkTaskProps) {
-    this.#name = props.name;
-    this.#reference = props.reference;
-    this.#settings = props.settings;
+    super(props);
+    const compete = props.compete ?? false;
+    const empty = props.branches.isEmpty();
+
+    if (compete && empty)
+      throw new EmptyCompetingForkError(props.branches.reference);
+
     this.#branches = props.branches;
-    this.#compete = props.compete;
-  }
-
-  static build(name: string, parsed: ParsedForkTask, scope: Scope): ForkTask {
-    const branchesAt = scope.at('fork').at('branches');
-    const settings = TaskSettings.read(parsed, scope);
-    const branches = TaskList.build(parsed.fork.branches, branchesAt);
-    const compete = parsed.fork.compete ?? false;
-    const empty = branches.isEmpty();
-
-    if (empty) branchesAt.refuse('A fork needs at least one branch');
-
-    return new ForkTask({
-      name,
-      reference: scope.pointer,
-      settings,
-      branches,
-      compete,
-    });
-  }
-
-  get name(): string {
-    return this.#name;
-  }
-
-  get reference(): string {
-    return this.#reference;
-  }
-
-  get settings(): TaskSettings {
-    return this.#settings;
+    this.#compete = compete;
   }
 
   get branches(): TaskList {
@@ -55,5 +26,13 @@ export class ForkTask implements Task {
 
   get compete(): boolean {
     return this.#compete;
+  }
+
+  override get children(): readonly TaskList[] {
+    return [this.#branches];
+  }
+
+  protected override get ownExpressions(): readonly Expression[] {
+    return this.#branches.expressions;
   }
 }

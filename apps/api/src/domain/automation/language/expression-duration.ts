@@ -10,4 +10,8 @@ export class ExpressionDuration {
   get expression(): Expression {
     return this.#expression;
   }
+
+  get expressions(): readonly Expression[] {
+    return [this.#expression];
+  }
 }

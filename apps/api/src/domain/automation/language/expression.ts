@@ -1,39 +1,29 @@
-import type { ExpressionProps } from './interfaces.js';
-import type { Scope } from './scope.js';
-
-const RUNTIME_EXPRESSION = /^\s*\$\{([\s\S]*)\}\s*$/;
+import type { ExpressionProps, NewExpression } from './interfaces.js';
+import type { JsonPointer } from './json-pointer.js';
 
 export class Expression {
-  readonly #pointer: string;
+  static readonly #RUNTIME = /^\s*\$\{([\s\S]*)\}\s*$/;
+
+  readonly #pointer: JsonPointer;
   readonly #program: string;
-  readonly #variables: readonly string[];
 
   constructor(props: ExpressionProps) {
     this.#pointer = props.pointer;
     this.#program = props.program;
-    this.#variables = props.variables;
   }
 
   static isRuntime(text: string): boolean {
-    return RUNTIME_EXPRESSION.test(text);
+    return Expression.#RUNTIME.test(text);
   }
 
-  static read(text: string | undefined, scope: Scope): Expression | null {
-    if (text === undefined) return null;
-
-    const wrapped = RUNTIME_EXPRESSION.exec(text);
-    const program = wrapped?.[1] ?? text;
+  static of(input: NewExpression): Expression {
+    const wrapped = Expression.#RUNTIME.exec(input.text);
+    const program = wrapped?.[1] ?? input.text;
     const trimmed = program.trim();
-    const expression = new Expression({
-      pointer: scope.pointer,
-      program: trimmed,
-      variables: scope.variables,
-    });
-    scope.register(expression);
-    return expression;
+    return new Expression({ pointer: input.pointer, program: trimmed });
   }
 
-  get pointer(): string {
+  get pointer(): JsonPointer {
     return this.#pointer;
   }
 
@@ -41,7 +31,7 @@ export class Expression {
     return this.#program;
   }
 
-  get variables(): readonly string[] {
-    return this.#variables;
+  get expressions(): readonly Expression[] {
+    return [this];
   }
 }

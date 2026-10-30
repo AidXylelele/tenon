@@ -8,9 +8,7 @@ import type {
   WorkflowQueries,
   WorkflowSummary,
 } from '../../../application/automation/workflows/queries.js';
-import type { PublishedTargets } from '../../../domain/automation/language/interfaces.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import type { WorkflowTarget } from '../../../domain/automation/language/workflow-target.js';
 import { Database } from '../../interfaces.js';
 import {
   workflow as workflows,
@@ -107,40 +105,6 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
         ),
       );
     return row ?? null;
-  }
-
-  async referenceFacts(
-    targets: readonly WorkflowTarget[],
-  ): Promise<PublishedTargets> {
-    if (targets.length === 0) return { workflows: [], versions: [] };
-
-    const named = targets.map((target) =>
-      and(
-        eq(workflows.namespace, target.workflow.namespace),
-        eq(workflows.name, target.workflow.name),
-      ),
-    );
-    const versioned = targets.map((target) =>
-      and(
-        eq(workflows.namespace, target.workflow.namespace),
-        eq(workflows.name, target.workflow.name),
-        eq(versions.semver, target.version),
-      ),
-    );
-    const existing = await this.db
-      .select({ namespace: workflows.namespace, name: workflows.name })
-      .from(workflows)
-      .where(or(...named));
-    const published = await this.db
-      .select({
-        namespace: workflows.namespace,
-        name: workflows.name,
-        version: versions.semver,
-      })
-      .from(versions)
-      .innerJoin(workflows, eq(workflows.id, versions.workflowId))
-      .where(or(...versioned));
-    return { workflows: existing, versions: published };
   }
 
   #after(cursor: string | null): SQL | undefined {

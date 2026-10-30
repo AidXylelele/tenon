@@ -1,41 +1,39 @@
-import { DocumentReading } from '../../../../../src/domain/automation/language/document-reading.js';
-import type { ParsedDocument } from '../../../../../src/domain/automation/language/interfaces.js';
-import { Problem } from '../../../../../src/domain/automation/language/problem.js';
+import { Definition } from '../../../../../src/domain/automation/language/definition.js';
+import { Input } from '../../../../../src/domain/automation/language/input.js';
+import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
+import { Output } from '../../../../../src/domain/automation/language/output.js';
+import { ReusableComponents } from '../../../../../src/domain/automation/language/reusable-components.js';
 import { WorkflowName } from '../../../../../src/domain/automation/language/workflow-name.js';
+import { DocumentFormat } from '../../../../../src/domain/automation/workflows/enums.js';
 import { SourceDocument } from '../../../../../src/domain/automation/workflows/source-document.js';
 import { Workflow } from '../../../../../src/domain/automation/workflows/workflow.js';
 import { WorkflowVersion } from '../../../../../src/domain/automation/workflows/workflow-version.js';
-import {
-  DefinitionRejectedError,
-  VersionConflictError,
-} from '../../../../../src/domain/errors.js';
+import { VersionConflictError } from '../../../../../src/domain/errors.js';
+import { setTask, taskList } from '../../../../support/language.js';
 
 const now = new Date('2026-06-01T00:00:00Z');
 
-const noTargets = { workflows: [], versions: [] };
-
-const parsed: ParsedDocument = {
-  document: {
-    dsl: '1.0.3',
-    namespace: 'default',
-    name: 'greet',
+function definitionOf(workflow: WorkflowName): Definition {
+  const body = JsonPointer.root().at('do');
+  return new Definition({
+    workflow,
     version: '1.2.0',
-  },
-  do: [{ hello: { set: { greeting: 'hello' } } }],
-};
-
-function definitionOf(document: ParsedDocument) {
-  const build = new DocumentReading(document, []).build();
-  const report = build.report([], noTargets);
-  return report.publishable();
+    dslVersion: '1.0.3',
+    input: Input.none(),
+    output: Output.none(),
+    timeout: null,
+    body: taskList(body, [setTask(body, 0, 'hello')]),
+    components: ReusableComponents.none(),
+  });
 }
 
 describe('WorkflowVersion', () => {
-  const source = SourceDocument.of('yaml', 'document: {}\n');
+  const greet = new WorkflowName('default', 'greet');
+  const source = SourceDocument.of(DocumentFormat.Yaml, 'document: {}\n');
 
-  it('a_clean_report_publishes_the_version_and_makes_it_current', () => {
-    const workflow = Workflow.register(new WorkflowName('default', 'greet'));
-    const definition = definitionOf(parsed);
+  it('a_definition_publishes_a_version_with_its_semver_and_dsl_version', () => {
+    const workflow = Workflow.register(greet);
+    const definition = definitionOf(greet);
 
     const version = WorkflowVersion.publish({
       workflow,
@@ -52,29 +50,9 @@ describe('WorkflowVersion', () => {
     expect(workflow.currentVersionId).toBe(version.id);
   });
 
-  it('a_report_with_problems_refuses_publication_with_every_problem', () => {
-    const build = new DocumentReading(parsed, []).build();
-    const expressionProblems = [new Problem('/do/0/hello/set', 'syntax error')];
-    const report = build.report(expressionProblems, noTargets);
-
-    expect(() => report.publishable()).toThrow(DefinitionRejectedError);
-    expect(() => report.publishable()).toThrow(
-      expect.objectContaining({ problems: expressionProblems }) as Error,
-    );
-  });
-
-  it('a_document_that_could_not_be_read_is_refused_with_the_reading_problems', () => {
-    const problems = [new Problem('/do', 'must be array')];
-    const build = new DocumentReading(null, problems).build();
-    const report = build.report([], noTargets);
-
-    expect(report.problems).toEqual(problems);
-    expect(() => report.publishable()).toThrow(DefinitionRejectedError);
-  });
-
   it('a_definition_of_another_workflow_cannot_become_its_version', () => {
     const workflow = Workflow.register(new WorkflowName('billing', 'invoice'));
-    const definition = definitionOf(parsed);
+    const definition = definitionOf(greet);
     const publish = () =>
       WorkflowVersion.publish({
         workflow,
@@ -88,19 +66,25 @@ describe('WorkflowVersion', () => {
   });
 
   it('the_same_text_is_the_same_document_and_other_text_is_a_conflict', () => {
-    const workflow = Workflow.register(new WorkflowName('default', 'greet'));
-    const definition = definitionOf(parsed);
+    const workflow = Workflow.register(greet);
     const version = WorkflowVersion.publish({
       workflow,
-      definition,
+      definition: definitionOf(greet),
       source,
       publisherId: 'author-1',
       now,
     });
-    const same = SourceDocument.of('yaml', 'document: {}\n');
-    const other = SourceDocument.of('yaml', 'document: { changed: true }\n');
+    const same = SourceDocument.of(DocumentFormat.Yaml, 'document: {}\n');
+    const other = SourceDocument.of(
+      DocumentFormat.Yaml,
+      'document: { changed: true }\n',
+    );
 
-    expect(() => version.confirmSame(same)).not.toThrow();
-    expect(() => version.confirmSame(other)).toThrow(VersionConflictError);
+    expect(() => {
+      version.confirmSame(same);
+    }).not.toThrow();
+    expect(() => {
+      version.confirmSame(other);
+    }).toThrow(VersionConflictError);
   });
 });

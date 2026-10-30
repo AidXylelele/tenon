@@ -1,12 +1,13 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { type NextFunction, type Request, type Response, text } from 'express';
 import {
-  DOCUMENT_LIMIT,
-  DOCUMENT_MEDIA_TYPES,
-  DOCUMENT_ROUTES,
-} from '../../interface-adapters/http/parsers/dsl-document.parser.js';
+  DocumentMediaType,
+  DocumentRoute,
+} from '../../interface-adapters/http/enums.js';
 
 const PREFIX = 'api/v1';
+
+const DOCUMENT_LIMIT = '1mb';
 
 export interface HttpSettings {
   readonly trustedProxies: readonly string[];
@@ -17,8 +18,12 @@ export function configureHttpApp(
   app: NestExpressApplication,
   settings: HttpSettings,
 ): void {
-  const documentPaths = DOCUMENT_ROUTES.map((route) => `/${PREFIX}${route}`);
-  const documents = text({ type: DOCUMENT_MEDIA_TYPES, limit: DOCUMENT_LIMIT });
+  const routes = Object.values(DocumentRoute);
+  const documentPaths: readonly string[] = routes.map(
+    (route) => `/${PREFIX}${route}`,
+  );
+  const mediaTypes = Object.values(DocumentMediaType);
+  const documents = text({ type: mediaTypes, limit: DOCUMENT_LIMIT });
   app.set('trust proxy', settings.trustedProxies);
   app.enableCsrfProtection({ trustedOrigins: settings.trustedOrigins.slice() });
   app.setGlobalPrefix(PREFIX);

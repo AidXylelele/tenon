@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { VersionConflictError } from '../../errors.js';
-import type { DocumentFormat, SourceDocumentProps } from './interfaces.js';
+import type { DocumentFormat } from './enums.js';
+import type { SourceDocumentProps } from './interfaces.js';
 
 export class SourceDocument {
   readonly #format: DocumentFormat;

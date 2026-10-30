@@ -11,11 +11,6 @@ function greeting(version: string, text: string): string {
   return `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: greet\n  version: '${version}'\ndo:\n  - hello:\n      set:\n        greeting: ${text}\n`;
 }
 
-interface ProblemBody {
-  readonly pointer: string;
-  readonly message: string;
-}
-
 describe('publishing workflows', () => {
   let t: TestApp;
   let editor: Record<string, string>;
@@ -173,7 +168,7 @@ describe('publishing workflows', () => {
     ]);
   });
 
-  it('a_document_with_several_defects_is_refused_with_every_defect_and_nothing_is_stored', async () => {
+  it('a_document_is_refused_at_its_first_defect_and_nothing_is_stored', async () => {
     const text = `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: broken\n  version: '1.0.0'\ndo:\n  - pause:\n      wait: PT1S\n  - compute:\n      set:\n        value: '\${ .a + }'\n      then: nowhere\n`;
 
     const refused = await request(t.server)
@@ -187,52 +182,59 @@ describe('publishing workflows', () => {
       .set(viewer)
       .expect(200);
 
-    const pointers = (refused.body.problems as ProblemBody[]).map(
-      (problem) => problem.pointer,
-    );
-    expect(pointers).toEqual([
-      '/do/0/pause/wait',
-      '/do/1/compute/then',
-      '/do/1/compute/set/value',
-    ]);
+    expect(refused.body).toEqual({
+      statusCode: 422,
+      error: 'Unprocessable Entity',
+      message: 'the wait task is outside the supported subset',
+      pointer: '/do/0/pause/wait',
+    });
     expect(listed.body.items).toEqual([]);
   });
 
-  it('checking_gives_the_report_publishing_would_give_and_stores_nothing', async () => {
-    const text = `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: broken\n  version: '1.0.0'\ndo:\n  - pause:\n      wait: PT1S\n`;
+  it('checking_accepts_what_publishing_would_publish_and_stores_nothing', async () => {
+    await request(t.server)
+      .post('/api/v1/workflows/check')
+      .set(editor)
+      .type(YAML)
+      .send(greeting('1.0.0', 'hello'))
+      .expect(204);
+    const listed = await request(t.server)
+      .get('/api/v1/workflows')
+      .set(viewer)
+      .expect(200);
+
+    expect(listed.body.items).toEqual([]);
+  });
+
+  it('checking_refuses_what_publishing_would_refuse', async () => {
+    const text = `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: broken\n  version: '1.0.0'\ndo:\n  - compute:\n      set:\n        value: '\${ .a + }'\n`;
 
     const checked = await request(t.server)
       .post('/api/v1/workflows/check')
       .set(editor)
       .type(YAML)
       .send(text)
-      .expect(200);
+      .expect(422);
     const refused = await request(t.server)
       .post('/api/v1/workflows')
       .set(editor)
       .type(YAML)
       .send(text)
       .expect(422);
-    const listed = await request(t.server)
-      .get('/api/v1/workflows')
-      .set(viewer)
-      .expect(200);
 
-    expect(checked.body.valid).toBe(false);
-    expect(checked.body.problems).toEqual(refused.body.problems);
-    expect(listed.body.items).toEqual([]);
+    expect(checked.body).toEqual(refused.body);
+    expect(checked.body).toMatchObject({ pointer: '/do/0/compute/set/value' });
   });
 
-  it('a_malformed_json_document_is_reported_as_a_problem_of_the_document', async () => {
+  it('a_malformed_json_document_is_refused_at_its_root', async () => {
     const checked = await request(t.server)
       .post('/api/v1/workflows/check')
       .set(editor)
       .type('application/json')
       .send('{ "document": ')
-      .expect(200);
+      .expect(422);
 
-    expect(checked.body.valid).toBe(false);
-    expect(checked.body.problems).toHaveLength(1);
+    expect(checked.body).toMatchObject({ statusCode: 422, pointer: '' });
   });
 
   it('a_path_that_is_not_a_workflow_name_is_refused', async () => {
@@ -304,15 +306,7 @@ describe('publishing workflows', () => {
         .send(text)
         .expect(422);
 
-      const pointers = (refused.body.problems as ProblemBody[]).map(
-        (problem) => problem.pointer,
-      );
-      const located = pointers.some(
-        (pointer) =>
-          pointer === document.pointer ||
-          pointer.startsWith(`${document.pointer}/`),
-      );
-      expect(located, `${document.defect}: ${pointers.join(', ')}`).toBe(true);
+      expect(refused.body).toMatchObject({ pointer: document.pointer });
     },
   );
 });

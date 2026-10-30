@@ -1,42 +1,21 @@
-import type { ParsedEmitTask, EmitTaskProps } from '../interfaces.js';
-import type { Scope } from '../scope.js';
-import type { Task } from '../task.js';
-import { TaskSettings } from '../task-settings.js';
-import { Template } from '../template.js';
+import type { Expression } from '../expression.js';
+import type { EmitTaskProps } from '../interfaces.js';
+import { Task } from '../task.js';
+import type { Template } from '../template.js';
 
-export class EmitTask implements Task {
-  readonly #name: string;
-  readonly #reference: string;
-  readonly #settings: TaskSettings;
-  readonly #event: Template | null;
+export class EmitTask extends Task {
+  readonly #event: Template;
 
   constructor(props: EmitTaskProps) {
-    this.#name = props.name;
-    this.#reference = props.reference;
-    this.#settings = props.settings;
+    super(props);
     this.#event = props.event;
   }
 
-  static build(name: string, parsed: ParsedEmitTask, scope: Scope): EmitTask {
-    const eventAt = scope.at('emit').at('event').at('with');
-    const settings = TaskSettings.read(parsed, scope);
-    const event = Template.read(parsed.emit.event.with, eventAt);
-    return new EmitTask({ name, reference: scope.pointer, settings, event });
-  }
-
-  get name(): string {
-    return this.#name;
-  }
-
-  get reference(): string {
-    return this.#reference;
-  }
-
-  get settings(): TaskSettings {
-    return this.#settings;
-  }
-
-  get event(): Template | null {
+  get event(): Template {
     return this.#event;
+  }
+
+  protected override get ownExpressions(): readonly Expression[] {
+    return this.#event.expressions;
   }
 }

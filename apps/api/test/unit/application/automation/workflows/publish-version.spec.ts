@@ -1,15 +1,15 @@
 import { CheckDocument } from '../../../../../src/application/automation/workflows/check-document.js';
 import { PublishVersion } from '../../../../../src/application/automation/workflows/publish-version.js';
+import { DocumentFormat } from '../../../../../src/domain/automation/workflows/enums.js';
 import {
   DefinitionRejectedError,
   VersionConflictError,
 } from '../../../../../src/domain/errors.js';
 import {
   FakeExpressionEvaluator,
-  InMemoryWorkflowQueries,
   InMemoryWorkflowRepository,
   InMemoryWorkflowVersionRepository,
-  JsonDocumentReader,
+  JsonDefinitionReader,
 } from '../../../../support/fakes.js';
 
 function documentText(version: string, greeting: string): string {
@@ -21,12 +21,10 @@ function documentText(version: string, greeting: string): string {
 
 function setUp() {
   const workflows = new InMemoryWorkflowRepository();
-  const versions = new InMemoryWorkflowVersionRepository();
-  const queries = new InMemoryWorkflowQueries(versions);
+  const versions = new InMemoryWorkflowVersionRepository(workflows);
   const check = new CheckDocument(
-    new JsonDocumentReader(),
+    new JsonDefinitionReader(),
     new FakeExpressionEvaluator(),
-    queries,
   );
   const publish = new PublishVersion(check, workflows, versions);
   return { workflows, versions, publish };
@@ -37,7 +35,7 @@ describe('PublishVersion', () => {
     const { workflows, versions, publish } = setUp();
 
     const result = await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: documentText('1.0.0', 'hi'),
       publisherId: 'author-1',
     });
@@ -54,13 +52,13 @@ describe('PublishVersion', () => {
     const { versions, publish } = setUp();
     const text = documentText('1.0.0', 'hi');
     const first = await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text,
       publisherId: 'author-1',
     });
 
     const again = await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text,
       publisherId: 'author-2',
     });
@@ -74,18 +72,18 @@ describe('PublishVersion', () => {
     const { publish } = setUp();
     const first = documentText('1.0.0', 'hi');
     await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: first,
       publisherId: 'author-1',
     });
     await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: documentText('1.1.0', 'hello'),
       publisherId: 'author-1',
     });
 
     const again = await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: first,
       publisherId: 'author-1',
     });
@@ -97,13 +95,13 @@ describe('PublishVersion', () => {
   it('other_content_under_the_same_version_is_a_conflict', async () => {
     const { publish } = setUp();
     await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: documentText('1.0.0', 'hi'),
       publisherId: 'author-1',
     });
 
     const conflicting = publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: documentText('1.0.0', 'hello'),
       publisherId: 'author-1',
     });
@@ -114,13 +112,13 @@ describe('PublishVersion', () => {
   it('a_later_version_becomes_current', async () => {
     const { workflows, publish } = setUp();
     await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: documentText('1.0.0', 'hi'),
       publisherId: 'author-1',
     });
 
     const second = await publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text: documentText('1.1.0', 'hello'),
       publisherId: 'author-1',
     });
@@ -130,7 +128,7 @@ describe('PublishVersion', () => {
     expect(workflow?.currentVersionId).toBe(second.version.id);
   });
 
-  it('a_document_with_problems_is_refused_and_nothing_is_stored', async () => {
+  it('a_refused_document_stores_nothing', async () => {
     const { workflows, versions, publish } = setUp();
     const text = JSON.stringify({
       document: {
@@ -143,7 +141,7 @@ describe('PublishVersion', () => {
     });
 
     const refused = publish.execute({
-      format: 'json',
+      format: DocumentFormat.Json,
       text,
       publisherId: 'author-1',
     });

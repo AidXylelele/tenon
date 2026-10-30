@@ -2,21 +2,20 @@ import {
   WorkflowRepository,
   WorkflowVersionRepository,
 } from '../../../src/application/automation/workflows/ports.js';
-import { WorkflowQueries } from '../../../src/application/automation/workflows/queries.js';
-import { DocumentReading } from '../../../src/domain/automation/language/document-reading.js';
-import type { ParsedDocument } from '../../../src/domain/automation/language/interfaces.js';
 import { WorkflowName } from '../../../src/domain/automation/language/workflow-name.js';
-import { WorkflowTarget } from '../../../src/domain/automation/language/workflow-target.js';
+import { DocumentFormat } from '../../../src/domain/automation/workflows/enums.js';
 import { SourceDocument } from '../../../src/domain/automation/workflows/source-document.js';
 import { Workflow } from '../../../src/domain/automation/workflows/workflow.js';
 import { WorkflowVersion } from '../../../src/domain/automation/workflows/workflow-version.js';
 import { StaleWriteError } from '../../../src/domain/errors.js';
 import { Role } from '../../../src/domain/identity/enums.js';
+import { DefinitionMapper } from '../../../src/interface-adapters/documents/mappers/definition.mapper.js';
+import type * as Dsl from '../../../src/interface-adapters/documents/interfaces.js';
 import { createUser } from '../../support/auth-helpers.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
 import { inTransaction, truncateAll } from '../../support/db.js';
 
-const parsed: ParsedDocument = {
+const parsed: Dsl.Workflow = {
   document: {
     dsl: '1.0.3',
     namespace: 'billing',
@@ -30,14 +29,12 @@ describe('workflow persistence', () => {
   let t: TestApp;
   let workflows: WorkflowRepository;
   let versions: WorkflowVersionRepository;
-  let queries: WorkflowQueries;
   let publisherId: string;
 
   beforeAll(async () => {
     t = await createTestApp();
     workflows = t.app.get(WorkflowRepository);
     versions = t.app.get(WorkflowVersionRepository);
-    queries = t.app.get(WorkflowQueries);
   });
 
   afterAll(async () => {
@@ -54,12 +51,12 @@ describe('workflow persistence', () => {
   });
 
   async function publish(): Promise<WorkflowVersion> {
-    const definition = new DocumentReading(parsed, [])
-      .build()
-      .report([], { workflows: [], versions: [] })
-      .publishable();
+    const definition = DefinitionMapper.toDomain(parsed);
     const workflow = Workflow.register(definition.workflow);
-    const source = SourceDocument.of('json', JSON.stringify(parsed));
+    const source = SourceDocument.of(
+      DocumentFormat.Json,
+      JSON.stringify(parsed),
+    );
     const version = WorkflowVersion.publish({
       workflow,
       definition,
@@ -75,17 +72,15 @@ describe('workflow persistence', () => {
     return version;
   }
 
-  it('a_stored_version_comes_back_with_its_definition_rebuilt_from_the_document', async () => {
+  it('a_stored_version_comes_back_with_its_source', async () => {
     const published = await publish();
     const name = new WorkflowName('billing', 'invoice');
 
     const found = await versions.find(name, '2.0.0');
 
     expect(found?.id).toBe(published.id);
-    expect(found?.definition.body.tasks.map((task) => task.name)).toEqual([
-      'total',
-    ]);
-    expect(found?.definition.document).toEqual(parsed);
+    expect(found?.dslVersion).toBe('1.0.3');
+    expect(found?.source.text).toBe(JSON.stringify(parsed));
     expect(found?.source.fingerprint).toBe(published.source.fingerprint);
   });
 
@@ -112,23 +107,5 @@ describe('workflow persistence', () => {
     const raced = inTransaction(t.app, () => workflows.save(rival));
 
     await expect(raced).rejects.toThrow(StaleWriteError);
-  });
-
-  it('reference_facts_report_the_workflows_and_versions_that_exist', async () => {
-    await publish();
-    const invoice = new WorkflowName('billing', 'invoice');
-    const refund = new WorkflowName('billing', 'refund');
-    const targets = [
-      new WorkflowTarget(invoice, '2.0.0'),
-      new WorkflowTarget(invoice, '3.0.0'),
-      new WorkflowTarget(refund, WorkflowTarget.LATEST),
-    ];
-
-    const facts = await queries.referenceFacts(targets);
-
-    expect(facts).toEqual({
-      workflows: [{ namespace: 'billing', name: 'invoice' }],
-      versions: [{ namespace: 'billing', name: 'invoice', version: '2.0.0' }],
-    });
   });
 });

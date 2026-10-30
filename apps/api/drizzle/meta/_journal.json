@@ -36,6 +36,13 @@
       "when": 1793232621071,
       "tag": "0004_workflow",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793347637473,
+      "tag": "0005_workflow_version_without_definition",
+      "breakpoints": true
     }
   ]
 }

@@ -1,24 +1,15 @@
-import type { Scope } from './scope.js';
-
-const KEYWORDS = new Set(['continue', 'exit', 'end']);
+import { UnknownTaskError } from '../../errors.js';
+import { FlowKeyword } from './enums.js';
+import type { FlowDirectiveProps } from './interfaces.js';
+import type { JsonPointer } from './json-pointer.js';
 
 export class FlowDirective {
   readonly #value: string;
+  readonly #pointer: JsonPointer;
 
-  constructor(value: string) {
-    this.#value = value;
-  }
-
-  static read(text: string | undefined, scope: Scope): FlowDirective {
-    const value = text ?? 'continue';
-    const directive = new FlowDirective(value);
-    const namesTask = directive.namesTask();
-    const known = scope.knowsTask(value);
-
-    if (namesTask && !known)
-      scope.refuse(`"${value}" is not a task of this list`);
-
-    return directive;
+  constructor(props: FlowDirectiveProps) {
+    this.#value = props.value ?? FlowKeyword.Continue;
+    this.#pointer = props.pointer;
   }
 
   get value(): string {
@@ -26,7 +17,17 @@ export class FlowDirective {
   }
 
   namesTask(): boolean {
-    const keyword = KEYWORDS.has(this.#value);
+    const keywords: readonly string[] = Object.values(FlowKeyword);
+    const keyword = keywords.includes(this.#value);
     return !keyword;
+  }
+
+  confirmWithin(tasks: ReadonlySet<string>): void {
+    const namesTask = this.namesTask();
+    const listed = tasks.has(this.#value);
+
+    if (!namesTask || listed) return;
+
+    throw new UnknownTaskError(this.#value, this.#pointer);
   }
 }

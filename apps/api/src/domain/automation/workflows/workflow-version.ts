@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { Definition } from '../language/definition.js';
 import type { NewWorkflowVersion, WorkflowVersionProps } from './interfaces.js';
 import type { SourceDocument } from './source-document.js';
 
@@ -7,8 +6,8 @@ export class WorkflowVersion {
   readonly #id: string;
   readonly #workflowId: string;
   readonly #semver: string;
+  readonly #dslVersion: string;
   readonly #source: SourceDocument;
-  readonly #definition: Definition;
   readonly #publisherId: string;
   readonly #publishedAt: Date;
 
@@ -16,8 +15,8 @@ export class WorkflowVersion {
     this.#id = props.id;
     this.#workflowId = props.workflowId;
     this.#semver = props.semver;
+    this.#dslVersion = props.dslVersion;
     this.#source = props.source;
-    this.#definition = props.definition;
     this.#publisherId = props.publisherId;
     this.#publishedAt = props.publishedAt;
   }
@@ -35,8 +34,8 @@ export class WorkflowVersion {
       id,
       workflowId: input.workflow.id,
       semver: definition.version,
+      dslVersion: definition.dslVersion,
       source: input.source,
-      definition,
       publisherId: input.publisherId,
       publishedAt: input.now,
     });
@@ -55,15 +54,11 @@ export class WorkflowVersion {
   }
 
   get dslVersion(): string {
-    return this.#definition.dslVersion;
+    return this.#dslVersion;
   }
 
   get source(): SourceDocument {
     return this.#source;
-  }
-
-  get definition(): Definition {
-    return this.#definition;
   }
 
   get publisherId(): string {

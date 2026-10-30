@@ -1,4 +1,8 @@
-import type { Problem } from './automation/language/problem.js';
+import type {
+  Component,
+  UnsupportedConstruct,
+} from './automation/language/enums.js';
+import type { JsonPointer } from './automation/language/json-pointer.js';
 
 export abstract class DomainError extends Error {
   constructor(message: string) {
@@ -97,12 +101,85 @@ export class StaleWriteError extends ConflictError {
   }
 }
 
-export class DefinitionRejectedError extends RuleViolationError {
-  readonly problems: readonly Problem[];
+export abstract class DefinitionRejectedError extends RuleViolationError {
+  readonly pointer: string;
 
-  constructor(problems: readonly Problem[]) {
-    super('The document has problems');
-    this.problems = problems;
+  constructor(pointer: string, message: string) {
+    super(message);
+    this.pointer = pointer;
+  }
+}
+
+export class InvalidDocumentError extends DefinitionRejectedError {}
+
+export class UnsupportedConstructError extends DefinitionRejectedError {
+  constructor(construct: UnsupportedConstruct, at: JsonPointer) {
+    const pointer = at.toString();
+    super(pointer, `${construct} is outside the supported subset`);
+  }
+}
+
+export class UndeclaredComponentError extends DefinitionRejectedError {
+  constructor(component: Component, name: string, at: JsonPointer) {
+    const pointer = at.toString();
+    super(pointer, `"${name}" is not declared in use.${component}`);
+  }
+}
+
+export class InvalidExpressionError extends DefinitionRejectedError {
+  constructor(at: JsonPointer, failure: string) {
+    const pointer = at.toString();
+    super(pointer, `Invalid expression: ${failure}`);
+  }
+}
+
+export class DuplicateTaskError extends DefinitionRejectedError {
+  constructor(name: string, at: JsonPointer) {
+    const pointer = at.toString();
+    super(pointer, `Another task in this list is named "${name}"`);
+  }
+}
+
+export class UnknownTaskError extends DefinitionRejectedError {
+  constructor(name: string, at: JsonPointer) {
+    const pointer = at.toString();
+    super(pointer, `"${name}" is not a task of this list`);
+  }
+}
+
+export class EmptyCompetingForkError extends DefinitionRejectedError {
+  constructor(at: JsonPointer) {
+    const pointer = at.toString();
+    super(pointer, 'A competing fork needs at least one branch');
+  }
+}
+
+export abstract class InvalidValueError extends RuleViolationError {}
+
+export class NegativeDurationError extends InvalidValueError {
+  constructor() {
+    super('A duration cannot be negative');
+  }
+}
+
+export class UncomputableDurationError extends InvalidValueError {
+  constructor() {
+    super(
+      'A fraction is allowed only in the smallest of the hours, minutes or seconds of a duration',
+    );
+  }
+}
+
+export class NegativeAttemptCountError extends InvalidValueError {
+  constructor() {
+    super('An attempt count cannot be negative');
+  }
+}
+
+export class InvalidDocumentValueError extends DefinitionRejectedError {
+  constructor(at: JsonPointer, cause: InvalidValueError) {
+    const pointer = at.toString();
+    super(pointer, cause.message);
   }
 }
 
