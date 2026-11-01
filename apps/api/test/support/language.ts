@@ -3,7 +3,7 @@ import { FlowDirective } from '../../src/domain/automation/language/flow-directi
 import { Input } from '../../src/domain/automation/language/input.js';
 import type { JsonPointer } from '../../src/domain/automation/language/json-pointer.js';
 import { Output } from '../../src/domain/automation/language/output.js';
-import type { Task } from '../../src/domain/automation/language/task.js';
+import type { Task } from '../../src/domain/automation/language/tasks/task.js';
 import { TaskBase } from '../../src/domain/automation/language/task-base.js';
 import { TaskList } from '../../src/domain/automation/language/task-list.js';
 import { FunctionCallTask } from '../../src/domain/automation/language/tasks/function-call-task.js';
@@ -13,7 +13,8 @@ import { DefinitionRejectedError } from '../../src/domain/errors.js';
 
 export function baseAt(at: JsonPointer, then: string | null = null): TaskBase {
   const thenAt = at.at('then');
-  const directive = new FlowDirective({ value: then, pointer: thenAt });
+  const name = then ?? undefined;
+  const directive = FlowDirective.named(name, thenAt);
   return new TaskBase({
     condition: null,
     input: Input.none(),
@@ -44,8 +45,9 @@ export function callTask(
   reference: JsonPointer,
   name: string,
   callee: string,
+  then: string | null = null,
 ): FunctionCallTask {
-  const base = baseAt(reference);
+  const base = baseAt(reference, then);
   return new FunctionCallTask({
     name,
     reference,

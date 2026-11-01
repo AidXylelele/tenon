@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { AccountType } from '../../domain/identity/enums.js';
 import {
   InvalidCredentialsError,
   UserSuspendedError,
@@ -21,10 +20,7 @@ export class AuthenticateUser {
   ) {}
 
   async execute(command: AuthenticateUserCommand): Promise<User> {
-    const account = await this.accounts.findByIdentifier(
-      AccountType.Password,
-      command.email,
-    );
+    const account = await this.accounts.findByEmail(command.email);
     const matches = await this.passwords.verify(
       command.password,
       account?.passwordHash ?? null,

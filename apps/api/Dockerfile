@@ -28,6 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production PORT=3000
 COPY --from=build --chown=65532:65532 /prod/api/ ./
 EXPOSE 3000
+# A worker-only container (HTTP=off) serves no health route; Docker's restart policy watches its process.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:3000/api/v1/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+  CMD ["/nodejs/bin/node", "-e", "if (process.env.HTTP === 'off') process.exit(0); fetch('http://127.0.0.1:3000/api/v1/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 ENTRYPOINT ["/nodejs/bin/node", "--enable-source-maps", "--import", "./dist/instrumentation.js", "dist/main.js"]

@@ -30,6 +30,18 @@
 - Q: Must a refused document report every problem at once? → A: No. The standard requires no such report, and its SDK stops at the first schema error. Publishing works like request validation: the first problem refuses the document, with its location and reason. The standard's SDK checks the schema, the DSL range and duplicate task names. The platform checks only what the schema accepts and the platform cannot run.
 - Q: Should publishing check other workflows, secrets, or which variables an expression can use? → A: No. Publishing checks the document as a compiler would: the schema, the subset, the references inside the document and the syntax of expressions. Like AWS Step Functions and Camunda, the platform resolves other workflows, secrets and variable values when a run needs them.
 
+### Session 2026-10-30
+
+- Q: Which evaluation modes must runs support? → A: jq's strict mode only. DSL 1.0.3 defines `evaluate` (`mode`, `language`); a document that asks for the `loose` mode or another language is refused at publish, and the conformance statement lists it. (Corrected on 2026-11-01: the first answer said that 1.0.3 had no `evaluate`.)
+
+### Session 2026-11-01
+
+- Q: What happens when a retry policy's retries are spent? → A: The standard does not say. The catch `do` runs when the catch has one; otherwise the `try` task faults with the last error, so a call that never succeeded never reads as a success (Synapse does the same).
+- Q: How is `limit.attempt.duration` read? → A: It is refused at publish. The specification text bounds all attempts with it and its schema each attempt; the conformance statement records the gap.
+- Q: What happens when a workflow's input breaks its input schema? → A: What the standard says: the instance is created and faults with a validation error ("Otherwise, it will fault with a ValidationError"), so a scheduled start leaves a visible faulted instance.
+- Q: Where can a fork branch's `then` lead? → A: `continue` and `exit` end the branch, and `end` ends the workflow. A branch that names another branch is refused at publish, because the branches run side by side.
+- Q: May use cases depend on the framework? → A: Yes, as a deliberate marriage (Martin, "Frameworks Are Details": a framework you marry should still be a decision). Use cases carry `@Injectable`, `@Transactional` and `@Policy`; solitary tests mock the transactional decorator.
+
 ## User Scenarios & Testing _(mandatory)_
 
 Two kinds of people use the platform, and both produce the same thing: a workflow document in the Open Workflow Specification DSL.
@@ -156,7 +168,7 @@ The execution history shows the instance's phase and, for every task, its status
 **Acceptance Scenarios**:
 
 1. **Given** a published workflow and an input that matches its input schema, **When** an instance is started, **Then** the instance is created as pending, runs, and ends completed with the output the standard prescribes.
-2. **Given** an input that violates the input schema, **When** an instance is started, **Then** the start is refused with a validation error and no instance exists.
+2. **Given** an input that violates the input schema, **When** an instance is started, **Then** the instance is created and faults with a validation error.
 3. **Given** a task that raises an error which nothing catches, **When** the instance runs, **Then** it ends faulted with that error: its type, status, title, detail and the location of the faulting task.
 4. **Given** a `try` task whose catch matches the error and declares a retry policy, **When** the guarded task fails, **Then** it is retried as the policy defines. The instance continues if a retry succeeds and follows the catch when the retries are exhausted. Every attempt is visible in the history.
 5. **Given** a task or workflow timeout, **When** it elapses, **Then** the task or instance faults with a timeout error.
@@ -374,7 +386,7 @@ An author can pause an instance, resume it later, or cancel it.
 **Errors**
 
 - In a `fork` without `compete`, one branch faults with an uncaught error: the fork faults and the remaining branches are cancelled. With `compete`, the first branch that completes wins and the others are cancelled.
-- A retry policy is exhausted: the error propagates to the enclosing scope as the standard defines.
+- A retry policy is exhausted: the catch `do` runs if the catch has one; otherwise the `try` task faults with the last error.
 - A runtime expression fails at run time: the task raises an expression error, which `try` can catch.
 - A sub-workflow instance faults: the `run` task faults with the sub-workflow's error.
 - A `run` task names a workflow or a version that is not published: the task faults with a configuration error when it starts.
@@ -398,7 +410,7 @@ An author can pause an instance, resume it later, or cancel it.
 
 **Definitions**
 
-- **FR-001**: The platform MUST accept workflow documents in YAML or JSON that declare a DSL version from 1.0.0 through 1.0.3 of the Open Workflow Specification, pre-releases of these versions included, and MUST refuse any other `document.dsl` value.
+- **FR-001**: The platform MUST accept workflow documents in YAML or JSON that declare a released DSL version of the Open Workflow Specification from 1.0.0 through 1.0.3, and MUST refuse any other `document.dsl` value, pre-releases included: a pre-release has its own schema.
 - **FR-002**: Before it accepts a document, the platform MUST check:
   - (a) conformance to the standard's schema for the declared version;
   - (b) use of the supported subset only (FR-011);
@@ -427,13 +439,13 @@ An author can pause an instance, resume it later, or cancel it.
 **Execution**
 
 - **FR-008**: An author or an application MUST be able to start an instance with a JSON input, either of a named version or, when no version is named, of the workflow's current version.
-  - If the version declares an input schema, the platform MUST validate the input before it creates the instance and MUST refuse the start with a validation error when the input does not match.
+  - If the version declares an input schema, the instance MUST validate the input as its first stage and MUST fault with a validation error when the input does not match.
   - An instance MUST run on the version it was started with until it ends.
 - **FR-009**: A start request MUST accept an idempotency key. Within 24 hours, a repeated request with the same key and the same input MUST return the original instance, and a request with the same key and a different input MUST be refused.
 - **FR-010**: The platform MUST execute instances with the standard's semantics:
   - flow directives (`continue`, `exit`, `end`, a task name) and the `if` condition;
   - the data-flow stages in the standard's order: input schema, `input.from`, execution, `output.as`, output schema, `export.as`, export schema;
-  - runtime expressions in jq, in strict and loose evaluation modes;
+  - runtime expressions in jq;
   - the runtime arguments `$context`, `$input`, `$output`, `$secrets`, `$authorization`, `$task`, `$workflow` and `$runtime`.
 
   The platform MUST NOT evaluate expressions found in input, event or webhook data.
@@ -444,7 +456,7 @@ An author can pause an instance, resume it later, or cancel it.
   - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error. A target that does not exist, or an explicit version that is not published, faults the task with a configuration error when it starts.
   - `run` with the `script` type (JavaScript or Python, with inline `code`) and the `shell` type, executed as FR-012 defines. A script `source` (an external resource) is outside the subset.
 
-  These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; `use.extensions`; digest authentication and OAuth2 or OIDC grants other than `client_credentials`; a runtime expression as a retry delay, jitter or limit; and a fraction in a duration other than in the smallest of its hours, minutes or seconds (`P1.5D`, `PT1.5H30M`), which the platform cannot compute. The tasks `wait` and `listen`, `schedule` and `use.secrets` join the subset with the stories that run them.
+  These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; `use.extensions`; digest authentication, OAuth2 or OIDC grants other than `client_credentials`, and the OAuth2 or OIDC settings that grant does not use (a client assertion or JWT authentication, `issuers`, a JSON token request, the revocation and introspection endpoints); a runtime expression as a retry delay, jitter or limit; and a fraction in a duration other than in the smallest of its hours, minutes or seconds (`P1.5D`, `PT1.5H30M`), which the platform cannot compute. The tasks `wait` and `listen`, `schedule`, `use.secrets` and the `$secrets` argument join the subset with the stories that run them; a version published before then is never checked again, so the platform refuses them until it runs them.
 
   The platform MUST refuse any construct outside the subset at publish and MUST never ignore a construct silently.
 
@@ -454,11 +466,11 @@ An author can pause an instance, resume it later, or cancel it.
   - **Output.** Its output follows `return` (`stdout` by default; `stderr`; `code`; `all` as `{ code, stdout, stderr }`; `none`).
   - **Exit codes.** A non-zero exit code is not an error by itself.
   - **Failures.** A process that exceeds its time limit faults the task with a timeout error. Any other sandbox failure faults the task with a runtime error.
-  - **Not awaited.** With `await: false`, the task completes with its transformed input once the process is submitted.
+  - **Not awaited.** With `await: false`, the task completes with its transformed input once the process is queued.
 - **FR-013**: Errors MUST follow the standard's error shape (`type`, `status`, `instance`, `title`, `detail`) and the standard error types (configuration, validation, expression, authentication, authorization, timeout, communication, runtime).
   - An uncaught error MUST fault the instance with that error.
   - `try`/`catch` MUST support the error filter, `as`, `when`, `exceptWhen` and a catch `do`.
-  - Retry policies MUST support `when`, `exceptWhen`, `delay`, constant, linear and exponential back-off, attempt-count, attempt-duration and total-duration limits, and jitter.
+  - Retry policies MUST support `when`, `exceptWhen`, `delay`, constant, linear and exponential back-off, attempt-count and total-duration limits, and jitter. `limit.attempt.duration` MUST be refused at publish, because the specification text and its schema disagree on it.
   - `raise` MUST raise the declared error.
 - **FR-014**: Task-level and workflow-level timeouts MUST fault the task or the instance with a timeout error when they elapse.
 - **FR-015**: Instances and tasks MUST use the standard's phases: pending, running, waiting, suspended, cancelled, faulted, completed. Completed, faulted and cancelled are terminal: a terminal instance or task MUST never change again. A task whose `if` evaluates to false is recorded as skipped, the standard's term for it: it enters no phase, produces no lifecycle event, and its raw input becomes its output.
@@ -509,7 +521,7 @@ An author can pause an instance, resume it later, or cancel it.
 
   A `listen` task MUST consider only events accepted after it started.
 
-- **FR-028**: `emit` MUST publish the event its task declares; the DSL 1.0.3 schema requires only `source` and `type`.
+- **FR-028**: `emit` MUST publish the event its task declares; the DSL 1.0.3 schema requires only `source` and `type`, inside `with`. A document whose event has no source and type is refused, and an event whose source or type does not evaluate to text faults the task with a runtime error.
   - The platform MUST generate the `id`, `time` and `specversion` attributes the task leaves out.
   - The task's output MUST be the emitted CloudEvent.
   - The event MUST be recorded together with the task's completion, so that a recovered instance never emits it twice. From there it is delivered as FR-026 defines.

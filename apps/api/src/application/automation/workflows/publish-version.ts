@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
 import { Workflow } from '../../../domain/automation/workflows/workflow.js';
-import { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 import { CheckDocument } from './check-document.js';
 import {
   type PublishedVersionResult,
@@ -24,7 +23,10 @@ export class PublishVersion {
     command: PublishVersionCommand,
   ): Promise<PublishedVersionResult> {
     const now = new Date();
-    const source = SourceDocument.of(command.format, command.text);
+    const source = new SourceDocument({
+      format: command.format,
+      text: command.text,
+    });
     const definition = await this.checkDocument.execute(command);
     const found = await this.workflows.findByName(definition.workflow);
     const workflow = found ?? Workflow.register(definition.workflow);
@@ -39,14 +41,12 @@ export class PublishVersion {
       return { workflow, version: existing, created: false, current };
     }
 
-    const version = WorkflowVersion.publish({
-      workflow,
+    const version = workflow.publish({
       definition,
       source,
       publisherId: command.publisherId,
       now,
     });
-    workflow.publish(version);
     await this.workflows.save(workflow);
     await this.versions.add(version);
     const current = workflow.isCurrent(version);

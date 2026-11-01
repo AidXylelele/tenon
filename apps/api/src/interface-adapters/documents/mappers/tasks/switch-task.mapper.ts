@@ -1,6 +1,6 @@
 import { FlowDirective } from '../../../../domain/automation/language/flow-directive.js';
 import type { TaskProps } from '../../../../domain/automation/language/interfaces.js';
-import { SwitchCase } from '../../../../domain/automation/language/tasks/switch-case.js';
+import { SwitchCase } from '../../../../domain/automation/language/switch-case.js';
 import { SwitchTask } from '../../../../domain/automation/language/tasks/switch-task.js';
 import type * as Dsl from '../../interfaces.js';
 import { ExpressionMapper } from '../expression.mapper.js';
@@ -18,8 +18,8 @@ export class SwitchTaskMapper {
         const whenAt = caseAt.at('when');
         const when = ExpressionMapper.toDomain(entry.when, whenAt);
         const thenAt = caseAt.at('then');
-        const then = new FlowDirective({ value: entry.then, pointer: thenAt });
-        const switchCase = new SwitchCase({ name, when, then });
+        const then = FlowDirective.named(entry.then, thenAt);
+        const switchCase = new SwitchCase({ reference: caseAt, when, then });
         cases.push(switchCase);
       }
     });

@@ -1,8 +1,11 @@
 import {
   InvalidDocumentValueError,
   NegativeAttemptCountError,
+  UnsupportedConstructError,
 } from '../../../domain/errors.js';
+import { UnsupportedConstruct } from '../../../domain/automation/language/enums.js';
 import type { JsonPointer } from '../../../domain/automation/language/json-pointer.js';
+import { ErrorCondition } from '../../../domain/automation/language/error-condition.js';
 import { RetryStrategy } from '../../../domain/automation/language/retry-strategy.js';
 import type * as Dsl from '../interfaces.js';
 import { BackoffMapper } from './backoff.mapper.js';
@@ -18,16 +21,23 @@ export class RetryStrategyMapper {
     const when = ExpressionMapper.toDomain(node.when, whenAt);
     const exceptWhenAt = at.at('exceptWhen');
     const exceptWhen = ExpressionMapper.toDomain(node.exceptWhen, exceptWhenAt);
+    const condition = new ErrorCondition({ when, exceptWhen });
     const delayAt = at.at('delay');
     const delay = FixedDurationMapper.toDomain(node.delay, delayAt);
-    const backoff = BackoffMapper.toDomain(node.backoff);
+    const backoffAt = at.at('backoff');
+    const backoff = BackoffMapper.toDomain(node.backoff, backoffAt);
     const attemptCount = node.limit?.attempt?.count ?? null;
+
     const attemptLimit = node.limit?.attempt?.duration;
-    const attemptDurationAt = attemptAt.at('duration');
-    const attemptDuration = FixedDurationMapper.toDomain(
-      attemptLimit,
-      attemptDurationAt,
-    );
+
+    if (attemptLimit !== undefined) {
+      const attemptDurationAt = attemptAt.at('duration');
+      throw new UnsupportedConstructError(
+        UnsupportedConstruct.RetryAttemptDuration,
+        attemptDurationAt,
+      );
+    }
+
     const totalLimit = node.limit?.duration;
     const totalDurationAt = limitAt.at('duration');
     const totalDuration = FixedDurationMapper.toDomain(
@@ -44,12 +54,10 @@ export class RetryStrategyMapper {
 
     try {
       return new RetryStrategy({
-        when,
-        exceptWhen,
+        condition,
         delay,
         backoff,
         attemptCount,
-        attemptDuration,
         totalDuration,
         jitterFrom,
         jitterTo,

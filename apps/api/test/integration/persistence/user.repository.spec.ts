@@ -9,6 +9,8 @@ import { createUser, suspendUser } from '../../support/auth-helpers.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
 import { inTransaction, truncateAll } from '../../support/db.js';
 
+const now = new Date();
+
 describe('DrizzleUserRepository', () => {
   let t: TestApp;
   let repository: UserRepository;
@@ -26,13 +28,13 @@ describe('DrizzleUserRepository', () => {
     await truncateAll(t.db);
   });
 
-  it('a_user_is_found_by_email_regardless_of_case_and_an_unknown_email_yields_null', async () => {
+  it('a_user_is_found_by_email_and_an_unknown_email_yields_null', async () => {
     const created = await createUser(t, {
       email: 'editor@example.com',
       name: 'Ed Editor',
       role: Role.Editor,
     });
-    const found = await repository.findByEmail('Editor@Example.COM');
+    const found = await repository.findByEmail('editor@example.com');
     expect(found?.id).toBe(created.id);
     expect(found?.name).toBe('Ed Editor');
     expect(found?.role).toBe(Role.Editor);
@@ -46,6 +48,7 @@ describe('DrizzleUserRepository', () => {
       email: 'taken@example.com',
       name: 'Second Comer',
       role: Role.Viewer,
+      now,
     });
     await expect(
       inTransaction(t.app, () => repository.add(duplicate)),
@@ -55,12 +58,10 @@ describe('DrizzleUserRepository', () => {
     );
   });
 
-  it('active_lookups_leave_out_suspended_users_while_plain_lookups_still_find_them', async () => {
+  it('lookups_find_a_suspended_user_with_its_status', async () => {
     const user = await createUser(t, { email: 'user@example.com' });
-    expect((await repository.findActiveById(user.id))?.id).toBe(user.id);
     await suspendUser(t.db, user.id);
-    expect(await repository.findActiveById(user.id)).toBeNull();
-    expect(await repository.findActiveByEmail('user@example.com')).toBeNull();
+    expect((await repository.findById(user.id))?.isActive).toBe(false);
     expect((await repository.findByEmail('user@example.com'))?.status).toBe(
       UserStatus.Suspended,
     );

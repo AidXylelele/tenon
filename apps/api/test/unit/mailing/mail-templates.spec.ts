@@ -6,7 +6,6 @@ import { InvitationToken } from '../../../src/domain/identity/invitation-token.j
 describe('mail templates', () => {
   it('the_invitation_mail_links_to_the_web_application_with_the_token_and_names_the_inviter_role_and_expiry', () => {
     const content = new InvitationMail('http://web.local').render({
-      to: 'new@example.com',
       token: new InvitationToken('the-token'),
       inviterName: 'Ada <Admin>',
       role: Role.Editor,
@@ -26,7 +25,6 @@ describe('mail templates', () => {
 
   it('the_password_reset_mail_carries_the_link_and_the_expiry', () => {
     const content = new PasswordResetMail().render({
-      to: 'user@example.com',
       link: 'http://web.local/reset-password?token=xyz',
       expiresAt: new Date('2026-10-11T11:00:00.000Z'),
     });

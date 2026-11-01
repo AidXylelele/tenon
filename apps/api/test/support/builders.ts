@@ -22,10 +22,16 @@ export const aUser = (overrides: Partial<UserProps> = {}): User =>
 export const aPasswordAccount = (
   user: User = aUser(),
   passwordHash = `hashed:${PASSWORD}`,
-): Account => Account.password(user, passwordHash);
+  now: Date = new Date(),
+): Account => Account.password(user, passwordHash, now);
 
 export const anInvitation = (
-  overrides: Partial<{ email: string; role: Role; invitedBy: string }> = {},
+  overrides: Partial<{
+    email: string;
+    role: Role;
+    invitedBy: string;
+  }> = {},
+  now: Date = new Date(),
 ): { invitation: Invitation; token: InvitationToken } => {
   const token = InvitationToken.generate();
   const invitation = Invitation.create({
@@ -33,6 +39,7 @@ export const anInvitation = (
     role: Role.Editor,
     invitedBy: 'admin-1',
     token,
+    now,
     ...overrides,
   });
   return { invitation, token };

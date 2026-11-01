@@ -13,16 +13,15 @@ import type { Workflow } from '../../src/domain/automation/workflows/workflow.js
 import type { WorkflowVersion } from '../../src/domain/automation/workflows/workflow-version.js';
 import type {
   AccountRepository,
-  InvitationEmail,
   InvitationRepository,
   Mailing,
   PasswordHasher,
-  PasswordResetEmail,
+  Sessions,
   UserRepository,
 } from '../../src/application/identity/ports.js';
 import type { Account } from '../../src/domain/identity/account.js';
 import {
-  type AccountType,
+  AccountType,
   InvitationStatus,
 } from '../../src/domain/identity/enums.js';
 import {
@@ -35,6 +34,7 @@ import type { Invitation } from '../../src/domain/identity/invitation.js';
 import type { InvitationToken } from '../../src/domain/identity/invitation-token.js';
 import type { User } from '../../src/domain/identity/user.js';
 import { DefinitionMapper } from '../../src/interface-adapters/documents/mappers/definition.mapper.js';
+import type { JsonObject } from '../../src/domain/automation/language/interfaces.js';
 import type * as Dsl from '../../src/interface-adapters/documents/interfaces.js';
 
 export class InMemoryUserRepository implements UserRepository {
@@ -56,20 +56,12 @@ export class InMemoryUserRepository implements UserRepository {
     return user;
   }
 
+  async findById(id: string): Promise<User | null> {
+    return this.users.get(id) ?? null;
+  }
+
   async findByEmail(email: string): Promise<User | null> {
-    return this.all().find((user) => sameEmail(user, email)) ?? null;
-  }
-
-  async findActiveById(id: string): Promise<User | null> {
-    return this.all().find((user) => user.id === id && user.isActive) ?? null;
-  }
-
-  async findActiveByEmail(email: string): Promise<User | null> {
-    const user = await this.findByEmail(email);
-
-    if (!user?.isActive) return null;
-
-    return user;
+    return this.all().find((user) => user.email === email) ?? null;
   }
 
   private all(): User[] {
@@ -88,13 +80,11 @@ export class InMemoryAccountRepository implements AccountRepository {
     this.accounts.set(account.id, account);
   }
 
-  async findByIdentifier(
-    type: AccountType,
-    identifier: string,
-  ): Promise<Account | null> {
+  async findByEmail(email: string): Promise<Account | null> {
     return (
       this.all().find(
-        (account) => account.type === type && account.identifier === identifier,
+        (account) =>
+          account.type === AccountType.Password && account.identifier === email,
       ) ?? null
     );
   }
@@ -168,27 +158,53 @@ export class FakePasswordHasher implements PasswordHasher {
   }
 }
 
-export class RecordingMailing implements Mailing {
-  readonly sent: InvitationEmail[] = [];
-  readonly resets: PasswordResetEmail[] = [];
+export interface SentInvitation {
+  readonly invitation: Invitation;
+  readonly token: InvitationToken;
+  readonly inviterName: string;
+}
 
-  async sendInvitation(email: InvitationEmail): Promise<void> {
-    this.sent.push(email);
+export interface SentRecoveryLink {
+  readonly to: string;
+  readonly link: string;
+  readonly expiresAt: Date;
+}
+
+export class RecordingMailing implements Mailing {
+  readonly sent: SentInvitation[] = [];
+  readonly resets: SentRecoveryLink[] = [];
+
+  async sendInvitation(
+    invitation: Invitation,
+    token: InvitationToken,
+    inviterName: string,
+  ): Promise<void> {
+    this.sent.push({ invitation, token, inviterName });
   }
 
-  async sendPasswordReset(email: PasswordResetEmail): Promise<void> {
-    this.resets.push(email);
+  async sendPasswordReset(
+    to: string,
+    link: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    this.resets.push({ to, link, expiresAt });
   }
 }
 
-const sameEmail = (user: User, email: string): boolean =>
-  user.email.toLowerCase() === email.toLowerCase();
+export class RecordingSessions implements Sessions {
+  readonly ended: { userId: string; except: string | null }[] = [];
+
+  async endAll(userId: string, except: string | null): Promise<void> {
+    this.ended.push({ userId, except });
+  }
+}
 
 export class JsonDefinitionReader implements DefinitionReader {
   read(text: string): Definition {
     try {
-      const workflow = JSON.parse(text) as Dsl.Workflow;
-      return DefinitionMapper.toDomain(workflow);
+      const document = JSON.parse(text) as JsonObject;
+      const workflow = document as unknown as Dsl.Workflow;
+      return DefinitionMapper.toDomain(workflow, document);
     } catch (error) {
       if (error instanceof SyntaxError)
         throw new InvalidDocumentError('', 'The document is not JSON');
@@ -216,7 +232,7 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
 
   async findByName(name: WorkflowName): Promise<Workflow | null> {
     const found = [...this.workflows.values()].find((workflow) =>
-      workflow.workflowName.equals(name),
+      workflow.name.equals(name),
     );
     return found ?? null;
   }

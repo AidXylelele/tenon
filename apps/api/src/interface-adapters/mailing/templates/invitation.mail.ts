@@ -1,10 +1,10 @@
 import { html, type Mailable, type MailContent } from '@nestjs/mail';
-import type { InvitationEmail } from '../../../application/identity/ports.js';
+import type { InvitationMailData } from '../interfaces.js';
 
-export class InvitationMail implements Mailable<InvitationEmail> {
+export class InvitationMail implements Mailable<InvitationMailData> {
   constructor(private readonly webBaseUrl: string) {}
 
-  render(mail: InvitationEmail): MailContent {
+  render(mail: InvitationMailData): MailContent {
     const link = new URL(`${this.webBaseUrl}/invitations/accept`);
     link.searchParams.set('token', mail.token.value);
     const expires = `${mail.expiresAt.toISOString().replace('T', ' ').slice(0, 16)} UTC`;

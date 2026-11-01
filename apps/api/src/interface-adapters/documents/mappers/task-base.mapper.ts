@@ -30,8 +30,7 @@ export class TaskBaseMapper {
       components,
     );
     const thenAt = at.at('then');
-    const directive = node.then ?? null;
-    const then = new FlowDirective({ value: directive, pointer: thenAt });
+    const then = FlowDirective.named(node.then, thenAt);
     return new TaskBase({
       condition,
       input,

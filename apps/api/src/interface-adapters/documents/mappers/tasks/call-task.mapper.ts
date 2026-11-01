@@ -1,19 +1,20 @@
 import { UnsupportedConstructError } from '../../../../domain/errors.js';
 import {
   CallKind,
-  ExcludedCallKind,
-  FunctionReference,
   UnsupportedConstruct,
 } from '../../../../domain/automation/language/enums.js';
 import type { TaskProps } from '../../../../domain/automation/language/interfaces.js';
 import type { ReusableComponents } from '../../../../domain/automation/language/reusable-components.js';
-import type { Task } from '../../../../domain/automation/language/task.js';
+import type { Task } from '../../../../domain/automation/language/tasks/task.js';
+import { ExcludedCallKind } from '../../enums.js';
 import type * as Dsl from '../../interfaces.js';
 import { FunctionCallTaskMapper } from './function-call-task.mapper.js';
 import { HttpCallTaskMapper } from './http-call-task.mapper.js';
 import { OpenApiCallTaskMapper } from './openapi-call-task.mapper.js';
 
 export class CallTaskMapper {
+  static readonly #CATALOG_SEPARATOR = '@';
+
   static toDomain(
     node: Dsl.CallTask,
     props: TaskProps,
@@ -42,7 +43,7 @@ export class CallTaskMapper {
         callAt,
       );
 
-    const catalogued = node.call.includes(FunctionReference.CatalogSeparator);
+    const catalogued = node.call.includes(CallTaskMapper.#CATALOG_SEPARATOR);
 
     if (catalogued)
       throw new UnsupportedConstructError(

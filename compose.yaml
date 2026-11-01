@@ -5,6 +5,8 @@ name: workflow-platform
 networks:
   default:
     name: workflow-platform
+  sandbox:
+    name: workflow-platform-sandbox
 
 volumes:
   postgres-data:
@@ -53,8 +55,13 @@ services:
     build:
       context: docker/go-judge
     image: workflow-platform/go-judge:local
+    # go-judge creates its sandboxes with namespaces and cgroups, which needs a privileged
+    # container; it therefore sits on its own network, away from PostgreSQL, and requires a token.
     privileged: true
     shm_size: 256m
+    networks: [sandbox]
+    environment:
+      ES_AUTH_TOKEN: ${SANDBOX_TOKEN:?set SANDBOX_TOKEN in .env}
     ports:
       - '127.0.0.1:${SANDBOX_PORT:-55050}:5050'
     healthcheck:
@@ -63,7 +70,7 @@ services:
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:5050/version').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+          "fetch('http://127.0.0.1:5050/version', { headers: { authorization: 'Bearer ' + process.env.ES_AUTH_TOKEN } }).then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
         ]
       interval: 5s
       timeout: 3s
@@ -91,6 +98,7 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       OUTBOX_RELAY: ${OUTBOX_RELAY:-on}
       SANDBOX_URL: http://go-judge:5050
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN:?set SANDBOX_TOKEN in .env}
       HTTP: ${HTTP:-on}
       ENGINE_WORKER: ${ENGINE_WORKER:-on}
       SECRETS_KEY: ${SECRETS_KEY:-}
@@ -105,6 +113,7 @@ services:
       OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-workflow-platform-api}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    networks: [default, sandbox]
     ports:
       - '127.0.0.1:${API_PORT:-53000}:3000'
     init: true

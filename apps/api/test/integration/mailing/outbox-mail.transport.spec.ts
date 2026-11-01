@@ -28,7 +28,6 @@ describe('OutboxMailTransport', () => {
     mailer.send(PasswordResetMail, {
       to: 'user@example.com',
       data: {
-        to: 'user@example.com',
         link: 'http://127.0.0.1:3001/reset-password?token=abc',
         expiresAt: new Date('2026-10-11T11:00:00.000Z'),
       },

@@ -6,11 +6,8 @@ import {
 } from '@nestjs-cls/transactional';
 import { and, eq, type SQL, sql } from 'drizzle-orm';
 import type { Account } from '../../../domain/identity/account.js';
-import type { AccountType } from '../../../domain/identity/enums.js';
-import {
-  AccountConflictError,
-  AccountExistsError,
-} from '../../../domain/errors.js';
+import { AccountType } from '../../../domain/identity/enums.js';
+import { StaleWriteError, AccountExistsError } from '../../../domain/errors.js';
 import type { AccountRepository } from '../../../application/identity/ports.js';
 import type { DrizzleTx } from '../../interfaces.js';
 import { AccountMapper } from '../mappers/account.mapper.js';
@@ -42,7 +39,7 @@ export class DrizzleAccountRepository implements AccountRepository {
     try {
       const saved = await upsert;
 
-      if (saved.length === 0) throw new AccountConflictError();
+      if (saved.length === 0) throw new StaleWriteError();
     } catch (error) {
       if (isUniqueViolation(error)) throw new AccountExistsError();
 
@@ -50,12 +47,12 @@ export class DrizzleAccountRepository implements AccountRepository {
     }
   }
 
-  findByIdentifier(
-    type: AccountType,
-    identifier: string,
-  ): Promise<Account | null> {
+  findByEmail(email: string): Promise<Account | null> {
     return this.findOne(
-      and(eq(accounts.type, type), eq(accounts.identifier, identifier)),
+      and(
+        eq(accounts.type, AccountType.Password),
+        eq(accounts.identifier, email),
+      ),
     );
   }
 

@@ -26,7 +26,7 @@ export class User {
       name: input.name,
       role: input.role,
       status: UserStatus.Active,
-      createdAt: new Date(),
+      createdAt: input.now,
     });
   }
 

@@ -1,6 +1,6 @@
 import type { JsonPointer } from '../../../domain/automation/language/json-pointer.js';
 import type { ReusableComponents } from '../../../domain/automation/language/reusable-components.js';
-import type { Task } from '../../../domain/automation/language/task.js';
+import type { Task } from '../../../domain/automation/language/tasks/task.js';
 import { TaskList } from '../../../domain/automation/language/task-list.js';
 import type * as Dsl from '../interfaces.js';
 import { TaskMapper } from './task.mapper.js';

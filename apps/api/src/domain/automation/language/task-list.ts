@@ -3,7 +3,7 @@ import type { Expression } from './expression.js';
 import type { TaskListProps } from './interfaces.js';
 import type { JsonPointer } from './json-pointer.js';
 import type { ReusableComponents } from './reusable-components.js';
-import type { Task } from './task.js';
+import type { Task } from './tasks/task.js';
 
 export class TaskList {
   readonly #reference: JsonPointer;
@@ -35,6 +35,24 @@ export class TaskList {
 
   isEmpty(): boolean {
     return this.#tasks.length === 0;
+  }
+
+  positionOf(name: string): number | null {
+    const position = this.#tasks.findIndex((task) => task.name === name);
+
+    if (position < 0) return null;
+
+    return position;
+  }
+
+  positionOfReference(reference: JsonPointer): number | null {
+    const position = this.#tasks.findIndex((task) =>
+      task.reference.equals(reference),
+    );
+
+    if (position < 0) return null;
+
+    return position;
   }
 
   confirmCalls(components: ReusableComponents): void {

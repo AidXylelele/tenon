@@ -88,6 +88,7 @@ jobs:
           set -a; . ./.env; set +a
           pnpm --filter api db:migrate
           pnpm --filter api outbox:migrate
+          pnpm --filter api engine:migrate
       - name: Start the API container
         run: docker compose --profile app up -d --wait --no-build
       - name: End-to-end journeys

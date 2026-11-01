@@ -6,7 +6,7 @@ import type { FixedDuration } from '../../../domain/automation/language/fixed-du
 import type { JsonPointer } from '../../../domain/automation/language/json-pointer.js';
 import type { RetryStrategy } from '../../../domain/automation/language/retry-strategy.js';
 import { ReusableComponents } from '../../../domain/automation/language/reusable-components.js';
-import type { Task } from '../../../domain/automation/language/task.js';
+import type { Task } from '../../../domain/automation/language/tasks/task.js';
 import type { Template } from '../../../domain/automation/language/template.js';
 import type * as Dsl from '../interfaces.js';
 import { AuthenticationMapper } from './authentication.mapper.js';

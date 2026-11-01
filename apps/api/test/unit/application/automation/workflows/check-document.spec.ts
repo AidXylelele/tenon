@@ -1,5 +1,4 @@
 import { CheckDocument } from '../../../../../src/application/automation/workflows/check-document.js';
-import { DocumentFormat } from '../../../../../src/domain/automation/workflows/enums.js';
 import {
   type DefinitionRejectedError,
   InvalidDocumentError,
@@ -45,10 +44,7 @@ describe('CheckDocument', () => {
   it('a_valid_document_gives_its_definition', async () => {
     const text = documentText([{ hello: { set: { greeting: '${ .name }' } } }]);
 
-    const definition = await checker().execute({
-      format: DocumentFormat.Json,
-      text,
-    });
+    const definition = await checker().execute({ text });
 
     expect(definition.workflow.toString()).toBe('default/greet');
     expect(definition.version).toBe('1.0.0');
@@ -61,9 +57,7 @@ describe('CheckDocument', () => {
     ]);
     const refused = new Set(['.a +']);
 
-    const rejection = await rejectionOf(
-      checker(refused).execute({ format: DocumentFormat.Json, text }),
-    );
+    const rejection = await rejectionOf(checker(refused).execute({ text }));
 
     expect(rejection).toBeInstanceOf(UnsupportedConstructError);
     expect(rejection.pointer).toBe('/do/0/pause/wait');
@@ -73,9 +67,7 @@ describe('CheckDocument', () => {
     const text = documentText([{ compute: { set: { value: '${ .a + }' } } }]);
     const refused = new Set(['.a +']);
 
-    const rejection = await rejectionOf(
-      checker(refused).execute({ format: DocumentFormat.Json, text }),
-    );
+    const rejection = await rejectionOf(checker(refused).execute({ text }));
 
     expect(rejection).toBeInstanceOf(InvalidExpressionError);
     expect(rejection.pointer).toBe('/do/0/compute/set/value');
@@ -83,7 +75,7 @@ describe('CheckDocument', () => {
 
   it('an_unreadable_document_is_refused', async () => {
     const rejection = await rejectionOf(
-      checker().execute({ format: DocumentFormat.Json, text: 'not json' }),
+      checker().execute({ text: 'not json' }),
     );
 
     expect(rejection).toBeInstanceOf(InvalidDocumentError);

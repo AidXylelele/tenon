@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { Role } from '../../../domain/identity/enums.js';
 
-export const Email = z.string().trim().toLowerCase().pipe(z.email());
+export const Email = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.email())
+  .meta({ format: 'email' });
 
 export const NewPassword = z.string().min(12).max(128);
 
@@ -34,7 +39,7 @@ export type ChangePasswordBody = z.infer<typeof ChangePasswordBody>;
 
 export const UserResponse = z.object({
   id: z.uuid(),
-  email: z.email(),
+  email: Email,
   name: z.string(),
   role: z.enum(Role),
 });

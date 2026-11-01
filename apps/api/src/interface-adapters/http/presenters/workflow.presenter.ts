@@ -1,10 +1,12 @@
-import type { PublishedVersionResult } from '../../../application/automation/workflows/ports.js';
+import type {
+  ConformanceStatement,
+  PublishedVersionResult,
+} from '../../../application/automation/workflows/ports.js';
 import type {
   VersionSummary,
   WorkflowPage,
   WorkflowSummary,
 } from '../../../application/automation/workflows/queries.js';
-import type { ConformanceStatement } from '../../../domain/automation/language/conformance-statement.js';
 import { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
 import { DocumentMediaType } from '../enums.js';
 import type {
@@ -19,8 +21,8 @@ export class WorkflowPresenter {
     const version = result.version;
     const workflow = result.workflow;
     return {
-      namespace: workflow.namespace,
-      name: workflow.name,
+      namespace: workflow.name.namespace,
+      name: workflow.name.name,
       version: version.semver,
       dsl: version.dslVersion,
       current: result.current,

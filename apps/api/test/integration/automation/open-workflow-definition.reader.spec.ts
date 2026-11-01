@@ -1,11 +1,13 @@
 import type { Definition } from '../../../src/domain/automation/language/definition.js';
-import { ErrorProperty } from '../../../src/domain/automation/language/enums.js';
+import { ErrorType } from '../../../src/domain/automation/language/error-type.js';
 import { DoTask } from '../../../src/domain/automation/language/tasks/do-task.js';
 import { FunctionCallTask } from '../../../src/domain/automation/language/tasks/function-call-task.js';
 import { HttpCallTask } from '../../../src/domain/automation/language/tasks/http-call-task.js';
 import { RunWorkflowTask } from '../../../src/domain/automation/language/tasks/run-workflow-task.js';
 import { TryTask } from '../../../src/domain/automation/language/tasks/try-task.js';
 import {
+  BranchJumpError,
+  DuplicateDefaultCaseError,
   EmptyCompetingForkError,
   InvalidDocumentError,
   UndeclaredComponentError,
@@ -149,6 +151,86 @@ do:
       '/do/0/guarded/catch/retry/delay',
       'do:\n  - guarded:\n      try:\n        - greet:\n            set:\n              x: 1\n      catch:\n        retry:\n          delay: ${ .delay }\n',
     ],
+    [
+      '/do/0/guarded/catch/retry/limit/attempt/duration',
+      'do:\n  - guarded:\n      try:\n        - greet:\n            set:\n              x: 1\n      catch:\n        retry:\n          limit:\n            attempt:\n              duration: PT5S\n',
+    ],
+    [
+      '/do/0/guarded/catch/retry/backoff',
+      'do:\n  - guarded:\n      try:\n        - greet:\n            set:\n              x: 1\n      catch:\n        retry:\n          backoff:\n            exponential:\n              factor: 3\n',
+    ],
+    [
+      '/evaluate/mode',
+      'evaluate:\n  mode: loose\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/evaluate/language',
+      'evaluate:\n  language: js\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/evaluate/langauge',
+      'evaluate:\n  langauge: js\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/input/schema/resource',
+      'input:\n  schema:\n    format: json\n    resource:\n      endpoint: https://schemas.example.com/order.json\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/input/schema/format',
+      'input:\n  schema:\n    format: avro\n    document: {}\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/do/0/greet/timeout/after',
+      'do:\n  - greet:\n      timeout:\n        after: P1W\n      set:\n        x: 1\n',
+    ],
+    [
+      '/do/0/guarded/catch/errors/type',
+      'do:\n  - guarded:\n      try:\n        - greet:\n            set:\n              x: 1\n      catch:\n        errors:\n          type: https://serverlessworkflow.io/spec/1.0.0/errors/communication\n',
+    ],
+    [
+      '/do/0/guarded/catch/errors/with/detail',
+      'do:\n  - guarded:\n      try:\n        - greet:\n            set:\n              x: 1\n      catch:\n        errors:\n          with:\n            detail: timeout\n',
+    ],
+    [
+      '/do/0/notify/emit/event/source',
+      'do:\n  - notify:\n      emit:\n        event:\n          with:\n            source: https://example.com\n            type: com.example.order\n          source: https://example.com\n',
+    ],
+    [
+      '/timout',
+      'timout:\n  after: PT1S\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/use/authentications/petAuth/token',
+      'use:\n  authentications:\n    petAuth:\n      bearer:\n        token: abc\n      token: abc\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/do/0/greet/set/x',
+      'do:\n  - greet:\n      set:\n        x: ${ $secrets.token }\n',
+    ],
+    [
+      '/use/authentications/petAuth/oauth2/client/authentication',
+      'use:\n  authentications:\n    petAuth:\n      oauth2:\n        authority: https://auth.example.com\n        grant: client_credentials\n        client:\n          id: pets\n          secret: s3cr3t\n          authentication: client_secret_jwt\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/use/authentications/petAuth/oauth2/client',
+      'use:\n  authentications:\n    petAuth:\n      oauth2:\n        authority: https://auth.example.com\n        grant: client_credentials\n        client:\n          id: pets\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/use/authentications/petAuth/oauth2/issuers',
+      'use:\n  authentications:\n    petAuth:\n      oauth2:\n        authority: https://auth.example.com\n        grant: client_credentials\n        client:\n          id: pets\n          secret: s3cr3t\n        issuers: [https://auth.example.com]\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/use/authentications/petAuth/oauth2/request/encoding',
+      'use:\n  authentications:\n    petAuth:\n      oauth2:\n        authority: https://auth.example.com\n        grant: client_credentials\n        client:\n          id: pets\n          secret: s3cr3t\n        request:\n          encoding: application/json\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/use/authentications/petAuth/oauth2/endpoints/introspection',
+      'use:\n  authentications:\n    petAuth:\n      oauth2:\n        authority: https://auth.example.com\n        grant: client_credentials\n        client:\n          id: pets\n          secret: s3cr3t\n        endpoints:\n          introspection: /introspect\ndo:\n  - greet:\n      set:\n        x: 1\n',
+    ],
+    [
+      '/do/0/archive/run/return',
+      'do:\n  - archive:\n      run:\n        workflow:\n          namespace: billing\n          name: archive\n          version: latest\n        return: all\n',
+    ],
   ])('a_construct_outside_the_subset_is_refused_at_%s', (pointer, body) => {
     const rejection = rejectionOf(() => read(workflowOf(body)));
 
@@ -219,6 +301,55 @@ do:
     expect(rejection.pointer).toBe('/do/0/race/fork/branches');
   });
 
+  it('a_dsl_version_outside_the_supported_range_is_refused', () => {
+    const document = workflowOf('do:\n  - greet:\n      set:\n        x: 1\n');
+    const alpha = document.replace("dsl: '1.0.3'", "dsl: '1.0.0-alpha5'");
+
+    const rejection = rejectionOf(() => read(alpha));
+
+    expect(rejection).toBeInstanceOf(UnsupportedConstructError);
+    expect(rejection.pointer).toBe('/document/dsl');
+  });
+
+  it('a_second_default_case_is_refused_where_it_stands', () => {
+    const rejection = rejectionOf(() =>
+      read(
+        workflowOf(
+          'do:\n  - pick:\n      switch:\n        - a:\n            then: end\n        - b:\n            then: end\n',
+        ),
+      ),
+    );
+
+    expect(rejection).toBeInstanceOf(DuplicateDefaultCaseError);
+    expect(rejection.pointer).toBe('/do/0/pick/switch/1/b');
+  });
+
+  it('a_fork_branch_naming_another_branch_is_refused_where_it_stands', () => {
+    const rejection = rejectionOf(() =>
+      read(
+        workflowOf(
+          'do:\n  - both:\n      fork:\n        branches:\n          - a:\n              set:\n                a: 1\n              then: b\n          - b:\n              set:\n                b: 2\n',
+        ),
+      ),
+    );
+
+    expect(rejection).toBeInstanceOf(BranchJumpError);
+    expect(rejection.pointer).toBe('/do/0/both/fork/branches/0/a/then');
+  });
+
+  it.each([
+    ['/evaluate', 'evaluate: loose\n'],
+    ['/evaluate/mode', 'evaluate:\n  mode: 5\n'],
+    ['/evaluate/language', 'evaluate:\n  language: [jq]\n'],
+  ])('an_evaluate_of_the_wrong_type_is_refused_at_%s', (pointer, evaluate) => {
+    const body = `${evaluate}do:\n  - greet:\n      set:\n        x: 1\n`;
+
+    const rejection = rejectionOf(() => read(workflowOf(body)));
+
+    expect(rejection).toBeInstanceOf(InvalidDocumentError);
+    expect(rejection.pointer).toBe(pointer);
+  });
+
   it('a_document_the_standard_refuses_is_refused_at_the_place_given', () => {
     const rejection = rejectionOf(() => read('document: [unclosed'));
 
@@ -234,14 +365,27 @@ do:
     );
 
     const [guarded] = definition.body.tasks;
-    const expected =
-      guarded instanceof TryTask ? guarded.catchClause.filter.expected : null;
-    expect(expected).toEqual(
-      new Map<ErrorProperty, string | number>([
-        [ErrorProperty.Status, 503],
-        [ErrorProperty.Detail, 'busy'],
-      ]),
+    const clause = guarded instanceof TryTask ? guarded.catchClause : null;
+    const at = definition.body.reference;
+    const busy = ErrorType.Communication.errorWithStatus(503, at, 'busy');
+    const idle = ErrorType.Communication.errorWithStatus(503, at, 'idle');
+    expect(clause?.filters(busy)).toBe(true);
+    expect(clause?.filters(idle)).toBe(false);
+  });
+
+  it('client_credentials_with_a_client_secret_scopes_and_a_token_endpoint_are_read', () => {
+    const definition = read(
+      workflowOf(
+        'use:\n  authentications:\n    petAuth:\n      oauth2:\n        authority: https://auth.example.com\n        grant: client_credentials\n        client:\n          id: pets\n          secret: s3cr3t\n          authentication: client_secret_basic\n        scopes: [pets]\n        audiences: [pets-api]\n        endpoints:\n          token: /token\n        request:\n          encoding: application/x-www-form-urlencoded\ndo:\n  - greet:\n      set:\n        x: 1\n',
+      ),
     );
+
+    const authentication = definition.components.authentication(
+      'petAuth',
+      definition.body.reference,
+    );
+
+    expect(authentication.scheme).toBe('oauth2');
   });
 
   it('declared_functions_may_call_each_other', () => {

@@ -1,10 +1,6 @@
 import { AcceptInvitation } from '../../../src/application/identity/accept-invitation.js';
 import { VerifyInvitationLink } from '../../../src/application/identity/verify-invitation-link.js';
-import {
-  AccountType,
-  InvitationStatus,
-  Role,
-} from '../../../src/domain/identity/enums.js';
+import { InvitationStatus, Role } from '../../../src/domain/identity/enums.js';
 import {
   AccountExistsError,
   InvitationExpiredError,
@@ -24,6 +20,8 @@ import {
   InMemoryInvitationRepository,
   InMemoryUserRepository,
 } from '../../support/fakes.js';
+
+const now = new Date();
 
 const accepting = (
   invitations: InMemoryInvitationRepository,
@@ -48,16 +46,14 @@ describe('AcceptInvitation and VerifyInvitationLink', () => {
       name: 'Newcomer',
       password: PASSWORD,
     });
+    expect(accepted.user.email).toBe('invitee@example.com');
     expect(accepted.user).toMatchObject({
-      email: 'invitee@example.com',
       name: 'Newcomer',
       role: Role.Editor,
     });
-    expect(await users.findByEmail('invitee@example.com')).toBe(accepted.user);
-    const account = await accounts.findByIdentifier(
-      AccountType.Password,
-      'invitee@example.com',
-    );
+    const invitee = 'invitee@example.com';
+    expect(await users.findByEmail(invitee)).toBe(accepted.user);
+    const account = await accounts.findByEmail(invitee);
     expect(account?.userId).toBe(accepted.user.id);
     expect(
       await passwords.verify(PASSWORD, account?.passwordHash ?? null),
@@ -68,9 +64,9 @@ describe('AcceptInvitation and VerifyInvitationLink', () => {
 
   it('a_used_revoked_or_expired_invitation_is_refused_with_its_reason', async () => {
     const used = anInvitation();
-    used.invitation.accept('someone');
+    used.invitation.accept('someone', now);
     const revoked = anInvitation();
-    revoked.invitation.revoke();
+    revoked.invitation.revoke(now);
     const expired = anInvitation();
     const invitations = new InMemoryInvitationRepository(
       used.invitation,

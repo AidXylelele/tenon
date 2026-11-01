@@ -12,6 +12,13 @@ export interface Workflow {
   readonly timeout?: Timeout | string;
   readonly output?: Output;
   readonly schedule?: JsonObject;
+  readonly evaluate?: JsonValue;
+}
+
+export interface Schema {
+  readonly format?: string;
+  readonly document?: JsonObject;
+  readonly resource?: JsonObject;
 }
 
 export interface Document {
@@ -22,12 +29,12 @@ export interface Document {
 }
 
 export interface Input {
-  readonly schema?: JsonObject;
+  readonly schema?: Schema;
   readonly from?: string | JsonObject;
 }
 
 export interface Output {
-  readonly schema?: JsonObject;
+  readonly schema?: Schema;
   readonly as?: string | JsonObject;
 }
 
@@ -70,6 +77,21 @@ export interface SchemeSettings {
   readonly [key: string]: JsonValue | undefined;
   readonly use?: string;
   readonly grant?: string;
+  readonly client?: OAuth2Client;
+  readonly endpoints?: JsonObject;
+  readonly request?: TokenRequest;
+}
+
+export interface OAuth2Client {
+  readonly [key: string]: JsonValue | undefined;
+  readonly id?: string;
+  readonly secret?: string;
+  readonly authentication?: string;
+}
+
+export interface TokenRequest {
+  readonly [key: string]: JsonValue | undefined;
+  readonly encoding?: string;
 }
 
 export interface RetryPolicy {
@@ -82,6 +104,7 @@ export interface RetryPolicy {
 }
 
 export interface Backoff {
+  readonly constant?: JsonObject;
   readonly linear?: JsonObject;
   readonly exponential?: JsonObject;
 }
@@ -230,7 +253,7 @@ export interface Emit {
 }
 
 export interface EmittedEvent {
-  readonly with: JsonObject;
+  readonly with?: JsonObject;
 }
 
 export interface RunTask extends TaskBase {
@@ -298,6 +321,7 @@ export type Task =
 export interface DslParsed {
   readonly kind: DslOutcomeKind.Parsed;
   readonly workflow: Workflow;
+  readonly document: JsonObject;
 }
 
 export interface DslFailure {

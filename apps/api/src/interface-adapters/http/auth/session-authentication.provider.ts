@@ -4,13 +4,13 @@ import {
   type SessionRecord,
 } from '@nestjs/authentication';
 import { Injectable } from '@nestjs/common';
-import { UserRepository } from '../../../application/identity/ports.js';
+import { ResolveSessionUser } from '../../../application/identity/resolve-session-user.js';
 import type { User } from '../../../domain/identity/user.js';
 
 @Injectable()
 export class SessionAuthenticationProvider extends SessionCookieProvider<User> {
   constructor(
-    private readonly users: UserRepository,
+    private readonly resolveSessionUser: ResolveSessionUser,
     registry: AuthenticationRegistry,
   ) {
     super();
@@ -18,6 +18,6 @@ export class SessionAuthenticationProvider extends SessionCookieProvider<User> {
   }
 
   protected validate(session: SessionRecord): Promise<User | null> {
-    return this.users.findActiveById(session.userId);
+    return this.resolveSessionUser.execute(session.userId);
   }
 }

@@ -4,12 +4,11 @@ import {
   Transactional,
   TransactionHost,
 } from '@nestjs-cls/transactional';
-import { and, eq, type SQL } from 'drizzle-orm';
+import { eq, type SQL } from 'drizzle-orm';
 import {
   AccountExistsError,
   UserNotFoundError,
 } from '../../../domain/errors.js';
-import { UserStatus } from '../../../domain/identity/enums.js';
 import type { User } from '../../../domain/identity/user.js';
 import type { UserRepository } from '../../../application/identity/ports.js';
 import type { DrizzleTx } from '../../interfaces.js';
@@ -39,23 +38,12 @@ export class DrizzleUserRepository implements UserRepository {
     return user;
   }
 
+  findById(id: string): Promise<User | null> {
+    return this.findOne(eq(users.id, id));
+  }
+
   findByEmail(email: string): Promise<User | null> {
-    return this.findOne(eq(users.email, email.toLowerCase()));
-  }
-
-  findActiveById(id: string): Promise<User | null> {
-    return this.findOne(
-      and(eq(users.id, id), eq(users.status, UserStatus.Active)),
-    );
-  }
-
-  findActiveByEmail(email: string): Promise<User | null> {
-    return this.findOne(
-      and(
-        eq(users.email, email.toLowerCase()),
-        eq(users.status, UserStatus.Active),
-      ),
-    );
+    return this.findOne(eq(users.email, email));
   }
 
   private async findOne(where: SQL | undefined): Promise<User | null> {

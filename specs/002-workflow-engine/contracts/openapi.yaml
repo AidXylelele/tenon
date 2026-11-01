@@ -197,7 +197,6 @@ paths:
               },
           }
         '404': { $ref: '#/components/responses/NotFound' }
-        '422': { $ref: '#/components/responses/InputRejected' }
 
   /instances:
     get:
@@ -603,14 +602,22 @@ components:
         name: namespace,
         in: path,
         required: true,
-        schema: { type: string, pattern: '^[a-z0-9](-*[a-z0-9])*$' },
+        schema:
+          {
+            type: string,
+            pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$',
+          },
       }
     Name:
       {
         name: name,
         in: path,
         required: true,
-        schema: { type: string, pattern: '^[a-z0-9](-*[a-z0-9])*$' },
+        schema:
+          {
+            type: string,
+            pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$',
+          },
       }
     SemVer:
       { name: version, in: path, required: true, schema: { type: string } }
@@ -661,17 +668,6 @@ components:
               value: { type: string, minLength: 1, maxLength: 16384 }
   responses:
     NotFound: { description: Not found }
-    InputRejected:
-      description: The input does not match the workflow's input schema
-      content:
-        application/json:
-          schema:
-            type: object
-            required: [statusCode, message, error]
-            properties:
-              statusCode: { const: 422 }
-              message: { type: string }
-              error: { $ref: '#/components/schemas/WorkflowError' }
     Conflict: { description: Conflict }
     Rejected:
       description: Refused at the first problem, located

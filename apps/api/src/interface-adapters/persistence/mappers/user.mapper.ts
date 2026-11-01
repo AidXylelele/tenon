@@ -14,6 +14,13 @@ export class UserMapper {
   }
 
   static toEntity(row: UserRow): User {
-    return new User(row);
+    return new User({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      status: row.status,
+      createdAt: row.createdAt,
+    });
   }
 }

@@ -5,6 +5,7 @@ import {
   DslValidationError,
   SchemaValidationError,
 } from '@openworkflowspec/sdk';
+import type { JsonObject } from '../../domain/automation/language/interfaces.js';
 import { DslOutcomeKind } from '../../interface-adapters/documents/enums.js';
 import type * as Dsl from '../../interface-adapters/documents/interfaces.js';
 import {
@@ -21,8 +22,10 @@ export class SdkOpenWorkflowClient implements OpenWorkflowClient {
   parse(text: string): DslOutcome {
     try {
       const hydrated = Classes.Workflow.deserialize(text);
-      const workflow = hydrated.asPlainObject() as Dsl.Workflow;
-      return { kind: DslOutcomeKind.Parsed, workflow };
+      const plain: unknown = hydrated.asPlainObject();
+      const workflow = plain as Dsl.Workflow;
+      const document = plain as JsonObject;
+      return { kind: DslOutcomeKind.Parsed, workflow, document };
     } catch (error) {
       if (error instanceof SchemaValidationError)
         return this.#schemaFailure(error);

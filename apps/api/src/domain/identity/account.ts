@@ -25,8 +25,7 @@ export class Account {
     this.#version = props.version;
   }
 
-  static password(user: User, passwordHash: string): Account {
-    const now = new Date();
+  static password(user: User, passwordHash: string, now: Date): Account {
     return new Account({
       id: randomUUID(),
       userId: user.id,
@@ -71,12 +70,12 @@ export class Account {
     return this.#version;
   }
 
-  changePassword(passwordHash: string): void {
+  changePassword(passwordHash: string, now: Date): void {
     if (this.#type !== AccountType.Password) {
       throw new AccountWithoutPasswordError();
     }
 
     this.#passwordHash = passwordHash;
-    this.#updatedAt = new Date();
+    this.#updatedAt = now;
   }
 }

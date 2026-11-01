@@ -1,4 +1,5 @@
 import {
+  CalendarDurationError,
   InvalidDocumentValueError,
   InvalidValueError,
   UncomputableDurationError,
@@ -38,6 +39,12 @@ export class FixedDurationMapper {
       if (error instanceof UncomputableDurationError)
         throw new UnsupportedConstructError(
           UnsupportedConstruct.FractionalDuration,
+          at,
+        );
+
+      if (error instanceof CalendarDurationError)
+        throw new UnsupportedConstructError(
+          UnsupportedConstruct.CalendarDuration,
           at,
         );
 

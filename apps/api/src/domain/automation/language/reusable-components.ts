@@ -7,7 +7,7 @@ import type { FixedDuration } from './fixed-duration.js';
 import type { ReusableComponentsProps } from './interfaces.js';
 import type { JsonPointer } from './json-pointer.js';
 import type { RetryStrategy } from './retry-strategy.js';
-import type { Task } from './task.js';
+import type { Task } from './tasks/task.js';
 import type { Template } from './template.js';
 
 export class ReusableComponents {
@@ -18,6 +18,10 @@ export class ReusableComponents {
   readonly #functions: ReadonlyMap<string, Task>;
 
   constructor(props: ReusableComponentsProps) {
+    for (const declared of props.functions.values())
+      for (const directive of declared.directives)
+        directive.confirmInFunction();
+
     this.#authentications = props.authentications;
     this.#errors = props.errors;
     this.#retries = props.retries;
@@ -54,6 +58,10 @@ export class ReusableComponents {
         for (const expression of component.expressions) found.push(expression);
 
     return found;
+  }
+
+  get declaredFunctions(): readonly Task[] {
+    return Array.from(this.#functions.values());
   }
 
   confirmCalls(): void {

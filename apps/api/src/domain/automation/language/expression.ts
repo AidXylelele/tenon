@@ -1,5 +1,13 @@
-import type { ExpressionProps, NewExpression } from './interfaces.js';
+import type {
+  Evaluation,
+  ExpressionProps,
+  JsonObject,
+  JsonValue,
+  NewExpression,
+} from './interfaces.js';
 import type { JsonPointer } from './json-pointer.js';
+import type { RoundResults } from './round-results.js';
+import type { WorkflowError } from './workflow-error.js';
 
 export class Expression {
   static readonly #RUNTIME = /^\s*\$\{([\s\S]*)\}\s*$/;
@@ -33,5 +41,39 @@ export class Expression {
 
   get expressions(): readonly Expression[] {
     return [this];
+  }
+
+  evaluationsFor(
+    prefix: string,
+    data: JsonValue,
+    args: JsonObject,
+  ): readonly Evaluation[] {
+    const id = this.#pointer.idIn(prefix);
+    const evaluation: Evaluation = {
+      id,
+      program: this.#program,
+      data,
+      arguments: args,
+    };
+    return [evaluation];
+  }
+
+  failureIn(
+    prefix: string,
+    results: RoundResults,
+    at: JsonPointer,
+  ): WorkflowError | null {
+    const id = this.#pointer.idIn(prefix);
+    return results.failureOf(id, at);
+  }
+
+  fill(prefix: string, results: RoundResults): JsonValue {
+    const id = this.#pointer.idIn(prefix);
+    return results.valueOf(id);
+  }
+
+  holds(prefix: string, results: RoundResults): boolean {
+    const value = this.fill(prefix, results);
+    return value !== false && value !== null;
   }
 }

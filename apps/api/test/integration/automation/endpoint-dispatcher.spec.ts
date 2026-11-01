@@ -44,6 +44,7 @@ describe('endpoint dispatcher', () => {
     'http://localhost',
     'http://[::1]',
     'http://[::ffff:127.0.0.1]',
+    'http://[::127.0.0.1]',
     'http://0.0.0.0',
     'http://10.1.2.3',
     'http://172.16.0.1',
@@ -51,6 +52,10 @@ describe('endpoint dispatcher', () => {
     'http://169.254.169.254',
     'http://[fe80::1]',
     'http://[fd00::1]',
+    'http://[2002:7f00:1::1]',
+    'http://[2001:0:4136:e378::1]',
+    'http://[64:ff9b:1::a00:1]',
+    'http://[fec0::1]',
   ])('a_call_to_%s_is_refused_before_a_connection_opens', async (origin) => {
     const dispatcher = createEndpointDispatcher([]);
     const before = receiver.connections;

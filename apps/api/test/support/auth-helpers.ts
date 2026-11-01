@@ -34,15 +34,17 @@ export async function createUser(
     name?: string;
   },
 ): Promise<User> {
+  const now = new Date();
   const user = User.create({
     email: input.email,
     name: input.name ?? input.email.split('@')[0] ?? 'user',
     role: input.role ?? Role.Viewer,
+    now,
   });
   const passwordHash = await t.app
     .get(PasswordHasher)
     .hash(input.password ?? PASSWORD);
-  const account = Account.password(user, passwordHash);
+  const account = Account.password(user, passwordHash, now);
   await inTransaction(t.app, async () => {
     await t.app.get(UserRepository).add(user);
     await t.app.get(AccountRepository).save(account);
@@ -97,9 +99,20 @@ export async function suspendUser(db: Database, userId: string): Promise<void> {
     .where(eq(users.id, userId));
 }
 
-export async function seedAdministrator(db: Database): Promise<void> {
+export async function seedAdministrator(
+  db: Database,
+  address: string | null = null,
+): Promise<void> {
   const file = fileURLToPath(
     new URL('../../drizzle/0001_bootstrap_administrator.sql', import.meta.url),
   );
-  await db.execute(sql.raw(readFileSync(file, 'utf8')));
+  const migration = readFileSync(file, 'utf8');
+  await db.transaction(async (tx) => {
+    if (address !== null)
+      await tx.execute(
+        sql`select set_config('app.bootstrap_admin_email', ${address}, true)`,
+      );
+
+    await tx.execute(sql.raw(migration));
+  });
 }

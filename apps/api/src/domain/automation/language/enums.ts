@@ -16,13 +16,6 @@ export enum CallKind {
   OpenApi = 'openapi',
 }
 
-export enum ExcludedCallKind {
-  A2a = 'a2a',
-  AsyncApi = 'asyncapi',
-  Grpc = 'grpc',
-  Mcp = 'mcp',
-}
-
 export enum RunKind {
   Workflow = 'workflow',
   Script = 'script',
@@ -34,29 +27,11 @@ export enum ScriptLanguage {
   Python = 'python',
 }
 
-export enum ProcessReturn {
-  Stdout = 'stdout',
-  Stderr = 'stderr',
-  Code = 'code',
-  All = 'all',
-  None = 'none',
-}
-
-export enum BackoffKind {
-  Constant = 'constant',
-  Linear = 'linear',
-  Exponential = 'exponential',
-}
-
 export enum AuthenticationScheme {
   Basic = 'basic',
   Bearer = 'bearer',
   OAuth2 = 'oauth2',
   Oidc = 'oidc',
-}
-
-export enum OAuth2Grant {
-  ClientCredentials = 'client_credentials',
 }
 
 export enum FlowKeyword {
@@ -79,17 +54,6 @@ export enum ErrorProperty {
   Detail = 'detail',
 }
 
-export enum FunctionReference {
-  CatalogSeparator = '@',
-}
-
-export enum PointerToken {
-  Separator = '/',
-  Tilde = '~',
-  EscapedTilde = '~0',
-  EscapedSeparator = '~1',
-}
-
 export enum Component {
   Authentications = 'authentications',
   Errors = 'errors',
@@ -103,17 +67,30 @@ export enum UnsupportedConstruct {
   ListenTask = 'the listen task',
   Schedule = 'schedule',
   Secrets = 'use.secrets',
+  SecretsArgument = 'the $secrets argument',
   Catalogs = 'catalogs, the default catalog included',
   Extensions = 'use.extensions',
   ExcludedCall = 'call with a2a, asyncapi, grpc or mcp',
   Container = 'run with container',
   ScriptSource = 'a script source (an external resource)',
-  ScriptLanguage = 'a script language other than js and python',
+  ScriptLanguage = 'a script language the platform does not run',
   Digest = 'digest authentication',
   SecretAuthentication = 'authentication taken from a secret',
   Grant = 'an oauth2 or oidc grant other than client_credentials',
+  ClientAuthentication = 'an oauth2 or oidc client without an id and a secret, or authenticated other than by that secret',
+  TokenRequestEncoding = 'an oauth2 or oidc token request encoded other than as a form',
   FractionalDuration = 'a fraction in a duration other than in the smallest of its hours, minutes or seconds',
   RetryExpression = 'a runtime expression as a retry delay, jitter or limit',
+  RetryAttemptDuration = 'limit.attempt.duration of a retry policy (the specification text bounds all attempts, its schema each attempt)',
+  LooseEvaluation = 'the loose evaluation mode',
+  ExpressionLanguage = 'a runtime expression language other than jq',
+  OtherDslVersion = 'a DSL version outside the supported range',
+  SchemaResource = 'a schema taken from an external resource',
+  SchemaFormat = 'a schema format other than json',
+  CalendarDuration = 'years, months or weeks in a duration',
+  BackoffParameters = 'backoff parameters (the standard defines none)',
+  UnknownProperty = 'a property the platform does not read at this place',
+  WorkflowReturn = 'return on a run workflow task',
 }
 
 export enum DslVersion {
@@ -125,4 +102,5 @@ export enum DslVersion {
 
 export enum Contradiction {
   CommunicationErrorType = 'CTK try.feature filters on https://serverlessworkflow.io/dsl/errors/types/communication, which the specification does not define; the platform raises https://serverlessworkflow.io/spec/1.0.0/errors/communication',
+  EmitEventShape = 'dsl-reference types emit.event as event properties, while its example and the schema put them under emit.event.with; the platform follows the schema',
 }

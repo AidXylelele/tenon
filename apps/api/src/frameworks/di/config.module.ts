@@ -38,6 +38,7 @@ const envSchema = z.object({
   SECRETS_KEY: encryptionKey,
   OUTBOUND_ALLOW_LIST: list,
   SANDBOX_URL: z.url(),
+  SANDBOX_TOKEN: z.string().min(32),
   SMTP_HOST: z.string().min(1),
   SMTP_PORT: z.coerce.number().int().positive(),
   SMTP_STARTTLS: z

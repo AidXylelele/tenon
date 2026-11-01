@@ -10,7 +10,8 @@ export class VerifyInvitationLink {
   async execute(value: string): Promise<Invitation> {
     const token = new InvitationToken(value);
     const invitation = await this.invitations.getByToken(token);
-    invitation.assertPending();
+    const now = new Date();
+    invitation.assertPending(now);
 
     return invitation;
   }

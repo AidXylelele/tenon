@@ -27,14 +27,10 @@ describe('InviteUser', () => {
     expect(invitation.status).toBe(InvitationStatus.Pending);
     expect(invitation.role).toBe(Role.Editor);
     expect(mailing.sent).toHaveLength(1);
-    const [email] = mailing.sent;
-    expect(email).toMatchObject({
-      to: 'invitee@example.com',
-      inviterName: 'Ada Admin',
-      role: Role.Editor,
-      expiresAt: invitation.expiresAt,
-    });
-    const opened = await invitations.getByToken(email!.token);
+    const [sent] = mailing.sent;
+    expect(sent).toMatchObject({ invitation, inviterName: 'Ada Admin' });
+    expect(invitation.email).toBe('invitee@example.com');
+    const opened = await invitations.getByToken(sent!.token);
     expect(opened.id).toBe(invitation.id);
   });
 
@@ -47,9 +43,8 @@ describe('InviteUser', () => {
       new RecordingMailing(),
     ).execute(command);
     expect(previous.invitation.status).toBe(InvitationStatus.Revoked);
-    expect(await invitations.findPendingByEmail('invitee@example.com')).toBe(
-      invitation,
-    );
+    const invitee = 'invitee@example.com';
+    expect(await invitations.findPendingByEmail(invitee)).toBe(invitation);
   });
 
   it('an_email_that_already_has_an_account_is_refused_and_nothing_is_sent', async () => {

@@ -6,11 +6,6 @@ import type {
 } from './enums.js';
 import type { InvitationToken } from './invitation-token.js';
 
-export interface Actor {
-  readonly id: string;
-  readonly role: Role;
-}
-
 export interface UserProps {
   readonly id: string;
   readonly email: string;
@@ -24,6 +19,7 @@ export interface NewUser {
   readonly email: string;
   readonly name: string;
   readonly role: Role;
+  readonly now: Date;
 }
 
 export interface AccountProps {
@@ -57,4 +53,5 @@ export interface NewInvitation {
   readonly role: Role;
   readonly invitedBy: string;
   readonly token: InvitationToken;
+  readonly now: Date;
 }

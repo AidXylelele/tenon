@@ -1,19 +1,17 @@
 import { randomUUID } from 'node:crypto';
-import { WorkflowName } from '../language/workflow-name.js';
-import type { WorkflowProps } from './interfaces.js';
-import type { WorkflowVersion } from './workflow-version.js';
+import type { WorkflowName } from '../language/workflow-name.js';
+import type { NewWorkflowVersion, WorkflowProps } from './interfaces.js';
+import { WorkflowVersion } from './workflow-version.js';
 
 export class Workflow {
   readonly #id: string;
-  readonly #namespace: string;
-  readonly #name: string;
+  readonly #name: WorkflowName;
   readonly #isOn: boolean;
   readonly #version: number;
   #currentVersionId: string | null;
 
   constructor(props: WorkflowProps) {
     this.#id = props.id;
-    this.#namespace = props.namespace;
     this.#name = props.name;
     this.#isOn = props.isOn;
     this.#currentVersionId = props.currentVersionId;
@@ -24,8 +22,7 @@ export class Workflow {
     const id = randomUUID();
     return new Workflow({
       id,
-      namespace: name.namespace,
-      name: name.name,
+      name,
       isOn: false,
       currentVersionId: null,
       version: 0,
@@ -36,16 +33,8 @@ export class Workflow {
     return this.#id;
   }
 
-  get namespace(): string {
-    return this.#namespace;
-  }
-
-  get name(): string {
+  get name(): WorkflowName {
     return this.#name;
-  }
-
-  get workflowName(): WorkflowName {
-    return new WorkflowName(this.#namespace, this.#name);
   }
 
   get isOn(): boolean {
@@ -64,11 +53,23 @@ export class Workflow {
     return this.#currentVersionId === version.id;
   }
 
-  publish(version: WorkflowVersion): void {
-    const own = version.workflowId === this.#id;
+  publish(input: NewWorkflowVersion): WorkflowVersion {
+    const definition = input.definition;
+    const own = definition.workflow.equals(this.#name);
 
-    if (!own) throw new TypeError('The version belongs to another workflow');
+    if (!own) throw new TypeError('The definition belongs to another workflow');
 
+    const id = randomUUID();
+    const version = new WorkflowVersion({
+      id,
+      workflowId: this.#id,
+      semver: definition.version,
+      dslVersion: definition.dslVersion,
+      source: input.source,
+      publisherId: input.publisherId,
+      publishedAt: input.now,
+    });
     this.#currentVersionId = version.id;
+    return version;
   }
 }

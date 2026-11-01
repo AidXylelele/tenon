@@ -2,6 +2,8 @@ import { Role, UserStatus } from '../../../src/domain/identity/enums.js';
 import { User } from '../../../src/domain/identity/user.js';
 import { aUser } from '../../support/builders.js';
 
+const now = new Date('2026-10-11T10:00:00.000Z');
+
 describe('User', () => {
   it('only_the_administrator_role_is_an_administrator', () => {
     expect(aUser({ role: Role.Admin }).isAdmin).toBe(true);
@@ -20,7 +22,9 @@ describe('User', () => {
       email: 'new@example.com',
       name: 'New',
       role: Role.Editor,
+      now,
     });
+    expect(user.createdAt).toBe(now);
     expect(user.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(user.status).toBe(UserStatus.Active);
     expect(user.isActive).toBe(true);

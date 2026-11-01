@@ -1,4 +1,5 @@
 import type { ErrorProperty } from './enums.js';
+import type { WorkflowError } from './workflow-error.js';
 
 export class ErrorFilter {
   readonly #expected: ReadonlyMap<ErrorProperty, string | number>;
@@ -12,7 +13,14 @@ export class ErrorFilter {
     return new ErrorFilter(expected);
   }
 
-  get expected(): ReadonlyMap<ErrorProperty, string | number> {
-    return this.#expected;
+  matches(error: WorkflowError): boolean {
+    for (const property of this.#expected.keys()) {
+      const expected = this.#expected.get(property);
+      const actual = error.property(property);
+
+      if (actual !== expected) return false;
+    }
+
+    return true;
   }
 }

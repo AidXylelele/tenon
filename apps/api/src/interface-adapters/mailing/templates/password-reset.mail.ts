@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { html, type Mailable, type MailContent } from '@nestjs/mail';
-import type { PasswordResetEmail } from '../../../application/identity/ports.js';
+import type { PasswordResetMailData } from '../interfaces.js';
 
 @Injectable()
-export class PasswordResetMail implements Mailable<PasswordResetEmail> {
-  render(mail: PasswordResetEmail): MailContent {
+export class PasswordResetMail implements Mailable<PasswordResetMailData> {
+  render(mail: PasswordResetMailData): MailContent {
     const expires = `${mail.expiresAt.toISOString().replace('T', ' ').slice(0, 16)} UTC`;
     return {
       subject: 'Reset your Workflow Platform password',

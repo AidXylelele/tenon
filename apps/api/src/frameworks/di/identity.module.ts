@@ -8,6 +8,7 @@ import {
   AccountRepository,
   InvitationRepository,
   PasswordHasher,
+  Sessions,
   UserRepository,
 } from '../../application/identity/ports.js';
 import { InvitationPolicy } from '../../application/identity/invitation.policy.js';
@@ -15,12 +16,16 @@ import { InvitationQueries } from '../../application/identity/queries.js';
 import { AuthenticateUser } from '../../application/identity/authenticate-user.js';
 import { AcceptInvitation } from '../../application/identity/accept-invitation.js';
 import { ChangePassword } from '../../application/identity/change-password.js';
+import { FindRecoveryAccount } from '../../application/identity/find-recovery-account.js';
+import { ResolveSessionUser } from '../../application/identity/resolve-session-user.js';
+import { SendRecoveryLink } from '../../application/identity/send-recovery-link.js';
 import { InviteUser } from '../../application/identity/invite-user.js';
 import { ResetPassword } from '../../application/identity/reset-password.js';
 import { RevokeInvitation } from '../../application/identity/revoke-invitation.js';
 import { VerifyInvitationLink } from '../../application/identity/verify-invitation-link.js';
 import { PasswordRecoveryHandler } from '../../interface-adapters/http/auth/password-recovery.handler.js';
 import { SessionAuthenticationProvider } from '../../interface-adapters/http/auth/session-authentication.provider.js';
+import { SessionsGateway } from '../../interface-adapters/http/auth/sessions.gateway.js';
 import { DrizzleEmailTokenStore } from '../../interface-adapters/persistence/stores/drizzle-email-token.store.js';
 import { DrizzleSessionStore } from '../../interface-adapters/persistence/stores/drizzle-session.store.js';
 import { AuthController } from '../../interface-adapters/http/controllers/auth.controller.js';
@@ -72,9 +77,14 @@ import { MailModule } from './mail.module.js';
     DrizzleInvitationQueries,
     { provide: InvitationQueries, useExisting: DrizzleInvitationQueries },
     { provide: PasswordHasher, useExisting: ScryptPasswordHasher },
+    SessionsGateway,
+    { provide: Sessions, useExisting: SessionsGateway },
     SessionAuthenticationProvider,
     PasswordRecoveryHandler,
     AuthenticateUser,
+    ResolveSessionUser,
+    FindRecoveryAccount,
+    SendRecoveryLink,
     ChangePassword,
     ResetPassword,
     InviteUser,

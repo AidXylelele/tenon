@@ -5,6 +5,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { DslVersion } from '../../../domain/automation/language/enums.js';
 import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
 import { user } from './user.js';
 import { workflow } from './workflow.js';
@@ -17,7 +18,7 @@ export const workflowVersion = pgTable(
       .notNull()
       .references(() => workflow.id),
     semver: text('semver').notNull(),
-    dslVersion: text('dsl_version').notNull(),
+    dslVersion: text('dsl_version').$type<DslVersion>().notNull(),
     sourceFormat: text('source_format').$type<DocumentFormat>().notNull(),
     sourceText: text('source_text').notNull(),
     fingerprint: text('fingerprint').notNull(),

@@ -3,7 +3,7 @@ import { UnsupportedConstruct } from '../../../domain/automation/language/enums.
 import type { TaskProps } from '../../../domain/automation/language/interfaces.js';
 import type { JsonPointer } from '../../../domain/automation/language/json-pointer.js';
 import type { ReusableComponents } from '../../../domain/automation/language/reusable-components.js';
-import type { Task } from '../../../domain/automation/language/task.js';
+import type { Task } from '../../../domain/automation/language/tasks/task.js';
 import type * as Dsl from '../interfaces.js';
 import { TaskBaseMapper } from './task-base.mapper.js';
 import { CallTaskMapper } from './tasks/call-task.mapper.js';

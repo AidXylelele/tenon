@@ -13,7 +13,7 @@ import type { Env } from './config.module.js';
   imports: [
     ClsModule.forRoot({
       global: true,
-      middleware: { mount: true, generateId: true },
+      middleware: { mount: true },
       plugins: [
         new ClsPluginTransactional({
           adapter: new TransactionalAdapterDrizzleOrm<Database>({

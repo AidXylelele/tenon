@@ -1,8 +1,12 @@
 import { TaskKind } from '../enums.js';
 import type { Expression } from '../expression.js';
-import type { FunctionCallTaskProps } from '../interfaces.js';
+import type { FunctionCallTaskProps, JsonValue } from '../interfaces.js';
 import type { ReusableComponents } from '../reusable-components.js';
-import { Task } from '../task.js';
+import type { KindProgress } from '../progress/kind-progress.js';
+import { FunctionCallProgress } from '../progress/function-call-progress.js';
+import type { Step } from '../step.js';
+import type { TaskScope } from '../scopes/task-scope.js';
+import { Task } from './task.js';
 import type { Template } from '../template.js';
 
 export class FunctionCallTask extends Task {
@@ -21,6 +25,13 @@ export class FunctionCallTask extends Task {
 
   get arguments(): Template | null {
     return this.#arguments;
+  }
+
+  enter(
+    input: JsonValue,
+    scope: TaskScope<FunctionCallTask>,
+  ): Step<KindProgress> {
+    return FunctionCallProgress.enter(input, scope);
   }
 
   override confirmCalls(components: ReusableComponents): void {

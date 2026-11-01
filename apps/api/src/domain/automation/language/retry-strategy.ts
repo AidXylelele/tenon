@@ -1,16 +1,20 @@
 import { NegativeAttemptCountError } from '../../errors.js';
-import type { BackoffKind } from './enums.js';
+import type { Backoff } from './backoffs/backoff.js';
+import type { ErrorCondition } from './error-condition.js';
 import type { Expression } from './expression.js';
 import type { FixedDuration } from './fixed-duration.js';
+import type { Attempt } from './attempt.js';
 import type { RetryStrategyProps } from './interfaces.js';
 
 export class RetryStrategy {
-  readonly #when: Expression | null;
-  readonly #exceptWhen: Expression | null;
+  static readonly #FNV_OFFSET = 0x811c9dc5;
+  static readonly #FNV_PRIME = 0x01000193;
+  static readonly #HASH_RANGE = 0x100000000;
+
+  readonly #condition: ErrorCondition;
   readonly #delay: FixedDuration | null;
-  readonly #backoff: BackoffKind;
+  readonly #backoff: Backoff;
   readonly #attemptCount: number | null;
-  readonly #attemptDuration: FixedDuration | null;
   readonly #totalDuration: FixedDuration | null;
   readonly #jitterFrom: FixedDuration | null;
   readonly #jitterTo: FixedDuration | null;
@@ -21,56 +25,53 @@ export class RetryStrategy {
 
     if (negative) throw new NegativeAttemptCountError();
 
-    this.#when = props.when;
-    this.#exceptWhen = props.exceptWhen;
+    this.#condition = props.condition;
     this.#delay = props.delay;
     this.#backoff = props.backoff;
     this.#attemptCount = props.attemptCount;
-    this.#attemptDuration = props.attemptDuration;
     this.#totalDuration = props.totalDuration;
     this.#jitterFrom = props.jitterFrom;
     this.#jitterTo = props.jitterTo;
   }
 
-  get when(): Expression | null {
-    return this.#when;
-  }
-
-  get exceptWhen(): Expression | null {
-    return this.#exceptWhen;
-  }
-
-  get delay(): FixedDuration | null {
-    return this.#delay;
-  }
-
-  get backoff(): BackoffKind {
-    return this.#backoff;
-  }
-
-  get attemptCount(): number | null {
-    return this.#attemptCount;
-  }
-
-  get attemptDuration(): FixedDuration | null {
-    return this.#attemptDuration;
-  }
-
-  get totalDuration(): FixedDuration | null {
-    return this.#totalDuration;
-  }
-
-  get jitterFrom(): FixedDuration | null {
-    return this.#jitterFrom;
-  }
-
-  get jitterTo(): FixedDuration | null {
-    return this.#jitterTo;
+  get condition(): ErrorCondition {
+    return this.#condition;
   }
 
   get expressions(): readonly Expression[] {
-    const when = this.#when?.expressions ?? [];
-    const exceptWhen = this.#exceptWhen?.expressions ?? [];
-    return when.concat(exceptWhen);
+    return this.#condition.expressions;
+  }
+
+  delayFor(attempt: number, workId: string): number {
+    const delay = this.#delay?.milliseconds ?? 0;
+    const backedOff = this.#backoff.delayFor(delay, attempt);
+    const from = this.#jitterFrom?.milliseconds ?? 0;
+    const to = this.#jitterTo?.milliseconds ?? from;
+    const sample = this.#sampleOf(workId);
+    const jitter = from + (to - from) * sample;
+    const total = backedOff + jitter;
+    return Math.round(total);
+  }
+
+  allows(attempt: Attempt, delay: number, now: Date): boolean {
+    const counted =
+      this.#attemptCount === null || attempt.count <= this.#attemptCount;
+    const retryEnds = now.getTime() + delay;
+    const firstStartedAt = attempt.firstStartedAt.getTime();
+    const window = retryEnds - firstStartedAt;
+    const windowLimit = this.#totalDuration?.milliseconds ?? Infinity;
+    return counted && window <= windowLimit;
+  }
+
+  #sampleOf(workId: string): number {
+    let hash = RetryStrategy.#FNV_OFFSET;
+
+    for (const character of workId) {
+      const code = character.codePointAt(0) ?? 0;
+      const mixed = hash ^ code;
+      hash = Math.imul(mixed, RetryStrategy.#FNV_PRIME) >>> 0;
+    }
+
+    return hash / RetryStrategy.#HASH_RANGE;
   }
 }

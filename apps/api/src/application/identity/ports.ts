@@ -11,6 +11,7 @@ export interface AuthenticateUserCommand {
 
 export interface ChangePasswordCommand {
   readonly userId: string;
+  readonly sessionId: string | null;
   readonly currentPassword: string;
   readonly newPassword: string;
 }
@@ -38,28 +39,16 @@ export interface AcceptedInvitation {
   readonly user: User;
 }
 
-export interface InvitationEmail {
-  readonly to: string;
-  readonly token: InvitationToken;
-  readonly inviterName: string;
-  readonly role: Role;
-  readonly expiresAt: Date;
-}
-
 export abstract class UserRepository {
   abstract add(user: User): Promise<void>;
   abstract getById(id: string): Promise<User>;
+  abstract findById(id: string): Promise<User | null>;
   abstract findByEmail(email: string): Promise<User | null>;
-  abstract findActiveById(id: string): Promise<User | null>;
-  abstract findActiveByEmail(email: string): Promise<User | null>;
 }
 
 export abstract class AccountRepository {
   abstract save(account: Account): Promise<void>;
-  abstract findByIdentifier(
-    type: AccountType,
-    identifier: string,
-  ): Promise<Account | null>;
+  abstract findByEmail(email: string): Promise<Account | null>;
   abstract findByUserId(
     userId: string,
     type: AccountType,
@@ -78,13 +67,30 @@ export abstract class PasswordHasher {
   abstract verify(password: string, hash: string | null): Promise<boolean>;
 }
 
-export interface PasswordResetEmail {
+export interface RecoveryAccount {
+  readonly user: User;
+  readonly account: Account | null;
+}
+
+export abstract class Sessions {
+  abstract endAll(userId: string, except: string | null): Promise<void>;
+}
+
+export interface SendRecoveryLinkCommand {
   readonly to: string;
   readonly link: string;
   readonly expiresAt: Date;
 }
 
 export abstract class Mailing {
-  abstract sendInvitation(email: InvitationEmail): Promise<void>;
-  abstract sendPasswordReset(email: PasswordResetEmail): Promise<void>;
+  abstract sendInvitation(
+    invitation: Invitation,
+    token: InvitationToken,
+    inviterName: string,
+  ): Promise<void>;
+  abstract sendPasswordReset(
+    to: string,
+    link: string,
+    expiresAt: Date,
+  ): Promise<void>;
 }

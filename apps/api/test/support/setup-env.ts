@@ -14,6 +14,7 @@ Object.assign(process.env, {
   SECRETS_KEY: 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
   OUTBOUND_ALLOW_LIST: '',
   SANDBOX_URL: 'http://127.0.0.1:55050',
+  SANDBOX_TOKEN: 'test-sandbox-token-of-at-least-32-characters',
   SMTP_HOST: '127.0.0.1',
   SMTP_PORT: '2525',
   SMTP_STARTTLS: 'never',

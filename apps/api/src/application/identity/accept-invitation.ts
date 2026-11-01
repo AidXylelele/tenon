@@ -26,7 +26,8 @@ export class AcceptInvitation {
   async execute(command: AcceptInvitationCommand): Promise<AcceptedInvitation> {
     const token = new InvitationToken(command.token);
     const invitation = await this.invitations.getByToken(token);
-    invitation.assertPending();
+    const now = new Date();
+    invitation.assertPending(now);
 
     const existing = await this.users.findByEmail(invitation.email);
 
@@ -36,11 +37,13 @@ export class AcceptInvitation {
       email: invitation.email,
       name: command.name,
       role: invitation.role,
+      now,
     });
     const passwordHash = await this.passwords.hash(command.password);
     await this.users.add(user);
-    await this.accounts.save(Account.password(user, passwordHash));
-    invitation.accept(user.id);
+    const account = Account.password(user, passwordHash, now);
+    await this.accounts.save(account);
+    invitation.accept(user.id, now);
     await this.invitations.save(invitation);
     return { invitation, user };
   }

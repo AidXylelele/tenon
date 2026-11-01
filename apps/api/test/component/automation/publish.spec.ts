@@ -237,6 +237,23 @@ describe('publishing workflows', () => {
     expect(checked.body).toMatchObject({ statusCode: 422, pointer: '' });
   });
 
+  it('a_namespace_in_upper_case_that_the_standard_allows_reads_back', async () => {
+    const text = `document:\n  dsl: '1.0.3'\n  namespace: Team\n  name: Greet\n  version: '1.0.0'\ndo:\n  - hello:\n      set:\n        greeting: hello\n`;
+
+    await request(t.server)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .type(YAML)
+      .send(text)
+      .expect(201);
+    const workflow = await request(t.server)
+      .get('/api/v1/workflows/Team/Greet')
+      .set(viewer)
+      .expect(200);
+
+    expect(workflow.body).toMatchObject({ namespace: 'Team', name: 'Greet' });
+  });
+
   it('a_path_that_is_not_a_workflow_name_is_refused', async () => {
     await request(t.server)
       .get('/api/v1/workflows/Bad_Namespace/greet')
@@ -282,7 +299,7 @@ describe('publishing workflows', () => {
       .expect(413);
   });
 
-  it('the_conformance_statement_names_the_subset_and_the_recorded_contradiction', async () => {
+  it('the_conformance_statement_names_the_subset_and_the_recorded_contradictions', async () => {
     const statement = await request(t.server)
       .get('/api/v1/conformance')
       .set(viewer)
@@ -291,7 +308,7 @@ describe('publishing workflows', () => {
     expect(statement.body.dsl).toEqual(['1.0.0', '1.0.1', '1.0.2', '1.0.3']);
     expect(statement.body.runs).toEqual(['workflow', 'script', 'shell']);
     expect(statement.body.excluded).toContain('the wait task');
-    expect(statement.body.contradictions).toHaveLength(1);
+    expect(statement.body.contradictions).toHaveLength(2);
   });
 
   it.each(DEFECTIVE_DOCUMENTS.map((document) => [document.defect, document]))(

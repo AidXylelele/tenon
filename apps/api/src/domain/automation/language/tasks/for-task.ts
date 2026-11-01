@@ -1,7 +1,11 @@
 import { DefaultVariable } from '../enums.js';
 import type { Expression } from '../expression.js';
-import type { ForTaskProps } from '../interfaces.js';
-import { Task } from '../task.js';
+import type { ForTaskProps, JsonObject, JsonValue } from '../interfaces.js';
+import type { KindProgress } from '../progress/kind-progress.js';
+import { ForProgress } from '../progress/for-progress.js';
+import type { Step } from '../step.js';
+import type { TaskScope } from '../scopes/task-scope.js';
+import { Task } from './task.js';
 import type { TaskList } from '../task-list.js';
 
 export class ForTask extends Task {
@@ -42,6 +46,17 @@ export class ForTask extends Task {
 
   override get children(): readonly TaskList[] {
     return [this.#body];
+  }
+
+  enter(input: JsonValue, scope: TaskScope<ForTask>): Step<KindProgress> {
+    return ForProgress.enter(input, scope);
+  }
+
+  variablesFor(item: JsonValue, index: number): JsonObject {
+    const variables: Record<string, JsonValue> = {};
+    variables[this.#each] = item;
+    variables[this.#at] = index;
+    return variables;
   }
 
   protected override get ownExpressions(): readonly Expression[] {

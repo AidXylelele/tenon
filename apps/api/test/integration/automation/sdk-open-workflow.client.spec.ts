@@ -13,17 +13,19 @@ describe('SdkOpenWorkflowClient', () => {
       header('1.0.3', '  - greet:\n      set:\n        x: 1\n'),
     );
 
+    const plain = {
+      document: {
+        dsl: '1.0.3',
+        namespace: 'default',
+        name: 'sample',
+        version: '1.0.0',
+      },
+      do: [{ greet: { set: { x: 1 } } }],
+    };
     expect(outcome).toEqual({
       kind: DslOutcomeKind.Parsed,
-      workflow: {
-        document: {
-          dsl: '1.0.3',
-          namespace: 'default',
-          name: 'sample',
-          version: '1.0.0',
-        },
-        do: [{ greet: { set: { x: 1 } } }],
-      },
+      workflow: plain,
+      document: plain,
     });
   });
 

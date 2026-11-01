@@ -4,7 +4,6 @@ import type { Workflow } from '../../../domain/automation/workflows/workflow.js'
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 
 export interface CheckDocumentQuery {
-  readonly format: DocumentFormat;
   readonly text: string;
 }
 
@@ -19,6 +18,17 @@ export interface PublishedVersionResult {
   readonly version: WorkflowVersion;
   readonly created: boolean;
   readonly current: boolean;
+}
+
+export interface ConformanceStatement {
+  readonly dsl: readonly string[];
+  readonly tasks: readonly string[];
+  readonly calls: readonly string[];
+  readonly runs: readonly string[];
+  readonly scriptLanguages: readonly string[];
+  readonly authentications: readonly string[];
+  readonly excluded: readonly string[];
+  readonly contradictions: readonly string[];
 }
 
 export abstract class WorkflowRepository {

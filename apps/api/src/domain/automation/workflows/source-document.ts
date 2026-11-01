@@ -11,12 +11,7 @@ export class SourceDocument {
   constructor(props: SourceDocumentProps) {
     this.#format = props.format;
     this.#text = props.text;
-    this.#fingerprint = props.fingerprint;
-  }
-
-  static of(format: DocumentFormat, text: string): SourceDocument {
-    const fingerprint = createHash('sha256').update(text).digest('hex');
-    return new SourceDocument({ format, text, fingerprint });
+    this.#fingerprint = createHash('sha256').update(props.text).digest('hex');
   }
 
   get format(): DocumentFormat {

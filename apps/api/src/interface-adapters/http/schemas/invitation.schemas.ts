@@ -25,7 +25,7 @@ export type AcceptInvitationBody = z.infer<typeof AcceptInvitationBody>;
 
 export const InvitationResponse = z.object({
   id: z.uuid(),
-  email: z.email(),
+  email: Email,
   role: z.enum(Role),
   status: z.enum(InvitationStatus),
   expiresAt: z.iso.datetime(),
@@ -35,7 +35,7 @@ export const InvitationResponse = z.object({
 export type InvitationResponse = z.infer<typeof InvitationResponse>;
 
 export const VerifiedInvitationResponse = z.object({
-  email: z.email(),
+  email: Email,
   role: z.enum(Role),
   expiresAt: z.iso.datetime(),
 });

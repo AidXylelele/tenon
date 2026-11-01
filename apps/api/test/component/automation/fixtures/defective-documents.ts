@@ -155,6 +155,17 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
       '  - a:\n      try:\n        - b:\n            set: { y: 1 }\n      catch:\n        retry:\n          limit:\n            attempt:\n              count: -1\n',
   },
   {
+    defect: 'an emitted event without with',
+    pointer: '/do/0/a/emit/event/with',
+    tasks: '  - a:\n      emit:\n        event: {}\n',
+  },
+  {
+    defect: 'a declared function going to a named task',
+    pointer: '/use/functions/finish/then',
+    tasks: '  - a:\n      call: finish\n',
+    use: '  functions:\n    finish:\n      set: { done: true }\n      then: a\n',
+  },
+  {
     defect: 'a directive to a missing task',
     pointer: '/do/0/a/then',
     tasks: '  - a:\n      set: { x: 1 }\n      then: nowhere\n',

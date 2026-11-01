@@ -1,8 +1,9 @@
 import {
+  CurrentSession,
   CurrentUser,
   PasswordResetService,
   Public,
-  SessionService,
+  type SessionRecord,
   SignInService,
 } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
@@ -47,7 +48,6 @@ export class AuthController {
     private readonly authenticateUser: AuthenticateUser,
     private readonly changePassword: ChangePassword,
     private readonly signInService: SignInService,
-    private readonly sessions: SessionService,
     private readonly passwordReset: PasswordResetService,
   ) {}
 
@@ -113,7 +113,6 @@ export class AuthController {
 
   @Patch('password')
   @Can.Anyone()
-  @Transactional()
   @HttpCode(204)
   @ApiCookieAuth('sessionCookie')
   @ApiNoContentResponse()
@@ -121,13 +120,15 @@ export class AuthController {
   async updatePassword(
     @Body({ schema: ChangePasswordBody }) body: ChangePasswordBody,
     @CurrentUser() user: User,
+    @CurrentSession() session: SessionRecord | null,
   ): Promise<void> {
+    const sessionId = session?.id ?? null;
     await this.changePassword.execute({
       userId: user.id,
+      sessionId,
       currentPassword: body.currentPassword,
       newPassword: body.newPassword,
     });
-    const rotated = await this.signInService.rotateSession();
-    await this.sessions.revokeAll(user.id, { except: rotated?.session.id });
+    await this.signInService.rotateSession();
   }
 }

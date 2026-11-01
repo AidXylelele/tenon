@@ -1,10 +1,11 @@
+import { DslVersion } from '../../../../../src/domain/automation/language/enums.js';
 import { Definition } from '../../../../../src/domain/automation/language/definition.js';
 import { Expression } from '../../../../../src/domain/automation/language/expression.js';
 import { Input } from '../../../../../src/domain/automation/language/input.js';
 import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
 import { Output } from '../../../../../src/domain/automation/language/output.js';
 import { ReusableComponents } from '../../../../../src/domain/automation/language/reusable-components.js';
-import type { Task } from '../../../../../src/domain/automation/language/task.js';
+import type { Task } from '../../../../../src/domain/automation/language/tasks/task.js';
 import { DoTask } from '../../../../../src/domain/automation/language/tasks/do-task.js';
 import { WorkflowName } from '../../../../../src/domain/automation/language/workflow-name.js';
 import { UndeclaredComponentError } from '../../../../../src/domain/errors.js';
@@ -15,6 +16,10 @@ import {
   setTask,
   taskList,
 } from '../../../../support/language.js';
+import {
+  definitionOf as definitionFrom,
+  pointerOf,
+} from '../../../../support/progress.js';
 
 const root = JsonPointer.root();
 const body = root.at('do');
@@ -25,9 +30,10 @@ function definitionOf(
   input: Input = Input.none(),
 ): Definition {
   return new Definition({
+    document: {},
     workflow: new WorkflowName('default', 'greet'),
     version: '1.0.0',
-    dslVersion: '1.0.3',
+    dslVersion: DslVersion.V103,
     input,
     output: Output.none(),
     timeout: null,
@@ -74,5 +80,40 @@ describe('Definition', () => {
     expect(rejection).toBeInstanceOf(UndeclaredComponentError);
     expect(rejection.message).toBe('"settle" is not declared in use.functions');
     expect(rejection.pointer).toBe('/do/0/outer/do/0/charge/call');
+  });
+});
+
+describe('Definition lookups', () => {
+  it('every_task_and_declared_function_is_found_by_its_reference', () => {
+    const definition = definitionFrom(
+      [{ outer: { do: [{ inner: { set: { a: 1 } } }] } }],
+      {
+        functions: {
+          getPet: {
+            call: 'http',
+            with: { method: 'get', endpoint: 'https://petstore.example' },
+          },
+        },
+      },
+    );
+
+    const names = [
+      '',
+      '/do/0/outer',
+      '/do/0/outer/do/0/inner',
+      '/use/functions/getPet',
+    ]
+      .map(pointerOf)
+      .map((pointer) => definition.taskAt(pointer).name);
+
+    expect(names).toEqual(['test', 'outer', 'inner', 'getPet']);
+  });
+
+  it('the_json_of_a_task_is_read_from_the_document', () => {
+    const definition = definitionFrom([{ greet: { set: { a: 1 } } }]);
+
+    const json = definition.jsonAt(pointerOf('/do/0/greet'));
+
+    expect(json).toEqual({ set: { a: 1 } });
   });
 });

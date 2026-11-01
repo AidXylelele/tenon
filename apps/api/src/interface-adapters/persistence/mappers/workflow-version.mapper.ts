@@ -21,7 +21,6 @@ export class WorkflowVersionMapper {
     const source = new SourceDocument({
       format: row.sourceFormat,
       text: row.sourceText,
-      fingerprint: row.fingerprint,
     });
     return new WorkflowVersion({
       id: row.id,

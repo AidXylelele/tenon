@@ -17,6 +17,7 @@ export class ResetPassword {
 
   @Transactional()
   async execute(command: ResetPasswordCommand): Promise<void> {
+    const now = new Date();
     const account = await this.accounts.findByUserId(
       command.userId,
       AccountType.Password,
@@ -24,11 +25,12 @@ export class ResetPassword {
 
     if (!account) {
       const user = await this.users.getById(command.userId);
-      await this.accounts.save(Account.password(user, command.passwordHash));
+      const created = Account.password(user, command.passwordHash, now);
+      await this.accounts.save(created);
       return;
     }
 
-    account.changePassword(command.passwordHash);
+    account.changePassword(command.passwordHash, now);
     await this.accounts.save(account);
   }
 }

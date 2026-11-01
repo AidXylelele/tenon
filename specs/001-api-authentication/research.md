@@ -13,7 +13,7 @@ testing strategy article (martinfowler.com). Research date: 2026-10-10, revised 
   0.1.0 (NestJS 12.1 Authentication and Authorization pages). `AuthenticationModule.forRootAsync` with
   `session: { absoluteTtl: '30d', idleTtl: '7d', cookie: { secure, sameSite: 'lax' }, trustedOrigins,
 metadata }` and `passwordReset: { url: WEB_BASE_URL/reset-password, ttl: '1h' }`. The application
-  supplies a `SessionCookieProvider` (`SessionAuthenticationProvider`: `validate` → `UserRepository.findActiveById`), a `PasswordResetHandler` (`PasswordRecoveryHandler`: `UserRepository.findActiveByEmail`, outbox mail,
+  supplies a `SessionCookieProvider` (`SessionAuthenticationProvider`: `validate` → `ResolveSessionUser`), a `PasswordResetHandler` (`PasswordRecoveryHandler`: `FindRecoveryAccount`, `SendRecoveryLink` (outbox mail),
   `ResetPassword` use case) and two Drizzle
   stores registered with `AuthenticationStorage.registerSource` (`DrizzleSessionStore`,
   `DrizzleEmailTokenStore`). Passwords are hashed by the package's scrypt `PasswordHasher`, bound to
@@ -202,6 +202,16 @@ build`, `pnpm --filter api --prod deploy /prod/api`; runtime stage
 - Rationale: these are constitution requirements for any API feature and the first feature must
   provide them; each uses the mechanism documented by NestJS.
 - Alternatives considered: `nestjs-zod` for DTO validation (peer range excludes Nest 12); deferred.
+
+## R14. Review of 2026-11-01
+
+- Decision: the identity model takes the time as a value (`now`), as the automation model does; each use case reads the clock once. The constitution allows reading the clock in the domain, so this aligns the two contexts and frees the domain tests from fake timers.
+- Decision: one path to users for the HTTP adapters. `ResolveSessionUser` (session cookie), `FindRecoveryAccount` and `SendRecoveryLink` (password recovery) replace the repository calls and the active-only SQL lookups (`findActiveById`, `findActiveByEmail`), so `User.isActive` is the only statement of the suspension rule.
+- Decision: the steps of a password change belong to `ChangePassword`: it renews the caller's session and ends the others through the `Sessions` port (`SessionsGateway` over `SignInService` and `SessionService`); the controller only delegates and declares no transaction.
+- Decision: the format and the normalization of input belong to the inbound adapter's schema (the user; 002 R22 Round 10). The zod `Email` schema trims, lower-cases and checks the format, and the domain, the ports and the repositories take the normalized `string`: the HTTP schemas and the bootstrap migration are the ways in, and the migration trims, lower-cases and checks the operator's `app.bootstrap_admin_email` with the same pattern as zod's `z.email()`, so stored rows are trusted because only the application writes them. The password follows the same rule. This restores this feature's earlier decision (tasks.md: validation lives in the DTOs).
+- Decision: ports take domain types and adapters map (the user): `AccountRepository.findByEmail(email)` (the account type is the repository's concern), `Mailing.sendInvitation(invitation, token, inviterName)`, `Mailing.sendPasswordReset(to, link, expiresAt)`; `SendRecoveryLink` hands the link to the mailing port; `FindRecoveryAccount` returns `{ user, account }`; one `StaleWriteError` replaces `AccountConflictError` and `InvitationConflictError`; the unused `Actor` went (002 R22 Round 9).
+- Rationale: an external review of the API (eight agents, findings D-3, D-4, D-5, A-1) checked against the code; Martin: the steps of an application operation live in its use case.
+- Critics (DDD and CA): both approve with fixes, applied. `ChangePassword` takes the caller's session id as data (`sessionId`) and ends the others; the controller renews the cookie (`rotateSession`) after the use case, because a port that read the request would end every session when called outside HTTP. Open: constitution 3.0.1 still names `findActiveById` as the pattern for recurring conditions and keeps the framework's session services out of ports; amending it is the user's decision.
 
 ## Resolved unknowns
 

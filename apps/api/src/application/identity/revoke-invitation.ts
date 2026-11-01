@@ -9,7 +9,8 @@ export class RevokeInvitation {
   @Transactional()
   async execute(id: string): Promise<void> {
     const invitation = await this.invitations.getById(id);
-    invitation.revoke();
+    const now = new Date();
+    invitation.revoke(now);
     await this.invitations.save(invitation);
   }
 }

@@ -6,6 +6,7 @@ import type { ReusableComponents } from '../../../../domain/automation/language/
 import { HttpCallTask } from '../../../../domain/automation/language/tasks/http-call-task.js';
 import type * as Dsl from '../../interfaces.js';
 import { EndpointMapper } from '../endpoint.mapper.js';
+import { CallOutputMapper } from '../call-output.mapper.js';
 import { TemplateMapper } from '../template.mapper.js';
 
 export class HttpCallTaskMapper {
@@ -30,12 +31,18 @@ export class HttpCallTaskMapper {
       redirect: node.redirect,
     };
     const args = TemplateMapper.toDomain(request, argumentsAt);
+    const output = CallOutputMapper.toDomain(
+      node.output,
+      node.redirect,
+      argumentsAt,
+    );
     return new HttpCallTask({
       name: props.name,
       reference: props.reference,
       base: props.base,
       endpoint,
       arguments: args,
+      output,
     });
   }
 }

@@ -1,12 +1,12 @@
-import { randomUUID } from 'node:crypto';
-import type { NewWorkflowVersion, WorkflowVersionProps } from './interfaces.js';
+import type { DslVersion } from '../language/enums.js';
+import type { WorkflowVersionProps } from './interfaces.js';
 import type { SourceDocument } from './source-document.js';
 
 export class WorkflowVersion {
   readonly #id: string;
   readonly #workflowId: string;
   readonly #semver: string;
-  readonly #dslVersion: string;
+  readonly #dslVersion: DslVersion;
   readonly #source: SourceDocument;
   readonly #publisherId: string;
   readonly #publishedAt: Date;
@@ -21,26 +21,6 @@ export class WorkflowVersion {
     this.#publishedAt = props.publishedAt;
   }
 
-  static publish(input: NewWorkflowVersion): WorkflowVersion {
-    const definition = input.definition;
-    const workflowName = input.workflow.workflowName;
-    const belongs = definition.workflow.equals(workflowName);
-
-    if (!belongs)
-      throw new TypeError('The definition belongs to another workflow');
-
-    const id = randomUUID();
-    return new WorkflowVersion({
-      id,
-      workflowId: input.workflow.id,
-      semver: definition.version,
-      dslVersion: definition.dslVersion,
-      source: input.source,
-      publisherId: input.publisherId,
-      publishedAt: input.now,
-    });
-  }
-
   get id(): string {
     return this.#id;
   }
@@ -53,7 +33,7 @@ export class WorkflowVersion {
     return this.#semver;
   }
 
-  get dslVersion(): string {
+  get dslVersion(): DslVersion {
     return this.#dslVersion;
   }
 

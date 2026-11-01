@@ -53,12 +53,6 @@ export class AccountWithoutPasswordError extends RuleViolationError {
   }
 }
 
-export class AccountConflictError extends ConflictError {
-  constructor() {
-    super('The account was changed concurrently');
-  }
-}
-
 export class InvalidPasswordError extends RuleViolationError {
   constructor() {
     super('The current password is wrong');
@@ -86,12 +80,6 @@ export class InvitationRevokedError extends ExpiredError {
 export class InvitationExpiredError extends ExpiredError {
   constructor() {
     super('The invitation has expired');
-  }
-}
-
-export class InvitationConflictError extends ConflictError {
-  constructor() {
-    super('The invitation was changed concurrently');
   }
 }
 
@@ -154,6 +142,49 @@ export class EmptyCompetingForkError extends DefinitionRejectedError {
   }
 }
 
+export class DuplicateDefaultCaseError extends DefinitionRejectedError {
+  constructor(at: JsonPointer) {
+    const pointer = at.toString();
+    super(
+      pointer,
+      'A switch has only one default case; every other case needs a when',
+    );
+  }
+}
+
+export class InconsistentProgressError extends DomainError {
+  constructor(reason: string) {
+    super(`Inconsistent run-time state: ${reason}`);
+  }
+}
+
+export class BranchJumpError extends DefinitionRejectedError {
+  constructor(name: string, at: JsonPointer) {
+    const pointer = at.toString();
+    super(
+      pointer,
+      `A fork branch cannot go to "${name}": the branches run side by side`,
+    );
+  }
+}
+
+export class IncompleteEventError extends DefinitionRejectedError {
+  constructor(at: JsonPointer) {
+    const pointer = at.toString();
+    super(pointer, 'An event to emit names its source and its type');
+  }
+}
+
+export class FunctionJumpError extends DefinitionRejectedError {
+  constructor(name: string, at: JsonPointer) {
+    const pointer = at.toString();
+    super(
+      pointer,
+      `A function cannot go to "${name}": it runs apart from the tasks that call it`,
+    );
+  }
+}
+
 export abstract class InvalidValueError extends RuleViolationError {}
 
 export class NegativeDurationError extends InvalidValueError {
@@ -162,10 +193,26 @@ export class NegativeDurationError extends InvalidValueError {
   }
 }
 
+export class CalendarDurationError extends InvalidValueError {
+  constructor() {
+    super(
+      'A duration cannot count years, months or weeks, whose length depends on the calendar',
+    );
+  }
+}
+
 export class UncomputableDurationError extends InvalidValueError {
   constructor() {
     super(
-      'A fraction is allowed only in the smallest of the hours, minutes or seconds of a duration',
+      'The text is not an ISO 8601 duration with a fraction, if any, only in its smallest unit',
+    );
+  }
+}
+
+export class MalformedDurationError extends InvalidValueError {
+  constructor() {
+    super(
+      'The value is not a duration: an ISO 8601 text or an object of days, hours, minutes, seconds and milliseconds',
     );
   }
 }
@@ -173,6 +220,12 @@ export class UncomputableDurationError extends InvalidValueError {
 export class NegativeAttemptCountError extends InvalidValueError {
   constructor() {
     super('An attempt count cannot be negative');
+  }
+}
+
+export class UnknownValueError extends InvalidValueError {
+  constructor(value: string) {
+    super(`The standard defines no value '${value}' here`);
   }
 }
 

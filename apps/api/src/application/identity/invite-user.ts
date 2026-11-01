@@ -24,10 +24,11 @@ export class InviteUser {
 
     if (existing) throw new AccountExistsError();
 
+    const now = new Date();
     const previous = await this.invitations.findPendingByEmail(command.email);
 
     if (previous) {
-      previous.revoke();
+      previous.revoke(now);
       await this.invitations.save(previous);
     }
 
@@ -37,15 +38,10 @@ export class InviteUser {
       role: command.role,
       invitedBy: command.invitedBy,
       token,
+      now,
     });
     await this.invitations.save(invitation);
-    await this.mailing.sendInvitation({
-      to: invitation.email,
-      token,
-      inviterName: command.inviterName,
-      role: invitation.role,
-      expiresAt: invitation.expiresAt,
-    });
+    await this.mailing.sendInvitation(invitation, token, command.inviterName);
     return invitation;
   }
 }

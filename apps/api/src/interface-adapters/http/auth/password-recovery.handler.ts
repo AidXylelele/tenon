@@ -5,21 +5,16 @@ import {
   type PasswordResetLink,
 } from '@nestjs/authentication';
 import { Injectable } from '@nestjs/common';
-import {
-  AccountRepository,
-  Mailing,
-  UserRepository,
-} from '../../../application/identity/ports.js';
+import { FindRecoveryAccount } from '../../../application/identity/find-recovery-account.js';
 import { ResetPassword } from '../../../application/identity/reset-password.js';
-import { AccountType } from '../../../domain/identity/enums.js';
+import { SendRecoveryLink } from '../../../application/identity/send-recovery-link.js';
 
 @Injectable()
 export class PasswordRecoveryHandler extends PasswordResetHandler {
   constructor(
-    private readonly users: UserRepository,
-    private readonly accounts: AccountRepository,
+    private readonly findRecoveryAccount: FindRecoveryAccount,
+    private readonly sendRecoveryLink: SendRecoveryLink,
     private readonly resetPassword: ResetPassword,
-    private readonly mail: Mailing,
     registry: AuthenticationRegistry,
   ) {
     super();
@@ -27,23 +22,16 @@ export class PasswordRecoveryHandler extends PasswordResetHandler {
   }
 
   async findUser(email: string): Promise<PasswordResetAccount | null> {
-    const user = await this.users.findActiveByEmail(email);
+    const found = await this.findRecoveryAccount.execute(email);
 
-    if (!user) return null;
+    if (found === null) return null;
 
-    const account = await this.accounts.findByUserId(
-      user.id,
-      AccountType.Password,
-    );
-    return {
-      id: user.id,
-      email: user.email,
-      passwordHash: account?.passwordHash ?? null,
-    };
+    const passwordHash = found.account?.passwordHash ?? null;
+    return { id: found.user.id, email: found.user.email, passwordHash };
   }
 
   send(link: PasswordResetLink): Promise<void> {
-    return this.mail.sendPasswordReset({
+    return this.sendRecoveryLink.execute({
       to: link.email,
       link: link.url,
       expiresAt: link.expiresAt,

@@ -6,7 +6,7 @@ import {
 } from '@nestjs-cls/transactional';
 import { and, eq, sql } from 'drizzle-orm';
 import {
-  InvitationConflictError,
+  StaleWriteError,
   InvitationNotFoundError,
 } from '../../../domain/errors.js';
 import { InvitationStatus } from '../../../domain/identity/enums.js';
@@ -45,9 +45,9 @@ export class DrizzleInvitationRepository implements InvitationRepository {
     try {
       const saved = await upsert;
 
-      if (saved.length === 0) throw new InvitationConflictError();
+      if (saved.length === 0) throw new StaleWriteError();
     } catch (error) {
-      if (isUniqueViolation(error)) throw new InvitationConflictError();
+      if (isUniqueViolation(error)) throw new StaleWriteError();
 
       throw error;
     }

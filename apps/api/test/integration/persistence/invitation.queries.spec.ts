@@ -9,6 +9,8 @@ import { anInvitation } from '../../support/builders.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
 import { inTransaction, truncateAll } from '../../support/db.js';
 
+const now = new Date();
+
 describe('DrizzleInvitationQueries', () => {
   let t: TestApp;
   let queries: InvitationQueries;
@@ -53,10 +55,10 @@ describe('DrizzleInvitationQueries', () => {
     const later = await stored('later@example.com', '2026-10-02T00:00:00Z');
     const earlier = await stored('earlier@example.com', '2026-10-01T00:00:00Z');
     await stored('accepted@example.com', '2026-10-01T00:00:00Z', (i) => {
-      i.accept(adminId);
+      i.accept(adminId, now);
     });
     await stored('revoked@example.com', '2026-10-01T00:00:00Z', (i) => {
-      i.revoke();
+      i.revoke(now);
     });
     const expired = await stored('expired@example.com', '2026-10-01T00:00:00Z');
     await t.db

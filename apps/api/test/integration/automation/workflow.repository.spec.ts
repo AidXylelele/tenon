@@ -6,10 +6,11 @@ import { WorkflowName } from '../../../src/domain/automation/language/workflow-n
 import { DocumentFormat } from '../../../src/domain/automation/workflows/enums.js';
 import { SourceDocument } from '../../../src/domain/automation/workflows/source-document.js';
 import { Workflow } from '../../../src/domain/automation/workflows/workflow.js';
-import { WorkflowVersion } from '../../../src/domain/automation/workflows/workflow-version.js';
+import type { WorkflowVersion } from '../../../src/domain/automation/workflows/workflow-version.js';
 import { StaleWriteError } from '../../../src/domain/errors.js';
 import { Role } from '../../../src/domain/identity/enums.js';
 import { DefinitionMapper } from '../../../src/interface-adapters/documents/mappers/definition.mapper.js';
+import type { JsonObject } from '../../../src/domain/automation/language/interfaces.js';
 import type * as Dsl from '../../../src/interface-adapters/documents/interfaces.js';
 import { createUser } from '../../support/auth-helpers.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
@@ -51,20 +52,17 @@ describe('workflow persistence', () => {
   });
 
   async function publish(): Promise<WorkflowVersion> {
-    const definition = DefinitionMapper.toDomain(parsed);
+    const document = JSON.parse(JSON.stringify(parsed)) as JsonObject;
+    const definition = DefinitionMapper.toDomain(parsed, document);
     const workflow = Workflow.register(definition.workflow);
-    const source = SourceDocument.of(
-      DocumentFormat.Json,
-      JSON.stringify(parsed),
-    );
-    const version = WorkflowVersion.publish({
-      workflow,
+    const text = JSON.stringify(parsed);
+    const source = new SourceDocument({ format: DocumentFormat.Json, text });
+    const version = workflow.publish({
       definition,
       source,
       publisherId,
       now: new Date('2026-06-01T00:00:00Z'),
     });
-    workflow.publish(version);
     await inTransaction(t.app, async () => {
       await workflows.save(workflow);
       await versions.add(version);

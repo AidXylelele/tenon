@@ -61,10 +61,11 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 **Decision:**
 
-1. Load the definition's declared secret values.
-2. Begin the round and save.
-3. Compute, with no transaction.
-4. In `TransactionHost.withTransaction`: reload, record, save, and add the produced Events.
+1. `BeginRound` (`@Transactional`): begin the round, save, and add the produced Events; the save is skipped when nothing changed.
+2. Compute, with no transaction.
+3. `RecordRound` (`@Transactional`): reload, record, save, and add the produced Events.
+
+`AdvanceInstance` composes the two and returns the instance's progress. Secrets join with US8.
 
 `InstanceRuns.start` and `wake` run inside the caller's transaction. S0 tests the nestjs-cls `tx`, the lease renewal, and that a signal sent during a step survives.
 
@@ -77,19 +78,19 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 **Decision:** Repositories write an aggregate's `#events` to the outbox in the save transaction. The topic is the domain event's name and the payload is its props. Each event below exists because its reaction either leaves the database or belongs to an aggregate that advances separately, under its own concurrency:
 
-| Event                                                   | Reaction                                              | Key            | Why it is outside the transaction                                              |
-| ------------------------------------------------------- | ----------------------------------------------------- | -------------- | ------------------------------------------------------------------------------ |
-| EventAccepted                                           | RouteEvent                                            | —              | unbounded fan-out; webhook answers must not wait                               |
-| (EventOffers) correlation, trigger, delivery offers     | OfferEvent, OfferTrigger, OfferDelivery               | candidate      | one message per candidate, so one slow filter delays no other                  |
-| CorrelationStarted                                      | CatchUpCorrelation                                    | correlation    | catch-up must see events committed after the start                             |
-| ListenStarted, ListenEnded                              | StartCorrelation, EndCorrelation                      | instance       | correlations advance under their own concurrency, per event                    |
-| EventConsumed, CorrelationCompleted                     | ConsumeListenEvent, CompleteListen                    | instance       | the instance advances in its own engine run                                    |
-| TriggerSatisfied                                        | StartTriggeredInstance                                | workflow       | a new instance and its run                                                     |
-| SubWorkflowRequested, SubWorkflowEnded, CancelRequested | StartSubWorkflow, CompleteSubWorkflow, CancelInstance | parent / child | a separate instance in a separate run; `latest` and the input check need reads |
-| ProcessDetached                                         | RunDetachedProcess                                    | instance       | a sandbox process outside the database                                         |
-| NextStartDue (`delay`)                                  | StartScheduledInstance                                | workflow       | delayed by definition                                                          |
-| RecurringScheduleSet, RecurringScheduleCleared          | RegisterRecurringStarts, RemoveRecurringStarts        | workflow       | `WorkflowSchedules.upsert` takes no transaction                                |
-| DeliveryScheduled                                       | DeliverEvent                                          | —              | it leaves the system                                                           |
+| Event                                               | Reaction                                       | Key         | Why it is outside the transaction                                                                                                                                                                     |
+| --------------------------------------------------- | ---------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EventAccepted                                       | RouteEvent                                     | —           | unbounded fan-out; webhook answers must not wait                                                                                                                                                      |
+| (EventOffers) correlation, trigger, delivery offers | OfferEvent, OfferTrigger, OfferDelivery        | candidate   | one message per candidate, so one slow filter delays no other                                                                                                                                         |
+| CorrelationStarted                                  | CatchUpCorrelation                             | correlation | catch-up must see events committed after the start                                                                                                                                                    |
+| ListenStarted, ListenEnded                          | StartCorrelation, EndCorrelation               | instance    | correlations advance under their own concurrency, per event                                                                                                                                           |
+| EventConsumed, CorrelationCompleted                 | ConsumeListenEvent, CompleteListen             | instance    | the instance advances in its own engine run                                                                                                                                                           |
+| TriggerSatisfied                                    | StartTriggeredInstance                         | workflow    | a new instance and its run                                                                                                                                                                            |
+| CancelRequested (US9)                               | CancelInstance                                 | child       | a separate instance in a separate run; sub-workflows themselves are engine steps (architecture §4)                                                                                                    |
+| ProcessDetached                                     | RunDetachedProcess                             | instance    | a sandbox process outside the database; the payload holds only ids                                                                                                                                    |
+| NextStartDue (`delay`)                              | StartScheduledInstance                         | —           | delayed by definition; it carries no key, because a delayed message heads its key's queue and would hold every later message of the workflow (a new cron, switching the workflow off) until it is due |
+| RecurringScheduleSet, RecurringScheduleCleared      | RegisterRecurringStarts, RemoveRecurringStarts | workflow    | `WorkflowSchedules.upsert` takes no transaction                                                                                                                                                       |
+| DeliveryScheduled                                   | DeliverEvent                                   | —           | it leaves the system                                                                                                                                                                                  |
 
 **Rationale:** Khorikov, "Domain events: simple and reliable solution". 0.1.2 fixed store writes of error texts containing U+0000.
 
@@ -135,7 +136,7 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 - **Port.** `DefinitionReader.read(source)` returns the Definition or throws a `DefinitionRejectedError` kind.
 - **Client (frameworks).** `SdkOpenWorkflowClient.parse(text)` calls `Classes.Workflow.deserialize` from `@openworkflowspec/sdk` 1.0.3-alpha8. The version is pinned, because `latest` is a 0.0.1 placeholder.
-  - The SDK parses YAML or JSON. It checks the 1.0.3 schema, the DSL range (`>=1.0.0-0 <=1.0.3`) and duplicate task names, and stops at the first error.
+  - The SDK parses YAML or JSON. It checks the 1.0.3 schema, the DSL range (`>=1.0.0-0 <=1.0.3`) and duplicate task names, and stops at the first error. Its range admits pre-releases; the definition mapper takes only the released versions (`DslVersion`, FR-001), since a pre-release has its own schema.
   - The client returns simple data: `DslParsed` with the document as `Dsl.Workflow`, or `DslFailure` with `pointer` and `failure`.
   - A failure comes from one of three sources: the deepest Ajv error of a `SchemaValidationError` that does not only select a `oneOf` branch (`const`, `not`, `oneOf`, `anyOf`), the `path` and cause of a `DslValidationError`, or a YAML error at the root pointer.
   - The document comes back through `asPlainObject()`, so no SDK object crosses the boundary.
@@ -183,7 +184,7 @@ It hands out four kinds of work, which are the four things Synapse's executors c
     - `env`, `$ENV`, `input`, `inputs`, `input_filename`, `halt`, `halt_error`, `localtime` and `strflocaltime` become errors;
     - `debug` and `stderr` become identities.
     - Its reasons: the environment never depends on how a jq build emulates one; results do not depend on a worker's time zone; data never reaches stderr; and `halt` never yields silent emptiness.
-  - The domain binds only the runtime arguments and variables that the standard's table allows at each place (R16).
+  - Each Evaluation carries the runtime arguments that the standard's table allows at its place, chosen by the domain (data-model §7); the domain also splits templates into their expressions.
 - **Templates.** A `${ }` leaf of a template is an expression. Fields typed as expressions are evaluated without `${ }` (CTK).
 - **Pattern matches** run as jq `test()`, written by the adapter (US7).
 
@@ -201,12 +202,8 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 **Decision:**
 
-- **Scope.** `HttpServiceCaller` (in `endpoints/`) performs `call: http`:
-  - URI templates, `query`;
-  - the output modes `content`, `response` and `raw`;
-  - `redirect`;
-  - basic, bearer and oauth2/oidc client-credentials authentication, including credentials taken from secrets.
-- **Authorization descriptor.** It returns the `$authorization` descriptor, masked.
+- **Scope.** `HttpServiceCaller` (in `endpoints/`) performs `call: http`: URI templates, `query`, and basic, bearer and oauth2/oidc client-credentials authentication (credentials from secrets join with US8).
+- **Results.** It returns what happened, as data: `ServiceResponded(status, headers, content, request, authorization)`, `ServiceTimedOut`, `AuthenticationFailed` (a token request refused) or `CommunicationFailed` (transport). The domain (`CallOutput`) decides the output format (`content`, `response`, `raw`), `redirect` and which statuses are errors. The adapter encodes the content as base64 when the evaluated arguments ask for `raw`.
 - **`call: openapi`.** It fetches the document through `EndpointDispatcher` and dereferences it with `@apidevtools/json-schema-ref-parser` (external resolution off), without caching or retries. It then resolves the `operationId`.
 - **Limits.** The `service-calls` preset caps the deadline at 30 s and adds a bulkhead.
 
@@ -222,8 +219,8 @@ It hands out four kinds of work, which are the four things Synapse's executors c
   - `memoryLimit` 256 MiB, `procLimit` 50;
   - `copyIn` with the code.
 - **Results.** `Accepted` or `Nonzero Exit Status` → `ProcessExited` (stdout and stderr as strings). `Time Limit Exceeded` → `ProcessTimedOut`. Anything else → `SandboxFailed`.
-- **`await: false`.** The task completes with its transformed input and raises `ProcessDetached`. The process then runs from the outbox, and its result is ignored.
-- **Deployment.** go-judge runs privileged with cgroup v2 and the network off. It uses a custom image, pinned by digest, with Node.js and Python 3 in its rootfs. It is reached through `SandboxPool`, which is separate from `EndpointDispatcher`.
+- **`await: false`.** The task completes with its transformed input and raises `ProcessDetached` (ids only). `RunDetachedProcess` runs the process from the outbox, and its result is ignored.
+- **Deployment.** go-judge runs privileged with cgroup v2 and the network off. It uses a custom image, pinned by digest, with Node.js and Python 3 in its rootfs. It is reached through `SandboxPool`, which is separate from `EndpointDispatcher`. It sits on its own Compose network (`sandbox`), which only the API shares, and requires a bearer token (`ES_AUTH_TOKEN` = `SANDBOX_TOKEN`), so a sandbox escape does not reach PostgreSQL and no other caller can run code.
 
 **Rationale:**
 
@@ -262,12 +259,12 @@ It hands out four kinds of work, which are the four things Synapse's executors c
 
 **Decision:** Presets declared in `frameworks/di/resilience.module`:
 
-| Preset                | Timeout                                                                                           | Bulkhead (rejects when full) | Retries |
-| --------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------- | ------- |
-| `service-calls`       | deadline, ≤ 30 s                                                                                  | yes                          | none    |
-| `subscriber-delivery` | 10 s, breaker per subscription                                                                    | —                            | none    |
-| `processes`           | deadline + 5 s                                                                                    | yes                          | none    |
-| `jq` (US2)            | 1 s, applied by `PiscinaJqClient` in frameworks, because terminating the worker is pool mechanics | —                            | —       |
+| Preset                      | Timeout                                                                                                                            | Bulkhead (rejects when full) | Retries |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------- |
+| `service-calls`             | deadline, ≤ 30 s                                                                                                                   | yes                          | none    |
+| `subscriber-delivery` (US6) | 10 s; no preset: a preset's breaker is shared under its name, so T096 creates one per subscription with `ResilienceService.create` | —                            | none    |
+| `processes`                 | deadline + 5 s                                                                                                                     | yes                          | none    |
+| `jq` (US2)                  | 1 s, applied by `PiscinaJqClient` in frameworks, because terminating the worker is pool mechanics                                  | —                            | —       |
 
 The `jq` preset is applied by `PiscinaJqClient` in `frameworks/jq`, and the others by the adapters that call out.
 
@@ -278,30 +275,35 @@ The `jq` preset is applied by `PiscinaJqClient` in `frameworks/jq`, and the othe
 
 ## R16. Interpretation of the standard and the CTK
 
-| Point                                                                                | Decision                                                                                                                                                                                                          |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `$secrets`                                                                           | Only in `input.from`, enforced at run time (US2). The standard's argument table marks it everywhere; its description limits it to `input.from`, and the platform follows the description (recorded contradiction) |
-| `$authorization`                                                                     | From the call's ServiceResult, for `output.as` and `export.as`; the availability of every argument follows the standard's table at run time (US2)                                                                 |
-| `$runtime`                                                                           | `{ name, version }` of the platform                                                                                                                                                                               |
-| `$task.definition`, `$workflow.definition`                                           | The parsed JSON kept in the Definition                                                                                                                                                                            |
-| `set`                                                                                | Replaces the data                                                                                                                                                                                                 |
-| `emit`                                                                               | The runtime generates `id`, `time` and `specversion`; the output is the event                                                                                                                                     |
-| Task reference                                                                       | `/do/<index>/<name>[…]` (CTK)                                                                                                                                                                                     |
-| Communication error                                                                  | Type `…/spec/1.0.0/errors/communication`; the HTTP status, or 500; a title                                                                                                                                        |
-| Missing workflow input                                                               | `{}`                                                                                                                                                                                                              |
-| `status-changed` events                                                              | Not produced                                                                                                                                                                                                      |
-| Lifecycle `output`                                                                   | Left out above 64 KiB (the LifecycleEvent VO)                                                                                                                                                                     |
-| Lifecycle `source`                                                                   | `/workflows/{namespace}/{name}/instances/{id}`                                                                                                                                                                    |
-| `run.workflow.version`                                                               | Required by the 1.0.3 schema; `latest` is resolved when the task starts; a missing target faults the task with a configuration error (US2)                                                                        |
-| Fork                                                                                 | Output is an array, or the winner's output with `compete`; exports apply in declaration order                                                                                                                     |
-| `after`                                                                              | Next start only after **completion**                                                                                                                                                                              |
-| Script language                                                                      | `js` → Node.js; `python` → Python 3; `source` is outside the subset                                                                                                                                               |
-| Process output                                                                       | stdout and stderr as strings; a non-zero exit is not an error; time-out → timeout error; other sandbox failure → runtime error                                                                                    |
-| `await: false`                                                                       | Transformed input; the process is detached                                                                                                                                                                        |
-| Backoff                                                                              | `constant`: the delay; `linear`: delay × attempt; `exponential`: delay × 2^(attempt − 1); jitter adds a share of `[from, to]`                                                                                     |
-| `catch.errors.with.details`                                                          | Matches the error's `detail` (the schema names the filter property `details`)                                                                                                                                     |
-| Retry limits                                                                         | `limit.attempt.count` bounds the attempts; `limit.attempt.duration` bounds one attempt; `limit.duration` bounds the whole retry window                                                                            |
-| A fraction in a duration other than in the smallest of its hours, minutes or seconds | Refused at publish (Temporal cannot compute it); listed in the conformance statement                                                                                                                              |
+| Point                                                                                | Decision                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `$secrets`                                                                           | Only in `input.from`, enforced at run time (US8). The standard's argument table marks it everywhere; its description limits it to `input.from`, and the platform follows the description (recorded contradiction)                                            |
+| `$authorization`                                                                     | From the call's ServiceResult, for `output.as` and `export.as`; the availability of every argument follows the standard's table at run time (US2)                                                                                                            |
+| `$runtime`                                                                           | `{ name, version }` of the platform                                                                                                                                                                                                                          |
+| `$task.definition`, `$workflow.definition`                                           | The parsed JSON kept in the Definition                                                                                                                                                                                                                       |
+| `set`                                                                                | Replaces the data                                                                                                                                                                                                                                            |
+| `emit`                                                                               | The runtime generates `id`, `time` and `specversion`; the output is the event                                                                                                                                                                                |
+| Task reference                                                                       | `/do/<index>/<name>[…]` (CTK)                                                                                                                                                                                                                                |
+| Communication error                                                                  | Type `…/spec/1.0.0/errors/communication`; the HTTP status, or 500; a title                                                                                                                                                                                   |
+| Missing workflow input                                                               | `{}`                                                                                                                                                                                                                                                         |
+| `status-changed` events                                                              | Not produced                                                                                                                                                                                                                                                 |
+| Lifecycle `output`                                                                   | Left out above 64 KiB (the LifecycleEvent VO)                                                                                                                                                                                                                |
+| Lifecycle `source`                                                                   | `/workflows/{namespace}/{name}/instances/{id}`                                                                                                                                                                                                               |
+| `run.workflow.version`                                                               | Required by the 1.0.3 schema; `latest` is resolved when the task starts; a missing target faults the task with a configuration error (US2)                                                                                                                   |
+| Fork                                                                                 | Output is an array, or the winner's output with `compete`; each branch's export applies when the branch ends, like any task's                                                                                                                                |
+| `after`                                                                              | Next start only after **completion**                                                                                                                                                                                                                         |
+| Script language                                                                      | `js` → Node.js; `python` → Python 3; `source` is outside the subset                                                                                                                                                                                          |
+| Process output                                                                       | stdout and stderr as strings; a non-zero exit is not an error; time-out → timeout error; other sandbox failure → runtime error                                                                                                                               |
+| `await: false`                                                                       | Transformed input; the process is detached                                                                                                                                                                                                                   |
+| Backoff                                                                              | `constant`: the delay; `linear`: delay × attempt; `exponential`: delay × 2^(attempt − 1); jitter adds a share of `[from, to]`                                                                                                                                |
+| `catch.errors.with.details`                                                          | Matches the error's `detail` (the schema names the filter property `details`)                                                                                                                                                                                |
+| Retry limits                                                                         | `limit.attempt.count` bounds the retries and `limit.duration` the whole retry window; `limit.attempt.duration` is refused (the text bounds all attempts, the schema each one). Spent retries run the catch `do`, or fault the `try` task with the last error |
+| A fraction in a duration other than in the smallest of its hours, minutes or seconds | Refused at publish (Temporal cannot compute it); listed in the conformance statement                                                                                                                                                                         |
+| Initial `$context`                                                                   | `{}`                                                                                                                                                                                                                                                         |
+| A faulted branch of a competing `fork`                                               | The first branch to end decides; a fault faults the fork (the standard names only the winner)                                                                                                                                                                |
+| `exit` inside `for`                                                                  | Ends the current iteration; the loop goes on (the standard: "halts the current branch")                                                                                                                                                                      |
+| `for.while`                                                                          | Checked before every iteration, the first included                                                                                                                                                                                                           |
+| A `for` without `while` whose body is empty                                          | Completes with its input at once, whatever the number of items                                                                                                                                                                                               |
 
 **Recorded contradiction.** In CTK `try.feature`, "Try Handle Caught Error" filters on `…/dsl/errors/types/communication`, but the specification requires `…/spec/1.0.0/errors/communication`. We follow the specification, and the scenario is recorded in FR-032 and SC-001.
 
@@ -309,7 +311,7 @@ The `jq` preset is applied by `PiscinaJqClient` in `frameworks/jq`, and the othe
 
 **Decision:**
 
-- One `ErrorClassifier` tells transient errors (stale writes, full bulkheads, PostgreSQL SQLSTATE classes 08, 40, 53 and 57, socket errors, through `cause`) from settled ones (not found, stale start, invalid control). Outbox handlers acknowledge settled errors, rethrow transient ones and turn the rest into `NonRetryableMessageError`; the module-level `retryIf` is not used, so the mail handler keeps its retries. Engine steps retry only transient errors. The table is architecture.md §8. It arrives with its first consumers (T046, T047); its folder is settled at T038.
+- One `ErrorClassifier` tells transient errors (stale writes, full bulkheads, PostgreSQL SQLSTATE classes 08, 40, 53 and 57, socket errors, through `cause`) from settled ones (not found, stale start, invalid control). Outbox handlers acknowledge settled errors, rethrow transient ones and turn the rest into `NonRetryableMessageError`; the module-level `retryIf` is not used, so the mail handler keeps its retries. Engine steps retry only transient errors. The table is architecture.md §8. It runs inside each engine step and in the detached-process handler; it arrives with them (T046, T047), and its folder is settled at T038.
 - Duplicate creations stop at a guard because their ids are derived.
 - Use cases never catch.
 
@@ -389,7 +391,7 @@ Each package exists because nothing built in covers it:
 
 **Rounds 1–3** (2026-10-28 and 2026-10-29): DDD and Clean Architecture gave _approve with fixes_. Still in force from them:
 
-- **Duplicate starts.** Derived ids with guards; a refused child starts faulted.
+- **Duplicate starts.** Derived ids with guards; a child whose input breaks its schema faults in its first round.
 - **Catch-up.** It runs after commit.
 - **Lease.** The bound is stated, with bulkheads that reject; renewal and signal retention are proven in S0.
 - **Missing secrets and masking.** Both have domain owners.
@@ -434,10 +436,102 @@ Moved to run time after comparing with AWS Step Functions and Camunda: other wor
 
 **Not applied:** the standard's names `RetryPolicy` and `AuthenticationPolicy`. In this codebase "Policy" means an access policy, so the domain uses `RetryStrategy` and `Authentication`.
 
+**Round 6** (2026-10-30, DDD and CA critics on the US2 design, before code): both gave _approve with fixes_. Applied:
+
+- Sub-workflows run as steps of the parent's engine run (explicit flow), read from persisted state; the detached process stays on the outbox, because it leaves the database. Checked on 2026-10-31 against `@nestjs/workflows` 0.0.4: the run starts children with `ctx.startChild` and waits for them with `waitForAny`, and the engine signals the parent in the child's last transaction, so the child no longer resumes its parent and US2 sends no wake.
+- `AdvanceInstance` composes `BeginRound` and `RecordRound`, both `@Transactional`; both add the produced Events; `progress(now)` replaces the `GetProgress` query.
+- One execution, one TaskInstance; progress keeps only state and receives its Task.
+- `StartSubWorkflow` saves one aggregate: the child, or the parent when the target is missing.
+- `ServiceResponded` carries the status, headers and body, and the call task decides; `AuthenticationFailed` added.
+- Errors are classified inside the engine steps; `FaultInstance` takes the instance id only.
+- The origin decides about a rejected input; jitter derives from the work id; the rule owners table is split by owner.
+
+**Not applied:** cancelling an abandoned child stays with US9 (until then it runs to its end and its result is ignored); a cache for reading the Definition waits for a measurement.
+
+**Round 11** (2026-11-01, a second review by six category agents, its findings checked by hand). Applied:
+
+- The SSRF policy refused every public IPv4 address: `BlockList` matches an IPv4 address against an IPv6 rule in its IPv4-mapped form, so `::ffff:0:0/96` covered all of them. The rule went (the IPv4 rules already catch `::ffff:127.0.0.1`), and `::/96` covers the IPv4-compatible form (`::127.0.0.1`), the unspecified address and loopback. A unit test keeps public addresses permitted.
+- An emitted event without `with` faulted the check with a `TypeError` (500): the 1.0.3 schema leaves `with` optional, and the documents contract claimed it was required. "An event to emit names its source and its type" is a rule of the concept (the DDD critic, after Khorikov's "Always-valid domain model"), so `EmitTask` owns it: its constructor refuses a template without them (`IncompleteEventError`), and an event whose source or type does not evaluate to text faults the task with a runtime error, as `raise` does. The mapper passes an absent `with` as an empty one. `dsl-reference` types `emit.event` as event properties, while its example and the schema put them under `with`; the platform follows the schema (a recorded contradiction).
+- `end` inside a declared function was lost: `FunctionCallProgress` took the plain outcome. It now takes `workflowEnd()` first, as `fork` does. A declared function runs apart from the tasks that call it, so `ReusableComponents` refuses a directive naming a task (`FunctionJumpError`); before, `then: nowhere` was published and ignored.
+- An `evaluate` of the wrong shape (a string, a misspelled key) ran as strict jq, since the 1.0.3 schema leaves `evaluate` out. `DefinitionMapper` checks the types the schema would (an object, string `mode` and `language`: `InvalidDocumentError`) and refuses unknown keys; the documents contract types it as `JsonValue`.
+- `$secrets` in an expression and the OAuth2 or OIDC settings that client credentials with a secret does not use were published and would fail or be ignored only at run time, and a published version is never checked again. They are refused until US8 and T043 run them (FR-011), as `use.secrets` already is. Client credentials need a client id and secret (the DDD critic). The `$secrets` scan is lexical and may refuse the text inside a jq string; it goes with US8.
+- FR-001 admitted DSL pre-releases, which the mapper refuses; the text now follows the code.
+- The Round 10 reason "the seeded administrator is a constant" was false: the migration reads `app.bootstrap_admin_email`. The migration trims, lower-cases and checks it with zod's pattern, so the format is checked at both ways in; a test keeps the SQL pattern equal to `z.regexes.email.source` (the CA critic).
+
+DDD and CA critics: _approve with fixes_; applied above. The dependency rule holds over the slice.
+
+Refuted on check: the recovery completion checks a suspended user (the library calls `findUser`, that is `FindRecoveryAccount`, before `updatePassword`).
+
+**Round 10** (2026-11-01, the user, after rereading Khorikov: "Value Objects: when to create one?", "Always-valid domain model", "Validation and DDD", "Combining ASP.NET Core validation attributes with Value Objects", "Functional C#: Primitive obsession"). Schemas only coerce types and validate: zod at the HTTP boundary, the standard's schema in the SDK for documents. Business rules never go into a schema or an adapter. The domain drops only the checks of type and format that a schema already makes; a rule about what a domain concept may be stays in the domain however simple it is and however few its ways in, and the adapter translates its error. A value object needs one of Khorikov's reasons (several primitives, non-trivial rules, repetition); a simple rule is not worth one. Stored rows are trusted, since only the application writes them. Applied:
+
+- `EmailAddress` and `InvalidEmailAddressError` went: the format is one simple rule with two ways in, each checked where it enters. The zod `Email` schema trims, lower-cases and checks it at HTTP (`format: email` kept for clients); the bootstrap migration does the same with zod's pattern for the operator's `app.bootstrap_admin_email` (the re-review found the earlier claim that the seed is a constant false). The entities, ports and repositories take the normalized string.
+- `WorkflowName` keeps the pair that identifies a workflow (`equals`) without a label rule: the path schema and the standard's schema check the labels, and the standard sets no pattern for the target of `run: workflow`, which the guard refused. `InvalidWorkflowNameError` went.
+- `RetryStrategy` lost the unused `attemptCount` getter.
+
+**Kept, with reasons:** `FixedDuration` (negative, calendar and fraction rules that the standard's schema allows, from two ways in: the document and jq results at run time); `RetryStrategy` refuses a negative attempt count and `Attempt` counts from zero (the user: rules of the concept, not format; the standard's schema checks only the integer type, and the retry mapper translates the error); the type checks on jq results (`for.in`, `raise`, `emit`, templates), which the standard answers with a `WorkflowError`; the language rules no schema can state (unique task names, directive targets, competing forks, one default case); the consistency guards of `Outcome`, `TaskEnding`, `ForProgress` and `ForkProgress`, invariants of state that many domain paths compose; the password length in zod, since on recovery the library hashes the password before our code sees it.
+
+**Round 9** (2026-11-01, the user's question on value objects; a CA critic on all four circles against Martin 2012 and a DDD critic against Khorikov's blog). Applied:
+
+- Ports take domain types; a use case never unwraps one for a port, and adapters do all mapping (the user). `AccountRepository.findByEmail(email)` replaced `findByIdentifier(type, email)`, so the account type is the repository's concern; `Mailing.sendInvitation(invitation, token, inviterName)` and `sendPasswordReset(to, link, expiresAt)`, with the template data owned by the mailing adapter; `FindRecoveryAccount` returns `{ user, account }` and the auth handler maps it.
+- The HTTP path schema takes the standard's label rule (the 1.0.3 schema allows upper case); its stricter copy made a published `Team/…` unreadable (component test).
+- `Workflow` holds its `WorkflowName` and creates its versions (`publish`), the one statement of "a version belongs to its workflow"; `SourceDocument` derives its fingerprint; `dslVersion` is a `DslVersion` in `Definition` and `WorkflowVersion`.
+- `TaskEnding` holds the body's `Outcome`, so the effects and their rules have one owner; the `try` states share an `Attempt`; `Input`, `Output` and `Export` own their part of the data flow, and the stages decide only the round.
+- `MalformedDurationError` names a value that is not a duration (a jq result of `42` was reported as a misplaced fraction).
+- The conformance statement is an application read model; `ExcludedCallKind` and `OAuth2Grant` moved to `documents/enums.ts`; `FunctionReference` and `PointerToken` became class constants; one `StaleWriteError` for every optimistic conflict; `Actor`, `CheckDocumentQuery.format` and the public `Invitation.isExpired` and `LIFETIME_MS` went; `TaskScope.definitionArgumentsWith` and `JsonPointer.idIn` own the argument merge and the work id format.
+
+**Kept, with reasons:** the framework clients translate library output into the contracts their adapters own (`SdkOpenWorkflowClient`, `InProcessJqClient`), so library types stay in frameworks (review item A-4, closed). The fixed-duration mapper turns domain value errors into located publish errors: translation, with one owner per rule. `settled` stays in both progress hierarchies, whose stop rules differ. `AcceptInvitation` checks the email before it creates the user (Khorikov, "Email uniqueness as an aggregate invariant": the application service checks, the unique index backs it). The OpenAPI email fields keep `format: email`, the hint clients map to `<input type=email>`, whose rule the server applies. `PasswordHasher.verify` keeps the hash as a string, since the domain has no hash type. The US2 modules, presets, factories and progress mappers stay as the Phase 2 foundations of the next story.
+
+**Waiting for the user:** whether to drop the OIDC half of `Account` (`AccountType.Oidc`, the nullable hash, `AccountWithoutPasswordError`) until an OIDC story exists, or to fold the password into `User`; this belongs to the open User/Account and OIDC decision. The accept route's controller transaction belongs to the constitution amendment.
+
+**Round 8** (2026-11-01, an external review by eight agents, its main findings checked again by hand): the dependency rule holds, and `language` is a real domain model. Decided by the user and applied:
+
+- Spent retries run the catch `do`, otherwise the `try` task faults with the last error (`spec.md` and `research.md` had disagreed).
+- `limit.attempt.duration` is refused at publish; `RetryStrategy` and the `try` states lost the attempt start.
+- A workflow input that breaks its schema faults the instance: the root task validates it in its first stage; `inputCheck`, `InputRejectedError` and the start's 422 are gone.
+- A fork branch's `end` ends the workflow (`TaskEnding.workflowEnd`, used by `Sequence` and `ForkProgress`); each branch ends once; a branch that names another branch is refused (`BranchJumpError`).
+- Framework-aware use cases stay, as a deliberate marriage (Martin, "Frameworks Are Details").
+
+- Progress state is persistable: the progress classes expose their fields through getters, as `Invitation` does, and `TaskProgressMapper` with one mapper per class (`interface-adapters/persistence/mappers/progress/`) writes and restores them; a round-trip test covers every stage and every kind. Duplicated fields stay: each state object is whole on its own.
+- A round saves only at side effects (architecture §3); `FaultInstance` is the compensation of the first step and interrupts are rethrown (architecture §4).
+- Publishing closes the gaps the review found: `evaluate`, the DSL version, calendar and negative durations, `Schema` holding the JSON Schema itself (no `resource`, only `json`), one default case, backoff parameters. An audit of the 1.0.3 schema against the mappers added: `return` on `run: workflow`, and unknown properties of the open objects (`catch.errors` and its `with`, where a typo emptied the filter and caught every error; `emit.event`; the workflow root; declared authentications).
+
+**Deferred by the user:** YAML alias bombs (the SDK parses with `maxAliases` unlimited).
+
+**Critics on this round** (DDD and CA): both _approve with fixes_. Applied:
+
+- `Outcome` and `TaskEnding` keep public constructors for reconstitution (persistence mappers build them, as they build `Invitation`), and the Round 7 rule moved into them as guard clauses: a failure carries nothing else, one effect at most, a task that did not fault has a directive, a skipped task exports nothing. `ForkProgress` (distinct, known, waiting branches), `ForProgress` (no iteration before the items) and the `try` attempts (from zero) guard their state too, since jsonb is where old or corrupt state comes in (`InconsistentProgressError`). `FlowDirective` keeps its private constructor; a restored directive goes through `named`.
+- One owner of "an `end` stops the flow": `Outcome.endsWorkflow()` for `for`, `TaskEnding.workflowEnd()` for `do` and `fork`. `FixedDuration` checks the sign only in its constructor.
+- The jsonb shapes belong to persistence: `ServiceCallState` and `ProcessRunState` with their mappers; one `InstantMapper` for every date; the naming table lists `toState`/`toDomain` and `confirm`.
+- The constants only the documents adapter reads (`EvaluationMode`, `ExpressionLanguage`, `SchemaFormat`) moved to `documents/enums.ts`; `EvaluateMapper` folded into `DefinitionMapper`; the texts of `UnsupportedConstruct` no longer repeat the lists that `ConformanceStatement` prints.
+- Architecture §3: outside writers only signal the run, so the replayed results never meet a changed task; §8: persistence turns driver failures into `TransientStoreError`, settled for T038.
+- An exception to "behaviour comes with its first consumer": the progress mappers precede their repository (T045), with the round-trip test as their consumer, because T037 needed proof that the T035 objects persist.
+
+**Then, in order** (the user: "иди по порядку"): identity (001 R14); the `subscriber-delivery` preset left with US6 (a preset's breaker is shared, T096 builds one per subscription) and the unread CLS `generateId`; go-judge on its own network with a bearer token (R12) and the SSRF list widened by `2001::/32`, `2002::/16`, `64:ff9b:1::/48`, `fec0::/10`; a health check that passes for a worker-only container; `engine:migrate` in CI (`test:ctk` joins with T050); a full bulkhead parks the round, `NextStartDue` carries no outbox key, `StartInstance` derives the instance id from the `Idempotency-Key`, a `Clock` port arrives with T046 (architecture §3–§5, §8).
+
+**Kept, with reasons:** mail through the outbox stays as it is: `@nestjs/mail` documents no outbox pattern beyond what the handler already does (`idempotencyKey` = the outbox message id, permanent `MailError` dead-lettered). The presets, factories and modules of US2 stay, since US2 is the story in progress.
+
+**Waiting for the user:** amending constitution 3.0.1 (repository query methods such as `findActiveById`, framework session services kept out of ports, the controller-level transaction); a readiness check against R13's decision of a health route without dependency checks; the package changes (explicit OpenTelemetry instrumentations instead of `auto-instrumentations-node`, `express` 5.3.0 to match `platform-express`), which the user installs.
+
+**Not applied:** a default no-op `childEnded` in the base classes (strict lint refuses the unused parameters it needs; the explicit no-ops show which states ignore children).
+
+**Not applied:** run generations past the journal limit (the user accepted the limit); moving the subset decision into the domain (the mappers and `ConformanceStatement` already share `UnsupportedConstruct`); `{ use }` inside a declared authentication and negative literal durations, which the SDK already refuses.
+
+**Round 7** (2026-10-31, DDD and CA critics on the code of T034–T035): both gave _approve with fixes_. Applied:
+
+- A bug: the `try` state re-ran its catch while the handler ran. `try` is now four states (`TryProgress`, `CatchProgress`, `RetryProgress`, `HandlerProgress`), the task stages are one class each (`language/stages`), and every kind ends as `ConcludedProgress`; the `Stage` enum and the nullable fields are gone.
+- One owner per rule: `Expression.holds` (jq truthiness), `TaskEnding.outcome()` (a faulted child faults its parent), `TaskScope.workId` (work ids), `Schema` (schema work and failures), `ErrorCondition` (`when`/`exceptWhen` of catch and retry), `ForTask.variablesFor`, `CatchClause.variablesFor`, `SwitchTask.outcomeFor`.
+- The standard's keywords stay in the domain: `FlowDirective.named` (an enumeration class); unknown output formats and process returns are refused at publish (`UnknownValueError`); the call task carries its `CallOutput`.
+- `Outcome` and `TaskEnding` are built only through factories, so they cannot hold contradictory states; the detached process or workflow travels in the `TaskEnding`, acted on once.
+- `$authorization` is `null` at the definition stage; `RoundResults` is built from the ports' arrays; leftovers removed; one grouping rule in `language/`: a folder per family of kinds with its base (`tasks/`, `backoffs/`, `results/`, `progress/`, `stages/`, `scopes/`), single values at the root.
+- Fork exports apply as branches end (the earlier "declaration order" had no owner and no source in the standard).
+- For T037 and the round: `pendingWork(definition, runtime, now)`, `progress(now)` as plain data, the unchanged save skipped by the repository, `$runtime` passed as a value.
+
+**Not applied:** the `TaskScope<DoTask>` narrowing stays (a guard in WorkflowInstance checks the scope's reference); `ExpressionDuration` keeps the always-valid `FixedDuration` factory and turns its refusal into an expression error; leaf kinds keep an explicit no-op `childEnded`; domain tests keep building definitions from documents through the mapper (sociable, like the CTK).
+
 **Round 5** (2026-10-30, CA critic on the US1 diff): _approve with fixes_. The dependency rule holds, and publishing checks only what a compiler would. Applied:
 
 - `DefinitionReader.read(text)`, so the shared `language` ports no longer depend on `workflows`.
-- Behaviour comes with the story that runs it: US1 removed `WorkflowError`, `ErrorType`, `ErrorFilter.matches`, retry delays, duration arithmetic and `latest` resolution (back with T034), and the backoff kinds are `BackoffKind` until delays are computed.
+- Behaviour comes with the story that runs it: US1 removed `WorkflowError`, `ErrorType`, `ErrorFilter.matches`, retry delays, duration arithmetic and `latest` resolution (back with T034 and T035, where the backoff kinds became `Backoff` classes).
 - Each adapter declares its client and its data in its own `interfaces.ts` and `enums.ts`; `ErrorClassifier` arrives with its first consumers (T046, T047).
 - The client reports the deepest schema error that does not only select a `oneOf` branch, so a refusal points at the defect.
 - `frameworks/http` is in the frameworks table.

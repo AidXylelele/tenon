@@ -3,6 +3,11 @@ import type { UserResponse } from '../schemas/auth.schemas.js';
 
 export class UserPresenter {
   static user(user: User): UserResponse {
-    return { id: user.id, email: user.email, name: user.name, role: user.role };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    };
   }
 }

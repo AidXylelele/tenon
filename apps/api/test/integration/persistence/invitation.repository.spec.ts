@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { InvitationRepository } from '../../../src/application/identity/ports.js';
 import {
-  InvitationConflictError,
+  StaleWriteError,
   InvitationNotFoundError,
 } from '../../../src/domain/errors.js';
 import type { Invitation } from '../../../src/domain/identity/invitation.js';
@@ -12,6 +12,8 @@ import { createUser } from '../../support/auth-helpers.js';
 import { anInvitation } from '../../support/builders.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
 import { inTransaction, truncateAll } from '../../support/db.js';
+
+const now = new Date();
 
 describe('DrizzleInvitationRepository', () => {
   let t: TestApp;
@@ -85,21 +87,21 @@ describe('DrizzleInvitationRepository', () => {
     const { invitation } = await stored();
     const first = await repository.getById(invitation.id);
     const second = await repository.getById(invitation.id);
-    first.accept(adminId);
+    first.accept(adminId, now);
     await save(first);
-    second.revoke();
-    await expect(save(second)).rejects.toBeInstanceOf(InvitationConflictError);
+    second.revoke(now);
+    await expect(save(second)).rejects.toBeInstanceOf(StaleWriteError);
     const current = await repository.getById(invitation.id);
     expect(current.status).toBe('accepted');
   });
 
   it('only_one_pending_invitation_per_email_can_exist_and_a_revoked_one_frees_the_email', async () => {
     const { invitation } = await stored();
-    await expect(stored()).rejects.toThrow(InvitationConflictError);
+    await expect(stored()).rejects.toThrow(StaleWriteError);
     const pending = await repository.findPendingByEmail('new@example.com');
     expect(pending?.id).toBe(invitation.id);
     const current = await repository.getById(invitation.id);
-    current.revoke();
+    current.revoke(now);
     await save(current);
     expect(await repository.findPendingByEmail('new@example.com')).toBeNull();
     await expect(stored()).resolves.toBeDefined();

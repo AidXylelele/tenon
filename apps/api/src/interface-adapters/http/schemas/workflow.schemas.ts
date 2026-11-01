@@ -48,7 +48,7 @@ export const ConformanceResponse = z.object({
 
 export type ConformanceResponse = z.infer<typeof ConformanceResponse>;
 
-const DSL_NAME = /^[a-z0-9](-*[a-z0-9]){0,62}$/;
+const DSL_NAME = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
 
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;

@@ -16,6 +16,6 @@ export class OpenWorkflowDefinitionReader implements DefinitionReader {
     if (outcome.kind === DslOutcomeKind.Failure)
       throw new InvalidDocumentError(outcome.pointer, outcome.failure);
 
-    return DefinitionMapper.toDomain(outcome.workflow);
+    return DefinitionMapper.toDomain(outcome.workflow, outcome.document);
   }
 }

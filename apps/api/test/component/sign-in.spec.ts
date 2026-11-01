@@ -101,8 +101,8 @@ describe('sign in and sign out over HTTP', () => {
     expect(refused.body).toMatchObject({ message: 'The account is suspended' });
   });
 
-  it('email_addresses_are_compared_case_insensitively', async () => {
+  it('email_addresses_are_compared_without_case_or_surrounding_spaces', async () => {
     await createUser(t, { email: 'user@example.com' });
-    await attempt('User@Example.COM', PASSWORD).expect(200);
+    await attempt(' User@Example.COM ', PASSWORD).expect(200);
   });
 });

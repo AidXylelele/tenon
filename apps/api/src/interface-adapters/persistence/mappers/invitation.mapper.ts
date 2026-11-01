@@ -20,6 +20,19 @@ export class InvitationMapper {
   }
 
   static toEntity(row: InvitationRow): Invitation {
-    return new Invitation(row);
+    return new Invitation({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      tokenHash: row.tokenHash,
+      status: row.status,
+      expiresAt: row.expiresAt,
+      invitedBy: row.invitedBy,
+      acceptedAt: row.acceptedAt,
+      acceptedUserId: row.acceptedUserId,
+      createdAt: row.createdAt,
+      revokedAt: row.revokedAt,
+      version: row.version,
+    });
   }
 }

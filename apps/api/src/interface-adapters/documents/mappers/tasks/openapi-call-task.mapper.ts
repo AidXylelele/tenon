@@ -7,6 +7,7 @@ import { OpenApiCallTask } from '../../../../domain/automation/language/tasks/op
 import type * as Dsl from '../../interfaces.js';
 import { EndpointMapper } from '../endpoint.mapper.js';
 import { ReferenceableAuthenticationMapper } from '../referenceable-authentication.mapper.js';
+import { CallOutputMapper } from '../call-output.mapper.js';
 import { TemplateMapper } from '../template.mapper.js';
 
 export class OpenApiCallTaskMapper {
@@ -35,12 +36,18 @@ export class OpenApiCallTaskMapper {
       redirect: node.redirect,
     };
     const args = TemplateMapper.toDomain(request, argumentsAt);
+    const output = CallOutputMapper.toDomain(
+      node.output,
+      node.redirect,
+      argumentsAt,
+    );
     return new OpenApiCallTask({
       name: props.name,
       reference: props.reference,
       base: props.base,
       document,
       arguments: args,
+      output,
       authentication,
     });
   }
