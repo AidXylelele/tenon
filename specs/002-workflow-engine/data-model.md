@@ -102,33 +102,34 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
   - each result accepted once;
   - lifecycle order.
 - **Fields:**
-  - `id`, `workflowId`, `versionId`, `phase`;
-  - `input`, `output`, `error`, `context`;
-  - `origin`, `startedAt`, `endedAt`, `deadline`, `sequence`;
-  - `tasks` (TaskInstances), `version`, `#produced` (the Events created in this change).
+  - `id`, `workflowId`, `versionId`, `workflow` (WorkflowName) and `semver`, which the lifecycle events and the definition check need even when the definition cannot be read;
+  - `phase`, `input`, `output`, `error`, `context`;
+  - `origin`, `startedAt`, `endedAt`;
+  - `executions` (TaskInstances created so far: it derives each task's id, and US3 bounds it);
+  - `tasks` (TaskInstances), `version`;
+  - an internal `ProducedEvents` (the lifecycle sequence and the Events created in this change) and the domain events.
 - **Behaviour (US2):**
-  - `start({ version, input, origin, now })`: a missing input becomes `{}`. The root task validates the input schema in its first stage, so an input that breaks it faults the instance with a validation error (dsl.md, "Workflow Input").
-  - `beginRound(definition, now)`: starts the workflow when it is pending, fires elapsed deadlines and the retries that are due, and starts the tasks that follow. When it changes nothing, the round skips its first save.
-  - `pendingWork(definition, runtime, now)` (query) returns RoundWork: every active task's work for its current stage, with the stage's runtime arguments (section 7).
-  - `record(results, definition, now)`:
-    - accepts each result once, by work id;
+  - `start({ id, workflow, version, input, origin, now })`: a missing input becomes `{}`. The root task validates the input schema in its first stage, so an input that breaks it faults the instance with a validation error (dsl.md, "Workflow Input").
+  - Every round method takes the Definition, `$runtime` and the time, and refuses a Definition of another workflow or version.
+  - `beginRound(definition, runtime, now)`: starts the workflow when it is pending, fires elapsed deadlines and the retries that are due, and starts the tasks that follow.
+  - `pendingWork(definition, runtime, now)` (query) returns RoundWork: every active task's work for its current stage, with the stage's runtime arguments (section 7). Work the outside did not start (a full bulkhead) gets no result and stays pending.
+  - `record(results, definition, runtime, now)`:
+    - accepts each result once, by work id; work ids are positional, because a task's id derives from the instance id and its execution number, so `RecordRound` replays the same results on the reloaded instance;
     - advances each task's progress, which decides what follows;
-    - ends the instance when its body ends or it faults;
-    - produces lifecycle and emitted Events through `Event.produced`, where `LifecycleEvent` owns the 64 KiB rule.
-
-    A `run` task with `await: false` completes with its transformed input and asks for the detached process.
-
-  - `takeProducedEvents()`.
-  - `fault(failure, now)`: an engine failure ends the instance with a runtime error.
-  - `requestedChildren()` (query) lists the `run: workflow` tasks waiting for their child, read from their persisted progress. `WorkflowInstance.startChild({ parent, taskId, version, input, now })` creates the child with a derived id; `refuseChild(taskId, error, now)` faults the parent task with a configuration error when the target does not exist or its version is not published. `completeSubWorkflow(taskId, outcome, now)` resumes the parent task, and does nothing when that task has already ended.
-  - `progress(now)` (query) returns plain data: ended, run again, or park until a time, plus the derived ids of the children the parent awaits. The engine run follows it.
-  - A task that ends hands its requests to the instance once, in its `TaskEnding`: the emitted event, a detached process (`ProcessDetached`) or a detached workflow (`WorkflowDetached`, for `run: workflow` with `await: false`).
-- **Later stories:** limits (US3), `wait` (US3), `listen` and correlations (US7), secrets and masking (US8), suspend, resume, cancel and `abandon()` (US9), the scheduled and triggered origins (US4). Until US9, a child whose parent task ends early (a timeout, a `compete` loser, a caught branch) runs to its end, and its result is ignored.
-- **Ending.** A child's end reaches its parent through the engine, which signals the parent's run in the transaction that ends the child (architecture §4). `ParentOrigin` names the parent instance and task for `CompleteSubWorkflow`.
+    - abandons the active children of a task whose body no longer runs (a competing fork's losers, a timed-out or faulted composite);
+    - ends the instance when its root task ends.
+  - `fault(now)`: an engine failure ends the instance with a runtime error, from pending or any later phase that is not terminal.
+  - `requestedSubWorkflows()` (query) lists the awaiting `run: workflow` tasks with the derived id of their sub-workflow instance. `WorkflowInstance.startSubWorkflow({ parentId, request, workflow, version, now })` creates that instance and refuses a workflow or version other than the one the task names (`latest` is the workflow's current version). `refuseSubWorkflow(instanceId, …)` faults the task with a configuration error when the target does not exist or its version is not published. `completeSubWorkflow(instanceId, ending, …)` takes the sub-workflow's ending by value (phase, output, error, read by a query) and resumes the task; a faulted sub-workflow faults it with the sub-workflow's error, located at the `run` task. Both do nothing on a terminal instance or a task that no longer awaits.
+  - `progress(now)` (query) returns plain data: ended, run again, or park until a time, plus the ids of the sub-workflows the instance awaits. The engine run follows it.
+  - `takeProducedEvents()` and `takeDomainEvents()`.
+  - A task that ends hands its requests to the instance once, in its `TaskEnding`: the emitted event, a detached process (`ProcessDetached`, which carries the `ProcessRun`) or a detached workflow (`WorkflowDetached`, which carries the derived instance id and the request), so their handlers need nothing else.
+- **Lifecycle events** (`LifecycleEvent`, `LifecycleEventType`): `workflow.started` in the first round, then `task.created` and `task.started` once a task's `if` passes (a skipped task produces none, FR-015), `task.retried` for the `try` task when a retry starts, `task.completed` or `task.faulted`, `task.cancelled` only for a task that was announced, and `workflow.completed` or `workflow.faulted`. The root task produces no task events. `name` and `workflow` carry the instance's qualified name, `{name}-{id}.{namespace}` like the standard's example.
+- **Later stories:** limits (US3), `wait` (US3), `listen` and correlations (US7), secrets and masking (US8), suspend, resume, cancel and `abandon()` (US9), the scheduled and triggered origins (US4). Until US9, a sub-workflow whose parent task ends early (a timeout, a `compete` loser, a caught branch) runs to its end, and its result is ignored.
+- **Ending.** A sub-workflow's end reaches its parent through the engine, which signals the parent's run in the transaction that ends the sub-workflow (architecture §4). `ParentOrigin` records the parent instance and task.
 
 **TaskInstance** is an entity with a local identity:
 
-- **Fields:** `id`, `reference`, `name`, `parentId`, `phase`, `rawInput`, `variables` (the iteration and catch variables it inherits), `output`, `error`, `startedAt`, `endedAt`, `progress`. A skipped task keeps no phase, and its raw input becomes its output (FR-015). The workflow itself is the root TaskInstance: it runs `Definition.root`.
+- **Fields:** `id` (derived), `reference`, `name`, `parentId`, `cancelled`, `rawInput`, `variables` (the iteration and catch variables it inherits), `retries`, `startedAt`, `endedAt`, `progress`. Its phase, output and error are read from its progress, so they cannot contradict it; only a cancellation is its own. A skipped task has no phase, and its raw input becomes its output (FR-015). The workflow itself is the root TaskInstance: it runs `Definition.root`.
 - **One execution, one TaskInstance.** Every attempt, loop iteration and re-entry through `then` is a new TaskInstance with its own id, so its history and its work ids never collide.
 - **Progress** (`TaskProgress`, from `language/stages`) begins with `EntryStage.begin(scope)` and decides for its task (section 7). It keeps only state (stage, counters, collected outputs) and receives its Task through a `TaskScope` built from `definition.taskAt(reference)` in each call, so it is stored without the Definition.
 
@@ -136,8 +137,8 @@ There are nine. References between them are ids (Khorikov, "Link to an aggregate
 
 - **Is:** the unit of acceptance and routing.
 - **Uniqueness:** source + id is unique, enforced by an index; `add` returns `false` for a duplicate.
-- **Fields:** `id`, `source`, `eventId`, `type`, `time`, `subject`, `dataContentType`, `dataSchema`, `data`, `extensions`, `origin` (intake, webhook, emit or lifecycle, with the workflow and instance ids), `sequence`, `acceptedAt`.
-- **Behaviour:** `accept(input)` (intake, webhook) and `produced(input)` (lifecycle, emit). Both raise `EventAccepted`.
+- **Fields:** `id`, `source`, `eventId`, `type`, `time`, `subject`, `dataContentType`, `dataSchema`, `data`, `extensions`, `origin` (emit or lifecycle, with the workflow and instance ids; intake and webhook join with US7 and US5), `sequence`, `acceptedAt`.
+- **Behaviour:** `produced(input)` (lifecycle, emit) takes a `CloudEvent`. `accept(input)` (intake, webhook) and `EventAccepted` join with US7 (T058).
 
 ### Correlation
 
@@ -200,7 +201,8 @@ The names follow the standard. Where a library export or the platform's access p
   - `TaskList`: task names are unique, and every flow directive names `continue`, `exit`, `end` or a task of the list (`DuplicateTaskError`, `UnknownTaskError`);
   - `ForkTask`: a competing fork has a branch, and no branch names another (`EmptyCompetingForkError`, `BranchJumpError`);
   - `SwitchTask`: one default case at most (`DuplicateDefaultCaseError`);
-  - `EmitTask`: the event names its source and its type, as text (`IncompleteEventError`; at run time a runtime error);
+  - `EmitTask`: the event names its source and its type, and its attribute names are lower-case letters and digits (`MalformedEventError`); at run time the evaluated event must be a CloudEvent 1.0.2 (`CloudEvent`), or the task faults with a runtime error;
+  - `ForTask` and `TryTask`: `for.each`, `for.at` and `catch.as` do not name a runtime argument (`ReservedVariableError`), which would otherwise hide it;
   - `ReusableComponents`: a declared function names no task in its directives, since it runs apart from the tasks that call it (`FunctionJumpError`); its `end` ends the workflow, as in `do`, `for`, `fork` and `try`;
   - `FixedDuration`: a duration is not negative, counts no years, months or weeks, and a fraction appears only in the smallest of its hours, minutes or seconds;
   - `RetryStrategy`: an attempt count is not negative.
@@ -215,7 +217,7 @@ The names follow the standard. Where a library export or the platform's access p
 **Model:**
 
 - **`Definition`:** `document` (the document's JSON), `workflow` (WorkflowName), `version`, `dslVersion` (DslVersion: the mapper refuses another version, the domain cannot hold one), `input`, `output`, `timeout`, `body` (TaskList) and `components` (ReusableComponents). It also gives `expressions` (every expression in the document, the declared components included), `root` (the workflow as a `do` task with the workflow's `input.from`, `output`, `timeout` and `then: end`), `taskAt(reference)` (body tasks and declared functions) and `jsonAt(pointer)`.
-- **`Task`** (abstract): `name`, `reference` (JsonPointer), `base` (TaskBase), `directives` and `expressions`. US2 adds `enter(input, scope)`, which gives the kind's progress. The leaf kinds decide their own results: `SetTask`, `RaiseTask` and `EmitTask` (`outcomeOf`), the call tasks (`callFrom`), the run tasks (`runFrom`).
+- **`Task`** (abstract): `name`, `reference` (JsonPointer), `base` (TaskBase), `directives` and `expressions`. US2 adds `enter(scope)`: the `BodyScope` carries the transformed input, so no kind progress keeps a copy of it. The leaf kinds decide their own results: `SetTask`, `RaiseTask` and `EmitTask` (`outcomeOf`), the call tasks (`callFrom`), the run tasks (`runFrom`).
 - **`TaskBase`** (the standard's common task properties): `if`, `input`, `output`, `export`, `timeout`, `then`.
 - **Task kinds** (`tasks/`):
   - flow: `DoTask`, `ForTask`, `ForkTask`, `SwitchTask` with `SwitchCase`, `TryTask` with `CatchClause`;
@@ -236,6 +238,8 @@ The names follow the standard. Where a library export or the platform's access p
   - `CatchClause`, `ErrorFilter`;
   - `Endpoint`, `Authentication`;
   - `ReusableComponents` (the declared `use`, with lookups by name);
+  - `CloudEvent` (the one owner of the CloudEvents 1.0.2 rules: non-empty id, source and type, a URI-reference source, an RFC 3339 time, spec version `1.0`, an absolute data schema, extension names and values), shared by `emit` and the lifecycle events;
+  - `Phase` (the standard's status phases, an enumeration class that knows which are terminal); the stages decide a task's phase;
   - `WorkflowName` (the namespace and name that identify a workflow; the HTTP path schema and the standard's schema check the labels), `WorkflowTarget`, `JsonPointer` (owns the work id format, `idIn(prefix)`).
 
   The conformance statement (ER-001) is an application read model that `GetConformanceStatement` builds from the enums.
@@ -296,9 +300,10 @@ Composites run stages 1 and 4–6 around their children.
 
 **Progress**, immutable values, one class per state (Khorikov, "C# and F# approaches to illegal state"):
 
-- `TaskProgress` (`language/stages`) owns the stages every task shares: `EntryStage` (`if`, input schema, `input.from`, timeout), `BodyStage`, `OutputStage`, `ExportStage`, `ExportCheckStage` and `EndedStage`. Each holds only its own data. It ends with a `TaskEnding`: output or error, flow directive, exported context, and the body's `Outcome`, which carries the requests the instance acts on once (emitted event, detached process or workflow). `Outcome` alone owns the rules of those effects; `TaskEnding` owns only its own (a task that did not fault has a directive; a skipped task runs no body and exports nothing).
+- `TaskProgress` (`language/stages`) owns the stages every task shares: `EntryStage` (`if`, input schema, `input.from`, timeout), `BodyStage`, `OutputStage`, `ExportStage`, `ExportCheckStage` and `EndedStage`. Each holds only its own data; `BodyStage` holds the transformed input and hands it to the kind progress through a `BodyScope`. The stages decide the task's phase (pending at the entry, waiting while the body is parked, the ending's phase at the end) and guard their state: a body stage runs an unfinished body, and a failed body has no output stage. It ends with a `TaskEnding`, built only by `completed`, `faulted` or `skipped`: output or error, flow directive, exported context, and the body's `Outcome`, which carries the requests the instance acts on once (emitted event, detached process or workflow). `Outcome` alone owns the rules of those effects. A completed ending's body did not fail, and its directive is the body's directive or else the task's `then`, so the two cannot disagree.
 - A kind progress (`language/progress`) owns the middle (stages 2–3) and ends as a `ConcludedProgress` with an `Outcome`: `ValueProgress` (set, raise, emit), `CallProgress`, `ProcessProgress`, `FunctionCallProgress` (the declared function runs as a child task), `RunWorkflowProgress`, `DoProgress`, `ForProgress`, `ForkProgress`, `SwitchProgress`, and for `try` the states `TryProgress`, `CatchProgress`, `RetryProgress` and `HandlerProgress`. `Sequence` runs a task list by its flow directives for `do`, each `for` iteration, and `try`.
-- Every transition returns a `Step`: the next progress and the child tasks to start. Composites learn a child's end through `childEnded`; a retry parks until `wakeAt`, and the next `record` after it runs the body again.
+- Every transition returns a `Step`: the next progress and the child tasks to start, and whether a retry started (the instance announces `task.retried`). Composites learn a child task's end through `childEnded`; a `run: workflow` task learns its sub-workflow's end through `subWorkflowEnded(outcome)`; a retry parks until `wakeAt`, and the next `record` after it runs the body again. A `Sequence` step gives either the next position or the list's `Outcome`, so an ended sequence is never stored.
+- Stored state is guarded where jsonb comes in: whole, non-negative counters (attempts, sequence positions, `for` indexes, fork branches) and a retry only after a failed attempt (`InconsistentProgressError`). A competing fork's skipped branch does not win the race; if every branch is skipped, the fork's output is its input.
 - `TaskScope` (`language/scopes`) carries the task, the Definition, the task instance id (the only owner of work ids), the variables, the time and the standard's arguments per stage; `WorkflowScope` gives the root's arguments. Expressions, templates, schemas and error conditions build their own work and read their own results.
 
 **Who decides what:**
@@ -320,6 +325,7 @@ Composites run stages 1 and 4–6 around their children.
 | From             | To                 | When                                |
 | ---------------- | ------------------ | ----------------------------------- |
 | pending          | running            | first round                         |
+| pending          | faulted            | engine fault                        |
 | running          | waiting            | all active tasks parked             |
 | waiting          | running            | deadline, event, or child end       |
 | running, waiting | suspended          | suspend                             |
@@ -369,31 +375,31 @@ Composites run stages 1 and 4–6 around their children.
 
 ## 10. Domain errors
 
-| Error                                                                                                                                                                                                                                                                                                                      | Base               | HTTP |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---- |
-| DefinitionRejectedError (pointer) and its kinds: InvalidDocumentError, UnsupportedConstructError, UndeclaredComponentError, InvalidExpressionError, DuplicateTaskError, UnknownTaskError, EmptyCompetingForkError, BranchJumpError, FunctionJumpError, IncompleteEventError, InvalidDocumentValueError; ForeignSecretError | RuleViolationError | 422  |
-| InvalidValueError and its kinds (NegativeDurationError, CalendarDurationError, UncomputableDurationError, MalformedDurationError, NegativeAttemptCountError): a value rule without a location; the caller gives it a meaning                                                                                               | RuleViolationError | —    |
-| StaleWriteError (any optimistic conflict), VersionConflictError, InvalidControlError                                                                                                                                                                                                                                       | ConflictError      | 409  |
-| WorkflowNotFoundError, VersionNotFoundError, InstanceNotFoundError, WebhookNotFoundError, SubscriptionNotFoundError, SecretNotFoundError                                                                                                                                                                                   | NotFoundError      | 404  |
-| StaleStartError                                                                                                                                                                                                                                                                                                            | RuleViolationError | —    |
+| Error                                                                                                                                                                                                                                                                                                                                            | Base               | HTTP |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ---- |
+| DefinitionRejectedError (pointer) and its kinds: InvalidDocumentError, UnsupportedConstructError, UndeclaredComponentError, InvalidExpressionError, DuplicateTaskError, UnknownTaskError, EmptyCompetingForkError, BranchJumpError, FunctionJumpError, MalformedEventError, ReservedVariableError, InvalidDocumentValueError; ForeignSecretError | RuleViolationError | 422  |
+| InvalidValueError and its kinds (NegativeDurationError, CalendarDurationError, UncomputableDurationError, MalformedDurationError, NegativeAttemptCountError): a value rule without a location; the caller gives it a meaning                                                                                                                     | RuleViolationError | —    |
+| StaleWriteError (any optimistic conflict), VersionConflictError, InvalidControlError                                                                                                                                                                                                                                                             | ConflictError      | 409  |
+| WorkflowNotFoundError, VersionNotFoundError, InstanceNotFoundError, WebhookNotFoundError, SubscriptionNotFoundError, SecretNotFoundError                                                                                                                                                                                                         | NotFoundError      | 404  |
+| StaleStartError                                                                                                                                                                                                                                                                                                                                  | RuleViolationError | —    |
 
 Run-time workflow errors are WorkflowError values.
 
 ## 11. Persistence (PostgreSQL, Drizzle)
 
-| Table               | Key columns                                                                                                                                                             | Notes                                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `workflow`          | id, namespace, name, is_on, current_version_id, schedule, trigger_types text[], epoch, version                                                                          | unique (namespace, name); GIN on trigger_types                                                                  |
-| `workflow_version`  | id, workflow_id, semver, dsl_version, source_format, source_text, fingerprint, publisher_id, published_at                                                               | unique (workflow_id, semver)                                                                                    |
-| `workflow_instance` | id, workflow_id, version_id, phase, input, output, error, context, origin, started_at, ended_at, deadline, sequence, version                                            | `limits` and `executions` join with US3                                                                         |
-| `task_instance`     | id, instance_id, reference, name, kind, parent_id, phase, raw_input, input, output, error, progress, started_at, ended_at, deadline                                     | one row per execution; active rows load with the aggregate; `progress` is jsonb written by `TaskProgressMapper` |
-| `event`             | id, source, event_id, type, time, subject, data_content_type, data_schema, data, extensions, origin_kind, origin_workflow_id, origin_instance_id, sequence, accepted_at | unique (source, event_id); indexes (type, accepted_at) and (origin_instance_id, sequence)                       |
-| `correlation`       | id, owner_kind, instance_id, task_instance_id, workflow_id, epoch, filter_types text[], strategy, since, expected, consumed, status, version                            | GIN on filter_types; `*` marks a filter without an exact type                                                   |
-| `webhook`           | id, name, event_type, token_fingerprint, owner_id, created_at                                                                                                           | unique token_fingerprint                                                                                        |
-| `subscription`      | id, name, endpoint_uri, auth_scheme, auth_secret, filter, filter_types text[], owner_id, created_at                                                                     | GIN on filter_types                                                                                             |
-| `delivery`          | id, subscription_id, event_id, status, attempts, last_error, first_attempt_at, last_attempt_at, version                                                                 | unique (subscription_id, event_id)                                                                              |
-| `secret`            | id, owner_id, name, ciphertext, created_at, updated_at, version                                                                                                         | unique (owner_id, name)                                                                                         |
-| `idempotency_key`   | the module's contract                                                                                                                                                   |                                                                                                                 |
+| Table               | Key columns                                                                                                                                                             | Notes                                                                                                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workflow`          | id, namespace, name, is_on, current_version_id, schedule, trigger_types text[], epoch, version                                                                          | unique (namespace, name); GIN on trigger_types                                                                                                                                         |
+| `workflow_version`  | id, workflow_id, semver, dsl_version, source_format, source_text, fingerprint, publisher_id, published_at                                                               | unique (workflow_id, semver)                                                                                                                                                           |
+| `workflow_instance` | id, workflow_id, version_id, namespace, name, semver, phase, input, output, error, context, origin, started_at, ended_at, sequence, executions, version                 | `limits` join with US3                                                                                                                                                                 |
+| `task_instance`     | id, instance_id, reference, name, parent_id, phase, raw_input, output, error, retries, progress, started_at, ended_at                                                   | one row per execution; active rows load with the aggregate; `progress` is jsonb written by `TaskProgressMapper`                                                                        |
+| `event`             | id, source, event_id, type, time, subject, data_content_type, data_schema, data, extensions, origin_kind, origin_workflow_id, origin_instance_id, sequence, accepted_at | unique (source, event_id), inserted with `ON CONFLICT DO NOTHING` (CloudEvents: the same source and id are duplicates); indexes (type, accepted_at) and (origin_instance_id, sequence) |
+| `correlation`       | id, owner_kind, instance_id, task_instance_id, workflow_id, epoch, filter_types text[], strategy, since, expected, consumed, status, version                            | GIN on filter_types; `*` marks a filter without an exact type                                                                                                                          |
+| `webhook`           | id, name, event_type, token_fingerprint, owner_id, created_at                                                                                                           | unique token_fingerprint                                                                                                                                                               |
+| `subscription`      | id, name, endpoint_uri, auth_scheme, auth_secret, filter, filter_types text[], owner_id, created_at                                                                     | GIN on filter_types                                                                                                                                                                    |
+| `delivery`          | id, subscription_id, event_id, status, attempts, last_error, first_attempt_at, last_attempt_at, version                                                                 | unique (subscription_id, event_id)                                                                                                                                                     |
+| `secret`            | id, owner_id, name, ciphertext, created_at, updated_at, version                                                                                                         | unique (owner_id, name)                                                                                                                                                                |
+| `idempotency_key`   | the module's contract                                                                                                                                                   |                                                                                                                                                                                        |
 
 The libraries own `nest_workflows` and `nest_outbox`.
 

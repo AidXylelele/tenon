@@ -2,7 +2,7 @@ import { Ajv } from 'ajv';
 import { Ajv2019 } from 'ajv/dist/2019.js';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import ajvFormats from 'ajv-formats';
-import type { JsonSchemaCompilers } from '../../interface-adapters/interfaces.js';
+import type { JsonSchemaCompilers } from '../../interface-adapters/json-schema/interfaces.js';
 
 const OPTIONS = { allErrors: true, strict: false };
 

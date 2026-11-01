@@ -12,7 +12,7 @@ import type {
 import { CallProgress } from '../progress/call-progress.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import type { RoundResults } from '../round-results.js';
 import { Task } from './task.js';
 import type { Template } from '../template.js';
@@ -56,8 +56,8 @@ export class OpenApiCallTask extends Task implements CallTask {
     return document.concat(this.#arguments, settings);
   }
 
-  enter(input: JsonValue, scope: TaskScope): Step<KindProgress> {
-    return CallProgress.enter(input, scope);
+  enter(scope: BodyScope): Step<KindProgress> {
+    return CallProgress.enter(scope);
   }
 
   callFrom(

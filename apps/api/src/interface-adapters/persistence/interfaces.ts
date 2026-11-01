@@ -8,7 +8,7 @@ import type {
   JsonObject,
   JsonValue,
 } from '../../domain/automation/language/interfaces.js';
-import type { ProgressKind, TaskStage } from './enums.js';
+import type { EndingKind, ProgressKind, TaskStage } from './enums.js';
 import type * as schema from './schema/index.js';
 
 export type UserRow = typeof schema.user.$inferSelect;
@@ -64,7 +64,7 @@ export interface FlowDirectiveState {
   readonly pointer: readonly string[] | null;
 }
 
-export interface ChildRequestState {
+export interface SubWorkflowRequestState {
   readonly namespace: string;
   readonly name: string;
   readonly version: string;
@@ -78,23 +78,35 @@ export interface OutcomeState {
   readonly authorization: JsonObject | null;
   readonly emitted: JsonObject | null;
   readonly detachedProcess: ProcessRunState | null;
-  readonly detachedWorkflow: ChildRequestState | null;
+  readonly detachedWorkflow: SubWorkflowRequestState | null;
 }
 
-export interface TaskEndingState {
+export interface CompletedEndingState {
+  readonly kind: EndingKind.Completed;
   readonly output: JsonValue;
-  readonly failure: WorkflowErrorState | null;
-  readonly directive: FlowDirectiveState | null;
-  readonly skipped: boolean;
+  readonly directive: FlowDirectiveState;
   readonly exported: boolean;
   readonly context: JsonValue;
-  readonly body: OutcomeState | null;
+  readonly body: OutcomeState;
 }
+
+export interface FaultedEndingState {
+  readonly kind: EndingKind.Faulted;
+  readonly failure: WorkflowErrorState;
+}
+
+export interface SkippedEndingState {
+  readonly kind: EndingKind.Skipped;
+  readonly output: JsonValue;
+  readonly directive: FlowDirectiveState;
+}
+
+export type TaskEndingState =
+  CompletedEndingState | FaultedEndingState | SkippedEndingState;
 
 export interface SequenceState {
   readonly position: number;
   readonly variables: JsonObject;
-  readonly outcome: OutcomeState | null;
 }
 
 export interface EntryStageState {
@@ -147,31 +159,26 @@ export type TaskProgressState =
 
 export interface ValueProgressState {
   readonly kind: ProgressKind.Value;
-  readonly input: JsonValue;
 }
 
 export interface CallProgressState {
   readonly kind: ProgressKind.Call;
-  readonly input: JsonValue;
   readonly call: ServiceCallState | null;
 }
 
 export interface ProcessProgressState {
   readonly kind: ProgressKind.Process;
-  readonly input: JsonValue;
   readonly run: ProcessRunState | null;
 }
 
 export interface FunctionCallProgressState {
   readonly kind: ProgressKind.FunctionCall;
-  readonly input: JsonValue;
   readonly started: boolean;
 }
 
 export interface RunWorkflowProgressState {
   readonly kind: ProgressKind.RunWorkflow;
-  readonly input: JsonValue;
-  readonly child: ChildRequestState | null;
+  readonly request: SubWorkflowRequestState | null;
 }
 
 export interface DoProgressState {
@@ -181,7 +188,6 @@ export interface DoProgressState {
 
 export interface ForProgressState {
   readonly kind: ProgressKind.For;
-  readonly input: JsonValue;
   readonly items: readonly JsonValue[] | null;
   readonly index: number;
   readonly data: JsonValue;
@@ -196,7 +202,6 @@ export interface ForkProgressState {
 
 export interface SwitchProgressState {
   readonly kind: ProgressKind.Switch;
-  readonly input: JsonValue;
 }
 
 export interface AttemptState {
@@ -206,21 +211,18 @@ export interface AttemptState {
 
 export interface TryProgressState {
   readonly kind: ProgressKind.Try;
-  readonly input: JsonValue;
   readonly attempt: AttemptState;
   readonly sequence: SequenceState;
 }
 
 export interface CatchProgressState {
   readonly kind: ProgressKind.Catch;
-  readonly input: JsonValue;
   readonly attempt: AttemptState;
   readonly error: WorkflowErrorState;
 }
 
 export interface RetryProgressState {
   readonly kind: ProgressKind.Retry;
-  readonly input: JsonValue;
   readonly attempt: AttemptState;
   readonly wakeAt: string;
 }
@@ -228,11 +230,6 @@ export interface RetryProgressState {
 export interface HandlerProgressState {
   readonly kind: ProgressKind.Handler;
   readonly sequence: SequenceState;
-}
-
-export interface ConcludedProgressState {
-  readonly kind: ProgressKind.Concluded;
-  readonly outcome: OutcomeState;
 }
 
 export type KindProgressState =
@@ -248,5 +245,4 @@ export type KindProgressState =
   | TryProgressState
   | CatchProgressState
   | RetryProgressState
-  | HandlerProgressState
-  | ConcludedProgressState;
+  | HandlerProgressState;

@@ -1,7 +1,7 @@
 import { lookup as resolve, type LookupAddress } from 'node:dns';
 import { isIP, type LookupFunction } from 'node:net';
 import { Agent, buildConnector } from 'undici';
-import type { EndpointDispatcher } from '../../interface-adapters/interfaces.js';
+import type { EndpointDispatcher } from '../../interface-adapters/endpoints/interfaces.js';
 import { AddressPolicy, AddressRefusedError } from './address-policy.js';
 
 export function createEndpointDispatcher(

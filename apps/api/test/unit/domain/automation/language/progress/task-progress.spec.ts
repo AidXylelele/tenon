@@ -1,4 +1,9 @@
+import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
 import { FlowDirective } from '../../../../../../src/domain/automation/language/flow-directive.js';
+import { Outcome } from '../../../../../../src/domain/automation/language/outcome.js';
+import { ConcludedProgress } from '../../../../../../src/domain/automation/language/progress/concluded-progress.js';
+import { OutputStage } from '../../../../../../src/domain/automation/language/stages/output-stage.js';
+import { InconsistentProgressError } from '../../../../../../src/domain/errors.js';
 import { JsonPointer } from '../../../../../../src/domain/automation/language/json-pointer.js';
 import { BodyStage } from '../../../../../../src/domain/automation/language/stages/body-stage.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
@@ -172,7 +177,9 @@ describe('TaskProgress', () => {
       definition,
       rawInput: { x: 1 },
       context: {},
-      workflow: { id: 'instance-1' },
+      instanceId: 'instance-1',
+      workflowInput: { x: 1 },
+      workflowStartedAt: now,
       runtime: { name: 'tenon' },
       variables: {},
       startedAt: now,
@@ -208,7 +215,9 @@ describe('TaskProgress', () => {
       definition,
       rawInput: {},
       context: {},
-      workflow: { id: 'instance-1' },
+      instanceId: 'instance-1',
+      workflowInput: {},
+      workflowStartedAt: now,
       runtime: { name: 'tenon' },
       variables: {},
       startedAt: now,
@@ -231,5 +240,25 @@ describe('TaskProgress', () => {
       'https://serverlessworkflow.io/spec/1.0.0/errors/validation',
     );
     expect(failure?.instance).toBe('');
+  });
+});
+
+describe('TaskProgress states', () => {
+  const at = new JsonPointer(['do', '0', 'greet']);
+  const failure = ErrorType.Runtime.errorAt(at, null);
+
+  it('a_body_stage_around_a_body_that_ended_is_refused', () => {
+    const outcome = Outcome.of({ a: 1 });
+    const body = new ConcludedProgress(outcome);
+    const build = () => new BodyStage({ input: {}, deadline: null, body });
+
+    expect(build).toThrow(InconsistentProgressError);
+  });
+
+  it('an_output_stage_after_a_failed_body_is_refused', () => {
+    const outcome = Outcome.failed(failure);
+    const build = () => new OutputStage({ input: {}, deadline: null, outcome });
+
+    expect(build).toThrow(InconsistentProgressError);
   });
 });

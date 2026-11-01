@@ -1,35 +1,24 @@
-import type { JsonValue, ValueTask } from '../interfaces.js';
+import type { ValueTask } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
 import { ConcludedProgress } from './concluded-progress.js';
 import { KindProgress } from './kind-progress.js';
 
 export class ValueProgress extends KindProgress {
-  readonly #input: JsonValue;
-
-  constructor(input: JsonValue) {
-    super();
-    this.#input = input;
-  }
-
-  static enter(input: JsonValue, scope: TaskScope): Step<KindProgress> {
-    const progress = new ValueProgress(input);
+  static enter(scope: BodyScope): Step<KindProgress> {
+    const progress = new ValueProgress();
     return progress.settled(scope);
   }
 
-  get input(): JsonValue {
-    return this.#input;
-  }
-
-  work(scope: TaskScope<ValueTask>): RoundWork {
-    const args = scope.definitionArguments(this.#input);
+  work(scope: BodyScope<ValueTask>): RoundWork {
+    const args = scope.definitionArguments();
     const template = scope.task.template;
     const evaluations = template.evaluationsFor(
       scope.prefix,
-      this.#input,
+      scope.input,
       args,
     );
     return RoundWork.evaluating(evaluations);
@@ -37,7 +26,7 @@ export class ValueProgress extends KindProgress {
 
   record(
     results: RoundResults,
-    scope: TaskScope<ValueTask>,
+    scope: BodyScope<ValueTask>,
   ): Step<KindProgress> {
     const work = this.work(scope);
     const answered = results.answers(work);
@@ -59,6 +48,10 @@ export class ValueProgress extends KindProgress {
   }
 
   childEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

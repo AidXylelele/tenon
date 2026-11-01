@@ -168,10 +168,23 @@ export class BranchJumpError extends DefinitionRejectedError {
   }
 }
 
-export class IncompleteEventError extends DefinitionRejectedError {
+export class MalformedEventError extends DefinitionRejectedError {
   constructor(at: JsonPointer) {
     const pointer = at.toString();
-    super(pointer, 'An event to emit names its source and its type');
+    super(
+      pointer,
+      'An event to emit names its source and its type, and its attribute names are lower-case letters and digits',
+    );
+  }
+}
+
+export class ReservedVariableError extends DefinitionRejectedError {
+  constructor(name: string, at: JsonPointer) {
+    const pointer = at.toString();
+    super(
+      pointer,
+      `"${name}" names a runtime argument of the standard, so it cannot name a variable`,
+    );
   }
 }
 
@@ -253,5 +266,11 @@ export class WorkflowNotFoundError extends NotFoundError {
 export class VersionNotFoundError extends NotFoundError {
   constructor() {
     super('The workflow version does not exist');
+  }
+}
+
+export class InstanceNotFoundError extends NotFoundError {
+  constructor() {
+    super('The workflow instance does not exist');
   }
 }

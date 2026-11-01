@@ -40,6 +40,17 @@ export enum FlowKeyword {
   End = 'end',
 }
 
+export enum RuntimeArgument {
+  Context = 'context',
+  Input = 'input',
+  Output = 'output',
+  Secrets = 'secrets',
+  Authorization = 'authorization',
+  Task = 'task',
+  Workflow = 'workflow',
+  Runtime = 'runtime',
+}
+
 export enum DefaultVariable {
   Item = 'item',
   Index = 'index',

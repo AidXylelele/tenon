@@ -248,6 +248,13 @@ export interface DefinitionProps {
   readonly components: ReusableComponents;
 }
 
+export interface CloudEventProps {
+  readonly id: string;
+  readonly source: string;
+  readonly type: string;
+  readonly attributes: JsonObject;
+}
+
 export interface Evaluation {
   readonly id: string;
   readonly program: string;
@@ -331,7 +338,7 @@ export interface TaskStart {
   readonly variables: JsonObject;
 }
 
-export interface ChildRequest {
+export interface SubWorkflowRequest {
   readonly target: WorkflowTarget;
   readonly input: JsonValue;
 }
@@ -343,7 +350,7 @@ export interface OutcomeProps {
   readonly authorization: JsonObject | null;
   readonly emitted: JsonObject | null;
   readonly detachedProcess: ProcessRun | null;
-  readonly detachedWorkflow: ChildRequest | null;
+  readonly detachedWorkflow: SubWorkflowRequest | null;
 }
 
 export interface TaskEndingProps {
@@ -358,7 +365,7 @@ export interface TaskEndingProps {
 
 export interface TaskCompletion {
   readonly output: JsonValue;
-  readonly directive: FlowDirective;
+  readonly then: FlowDirective;
   readonly exported: boolean;
   readonly context: JsonValue;
   readonly outcome: Outcome;
@@ -370,7 +377,9 @@ export interface TaskScopeProps<T extends Task> {
   readonly definition: Definition;
   readonly rawInput: JsonValue;
   readonly context: JsonValue;
-  readonly workflow: JsonObject;
+  readonly instanceId: string;
+  readonly workflowInput: JsonValue;
+  readonly workflowStartedAt: Date;
   readonly runtime: JsonObject;
   readonly variables: JsonObject;
   readonly startedAt: Date;
@@ -404,31 +413,9 @@ export interface ExportCheckStageProps {
 export interface SequenceProps {
   readonly position: number;
   readonly variables: JsonObject;
-  readonly outcome: Outcome | null;
-}
-
-export interface CallProgressProps {
-  readonly input: JsonValue;
-  readonly call: ServiceCall | null;
-}
-
-export interface ProcessProgressProps {
-  readonly input: JsonValue;
-  readonly run: ProcessRun | null;
-}
-
-export interface FunctionCallProgressProps {
-  readonly input: JsonValue;
-  readonly started: boolean;
-}
-
-export interface RunWorkflowProgressProps {
-  readonly input: JsonValue;
-  readonly child: ChildRequest | null;
 }
 
 export interface ForProgressProps {
-  readonly input: JsonValue;
   readonly items: readonly JsonValue[] | null;
   readonly index: number;
   readonly data: JsonValue;
@@ -446,19 +433,16 @@ export interface AttemptProps {
 }
 
 export interface TryProgressProps {
-  readonly input: JsonValue;
   readonly attempt: Attempt;
   readonly sequence: Sequence;
 }
 
 export interface CatchProgressProps {
-  readonly input: JsonValue;
   readonly attempt: Attempt;
   readonly error: WorkflowError;
 }
 
 export interface RetryProgressProps {
-  readonly input: JsonValue;
   readonly attempt: Attempt;
   readonly wakeAt: Date;
 }

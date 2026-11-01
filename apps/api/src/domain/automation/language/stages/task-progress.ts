@@ -1,5 +1,7 @@
-import type { ChildRequest } from '../interfaces.js';
+import type { SubWorkflowRequest } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
+import type { Outcome } from '../outcome.js';
+import { Phase } from '../phase.js';
 import { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
@@ -19,8 +21,16 @@ export abstract class TaskProgress {
     return null;
   }
 
-  child(): ChildRequest | null {
+  subWorkflow(): SubWorkflowRequest | null {
     return null;
+  }
+
+  phase(): Phase | null {
+    return Phase.Running;
+  }
+
+  runsBody(): boolean {
+    return false;
   }
 
   abstract work(scope: TaskScope): RoundWork;
@@ -30,6 +40,11 @@ export abstract class TaskProgress {
   abstract childEnded(
     child: JsonPointer,
     ending: TaskEnding,
+    scope: TaskScope,
+  ): Step<TaskProgress>;
+
+  abstract subWorkflowEnded(
+    outcome: Outcome,
     scope: TaskScope,
   ): Step<TaskProgress>;
 

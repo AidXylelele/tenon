@@ -7,6 +7,7 @@ import type { Definition } from '../../../../../../src/domain/automation/languag
 import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
 import type { JsonValue } from '../../../../../../src/domain/automation/language/interfaces.js';
 import { FlowDirective } from '../../../../../../src/domain/automation/language/flow-directive.js';
+import { Outcome } from '../../../../../../src/domain/automation/language/outcome.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
 import { ProcessExited } from '../../../../../../src/domain/automation/language/results/process-exited.js';
 import { ProcessTimedOut } from '../../../../../../src/domain/automation/language/results/process-timed-out.js';
@@ -237,6 +238,32 @@ describe('leaf progress', () => {
     expect(ending?.failure?.instance).toBe('/do/0/greet');
   });
 
+  it('an_event_whose_time_evaluates_to_no_timestamp_faults_the_task_with_a_runtime_error', () => {
+    const definition = definitionOf([
+      {
+        greet: {
+          emit: {
+            event: {
+              with: {
+                source: 'https://fake-source.com',
+                type: 'greeted',
+                time: '${ .when }',
+              },
+            },
+          },
+        },
+      },
+    ]);
+    const scope = scopeOf(definition, '/do/0/greet', {});
+    const emitting = EntryStage.begin(scope).progress;
+    const work = emitting.work(scope);
+    const results = answer(work, { evaluate: evaluatedAs(() => 'yesterday') });
+
+    const ending = emitting.record(results, scope).progress.ending();
+
+    expect(ending?.failure?.status).toBe(500);
+  });
+
   it('a_raised_error_faults_the_task_at_its_reference', () => {
     const definition = definitionOf([
       {
@@ -285,16 +312,11 @@ describe('leaf progress', () => {
       scope,
     ).progress;
 
-    const ending = awaiting
-      .childEnded(
-        pointerOf('/do/0/invoice'),
-        completedAt(definition, '/do/0/invoice', { sent: true }),
-        scope,
-      )
-      .progress.ending();
+    const sent = Outcome.of({ sent: true });
+    const ending = awaiting.subWorkflowEnded(sent, scope).progress.ending();
 
-    expect(awaiting.child()?.input).toEqual({ order: 42 });
-    expect(awaiting.child()?.target.workflow.toString()).toBe(
+    expect(awaiting.subWorkflow()?.input).toEqual({ order: 42 });
+    expect(awaiting.subWorkflow()?.target.workflow.toString()).toBe(
       'billing/send-invoice',
     );
     expect(ending?.output).toEqual({ sent: true });

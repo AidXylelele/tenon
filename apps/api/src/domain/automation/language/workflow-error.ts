@@ -4,6 +4,7 @@ import type {
   JsonValue,
   WorkflowErrorProps,
 } from './interfaces.js';
+import type { JsonPointer } from './json-pointer.js';
 
 export class WorkflowError {
   readonly #type: string;
@@ -50,6 +51,17 @@ export class WorkflowError {
     if (name === ErrorProperty.Title) return this.#title;
 
     return this.#detail;
+  }
+
+  raisedAt(at: JsonPointer): WorkflowError {
+    const instance = at.toString();
+    return new WorkflowError({
+      type: this.#type,
+      status: this.#status,
+      instance,
+      title: this.#title,
+      detail: this.#detail,
+    });
   }
 
   toJson(): JsonObject {

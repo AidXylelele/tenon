@@ -6,8 +6,12 @@ export class Attempt {
   readonly #firstStartedAt: Date;
 
   constructor(props: AttemptProps) {
-    if (props.count < 0)
-      throw new InconsistentProgressError('an attempt is counted from zero');
+    const counted = Number.isInteger(props.count) && props.count >= 0;
+
+    if (!counted)
+      throw new InconsistentProgressError(
+        'an attempt is counted in whole numbers from zero',
+      );
 
     this.#count = props.count;
     this.#firstStartedAt = props.firstStartedAt;
@@ -23,6 +27,10 @@ export class Attempt {
 
   get firstStartedAt(): Date {
     return this.#firstStartedAt;
+  }
+
+  isFirst(): boolean {
+    return this.#count === 0;
   }
 
   next(): Attempt {

@@ -11,8 +11,8 @@ describe('Attempt', () => {
     expect(next.firstStartedAt).toBe(start);
   });
 
-  it('an_attempt_below_zero_is_refused', () => {
-    const build = () => new Attempt({ count: -1, firstStartedAt: start });
+  it.each([-1, 1.5])('an_attempt_counted_%d_is_refused', (count) => {
+    const build = () => new Attempt({ count, firstStartedAt: start });
 
     expect(build).toThrow(InconsistentProgressError);
   });

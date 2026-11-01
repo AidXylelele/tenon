@@ -1,10 +1,12 @@
-import { DefaultVariable } from '../enums.js';
+import { ReservedVariableError } from '../../../errors.js';
+import { DefaultVariable, RuntimeArgument } from '../enums.js';
 import type { Expression } from '../expression.js';
 import type { ForTaskProps, JsonObject, JsonValue } from '../interfaces.js';
+import type { JsonPointer } from '../json-pointer.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { ForProgress } from '../progress/for-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { TaskList } from '../task-list.js';
 
@@ -17,11 +19,22 @@ export class ForTask extends Task {
 
   constructor(props: ForTaskProps) {
     super(props);
-    this.#each = props.each ?? DefaultVariable.Item;
-    this.#at = props.at ?? DefaultVariable.Index;
+    const each = props.each ?? DefaultVariable.Item;
+    const at = props.at ?? DefaultVariable.Index;
+    const loopAt = props.reference.at('for');
+    ForTask.#confirmVariable(each, loopAt.at('each'));
+    ForTask.#confirmVariable(at, loopAt.at('at'));
+    this.#each = each;
+    this.#at = at;
     this.#collection = props.collection;
     this.#whilst = props.whilst;
     this.#body = props.body;
+  }
+
+  static #confirmVariable(name: string, at: JsonPointer): void {
+    const reserved: readonly string[] = Object.values(RuntimeArgument);
+
+    if (reserved.includes(name)) throw new ReservedVariableError(name, at);
   }
 
   get each(): string {
@@ -48,8 +61,8 @@ export class ForTask extends Task {
     return [this.#body];
   }
 
-  enter(input: JsonValue, scope: TaskScope<ForTask>): Step<KindProgress> {
-    return ForProgress.enter(input, scope);
+  enter(scope: BodyScope<ForTask>): Step<KindProgress> {
+    return ForProgress.enter(scope);
   }
 
   variablesFor(item: JsonValue, index: number): JsonObject {

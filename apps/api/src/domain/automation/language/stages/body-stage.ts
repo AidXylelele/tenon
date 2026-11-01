@@ -1,8 +1,16 @@
-import type { BodyStageProps, ChildRequest, JsonValue } from '../interfaces.js';
+import { InconsistentProgressError } from '../../../errors.js';
+import type {
+  BodyStageProps,
+  SubWorkflowRequest,
+  JsonValue,
+} from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
+import { Phase } from '../phase.js';
+import type { Outcome } from '../outcome.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import type { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
+import { BodyScope } from '../scopes/body-scope.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
@@ -17,6 +25,12 @@ export class BodyStage extends TaskProgress {
 
   constructor(props: BodyStageProps) {
     super();
+
+    if (props.body.outcome() !== null)
+      throw new InconsistentProgressError(
+        'a task stays in its body only while the body runs',
+      );
+
     this.#input = props.input;
     this.#deadline = props.deadline;
     this.#body = props.body;
@@ -27,7 +41,8 @@ export class BodyStage extends TaskProgress {
     deadline: Date | null,
     scope: TaskScope,
   ): Step<TaskProgress> {
-    const step = scope.task.enter(input, scope);
+    const bodyScope = new BodyScope(scope, input);
+    const step = scope.task.enter(bodyScope);
     return BodyStage.#following(input, deadline, step, scope);
   }
 
@@ -42,18 +57,18 @@ export class BodyStage extends TaskProgress {
 
     if (outcome === null) {
       const running = new BodyStage({ input, deadline, body });
-      return new Step<TaskProgress>(running, step.starts);
+      return step.toward<TaskProgress>(running);
     }
 
     const failure = outcome.failure;
 
     if (failure !== null) {
       const faulted = EndedStage.faulted(failure);
-      return new Step<TaskProgress>(faulted, step.starts);
+      return step.toward<TaskProgress>(faulted);
     }
 
     const output = OutputStage.enter({ input, deadline, outcome }, scope);
-    return new Step(output.progress, step.starts);
+    return step.toward(output.progress);
   }
 
   get input(): JsonValue {
@@ -72,16 +87,34 @@ export class BodyStage extends TaskProgress {
     return this.#body.wakeAt();
   }
 
-  override child(): ChildRequest | null {
-    return this.#body.child();
+  override subWorkflow(): SubWorkflowRequest | null {
+    return this.#body.subWorkflow();
+  }
+
+  override phase(): Phase {
+    const parked =
+      this.#body.wakeAt() !== null || this.#body.subWorkflow() !== null;
+
+    if (parked) return Phase.Waiting;
+
+    return Phase.Running;
+  }
+
+  override runsBody(): boolean {
+    return true;
   }
 
   work(scope: TaskScope): RoundWork {
-    return this.#body.work(scope);
+    const bodyScope = new BodyScope(scope, this.#input);
+    return this.#body.work(bodyScope);
   }
 
   record(results: RoundResults, scope: TaskScope): Step<TaskProgress> {
-    const step = this.#body.record(results, scope);
+    const bodyScope = new BodyScope(scope, this.#input);
+    const step = this.#body.record(results, bodyScope);
+
+    if (step.progress === this.#body) return Step.of<TaskProgress>(this);
+
     return BodyStage.#following(this.#input, this.#deadline, step, scope);
   }
 
@@ -90,7 +123,20 @@ export class BodyStage extends TaskProgress {
     ending: TaskEnding,
     scope: TaskScope,
   ): Step<TaskProgress> {
-    const step = this.#body.childEnded(child, ending, scope);
+    const bodyScope = new BodyScope(scope, this.#input);
+    const step = this.#body.childEnded(child, ending, bodyScope);
+
+    if (step.progress === this.#body) return Step.of<TaskProgress>(this);
+
+    return BodyStage.#following(this.#input, this.#deadline, step, scope);
+  }
+
+  subWorkflowEnded(outcome: Outcome, scope: TaskScope): Step<TaskProgress> {
+    const bodyScope = new BodyScope(scope, this.#input);
+    const step = this.#body.subWorkflowEnded(outcome, bodyScope);
+
+    if (step.progress === this.#body) return Step.of<TaskProgress>(this);
+
     return BodyStage.#following(this.#input, this.#deadline, step, scope);
   }
 

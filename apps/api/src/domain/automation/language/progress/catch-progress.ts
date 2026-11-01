@@ -1,14 +1,10 @@
 import type { Attempt } from '../attempt.js';
-import type {
-  CatchProgressProps,
-  JsonObject,
-  JsonValue,
-} from '../interfaces.js';
+import type { CatchProgressProps, JsonObject } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
 import type { RetryStrategy } from '../retry-strategy.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
 import type { TryTask } from '../tasks/try-task.js';
 import type { WorkflowError } from '../workflow-error.js';
@@ -21,27 +17,21 @@ export class CatchProgress extends KindProgress {
   static readonly #CATCH = 'catch';
   static readonly #RETRY = 'retry';
 
-  readonly #input: JsonValue;
   readonly #attempt: Attempt;
   readonly #error: WorkflowError;
 
   constructor(props: CatchProgressProps) {
     super();
-    this.#input = props.input;
     this.#attempt = props.attempt;
     this.#error = props.error;
   }
 
   static enter(
     props: CatchProgressProps,
-    scope: TaskScope<TryTask>,
+    scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
     const catching = new CatchProgress(props);
     return catching.settled(scope);
-  }
-
-  get input(): JsonValue {
-    return this.#input;
   }
 
   get attempt(): Attempt {
@@ -52,18 +42,18 @@ export class CatchProgress extends KindProgress {
     return this.#error;
   }
 
-  work(scope: TaskScope<TryTask>): RoundWork {
+  work(scope: BodyScope<TryTask>): RoundWork {
     const args = this.#arguments(scope);
     const prefix = this.#prefix(scope);
     const evaluations = scope.task.catchClause.evaluationsFor(
       prefix,
-      this.#input,
+      scope.input,
       args,
     );
     return RoundWork.evaluating(evaluations);
   }
 
-  record(results: RoundResults, scope: TaskScope<TryTask>): Step<KindProgress> {
+  record(results: RoundResults, scope: BodyScope<TryTask>): Step<KindProgress> {
     const work = this.work(scope);
     const answered = results.answers(work);
 
@@ -91,7 +81,7 @@ export class CatchProgress extends KindProgress {
 
     if (retry !== null && retries) return this.#retrying(retry, scope);
 
-    const completed = Outcome.of(this.#input);
+    const completed = Outcome.of(scope.input);
     return this.#handled(completed, scope);
   }
 
@@ -101,7 +91,7 @@ export class CatchProgress extends KindProgress {
 
   #retrying(
     retry: RetryStrategy,
-    scope: TaskScope<TryTask>,
+    scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
     const attempt = this.#attempt.next();
     const part = `${CatchProgress.#RETRY}-${attempt.count}`;
@@ -116,32 +106,32 @@ export class CatchProgress extends KindProgress {
 
     const resumesAt = scope.now.getTime() + delay;
     const wakeAt = new Date(resumesAt);
-    const parked = new RetryProgress({
-      input: this.#input,
-      attempt,
-      wakeAt,
-    });
+    const parked = new RetryProgress({ attempt, wakeAt });
     return Step.of<KindProgress>(parked);
   }
 
   #handled(
     withoutHandler: Outcome,
-    scope: TaskScope<TryTask>,
+    scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
     const handler = scope.task.catchClause.handler;
 
     if (handler === null) return ConcludedProgress.step(withoutHandler);
 
-    return HandlerProgress.enter(handler, this.#input, this.#error, scope);
+    return HandlerProgress.enter(handler, this.#error, scope);
   }
 
-  #arguments(scope: TaskScope<TryTask>): JsonObject {
+  #arguments(scope: BodyScope<TryTask>): JsonObject {
     const additions = scope.task.catchClause.variablesFor(this.#error);
-    return scope.definitionArgumentsWith(this.#input, additions);
+    return scope.definitionArgumentsWith(additions);
   }
 
-  #prefix(scope: TaskScope): string {
+  #prefix(scope: BodyScope): string {
     const part = `${CatchProgress.#CATCH}-${this.#attempt.count}`;
     return scope.prefixFor(part);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

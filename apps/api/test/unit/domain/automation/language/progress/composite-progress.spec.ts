@@ -5,7 +5,10 @@ import { TaskEnding } from '../../../../../../src/domain/automation/language/tas
 import { ForkProgress } from '../../../../../../src/domain/automation/language/progress/fork-progress.js';
 import { ForProgress } from '../../../../../../src/domain/automation/language/progress/for-progress.js';
 import { Sequence } from '../../../../../../src/domain/automation/language/sequence.js';
-import { InconsistentProgressError } from '../../../../../../src/domain/errors.js';
+import {
+  InconsistentProgressError,
+  ReservedVariableError,
+} from '../../../../../../src/domain/errors.js';
 import {
   answer,
   completedAt,
@@ -14,6 +17,7 @@ import {
   pointerOf,
   scopeOf,
 } from '../../../../../support/progress.js';
+import { rejectionOf } from '../../../../../support/language.js';
 
 const colors = [
   { setRed: { set: { colors: '${ .colors + ["red"] }' }, then: 'setGreen' } },
@@ -164,21 +168,32 @@ describe('composite progress', () => {
     expect(ending?.output).toEqual({ items });
   });
 
-  it('a_fork_waiting_twice_for_the_same_branch_is_refused', () => {
+  it.each([[[1, 1]], [[0.5]], [[-1]], [[2]], [[]]])(
+    'a_fork_waiting_for_branches_%j_of_two_is_refused',
+    (pending) => {
+      const build = () => new ForkProgress({ outputs: [null, null], pending });
+
+      expect(build).toThrow(InconsistentProgressError);
+    },
+  );
+
+  it('a_for_iterating_before_it_collected_its_items_is_refused', () => {
+    const sequence = new Sequence({ position: 0, variables: {} });
     const build = () =>
-      new ForkProgress({ outputs: [null, null], pending: [1, 1] });
+      new ForProgress({ items: null, index: 0, data: {}, sequence });
 
     expect(build).toThrow(InconsistentProgressError);
   });
 
-  it('a_for_iterating_before_it_collected_its_items_is_refused', () => {
-    const sequence = new Sequence({
-      position: 0,
-      variables: {},
-      outcome: null,
-    });
+  it.each([-1, 0.5, 2])('a_for_at_item_%d_of_two_is_refused', (index) => {
     const build = () =>
-      new ForProgress({ input: {}, items: null, index: 0, data: {}, sequence });
+      new ForProgress({ items: [1, 2], index, data: {}, sequence: null });
+
+    expect(build).toThrow(InconsistentProgressError);
+  });
+
+  it.each([-1, 1.5])('a_sequence_at_position_%d_is_refused', (position) => {
+    const build = () => new Sequence({ position, variables: {} });
 
     expect(build).toThrow(InconsistentProgressError);
   });
@@ -339,4 +354,62 @@ describe('composite progress', () => {
     expect(ending?.output).toEqual({ color: 'yellow' });
     expect(ending?.directive).toBe(FlowDirective.End);
   });
+
+  it('a_skipped_branch_does_not_win_a_competing_fork', () => {
+    const definition = definitionOf([
+      {
+        race: {
+          fork: {
+            compete: true,
+            branches: [
+              { skipped: { if: '${ false }', set: { a: 1 } } },
+              { real: { set: { b: 2 } } },
+            ],
+          },
+        },
+      },
+    ]);
+    const scope = scopeOf(definition, '/do/0/race', { raw: true });
+    const racing = EntryStage.begin(scope).progress;
+    const skippedAt = '/do/0/race/fork/branches/0/skipped';
+    const realAt = '/do/0/race/fork/branches/1/real';
+    const skipped = TaskEnding.skipped(
+      { raw: true },
+      definition.taskAt(pointerOf(skippedAt)).base.then,
+    );
+
+    const ending = racing
+      .childEnded(pointerOf(skippedAt), skipped, scope)
+      .progress.childEnded(
+        pointerOf(realAt),
+        completedAt(definition, realAt, { b: 2 }),
+        scope,
+      )
+      .progress.ending();
+
+    expect(ending?.output).toEqual({ b: 2 });
+  });
+
+  it.each([
+    [{ each: 'input' }, '/do/0/loop/for/each'],
+    [{ at: 'context' }, '/do/0/loop/for/at'],
+  ])(
+    'a_loop_variable_named_like_a_runtime_argument_is_refused',
+    (names, pointer) => {
+      const build = () =>
+        definitionOf([
+          {
+            loop: {
+              for: { in: '${ .items }', ...names },
+              do: [{ a: { set: { a: 1 } } }],
+            },
+          },
+        ]);
+
+      const rejection = rejectionOf(build);
+
+      expect(rejection).toBeInstanceOf(ReservedVariableError);
+      expect(rejection.pointer).toBe(pointer);
+    },
+  );
 });

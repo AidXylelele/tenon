@@ -1,4 +1,5 @@
 import { ErrorType } from '../error-type.js';
+import type { Phase } from '../phase.js';
 import { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
@@ -33,6 +34,10 @@ export class EndedStage extends TaskProgress {
     return this.#ending;
   }
 
+  override phase(): Phase | null {
+    return this.#ending.phase();
+  }
+
   work(): RoundWork {
     return RoundWork.none();
   }
@@ -47,5 +52,9 @@ export class EndedStage extends TaskProgress {
 
   timeOut(): TaskProgress {
     return this;
+  }
+
+  subWorkflowEnded(): Step<TaskProgress> {
+    return Step.of<TaskProgress>(this);
   }
 }

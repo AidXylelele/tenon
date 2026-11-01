@@ -1,3 +1,4 @@
+import { InconsistentProgressError } from '../../../errors.js';
 import type { JsonValue, OutputStageProps } from '../interfaces.js';
 import type { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
@@ -15,6 +16,12 @@ export class OutputStage extends TaskProgress {
 
   constructor(props: OutputStageProps) {
     super();
+
+    if (props.outcome.failure !== null)
+      throw new InconsistentProgressError(
+        'a task whose body failed has no output to transform',
+      );
+
     this.#input = props.input;
     this.#deadline = props.deadline;
     this.#outcome = props.outcome;
@@ -83,5 +90,9 @@ export class OutputStage extends TaskProgress {
 
   timeOut(scope: TaskScope): TaskProgress {
     return EndedStage.timedOut(scope);
+  }
+
+  subWorkflowEnded(): Step<TaskProgress> {
+    return Step.of<TaskProgress>(this);
   }
 }

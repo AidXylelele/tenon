@@ -3,6 +3,8 @@ import { JsonPointer } from '../../../../domain/automation/language/json-pointer
 import type { FlowDirectiveState } from '../../interfaces.js';
 
 export class FlowDirectiveMapper {
+  static toState(directive: FlowDirective): FlowDirectiveState;
+  static toState(directive: FlowDirective | null): FlowDirectiveState | null;
   static toState(directive: FlowDirective | null): FlowDirectiveState | null {
     if (directive === null) return null;
 
@@ -10,6 +12,8 @@ export class FlowDirectiveMapper {
     return { name: directive.name, pointer };
   }
 
+  static toDomain(state: FlowDirectiveState): FlowDirective;
+  static toDomain(state: FlowDirectiveState | null): FlowDirective | null;
   static toDomain(state: FlowDirectiveState | null): FlowDirective | null {
     if (state === null) return null;
 

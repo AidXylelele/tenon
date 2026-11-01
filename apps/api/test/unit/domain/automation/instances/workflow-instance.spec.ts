@@ -1,0 +1,563 @@
+import { EventOriginKind } from '../../../../../src/domain/automation/events/enums.js';
+import { ProcessDetached } from '../../../../../src/domain/automation/instances/domain-events/process-detached.js';
+import { InstanceProgressKind } from '../../../../../src/domain/automation/instances/enums.js';
+import { WorkflowInstance } from '../../../../../src/domain/automation/instances/workflow-instance.js';
+import type { Definition } from '../../../../../src/domain/automation/language/definition.js';
+import { ErrorType } from '../../../../../src/domain/automation/language/error-type.js';
+import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
+import { Phase } from '../../../../../src/domain/automation/language/phase.js';
+import { ServiceResponded } from '../../../../../src/domain/automation/language/results/service-responded.js';
+import { ValidationFailed } from '../../../../../src/domain/automation/language/results/validation-failed.js';
+import {
+  published,
+  runtime,
+  settle,
+  started,
+  typesOf,
+} from '../../../../support/instances.js';
+import {
+  answer,
+  definitionOf,
+  evaluatedAs,
+  now,
+} from '../../../../support/progress.js';
+import { InconsistentProgressError } from '../../../../../src/domain/errors.js';
+
+const later = (seconds: number): Date => {
+  const time = now.getTime() + seconds * 1000;
+  return new Date(time);
+};
+
+const call = (endpoint: string) => ({
+  call: 'http',
+  with: { method: 'get', endpoint },
+});
+
+const ok = (id: string): ServiceResponded =>
+  new ServiceResponded({
+    id,
+    status: 200,
+    headers: {},
+    content: { id },
+    request: {},
+    authorization: null,
+  });
+
+const failing = {
+  type: 'https://serverlessworkflow.io/spec/1.0.0/errors/runtime',
+  status: 500,
+  title: 'Boom',
+};
+
+describe('WorkflowInstance', () => {
+  it('an_instance_is_created_pending_with_an_empty_input_when_none_is_given', () => {
+    const definition = definitionOf([{ first: { set: { a: 1 } } }]);
+
+    const instance = started(definition, undefined);
+
+    expect(instance.phase).toBe(Phase.Pending);
+    expect(instance.input).toEqual({});
+    expect(instance.progress(now).kind).toBe(InstanceProgressKind.Run);
+  });
+
+  it('an_instance_runs_its_tasks_in_order_and_completes_with_the_last_output', () => {
+    const definition = definitionOf([
+      { first: { set: { a: 1 } } },
+      { second: { set: { b: 2 } } },
+    ]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, now);
+
+    expect(instance.phase).toBe(Phase.Completed);
+    expect(instance.output).toEqual({ b: 2 });
+    expect(instance.endedAt).toEqual(now);
+    expect(typesOf(instance)).toEqual([
+      'workflow.started',
+      'task.created',
+      'task.started',
+      'task.completed',
+      'task.created',
+      'task.started',
+      'task.completed',
+      'workflow.completed',
+    ]);
+    expect(instance.progress(now).kind).toBe(InstanceProgressKind.Ended);
+  });
+
+  it('lifecycle_events_carry_the_standard_shape_in_the_order_of_changes', () => {
+    const definition = definitionOf([{ first: { set: { a: 1 } } }]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, now);
+    const [started_, created] = instance.takeProducedEvents();
+
+    expect(started_?.source).toBe(
+      `/workflows/default/test/instances/${instance.id}`,
+    );
+    expect(started_?.eventId).toBe('1');
+    expect(started_?.sequence).toBe(1);
+    expect(started_?.data).toEqual({
+      name: `test-${instance.id}.default`,
+      definition: { name: 'test', namespace: 'default', version: '1.0.0' },
+      startedAt: now.toISOString(),
+    });
+    expect(created?.data).toEqual({
+      workflow: `test-${instance.id}.default`,
+      task: '/do/0/first',
+      createdAt: now.toISOString(),
+    });
+    expect(created?.origin).toEqual({
+      kind: EventOriginKind.Lifecycle,
+      workflowId: instance.workflowId,
+      instanceId: instance.id,
+    });
+  });
+
+  it('an_input_that_breaks_the_input_schema_faults_the_instance_with_a_validation_error', () => {
+    const definition = definitionOf(
+      [{ first: { set: { a: 1 } } }],
+      {},
+      {
+        schema: {
+          format: 'json',
+          document: { type: 'object', required: ['orderId'] },
+        },
+      },
+    );
+    const instance = started(definition, {});
+
+    instance.beginRound(definition, runtime, now);
+    settle(instance, definition, now, {
+      validate: (id) => new ValidationFailed(id, 'orderId is required'),
+    });
+
+    expect(instance.phase).toBe(Phase.Faulted);
+    expect(instance.error?.status).toBe(400);
+    expect(instance.error?.type).toBe(
+      ErrorType.Validation.errorAt(JsonPointer.root(), null).type,
+    );
+  });
+
+  it('an_uncaught_raised_error_faults_the_instance_with_that_error_at_its_task', () => {
+    const definition = definitionOf([{ fail: { raise: { error: failing } } }]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, now);
+
+    expect(instance.phase).toBe(Phase.Faulted);
+    expect(instance.error?.toJson()).toEqual({
+      type: failing.type,
+      status: 500,
+      title: 'Boom',
+      instance: '/do/0/fail',
+    });
+    expect(typesOf(instance)).toEqual([
+      'workflow.started',
+      'task.created',
+      'task.started',
+      'task.faulted',
+      'workflow.faulted',
+    ]);
+  });
+
+  it('a_skipped_task_produces_no_lifecycle_event_and_passes_its_input_on', () => {
+    const definition = definitionOf([
+      { skipped: { if: '${ false }', set: { a: 1 } } },
+    ]);
+    const instance = started(definition, { kept: true });
+
+    instance.beginRound(definition, runtime, now);
+    settle(instance, definition, now, {
+      evaluate: evaluatedAs(() => false),
+    });
+
+    expect(instance.output).toEqual({ kept: true });
+    expect(typesOf(instance)).toEqual([
+      'workflow.started',
+      'workflow.completed',
+    ]);
+  });
+
+  it('a_retry_parks_the_instance_until_its_delay_and_spent_retries_fault_it', () => {
+    const definition = definitionOf([
+      {
+        attempt: {
+          try: [{ fail: { raise: { error: failing } } }],
+          catch: {
+            errors: { with: { status: 500 } },
+            retry: {
+              delay: { seconds: 1 },
+              limit: { attempt: { count: 2 } },
+            },
+          },
+        },
+      },
+    ]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, now);
+    const parked = instance.progress(now);
+    instance.beginRound(definition, runtime, later(1));
+    instance.beginRound(definition, runtime, later(2));
+    const types = typesOf(instance);
+
+    expect(parked).toEqual({
+      kind: InstanceProgressKind.Park,
+      wakeAt: later(1),
+      subWorkflows: [],
+    });
+    expect(instance.phase).toBe(Phase.Faulted);
+    expect(instance.error?.title).toBe('Boom');
+    expect(types.filter((type) => type === 'task.retried')).toHaveLength(2);
+    expect(
+      instance.tasks.find((task) => task.name === 'attempt')?.retries,
+    ).toBe(2);
+  });
+
+  it('an_elapsed_task_timeout_faults_the_task_and_the_instance_with_a_timeout_error', () => {
+    const definition = definitionOf([
+      {
+        slow: {
+          timeout: { after: { seconds: 5 } },
+          ...call('https://slow.example/'),
+        },
+      },
+    ]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, now);
+    const waiting = instance.progress(now);
+    instance.beginRound(definition, runtime, later(5));
+
+    expect(waiting.wakeAt).toEqual(later(5));
+    expect(instance.phase).toBe(Phase.Faulted);
+    expect(instance.error?.status).toBe(408);
+    expect(instance.error?.instance).toBe('/do/0/slow');
+  });
+
+  it('a_competing_fork_takes_the_first_branch_and_cancels_the_others', () => {
+    const definition = definitionOf([
+      {
+        race: {
+          fork: {
+            compete: true,
+            branches: [
+              { a: call('https://a.example/') },
+              { b: call('https://b.example/') },
+            ],
+          },
+        },
+      },
+    ]);
+    const instance = started(definition);
+    instance.beginRound(definition, runtime, now);
+    const work = instance.pendingWork(definition, runtime, now);
+    const first = work.calls[0];
+
+    if (first === undefined) throw new Error('call');
+
+    settle(instance, definition, now, {
+      respond: (id) => ok(id),
+    });
+    instance.takeProducedEvents();
+
+    expect(work.calls).toHaveLength(2);
+    expect(instance.phase).toBe(Phase.Completed);
+    expect(instance.output).toEqual({ id: first.id });
+    expect(
+      instance.tasks.filter((task) => task.phase === Phase.Cancelled),
+    ).toHaveLength(1);
+  });
+
+  it('an_emit_task_produces_its_event_in_the_change_that_records_it', () => {
+    const definition = definitionOf([
+      {
+        notify: {
+          emit: {
+            event: {
+              with: {
+                source: 'https://orders.example',
+                type: 'order.placed',
+                data: { id: 1 },
+                traceid: 'abc',
+              },
+            },
+          },
+        },
+      },
+    ]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, now);
+    const emitted = instance
+      .takeProducedEvents()
+      .find((event) => event.origin.kind === EventOriginKind.Emit);
+
+    expect(emitted?.type).toBe('order.placed');
+    expect(emitted?.data).toEqual({ id: 1 });
+    expect(emitted?.extensions).toEqual({ traceid: 'abc' });
+    expect(emitted?.sequence).toBe(4);
+  });
+
+  it('a_process_not_awaited_is_detached_once_from_the_ending_task', () => {
+    const definition = definitionOf([
+      { greet: { run: { shell: { command: 'echo hi' }, await: false } } },
+    ]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, now);
+    const events = instance.takeDomainEvents();
+    const again = instance.takeDomainEvents();
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toBeInstanceOf(ProcessDetached);
+    expect(events[0]?.instanceId).toBe(instance.id);
+    expect(again).toHaveLength(0);
+  });
+
+  describe('sub-workflows', () => {
+    const definition = definitionOf([
+      {
+        invoice: {
+          run: {
+            workflow: {
+              namespace: 'billing',
+              name: 'send-invoice',
+              version: '1.0.0',
+            },
+          },
+        },
+      },
+    ]);
+    const child = definitionOf(
+      [{ send: { set: { sent: true } } }],
+      {},
+      null,
+      'billing/send-invoice',
+    );
+    const failingChild = definitionOf(
+      [{ fail: { raise: { error: failing } } }],
+      {},
+      null,
+      'billing/send-invoice',
+    );
+
+    function childOf(
+      parent: WorkflowInstance,
+      childDefinition: Definition,
+    ): WorkflowInstance {
+      const request = parent.requestedSubWorkflows()[0];
+
+      if (request === undefined) throw new Error('request');
+
+      const target = published(childDefinition);
+      const instance = WorkflowInstance.startSubWorkflow({
+        parentId: parent.id,
+        request,
+        workflow: target.workflow,
+        version: target.version,
+        now,
+      });
+      instance.beginRound(childDefinition, runtime, now);
+      return instance;
+    }
+
+    it('an_awaiting_run_task_requests_its_child_by_a_derived_id', () => {
+      const parent = started(definition, { id: 42 });
+
+      parent.beginRound(definition, runtime, now);
+      const requested = parent.requestedSubWorkflows();
+      const progress = parent.progress(now);
+
+      expect(requested).toHaveLength(1);
+      expect(requested[0]?.input).toEqual({ id: 42 });
+      expect(progress.kind).toBe(InstanceProgressKind.Park);
+      expect(progress.subWorkflows).toEqual([requested[0]?.instanceId]);
+    });
+
+    it('a_completed_child_completes_its_run_task_with_its_output', () => {
+      const parent = started(definition, { id: 42 });
+      parent.beginRound(definition, runtime, now);
+      const instance = childOf(parent, child);
+
+      parent.completeSubWorkflow(
+        instance.id,
+        {
+          phase: instance.phase,
+          output: instance.output,
+          error: instance.error,
+        },
+        definition,
+        runtime,
+        now,
+      );
+
+      expect(parent.phase).toBe(Phase.Completed);
+      expect(parent.output).toEqual({ sent: true });
+    });
+
+    it('a_faulted_child_faults_its_run_task_with_its_error_at_the_task', () => {
+      const parent = started(definition, { id: 42 });
+      parent.beginRound(definition, runtime, now);
+      const instance = childOf(parent, failingChild);
+
+      parent.completeSubWorkflow(
+        instance.id,
+        {
+          phase: instance.phase,
+          output: instance.output,
+          error: instance.error,
+        },
+        definition,
+        runtime,
+        now,
+      );
+
+      expect(parent.phase).toBe(Phase.Faulted);
+      expect(parent.error?.title).toBe('Boom');
+      expect(parent.error?.instance).toBe('/do/0/invoice');
+    });
+
+    it('a_sub_workflow_of_another_workflow_than_the_task_names_is_refused', () => {
+      const parent = started(definition, { id: 42 });
+      parent.beginRound(definition, runtime, now);
+      const other = definitionOf([{ send: { set: { sent: true } } }]);
+
+      const start = () => childOf(parent, other);
+
+      expect(start).toThrow(TypeError);
+    });
+
+    it('a_refused_child_faults_its_run_task_with_a_configuration_error', () => {
+      const parent = started(definition, { id: 42 });
+      parent.beginRound(definition, runtime, now);
+      const request = parent.requestedSubWorkflows()[0];
+
+      if (request === undefined) throw new Error('request');
+
+      parent.refuseSubWorkflow(request.instanceId, definition, runtime, now);
+
+      expect(parent.phase).toBe(Phase.Faulted);
+      expect(parent.error?.status).toBe(400);
+      expect(parent.error?.instance).toBe('/do/0/invoice');
+    });
+  });
+
+  it('an_engine_failure_faults_the_instance_and_cancels_its_active_tasks', () => {
+    const definition = definitionOf([{ slow: call('https://slow.example/') }]);
+    const instance = started(definition);
+    instance.beginRound(definition, runtime, now);
+    instance.takeProducedEvents();
+
+    instance.fault(later(1));
+
+    expect(instance.phase).toBe(Phase.Faulted);
+    expect(instance.error?.status).toBe(500);
+    expect(typesOf(instance)).toEqual(['task.cancelled', 'workflow.faulted']);
+  });
+
+  it('a_terminal_instance_never_changes_again', () => {
+    const definition = definitionOf([{ first: { set: { a: 1 } } }]);
+    const instance = started(definition);
+    instance.beginRound(definition, runtime, now);
+    instance.takeProducedEvents();
+
+    instance.fault(later(1));
+    instance.beginRound(definition, runtime, later(2));
+
+    expect(instance.phase).toBe(Phase.Completed);
+    expect(instance.takeProducedEvents()).toHaveLength(0);
+  });
+
+  it('replaying_the_same_results_on_the_same_state_derives_the_same_task_ids', () => {
+    const definition = definitionOf([
+      { a: call('https://a.example/') },
+      { b: call('https://b.example/') },
+    ]);
+    const first = started(definition);
+    const second = started(definition);
+
+    for (const instance of [first, second]) {
+      instance.beginRound(definition, runtime, now);
+      settle(instance, definition, now, { respond: (id) => ok(id) });
+    }
+
+    const firstIds = first.tasks.map((task) => task.id);
+    const secondIds = second.tasks.map((task) => task.id);
+    expect(firstIds).toEqual(secondIds);
+    expect(first.output).toEqual(second.output);
+  });
+
+  it('a_task_cancelled_before_its_condition_passed_is_cancelled_without_an_event', () => {
+    const definition = definitionOf([
+      { gated: { if: '${ .go }', set: { a: 1 } } },
+    ]);
+    const instance = started(definition);
+    instance.beginRound(definition, runtime, now);
+    instance.takeProducedEvents();
+
+    instance.fault(later(1));
+
+    const gated = instance.tasks.find((task) => task.name === 'gated');
+    expect(gated?.phase).toBe(Phase.Cancelled);
+    expect(typesOf(instance)).toEqual(['workflow.faulted']);
+  });
+
+  it('a_task_whose_parent_is_missing_is_refused_as_corrupt_state', () => {
+    const definition = definitionOf([
+      { a: call('https://a.example/') },
+      { b: { set: { b: 2 } } },
+    ]);
+    const instance = started(definition);
+    instance.beginRound(definition, runtime, now);
+    const leaf = instance.tasks.find((task) => task.name === 'a');
+
+    if (leaf === undefined) throw new Error('leaf');
+
+    const restored = new WorkflowInstance({
+      id: instance.id,
+      workflowId: instance.workflowId,
+      versionId: instance.versionId,
+      workflow: instance.workflow,
+      semver: instance.semver,
+      phase: instance.phase,
+      input: instance.input,
+      output: null,
+      error: null,
+      context: {},
+      origin: instance.origin,
+      startedAt: instance.startedAt,
+      endedAt: null,
+      sequence: instance.sequence,
+      executions: instance.executions,
+      tasks: [leaf],
+      version: 1,
+    });
+    const work = restored.pendingWork(definition, runtime, now);
+    const results = answer(work, { respond: (id) => ok(id) });
+
+    const record = () => {
+      restored.record(results, definition, runtime, now);
+    };
+
+    expect(record).toThrow(InconsistentProgressError);
+  });
+
+  it('a_round_with_the_definition_of_another_version_is_refused', () => {
+    const definition = definitionOf([{ first: { set: { a: 1 } } }]);
+    const other = definitionOf(
+      [{ first: { set: { a: 1 } } }],
+      {},
+      null,
+      'billing/other',
+    );
+    const instance = started(definition);
+
+    const begin = () => {
+      instance.beginRound(other, runtime, now);
+    };
+
+    expect(begin).toThrow(TypeError);
+  });
+});

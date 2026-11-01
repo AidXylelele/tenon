@@ -31,4 +31,8 @@ export class ConcludedProgress extends KindProgress {
   childEnded(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
+  }
 }

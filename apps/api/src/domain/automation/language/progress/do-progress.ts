@@ -1,7 +1,7 @@
-import type { JsonValue } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
+import { Outcome } from '../outcome.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Sequence } from '../sequence.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
@@ -17,18 +17,17 @@ export class DoProgress extends KindProgress {
     this.#sequence = sequence;
   }
 
-  static enter(input: JsonValue, scope: TaskScope<DoTask>): Step<KindProgress> {
-    const step = Sequence.start(scope.task.body, input, scope.variables);
+  static enter(scope: BodyScope<DoTask>): Step<KindProgress> {
+    const step = Sequence.start(scope.task.body, scope.input, scope.variables);
     return DoProgress.#following(step);
   }
 
-  static #following(step: Step<Sequence>): Step<KindProgress> {
-    const sequence = step.progress;
-    const outcome = sequence.outcome;
+  static #following(step: Step<Sequence | Outcome>): Step<KindProgress> {
+    const next = step.progress;
 
-    if (outcome !== null) return ConcludedProgress.step(outcome);
+    if (next instanceof Outcome) return ConcludedProgress.step(next);
 
-    const progress = new DoProgress(sequence);
+    const progress = new DoProgress(next);
     return new Step<KindProgress>(progress, step.starts);
   }
 
@@ -47,9 +46,13 @@ export class DoProgress extends KindProgress {
   childEnded(
     child: JsonPointer,
     ending: TaskEnding,
-    scope: TaskScope<DoTask>,
+    scope: BodyScope<DoTask>,
   ): Step<KindProgress> {
     const step = this.#sequence.childEnded(child, ending, scope.task.body);
     return DoProgress.#following(step);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

@@ -1,14 +1,8 @@
-import type {
-  CallProgressProps,
-  CallTask,
-  Evaluation,
-  JsonValue,
-  ServiceCall,
-} from '../interfaces.js';
+import type { CallTask, Evaluation, ServiceCall } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
 import type { WorkflowError } from '../workflow-error.js';
 import { ConcludedProgress } from './concluded-progress.js';
@@ -17,36 +11,30 @@ import { KindProgress } from './kind-progress.js';
 export class CallProgress extends KindProgress {
   static readonly #CALL = 'call';
 
-  readonly #input: JsonValue;
   readonly #call: ServiceCall | null;
 
-  constructor(props: CallProgressProps) {
+  constructor(call: ServiceCall | null) {
     super();
-    this.#input = props.input;
-    this.#call = props.call;
+    this.#call = call;
   }
 
-  static enter(input: JsonValue, scope: TaskScope): Step<KindProgress> {
-    const progress = new CallProgress({ input, call: null });
+  static enter(scope: BodyScope): Step<KindProgress> {
+    const progress = new CallProgress(null);
     return progress.settled(scope);
-  }
-
-  get input(): JsonValue {
-    return this.#input;
   }
 
   get call(): ServiceCall | null {
     return this.#call;
   }
 
-  work(scope: TaskScope<CallTask>): RoundWork {
+  work(scope: BodyScope<CallTask>): RoundWork {
     if (this.#call !== null) return RoundWork.calling(this.#call);
 
-    const args = scope.definitionArguments(this.#input);
+    const args = scope.definitionArguments();
     const evaluations: Evaluation[] = [];
 
     for (const template of scope.task.templates) {
-      const found = template.evaluationsFor(scope.prefix, this.#input, args);
+      const found = template.evaluationsFor(scope.prefix, scope.input, args);
 
       for (const evaluation of found) evaluations.push(evaluation);
     }
@@ -56,7 +44,7 @@ export class CallProgress extends KindProgress {
 
   record(
     results: RoundResults,
-    scope: TaskScope<CallTask>,
+    scope: BodyScope<CallTask>,
   ): Step<KindProgress> {
     if (this.#call !== null) return this.#responded(this.#call, results, scope);
 
@@ -69,7 +57,7 @@ export class CallProgress extends KindProgress {
 
   #defined(
     results: RoundResults,
-    scope: TaskScope<CallTask>,
+    scope: BodyScope<CallTask>,
   ): Step<KindProgress> {
     const work = this.work(scope);
     const answered = results.answers(work);
@@ -84,14 +72,14 @@ export class CallProgress extends KindProgress {
     }
 
     const id = scope.workId(CallProgress.#CALL);
-    const call = scope.task.callFrom(id, scope.prefix, results, this.#input);
-    const calling = new CallProgress({ input: this.#input, call });
+    const call = scope.task.callFrom(id, scope.prefix, results, scope.input);
+    const calling = new CallProgress(call);
     return Step.of<KindProgress>(calling);
   }
 
   #failureIn(
     results: RoundResults,
-    scope: TaskScope<CallTask>,
+    scope: BodyScope<CallTask>,
   ): WorkflowError | null {
     const at = scope.task.reference;
 
@@ -107,7 +95,7 @@ export class CallProgress extends KindProgress {
   #responded(
     call: ServiceCall,
     results: RoundResults,
-    scope: TaskScope<CallTask>,
+    scope: BodyScope<CallTask>,
   ): Step<KindProgress> {
     const result = results.response(call.id);
 
@@ -116,5 +104,9 @@ export class CallProgress extends KindProgress {
     const at = scope.task.reference;
     const outcome = result.outcome(scope.task.output, at);
     return ConcludedProgress.step(outcome);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

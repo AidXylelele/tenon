@@ -1,9 +1,9 @@
 import type { Expression } from '../expression.js';
-import type { JsonValue, RunWorkflowTaskProps } from '../interfaces.js';
+import type { RunWorkflowTaskProps } from '../interfaces.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { RunWorkflowProgress } from '../progress/run-workflow-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { Template } from '../template.js';
 import type { WorkflowTarget } from '../workflow-target.js';
@@ -32,11 +32,8 @@ export class RunWorkflowTask extends Task {
     return this.#awaits;
   }
 
-  enter(
-    input: JsonValue,
-    scope: TaskScope<RunWorkflowTask>,
-  ): Step<KindProgress> {
-    return RunWorkflowProgress.enter(input, scope);
+  enter(scope: BodyScope<RunWorkflowTask>): Step<KindProgress> {
+    return RunWorkflowProgress.enter(scope);
   }
 
   protected override get ownExpressions(): readonly Expression[] {

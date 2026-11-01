@@ -1,10 +1,10 @@
 import { EmptyCompetingForkError } from '../../../errors.js';
 import type { Expression } from '../expression.js';
-import type { ForkTaskProps, JsonValue } from '../interfaces.js';
+import type { ForkTaskProps } from '../interfaces.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { ForkProgress } from '../progress/fork-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { TaskList } from '../task-list.js';
 
@@ -39,8 +39,8 @@ export class ForkTask extends Task {
     return [this.#branches];
   }
 
-  enter(input: JsonValue, scope: TaskScope<ForkTask>): Step<KindProgress> {
-    return ForkProgress.enter(input, scope);
+  enter(scope: BodyScope<ForkTask>): Step<KindProgress> {
+    return ForkProgress.enter(scope);
   }
 
   protected override get ownExpressions(): readonly Expression[] {

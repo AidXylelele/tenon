@@ -1,4 +1,7 @@
+import { Attempt } from '../../../../../../src/domain/automation/language/attempt.js';
 import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
+import { RetryProgress } from '../../../../../../src/domain/automation/language/progress/retry-progress.js';
+import { InconsistentProgressError } from '../../../../../../src/domain/errors.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
 import { TaskEnding } from '../../../../../../src/domain/automation/language/task-ending.js';
 import {
@@ -256,5 +259,14 @@ describe('TryProgress while its handler runs', () => {
     expect(handling.progress.work(scope).isEmpty()).toBe(true);
     expect(again.starts).toEqual([]);
     expect(ending?.output).toEqual({ name: 'unknown' });
+  });
+});
+
+describe('RetryProgress', () => {
+  it('a_retry_before_any_failed_attempt_is_refused', () => {
+    const attempt = Attempt.first(now);
+    const build = () => new RetryProgress({ attempt, wakeAt: now });
+
+    expect(build).toThrow(InconsistentProgressError);
   });
 });

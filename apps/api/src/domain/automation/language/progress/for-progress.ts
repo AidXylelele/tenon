@@ -5,7 +5,7 @@ import type { JsonPointer } from '../json-pointer.js';
 import { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Sequence } from '../sequence.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
@@ -17,7 +17,6 @@ export class ForProgress extends KindProgress {
   static readonly #WHILE = 'while';
   static readonly #NOT_A_COLLECTION = 'The for collection is not an array';
 
-  readonly #input: JsonValue;
   readonly #items: readonly JsonValue[] | null;
   readonly #index: number;
   readonly #data: JsonValue;
@@ -25,33 +24,30 @@ export class ForProgress extends KindProgress {
 
   constructor(props: ForProgressProps) {
     super();
-    const iteratingBlind = props.sequence !== null && props.items === null;
+    const counted = Number.isInteger(props.index) && props.index >= 0;
+    const collecting = props.items === null;
+    const started = props.index > 0 || props.sequence !== null;
+    const beyond = props.items !== null && props.index >= props.items.length;
 
-    if (iteratingBlind)
+    if (!counted || (collecting && started) || beyond)
       throw new InconsistentProgressError(
-        'a for iterates only over collected items',
+        'a for iterates over the items it collected, from the first',
       );
 
-    this.#input = props.input;
     this.#items = props.items;
     this.#index = props.index;
     this.#data = props.data;
     this.#sequence = props.sequence;
   }
 
-  static enter(input: JsonValue, scope: TaskScope): Step<KindProgress> {
+  static enter(scope: BodyScope<ForTask>): Step<KindProgress> {
     const progress = new ForProgress({
-      input,
       items: null,
       index: 0,
-      data: input,
+      data: scope.input,
       sequence: null,
     });
     return progress.settled(scope);
-  }
-
-  get input(): JsonValue {
-    return this.#input;
   }
 
   get items(): readonly JsonValue[] | null {
@@ -70,16 +66,16 @@ export class ForProgress extends KindProgress {
     return this.#sequence;
   }
 
-  work(scope: TaskScope<ForTask>): RoundWork {
+  work(scope: BodyScope<ForTask>): RoundWork {
     if (this.#sequence !== null) return RoundWork.none();
 
     const task = scope.task;
 
     if (this.#items === null) {
-      const args = scope.definitionArguments(this.#input);
+      const args = scope.definitionArguments();
       const evaluations = task.collection.evaluationsFor(
         scope.prefix,
-        this.#input,
+        scope.input,
         args,
       );
       return RoundWork.evaluating(evaluations);
@@ -95,7 +91,7 @@ export class ForProgress extends KindProgress {
     return RoundWork.evaluating(evaluations);
   }
 
-  record(results: RoundResults, scope: TaskScope<ForTask>): Step<KindProgress> {
+  record(results: RoundResults, scope: BodyScope<ForTask>): Step<KindProgress> {
     const work = this.work(scope);
     const answered = results.answers(work);
     const waiting = this.#sequence !== null || work.isEmpty();
@@ -110,7 +106,7 @@ export class ForProgress extends KindProgress {
   childEnded(
     child: JsonPointer,
     ending: TaskEnding,
-    scope: TaskScope<ForTask>,
+    scope: BodyScope<ForTask>,
   ): Step<KindProgress> {
     const sequence = this.#sequence;
     const items = this.#items;
@@ -118,12 +114,12 @@ export class ForProgress extends KindProgress {
     if (sequence === null || items === null) return Step.of<KindProgress>(this);
 
     const step = sequence.childEnded(child, ending, scope.task.body);
-    return this.#following(items, step, scope);
+    return ForProgress.#following(items, this.#index, this.#data, step, scope);
   }
 
   #collected(
     results: RoundResults,
-    scope: TaskScope<ForTask>,
+    scope: BodyScope<ForTask>,
   ): Step<KindProgress> {
     const collection = scope.task.collection;
     const at = scope.task.reference;
@@ -137,7 +133,7 @@ export class ForProgress extends KindProgress {
     const value = collection.fill(scope.prefix, results);
     const none: readonly JsonValue[] = [];
 
-    if (value === null) return this.#iterate(none, 0, this.#data, scope);
+    if (value === null) return ForProgress.#iterate(none, 0, this.#data, scope);
 
     if (!Array.isArray(value)) {
       const error = ErrorType.Expression.errorAt(
@@ -148,13 +144,13 @@ export class ForProgress extends KindProgress {
       return ConcludedProgress.step(failed);
     }
 
-    return this.#iterate(value, 0, this.#data, scope);
+    return ForProgress.#iterate(value, 0, this.#data, scope);
   }
 
   #checked(
     items: readonly JsonValue[],
     results: RoundResults,
-    scope: TaskScope<ForTask>,
+    scope: BodyScope<ForTask>,
   ): Step<KindProgress> {
     const whilst = scope.task.whilst;
 
@@ -176,14 +172,14 @@ export class ForProgress extends KindProgress {
       return ConcludedProgress.step(completed);
     }
 
-    return this.#started(items, this.#index, this.#data, scope);
+    return ForProgress.#started(items, this.#index, this.#data, scope);
   }
 
-  #iterate(
+  static #iterate(
     items: readonly JsonValue[],
     index: number,
     data: JsonValue,
-    scope: TaskScope<ForTask>,
+    scope: BodyScope<ForTask>,
   ): Step<KindProgress> {
     const unguarded = scope.task.whilst === null;
     const unchanged = unguarded && scope.task.body.isEmpty();
@@ -193,10 +189,9 @@ export class ForProgress extends KindProgress {
       return ConcludedProgress.step(completed);
     }
 
-    if (unguarded) return this.#started(items, index, data, scope);
+    if (unguarded) return ForProgress.#started(items, index, data, scope);
 
     const checking = new ForProgress({
-      input: this.#input,
       items,
       index,
       data,
@@ -205,63 +200,55 @@ export class ForProgress extends KindProgress {
     return Step.of<KindProgress>(checking);
   }
 
-  #started(
+  static #started(
     items: readonly JsonValue[],
     index: number,
     data: JsonValue,
-    scope: TaskScope<ForTask>,
+    scope: BodyScope<ForTask>,
   ): Step<KindProgress> {
     const item = items[index] ?? null;
     const additions = scope.task.variablesFor(item, index);
     const variables = scope.variablesWith(additions);
     const step = Sequence.start(scope.task.body, data, variables);
-    const iterating = new ForProgress({
-      input: this.#input,
-      items,
-      index,
-      data,
-      sequence: step.progress,
-    });
-    return iterating.#following(items, step, scope);
+    return ForProgress.#following(items, index, data, step, scope);
   }
 
-  #following(
+  static #following(
     items: readonly JsonValue[],
-    step: Step<Sequence>,
-    scope: TaskScope<ForTask>,
+    index: number,
+    data: JsonValue,
+    step: Step<Sequence | Outcome>,
+    scope: BodyScope<ForTask>,
   ): Step<KindProgress> {
-    const sequence = step.progress;
-    const outcome = sequence.outcome;
+    const next = step.progress;
 
-    if (outcome === null) {
-      const iterating = new ForProgress({
-        input: this.#input,
-        items,
-        index: this.#index,
-        data: this.#data,
-        sequence,
-      });
+    if (!(next instanceof Outcome)) {
+      const iterating = new ForProgress({ items, index, data, sequence: next });
       return new Step<KindProgress>(iterating, step.starts);
     }
 
-    if (outcome.failure !== null || outcome.endsWorkflow())
-      return ConcludedProgress.step(outcome);
+    if (next.failure !== null || next.endsWorkflow())
+      return ConcludedProgress.step(next);
 
-    const next = this.#index + 1;
-    return this.#iterate(items, next, outcome.output, scope);
+    const following = index + 1;
+    return ForProgress.#iterate(items, following, next.output, scope);
   }
 
   #iterationArguments(
     items: readonly JsonValue[],
-    scope: TaskScope<ForTask>,
+    scope: BodyScope<ForTask>,
   ): JsonObject {
     const item = items[this.#index] ?? null;
     const additions = scope.task.variablesFor(item, this.#index);
-    return scope.definitionArgumentsWith(this.#input, additions);
+    return scope.definitionArgumentsWith(additions);
   }
 
-  #whilePrefix(scope: TaskScope): string {
+  #whilePrefix(scope: BodyScope): string {
     const part = `${ForProgress.#WHILE}-${this.#index}`;
     return scope.prefixFor(part);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

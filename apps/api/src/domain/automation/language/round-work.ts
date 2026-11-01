@@ -28,6 +28,14 @@ export class RoundWork {
     });
   }
 
+  static combined(works: readonly RoundWork[]): RoundWork {
+    const evaluations = works.flatMap((work) => work.#evaluations);
+    const validations = works.flatMap((work) => work.#validations);
+    const calls = works.flatMap((work) => work.#calls);
+    const processes = works.flatMap((work) => work.#processes);
+    return new RoundWork({ evaluations, validations, calls, processes });
+  }
+
   static evaluating(evaluations: readonly Evaluation[]): RoundWork {
     return new RoundWork({
       evaluations,

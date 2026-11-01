@@ -1,5 +1,6 @@
 import type { Definition } from '../definition.js';
 import type { JsonObject, JsonValue, TaskScopeProps } from '../interfaces.js';
+import { JsonPointer } from '../json-pointer.js';
 import type { Task } from '../tasks/task.js';
 
 export class TaskScope<T extends Task = Task> {
@@ -10,7 +11,9 @@ export class TaskScope<T extends Task = Task> {
   readonly #definition: Definition;
   readonly #rawInput: JsonValue;
   readonly #context: JsonValue;
-  readonly #workflow: JsonObject;
+  readonly #instanceId: string;
+  readonly #workflowInput: JsonValue;
+  readonly #workflowStartedAt: Date;
   readonly #runtime: JsonObject;
   readonly #variables: JsonObject;
   readonly #startedAt: Date;
@@ -22,7 +25,9 @@ export class TaskScope<T extends Task = Task> {
     this.#definition = props.definition;
     this.#rawInput = props.rawInput;
     this.#context = props.context;
-    this.#workflow = props.workflow;
+    this.#instanceId = props.instanceId;
+    this.#workflowInput = props.workflowInput;
+    this.#workflowStartedAt = props.workflowStartedAt;
     this.#runtime = props.runtime;
     this.#variables = props.variables;
     this.#startedAt = props.startedAt;
@@ -49,8 +54,28 @@ export class TaskScope<T extends Task = Task> {
     return this.#context;
   }
 
+  get instanceId(): string {
+    return this.#instanceId;
+  }
+
+  get workflowInput(): JsonValue {
+    return this.#workflowInput;
+  }
+
+  get workflowStartedAt(): Date {
+    return this.#workflowStartedAt;
+  }
+
   get workflow(): JsonObject {
-    return this.#workflow;
+    const root = JsonPointer.root();
+    const definition = this.#definition.jsonAt(root);
+    const startedAt = this.#instant(this.#workflowStartedAt);
+    return {
+      id: this.#instanceId,
+      definition,
+      input: this.#workflowInput,
+      startedAt,
+    };
   }
 
   get runtime(): JsonObject {
@@ -94,22 +119,6 @@ export class TaskScope<T extends Task = Task> {
     return this.#common(null);
   }
 
-  definitionArguments(input: JsonValue): JsonObject {
-    const args = this.#common(null);
-    args.input = input;
-    args.authorization = null;
-    return args;
-  }
-
-  definitionArgumentsWith(input: JsonValue, additions: JsonObject): JsonObject {
-    const args = this.definitionArguments(input);
-    const merged = this.#copyOf(args);
-
-    for (const name of Object.keys(additions)) merged[name] = additions[name];
-
-    return merged;
-  }
-
   outputArguments(
     input: JsonValue,
     rawOutput: JsonValue,
@@ -138,7 +147,7 @@ export class TaskScope<T extends Task = Task> {
     const descriptor = this.#descriptor(rawOutput);
     args.context = this.#context;
     args.task = descriptor;
-    args.workflow = this.#workflow;
+    args.workflow = this.workflow;
     args.runtime = this.#runtime;
     return args;
   }

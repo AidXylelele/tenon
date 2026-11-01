@@ -49,49 +49,38 @@ describe('Outcome', () => {
 });
 
 describe('TaskEnding', () => {
-  it('a_faulted_ending_with_a_directive_is_refused', () => {
+  it('a_completed_ending_whose_body_failed_is_refused', () => {
+    const outcome = Outcome.failed(failure);
     const build = () =>
-      new TaskEnding({
+      TaskEnding.completed({
         output: null,
-        failure,
-        directive: FlowDirective.Continue,
-        skipped: false,
+        then: FlowDirective.Continue,
         exported: false,
         context: null,
-        body: null,
+        outcome,
       });
 
     expect(build).toThrow(InconsistentProgressError);
   });
 
-  it('an_ending_without_a_fault_or_a_directive_is_refused', () => {
-    const build = () =>
-      new TaskEnding({
-        output: { a: 1 },
-        failure: null,
-        directive: null,
-        skipped: false,
-        exported: false,
-        context: null,
-        body: null,
-      });
+  it('a_completed_ending_follows_the_directive_of_its_body', () => {
+    const outcome = Outcome.directed({ a: 1 }, FlowDirective.End);
+    const ending = TaskEnding.completed({
+      output: { a: 1 },
+      then: FlowDirective.Continue,
+      exported: false,
+      context: null,
+      outcome,
+    });
 
-    expect(build).toThrow(InconsistentProgressError);
+    expect(ending.directive).toBe(FlowDirective.End);
   });
 
-  it('a_skipped_ending_with_a_body_is_refused', () => {
-    const body = Outcome.of({ a: 1 });
-    const build = () =>
-      new TaskEnding({
-        output: { a: 1 },
-        failure: null,
-        directive: FlowDirective.Continue,
-        skipped: true,
-        exported: false,
-        context: null,
-        body,
-      });
+  it('a_skipped_ending_keeps_its_raw_input_and_runs_no_body', () => {
+    const ending = TaskEnding.skipped({ a: 1 }, FlowDirective.Exit);
 
-    expect(build).toThrow(InconsistentProgressError);
+    expect(ending.output).toEqual({ a: 1 });
+    expect(ending.directive).toBe(FlowDirective.Exit);
+    expect(ending.body).toBeNull();
   });
 });

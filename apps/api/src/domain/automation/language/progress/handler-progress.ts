@@ -1,7 +1,7 @@
-import type { JsonValue } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
+import { Outcome } from '../outcome.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Sequence } from '../sequence.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
@@ -21,23 +21,21 @@ export class HandlerProgress extends KindProgress {
 
   static enter(
     handler: TaskList,
-    input: JsonValue,
     error: WorkflowError,
-    scope: TaskScope<TryTask>,
+    scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
     const additions = scope.task.catchClause.variablesFor(error);
     const variables = scope.variablesWith(additions);
-    const step = Sequence.start(handler, input, variables);
+    const step = Sequence.start(handler, scope.input, variables);
     return HandlerProgress.#following(step);
   }
 
-  static #following(step: Step<Sequence>): Step<KindProgress> {
-    const sequence = step.progress;
-    const outcome = sequence.outcome;
+  static #following(step: Step<Sequence | Outcome>): Step<KindProgress> {
+    const next = step.progress;
 
-    if (outcome !== null) return ConcludedProgress.step(outcome);
+    if (next instanceof Outcome) return ConcludedProgress.step(next);
 
-    const handling = new HandlerProgress(sequence);
+    const handling = new HandlerProgress(next);
     return new Step<KindProgress>(handling, step.starts);
   }
 
@@ -56,7 +54,7 @@ export class HandlerProgress extends KindProgress {
   childEnded(
     child: JsonPointer,
     ending: TaskEnding,
-    scope: TaskScope<TryTask>,
+    scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
     const handler = scope.task.catchClause.handler;
 
@@ -64,5 +62,9 @@ export class HandlerProgress extends KindProgress {
 
     const step = this.#sequence.childEnded(child, ending, handler);
     return HandlerProgress.#following(step);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

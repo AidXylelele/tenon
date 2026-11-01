@@ -1,9 +1,9 @@
 import type { Expression } from '../expression.js';
-import type { DoTaskProps, JsonValue } from '../interfaces.js';
+import type { DoTaskProps } from '../interfaces.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { DoProgress } from '../progress/do-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { TaskList } from '../task-list.js';
 
@@ -23,8 +23,8 @@ export class DoTask extends Task {
     return [this.#body];
   }
 
-  enter(input: JsonValue, scope: TaskScope<DoTask>): Step<KindProgress> {
-    return DoProgress.enter(input, scope);
+  enter(scope: BodyScope<DoTask>): Step<KindProgress> {
+    return DoProgress.enter(scope);
   }
 
   protected override get ownExpressions(): readonly Expression[] {

@@ -1,9 +1,9 @@
-import type { ChildRequest } from '../interfaces.js';
+import type { SubWorkflowRequest } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
 import type { Outcome } from '../outcome.js';
 import { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
 
@@ -16,21 +16,26 @@ export abstract class KindProgress {
     return null;
   }
 
-  child(): ChildRequest | null {
+  subWorkflow(): SubWorkflowRequest | null {
     return null;
   }
 
-  abstract work(scope: TaskScope): RoundWork;
+  abstract work(scope: BodyScope): RoundWork;
 
-  abstract record(results: RoundResults, scope: TaskScope): Step<KindProgress>;
+  abstract record(results: RoundResults, scope: BodyScope): Step<KindProgress>;
 
   abstract childEnded(
     child: JsonPointer,
     ending: TaskEnding,
-    scope: TaskScope,
+    scope: BodyScope,
   ): Step<KindProgress>;
 
-  protected settled(scope: TaskScope): Step<KindProgress> {
+  abstract subWorkflowEnded(
+    outcome: Outcome,
+    scope: BodyScope,
+  ): Step<KindProgress>;
+
+  protected settled(scope: BodyScope): Step<KindProgress> {
     const work = this.work(scope);
 
     if (!work.isEmpty()) return Step.of<KindProgress>(this);

@@ -1,13 +1,8 @@
-import type {
-  JsonValue,
-  ProcessProgressProps,
-  ProcessRun,
-  ProcessTask,
-} from '../interfaces.js';
+import type { ProcessRun, ProcessTask } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
 import { ConcludedProgress } from './concluded-progress.js';
 import { KindProgress } from './kind-progress.js';
@@ -15,40 +10,34 @@ import { KindProgress } from './kind-progress.js';
 export class ProcessProgress extends KindProgress {
   static readonly #PROCESS = 'process';
 
-  readonly #input: JsonValue;
   readonly #run: ProcessRun | null;
 
-  constructor(props: ProcessProgressProps) {
+  constructor(run: ProcessRun | null) {
     super();
-    this.#input = props.input;
-    this.#run = props.run;
+    this.#run = run;
   }
 
-  static enter(input: JsonValue, scope: TaskScope): Step<KindProgress> {
-    const progress = new ProcessProgress({ input, run: null });
+  static enter(scope: BodyScope): Step<KindProgress> {
+    const progress = new ProcessProgress(null);
     return progress.settled(scope);
-  }
-
-  get input(): JsonValue {
-    return this.#input;
   }
 
   get run(): ProcessRun | null {
     return this.#run;
   }
 
-  work(scope: TaskScope<ProcessTask>): RoundWork {
+  work(scope: BodyScope<ProcessTask>): RoundWork {
     if (this.#run !== null) return RoundWork.running(this.#run);
 
-    const args = scope.definitionArguments(this.#input);
+    const args = scope.definitionArguments();
     const process = scope.task.process;
-    const evaluations = process.evaluationsFor(scope.prefix, this.#input, args);
+    const evaluations = process.evaluationsFor(scope.prefix, scope.input, args);
     return RoundWork.evaluating(evaluations);
   }
 
   record(
     results: RoundResults,
-    scope: TaskScope<ProcessTask>,
+    scope: BodyScope<ProcessTask>,
   ): Step<KindProgress> {
     if (this.#run !== null) return this.#exited(this.#run, results, scope);
 
@@ -61,7 +50,7 @@ export class ProcessProgress extends KindProgress {
 
   #defined(
     results: RoundResults,
-    scope: TaskScope<ProcessTask>,
+    scope: BodyScope<ProcessTask>,
   ): Step<KindProgress> {
     const work = this.work(scope);
     const answered = results.answers(work);
@@ -82,18 +71,18 @@ export class ProcessProgress extends KindProgress {
     const run = scope.task.runFrom(id, value);
 
     if (!scope.task.awaits) {
-      const detached = Outcome.detachingProcess(this.#input, run);
+      const detached = Outcome.detachingProcess(scope.input, run);
       return ConcludedProgress.step(detached);
     }
 
-    const running = new ProcessProgress({ input: this.#input, run });
+    const running = new ProcessProgress(run);
     return Step.of<KindProgress>(running);
   }
 
   #exited(
     run: ProcessRun,
     results: RoundResults,
-    scope: TaskScope<ProcessTask>,
+    scope: BodyScope<ProcessTask>,
   ): Step<KindProgress> {
     const result = results.process(run.id);
 
@@ -102,5 +91,9 @@ export class ProcessProgress extends KindProgress {
     const at = scope.task.reference;
     const outcome = result.outcome(scope.task.returns, at);
     return ConcludedProgress.step(outcome);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

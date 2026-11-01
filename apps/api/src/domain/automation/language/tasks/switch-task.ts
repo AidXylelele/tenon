@@ -12,7 +12,7 @@ import type { KindProgress } from '../progress/kind-progress.js';
 import { SwitchProgress } from '../progress/switch-progress.js';
 import type { Step } from '../step.js';
 import type { RoundResults } from '../round-results.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { SwitchCase } from '../switch-case.js';
 
@@ -40,8 +40,8 @@ export class SwitchTask extends Task {
     return cases.concat(own);
   }
 
-  enter(input: JsonValue, scope: TaskScope<SwitchTask>): Step<KindProgress> {
-    return SwitchProgress.enter(input, scope);
+  enter(scope: BodyScope<SwitchTask>): Step<KindProgress> {
+    return SwitchProgress.enter(scope);
   }
 
   evaluationsFor(

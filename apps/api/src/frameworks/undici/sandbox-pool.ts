@@ -1,6 +1,24 @@
-import { Pool } from 'undici';
-import type { SandboxPool } from '../../interface-adapters/interfaces.js';
+import { type Dispatcher, Pool } from 'undici';
+import type { SandboxPool } from '../../interface-adapters/sandbox/interfaces.js';
 
-export function createSandboxPool(sandboxUrl: string): SandboxPool {
-  return new Pool(sandboxUrl, { connections: 16 });
+export function createSandboxPool(
+  sandboxUrl: string,
+  token: string,
+): SandboxPool {
+  const pool = new Pool(sandboxUrl, { connections: 16 });
+  const authorization = `Bearer ${token}`;
+  return pool.compose(
+    (dispatch) => (options: Dispatcher.DispatchOptions, handler) => {
+      const headers = new Headers();
+      const declared = options.headers;
+
+      if (declared && !Array.isArray(declared))
+        for (const [name, value] of Object.entries(declared))
+          if (typeof value === 'string') headers.set(name, value);
+
+      headers.set('authorization', authorization);
+      const authorized = Object.fromEntries(headers);
+      return dispatch({ ...options, headers: authorized }, handler);
+    },
+  );
 }

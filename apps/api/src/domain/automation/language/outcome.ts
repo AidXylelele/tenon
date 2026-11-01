@@ -1,7 +1,7 @@
 import { InconsistentProgressError } from '../../errors.js';
 import type { FlowDirective } from './flow-directive.js';
 import type {
-  ChildRequest,
+  SubWorkflowRequest,
   JsonObject,
   JsonValue,
   OutcomeProps,
@@ -16,7 +16,7 @@ export class Outcome {
   readonly #authorization: JsonObject | null;
   readonly #emitted: JsonObject | null;
   readonly #detachedProcess: ProcessRun | null;
-  readonly #detachedWorkflow: ChildRequest | null;
+  readonly #detachedWorkflow: SubWorkflowRequest | null;
 
   constructor(props: OutcomeProps) {
     const effects = [
@@ -125,7 +125,10 @@ export class Outcome {
     });
   }
 
-  static detachingWorkflow(output: JsonValue, child: ChildRequest): Outcome {
+  static detachingWorkflow(
+    output: JsonValue,
+    child: SubWorkflowRequest,
+  ): Outcome {
     return new Outcome({
       output,
       failure: null,
@@ -165,7 +168,7 @@ export class Outcome {
     return this.#detachedProcess;
   }
 
-  get detachedWorkflow(): ChildRequest | null {
+  get detachedWorkflow(): SubWorkflowRequest | null {
     return this.#detachedWorkflow;
   }
 }

@@ -10,7 +10,7 @@ import { ProcessReturn } from '../process-return.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { ProcessProgress } from '../progress/process-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { Template } from '../template.js';
 
@@ -38,8 +38,8 @@ export class RunShellTask extends Task implements ProcessTask {
     return this.#returns;
   }
 
-  enter(input: JsonValue, scope: TaskScope): Step<KindProgress> {
-    return ProcessProgress.enter(input, scope);
+  enter(scope: BodyScope): Step<KindProgress> {
+    return ProcessProgress.enter(scope);
   }
 
   runFrom(id: string, process: JsonValue): ProcessRun {

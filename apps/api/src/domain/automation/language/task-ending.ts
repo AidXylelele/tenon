@@ -6,6 +6,7 @@ import type {
   TaskEndingProps,
 } from './interfaces.js';
 import { Outcome } from './outcome.js';
+import { Phase } from './phase.js';
 import type { WorkflowError } from './workflow-error.js';
 
 export class TaskEnding {
@@ -17,36 +18,7 @@ export class TaskEnding {
   readonly #context: JsonValue;
   readonly #body: Outcome | null;
 
-  constructor(props: TaskEndingProps) {
-    const failed = props.failure !== null;
-    const kept =
-      props.output !== null ||
-      props.directive !== null ||
-      props.context !== null ||
-      props.skipped ||
-      props.exported ||
-      props.body !== null;
-
-    if (failed && kept)
-      throw new InconsistentProgressError(
-        'a faulted task carries nothing but its error',
-      );
-
-    const undirected = !failed && props.directive === null;
-
-    if (undirected)
-      throw new InconsistentProgressError(
-        'a task that did not fault has a flow directive',
-      );
-
-    const skippedWithMore =
-      props.skipped && (props.exported || props.body !== null);
-
-    if (skippedWithMore)
-      throw new InconsistentProgressError(
-        'a skipped task runs no body and exports nothing',
-      );
-
+  private constructor(props: TaskEndingProps) {
     this.#output = props.output;
     this.#failure = props.failure;
     this.#directive = props.directive;
@@ -57,14 +29,22 @@ export class TaskEnding {
   }
 
   static completed(completion: TaskCompletion): TaskEnding {
+    const body = completion.outcome;
+
+    if (body.failure !== null)
+      throw new InconsistentProgressError(
+        'a task completes only when its body did not fail',
+      );
+
+    const directive = body.directive ?? completion.then;
     return new TaskEnding({
       output: completion.output,
       failure: null,
-      directive: completion.directive,
+      directive,
       skipped: false,
       exported: completion.exported,
       context: completion.context,
-      body: completion.outcome,
+      body,
     });
   }
 
@@ -80,11 +60,11 @@ export class TaskEnding {
     });
   }
 
-  static skipped(output: JsonValue, directive: FlowDirective): TaskEnding {
+  static skipped(output: JsonValue, then: FlowDirective): TaskEnding {
     return new TaskEnding({
       output,
       failure: null,
-      directive,
+      directive: then,
       skipped: true,
       exported: false,
       context: null,
@@ -118,6 +98,14 @@ export class TaskEnding {
 
   get body(): Outcome | null {
     return this.#body;
+  }
+
+  phase(): Phase | null {
+    if (this.#skipped) return null;
+
+    if (this.#failure !== null) return Phase.Faulted;
+
+    return Phase.Completed;
   }
 
   outcome(): Outcome {

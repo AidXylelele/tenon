@@ -1,3 +1,4 @@
+import { Phase } from '../phase.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
@@ -11,6 +12,10 @@ export class EntryStage extends TaskProgress {
   static begin(scope: TaskScope): Step<TaskProgress> {
     const entry = new EntryStage();
     return entry.settled(scope);
+  }
+
+  override phase(): Phase {
+    return Phase.Pending;
   }
 
   work(scope: TaskScope): RoundWork {
@@ -96,5 +101,9 @@ export class EntryStage extends TaskProgress {
   #faulted(error: WorkflowError): Step<TaskProgress> {
     const faulted = EndedStage.faulted(error);
     return Step.of<TaskProgress>(faulted);
+  }
+
+  subWorkflowEnded(): Step<TaskProgress> {
+    return Step.of<TaskProgress>(this);
   }
 }

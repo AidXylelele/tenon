@@ -30,7 +30,7 @@ The dependency rule: frameworks → interface adapters → application → domai
 
 Rules:
 
-- **Shared types.** An adapter folder declares in its `interfaces.ts` and `enums.ts` the client the frameworks provide for it and its simple outcomes: `documents/` has `OpenWorkflowClient`, `DslOutcome` and the standard's document shape (`Dsl.*`); `expressions/` has `JqClient` and `JqCompilation`. `interface-adapters/interfaces.ts` keeps what several adapters share (`Database`, `DrizzleTx`) and, until their adapters arrive in US2, `EndpointDispatcher`, `SandboxPool` and `JsonSchemaCompilers`.
+- **Shared types.** An adapter folder declares in its `interfaces.ts` and `enums.ts` the client the frameworks provide for it and its simple outcomes: `documents/` has `OpenWorkflowClient`, `DslOutcome` and the standard's document shape (`Dsl.*`); `expressions/` has `JqClient` and `JqCompilation`; `json-schema/` has `JsonSchemaCompilers`; `endpoints/` has `EndpointDispatcher` and its request shapes; `sandbox/` has `SandboxPool`, `SandboxLimits` and the go-judge command shapes. The `interface-adapters/` root keeps only what several adapters share: `Database` and `DrizzleTx`, the outbox payload shapes of the domain events (written by `persistence/`, read by `messaging/`), the `TransientFailures` recognizer that `persistence/` implements, and the `ErrorClassifier` that `engine/` and `messaging/` use (§8).
 - **Contracts.** Outbox topics and payloads are the domain events in `domain/automation/*/events.ts`.
 - **Isolation.** No adapter folder imports another.
 
@@ -45,6 +45,7 @@ Rules:
 | Outbox handlers                | `*-outbox.handler.ts`                                                                                                                                                                                                                                                                                          |
 | Gateways                       | `*.gateway.ts`                                                                                                                                                                                                                                                                                                 |
 | Engine workflows               | `*.workflow.ts`                                                                                                                                                                                                                                                                                                |
+| Clocks                         | `*.clock.ts` (`EngineClock` implements the `Clock` port over the engine's `WorkflowClock`)                                                                                                                                                                                                                     |
 | Computations                   | `*.reader.ts`, `*.evaluator.ts`, `*.validator.ts`, `*.caller.ts`, `*.runner.ts`                                                                                                                                                                                                                                |
 | Document mappers               | `documents/mappers/*.mapper.ts`, static `toDomain`: one-way into value objects; `KnownPropertiesMapper.confirm` refuses what a mapper does not read. Persistence mappers use `toEntity`/`toRow` for aggregates and `toState`/`toDomain` for the value graphs stored as jsonb (`persistence/mappers/progress/`) |
 | Library factories (frameworks) | `create*`, for library objects that adapters use as they are                                                                                                                                                                                                                                                   |
@@ -62,7 +63,7 @@ Rules:
 | events    | EventRepository, CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway                          | EventQueries (candidates, catch-up), ConnectionQueries |
 | secrets   | SecretRepository                                                                                                                                               | SecretQueries (`valuesFor`, `namesOwnedBy`)            |
 
-**Time.** A use case reads the clock once per operation and passes it as a value: `new Date()` until T046, then a `Clock` port that the engine's `WorkflowClock` implements, so `ManualWorkflowClock` drives HTTP starts and engine runs alike in tests. Jitter samples come from `node:crypto`, also passed as values. The domain reads neither.
+**Time.** A use case reads the clock once per operation through the `Clock` port (`application/automation/language/ports.ts`), which `EngineClock` implements over the engine's `WorkflowClock`, so `ManualWorkflowClock` drives HTTP starts and engine runs alike in tests; the time is then passed as a value. A retry's jitter sample derives from its work id, which is pure and stable on replay. The domain reads no clock.
 
 **Runtime topology.** Every API process runs the same image, and the flags `HTTP`, `ENGINE_WORKER` and `OUTBOX_RELAY` switch its roles. Work is shared through PostgreSQL:
 
@@ -102,34 +103,33 @@ Gaps this closes:
 
 ## 3. A round
 
-`AdvanceInstance` composes two transactional use cases around the computation, the way `PublishVersion` composes `CheckDocument`:
+`AdvanceInstance` composes two transactional use cases around the computation, the way `PublishVersion` composes `CheckDocument`. It is not transactional itself, so no transaction stays open across a call:
 
 ```text
-AdvanceInstance(instanceId, now):
-  BeginRound (@Transactional):                       // returns the definition and the instance as loaded
-    instance = instances.get(id);  version = versions.get(instance.versionId)
-    definition = definitions.read(version.source)      // US2: the port takes the SourceDocument; the reader takes its text
-    instance.beginRound(definition, runtime, now);  instances.save(instance)   // save writes nothing when the version is unchanged
-    events.addAll(instance.takeProducedEvents())
-    return { definition, instance }
+AdvanceInstance({ instanceId, runtime }):
+  now = clock.now()
+  { definition, instance } = BeginRound({ instanceId, now, runtime })     // @Transactional
+      instance = instances.find(id);  definition = definitions.read(queries.documentOf(instance.versionId))
+      instance.beginRound(definition, runtime, now);  instances.save(instance)   // save writes nothing when unchanged
+      events.addAll(instance.takeProducedEvents())                               // save writes the domain events to the outbox
   recorded = []
   repeat:                                                    // pure work is never saved on its own
     work = instance.pendingWork(definition, runtime, now)
+    if work is empty: stop
     results = { evaluated: expressions.evaluateAll(work.evaluations), validated: schemas.validateAll(work.validations),
-                responses: services.callAll(work.calls), processes: processRunner.runAll(work.processes) }
+                responses: services.callAll(work.calls), processes: processes.runAll(work.processes) }
     instance.record(results, definition, runtime, now);  recorded.push(results)
-  until work had calls or processes, or work was empty
-  RecordRound (@Transactional):
-    current = instances.get(id)
-    for each results of recorded: current.record(results, definition, runtime, now)
-    instances.save(current)
-    events.addAll(current.takeProducedEvents())
-  return current.progress(now)                               // plain data: kind, wakeAt, awaited child ids
+    if work.endsRound(): stop                                 // it had calls or processes
+  if recorded is not empty: RecordRound({ instanceId, recorded, definition, runtime, now })   // @Transactional
+      current = instances.find(id);  for each results of recorded: current.record(…)
+      instances.save(current);  events.addAll(current.takeProducedEvents())
+  return { progress: current.progress(now), deferred: work the outside did not start }
 ```
 
 `runtime` (`$runtime`: name, version) is configuration, passed as a value like the time.
 
-- A round saves at the boundaries of side effects: a call, a process, a child, parking, the end. Expressions and schemas are pure and run in process, so a crash only computes them again; one HTTP task costs one round instead of one per stage. `RecordRound` replays the recorded results on the instance it reloads. Work ids are positional, so nothing outside the run changes task state between the two transactions: other writers (a listen's event in US7, a sub-workflow's start) only signal the run, which records the change in its own step, as `StartSubWorkflow` and `CompleteSubWorkflow` do. A cancel is the one exception, and it discards the round.
+- A round saves at the boundaries of side effects: a call, a process, a sub-workflow, parking, the end. Expressions and schemas are pure and run in process, so a crash only computes them again; one HTTP task costs one round instead of one per stage. `RecordRound` replays the recorded results on the instance it reloads. Work ids are positional (a task's id derives from the instance id and its execution number), so nothing outside the run changes task state between the two transactions: other writers (a listen's event in US7, a sub-workflow's start) only signal the run, which records the change in its own step, as `StartSubWorkflow` and `CompleteSubWorkflow` do. A cancel is the one exception, and it discards the round.
+- **Capacity is data.** `ServiceCaller.callAll` and `ProcessRunner.runAll` take one bulkhead slot per item and return no result for an item the full bulkhead rejected, so the accepted results are kept, the rejected work stays pending in the domain, and `AdvanceInstance` reports how much it deferred.
 - The engine run follows the returned progress; no separate query is needed.
 - Secrets join the round with US8: their values are read once per round and passed as a value to `beginRound`, `record` and the computations that need them.
 - Adapters log work ids, never payloads. Handlers and gateways throw fixed texts, never response bodies.
@@ -139,22 +139,24 @@ AdvanceInstance(instanceId, now):
 ```text
 @Workflow('instance', { version: 1 })
 run(ctx, { instanceId }):
-  children = the handles of the children this run started (rebuilt on every replay)
+  started = the handles of the sub-workflows this run started (rebuilt on every replay)
+  busy = 1 s
   for round = 1, 2, …:
     try
-      progress = ctx.step("advance-" + round, rounds.untilParked(instanceId, children.ids),
+      progress = ctx.step("advance-" + round, rounds.untilParked(instanceId, started.ids),
                           round = 1: { compensate: FaultInstance({ instanceId }) })
       if progress.kind = ended: return
-      if progress.children has an id not in children:
-        started = ctx.step("children-" + round, StartSubWorkflow({ instanceId }))
-        for each id of started not in children:
-          children[id] = ctx.startChild(InstanceWorkflow, { instanceId: id }, { id, parentClose: 'abandon' })
-        continue
+      for each id of progress.subWorkflows not in started:
+        exists = ctx.step("start-" + id, StartSubWorkflow({ instanceId, subWorkflowId: id }))
+        if exists: started[id] = ctx.startChild(InstanceWorkflow, { instanceId: id }, { id, parentClose: 'abandon' })
+      if a sub-workflow was started: continue
+      if progress.kind = busy: ctx.sleep("busy-" + round, busy); busy = min(2 × busy, 30 s); continue
+      busy = 1 s
       if progress.kind = run: continue
-      winner = ctx.waitForAny("park-" + round, { timer: ctx.timer(progress.wakeAt) when set, each child handle })
-      if winner is a child:
-        remove it from children
-        ctx.step("child-" + round, CompleteSubWorkflow({ childId: winner.key }))
+      winner = ctx.waitForAny("park-" + round, { timer: ctx.timer({ until: progress.wakeAt }) when set, each started handle })
+      if winner is a sub-workflow:
+        remove it from started
+        ctx.step("ended-" + round, CompleteSubWorkflow({ instanceId, subWorkflowId: winner.key }))
     catch (error)
       if isWorkflowInterrupt(error): throw error
       ctx.step("fault-" + round, FaultInstance({ instanceId })); return
@@ -163,7 +165,8 @@ run(ctx, { instanceId }):
 **Constraints:**
 
 - **Explicit flow, with the engine's children.** Sub-workflows are steps of the parent's run, not domain events (Khorikov, "Domain events: simple and reliable solution": events only for what leaves the application). The run follows the engine's own pattern: a step creates the child instances (`StartSubWorkflow`) and returns their ids, and `run()` starts each with `ctx.startChild` ("Start the child from run(), and pass it what the step returned"). The engine journals every start, so a replay gets the same child back. A child's end needs no step of the child: the engine writes the end and a signal to the parent in one transaction ("a parent never misses its child's end"), and the parent's `waitForAny` takes the child's handle.
-- **Which children.** `progress.children` lists, from persisted state, the derived ids of the children the awaiting `run: workflow` tasks need. `StartSubWorkflow` returns every one that exists, whether this attempt created it or an earlier one did, so a crash between its commit and its journal entry loses no child; the run starts only the ids it has not started. `untilParked` stops after a round that awaits a child the run has not started, so a child never waits for other branches.
+- **Which sub-workflows.** `progress.subWorkflows` lists, from persisted state, the derived ids of the sub-workflow instances the awaiting `run: workflow` tasks need. One step per id runs `StartSubWorkflow`, which saves one aggregate (the sub-workflow, or the parent when the target is missing) and answers whether the instance exists, whether this attempt created it or an earlier one did; so a crash between its commit and its journal entry loses nothing, and the run starts only the ids it has not started. `untilParked` stops after a round that awaits a sub-workflow the run has not started, so a sub-workflow never waits for other branches.
+- **The step's result.** `ctx.step` journals its value as JSON, so `InstanceRounds` maps the use case's result inside the step to its own `RoundProgress` (`engine/interfaces.ts`): `kind` (run, park, busy or ended), `wakeAt` as epoch milliseconds, and the sub-workflow ids. `busy` is the engine's word for deferred work and stays out of the domain.
 - **`parentClose: 'abandon'`.** The engine never cancels a child behind the domain's back. Until US9, a child whose task ended early runs to its end and `CompleteSubWorkflow` ignores it; US9 cancels it through `CancelInstance`.
 - **A child run that fails.** A faulted child instance ends its run normally. Only a run that fails in the engine (its own fault step failed) throws `ChildWorkflowFailedError` from `waitForAny`, and the parent faults as after any failed step.
 - **A run the engine fails.** The journal limit, the run timeout or a failed fault step end the run as `failed` before it can record a new step, so the first step registers `FaultInstance` as its compensation ("Compensations may still record theirs"). `FaultInstance` does nothing to a terminal instance. The `catch` rethrows `WorkflowInterrupt` ("must rethrow").
@@ -174,7 +177,7 @@ run(ctx, { instanceId }):
   - calls 30 s;
   - processes 30 s + 5 s.
 - **Lease.** `leaseDuration` is 120 s, and the worker heartbeat (every 40 s) renews it during a step. S0 proves both the renewal and that a `signal` sent during `advance-N` is consumed by `park-N`.
-- **Bulkheads** reject when full, so they never queue past the lease. A full bulkhead never faults an instance: `untilParked` stops before the rejected work and returns `busy` with a short `wakeAt` (1 s doubling to 30 s), and the run parks on its timer, so capacity delays a `fork` of 65 calls instead of failing it.
+- **Bulkheads** reject when full, so they never queue past the lease. A full bulkhead never faults an instance: the rejected work gets no result and stays pending (§3), `untilParked` returns `busy` when a round deferred work, and the run sleeps 1 s doubling to 30 s, so capacity delays a `fork` of 65 calls instead of failing it.
 - **Journal.** Each park costs two entries (the round and the wait), and each child two more (its start and the step that records its end). The accepted default of 10,000 entries therefore allows about 5,000 parks.
 
 **Gateways and wakes:**
@@ -187,12 +190,13 @@ run(ctx, { instanceId }):
 
 Every non-HTTP start derives its id, so a repeated message finds the instance and returns at a guard:
 
-| Use case                                                                  | Id                                                  | Steps                                                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `StartInstance` (HTTP, `@Transactional`; `@Idempotent` on the controller) | new                                                 | version → id (UUIDv5 of the user and the `Idempotency-Key`, when given) → `WorkflowInstance.start` → save (an existing id returns that instance) → `InstanceRuns.start`                                                                                                                                                                                                                  |
-| `StartScheduledInstance(workflowId, epoch, occurrence)`                   | `workflowId` + occurrence (or previous instance id) | guard (exists) → `workflows.getForStart` (`FOR SHARE`) → `assertStartable(epoch)` → the same steps                                                                                                                                                                                                                                                                                       |
-| `StartTriggeredInstance`                                                  | correlation context id                              | the same steps, with the consumed events as input                                                                                                                                                                                                                                                                                                                                        |
-| `StartSubWorkflow`                                                        | parent id + task instance id                        | for each of `parent.requestedChildren()`: guard (exists: keep its id) → target (`latest` resolved) → `WorkflowInstance.startChild(...)` → save the child; a missing target → `parent.refuseChild(...)` → save the parent. Returns the ids of the children that exist, which the run starts with `ctx.startChild`. It runs in the parent's own run, so it never races the parent's rounds |
+| Use case                                                                  | Id                                                                                    | Steps                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `StartInstance` (HTTP, `@Transactional`; `@Idempotent` on the controller) | UUIDv5 of the user, the workflow and the `Idempotency-Key`, when given; otherwise new | version → id → guard (exists: return it, so a repeat after a crash gets the instance, not a 409) → `WorkflowInstance.start` → save → `InstanceRuns.start`                                                                                                                                                 |
+| `StartScheduledInstance(workflowId, epoch, occurrence)`                   | `workflowId` + occurrence (or previous instance id)                                   | guard (exists) → `workflows.getForStart` (`FOR SHARE`) → `assertStartable(epoch)` → the same steps                                                                                                                                                                                                        |
+| `StartTriggeredInstance`                                                  | correlation context id                                                                | the same steps, with the consumed events as input                                                                                                                                                                                                                                                         |
+| `StartSubWorkflow({ instanceId, subWorkflowId })`                         | parent id + task instance id (derived in the domain)                                  | guard (exists: true) → the parent's request for that id (none: false) → target (`latest` resolved) → `WorkflowInstance.startSubWorkflow(…)` → save it; a missing target → `parent.refuseSubWorkflow(…)` → save the parent → false. It runs in the parent's own run, so it never races the parent's rounds |
+| `StartDetachedWorkflow` (outbox)                                          | the id `WorkflowDetached` carries                                                     | guard (exists) → target → `WorkflowInstance.start` with a `ParentOrigin` → save → `InstanceRuns.start`; a missing target is acknowledged, because the detached task has already completed                                                                                                                 |
 
 ## 6. Events
 
@@ -215,7 +219,7 @@ Every non-HTTP start derives its id, so a repeated message finds the instance an
 
    The handler throws while the delivery is pending, so the outbox retries (backoff capped at 60 s).
 
-8. **Detached processes.** `ProcessDetached` → `RunDetachedProcess`, which calls `processRunner.runAll` and ignores the result.
+8. **Detached processes.** `ProcessDetached` carries the `ProcessRun` → `RunDetachedProcess`, which calls `processRunner.runAll` and ignores the result.
 
 ## 7. Schedules, control, sub-workflows
 
@@ -227,13 +231,13 @@ Every non-HTTP start derives its id, so a repeated message finds the instance an
 
 ## 8. Errors at non-HTTP inbound adapters
 
-| Error                                                                  | Outbox handler | `InstanceWorkflow` step                                   | `ScheduledStartWorkflow` |
-| ---------------------------------------------------------------------- | -------------- | --------------------------------------------------------- | ------------------------ |
-| NotFoundError, StaleStartError, InvalidControlError                    | Acknowledge    | End the run                                               | End the run              |
-| StaleWriteError, TransientStoreError, a network error, a full bulkhead | Retry          | Transient: retry; a full bulkhead parks the round (§4)    | Retry                    |
-| Anything else                                                          | Dead-letter    | `NonRetryableStepError` → `FaultInstance({ instanceId })` | Fail the run             |
+| Error                                                            | Outbox handler | `InstanceWorkflow` step                                   | `ScheduledStartWorkflow` |
+| ---------------------------------------------------------------- | -------------- | --------------------------------------------------------- | ------------------------ |
+| NotFoundError, StaleStartError, InvalidControlError              | Acknowledge    | End the run                                               | End the run              |
+| StaleWriteError, a transient PostgreSQL failure, a network error | Retry          | Transient: retry (a full bulkhead is data, §3)            | Retry                    |
+| Anything else                                                    | Dead-letter    | `NonRetryableStepError` → `FaultInstance({ instanceId })` | Fail the run             |
 
-Use cases never catch. Persistence translates the driver's transient failures (serialization, deadlock, lost connection) into `TransientStoreError` beside `StaleWriteError`, so SQLSTATE codes never leave it and the inbound adapters classify only inner error classes. The classification runs inside each step, because the engine's journal keeps no error class, and `FaultInstance` takes only the instance id, so no framework data reaches the use case.
+Use cases never catch. Some transient PostgreSQL failures surface outside repository code (a pool connection, `BEGIN` and `COMMIT` in `@Transactional`, the engine's insert in the caller's transaction), so translating them in the repositories would leave holes. Instead one owner recognizes them wherever they surface: `TransientFailures`, declared at the `interface-adapters/` root and implemented in `persistence/` (SQLSTATE classes 08, 40, 53 and 57 and pool timeouts, found through `cause`). The `ErrorClassifier` (`interface-adapters/error-classifier.ts`) asks it and classifies inner error classes into settled, transient or permanent; `engine/` and `messaging/` map that to their library's answer. The classification runs inside each step, because the engine's journal keeps no error class, and `FaultInstance` takes only the instance id, so no framework data reaches the use case.
 
 ## 9. Guarantees
 

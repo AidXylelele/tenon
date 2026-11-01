@@ -1,6 +1,6 @@
 import { Outcome } from '../../../../domain/automation/language/outcome.js';
 import type { OutcomeState } from '../../interfaces.js';
-import { ChildRequestMapper } from './child-request.mapper.js';
+import { SubWorkflowRequestMapper } from './sub-workflow-request.mapper.js';
 import { FlowDirectiveMapper } from './flow-directive.mapper.js';
 import { ProcessRunMapper } from './process-run.mapper.js';
 import { WorkflowErrorMapper } from './workflow-error.mapper.js';
@@ -13,7 +13,7 @@ export class OutcomeMapper {
 
     const failure = WorkflowErrorMapper.toState(outcome.failure);
     const directive = FlowDirectiveMapper.toState(outcome.directive);
-    const detachedWorkflow = ChildRequestMapper.toState(
+    const detachedWorkflow = SubWorkflowRequestMapper.toState(
       outcome.detachedWorkflow,
     );
     const detachedProcess = ProcessRunMapper.toState(outcome.detachedProcess);
@@ -35,7 +35,7 @@ export class OutcomeMapper {
 
     const failure = WorkflowErrorMapper.toDomain(state.failure);
     const directive = FlowDirectiveMapper.toDomain(state.directive);
-    const detachedWorkflow = ChildRequestMapper.toDomain(
+    const detachedWorkflow = SubWorkflowRequestMapper.toDomain(
       state.detachedWorkflow,
     );
     const detachedProcess = ProcessRunMapper.toDomain(state.detachedProcess);

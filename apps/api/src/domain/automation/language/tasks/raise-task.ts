@@ -4,7 +4,7 @@ import type { JsonValue, RaiseTaskProps, ValueTask } from '../interfaces.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { Outcome } from '../outcome.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { ValueProgress } from '../progress/value-progress.js';
 import { Task } from './task.js';
 import type { Template } from '../template.js';
@@ -24,8 +24,8 @@ export class RaiseTask extends Task implements ValueTask {
     return this.#error;
   }
 
-  enter(input: JsonValue, scope: TaskScope): Step<KindProgress> {
-    return ValueProgress.enter(input, scope);
+  enter(scope: BodyScope): Step<KindProgress> {
+    return ValueProgress.enter(scope);
   }
 
   outcomeOf(value: JsonValue): Outcome {

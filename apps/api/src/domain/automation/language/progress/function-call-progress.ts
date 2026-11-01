@@ -1,14 +1,10 @@
 import { TaskKind } from '../enums.js';
-import type {
-  FunctionCallProgressProps,
-  JsonValue,
-  TaskStart,
-} from '../interfaces.js';
+import type { JsonValue, TaskStart } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
 import { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
 import type { FunctionCallTask } from '../tasks/function-call-task.js';
@@ -16,40 +12,31 @@ import { ConcludedProgress } from './concluded-progress.js';
 import { KindProgress } from './kind-progress.js';
 
 export class FunctionCallProgress extends KindProgress {
-  readonly #input: JsonValue;
   readonly #started: boolean;
 
-  constructor(props: FunctionCallProgressProps) {
+  constructor(started: boolean) {
     super();
-    this.#input = props.input;
-    this.#started = props.started;
+    this.#started = started;
   }
 
-  static enter(
-    input: JsonValue,
-    scope: TaskScope<FunctionCallTask>,
-  ): Step<KindProgress> {
-    const progress = new FunctionCallProgress({ input, started: false });
+  static enter(scope: BodyScope<FunctionCallTask>): Step<KindProgress> {
+    const progress = new FunctionCallProgress(false);
     return progress.settled(scope);
-  }
-
-  get input(): JsonValue {
-    return this.#input;
   }
 
   get started(): boolean {
     return this.#started;
   }
 
-  work(scope: TaskScope<FunctionCallTask>): RoundWork {
+  work(scope: BodyScope<FunctionCallTask>): RoundWork {
     const args = scope.task.arguments;
 
     if (this.#started || args === null) return RoundWork.none();
 
-    const definitionArguments = scope.definitionArguments(this.#input);
+    const definitionArguments = scope.definitionArguments();
     const evaluations = args.evaluationsFor(
       scope.prefix,
-      this.#input,
+      scope.input,
       definitionArguments,
     );
     return RoundWork.evaluating(evaluations);
@@ -57,7 +44,7 @@ export class FunctionCallProgress extends KindProgress {
 
   record(
     results: RoundResults,
-    scope: TaskScope<FunctionCallTask>,
+    scope: BodyScope<FunctionCallTask>,
   ): Step<KindProgress> {
     const work = this.work(scope);
     const answered = results.answers(work);
@@ -66,7 +53,7 @@ export class FunctionCallProgress extends KindProgress {
 
     const args = scope.task.arguments;
 
-    if (args === null) return this.#start(this.#input, scope);
+    if (args === null) return FunctionCallProgress.#start(scope.input, scope);
 
     const at = scope.task.reference;
     const failure = args.failureIn(scope.prefix, results, at);
@@ -77,7 +64,7 @@ export class FunctionCallProgress extends KindProgress {
     }
 
     const input = args.fill(scope.prefix, results);
-    return this.#start(input, scope);
+    return FunctionCallProgress.#start(input, scope);
   }
 
   childEnded(child: JsonPointer, ending: TaskEnding): Step<KindProgress> {
@@ -91,9 +78,9 @@ export class FunctionCallProgress extends KindProgress {
     return ConcludedProgress.step(outcome);
   }
 
-  #start(
+  static #start(
     input: JsonValue,
-    scope: TaskScope<FunctionCallTask>,
+    scope: BodyScope<FunctionCallTask>,
   ): Step<KindProgress> {
     const callAt = scope.task.reference.at(TaskKind.Call);
     const declared = scope.definition.components.function(
@@ -105,10 +92,11 @@ export class FunctionCallProgress extends KindProgress {
       input,
       variables: scope.variables,
     };
-    const started = new FunctionCallProgress({
-      input: this.#input,
-      started: true,
-    });
+    const started = new FunctionCallProgress(true);
     return new Step<KindProgress>(started, [start]);
+  }
+
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

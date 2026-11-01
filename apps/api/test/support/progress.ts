@@ -25,12 +25,14 @@ export function definitionOf(
   body: JsonValue,
   use: JsonObject = {},
   input: JsonObject | null = null,
+  name = 'default/test',
 ): Definition {
+  const [namespace = 'default', named = 'test'] = name.split('/');
   const top: Record<string, JsonValue> = {
     document: {
       dsl: '1.0.3',
-      namespace: 'default',
-      name: 'test',
+      namespace,
+      name: named,
       version: '1.0.0',
     },
     use,
@@ -69,7 +71,9 @@ export function scopeOf(
     definition,
     rawInput,
     context: options.context ?? {},
-    workflow: { id: 'instance-1', input: {} },
+    instanceId: 'instance-1',
+    workflowInput: {},
+    workflowStartedAt: now,
     runtime: { name: 'tenon', version: '1.0.0' },
     variables: options.variables ?? {},
     startedAt: now,
@@ -116,11 +120,11 @@ export function completedAt(
   output: JsonValue,
 ): TaskEnding {
   const pointer = pointerOf(reference);
-  const directive = definition.taskAt(pointer).base.then;
+  const then = definition.taskAt(pointer).base.then;
   const outcome = Outcome.of(output);
   return TaskEnding.completed({
     output,
-    directive,
+    then,
     exported: false,
     context: null,
     outcome,

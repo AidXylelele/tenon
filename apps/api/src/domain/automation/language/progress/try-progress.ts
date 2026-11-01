@@ -1,9 +1,9 @@
 import { Attempt } from '../attempt.js';
-import type { JsonValue, TryProgressProps } from '../interfaces.js';
+import type { TryProgressProps } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
 import { Outcome } from '../outcome.js';
 import { RoundWork } from '../round-work.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Sequence } from '../sequence.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
@@ -14,41 +14,60 @@ import { ConcludedProgress } from './concluded-progress.js';
 import { KindProgress } from './kind-progress.js';
 
 export class TryProgress extends KindProgress {
-  readonly #input: JsonValue;
   readonly #attempt: Attempt;
   readonly #sequence: Sequence;
 
   constructor(props: TryProgressProps) {
     super();
-    this.#input = props.input;
     this.#attempt = props.attempt;
     this.#sequence = props.sequence;
   }
 
-  static enter(
-    input: JsonValue,
-    scope: TaskScope<TryTask>,
-  ): Step<KindProgress> {
+  static enter(scope: BodyScope<TryTask>): Step<KindProgress> {
     const first = Attempt.first(scope.now);
-    return TryProgress.attempt(input, first, scope);
+    return TryProgress.attempt(first, scope);
   }
 
   static attempt(
-    input: JsonValue,
     attempt: Attempt,
-    scope: TaskScope<TryTask>,
+    scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
-    const step = Sequence.start(scope.task.body, input, scope.variables);
-    const trying = new TryProgress({
-      input,
-      attempt,
-      sequence: step.progress,
-    });
-    return trying.#following(step, scope);
+    const step = Sequence.start(scope.task.body, scope.input, scope.variables);
+    return TryProgress.#following(attempt, step, scope);
   }
 
-  get input(): JsonValue {
-    return this.#input;
+  static #following(
+    attempt: Attempt,
+    step: Step<Sequence | Outcome>,
+    scope: BodyScope<TryTask>,
+  ): Step<KindProgress> {
+    const next = step.progress;
+
+    if (!(next instanceof Outcome)) {
+      const trying = new TryProgress({ attempt, sequence: next });
+      return new Step<KindProgress>(trying, step.starts);
+    }
+
+    const failure = next.failure;
+
+    if (failure === null) return ConcludedProgress.step(next);
+
+    return TryProgress.#failed(attempt, failure, scope);
+  }
+
+  static #failed(
+    attempt: Attempt,
+    error: WorkflowError,
+    scope: BodyScope<TryTask>,
+  ): Step<KindProgress> {
+    const filtered = scope.task.catchClause.filters(error);
+
+    if (!filtered) {
+      const uncaught = Outcome.failed(error);
+      return ConcludedProgress.step(uncaught);
+    }
+
+    return CatchProgress.enter({ attempt, error }, scope);
   }
 
   get attempt(): Attempt {
@@ -70,50 +89,13 @@ export class TryProgress extends KindProgress {
   childEnded(
     child: JsonPointer,
     ending: TaskEnding,
-    scope: TaskScope<TryTask>,
+    scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
     const step = this.#sequence.childEnded(child, ending, scope.task.body);
-    return this.#following(step, scope);
+    return TryProgress.#following(this.#attempt, step, scope);
   }
 
-  #following(
-    step: Step<Sequence>,
-    scope: TaskScope<TryTask>,
-  ): Step<KindProgress> {
-    const sequence = step.progress;
-    const outcome = sequence.outcome;
-
-    if (outcome === null) {
-      const trying = new TryProgress({
-        input: this.#input,
-        attempt: this.#attempt,
-        sequence,
-      });
-      return new Step<KindProgress>(trying, step.starts);
-    }
-
-    const failure = outcome.failure;
-
-    if (failure === null) return ConcludedProgress.step(outcome);
-
-    return this.#failed(failure, scope);
-  }
-
-  #failed(error: WorkflowError, scope: TaskScope<TryTask>): Step<KindProgress> {
-    const filtered = scope.task.catchClause.filters(error);
-
-    if (!filtered) {
-      const uncaught = Outcome.failed(error);
-      return ConcludedProgress.step(uncaught);
-    }
-
-    return CatchProgress.enter(
-      {
-        input: this.#input,
-        attempt: this.#attempt,
-        error,
-      },
-      scope,
-    );
+  subWorkflowEnded(): Step<KindProgress> {
+    return Step.of<KindProgress>(this);
   }
 }

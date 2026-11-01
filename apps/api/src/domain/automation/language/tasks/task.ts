@@ -1,10 +1,10 @@
 import type { Expression } from '../expression.js';
 import type { FlowDirective } from '../flow-directive.js';
-import type { JsonValue, TaskProps } from '../interfaces.js';
+import type { TaskProps } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import type { ReusableComponents } from '../reusable-components.js';
 import type { TaskBase } from '../task-base.js';
 import type { TaskList } from '../task-list.js';
@@ -51,7 +51,7 @@ export abstract class Task {
     for (const list of this.children) list.confirmCalls(components);
   }
 
-  abstract enter(input: JsonValue, scope: TaskScope): Step<KindProgress>;
+  abstract enter(scope: BodyScope): Step<KindProgress>;
 
   protected abstract get ownExpressions(): readonly Expression[];
 }

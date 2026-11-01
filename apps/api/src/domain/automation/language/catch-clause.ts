@@ -29,6 +29,10 @@ export class CatchClause {
     this.#handler = props.handler;
   }
 
+  get variable(): string {
+    return this.#as;
+  }
+
   get retry(): RetryStrategy | null {
     return this.#retry;
   }

@@ -1,10 +1,12 @@
+import { ReservedVariableError } from '../../../errors.js';
 import type { CatchClause } from '../catch-clause.js';
+import { RuntimeArgument } from '../enums.js';
 import type { Expression } from '../expression.js';
-import type { JsonValue, TryTaskProps } from '../interfaces.js';
+import type { TryTaskProps } from '../interfaces.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { TryProgress } from '../progress/try-progress.js';
 import type { Step } from '../step.js';
-import type { TaskScope } from '../scopes/task-scope.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { TaskList } from '../task-list.js';
 
@@ -14,6 +16,14 @@ export class TryTask extends Task {
 
   constructor(props: TryTaskProps) {
     super(props);
+    const variable = props.catchClause.variable;
+    const reserved: readonly string[] = Object.values(RuntimeArgument);
+
+    if (reserved.includes(variable)) {
+      const asAt = props.reference.at('catch').at('as');
+      throw new ReservedVariableError(variable, asAt);
+    }
+
     this.#body = props.body;
     this.#catchClause = props.catchClause;
   }
@@ -34,8 +44,8 @@ export class TryTask extends Task {
     return [this.#body, handler];
   }
 
-  enter(input: JsonValue, scope: TaskScope<TryTask>): Step<KindProgress> {
-    return TryProgress.enter(input, scope);
+  enter(scope: BodyScope<TryTask>): Step<KindProgress> {
+    return TryProgress.enter(scope);
   }
 
   protected override get ownExpressions(): readonly Expression[] {

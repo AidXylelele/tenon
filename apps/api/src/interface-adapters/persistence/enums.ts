@@ -21,5 +21,10 @@ export enum ProgressKind {
   Catch = 'catch',
   Retry = 'retry',
   Handler = 'handler',
-  Concluded = 'concluded',
+}
+
+export enum EndingKind {
+  Completed = 'completed',
+  Faulted = 'faulted',
+  Skipped = 'skipped',
 }
