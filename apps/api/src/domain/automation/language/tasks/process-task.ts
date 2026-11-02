@@ -1,6 +1,6 @@
-import type { JsonValue, ProcessRun } from '../interfaces.js';
+import type { JsonValue, ProcessRun, ProcessTaskProps } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
-import type { ProcessReturn } from '../process-return.js';
+import { ProcessReturn } from '../process-return.js';
 import { ConcludedProgress } from '../progress/concluded-progress.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { RunningProgress } from '../progress/running-progress.js';
@@ -14,11 +14,25 @@ import { LeafTask } from './leaf-task.js';
 export abstract class ProcessTask extends LeafTask {
   static readonly #PROCESS = 'process';
 
+  readonly #awaits: boolean;
+  readonly #returns: ProcessReturn;
+
+  // The standard's defaults: a process is awaited, and its task returns its stdout.
+  constructor(props: ProcessTaskProps) {
+    super(props);
+    this.#awaits = props.awaits ?? true;
+    this.#returns = props.returns ?? ProcessReturn.Stdout;
+  }
+
   abstract get process(): Template;
 
-  abstract get awaits(): boolean;
+  get awaits(): boolean {
+    return this.#awaits;
+  }
 
-  abstract get returns(): ProcessReturn;
+  get returns(): ProcessReturn {
+    return this.#returns;
+  }
 
   get templates(): readonly Template[] {
     return [this.process];

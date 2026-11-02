@@ -96,16 +96,14 @@ export class CatchProgress extends KindProgress {
   ): Step<KindProgress> {
     const attempt = this.#attempt.next();
     const workId = scope.key.countedIdFor(CatchProgress.#RETRY, attempt.count);
-    const delay = retry.delayFor(attempt.count, workId);
-    const allowed = retry.allows(attempt, delay, scope.now);
+    const resumes = retry.resumesAt(attempt, workId, scope.now);
+    const wakeAt = resumes.time;
 
-    if (!allowed) {
+    if (wakeAt === null) {
       const failed = Outcome.failed(this.#error);
       return this.#handled(failed, scope);
     }
 
-    const resumesAt = scope.now.getTime() + delay;
-    const wakeAt = new Date(resumesAt);
     const parked = new RetryProgress({ attempt, wakeAt });
     return Step.of<KindProgress>(parked);
   }

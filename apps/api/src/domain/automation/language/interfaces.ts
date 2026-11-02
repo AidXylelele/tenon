@@ -225,17 +225,18 @@ export interface RunWorkflowTaskProps extends TaskProps {
   readonly awaits: boolean | null;
 }
 
-export interface RunScriptTaskProps extends TaskProps {
-  readonly language: ScriptLanguage;
-  readonly script: Template;
+export interface ProcessTaskProps extends TaskProps {
   readonly awaits: boolean | null;
   readonly returns: ProcessReturn | null;
 }
 
-export interface RunShellTaskProps extends TaskProps {
+export interface RunScriptTaskProps extends ProcessTaskProps {
+  readonly language: ScriptLanguage;
+  readonly script: Template;
+}
+
+export interface RunShellTaskProps extends ProcessTaskProps {
   readonly shell: Template;
-  readonly awaits: boolean | null;
-  readonly returns: ProcessReturn | null;
 }
 
 export interface DefinitionProps {

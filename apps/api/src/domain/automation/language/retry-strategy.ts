@@ -4,6 +4,7 @@ import type { ErrorCondition } from './error-condition.js';
 import type { Expression } from './expression.js';
 import type { FixedDuration } from './fixed-duration.js';
 import type { Attempt } from './attempt.js';
+import { DueTime } from './due-time.js';
 import type { RetryStrategyProps } from './interfaces.js';
 
 export class RetryStrategy {
@@ -42,7 +43,20 @@ export class RetryStrategy {
     return this.#condition.expressions;
   }
 
-  delayFor(attempt: number, workId: string): number {
+  // When the attempt starts, none once the limits are spent. The jitter is sampled from the work
+  // id, so a replay of the round derives the same time.
+  resumesAt(attempt: Attempt, workId: string, now: Date): DueTime {
+    const delay = this.#delayFor(attempt.count, workId);
+    const allowed = this.#allows(attempt, delay, now);
+
+    if (!allowed) return DueTime.None;
+
+    const resumes = now.getTime() + delay;
+    const at = new Date(resumes);
+    return DueTime.of(at);
+  }
+
+  #delayFor(attempt: number, workId: string): number {
     const delay = this.#delay?.milliseconds ?? 0;
     const backedOff = this.#backoff.delayFor(delay, attempt);
     const from = this.#jitterFrom?.milliseconds ?? 0;
@@ -53,7 +67,7 @@ export class RetryStrategy {
     return Math.round(total);
   }
 
-  allows(attempt: Attempt, delay: number, now: Date): boolean {
+  #allows(attempt: Attempt, delay: number, now: Date): boolean {
     const counted =
       this.#attemptCount === null || attempt.count <= this.#attemptCount;
     const retryEnds = now.getTime() + delay;
