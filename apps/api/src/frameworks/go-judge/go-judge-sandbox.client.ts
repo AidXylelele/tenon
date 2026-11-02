@@ -20,8 +20,9 @@ export class GoJudgeSandboxClient implements SandboxClient {
   private static readonly PRESET = 'processes';
   private static readonly RUN = '/run';
   private static readonly LOGGER = new Logger(GoJudgeSandboxClient.name);
-  // The statuses with which go-judge refuses a command, its message in a JSON string.
-  private static readonly REFUSING: readonly number[] = [400, 404, 500];
+  // The statuses with which go-judge refuses this command, its message in a JSON string. Its 500
+  // is its own failure (a worker shutting down, a full queue), an outage like any other.
+  private static readonly REFUSING: readonly number[] = [400, 404];
   // The connection failures: anything else is a defect, not an outage.
   private static readonly UNREACHABLE: readonly string[] = [
     'ECONNREFUSED',
@@ -83,9 +84,9 @@ export class GoJudgeSandboxClient implements SandboxClient {
 
     if (response.statusCode >= 300 || result === null) {
       GoJudgeSandboxClient.LOGGER.warn(
-        `The sandbox refused a run with status ${String(response.statusCode)}`,
+        `The sandbox answered other than with a result, status ${String(response.statusCode)}`,
       );
-      return { kind: SandboxOutcomeKind.Refused };
+      return { kind: SandboxOutcomeKind.Unrecognized };
     }
 
     return { kind: SandboxOutcomeKind.Ran, result };

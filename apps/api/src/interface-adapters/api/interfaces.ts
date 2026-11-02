@@ -1,6 +1,6 @@
 import type { HealthIndicatorResult } from '@nestjs/terminus';
 
-// Whether the platform's database answers, for the health route that load balancers ask.
-export abstract class DatabaseProbe {
-  abstract isReachable(): PromiseLike<HealthIndicatorResult>;
+// What the health route asks the platform's tools, for the load balancers that ask it.
+export abstract class HealthClient {
+  abstract database(): PromiseLike<HealthIndicatorResult>;
 }

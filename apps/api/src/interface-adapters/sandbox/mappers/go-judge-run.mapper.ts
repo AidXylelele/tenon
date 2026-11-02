@@ -11,7 +11,7 @@ import { ProcessExited } from '../../../domain/automation/language/results/proce
 import type { ProcessResult } from '../../../domain/automation/language/results/process-result.js';
 import { ProcessTimedOut } from '../../../domain/automation/language/results/process-timed-out.js';
 import { SandboxFailed } from '../../../domain/automation/language/results/sandbox-failed.js';
-import { GoJudgeStatus, SandboxOutcomeKind } from '../enums.js';
+import { GoJudgeOutput, GoJudgeStatus, SandboxOutcomeKind } from '../enums.js';
 import type {
   GoJudgeCommand,
   GoJudgeResult,
@@ -46,8 +46,8 @@ export class GoJudgeRunMapper {
       env,
       files: [
         { content: stdin },
-        { name: 'stdout', max: limits.outputBytes },
-        { name: 'stderr', max: limits.outputBytes },
+        { name: GoJudgeOutput.Stdout, max: limits.outputBytes },
+        { name: GoJudgeOutput.Stderr, max: limits.outputBytes },
       ],
       cpuLimit: limit,
       clockLimit: limit,
@@ -100,7 +100,7 @@ export class GoJudgeRunMapper {
         return new SandboxFailed(id, GoJudgeRunMapper.#REFUSED);
       case SandboxOutcomeKind.Rejected:
       case SandboxOutcomeKind.Unreachable:
-      case SandboxOutcomeKind.Refused:
+      case SandboxOutcomeKind.Unrecognized:
       case SandboxOutcomeKind.TimedOut:
         return null;
     }

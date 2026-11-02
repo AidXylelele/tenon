@@ -8,8 +8,10 @@ const Json = z.json();
 const InstanceCursor = z.string().refine((cursor) => {
   const position = CursorMapper.toInstancePosition(cursor);
   const canonical = CursorMapper.fromInstancePosition(position) === cursor;
+  const time = position.startedAt.getTime();
+  const timed = Number.isSafeInteger(time) && time >= 0;
   const identified = z.uuid().safeParse(position.id).success;
-  return canonical && identified;
+  return canonical && timed && identified;
 });
 
 const PositionCursor = z.string().refine((cursor) => {

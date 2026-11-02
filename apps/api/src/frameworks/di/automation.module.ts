@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { Module } from '@nestjs/common';
 import { AdvanceInstance } from '../../application/automation/instances/advance-instance.js';
 import { WorkAnswers } from '../../application/automation/instances/work-answers.js';
@@ -96,7 +97,17 @@ import { ErrorClassifier } from '../resilience/error-classifier.js';
     { provide: Clock, useExisting: EngineClock },
     {
       provide: PlatformRuntime,
-      useValue: { descriptor: { name: 'workflow-platform', version: '0.0.1' } },
+      useFactory: () => {
+        // `$runtime.version` is the deployed API's own, as package.json states it.
+        const manifest = createRequire(import.meta.url)(
+          '../../../package.json',
+        ) as { readonly version: string };
+        const descriptor = {
+          name: 'workflow-platform',
+          version: manifest.version,
+        };
+        return { descriptor };
+      },
     },
     OpenWorkflowDefinitionReader,
     { provide: DefinitionReader, useExisting: OpenWorkflowDefinitionReader },

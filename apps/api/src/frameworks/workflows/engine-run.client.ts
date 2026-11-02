@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionHost } from '@nestjs-cls/transactional';
+import {
+  Propagation,
+  Transactional,
+  TransactionHost,
+} from '@nestjs-cls/transactional';
 import { WorkflowClient } from '@nestjs/workflows';
 import type { DrizzleTx } from '../../interface-adapters/persistence/interfaces.js';
 import {
@@ -15,6 +19,8 @@ export class EngineRunClient implements RunClient {
     private readonly txHost: TransactionHost<DrizzleTx>,
   ) {}
 
+  // In the caller's transaction, so the run starts only with the instance it runs (§9).
+  @Transactional(Propagation.Mandatory)
   async start(run: InstanceRun): Promise<void> {
     await this.client.start(InstanceWorkflow, run.input, {
       id: run.id,

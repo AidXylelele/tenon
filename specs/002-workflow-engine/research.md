@@ -540,6 +540,28 @@ Moved to run time after comparing with AWS Step Functions and Camunda: other wor
     - L12's reads: `ResolveSessionUser` gives the policies their principal, a `User`.
 
     All of these stay.
+- **The third critic round, outer rings.**
+  - Applied:
+    - go-judge's 500 is its own failure (a worker shutting down, a full queue), so it stays an outage; only its 400 and 404 refuse the command.
+    - An instance cursor whose time is not a whole non-negative number (`NaN_…`) is refused.
+    - `ENOTFOUND` is a transient database failure, since a stopped container in Compose is not found by its name.
+    - The health route's database check is cached for 1 s.
+    - The health client follows the client naming: `HealthClient`, implemented by `TerminusHealthClient` in `frameworks/terminus`.
+    - `GoJudgeOutput` owns the output files that both the run mapper and the pool's bound count.
+    - The outcome for an answer that is not go-judge's is `Unrecognized`, apart from go-judge's refusal (`Failed`).
+    - The API container gets 170 s: 90 s, 60 s and Terminus's 5 s.
+    - `EngineRunClient.start` requires its caller's transaction (`Propagation.Mandatory`), as the repositories do.
+    - `$runtime.version` reads `package.json`.
+    - A spec ties the API's phase list to the domain's phases, since the presenters cast them.
+  - Recorded:
+    - The busy rest's journal entry changed from a sleep to a wait under the same name, and the `instance` workflow keeps version 1 on this unreleased branch. A database holding runs of an earlier build must be reset, or the version raised, before a release.
+  - Not applied, with reasons:
+    - The service client keeps its broad network check. For the author's own services, any network failure is a communication error that the workflow sees and can catch. An explicit list would turn an unknown code (the SSRF refusal, a TLS failure) into a fault of the instance.
+    - Step retries stay on each step (L10), since the compensation and the classification wrap each step as well. The `true` of `ended-N` stays, because `null` is the settled answer.
+    - The client-credentials contract (L7) and the workers' answers (L8) stay plain data at a process boundary.
+    - `ENGINE_CONCURRENCY` (L9) is one number that the engine and the pools share by design.
+    - The publish-time timeouts (L11) include the wait for a worker, which bounds the request as a whole.
+    - The `*errors.ts` names (L14) and the small rewrites (L13) stay.
 - **The re-verification** (FT-1 to FT-4 on the fixed build). The PostgreSQL kill, the frozen worker and the paused sandbox pass. A stage has stored its deadline since US2, so a stage without one is corrupt, not old: an instant that is not a time is refused when read (`InconsistentProgressError`), not when written back. An instance whose stored state can be neither read nor written faults neither in its round nor in its fault step: the run ends `failed` and the instance stays `running`. That is the `@nestjs/workflows` state of a run that needs a person, and `retry(id)` runs it again from its journal once the cause is fixed. Not applied: a direct `faulted` write past the aggregate, which would be a second owner of the fault rule and would skip the lifecycle events.
 
 **Round 17** (2026-11-02, the final review and the first QA round on a local stand: three isolated stacks of PostgreSQL, Mailpit and go-judge with API nodes in their roles; two static reviewers (DDD, Clean Architecture and libraries) and four QA agents (identity and the contract, the runtime against DSL 1.0.3, performance, fault tolerance)). Applied:

@@ -122,9 +122,10 @@ services:
     init: true
     # A node that ended (a crash, a lost database) comes back; its work resumes after its lease.
     restart: unless-stopped
-    # On shutdown the engine lets a running round finish for up to 90 s, and then the outbox
-    # relay drains for up to 60 s (engine.module.ts, outbox.module.ts): Nest runs them in turn.
-    stop_grace_period: 160s
+    # On shutdown the engine lets a running round finish for up to 90 s, then the outbox relay
+    # drains for up to 60 s, and Terminus waits 5 s more (engine.module.ts, outbox.module.ts,
+    # app.module.ts): Nest runs them in turn.
+    stop_grace_period: 170s
     read_only: true
     tmpfs:
       - /tmp

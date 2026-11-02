@@ -15,7 +15,8 @@ export class PostgresTransientFailures {
     'timeout exceeded when trying to connect',
     'Connection terminated',
   ];
-  // The server could not be reached, which Drizzle reports as the cause of its query error.
+  // The server could not be reached, which Drizzle reports as the cause of its query error. A
+  // stopped database container is not found by its name (`postgres` in Compose).
   private static readonly CONNECTION_FAILURES: readonly string[] = [
     'ECONNREFUSED',
     'ECONNRESET',
@@ -24,6 +25,7 @@ export class PostgresTransientFailures {
     'EHOSTUNREACH',
     'ENETUNREACH',
     'EAI_AGAIN',
+    'ENOTFOUND',
   ];
 
   includes(error: unknown): boolean {

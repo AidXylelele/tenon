@@ -4,12 +4,18 @@ export enum GoJudgeStatus {
   TimeLimitExceeded = 'Time Limit Exceeded',
 }
 
+// The files go-judge collects from a process, each capped at `SandboxLimits.outputBytes`.
+export enum GoJudgeOutput {
+  Stdout = 'stdout',
+  Stderr = 'stderr',
+}
+
 export enum SandboxOutcomeKind {
   Ran = 'ran',
   Rejected = 'rejected',
   TimedOut = 'timed-out',
   Unreachable = 'unreachable',
-  Refused = 'refused',
+  Unrecognized = 'unrecognized',
   Oversized = 'oversized',
   Failed = 'failed',
 }

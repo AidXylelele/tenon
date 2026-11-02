@@ -49,8 +49,8 @@ export interface SandboxUnreachable {
 }
 
 // An answer that is not the sandbox's (a proxy's page, a gateway status): an outage.
-export interface SandboxRefused {
-  readonly kind: SandboxOutcomeKind.Refused;
+export interface SandboxUnrecognized {
+  readonly kind: SandboxOutcomeKind.Unrecognized;
 }
 
 // An answer larger than its bound, which repeating the run would only repeat.
@@ -68,7 +68,7 @@ export type SandboxOutcome =
   | SandboxRejected
   | SandboxTimedOut
   | SandboxUnreachable
-  | SandboxRefused
+  | SandboxUnrecognized
   | SandboxOversized
   | SandboxFailure;
 
