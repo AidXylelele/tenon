@@ -77,7 +77,7 @@ export class CallProgress extends KindProgress {
       scope.prefix,
       results,
       scope.input,
-      scope.deadline,
+      scope.deadline.time,
     );
     const calling = new CallProgress(call);
     return Step.of<KindProgress>(calling);

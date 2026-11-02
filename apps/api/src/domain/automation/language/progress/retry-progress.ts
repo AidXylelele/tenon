@@ -8,6 +8,7 @@ import { Step } from '../step.js';
 import type { TryTask } from '../tasks/try-task.js';
 import { KindProgress } from './kind-progress.js';
 import { TryProgress } from './try-progress.js';
+import { DueTime } from '../due-time.js';
 
 export class RetryProgress extends KindProgress {
   readonly #attempt: Attempt;
@@ -27,8 +28,13 @@ export class RetryProgress extends KindProgress {
     return this.#attempt;
   }
 
-  override wakeAt(): Date {
+  // For persistence: a retry always has a time to resume.
+  get resumesAt(): Date {
     return this.#wakeAt;
+  }
+
+  override wakeAt(): DueTime {
+    return DueTime.of(this.#wakeAt);
   }
 
   work(): RoundWork {
@@ -36,7 +42,9 @@ export class RetryProgress extends KindProgress {
   }
 
   record(results: RoundResults, scope: BodyScope<TryTask>): Step<KindProgress> {
-    if (scope.now < this.#wakeAt) return Step.of<KindProgress>(this);
+    const due = this.wakeAt().isDue(scope.now);
+
+    if (!due) return Step.of<KindProgress>(this);
 
     const attempt = TryProgress.attempt(this.#attempt, scope);
     return attempt.asRetry();

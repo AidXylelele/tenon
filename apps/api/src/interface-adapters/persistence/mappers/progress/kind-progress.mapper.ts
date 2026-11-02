@@ -92,7 +92,7 @@ export class KindProgressMapper {
 
     if (progress instanceof RetryProgress) {
       const attempt = AttemptMapper.toState(progress.attempt);
-      const due = progress.wakeAt();
+      const due = progress.resumesAt;
       const wakeAt = InstantMapper.toState(due);
       return { kind: ProgressKind.Retry, attempt, wakeAt };
     }

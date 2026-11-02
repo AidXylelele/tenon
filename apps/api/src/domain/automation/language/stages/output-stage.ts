@@ -8,10 +8,11 @@ import { Step } from '../step.js';
 import { EndedStage } from './ended-stage.js';
 import { ExportStage } from './export-stage.js';
 import { TaskProgress } from './task-progress.js';
+import type { DueTime } from '../due-time.js';
 
 export class OutputStage extends TaskProgress {
   readonly #input: JsonValue;
-  readonly #deadline: Date | null;
+  readonly #deadline: DueTime;
   readonly #outcome: Outcome;
 
   constructor(props: OutputStageProps) {
@@ -40,7 +41,7 @@ export class OutputStage extends TaskProgress {
     return this.#outcome;
   }
 
-  override deadline(): Date | null {
+  override deadline(): DueTime {
     return this.#deadline;
   }
 

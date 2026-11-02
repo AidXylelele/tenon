@@ -76,7 +76,8 @@ export class ProcessProgress extends KindProgress {
       return ConcludedProgress.step(detached);
     }
 
-    const run = scope.task.runFrom(id, value, scope.deadline);
+    const deadline = scope.deadline.time;
+    const run = scope.task.runFrom(id, value, deadline);
     const running = new ProcessProgress(run);
     return Step.of<KindProgress>(running);
   }

@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { InconsistentProgressError } from '../../errors.js';
 import type { Event } from '../events/event.js';
 import type { Definition } from '../language/definition.js';
 import { ErrorType } from '../language/error-type.js';
@@ -44,15 +43,13 @@ import type {
   TaskFollowUp,
   WorkflowInstanceProps,
 } from './interfaces.js';
-import { LifecycleEventType } from './lifecycle-event-type.js';
 import { ParentOrigin } from './origins/parent-origin.js';
 import { ProducedEvents } from './produced-events.js';
-import { TaskInstance } from './task-instance.js';
+import type { TaskInstance } from './task-instance.js';
+import { TaskTree } from './task-tree.js';
 
 export class WorkflowInstance {
   static readonly #RUN_FAILED = 'The run of the instance failed';
-  // The default limit of task executions per instance (spec, Assumptions).
-  static readonly #EXECUTION_LIMIT = 10_000;
   static readonly #LIMIT_REACHED =
     'The instance reached its limit of 10,000 task executions';
   static readonly #NOT_NAMED = 'The workflow is not the one the run task names';
@@ -66,10 +63,7 @@ export class WorkflowInstance {
   readonly #origin: Origin;
   readonly #startedAt: Date;
   readonly #version: number;
-  readonly #tasks: TaskInstance[];
-  // Lookups by id and the tasks still running, so a pass costs what runs, not what ran.
-  readonly #byId: Map<string, TaskInstance>;
-  #running: TaskInstance[];
+  readonly #tasks: TaskTree;
   readonly #produced: ProducedEvents;
   readonly #events: InstanceEvent[];
   #phase: Phase;
@@ -77,7 +71,6 @@ export class WorkflowInstance {
   #error: WorkflowError | null;
   #context: JsonValue;
   #endedAt: Date | null;
-  #executions: number;
   #changed: boolean;
 
   constructor(props: WorkflowInstanceProps) {
@@ -94,13 +87,7 @@ export class WorkflowInstance {
     this.#origin = props.origin;
     this.#startedAt = props.startedAt;
     this.#endedAt = props.endedAt;
-    this.#executions = props.executions;
-    this.#tasks = props.tasks.slice();
-    this.#byId = new Map();
-    this.#running = [];
-
-    for (const task of this.#tasks) this.#index(task);
-
+    this.#tasks = new TaskTree(props.id, props.tasks, props.executions);
     this.#version = props.version;
     this.#events = [];
     this.#changed = false;
@@ -221,11 +208,11 @@ export class WorkflowInstance {
   }
 
   get executions(): number {
-    return this.#executions;
+    return this.#tasks.executions;
   }
 
   get tasks(): readonly TaskInstance[] {
-    return this.#tasks;
+    return this.#tasks.tasks;
   }
 
   get version(): number {
@@ -243,7 +230,7 @@ export class WorkflowInstance {
 
     if (this.#phase === Phase.Pending) this.#run(round);
 
-    for (const task of this.#activeTasks()) this.#fire(task, round);
+    for (const task of this.#tasks.active()) this.#fire(task, round);
 
     this.#settle(round);
   }
@@ -261,7 +248,7 @@ export class WorkflowInstance {
 
     // One export per pass, so each sees the context the one before it left (fork branches
     // that end together would otherwise overwrite one another's exports).
-    for (const task of this.#activeTasks()) {
+    for (const task of this.#tasks.active()) {
       const exports = task.exportsContext();
 
       if (exports && exporting) continue;
@@ -286,7 +273,7 @@ export class WorkflowInstance {
 
     const round = this.#round(definition, runtime, now);
 
-    for (const task of this.#activeTasks()) {
+    for (const task of this.#tasks.active()) {
       const scope = this.#scopeOf(task, round);
       const change = task.record(results, scope);
       this.#follow(task, change, round);
@@ -294,7 +281,7 @@ export class WorkflowInstance {
 
     // The results arrived at `now`: a task whose time ran out meanwhile, or around whose
     // work the workflow's did, is interrupted, as the standard's timeouts require.
-    for (const task of this.#activeTasks()) this.#expire(task, round);
+    for (const task of this.#tasks.active()) this.#expire(task, round);
 
     this.#settle(round);
   }
@@ -308,41 +295,15 @@ export class WorkflowInstance {
   }
 
   #faultWith(error: WorkflowError, now: Date): void {
-    for (const task of this.#activeTasks()) this.#abandon(task, now);
+    for (const task of this.#tasks.active()) this.#abandon(task, now);
 
     this.#end(Phase.Faulted, now);
     this.#error = error;
-    this.#produced.announce(
-      {
-        type: LifecycleEventType.WorkflowFaulted,
-        task: null,
-        time: now,
-        error,
-        output: null,
-      },
-      now,
-    );
+    this.#produced.workflowFaulted(error, now);
   }
 
   requestedSubWorkflows(): readonly RequestedSubWorkflow[] {
-    const requested: RequestedSubWorkflow[] = [];
-
-    for (const task of this.#activeTasks()) {
-      const request = task.requestedSubWorkflow();
-
-      if (request === null) continue;
-
-      const instanceId = this.#subWorkflowIdOf(task);
-      requested.push({
-        taskId: task.id,
-        instanceId,
-        target: request.target,
-        input: request.input,
-        awaited: request.awaited,
-      });
-    }
-
-    return requested;
+    return this.#tasks.requests();
   }
 
   requestedSubWorkflow(instanceId: string): RequestedSubWorkflow | null {
@@ -362,7 +323,7 @@ export class WorkflowInstance {
     now: Date,
   ): WorkflowInstance | null {
     const request = this.requestedSubWorkflow(instanceId);
-    const task = this.#requesting(instanceId);
+    const task = this.#tasks.requesting(instanceId);
 
     if (this.#phase.isTerminal() || request === null || task === null)
       return null;
@@ -407,7 +368,7 @@ export class WorkflowInstance {
     runtime: JsonObject,
     now: Date,
   ): void {
-    const task = this.#requesting(instanceId);
+    const task = this.#tasks.requesting(instanceId);
 
     if (this.#phase.isTerminal() || task === null) return;
 
@@ -428,8 +389,9 @@ export class WorkflowInstance {
 
     const requested = this.requestedSubWorkflows();
     const subWorkflows = requested.map((request) => request.instanceId);
-    const wakeAt = this.#earliestWake();
-    const due = wakeAt !== null && wakeAt <= now;
+    const next = this.#tasks.nextDue();
+    const due = next.isDue(now);
+    const wakeAt = next.time;
 
     if (this.#phase === Phase.Waiting && !due)
       return { kind: InstanceProgressKind.Park, wakeAt, subWorkflows };
@@ -461,16 +423,7 @@ export class WorkflowInstance {
   #run(round: RoundContext): void {
     this.#phase = Phase.Running;
     this.#changed = true;
-    this.#produced.announce(
-      {
-        type: LifecycleEventType.WorkflowStarted,
-        task: null,
-        time: this.#startedAt,
-        error: null,
-        output: null,
-      },
-      round.now,
-    );
+    this.#produced.workflowStarted(this.#startedAt, round.now);
     const variables: JsonObject = {};
     const start: TaskStart = {
       reference: round.definition.root.reference,
@@ -535,23 +488,9 @@ export class WorkflowInstance {
     queue: TaskFollowUp[],
     now: Date,
   ): void {
-    if (change.entered) {
-      this.#announceTask(
-        LifecycleEventType.TaskCreated,
-        task,
-        task.startedAt,
-        now,
-      );
-      this.#announceTask(
-        LifecycleEventType.TaskStarted,
-        task,
-        task.startedAt,
-        now,
-      );
-    }
+    if (change.entered) this.#produced.taskEntered(task, now);
 
-    if (change.retried)
-      this.#announceTask(LifecycleEventType.TaskRetried, task, now, now);
+    if (change.retried) this.#produced.taskRetried(task, now);
 
     queue.push({ task, change });
   }
@@ -567,9 +506,7 @@ export class WorkflowInstance {
     if (task.isCancelled()) return;
 
     for (const start of change.starts) {
-      const spent = this.#executions >= WorkflowInstance.#EXECUTION_LIMIT;
-
-      if (spent) {
+      if (this.#tasks.isFull()) {
         const error = ErrorType.Runtime.errorAt(
           task.reference,
           WorkflowInstance.#LIMIT_REACHED,
@@ -597,7 +534,7 @@ export class WorkflowInstance {
       return;
     }
 
-    const parent = this.#parentOf(task);
+    const parent = this.#tasks.parentOf(task);
     const scope = this.#scopeOf(parent, round);
     const parentChange = parent.childEnded(task.reference, ending, scope);
 
@@ -614,34 +551,7 @@ export class WorkflowInstance {
 
     if (ending.exported) this.#context = ending.context;
 
-    if (task.isRoot()) return;
-
-    const failure = ending.failure;
-
-    if (failure !== null) {
-      this.#produced.announce(
-        {
-          type: LifecycleEventType.TaskFaulted,
-          task: task.reference,
-          time: now,
-          error: failure,
-          output: null,
-        },
-        now,
-      );
-      return;
-    }
-
-    this.#produced.announce(
-      {
-        type: LifecycleEventType.TaskCompleted,
-        task: task.reference,
-        time: now,
-        error: null,
-        output: { value: ending.output },
-      },
-      now,
-    );
+    this.#produced.taskEnded(task, ending, now);
   }
 
   #act(task: TaskInstance, body: Outcome, now: Date): void {
@@ -661,7 +571,7 @@ export class WorkflowInstance {
     }
 
     if (detachedWorkflow !== null) {
-      const subWorkflowId = this.#subWorkflowIdOf(task);
+      const subWorkflowId = this.#tasks.subWorkflowIdOf(task);
       const detached = new WorkflowDetached({
         instanceId: this.#id,
         taskInstanceId: task.id,
@@ -676,33 +586,13 @@ export class WorkflowInstance {
     const failure = ending.failure;
 
     if (failure !== null) {
-      this.#end(Phase.Faulted, now);
-      this.#error = failure;
-      this.#produced.announce(
-        {
-          type: LifecycleEventType.WorkflowFaulted,
-          task: null,
-          time: now,
-          error: failure,
-          output: null,
-        },
-        now,
-      );
+      this.#faultWith(failure, now);
       return;
     }
 
     this.#end(Phase.Completed, now);
     this.#output = ending.output;
-    this.#produced.announce(
-      {
-        type: LifecycleEventType.WorkflowCompleted,
-        task: null,
-        time: now,
-        error: null,
-        output: { value: ending.output },
-      },
-      now,
-    );
+    this.#produced.workflowCompleted(ending.output, now);
   }
 
   #end(phase: Phase, now: Date): void {
@@ -732,46 +622,15 @@ export class WorkflowInstance {
   }
 
   #abandonChildrenOf(parent: TaskInstance, now: Date): void {
-    const pending: TaskInstance[] = [parent];
+    const descendants = this.#tasks.activeDescendantsOf(parent);
 
-    for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
-      const parentId = next.id;
-      const children = this.#activeTasks().filter(
-        (task) => task.parentId === parentId,
-      );
-
-      for (const child of children) {
-        this.#abandon(child, now);
-        pending.push(child);
-      }
-    }
+    for (const descendant of descendants) this.#abandon(descendant, now);
   }
 
   #abandon(task: TaskInstance, now: Date): void {
     const announced = task.abandon(now);
 
-    if (announced)
-      this.#announceTask(LifecycleEventType.TaskCancelled, task, now, now);
-  }
-
-  #announceTask(
-    type: LifecycleEventType,
-    task: TaskInstance,
-    at: Date,
-    now: Date,
-  ): void {
-    if (task.isRoot()) return;
-
-    this.#produced.announce(
-      {
-        type,
-        task: task.reference,
-        time: at,
-        error: null,
-        output: null,
-      },
-      now,
-    );
+    if (announced) this.#produced.taskCancelled(task, now);
   }
 
   #created(
@@ -779,29 +638,8 @@ export class WorkflowInstance {
     start: TaskStart,
     round: RoundContext,
   ): TaskInstance {
-    const execution = this.#executions;
-    const counted = String(execution);
-    const parts = [this.#id, counted];
-    const id = DerivedId.of(parts);
-    const name = round.definition.taskAt(start.reference).name;
-    const task = TaskInstance.create({
-      id,
-      execution,
-      parentId,
-      name,
-      start,
-      now: round.now,
-    });
-    this.#executions += 1;
-    this.#tasks.push(task);
-    this.#index(task);
-    return task;
-  }
-
-  #index(task: TaskInstance): void {
-    this.#byId.set(task.id, task);
-
-    if (!task.isTerminal()) this.#running.push(task);
+    const declared = round.definition.taskAt(start.reference);
+    return this.#tasks.create(parentId, declared.name, start, round.now);
   }
 
   #scopeOf(task: TaskInstance, round: RoundContext): TaskScope {
@@ -834,69 +672,8 @@ export class WorkflowInstance {
       runtime: round.runtime,
       variables: task.variables,
       startedAt: task.startedAt,
-      deadline: this.#deadlineOf(task),
+      deadline: this.#tasks.deadlineOf(task),
       now: round.now,
     };
-  }
-
-  #deadlineOf(task: TaskInstance): Date | null {
-    let earliest = task.deadline();
-    let current = task;
-
-    while (!current.isRoot()) {
-      current = this.#parentOf(current);
-      const deadline = current.deadline();
-      const earlier =
-        deadline !== null && (earliest === null || deadline < earliest);
-
-      if (earlier) earliest = deadline;
-    }
-
-    return earliest;
-  }
-
-  // A copy, since following a change starts tasks while the caller goes through these.
-  #activeTasks(): readonly TaskInstance[] {
-    this.#running = this.#running.filter((task) => !task.isTerminal());
-    return this.#running.slice();
-  }
-
-  #parentOf(task: TaskInstance): TaskInstance {
-    const parentId = task.parentId ?? '';
-    const parent = this.#byId.get(parentId);
-
-    if (parent === undefined)
-      throw new InconsistentProgressError(
-        'a task other than the root runs inside its parent',
-      );
-
-    return parent;
-  }
-
-  #requesting(instanceId: string): TaskInstance | null {
-    const task = this.#activeTasks().find(
-      (candidate) =>
-        candidate.requestedSubWorkflow() !== null &&
-        this.#subWorkflowIdOf(candidate) === instanceId,
-    );
-    return task ?? null;
-  }
-
-  #subWorkflowIdOf(task: TaskInstance): string {
-    const parts = [this.#id, task.id];
-    return DerivedId.of(parts);
-  }
-
-  #earliestWake(): Date | null {
-    let earliest: Date | null = null;
-
-    for (const task of this.#activeTasks()) {
-      const wakeAt = task.wakeAt();
-
-      if (wakeAt !== null && (earliest === null || wakeAt < earliest))
-        earliest = wakeAt;
-    }
-
-    return earliest;
   }
 }

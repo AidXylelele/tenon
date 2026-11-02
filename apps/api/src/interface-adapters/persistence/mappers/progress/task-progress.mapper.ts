@@ -12,13 +12,14 @@ import { InstantMapper } from './instant.mapper.js';
 import { KindProgressMapper } from './kind-progress.mapper.js';
 import { OutcomeMapper } from './outcome.mapper.js';
 import { TaskEndingMapper } from './task-ending.mapper.js';
+import { DueTime } from '../../../../domain/automation/language/due-time.js';
 
 export class TaskProgressMapper {
   static readonly #UNSTORED = 'a task stage the platform does not store';
 
   static toState(progress: TaskProgress): TaskProgressState {
     const deadline = progress.deadline();
-    const deadlineState = InstantMapper.toState(deadline);
+    const deadlineState = InstantMapper.toState(deadline.time);
 
     if (progress instanceof EntryStage) return { stage: TaskStage.Entry };
 
@@ -78,17 +79,20 @@ export class TaskProgressMapper {
       case TaskStage.Entry:
         return new EntryStage();
       case TaskStage.Body: {
-        const deadline = InstantMapper.toDomain(state.deadline);
+        const due = InstantMapper.toDomain(state.deadline);
+        const deadline = DueTime.of(due);
         const body = KindProgressMapper.toDomain(state.body);
         return new BodyStage({ input: state.input, deadline, body });
       }
       case TaskStage.Output: {
-        const deadline = InstantMapper.toDomain(state.deadline);
+        const due = InstantMapper.toDomain(state.deadline);
+        const deadline = DueTime.of(due);
         const outcome = OutcomeMapper.toDomain(state.outcome);
         return new OutputStage({ input: state.input, deadline, outcome });
       }
       case TaskStage.Export: {
-        const deadline = InstantMapper.toDomain(state.deadline);
+        const due = InstantMapper.toDomain(state.deadline);
+        const deadline = DueTime.of(due);
         const outcome = OutcomeMapper.toDomain(state.outcome);
         return new ExportStage({
           input: state.input,
@@ -98,7 +102,8 @@ export class TaskProgressMapper {
         });
       }
       case TaskStage.ExportCheck: {
-        const deadline = InstantMapper.toDomain(state.deadline);
+        const due = InstantMapper.toDomain(state.deadline);
+        const deadline = DueTime.of(due);
         const outcome = OutcomeMapper.toDomain(state.outcome);
         return new ExportCheckStage({
           deadline,

@@ -7,18 +7,19 @@ import type { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
+import { DueTime } from '../due-time.js';
 
 export abstract class TaskProgress {
   ending(): TaskEnding | null {
     return null;
   }
 
-  deadline(): Date | null {
-    return null;
+  deadline(): DueTime {
+    return DueTime.None;
   }
 
-  wakeAt(): Date | null {
-    return null;
+  wakeAt(): DueTime {
+    return DueTime.None;
   }
 
   subWorkflow(): SubWorkflowRequest | null {

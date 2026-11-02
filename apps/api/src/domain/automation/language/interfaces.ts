@@ -45,6 +45,7 @@ import type { WorkflowError } from './workflow-error.js';
 import type { WorkflowName } from './workflow-name.js';
 import type { WorkflowTarget } from './workflow-target.js';
 import type { Phase } from './phase.js';
+import type { DueTime } from './due-time.js';
 
 export type JsonValue =
   string | number | boolean | null | JsonValue[] | JsonObject;
@@ -408,19 +409,19 @@ export interface TaskScopeProps<T extends Task> {
   readonly runtime: JsonObject;
   readonly variables: JsonObject;
   readonly startedAt: Date;
-  readonly deadline: Date | null;
+  readonly deadline: DueTime;
   readonly now: Date;
 }
 
 export interface BodyStageProps {
   readonly input: JsonValue;
-  readonly deadline: Date | null;
+  readonly deadline: DueTime;
   readonly body: KindProgress;
 }
 
 export interface OutputStageProps {
   readonly input: JsonValue;
-  readonly deadline: Date | null;
+  readonly deadline: DueTime;
   readonly outcome: Outcome;
 }
 
@@ -429,7 +430,7 @@ export interface ExportStageProps extends OutputStageProps {
 }
 
 export interface ExportCheckStageProps {
-  readonly deadline: Date | null;
+  readonly deadline: DueTime;
   readonly outcome: Outcome;
   readonly output: JsonValue;
   readonly context: JsonValue;

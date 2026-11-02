@@ -17,10 +17,11 @@ import type { TaskEnding } from '../task-ending.js';
 import { EndedStage } from './ended-stage.js';
 import { OutputStage } from './output-stage.js';
 import { TaskProgress } from './task-progress.js';
+import type { DueTime } from '../due-time.js';
 
 export class BodyStage extends TaskProgress {
   readonly #input: JsonValue;
-  readonly #deadline: Date | null;
+  readonly #deadline: DueTime;
   readonly #body: KindProgress;
 
   constructor(props: BodyStageProps) {
@@ -38,7 +39,7 @@ export class BodyStage extends TaskProgress {
 
   static enter(
     input: JsonValue,
-    deadline: Date | null,
+    deadline: DueTime,
     scope: TaskScope,
   ): Step<TaskProgress> {
     const bodyScope = new BodyScope(scope, input, deadline);
@@ -48,7 +49,7 @@ export class BodyStage extends TaskProgress {
 
   static #following(
     input: JsonValue,
-    deadline: Date | null,
+    deadline: DueTime,
     step: Step<KindProgress>,
     scope: TaskScope,
   ): Step<TaskProgress> {
@@ -79,11 +80,11 @@ export class BodyStage extends TaskProgress {
     return this.#body;
   }
 
-  override deadline(): Date | null {
+  override deadline(): DueTime {
     return this.#deadline;
   }
 
-  override wakeAt(): Date | null {
+  override wakeAt(): DueTime {
     return this.#body.wakeAt();
   }
 
@@ -93,7 +94,7 @@ export class BodyStage extends TaskProgress {
 
   override phase(): Phase {
     const parked =
-      this.#body.wakeAt() !== null || this.#body.subWorkflow() !== null;
+      !this.#body.wakeAt().isNone() || this.#body.subWorkflow() !== null;
 
     if (parked) return Phase.Waiting;
 

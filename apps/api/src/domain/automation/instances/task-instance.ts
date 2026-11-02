@@ -19,6 +19,7 @@ import type {
   TaskChange,
   TaskInstanceProps,
 } from './interfaces.js';
+import type { DueTime } from '../language/due-time.js';
 
 export class TaskInstance {
   readonly #id: string;
@@ -155,29 +156,25 @@ export class TaskInstance {
     return this.#progress.subWorkflow();
   }
 
-  deadline(): Date | null {
+  deadline(): DueTime {
     return this.#progress.deadline();
   }
 
   hasElapsed(now: Date): boolean {
     const deadline = this.#progress.deadline();
-    return deadline !== null && deadline <= now;
+    return deadline.isDue(now);
   }
 
   isDue(now: Date): boolean {
     const wakeAt = this.#progress.wakeAt();
-    return wakeAt !== null && wakeAt <= now;
+    return wakeAt.isDue(now);
   }
 
-  wakeAt(): Date | null {
+  // The earlier of the wake-up and the deadline: either one makes the run look at the task.
+  nextDue(): DueTime {
     const wakeAt = this.#progress.wakeAt();
     const deadline = this.#progress.deadline();
-
-    if (wakeAt === null) return deadline;
-
-    if (deadline === null || wakeAt < deadline) return wakeAt;
-
-    return deadline;
+    return wakeAt.earlierOf(deadline);
   }
 
   work(scope: TaskScope): RoundWork {

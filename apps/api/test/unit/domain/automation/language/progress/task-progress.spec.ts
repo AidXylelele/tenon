@@ -1,3 +1,4 @@
+import { DueTime } from '../../../../../../src/domain/automation/language/due-time.js';
 import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
 import { FlowDirective } from '../../../../../../src/domain/automation/language/flow-directive.js';
 import { Outcome } from '../../../../../../src/domain/automation/language/outcome.js';
@@ -159,7 +160,7 @@ describe('TaskProgress', () => {
 
     const failure = calling.timeOut(scope).ending()?.failure;
 
-    expect(calling.deadline()).toEqual(new Date(now.getTime() + 5000));
+    expect(calling.deadline().time).toEqual(new Date(now.getTime() + 5000));
     expect(failure?.type).toBe(
       'https://serverlessworkflow.io/spec/1.0.0/errors/timeout',
     );
@@ -183,7 +184,7 @@ describe('TaskProgress', () => {
       runtime: { name: 'tenon' },
       variables: {},
       startedAt: now,
-      deadline: null,
+      deadline: DueTime.None,
       now,
     });
 
@@ -222,7 +223,7 @@ describe('TaskProgress', () => {
       runtime: { name: 'tenon' },
       variables: {},
       startedAt: now,
-      deadline: null,
+      deadline: DueTime.None,
       now,
     });
     const checking = EntryStage.begin(scope).progress;
@@ -252,14 +253,16 @@ describe('TaskProgress states', () => {
   it('a_body_stage_around_a_body_that_ended_is_refused', () => {
     const outcome = Outcome.of({ a: 1 });
     const body = new ConcludedProgress(outcome);
-    const build = () => new BodyStage({ input: {}, deadline: null, body });
+    const build = () =>
+      new BodyStage({ input: {}, deadline: DueTime.None, body });
 
     expect(build).toThrow(InconsistentProgressError);
   });
 
   it('an_output_stage_after_a_failed_body_is_refused', () => {
     const outcome = Outcome.failed(failure);
-    const build = () => new OutputStage({ input: {}, deadline: null, outcome });
+    const build = () =>
+      new OutputStage({ input: {}, deadline: DueTime.None, outcome });
 
     expect(build).toThrow(InconsistentProgressError);
   });

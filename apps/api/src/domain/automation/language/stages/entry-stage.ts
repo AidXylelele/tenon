@@ -7,6 +7,7 @@ import type { WorkflowError } from '../workflow-error.js';
 import { BodyStage } from './body-stage.js';
 import { EndedStage } from './ended-stage.js';
 import { TaskProgress } from './task-progress.js';
+import { DueTime } from '../due-time.js';
 
 export class EntryStage extends TaskProgress {
   static begin(scope: TaskScope): Step<TaskProgress> {
@@ -89,13 +90,14 @@ export class EntryStage extends TaskProgress {
     return base.input.failureIn(prefix, results, at);
   }
 
-  #deadlineFrom(results: RoundResults, scope: TaskScope): Date | null {
+  #deadlineFrom(results: RoundResults, scope: TaskScope): DueTime {
     const timeout = scope.task.base.timeout;
 
-    if (timeout === null) return null;
+    if (timeout === null) return DueTime.None;
 
     const duration = timeout.resolve(scope.prefix, results);
-    return duration.endFrom(scope.startedAt);
+    const end = duration.endFrom(scope.startedAt);
+    return DueTime.of(end);
   }
 
   #faulted(error: WorkflowError): Step<TaskProgress> {

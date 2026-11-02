@@ -1,3 +1,4 @@
+import { DueTime } from '../../src/domain/automation/language/due-time.js';
 import type { Definition } from '../../src/domain/automation/language/definition.js';
 import type {
   Evaluation,
@@ -77,7 +78,7 @@ export function scopeOf(
     runtime: { name: 'tenon', version: '1.0.0' },
     variables: options.variables ?? {},
     startedAt: now,
-    deadline: null,
+    deadline: DueTime.None,
     now: options.at ?? now,
   });
 }

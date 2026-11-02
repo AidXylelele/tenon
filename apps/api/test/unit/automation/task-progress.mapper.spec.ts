@@ -1,3 +1,4 @@
+import { DueTime } from '../../../src/domain/automation/language/due-time.js';
 import { ErrorType } from '../../../src/domain/automation/language/error-type.js';
 import { FlowDirective } from '../../../src/domain/automation/language/flow-directive.js';
 import type { JsonValue } from '../../../src/domain/automation/language/interfaces.js';
@@ -262,7 +263,7 @@ describe('TaskProgressMapper', () => {
 
     const retried = restored.record(answer(restored.work(scope), {}), scope);
 
-    expect(restored.wakeAt()).toEqual(due);
+    expect(restored.wakeAt().time).toEqual(due);
     expect(retried.starts.map((start) => start.reference.toString())).toEqual([
       getPetAt,
     ]);
@@ -302,7 +303,11 @@ describe('TaskProgressMapper', () => {
     const ended = Outcome.directed({ id: 1 }, FlowDirective.End);
 
     const states = [detached, ended].map((outcome) => {
-      const stage = new OutputStage({ input: {}, deadline: null, outcome });
+      const stage = new OutputStage({
+        input: {},
+        deadline: DueTime.None,
+        outcome,
+      });
       const state = TaskProgressMapper.toState(stage);
       const restored = TaskProgressMapper.toDomain(stored(state));
 

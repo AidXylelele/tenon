@@ -59,6 +59,14 @@ export interface LifecycleNotice {
   readonly output: LifecycleOutput | null;
 }
 
+// A notice about a task, before it names the task.
+export interface TaskNotice {
+  readonly type: LifecycleEventType;
+  readonly time: Date;
+  readonly error: WorkflowError | null;
+  readonly output: LifecycleOutput | null;
+}
+
 export interface LifecycleEventProps extends LifecycleNotice {
   readonly subject: LifecycleSubject;
   readonly sequence: number;

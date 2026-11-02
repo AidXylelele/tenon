@@ -164,12 +164,12 @@ describe('TryProgress', () => {
     const waiting = parked.record(answer(parked.work(early), {}), early);
     const retried = parked.record(answer(parked.work(due), {}), due);
 
-    expect(parked.wakeAt()).toEqual(new Date(now.getTime() + 2000));
+    expect(parked.wakeAt().time).toEqual(new Date(now.getTime() + 2000));
     expect(waiting.starts).toEqual([]);
     expect(retried.starts.map((start) => start.reference.toString())).toEqual([
       getPetAt,
     ]);
-    expect(retried.progress.wakeAt()).toBeNull();
+    expect(retried.progress.wakeAt().isNone()).toBe(true);
   });
 
   it('spent_retries_fault_the_try_task_with_the_last_error', () => {

@@ -1,13 +1,14 @@
 import type { JsonObject, JsonValue } from '../interfaces.js';
 import type { Task } from '../tasks/task.js';
 import { TaskScope } from './task-scope.js';
+import type { DueTime } from '../due-time.js';
 
 export class BodyScope<T extends Task = Task> extends TaskScope<T> {
   readonly #input: JsonValue;
 
   // `deadline`: the body's own, which the task's scope may not hold yet as the body begins.
-  constructor(scope: TaskScope<T>, input: JsonValue, deadline: Date | null) {
-    const earliest = scope.deadlineWith(deadline);
+  constructor(scope: TaskScope<T>, input: JsonValue, deadline: DueTime) {
+    const earliest = scope.deadline.earlierOf(deadline);
     super({
       id: scope.id,
       task: scope.task,

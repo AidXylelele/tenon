@@ -7,14 +7,15 @@ import type { RoundWork } from '../round-work.js';
 import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
+import { DueTime } from '../due-time.js';
 
 export abstract class KindProgress {
   outcome(): Outcome | null {
     return null;
   }
 
-  wakeAt(): Date | null {
-    return null;
+  wakeAt(): DueTime {
+    return DueTime.None;
   }
 
   subWorkflow(): SubWorkflowRequest | null {

@@ -2,6 +2,7 @@ import type { Definition } from '../definition.js';
 import type { JsonObject, JsonValue, TaskScopeProps } from '../interfaces.js';
 import { JsonPointer } from '../json-pointer.js';
 import type { Task } from '../tasks/task.js';
+import type { DueTime } from '../due-time.js';
 
 export class TaskScope<T extends Task = Task> {
   static readonly #MILLISECONDS_PER_SECOND = 1000;
@@ -17,7 +18,7 @@ export class TaskScope<T extends Task = Task> {
   readonly #runtime: JsonObject;
   readonly #variables: JsonObject;
   readonly #startedAt: Date;
-  readonly #deadline: Date | null;
+  readonly #deadline: DueTime;
   readonly #now: Date;
 
   constructor(props: TaskScopeProps<T>) {
@@ -93,20 +94,12 @@ export class TaskScope<T extends Task = Task> {
   }
 
   // The earliest deadline of the task and the tasks around it, the workflow's included.
-  get deadline(): Date | null {
+  get deadline(): DueTime {
     return this.#deadline;
   }
 
   get now(): Date {
     return this.#now;
-  }
-
-  deadlineWith(other: Date | null): Date | null {
-    if (other === null) return this.#deadline;
-
-    if (this.#deadline === null || other < this.#deadline) return other;
-
-    return this.#deadline;
   }
 
   get prefix(): string {

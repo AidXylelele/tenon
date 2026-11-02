@@ -9,10 +9,11 @@ import type { WorkflowError } from '../workflow-error.js';
 import { EndedStage } from './ended-stage.js';
 import { ExportCheckStage } from './export-check-stage.js';
 import { TaskProgress } from './task-progress.js';
+import type { DueTime } from '../due-time.js';
 
 export class ExportStage extends TaskProgress {
   readonly #input: JsonValue;
-  readonly #deadline: Date | null;
+  readonly #deadline: DueTime;
   readonly #outcome: Outcome;
   readonly #output: JsonValue;
 
@@ -47,7 +48,7 @@ export class ExportStage extends TaskProgress {
     return this.#output;
   }
 
-  override deadline(): Date | null {
+  override deadline(): DueTime {
     return this.#deadline;
   }
 

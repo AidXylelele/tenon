@@ -8,9 +8,10 @@ import { Step } from '../step.js';
 import { TaskEnding } from '../task-ending.js';
 import { EndedStage } from './ended-stage.js';
 import { TaskProgress } from './task-progress.js';
+import type { DueTime } from '../due-time.js';
 
 export class ExportCheckStage extends TaskProgress {
-  readonly #deadline: Date | null;
+  readonly #deadline: DueTime;
   readonly #outcome: Outcome;
   readonly #output: JsonValue;
   readonly #context: JsonValue;
@@ -55,7 +56,7 @@ export class ExportCheckStage extends TaskProgress {
     return this.#exported;
   }
 
-  override deadline(): Date | null {
+  override deadline(): DueTime {
     return this.#deadline;
   }
 
