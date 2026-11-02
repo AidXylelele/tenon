@@ -1,16 +1,11 @@
 import { ErrorType } from '../error-type.js';
-import type { Expression } from '../expression.js';
-import type { JsonValue, RaiseTaskProps, ValueTask } from '../interfaces.js';
-import type { KindProgress } from '../progress/kind-progress.js';
+import type { JsonValue, RaiseTaskProps } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
-import type { Step } from '../step.js';
-import type { BodyScope } from '../scopes/body-scope.js';
-import { ValueProgress } from '../progress/value-progress.js';
-import { Task } from './task.js';
+import { ValueTask } from './value-task.js';
 import type { Template } from '../template.js';
 import { WorkflowError } from '../workflow-error.js';
 
-export class RaiseTask extends Task implements ValueTask {
+export class RaiseTask extends ValueTask {
   static readonly #NOT_AN_ERROR = 'The raised error has no type or status';
 
   readonly #error: Template;
@@ -24,17 +19,9 @@ export class RaiseTask extends Task implements ValueTask {
     return this.#error;
   }
 
-  enter(scope: BodyScope): Step<KindProgress> {
-    return ValueProgress.enter(scope);
-  }
-
-  outcomeOf(value: JsonValue): Outcome {
+  protected outcomeOf(value: JsonValue): Outcome {
     const error = this.#raised(value);
     return Outcome.failed(error);
-  }
-
-  protected override get ownExpressions(): readonly Expression[] {
-    return this.#error.expressions;
   }
 
   #raised(value: JsonValue): WorkflowError {

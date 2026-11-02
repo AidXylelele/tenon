@@ -3,6 +3,7 @@ import type { JsonObject, JsonValue, TaskScopeProps } from '../interfaces.js';
 import { JsonPointer } from '../json-pointer.js';
 import type { Task } from '../tasks/task.js';
 import type { DueTime } from '../due-time.js';
+import { BodyScope } from './body-scope.js';
 
 export class TaskScope<T extends Task = Task> {
   static readonly #MILLISECONDS_PER_SECOND = 1000;
@@ -100,6 +101,12 @@ export class TaskScope<T extends Task = Task> {
 
   get now(): Date {
     return this.#now;
+  }
+
+  // `deadline`: the body's own, which this scope may not hold yet as the body begins.
+  forBody(input: JsonValue, deadline: DueTime): BodyScope<T> {
+    const earliest = this.#deadline.earlierOf(deadline);
+    return new BodyScope(this, input, earliest);
   }
 
   get prefix(): string {

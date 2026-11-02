@@ -2,18 +2,13 @@ import { MalformedEventError } from '../../../errors.js';
 import { CloudEvent } from '../cloud-event.js';
 import { ErrorType } from '../error-type.js';
 import { LifecycleSource } from '../lifecycle-source.js';
-import type { Expression } from '../expression.js';
-import type { EmitTaskProps, JsonValue, ValueTask } from '../interfaces.js';
-import type { KindProgress } from '../progress/kind-progress.js';
+import type { EmitTaskProps, JsonValue } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
-import type { Step } from '../step.js';
 import type { BodyScope } from '../scopes/body-scope.js';
-import type { TaskScope } from '../scopes/task-scope.js';
-import { ValueProgress } from '../progress/value-progress.js';
-import { Task } from './task.js';
+import { ValueTask } from './value-task.js';
 import type { Template } from '../template.js';
 
-export class EmitTask extends Task implements ValueTask {
+export class EmitTask extends ValueTask {
   static readonly #MALFORMED =
     'The event to emit is not a well-formed CloudEvent';
   static readonly #RESERVED =
@@ -35,11 +30,7 @@ export class EmitTask extends Task implements ValueTask {
     return this.#event;
   }
 
-  enter(scope: BodyScope): Step<KindProgress> {
-    return ValueProgress.enter(scope);
-  }
-
-  outcomeOf(value: JsonValue, scope: TaskScope): Outcome {
+  protected outcomeOf(value: JsonValue, scope: BodyScope): Outcome {
     const malformed = ErrorType.Runtime.errorAt(
       this.reference,
       EmitTask.#MALFORMED,
@@ -63,9 +54,5 @@ export class EmitTask extends Task implements ValueTask {
     }
 
     return Outcome.emitting(completed, event);
-  }
-
-  protected override get ownExpressions(): readonly Expression[] {
-    return this.#event.expressions;
   }
 }

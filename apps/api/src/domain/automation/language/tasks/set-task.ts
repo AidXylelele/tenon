@@ -1,14 +1,10 @@
 import type { Expression } from '../expression.js';
-import type { JsonValue, SetTaskProps, ValueTask } from '../interfaces.js';
-import type { KindProgress } from '../progress/kind-progress.js';
+import type { JsonValue, SetTaskProps } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
-import type { Step } from '../step.js';
-import type { BodyScope } from '../scopes/body-scope.js';
-import { ValueProgress } from '../progress/value-progress.js';
-import { Task } from './task.js';
+import { ValueTask } from './value-task.js';
 import type { Template } from '../template.js';
 
-export class SetTask extends Task implements ValueTask {
+export class SetTask extends ValueTask {
   readonly #value: Expression | Template;
 
   constructor(props: SetTaskProps) {
@@ -20,15 +16,7 @@ export class SetTask extends Task implements ValueTask {
     return this.#value;
   }
 
-  enter(scope: BodyScope): Step<KindProgress> {
-    return ValueProgress.enter(scope);
-  }
-
-  outcomeOf(value: JsonValue): Outcome {
+  protected outcomeOf(value: JsonValue): Outcome {
     return Outcome.of(value);
-  }
-
-  protected override get ownExpressions(): readonly Expression[] {
-    return this.#value.expressions;
   }
 }

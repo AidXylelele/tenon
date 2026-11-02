@@ -1,22 +1,16 @@
 import type { CallOutput } from '../call-output.js';
 import type { Endpoint } from '../endpoint.js';
 import { CallKind } from '../enums.js';
-import type { Expression } from '../expression.js';
 import type {
-  CallTask,
   HttpCallTaskProps,
   JsonValue,
   ServiceCall,
 } from '../interfaces.js';
-import { CallProgress } from '../progress/call-progress.js';
-import type { KindProgress } from '../progress/kind-progress.js';
-import type { Step } from '../step.js';
-import type { BodyScope } from '../scopes/body-scope.js';
 import type { RoundResults } from '../round-results.js';
-import { Task } from './task.js';
+import { CallTask } from './call-task.js';
 import type { Template } from '../template.js';
 
-export class HttpCallTask extends Task implements CallTask {
+export class HttpCallTask extends CallTask {
   readonly #endpoint: Endpoint;
   readonly #arguments: Template;
   readonly #output: CallOutput;
@@ -45,11 +39,7 @@ export class HttpCallTask extends Task implements CallTask {
     return endpoint.concat(this.#arguments);
   }
 
-  enter(scope: BodyScope): Step<KindProgress> {
-    return CallProgress.enter(scope);
-  }
-
-  callFrom(
+  protected callFrom(
     id: string,
     prefix: string,
     results: RoundResults,
@@ -67,11 +57,5 @@ export class HttpCallTask extends Task implements CallTask {
       input,
       deadline,
     };
-  }
-
-  protected override get ownExpressions(): readonly Expression[] {
-    const endpoint = this.#endpoint.expressions;
-    const args = this.#arguments.expressions;
-    return endpoint.concat(args);
   }
 }

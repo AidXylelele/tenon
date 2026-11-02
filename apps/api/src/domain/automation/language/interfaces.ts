@@ -32,9 +32,7 @@ import type { ServiceResult } from './results/service-result.js';
 import type { ValidationResult } from './results/validation-result.js';
 import type { RetryStrategy } from './retry-strategy.js';
 import type { ReusableComponents } from './reusable-components.js';
-import type { RoundResults } from './round-results.js';
 import type { Schema } from './schema.js';
-import type { TaskScope } from './scopes/task-scope.js';
 import type { Sequence } from './sequence.js';
 import type { SwitchCase } from './switch-case.js';
 import type { TaskBase } from './task-base.js';
@@ -472,28 +470,4 @@ export interface CatchProgressProps {
 export interface RetryProgressProps {
   readonly attempt: Attempt;
   readonly wakeAt: Date;
-}
-
-export interface ValueTask extends Task {
-  readonly template: Expression | Template;
-  outcomeOf(value: JsonValue, scope: TaskScope): Outcome;
-}
-
-export interface CallTask extends Task {
-  readonly templates: readonly (Expression | Template)[];
-  readonly output: CallOutput;
-  callFrom(
-    id: string,
-    prefix: string,
-    results: RoundResults,
-    input: JsonValue,
-    deadline: Date | null,
-  ): ServiceCall;
-}
-
-export interface ProcessTask extends Task {
-  readonly process: Template;
-  readonly awaits: boolean;
-  readonly returns: ProcessReturn;
-  runFrom(id: string, process: JsonValue, deadline: Date | null): ProcessRun;
 }

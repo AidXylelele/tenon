@@ -10,7 +10,6 @@ import { Phase } from '../phase.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import type { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
-import { BodyScope } from '../scopes/body-scope.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../task-ending.js';
@@ -42,7 +41,7 @@ export class BodyStage extends TaskProgress {
     deadline: DueTime,
     scope: TaskScope,
   ): Step<TaskProgress> {
-    const bodyScope = new BodyScope(scope, input, deadline);
+    const bodyScope = scope.forBody(input, deadline);
     const step = scope.task.enter(bodyScope);
     return BodyStage.#following(input, deadline, step, scope);
   }
@@ -106,12 +105,12 @@ export class BodyStage extends TaskProgress {
   }
 
   work(scope: TaskScope): RoundWork {
-    const bodyScope = new BodyScope(scope, this.#input, this.#deadline);
+    const bodyScope = scope.forBody(this.#input, this.#deadline);
     return this.#body.work(bodyScope);
   }
 
   record(results: RoundResults, scope: TaskScope): Step<TaskProgress> {
-    const bodyScope = new BodyScope(scope, this.#input, this.#deadline);
+    const bodyScope = scope.forBody(this.#input, this.#deadline);
     const step = this.#body.record(results, bodyScope);
 
     if (step.progress === this.#body) return Step.of<TaskProgress>(this);
@@ -124,7 +123,7 @@ export class BodyStage extends TaskProgress {
     ending: TaskEnding,
     scope: TaskScope,
   ): Step<TaskProgress> {
-    const bodyScope = new BodyScope(scope, this.#input, this.#deadline);
+    const bodyScope = scope.forBody(this.#input, this.#deadline);
     const step = this.#body.childEnded(child, ending, bodyScope);
 
     if (step.progress === this.#body) return Step.of<TaskProgress>(this);
@@ -136,7 +135,7 @@ export class BodyStage extends TaskProgress {
     answer: SubWorkflowAnswer,
     scope: TaskScope,
   ): Step<TaskProgress> {
-    const bodyScope = new BodyScope(scope, this.#input, this.#deadline);
+    const bodyScope = scope.forBody(this.#input, this.#deadline);
     const step = this.#body.subWorkflowAnswered(answer, bodyScope);
 
     if (step.progress === this.#body) return Step.of<TaskProgress>(this);

@@ -2,22 +2,16 @@ import type { Authentication } from '../authentication.js';
 import type { CallOutput } from '../call-output.js';
 import type { Endpoint } from '../endpoint.js';
 import { CallKind } from '../enums.js';
-import type { Expression } from '../expression.js';
 import type {
-  CallTask,
   JsonValue,
   OpenApiCallTaskProps,
   ServiceCall,
 } from '../interfaces.js';
-import { CallProgress } from '../progress/call-progress.js';
-import type { KindProgress } from '../progress/kind-progress.js';
-import type { Step } from '../step.js';
-import type { BodyScope } from '../scopes/body-scope.js';
 import type { RoundResults } from '../round-results.js';
-import { Task } from './task.js';
+import { CallTask } from './call-task.js';
 import type { Template } from '../template.js';
 
-export class OpenApiCallTask extends Task implements CallTask {
+export class OpenApiCallTask extends CallTask {
   readonly #document: Endpoint;
   readonly #arguments: Template;
   readonly #output: CallOutput;
@@ -56,11 +50,7 @@ export class OpenApiCallTask extends Task implements CallTask {
     return document.concat(this.#arguments, settings);
   }
 
-  enter(scope: BodyScope): Step<KindProgress> {
-    return CallProgress.enter(scope);
-  }
-
-  callFrom(
+  protected callFrom(
     id: string,
     prefix: string,
     results: RoundResults,
@@ -80,12 +70,5 @@ export class OpenApiCallTask extends Task implements CallTask {
       input,
       deadline,
     };
-  }
-
-  protected override get ownExpressions(): readonly Expression[] {
-    const document = this.#document.expressions;
-    const args = this.#arguments.expressions;
-    const authentication = this.#authentication?.expressions ?? [];
-    return document.concat(args, authentication);
   }
 }

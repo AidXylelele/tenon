@@ -4,11 +4,7 @@ import { WorkflowTarget } from '../../../../domain/automation/language/workflow-
 import type { SubWorkflowRequestState } from '../../interfaces.js';
 
 export class SubWorkflowRequestMapper {
-  static toState(
-    request: SubWorkflowRequest | null,
-  ): SubWorkflowRequestState | null {
-    if (request === null) return null;
-
+  static toState(request: SubWorkflowRequest): SubWorkflowRequestState {
     const target = request.target;
     return {
       namespace: target.workflow.namespace,
@@ -19,11 +15,7 @@ export class SubWorkflowRequestMapper {
     };
   }
 
-  static toDomain(
-    state: SubWorkflowRequestState | null,
-  ): SubWorkflowRequest | null {
-    if (state === null) return null;
-
+  static toDomain(state: SubWorkflowRequestState): SubWorkflowRequest {
     const workflow = new WorkflowName(state.namespace, state.name);
     const target = new WorkflowTarget(workflow, state.version);
     return { target, input: state.input, awaited: state.awaited };

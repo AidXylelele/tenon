@@ -1,6 +1,7 @@
-import type { Outcome } from '../outcome.js';
+import { Outcome } from '../outcome.js';
 import { RoundWork } from '../round-work.js';
 import { Step } from '../step.js';
+import type { WorkflowError } from '../workflow-error.js';
 import { KindProgress } from './kind-progress.js';
 
 export class ConcludedProgress extends KindProgress {
@@ -14,6 +15,11 @@ export class ConcludedProgress extends KindProgress {
   static step(outcome: Outcome): Step<KindProgress> {
     const concluded = new ConcludedProgress(outcome);
     return Step.of<KindProgress>(concluded);
+  }
+
+  static failed(error: WorkflowError): Step<KindProgress> {
+    const failed = Outcome.failed(error);
+    return ConcludedProgress.step(failed);
   }
 
   override outcome(): Outcome {

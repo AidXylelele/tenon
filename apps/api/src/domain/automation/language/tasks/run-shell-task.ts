@@ -1,20 +1,14 @@
 import { RunKind } from '../enums.js';
-import type { Expression } from '../expression.js';
 import type {
   JsonValue,
   ProcessRun,
-  ProcessTask,
   RunShellTaskProps,
 } from '../interfaces.js';
 import { ProcessReturn } from '../process-return.js';
-import type { KindProgress } from '../progress/kind-progress.js';
-import { ProcessProgress } from '../progress/process-progress.js';
-import type { Step } from '../step.js';
-import type { BodyScope } from '../scopes/body-scope.js';
-import { Task } from './task.js';
+import { ProcessTask } from './process-task.js';
 import type { Template } from '../template.js';
 
-export class RunShellTask extends Task implements ProcessTask {
+export class RunShellTask extends ProcessTask {
   readonly #shell: Template;
   readonly #awaits: boolean;
   readonly #returns: ProcessReturn;
@@ -38,15 +32,7 @@ export class RunShellTask extends Task implements ProcessTask {
     return this.#returns;
   }
 
-  enter(scope: BodyScope): Step<KindProgress> {
-    return ProcessProgress.enter(scope);
-  }
-
   runFrom(id: string, process: JsonValue, deadline: Date | null): ProcessRun {
     return { id, kind: RunKind.Shell, language: null, process, deadline };
-  }
-
-  protected override get ownExpressions(): readonly Expression[] {
-    return this.#shell.expressions;
   }
 }

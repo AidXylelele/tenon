@@ -3,6 +3,8 @@ import type { ProcessRunState } from '../../interfaces.js';
 import { InstantMapper } from './instant.mapper.js';
 
 export class ProcessRunMapper {
+  static toState(run: ProcessRun): ProcessRunState;
+  static toState(run: ProcessRun | null): ProcessRunState | null;
   static toState(run: ProcessRun | null): ProcessRunState | null {
     if (run === null) return null;
 
@@ -16,6 +18,8 @@ export class ProcessRunMapper {
     };
   }
 
+  static toDomain(state: ProcessRunState): ProcessRun;
+  static toDomain(state: ProcessRunState | null): ProcessRun | null;
   static toDomain(state: ProcessRunState | null): ProcessRun | null {
     if (state === null) return null;
 

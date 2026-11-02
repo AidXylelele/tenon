@@ -8,11 +8,11 @@ export enum TaskStage {
 }
 
 export enum ProgressKind {
-  Value = 'value',
-  Call = 'call',
-  Process = 'process',
-  FunctionCall = 'function-call',
-  RunWorkflow = 'run-workflow',
+  Definition = 'definition',
+  Calling = 'calling',
+  Running = 'running',
+  Function = 'function',
+  SubWorkflow = 'sub-workflow',
   Do = 'do',
   For = 'for',
   Fork = 'fork',

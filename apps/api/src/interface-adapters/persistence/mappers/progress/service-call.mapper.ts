@@ -4,9 +4,7 @@ import { InstantMapper } from './instant.mapper.js';
 import { ServiceAuthenticationMapper } from './service-authentication.mapper.js';
 
 export class ServiceCallMapper {
-  static toState(call: ServiceCall | null): ServiceCallState | null {
-    if (call === null) return null;
-
+  static toState(call: ServiceCall): ServiceCallState {
     const endpointAuthentication = ServiceAuthenticationMapper.toState(
       call.endpoint.authentication,
     );
@@ -28,9 +26,7 @@ export class ServiceCallMapper {
     };
   }
 
-  static toDomain(state: ServiceCallState | null): ServiceCall | null {
-    if (state === null) return null;
-
+  static toDomain(state: ServiceCallState): ServiceCall {
     const endpointAuthentication = ServiceAuthenticationMapper.toDomain(
       state.endpoint.authentication,
     );

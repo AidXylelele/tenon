@@ -226,11 +226,11 @@ describe('TaskProgressMapper', () => {
 
     expect(shapes).toEqual([
       'entry',
-      'body/value',
-      'body/call',
-      'body/process',
-      'body/function-call',
-      'body/run-workflow',
+      'body/definition',
+      'body/calling',
+      'body/running',
+      'body/function',
+      'body/sub-workflow',
       'body/do',
       'body/for',
       'body/fork',

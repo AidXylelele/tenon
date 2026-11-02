@@ -220,28 +220,27 @@ export type TaskProgressState =
   | ExportCheckStageState
   | EndedStageState;
 
-export interface ValueProgressState {
-  readonly kind: ProgressKind.Value;
+export interface DefinitionProgressState {
+  readonly kind: ProgressKind.Definition;
 }
 
-export interface CallProgressState {
-  readonly kind: ProgressKind.Call;
-  readonly call: ServiceCallState | null;
+export interface CallingProgressState {
+  readonly kind: ProgressKind.Calling;
+  readonly call: ServiceCallState;
 }
 
-export interface ProcessProgressState {
-  readonly kind: ProgressKind.Process;
-  readonly run: ProcessRunState | null;
+export interface RunningProgressState {
+  readonly kind: ProgressKind.Running;
+  readonly run: ProcessRunState;
 }
 
-export interface FunctionCallProgressState {
-  readonly kind: ProgressKind.FunctionCall;
-  readonly started: boolean;
+export interface FunctionProgressState {
+  readonly kind: ProgressKind.Function;
 }
 
-export interface RunWorkflowProgressState {
-  readonly kind: ProgressKind.RunWorkflow;
-  readonly request: SubWorkflowRequestState | null;
+export interface SubWorkflowProgressState {
+  readonly kind: ProgressKind.SubWorkflow;
+  readonly request: SubWorkflowRequestState;
 }
 
 export interface DoProgressState {
@@ -296,11 +295,11 @@ export interface HandlerProgressState {
 }
 
 export type KindProgressState =
-  | ValueProgressState
-  | CallProgressState
-  | ProcessProgressState
-  | FunctionCallProgressState
-  | RunWorkflowProgressState
+  | DefinitionProgressState
+  | CallingProgressState
+  | RunningProgressState
+  | FunctionProgressState
+  | SubWorkflowProgressState
   | DoProgressState
   | ForProgressState
   | ForkProgressState
