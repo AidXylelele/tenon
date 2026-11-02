@@ -1,5 +1,6 @@
 import type { ServiceCall } from '../../../../domain/automation/language/interfaces.js';
 import type { ServiceCallState } from '../../interfaces.js';
+import { InstantMapper } from './instant.mapper.js';
 import { ServiceAuthenticationMapper } from './service-authentication.mapper.js';
 
 export class ServiceCallMapper {
@@ -12,6 +13,7 @@ export class ServiceCallMapper {
     const authentication = ServiceAuthenticationMapper.toState(
       call.authentication,
     );
+    const deadline = InstantMapper.toState(call.deadline);
     return {
       id: call.id,
       kind: call.kind,
@@ -22,6 +24,7 @@ export class ServiceCallMapper {
       arguments: call.arguments,
       authentication,
       input: call.input,
+      deadline,
     };
   }
 
@@ -34,6 +37,7 @@ export class ServiceCallMapper {
     const authentication = ServiceAuthenticationMapper.toDomain(
       state.authentication,
     );
+    const deadline = InstantMapper.toDomain(state.deadline);
     return {
       id: state.id,
       kind: state.kind,
@@ -44,6 +48,7 @@ export class ServiceCallMapper {
       arguments: state.arguments,
       authentication,
       input: state.input,
+      deadline,
     };
   }
 }

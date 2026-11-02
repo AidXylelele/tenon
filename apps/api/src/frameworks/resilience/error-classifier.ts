@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { WorkDeferredError } from '../../application/errors.js';
-import { NotFoundError, StaleWriteError } from '../../domain/errors.js';
+import { InstanceNotFoundError, StaleWriteError } from '../../domain/errors.js';
 import { PostgresTransientFailures } from '../drizzle/postgres-transient-failures.js';
 import { ErrorClass } from './enums.js';
 
@@ -16,8 +16,10 @@ export class ErrorClassifier {
 
   constructor(private readonly transientFailures: PostgresTransientFailures) {}
 
+  // A run or message whose instance is gone has nothing left to do; any other record missing
+  // from a run is corrupt state, which faults the instance or dead-letters the message.
   classify(error: unknown): ErrorClass {
-    if (error instanceof NotFoundError) return ErrorClass.Settled;
+    if (error instanceof InstanceNotFoundError) return ErrorClass.Settled;
 
     const transient =
       error instanceof StaleWriteError ||

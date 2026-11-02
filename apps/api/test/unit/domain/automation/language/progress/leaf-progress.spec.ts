@@ -64,6 +64,7 @@ describe('leaf progress', () => {
         arguments: { method: 'get' },
         authentication: null,
         input: { petId: 1 },
+        deadline: null,
       },
     ]);
   });
@@ -155,6 +156,7 @@ describe('leaf progress', () => {
         kind: RunKind.Script,
         language: ScriptLanguage.JavaScript,
         process: { language: 'js', code: 'console.log(1)' },
+        deadline: null,
       },
     ]);
     expect(ending?.output).toEqual({ code: 3, stdout: '1\n', stderr: '' });
@@ -246,6 +248,26 @@ describe('leaf progress', () => {
       'https://serverlessworkflow.io/spec/1.0.0/errors/runtime',
     );
     expect(ending?.body?.emitted ?? null).toBeNull();
+  });
+
+  it('an_event_with_another_source_under_workflows_is_the_authors_and_is_emitted', () => {
+    const definition = definitionOf([
+      {
+        greet: {
+          emit: {
+            event: {
+              with: { source: '/workflows/billing', type: 'invoiced' },
+            },
+          },
+        },
+      },
+    ]);
+    const scope = scopeOf(definition, '/do/0/greet', {});
+
+    const ending = EntryStage.begin(scope).progress.ending();
+
+    expect(ending?.failure ?? null).toBeNull();
+    expect(ending?.body?.emitted?.source).toBe('/workflows/billing');
   });
 
   it('an_event_whose_source_evaluates_to_no_text_faults_the_task_with_a_runtime_error', () => {

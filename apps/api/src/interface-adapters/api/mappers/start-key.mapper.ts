@@ -8,7 +8,8 @@ export class StartKeyMapper {
     target: WorkflowTarget,
     input: JsonValue | undefined,
   ): string | null {
-    if (idempotencyKey === undefined) return null;
+    // An empty key is no key, as @nestjs/idempotency reads it: the start is not deduplicated.
+    if (idempotencyKey === undefined || idempotencyKey === '') return null;
 
     const requested = input ?? {};
     const request = { version: target.version, input: requested };

@@ -51,6 +51,10 @@ export class ExportStage extends TaskProgress {
     return this.#deadline;
   }
 
+  override exportsContext(): boolean {
+    return true;
+  }
+
   work(scope: TaskScope): RoundWork {
     const base = scope.task.base;
     const validations = base.output.validationsFor(scope.prefix, this.#output);

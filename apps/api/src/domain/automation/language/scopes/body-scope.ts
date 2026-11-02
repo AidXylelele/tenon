@@ -5,7 +5,9 @@ import { TaskScope } from './task-scope.js';
 export class BodyScope<T extends Task = Task> extends TaskScope<T> {
   readonly #input: JsonValue;
 
-  constructor(scope: TaskScope<T>, input: JsonValue) {
+  // `deadline`: the body's own, which the task's scope may not hold yet as the body begins.
+  constructor(scope: TaskScope<T>, input: JsonValue, deadline: Date | null) {
+    const earliest = scope.deadlineWith(deadline);
     super({
       id: scope.id,
       task: scope.task,
@@ -18,6 +20,7 @@ export class BodyScope<T extends Task = Task> extends TaskScope<T> {
       runtime: scope.runtime,
       variables: scope.variables,
       startedAt: scope.startedAt,
+      deadline: earliest,
       now: scope.now,
     });
     this.#input = input;

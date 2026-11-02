@@ -5,9 +5,14 @@ import { ValidationResult } from './validation-result.js';
 
 // The author's schema itself cannot be used, which the standard calls a configuration error.
 export class SchemaUnusable extends ValidationResult {
-  static readonly #REASON = 'The schema is not a valid JSON Schema';
+  readonly #reason: string;
+
+  constructor(id: string, reason: string) {
+    super(id);
+    this.#reason = reason;
+  }
 
   failure(at: JsonPointer): WorkflowError {
-    return ErrorType.Configuration.errorAt(at, SchemaUnusable.#REASON);
+    return ErrorType.Configuration.errorAt(at, this.#reason);
   }
 }

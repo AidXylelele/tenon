@@ -20,6 +20,8 @@ import {
 
 @Injectable()
 export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceRepository {
+  private static readonly BATCH = 1_000;
+
   constructor(
     private readonly txHost: TransactionHost<DrizzleTx>,
     private readonly outbox: Outbox,
@@ -51,10 +53,17 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
       TaskInstanceMapper.toRow(task, instance.id),
     );
 
-    if (rows.length > 0)
+    // PostgreSQL binds at most 65,535 parameters per statement, so rows go in batches.
+    for (
+      let start = 0;
+      start < rows.length;
+      start += DrizzleWorkflowInstanceRepository.BATCH
+    ) {
+      const end = start + DrizzleWorkflowInstanceRepository.BATCH;
+      const batch = rows.slice(start, end);
       await this.txHost.tx
         .insert(tasks)
-        .values(rows)
+        .values(batch)
         .onConflictDoUpdate({
           target: tasks.id,
           set: {
@@ -66,6 +75,7 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
             endedAt: sql`excluded.ended_at`,
           },
         });
+    }
 
     const events = instance.takeDomainEvents();
     const entries = events.map((event) => DomainEventMapper.toEntry(event));

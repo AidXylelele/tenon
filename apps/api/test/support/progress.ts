@@ -77,6 +77,7 @@ export function scopeOf(
     runtime: { name: 'tenon', version: '1.0.0' },
     variables: options.variables ?? {},
     startedAt: now,
+    deadline: null,
     now: options.at ?? now,
   });
 }

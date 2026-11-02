@@ -9,6 +9,8 @@ export class PostgresTransientFailures {
     '57',
   ];
   private static readonly SQLSTATE = /^[0-9A-Z]{5}$/;
+  // A protocol violation (too many parameters, say) repeats on every attempt.
+  private static readonly LASTING = ['08P01'];
   private static readonly POOL_FAILURES = [
     'timeout exceeded when trying to connect',
     'Connection terminated',
@@ -26,7 +28,10 @@ export class PostgresTransientFailures {
         PostgresTransientFailures.SQLSTATE.test(code);
       const transientClass =
         sqlState &&
-        PostgresTransientFailures.TRANSIENT_CLASSES.includes(code.slice(0, 2));
+        PostgresTransientFailures.TRANSIENT_CLASSES.includes(
+          code.slice(0, 2),
+        ) &&
+        !PostgresTransientFailures.LASTING.includes(code);
       const pool = PostgresTransientFailures.POOL_FAILURES.some((failure) =>
         current instanceof Error ? current.message.includes(failure) : false,
       );

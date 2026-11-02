@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   BulkheadFullError,
   type ResiliencePolicy,
@@ -18,6 +18,7 @@ import { SandboxPool } from './sandbox-pool.js';
 export class GoJudgeSandboxClient implements SandboxClient {
   private static readonly PRESET = 'processes';
   private static readonly RUN = '/run';
+  private static readonly LOGGER = new Logger(GoJudgeSandboxClient.name);
 
   private readonly policy: ResiliencePolicy;
 
@@ -53,8 +54,12 @@ export class GoJudgeSandboxClient implements SandboxClient {
     const text = await response.body.text();
     const result = GoJudgeSandboxClient.resultOf(text);
 
-    if (response.statusCode >= 300 || result === null)
+    if (response.statusCode >= 300 || result === null) {
+      GoJudgeSandboxClient.LOGGER.warn(
+        `The sandbox refused a run with status ${String(response.statusCode)}`,
+      );
       return { kind: SandboxOutcomeKind.Refused };
+    }
 
     return { kind: SandboxOutcomeKind.Ran, result };
   }
@@ -89,7 +94,12 @@ export class GoJudgeSandboxClient implements SandboxClient {
     const transport =
       error instanceof Error && typeof Reflect.get(error, 'code') === 'string';
 
-    if (transport) return { kind: SandboxOutcomeKind.Unreachable };
+    if (transport) {
+      GoJudgeSandboxClient.LOGGER.warn(
+        `The sandbox could not be reached: ${error.message}`,
+      );
+      return { kind: SandboxOutcomeKind.Unreachable };
+    }
 
     throw error;
   }

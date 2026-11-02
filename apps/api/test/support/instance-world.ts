@@ -1,3 +1,4 @@
+import { WorkAnswers } from '../../src/application/automation/instances/work-answers.js';
 import { AdvanceInstance } from '../../src/application/automation/instances/advance-instance.js';
 import { BeginRound } from '../../src/application/automation/instances/begin-round.js';
 import { CompleteSubWorkflow } from '../../src/application/automation/instances/complete-sub-workflow.js';
@@ -54,6 +55,7 @@ export function documentOf(
 export function instanceWorld(
   respond: (call: ServiceCall) => ServiceResult | null = () => null,
   exit: (run: ProcessRun) => ProcessResult | null = () => null,
+  delay: (call: ServiceCall) => number = () => 0,
 ) {
   const clock = new FixedClock(new Date('2026-11-01T10:00:00.000Z'));
   const workflows = new InMemoryWorkflowRepository();
@@ -62,7 +64,7 @@ export function instanceWorld(
   const expressions = new FakeExpressionEvaluator();
   const schemas = new AcceptingSchemaValidator();
   const publish = new PublishVersion(
-    new CheckDocument(reader, expressions, schemas),
+    new CheckDocument(reader, expressions, schemas, versions),
     workflows,
     versions,
     clock,
@@ -70,7 +72,7 @@ export function instanceWorld(
   const instances = new InMemoryWorkflowInstanceRepository();
   const runs = new RecordingInstanceRuns();
   const events = new RecordingEventRepository();
-  const services = new ScriptedServiceCaller(respond);
+  const services = new ScriptedServiceCaller(respond, delay);
   const processes = new ScriptedProcessRunner(exit);
   const workflowQueries = new InMemoryWorkflowQueries(versions);
   const instanceQueries = new InMemoryInstanceQueries(instances);
@@ -97,10 +99,7 @@ export function instanceWorld(
     advance: new AdvanceInstance(
       beginRound,
       recordRound,
-      expressions,
-      new AcceptingSchemaValidator(),
-      services,
-      processes,
+      new WorkAnswers(expressions, schemas, services, processes),
       clock,
     ),
     fault: new FaultInstance(instances, events, clock),

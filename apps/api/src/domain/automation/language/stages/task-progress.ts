@@ -33,6 +33,11 @@ export abstract class TaskProgress {
     return false;
   }
 
+  // The stage evaluates `export.as`, whose result replaces the workflow's context.
+  exportsContext(): boolean {
+    return false;
+  }
+
   abstract work(scope: TaskScope): RoundWork;
 
   abstract record(results: RoundResults, scope: TaskScope): Step<TaskProgress>;

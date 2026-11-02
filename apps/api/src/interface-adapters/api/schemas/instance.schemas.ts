@@ -24,9 +24,18 @@ const Phase = z.enum([
   'completed',
 ]);
 
+// PostgreSQL keeps no U+0000 in jsonb, so an input holding one is refused here. In JSON text
+// the character is the escape `\u0000` after an even number of backslashes.
+const NUL = /(?:^|[^\\])(?:\\\\)*\\u0000/;
+
+const StoredJson = Json.refine(
+  (value) => !NUL.test(JSON.stringify(value)),
+  'NUL characters are not allowed',
+);
+
 export const StartInstanceBody = z.strictObject({
   version: z.string().min(1).optional(),
-  input: Json.optional(),
+  input: StoredJson.optional(),
 });
 
 export type StartInstanceBody = z.infer<typeof StartInstanceBody>;

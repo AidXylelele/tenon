@@ -5,6 +5,7 @@ import { systemClock } from '@nestjs/workflows/core';
 import { fromDrizzle, PostgresWorkflowStore } from '@nestjs/workflows/postgres';
 import { EngineClock } from '../../interface-adapters/workflows/runs/engine.clock.js';
 import { Database } from '../../interface-adapters/persistence/interfaces.js';
+import { ENGINE_CONCURRENCY } from '../workflows/engine.constants.js';
 import type { Env } from './config.module.js';
 
 @Module({
@@ -25,6 +26,7 @@ export class EngineClockModule {}
         clock: clock.source,
         worker: {
           enabled: config.get('ENGINE_WORKER', { infer: true }) === 'on',
+          concurrency: ENGINE_CONCURRENCY,
           leaseDuration: '120s',
           // One round's calls and processes take up to about 70 s; a shutdown lets it finish.
           shutdownTimeout: '90s',

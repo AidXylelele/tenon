@@ -1,70 +1,53 @@
 import { Injectable } from '@nestjs/common';
-import { RoundResults } from '../../../domain/automation/language/round-results.js';
-import {
-  Clock,
-  ExpressionEvaluator,
-  SchemaValidator,
-} from '../language/ports.js';
+import { Clock } from '../language/ports.js';
 import { BeginRound } from './begin-round.js';
-import {
-  type AdvancedInstanceResult,
-  type AdvanceInstanceCommand,
-  ProcessRunner,
-  ServiceCaller,
+import type {
+  AdvancedInstanceResult,
+  AdvanceInstanceCommand,
+  RecordedAnswer,
 } from './ports.js';
 import { RecordRound } from './record-round.js';
+import { WorkAnswers } from './work-answers.js';
 
 @Injectable()
 export class AdvanceInstance {
   constructor(
     private readonly beginRound: BeginRound,
     private readonly recordRound: RecordRound,
-    private readonly expressions: ExpressionEvaluator,
-    private readonly schemas: SchemaValidator,
-    private readonly services: ServiceCaller,
-    private readonly processes: ProcessRunner,
+    private readonly answers: WorkAnswers,
     private readonly clock: Clock,
   ) {}
 
   async execute(
     command: AdvanceInstanceCommand,
   ): Promise<AdvancedInstanceResult> {
-    const now = this.clock.now();
+    const startedAt = this.clock.now();
     const round = {
       instanceId: command.instanceId,
       runtime: command.runtime,
-      now,
+      now: startedAt,
     };
     const begun = await this.beginRound.execute(round);
     const instance = begun.instance;
     const definition = begun.definition;
-    const recorded: RoundResults[] = [];
+    const recorded: RecordedAnswer[] = [];
     let deferred = 0;
+    let now = startedAt;
 
     for (
       let work = instance.pendingWork(definition, command.runtime, now);
       !work.isEmpty();
       work = instance.pendingWork(definition, command.runtime, now)
     ) {
-      const computations = [
-        this.expressions.evaluateAll(work.evaluations),
-        this.schemas.validateAll(work.validations),
-        this.services.callAll(work.calls),
-        this.processes.runAll(work.processes),
-      ] as const;
-      const [evaluated, validated, responses, processes] =
-        await Promise.all(computations);
-      const results = new RoundResults({
-        evaluated,
-        validated,
-        responses,
-        processes,
-      });
-      instance.record(results, definition, command.runtime, now);
-      recorded.push(results);
-      // Only a pass with calls or processes can defer work, and such a pass ends the round.
-      deferred = results.deferredIn(work);
+      // Each answer is recorded at the time it arrived.
+      for await (const answer of this.answers.inArrivalOrder(work)) {
+        now = this.clock.now();
+        instance.record(answer.results, definition, command.runtime, now);
+        recorded.push({ results: answer.results, at: now });
+        deferred += answer.deferred;
+      }
 
+      // A pass with calls or processes ends the round, which saves before the next one.
       if (work.endsRound()) break;
     }
 

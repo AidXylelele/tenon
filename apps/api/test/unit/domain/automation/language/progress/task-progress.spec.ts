@@ -183,6 +183,7 @@ describe('TaskProgress', () => {
       runtime: { name: 'tenon' },
       variables: {},
       startedAt: now,
+      deadline: null,
       now,
     });
 
@@ -221,6 +222,7 @@ describe('TaskProgress', () => {
       runtime: { name: 'tenon' },
       variables: {},
       startedAt: now,
+      deadline: null,
       now,
     });
     const checking = EntryStage.begin(scope).progress;

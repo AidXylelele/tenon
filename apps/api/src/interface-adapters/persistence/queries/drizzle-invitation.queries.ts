@@ -1,19 +1,22 @@
 import { Injectable } from '@nestjs/common';
+import { TransactionHost } from '@nestjs-cls/transactional';
 import { and, eq, gt, sql } from 'drizzle-orm';
 import type {
   InvitationQueries,
   PendingInvitation,
 } from '../../../application/identity/queries.js';
 import { InvitationStatus } from '../../../domain/identity/enums.js';
-import { Database } from '../interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { invitation as invitations } from '../schema/index.js';
 
 @Injectable()
 export class DrizzleInvitationQueries implements InvitationQueries {
-  constructor(private readonly db: Database) {}
+  // Through the transaction host, so a query inside a use case's transaction shares its
+  // connection instead of taking a second one from the pool.
+  constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   listPending(): Promise<PendingInvitation[]> {
-    return this.db
+    return this.txHost.tx
       .select({
         id: invitations.id,
         email: invitations.email,

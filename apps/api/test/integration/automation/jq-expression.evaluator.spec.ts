@@ -125,4 +125,16 @@ describe('JqExpressionEvaluator', () => {
     expect(result?.failure(set)?.status).toBe(400);
     expect(result?.failure(set)?.detail).toBe('The expression ran out of time');
   });
+
+  it('a_value_holding_a_nul_character_is_an_expression_error_and_its_escaped_text_is_not', async () => {
+    const [nul, text] = await evaluator.evaluateAll([
+      { id: 'w:1', program: '[0] | implode', data: null, arguments: {} },
+      { id: 'w:2', program: '"a\\\\u0000b"', data: null, arguments: {} },
+    ]);
+
+    expect(nul?.failure(set)?.detail).toBe(
+      'The expression produced a NUL character, which a value cannot hold',
+    );
+    expect(text?.value).toBe('a\\u0000b');
+  });
 });

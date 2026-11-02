@@ -52,9 +52,9 @@ describe('running workflows', () => {
     );
   });
 
+  // The application closes the dispatcher it was given, the MockAgent included.
   afterAll(async () => {
     await t.close();
-    await agent.close();
   });
 
   beforeEach(async () => {
@@ -91,6 +91,81 @@ describe('running workflows', () => {
   async function drain(): Promise<void> {
     await t.app.get(WorkflowWorker).drain();
   }
+
+  it('fork_branches_that_end_together_each_add_their_export_to_the_context', async () => {
+    const branch = (name: string, value: number) => ({
+      [name]: {
+        set: { [name]: value },
+        export: { as: `\${ $context + { ${name}: ${String(value)} } }` },
+      },
+    });
+    await publish(
+      documentOf('exports', [
+        {
+          split: {
+            fork: {
+              branches: [branch('a', 1), branch('b', 2), branch('c', 3)],
+            },
+          },
+        },
+        { read: { set: { context: '${ $context }' } } },
+      ]),
+    );
+
+    const started = await start('exports', { input: {} });
+    await drain();
+    const instance = await request(t.server)
+      .get(`/api/v1/instances/${String(started.body.id)}`)
+      .set(viewer)
+      .expect(200);
+
+    expect(instance.body).toMatchObject({
+      phase: 'completed',
+      output: { context: { a: 1, b: 2, c: 3 } },
+    });
+  });
+
+  it('a_loop_over_thousands_of_items_completes_in_one_round', async () => {
+    await publish(
+      documentOf('loop', [
+        {
+          each: {
+            for: { in: '${ [range(.n)] }' },
+            do: [{ one: { set: { x: 1 } } }],
+          },
+        },
+      ]),
+    );
+
+    const started = await start('loop', { input: { n: 5000 } });
+    await drain();
+    const instance = await request(t.server)
+      .get(`/api/v1/instances/${String(started.body.id)}`)
+      .set(viewer)
+      .expect(200);
+
+    expect(instance.body).toMatchObject({ phase: 'completed' });
+  }, 120_000);
+
+  it('a_start_carries_an_input_beyond_the_default_body_limit_of_express', async () => {
+    await publish(
+      documentOf('large', [{ keep: { set: '${ .items | length }' } }]),
+    );
+    const items = Array.from(
+      { length: 2000 },
+      (_, index) => 'x'.repeat(100) + String(index),
+    );
+
+    const started = await start('large', { input: { items } });
+    await drain();
+    const instance = await request(t.server)
+      .get(`/api/v1/instances/${String(started.body.id)}`)
+      .set(viewer)
+      .expect(200);
+
+    expect(started.status).toBe(201);
+    expect(instance.body).toMatchObject({ phase: 'completed', output: 2000 });
+  });
 
   it('an_instance_runs_to_completion_with_the_output_the_standard_prescribes', async () => {
     await publish(

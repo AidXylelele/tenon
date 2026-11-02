@@ -9,6 +9,7 @@ import type { ServiceCall } from '../../../src/domain/automation/language/interf
 import { JsonPointer } from '../../../src/domain/automation/language/json-pointer.js';
 import { CallOutput } from '../../../src/domain/automation/language/call-output.js';
 import { OutputFormat } from '../../../src/domain/automation/language/output-format.js';
+import { ServiceTimedOut } from '../../../src/domain/automation/language/results/service-timed-out.js';
 import { ServiceResponded } from '../../../src/domain/automation/language/results/service-responded.js';
 import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.js';
 import type { EndpointDispatcher } from '../../../src/frameworks/undici/endpoint-dispatcher.js';
@@ -30,6 +31,7 @@ function httpCall(overrides: Partial<ServiceCall> = {}): ServiceCall {
     arguments: { method: 'get' },
     authentication: null,
     input: { petId: 1 },
+    deadline: null,
     ...overrides,
   };
 }
@@ -47,7 +49,8 @@ describe('ServiceCallGateway', () => {
     agent.disableNetConnect();
     const dispatcher = agent as unknown as EndpointDispatcher;
     const client = new UndiciEndpointClient(dispatcher, resilience);
-    caller = new ServiceCallGateway(client);
+    const clock = { now: () => new Date() };
+    caller = new ServiceCallGateway(client, clock);
   });
 
   afterAll(async () => {
@@ -111,11 +114,16 @@ describe('ServiceCallGateway', () => {
       },
     });
 
+    const response = new CallOutput(OutputFormat.Response, false);
+
     const [result] = await caller.callAll([call]);
 
     expect(result?.outcome(content, at).authorization).toEqual({
       scheme: 'Basic',
       parameter: expected,
+    });
+    expect(result?.outcome(response, at).output).toMatchObject({
+      request: { headers: { authorization: 'Basic [redacted]' } },
     });
   });
 
@@ -289,5 +297,80 @@ describe('ServiceCallGateway', () => {
     const [result] = await caller.callAll([call]);
 
     expect(result?.outcome(raw, at).output).toBe('AAEC');
+  });
+
+  it('a_call_stops_at_its_task_deadline_and_times_out', async () => {
+    agent
+      .get('https://petstore.example')
+      .intercept({ path: '/v2/pet/1', method: 'GET' })
+      .reply(200, { id: 1 }, json)
+      .delay(2000);
+    const deadline = new Date(Date.now() + 200);
+    const call = httpCall({ deadline });
+    const started = performance.now();
+
+    const [result] = await caller.callAll([call]);
+
+    const elapsed = performance.now() - started;
+    expect(result).toBeInstanceOf(ServiceTimedOut);
+    expect(elapsed).toBeLessThan(1500);
+  });
+
+  it('a_call_whose_deadline_passed_is_not_sent', async () => {
+    const deadline = new Date(Date.now() - 1);
+    const call = httpCall({ deadline });
+
+    const [result] = await caller.callAll([call]);
+
+    expect(result).toBeInstanceOf(ServiceTimedOut);
+  });
+
+  it.each([
+    [
+      'application/octet-stream',
+      Buffer.from([0xff, 0xfe, 0x41, 0x00]),
+      '//5BAA==',
+    ],
+    ['image/png', Buffer.from([0x89, 0x50]), 'iVA='],
+    ['text/plain; charset=utf-8', Buffer.from('hello'), 'hello'],
+    ['application/problem+json', Buffer.from('{"title":"x"}'), { title: 'x' }],
+  ])(
+    'content_of_type_%s_is_deserialized_or_base64',
+    async (type, bytes, expected) => {
+      agent
+        .get('https://petstore.example')
+        .intercept({ path: '/v2/pet/1', method: 'GET' })
+        .reply(200, bytes, { headers: { 'content-type': type } });
+
+      const [result] = await caller.callAll([httpCall()]);
+
+      expect(result?.outcome(content, at).output).toEqual(expected);
+    },
+  );
+
+  it('a_body_that_claims_json_and_is_not_is_a_communication_error', async () => {
+    agent
+      .get('https://petstore.example')
+      .intercept({ path: '/v2/pet/1', method: 'GET' })
+      .reply(200, '{not json', json);
+
+    const [result] = await caller.callAll([httpCall()]);
+
+    expect(result?.outcome(content, at).failure?.type).toBe(
+      'https://serverlessworkflow.io/spec/1.0.0/errors/communication',
+    );
+  });
+
+  it('content_holding_a_nul_character_is_a_communication_error', async () => {
+    agent
+      .get('https://petstore.example')
+      .intercept({ path: '/v2/pet/1', method: 'GET' })
+      .reply(200, 'a\u0000b', { headers: { 'content-type': 'text/plain' } });
+
+    const [result] = await caller.callAll([httpCall()]);
+
+    expect(result?.outcome(content, at).failure?.detail).toBe(
+      'The response content holds a NUL character, which a value cannot hold',
+    );
   });
 });

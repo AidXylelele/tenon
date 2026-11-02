@@ -22,12 +22,21 @@ export interface JsonSchemaUnusable {
   readonly reason: string;
 }
 
-export type JsonSchemaCompilation = JsonSchemaCompiled | JsonSchemaUnusable;
+// Checking the schema or the value outlasted its time limit.
+export interface JsonSchemaTimedOut {
+  readonly kind: JsonSchemaOutcomeKind.TimedOut;
+}
+
+export type JsonSchemaCompilation =
+  JsonSchemaCompiled | JsonSchemaUnusable | JsonSchemaTimedOut;
 
 export type JsonSchemaVerdict =
-  JsonSchemaValid | JsonSchemaInvalid | JsonSchemaUnusable;
+  JsonSchemaValid | JsonSchemaInvalid | JsonSchemaUnusable | JsonSchemaTimedOut;
 
 export abstract class JsonSchemaClient {
-  abstract compile(schema: JsonObject): JsonSchemaCompilation;
-  abstract validate(schema: JsonObject, data: JsonValue): JsonSchemaVerdict;
+  abstract compile(schema: JsonObject): Promise<JsonSchemaCompilation>;
+  abstract validate(
+    schema: JsonObject,
+    data: JsonValue,
+  ): Promise<JsonSchemaVerdict>;
 }

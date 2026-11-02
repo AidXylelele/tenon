@@ -145,10 +145,18 @@ export class TaskInstance {
     return this.#progress.runsBody();
   }
 
+  exportsContext(): boolean {
+    return !this.isTerminal() && this.#progress.exportsContext();
+  }
+
   requestedSubWorkflow(): SubWorkflowRequest | null {
     if (this.isTerminal()) return null;
 
     return this.#progress.subWorkflow();
+  }
+
+  deadline(): Date | null {
+    return this.#progress.deadline();
   }
 
   hasElapsed(now: Date): boolean {

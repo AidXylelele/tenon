@@ -83,6 +83,7 @@ export interface ServiceCallState {
   readonly arguments: JsonValue;
   readonly authentication: ServiceAuthenticationState | null;
   readonly input: JsonValue;
+  readonly deadline: string | null;
 }
 
 export interface ProcessRunState {
@@ -90,6 +91,7 @@ export interface ProcessRunState {
   readonly kind: RunKind;
   readonly language: ScriptLanguage | null;
   readonly process: JsonValue;
+  readonly deadline: string | null;
 }
 
 export interface WorkflowErrorState {

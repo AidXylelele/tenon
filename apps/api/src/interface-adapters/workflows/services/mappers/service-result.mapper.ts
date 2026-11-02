@@ -19,7 +19,19 @@ import type {
 
 export class ServiceResultMapper {
   static readonly #UNREADABLE = 'The OpenAPI document could not be read';
-  static readonly #JSON = 'json';
+  // The media types whose content is deserialized (R16): JSON parsed, text as text; any
+  // other content is base64, as the standard's HTTP response prescribes.
+  static readonly #JSON_TYPE = /^application\/(?:[\w.+-]+\+)?json$/;
+  static readonly #TEXT_TYPE =
+    /^(?:text\/[\w.+-]+|application\/(?:[\w.+-]+\+)?(?:xml|yaml))$/;
+  static readonly #NOT_JSON = 'The response content is not valid JSON';
+  // PostgreSQL keeps no U+0000 in jsonb, so content holding one cannot be recorded. In JSON
+  // text the character is the escape `\u0000` after an even number of backslashes.
+  static readonly #NUL = /(?:^|[^\\])(?:\\\\)*\\u0000/;
+  static readonly #HOLDS_NUL =
+    'The response content holds a NUL character, which a value cannot hold';
+  static readonly #AUTHORIZATION = 'authorization';
+  static readonly #REDACTED = '[redacted]';
 
   static toResult(
     call: ServiceCall,
@@ -47,6 +59,8 @@ export class ServiceResultMapper {
         return new AuthenticationFailed(id, outcome.reason);
       case EndpointOutcomeKind.Unreadable:
         return new CallMisconfigured(id, ServiceResultMapper.#UNREADABLE);
+      case EndpointOutcomeKind.Invalid:
+        return new CallMisconfigured(id, outcome.reason);
     }
   }
 
@@ -56,15 +70,32 @@ export class ServiceResultMapper {
     outcome: Responded,
   ): ServiceResult {
     const content = ServiceResultMapper.#contentOf(outcome);
+
+    // A body that claims JSON and is not is an invalid response, a communication error.
+    if (content === undefined)
+      return new CommunicationFailed(call.id, ServiceResultMapper.#NOT_JSON);
+
+    const text = JSON.stringify(content);
+
+    if (ServiceResultMapper.#NUL.test(text))
+      return new CommunicationFailed(call.id, ServiceResultMapper.#HOLDS_NUL);
+
     const body = outcome.body.toString('base64');
     const sent = outcome.authorization;
     const headers: Record<string, string> = {};
 
-    for (const name of Object.keys(request.headers))
-      headers[name] = request.headers[name] ?? '';
+    // The described request lands in the task's output, which every user may read, so it
+    // names the credentials it sent without their value.
+    for (const name of Object.keys(request.headers)) {
+      const credentials =
+        name.toLowerCase() === ServiceResultMapper.#AUTHORIZATION;
+      headers[name] = credentials
+        ? ServiceResultMapper.#REDACTED
+        : (request.headers[name] ?? '');
+    }
 
     if (sent !== null)
-      headers.authorization = `${sent.scheme} ${sent.parameter}`;
+      headers.authorization = `${sent.scheme} ${ServiceResultMapper.#REDACTED}`;
 
     const described: JsonObject = {
       method: request.method,
@@ -83,16 +114,24 @@ export class ServiceResultMapper {
     });
   }
 
-  static #contentOf(outcome: Responded): JsonValue {
-    const type = outcome.headers['content-type'] ?? '';
-    const text = outcome.body.toString('utf8');
+  // undefined: a JSON body that does not parse.
+  static #contentOf(outcome: Responded): JsonValue | undefined {
+    const declared = outcome.headers['content-type'] ?? '';
+    const essence = declared.split(';')[0] ?? '';
+    const type = essence.trim().toLowerCase();
 
-    if (!type.includes(ServiceResultMapper.#JSON) || text === '') return text;
+    if (outcome.body.length === 0) return null;
+
+    if (ServiceResultMapper.#TEXT_TYPE.test(type))
+      return outcome.body.toString('utf8');
+
+    if (!ServiceResultMapper.#JSON_TYPE.test(type))
+      return outcome.body.toString('base64');
 
     try {
-      return JSON.parse(text) as JsonValue;
+      return JSON.parse(outcome.body.toString('utf8')) as JsonValue;
     } catch {
-      return text;
+      return undefined;
     }
   }
 

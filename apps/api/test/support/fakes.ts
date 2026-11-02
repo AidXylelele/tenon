@@ -206,7 +206,7 @@ export class RecordingSessions implements Sessions {
 }
 
 export class JsonDefinitionReader implements DefinitionReader {
-  read(text: string): Definition {
+  async read(text: string): Promise<Definition> {
     try {
       const document = JSON.parse(text) as JsonObject;
       const workflow = document as unknown as Dsl.Workflow;

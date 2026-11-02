@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { TransactionHost } from '@nestjs-cls/transactional';
 import {
   and,
   asc,
@@ -8,10 +9,9 @@ import {
   gte,
   isNotNull,
   isNull,
-  lt,
   lte,
-  or,
   type SQL,
+  sql,
 } from 'drizzle-orm';
 import type {
   EventPage,
@@ -27,7 +27,7 @@ import type {
 import { EventOriginKind } from '../../../domain/automation/events/enums.js';
 import type { SubWorkflowEnding } from '../../../domain/automation/language/interfaces.js';
 import { Phase } from '../../../domain/automation/language/phase.js';
-import { Database } from '../interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { OriginKind } from '../enums.js';
 import { WorkflowErrorMapper } from '../mappers/progress/workflow-error.mapper.js';
 import {
@@ -38,7 +38,9 @@ import {
 
 @Injectable()
 export class DrizzleInstanceQueries implements InstanceQueries {
-  constructor(private readonly db: Database) {}
+  // Through the transaction host, so a query inside a use case's transaction shares its
+  // connection instead of taking a second one from the pool.
+  constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   async list(
     filter: InstanceFilter,
@@ -46,7 +48,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
   ): Promise<InstancePage> {
     const conditions = this.#conditions(filter, page.after);
     const fetched = page.limit + 1;
-    const rows = await this.db
+    const rows = await this.txHost.tx
       .select({
         id: instances.id,
         namespace: instances.namespace,
@@ -71,7 +73,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
   }
 
   async exists(id: string): Promise<boolean> {
-    const [row] = await this.db
+    const [row] = await this.txHost.tx
       .select({ id: instances.id })
       .from(instances)
       .where(eq(instances.id, id));
@@ -79,7 +81,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
   }
 
   async get(id: string): Promise<InstanceView | null> {
-    const [row] = await this.db
+    const [row] = await this.txHost.tx
       .select()
       .from(instances)
       .where(eq(instances.id, id));
@@ -106,12 +108,12 @@ export class DrizzleInstanceQueries implements InstanceQueries {
 
   async tasks(id: string, page: PositionPageRequest): Promise<TaskRecordPage> {
     const after = page.after ?? -1;
-    const [root] = await this.db
+    const [root] = await this.txHost.tx
       .select({ id: tasks.id })
       .from(tasks)
       .where(and(eq(tasks.instanceId, id), isNull(tasks.parentId)));
     const rootId = root?.id ?? null;
-    const rows = await this.db
+    const rows = await this.txHost.tx
       .select()
       .from(tasks)
       .where(
@@ -147,7 +149,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
     page: PositionPageRequest,
   ): Promise<EventPage> {
     const after = page.after ?? -1;
-    const rows = await this.db
+    const rows = await this.txHost.tx
       .select()
       .from(events)
       .where(
@@ -177,7 +179,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
   }
 
   async subWorkflowEnding(id: string): Promise<SubWorkflowEnding | null> {
-    const [row] = await this.db
+    const [row] = await this.txHost.tx
       .select({
         phase: instances.phase,
         output: instances.output,
@@ -219,13 +221,11 @@ export class DrizzleInstanceQueries implements InstanceQueries {
     return conditions;
   }
 
+  // A row comparison, which an index on (started_at, id) answers; the same condition written
+  // with `or` makes PostgreSQL read the history up to the page.
   #after(position: InstancePosition | null): SQL | undefined {
     if (position === null) return undefined;
 
-    const time = position.startedAt;
-    return or(
-      lt(instances.startedAt, time),
-      and(eq(instances.startedAt, time), lt(instances.id, position.id)),
-    );
+    return sql`(${instances.startedAt}, ${instances.id}) < (${position.startedAt}, ${position.id})`;
   }
 }

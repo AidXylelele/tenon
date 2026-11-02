@@ -1,6 +1,8 @@
 export enum DslOutcomeKind {
   Parsed = 'parsed',
   Failure = 'failure',
+  TimedOut = 'timed-out',
+  Exhausted = 'exhausted',
 }
 
 export enum ExcludedCallKind {

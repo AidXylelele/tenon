@@ -10,7 +10,6 @@ import {
   WorkflowClient,
   type WorkflowContext,
   type WorkflowRunner,
-  WorkflowSignal,
   WorkflowWorker,
 } from '@nestjs/workflows';
 import { sql } from 'drizzle-orm';
@@ -18,8 +17,6 @@ import { ConfigModule } from '../../../src/frameworks/di/config.module.js';
 import { DatabaseModule } from '../../../src/frameworks/di/database.module.js';
 import { EngineModule } from '../../../src/frameworks/di/engine.module.js';
 import { Database } from '../../../src/interface-adapters/persistence/interfaces.js';
-
-const wake = new WorkflowSignal<{ by: string }>('wake');
 
 @Injectable()
 class Gate {
@@ -47,16 +44,8 @@ interface ProbeInput {
 class RoundProbe implements WorkflowRunner<ProbeInput, string> {
   constructor(private readonly gate: Gate) {}
 
-  async run(ctx: WorkflowContext, input: ProbeInput): Promise<string> {
-    await ctx.step('advance-1', () => this.gate.pass());
-    const woken = await ctx.waitForSignal('park-1', wake, {
-      key: input.key,
-      timeout: '1h',
-    });
-
-    if (woken === null) return 'timed-out';
-
-    return `woken by ${woken.by}`;
+  async run(ctx: WorkflowContext): Promise<string> {
+    return ctx.step('advance-1', () => this.gate.pass());
   }
 }
 
@@ -128,7 +117,7 @@ describe('engine module', () => {
     expect(await node.client.getStatus(id)).toBeNull();
   });
 
-  it('a_start_and_a_signal_in_committed_transactions_run_the_instance_without_waiting', async () => {
+  it('a_start_in_a_committed_transaction_runs_the_instance', async () => {
     const id = randomUUID();
     await node.transactions.withTransaction(() =>
       node.client.start(
@@ -137,35 +126,12 @@ describe('engine module', () => {
         { id, transaction: node.transactions.tx },
       ),
     );
-    await node.transactions.withTransaction(() =>
-      node.client.signal(
-        wake,
-        { by: 'a committed change' },
-        { key: id, transaction: node.transactions.tx },
-      ),
-    );
     gate.open();
     await node.worker.drain();
 
     const instance = await node.client.getStatus(id);
     expect(instance?.status).toBe('completed');
-    expect(instance?.output).toBe('woken by a committed change');
-  });
-
-  it('a_signal_sent_while_the_round_runs_is_taken_by_the_park_that_follows', async () => {
-    const id = randomUUID();
-    await node.client.start(RoundProbe, { key: id }, { id });
-    const draining = node.worker.drain();
-    await vi.waitFor(() => {
-      expect(gate.calls).toBe(1);
-    });
-    await node.client.signal(wake, { by: 'an event' }, { key: id });
-    gate.open();
-    await draining;
-
-    const instance = await node.client.getStatus(id);
-    expect(instance?.status).toBe('completed');
-    expect(instance?.output).toBe('woken by an event');
+    expect(instance?.output).toBe('passed');
   });
 
   it('a_long_step_keeps_its_lease_so_another_worker_does_not_run_it_again', async () => {

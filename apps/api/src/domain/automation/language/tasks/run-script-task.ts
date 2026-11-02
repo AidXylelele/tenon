@@ -48,8 +48,14 @@ export class RunScriptTask extends Task implements ProcessTask {
     return ProcessProgress.enter(scope);
   }
 
-  runFrom(id: string, process: JsonValue): ProcessRun {
-    return { id, kind: RunKind.Script, language: this.#language, process };
+  runFrom(id: string, process: JsonValue, deadline: Date | null): ProcessRun {
+    return {
+      id,
+      kind: RunKind.Script,
+      language: this.#language,
+      process,
+      deadline,
+    };
   }
 
   protected override get ownExpressions(): readonly Expression[] {

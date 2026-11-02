@@ -43,12 +43,24 @@ export interface BegunRoundResult {
   readonly instance: WorkflowInstance;
 }
 
+// Results that arrived together, and how many calls and processes got none (a full bulkhead).
+export interface WorkAnswer {
+  readonly results: RoundResults;
+  readonly deferred: number;
+}
+
+// Results and the time they arrived, which the instance records them at.
+export interface RecordedAnswer {
+  readonly results: RoundResults;
+  readonly at: Date;
+}
+
 export interface RecordRoundCommand {
   readonly instanceId: string;
   readonly runtime: JsonObject;
   readonly now: Date;
   readonly definition: Definition;
-  readonly recorded: readonly RoundResults[];
+  readonly recorded: readonly RecordedAnswer[];
 }
 
 export interface FaultInstanceCommand {

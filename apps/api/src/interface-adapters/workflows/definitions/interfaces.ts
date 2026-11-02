@@ -330,8 +330,18 @@ export interface DslFailure {
   readonly failure: string;
 }
 
-export type DslOutcome = DslParsed | DslFailure;
+// Reading the document outlasted its time limit.
+export interface DslTimedOut {
+  readonly kind: DslOutcomeKind.TimedOut;
+}
+
+// The document needs more memory than a document may use (YAML aliases expand it).
+export interface DslExhausted {
+  readonly kind: DslOutcomeKind.Exhausted;
+}
+
+export type DslOutcome = DslParsed | DslFailure | DslTimedOut | DslExhausted;
 
 export abstract class OpenWorkflowClient {
-  abstract parse(text: string): DslOutcome;
+  abstract parse(text: string): Promise<DslOutcome>;
 }

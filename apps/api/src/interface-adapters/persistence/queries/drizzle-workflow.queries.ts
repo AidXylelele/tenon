@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { TransactionHost } from '@nestjs-cls/transactional';
 import { and, asc, eq, gt, or, type SQL, sql } from 'drizzle-orm';
 import type {
   PageRequest,
@@ -9,7 +10,7 @@ import type {
   WorkflowSummary,
 } from '../../../application/automation/workflows/queries.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import { Database } from '../interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 import {
   workflow as workflows,
   workflowVersion as versions,
@@ -19,12 +20,14 @@ const SEPARATOR = '\n';
 
 @Injectable()
 export class DrizzleWorkflowQueries implements WorkflowQueries {
-  constructor(private readonly db: Database) {}
+  // Through the transaction host, so a query inside a use case's transaction shares its
+  // connection instead of taking a second one from the pool.
+  constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   async list(page: PageRequest): Promise<WorkflowPage> {
     const after = this.#after(page.cursor);
     const fetched = page.limit + 1;
-    const rows = await this.db
+    const rows = await this.txHost.tx
       .select({
         namespace: workflows.namespace,
         name: workflows.name,
@@ -49,7 +52,7 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
   }
 
   async get(name: WorkflowName): Promise<WorkflowSummary | null> {
-    const [row] = await this.db
+    const [row] = await this.txHost.tx
       .select({
         namespace: workflows.namespace,
         name: workflows.name,
@@ -68,7 +71,7 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
   }
 
   versions(name: WorkflowName): Promise<VersionSummary[]> {
-    return this.db
+    return this.txHost.tx
       .select({
         namespace: workflows.namespace,
         name: workflows.name,
@@ -93,7 +96,7 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionDocument | null> {
-    const [row] = await this.db
+    const [row] = await this.txHost.tx
       .select({ format: versions.sourceFormat, text: versions.sourceText })
       .from(versions)
       .innerJoin(workflows, eq(workflows.id, versions.workflowId))
@@ -108,7 +111,7 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
   }
 
   async documentOf(versionId: string): Promise<VersionDocument | null> {
-    const [row] = await this.db
+    const [row] = await this.txHost.tx
       .select({ format: versions.sourceFormat, text: versions.sourceText })
       .from(versions)
       .where(eq(versions.id, versionId));

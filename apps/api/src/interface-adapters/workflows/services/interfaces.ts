@@ -36,14 +36,17 @@ export interface SentAuthorization {
   readonly parameter: string;
 }
 
+// `timeout`: the milliseconds left before the calling task's deadline; null: none.
 export interface Exchange {
   readonly request: HttpRequest;
   readonly authorization: Authorization | null;
+  readonly timeout: number | null;
 }
 
 export interface DocumentRequest {
   readonly url: string;
   readonly authorization: Authorization | null;
+  readonly timeout: number | null;
 }
 
 export interface Responded {
@@ -81,7 +84,14 @@ export interface Unauthorized {
   readonly reason: string;
 }
 
-export type EndpointFailure = Rejected | TimedOut | Unreachable | Unauthorized;
+// The request cannot be sent as the author wrote it (a header value undici refuses).
+export interface Invalid {
+  readonly kind: EndpointOutcomeKind.Invalid;
+  readonly reason: string;
+}
+
+export type EndpointFailure =
+  Rejected | TimedOut | Unreachable | Unauthorized | Invalid;
 
 export type ExchangeOutcome = Responded | EndpointFailure;
 

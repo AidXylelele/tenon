@@ -2,6 +2,7 @@ import { WorkDeferredError } from '../../../src/application/errors.js';
 import {
   InstanceNotFoundError,
   StaleWriteError,
+  VersionNotFoundError,
 } from '../../../src/domain/errors.js';
 import { PostgresTransientFailures } from '../../../src/frameworks/drizzle/postgres-transient-failures.js';
 import { ErrorClass } from '../../../src/frameworks/resilience/enums.js';
@@ -16,7 +17,7 @@ function failure(message: string, code: string, cause?: unknown): Error {
 describe('ErrorClassifier', () => {
   const classifier = new ErrorClassifier(new PostgresTransientFailures());
 
-  it('a_missing_record_is_settled', () => {
+  it('a_missing_instance_is_settled', () => {
     const kind = classifier.classify(new InstanceNotFoundError());
 
     expect(kind).toBe(ErrorClass.Settled);
@@ -42,6 +43,8 @@ describe('ErrorClassifier', () => {
     ['a_unique_violation', failure('duplicate key', '23505')],
     ['a_type_error', new TypeError('wrong')],
     ['a_value_that_is_not_an_error', 'boom'],
+    ['a_missing_version', new VersionNotFoundError()],
+    ['a_protocol_violation', failure('too many parameters', '08P01')],
   ])('%s_is_permanent', (_name, error) => {
     const kind = classifier.classify(error);
 

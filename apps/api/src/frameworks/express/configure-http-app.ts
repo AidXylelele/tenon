@@ -9,6 +9,9 @@ const PREFIX = 'api/v1';
 
 const DOCUMENT_LIMIT = '1mb';
 
+// A start carries an input of up to 1 MiB, the default limit of a task's input (spec, Assumptions).
+const JSON_LIMIT = '1mb';
+
 export interface HttpSettings {
   readonly trustedProxies: readonly string[];
   readonly trustedOrigins: readonly string[];
@@ -25,6 +28,7 @@ export function configureHttpApp(
   const mediaTypes = Object.values(DocumentMediaType);
   const documents = text({ type: mediaTypes, limit: DOCUMENT_LIMIT });
   app.set('trust proxy', settings.trustedProxies);
+  app.disable('x-powered-by');
   app.enableCsrfProtection({ trustedOrigins: settings.trustedOrigins.slice() });
   app.setGlobalPrefix(PREFIX);
   app.use((request: Request, response: Response, next: NextFunction) => {
@@ -38,4 +42,6 @@ export function configureHttpApp(
 
     documents(request, response, next);
   });
+  // After the document parser, so a document sent as JSON reaches its route as text.
+  app.useBodyParser('json', { limit: JSON_LIMIT });
 }

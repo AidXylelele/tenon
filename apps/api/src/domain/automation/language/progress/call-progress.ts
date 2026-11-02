@@ -72,7 +72,13 @@ export class CallProgress extends KindProgress {
     }
 
     const id = scope.workId(CallProgress.#CALL);
-    const call = scope.task.callFrom(id, scope.prefix, results, scope.input);
+    const call = scope.task.callFrom(
+      id,
+      scope.prefix,
+      results,
+      scope.input,
+      scope.deadline,
+    );
     const calling = new CallProgress(call);
     return Step.of<KindProgress>(calling);
   }

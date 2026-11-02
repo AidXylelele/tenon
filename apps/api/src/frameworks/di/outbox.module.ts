@@ -19,7 +19,6 @@ import type { Env } from './config.module.js';
           lease: '120s',
           publishTimeout: '60s',
         },
-        retry: { attempts: 20 },
       }),
     }),
   ],

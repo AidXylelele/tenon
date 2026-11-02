@@ -611,7 +611,7 @@ paths:
 
 components:
   securitySchemes:
-    sessionCookie: { type: apiKey, in: cookie, name: session }
+    sessionCookie: { type: apiKey, in: cookie, name: sid }
   parameters:
     Namespace:
       {

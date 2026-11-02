@@ -1,12 +1,34 @@
+import { ResilienceService } from '@nestjs/resilience';
+import { Test } from '@nestjs/testing';
 import { ErrorType } from '../../../src/domain/automation/language/error-type.js';
 import { JsonPointer } from '../../../src/domain/automation/language/json-pointer.js';
 import { Schema } from '../../../src/domain/automation/language/schema.js';
 import { InvalidSchemaError } from '../../../src/domain/errors.js';
+import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.js';
 import { AjvJsonSchemaClient } from '../../../src/frameworks/ajv/ajv-json-schema.client.js';
 import { JsonSchemaValidator } from '../../../src/interface-adapters/workflows/schemas/json-schema.validator.js';
 
+const validationType =
+  'https://serverlessworkflow.io/spec/1.0.0/errors/validation';
+const configurationType =
+  'https://serverlessworkflow.io/spec/1.0.0/errors/configuration';
+
 describe('JsonSchemaValidator', () => {
-  const validator = new JsonSchemaValidator(new AjvJsonSchemaClient());
+  let client: AjvJsonSchemaClient;
+  let validator: JsonSchemaValidator;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ResilienceModule],
+    }).compile();
+    client = new AjvJsonSchemaClient(moduleRef.get(ResilienceService));
+    validator = new JsonSchemaValidator(client);
+  });
+
+  afterAll(async () => {
+    await client.onApplicationShutdown();
+  });
+
   const at = JsonPointer.root().at('input').at('schema');
   const order = {
     type: 'object',
@@ -84,20 +106,40 @@ describe('JsonSchemaValidator', () => {
     expect(second?.failure(at)?.detail).toContain('orderId');
   });
 
-  it('the_compiled_schemas_ajv_keeps_stay_bounded', async () => {
-    const client = new AjvJsonSchemaClient();
-    const bounded = new JsonSchemaValidator(client);
+  it('a_schema_compiled_again_after_many_others_still_validates', async () => {
     const validations = Array.from({ length: 400 }, (_, index) => ({
       id: `w:${String(index)}`,
       schema: { type: 'object', minProperties: index },
       data: {},
     }));
+    await validator.validateAll(validations);
 
-    await bounded.validateAll(validations);
+    const [first, later] = await validator.validateAll([
+      { id: 'w:a', schema: { type: 'object', minProperties: 0 }, data: {} },
+      { id: 'w:b', schema: { type: 'object', minProperties: 1 }, data: {} },
+    ]);
 
-    const draft07: unknown = Reflect.get(client, 'draft07');
-    const cache: unknown = Reflect.get(draft07 as object, '_cache');
-    expect((cache as Map<unknown, unknown>).size).toBeLessThanOrEqual(260);
+    expect(first?.failure(at)).toBeNull();
+    expect(later?.failure(at)?.type).toBe(validationType);
+  });
+
+  it('a_pattern_that_backtracks_without_end_stops_at_its_limit_and_others_go_on', async () => {
+    const backtracking = { type: 'string', pattern: '^(a+)+$' };
+    const runaway = 'a'.repeat(40) + '!';
+    const started = performance.now();
+
+    const [stuck, plain] = await validator.validateAll([
+      { id: 'w:1', schema: backtracking, data: runaway },
+      { id: 'w:2', schema: order, data: {} },
+    ]);
+
+    const elapsed = performance.now() - started;
+    expect(stuck?.failure(at)?.type).toBe(configurationType);
+    expect(stuck?.failure(at)?.detail).toBe(
+      'The schema could not be checked in time',
+    );
+    expect(plain?.failure(at)?.type).toBe(validationType);
+    expect(elapsed).toBeLessThan(3000);
   });
 
   it('a_usable_schema_passes_the_publish_check', async () => {

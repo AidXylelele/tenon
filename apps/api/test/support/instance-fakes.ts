@@ -121,17 +121,25 @@ export class FixedClock implements Clock {
   }
 }
 
+// Answers each call after `delay` milliseconds of real time, so tests can order the answers.
 export class ScriptedServiceCaller implements ServiceCaller {
   readonly calls: ServiceCall[] = [];
 
   constructor(
     private readonly respond: (call: ServiceCall) => ServiceResult | null,
+    private readonly delay: (call: ServiceCall) => number = () => 0,
   ) {}
 
   async callAll(
     calls: readonly ServiceCall[],
   ): Promise<readonly ServiceResult[]> {
     this.calls.push(...calls);
+    const waits = calls.map((call) => this.delay(call));
+    const longest = Math.max(0, ...waits);
+
+    if (longest > 0)
+      await new Promise((resolve) => setTimeout(resolve, longest));
+
     const results = calls.map((call) => this.respond(call));
     return results.filter((result) => result !== null);
   }

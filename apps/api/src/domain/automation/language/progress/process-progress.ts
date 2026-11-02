@@ -68,13 +68,15 @@ export class ProcessProgress extends KindProgress {
 
     const id = scope.workId(ProcessProgress.#PROCESS);
     const value = process.fill(scope.prefix, results);
-    const run = scope.task.runFrom(id, value);
 
+    // A detached process outlives its task, so no deadline of the task applies to it.
     if (!scope.task.awaits) {
-      const detached = Outcome.detachingProcess(scope.input, run);
+      const detachedRun = scope.task.runFrom(id, value, null);
+      const detached = Outcome.detachingProcess(scope.input, detachedRun);
       return ConcludedProgress.step(detached);
     }
 
+    const run = scope.task.runFrom(id, value, scope.deadline);
     const running = new ProcessProgress(run);
     return Step.of<KindProgress>(running);
   }

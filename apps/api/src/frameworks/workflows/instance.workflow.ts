@@ -56,9 +56,9 @@ export class InstanceWorkflow implements WorkflowRunner<
           : { retry: InstanceWorkflow.STEPS };
         const progress = await ctx.step(
           `advance-${String(round)}`,
-          () =>
+          ({ signal }) =>
             this.errors.classified(() =>
-              this.#untilParked(instanceId, attemptedIds),
+              this.#untilParked(instanceId, attemptedIds, signal),
             ),
           options,
         );
@@ -148,9 +148,12 @@ export class InstanceWorkflow implements WorkflowRunner<
   }
 
   // Rounds repeat within one step while the instance can run on, so a short run costs one entry.
+  // The step's signal (a shutdown, a lost lease) lets the round in progress end but starts no
+  // other, so a worker that lost the instance repeats no work its successor took over.
   async #untilParked(
     instanceId: string,
     attempted: readonly string[],
+    signal: AbortSignal,
   ): Promise<RoundProgress> {
     const deadline = performance.now() + InstanceWorkflow.BUDGET_MS;
 
@@ -162,7 +165,7 @@ export class InstanceWorkflow implements WorkflowRunner<
       const spent = performance.now() >= deadline;
       const runsOn = progress.kind === RoundProgressKind.Run;
 
-      if (!runsOn || listsNew || spent) return progress;
+      if (!runsOn || listsNew || spent || signal.aborted) return progress;
     }
   }
 }

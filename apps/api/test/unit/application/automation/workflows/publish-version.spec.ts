@@ -30,6 +30,7 @@ function setUp() {
     new JsonDefinitionReader(),
     new FakeExpressionEvaluator(),
     new AcceptingSchemaValidator(),
+    versions,
   );
   const clock = new FixedClock(new Date('2026-11-01T10:00:00.000Z'));
   const publish = new PublishVersion(check, workflows, versions, clock);

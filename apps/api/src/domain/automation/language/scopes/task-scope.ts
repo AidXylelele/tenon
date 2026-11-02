@@ -17,6 +17,7 @@ export class TaskScope<T extends Task = Task> {
   readonly #runtime: JsonObject;
   readonly #variables: JsonObject;
   readonly #startedAt: Date;
+  readonly #deadline: Date | null;
   readonly #now: Date;
 
   constructor(props: TaskScopeProps<T>) {
@@ -31,6 +32,7 @@ export class TaskScope<T extends Task = Task> {
     this.#runtime = props.runtime;
     this.#variables = props.variables;
     this.#startedAt = props.startedAt;
+    this.#deadline = props.deadline;
     this.#now = props.now;
   }
 
@@ -90,8 +92,21 @@ export class TaskScope<T extends Task = Task> {
     return this.#startedAt;
   }
 
+  // The earliest deadline of the task and the tasks around it, the workflow's included.
+  get deadline(): Date | null {
+    return this.#deadline;
+  }
+
   get now(): Date {
     return this.#now;
+  }
+
+  deadlineWith(other: Date | null): Date | null {
+    if (other === null) return this.#deadline;
+
+    if (this.#deadline === null || other < this.#deadline) return other;
+
+    return this.#deadline;
   }
 
   get prefix(): string {

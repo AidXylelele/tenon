@@ -2,6 +2,7 @@ import $RefParser from '@apidevtools/json-schema-ref-parser';
 import { Injectable } from '@nestjs/common';
 import {
   BulkheadFullError,
+  type ExecuteOptions,
   type ResiliencePolicy,
   ResilienceService,
   ResilienceTimeoutError,
@@ -39,6 +40,8 @@ interface ReceivedResponse {
 @Injectable()
 export class UndiciEndpointClient implements EndpointClient {
   private static readonly PRESET = 'service-calls';
+  private static readonly DEADLINE = 'TimeoutError';
+  private static readonly INVALID_ARGUMENT = 'UND_ERR_INVALID_ARG';
   private static readonly MAXIMUM_BYTES = 1024 * 1024;
   private static readonly DISCOVERY = '/.well-known/openid-configuration';
   private static readonly UNREACHABLE = 'The service could not be reached';
@@ -56,9 +59,12 @@ export class UndiciEndpointClient implements EndpointClient {
   }
 
   async exchange(exchange: Exchange): Promise<ExchangeOutcome> {
+    const options = UndiciEndpointClient.optionsOf(exchange.timeout);
+
     try {
-      return await this.policy.execute(({ signal }) =>
-        this.#exchange(exchange, signal),
+      return await this.policy.execute(
+        ({ signal }) => this.#exchange(exchange, signal),
+        options,
       );
     } catch (error) {
       return UndiciEndpointClient.failureOf(error);
@@ -66,9 +72,12 @@ export class UndiciEndpointClient implements EndpointClient {
   }
 
   async read(request: DocumentRequest): Promise<DocumentOutcome> {
+    const options = UndiciEndpointClient.optionsOf(request.timeout);
+
     try {
-      return await this.policy.execute(({ signal }) =>
-        this.#read(request, signal),
+      return await this.policy.execute(
+        ({ signal }) => this.#read(request, signal),
+        options,
       );
     } catch (error) {
       return UndiciEndpointClient.failureOf(error);
@@ -267,11 +276,22 @@ export class UndiciEndpointClient implements EndpointClient {
     };
   }
 
+  // The task's deadline cancels the execution, within the preset's own timeout.
+  private static optionsOf(timeout: number | null): ExecuteOptions {
+    if (timeout === null) return {};
+
+    return { signal: AbortSignal.timeout(timeout) };
+  }
+
   private static failureOf(error: unknown): EndpointFailure {
     if (error instanceof BulkheadFullError)
       return { kind: EndpointOutcomeKind.Rejected };
 
-    if (error instanceof ResilienceTimeoutError)
+    const deadlinePassed =
+      error instanceof DOMException &&
+      error.name === UndiciEndpointClient.DEADLINE;
+
+    if (error instanceof ResilienceTimeoutError || deadlinePassed)
       return { kind: EndpointOutcomeKind.TimedOut };
 
     if (error instanceof TokenRefusedError)
@@ -279,6 +299,15 @@ export class UndiciEndpointClient implements EndpointClient {
 
     if (error instanceof ResponseTooLargeError)
       return { kind: EndpointOutcomeKind.Unreachable, reason: error.message };
+
+    const code: unknown =
+      error instanceof Error ? Reflect.get(error, 'code') : undefined;
+
+    if (
+      code === UndiciEndpointClient.INVALID_ARGUMENT &&
+      error instanceof Error
+    )
+      return { kind: EndpointOutcomeKind.Invalid, reason: error.message };
 
     const transport =
       error instanceof Error && typeof Reflect.get(error, 'code') === 'string';

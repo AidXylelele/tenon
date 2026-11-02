@@ -1,11 +1,21 @@
+import type { Definition } from '../../../domain/automation/language/definition.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
 import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
+import type { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
 import type { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
 import type { Workflow } from '../../../domain/automation/workflows/workflow.js';
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 
 export interface CheckDocumentQuery {
+  readonly format: DocumentFormat;
   readonly text: string;
+}
+
+// What publishing would publish, and the version already published under its identity.
+export interface CheckedDocument {
+  readonly source: SourceDocument;
+  readonly definition: Definition;
+  readonly existing: WorkflowVersion | null;
 }
 
 export interface PublishVersionCommand {

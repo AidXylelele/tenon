@@ -17,7 +17,6 @@ import {
   typesOf,
 } from '../../../../support/instances.js';
 import {
-  answer,
   definitionOf,
   evaluatedAs,
   now,
@@ -632,14 +631,10 @@ describe('WorkflowInstance', () => {
       tasks: [leaf],
       version: 1,
     });
-    const work = restored.pendingWork(definition, runtime, now);
-    const results = answer(work, { respond: (id) => ok(id) });
+    // A task's scope holds the deadlines of the tasks around it, so its work is refused.
+    const work = () => restored.pendingWork(definition, runtime, now);
 
-    const record = () => {
-      restored.record(results, definition, runtime, now);
-    };
-
-    expect(record).toThrow(InconsistentProgressError);
+    expect(work).toThrow(InconsistentProgressError);
   });
 
   it('a_round_with_the_definition_of_another_version_is_refused', () => {

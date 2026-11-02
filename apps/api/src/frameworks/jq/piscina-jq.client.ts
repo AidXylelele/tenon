@@ -18,6 +18,7 @@ import {
   type JqEvaluation,
   type JqTimedOut,
 } from '../../interface-adapters/workflows/expressions/interfaces.js';
+import { ENGINE_CONCURRENCY } from '../workflows/engine.constants.js';
 import type { JqRun, JqRunResult } from './jq.worker.js';
 
 // jq-wasm computes synchronously, so a runaway program is stopped by terminating the worker
@@ -51,11 +52,12 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
   private static readonly UNBOUND = 'null';
   private static readonly COMPACT = '-c';
 
-  // Up to four programs at once, about 20 MB each; idle workers beyond one stop after 30 s.
+  // A worker per running instance and one for the compilations of a publish, so a program
+  // never waits behind another instance's runaway; idle workers beyond one stop after 30 s.
   private readonly pool = new Piscina<JqRun, JqRunResult>({
     filename: PiscinaJqClient.WORKER,
     minThreads: 1,
-    maxThreads: 4,
+    maxThreads: ENGINE_CONCURRENCY + 1,
     idleTimeout: 30_000,
   });
   private readonly policy: ResiliencePolicy;
@@ -89,8 +91,10 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
     variables: JsonObject,
   ): Promise<JqEvaluation> {
     const flags = [PiscinaJqClient.COMPACT];
+    const mentioned = PiscinaJqClient.mentionsOf(program);
 
-    for (const name of Object.keys(variables)) {
+    // Only the arguments the program names: `$workflow` alone holds the whole document.
+    for (const name of mentioned) {
       const value = variables[name];
 
       if (value !== undefined)
@@ -126,6 +130,17 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
   }
 
   #bindings(program: string): string[] {
+    const names = PiscinaJqClient.mentionsOf(program);
+    const flags: string[] = [];
+
+    for (const name of names)
+      flags.push('--argjson', name, PiscinaJqClient.UNBOUND);
+
+    return flags;
+  }
+
+  // The `$name`s a program mentions, read lexically: one inside a string only binds too much.
+  private static mentionsOf(program: string): ReadonlySet<string> {
     const names = new Set<string>();
 
     for (const mention of program.matchAll(PiscinaJqClient.VARIABLE)) {
@@ -133,12 +148,7 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
       names.add(name);
     }
 
-    const flags: string[] = [];
-
-    for (const name of names)
-      flags.push('--argjson', name, PiscinaJqClient.UNBOUND);
-
-    return flags;
+    return names;
   }
 
   // `--argjson ENV` does not shadow jq's built-in `$ENV`, and a closing bracket on its own line

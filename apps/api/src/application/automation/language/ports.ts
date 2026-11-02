@@ -9,7 +9,7 @@ import type { ValidationResult } from '../../../domain/automation/language/resul
 import type { Schema } from '../../../domain/automation/language/schema.js';
 
 export abstract class DefinitionReader {
-  abstract read(text: string): Definition;
+  abstract read(text: string): Promise<Definition>;
 }
 
 export abstract class ExpressionEvaluator {

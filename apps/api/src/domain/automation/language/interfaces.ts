@@ -292,6 +292,8 @@ export interface ServiceCall {
   readonly arguments: JsonValue;
   readonly authentication: ServiceAuthentication | null;
   readonly input: JsonValue;
+  // The earliest deadline of the calling task and the tasks around it; null: none.
+  readonly deadline: Date | null;
 }
 
 export interface ProcessRun {
@@ -299,6 +301,8 @@ export interface ProcessRun {
   readonly kind: RunKind;
   readonly language: ScriptLanguage | null;
   readonly process: JsonValue;
+  // The earliest deadline of an awaiting task and the tasks around it; null: none or detached.
+  readonly deadline: Date | null;
 }
 
 export interface RoundWorkProps {
@@ -404,6 +408,7 @@ export interface TaskScopeProps<T extends Task> {
   readonly runtime: JsonObject;
   readonly variables: JsonObject;
   readonly startedAt: Date;
+  readonly deadline: Date | null;
   readonly now: Date;
 }
 
@@ -481,6 +486,7 @@ export interface CallTask extends Task {
     prefix: string,
     results: RoundResults,
     input: JsonValue,
+    deadline: Date | null,
   ): ServiceCall;
 }
 
@@ -488,5 +494,5 @@ export interface ProcessTask extends Task {
   readonly process: Template;
   readonly awaits: boolean;
   readonly returns: ProcessReturn;
-  runFrom(id: string, process: JsonValue): ProcessRun;
+  runFrom(id: string, process: JsonValue, deadline: Date | null): ProcessRun;
 }

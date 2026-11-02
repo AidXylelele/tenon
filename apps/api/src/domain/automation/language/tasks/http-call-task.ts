@@ -54,6 +54,7 @@ export class HttpCallTask extends Task implements CallTask {
     prefix: string,
     results: RoundResults,
     input: JsonValue,
+    deadline: Date | null,
   ): ServiceCall {
     const endpoint = this.#endpoint.filled(prefix, results);
     const args = this.#arguments.fill(prefix, results);
@@ -64,6 +65,7 @@ export class HttpCallTask extends Task implements CallTask {
       arguments: args,
       authentication: null,
       input,
+      deadline,
     };
   }
 

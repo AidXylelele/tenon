@@ -21,20 +21,28 @@ import type {
 
 export class ProcessRunMapper {
   static readonly #NANOSECONDS_PER_SECOND = 1_000_000_000;
+  static readonly #NANOSECONDS_PER_MILLISECOND = 1_000_000;
   static readonly #PATH = 'PATH=/usr/local/bin:/usr/bin:/bin';
   static readonly #NODE = '/usr/local/bin/node';
   static readonly #PYTHON = '/usr/bin/python3';
   static readonly #SHELL = '/bin/sh';
   static readonly #SCRIPT = 'script';
-  static readonly #UNREACHABLE = 'The sandbox could not be reached';
-  static readonly #REFUSED = 'The sandbox refused to run the process';
+  // PostgreSQL keeps no U+0000 in jsonb, so output holding one cannot be recorded.
+  static readonly #NUL = '\u0000';
+  static readonly #HOLDS_NUL =
+    'The process wrote a NUL character, which a value cannot hold';
 
-  static toCommand(run: ProcessRun, limits: SandboxLimits): GoJudgeCommand {
+  // `timeout`: the milliseconds left before the awaiting task's deadline; null: none.
+  static toCommand(
+    run: ProcessRun,
+    limits: SandboxLimits,
+    timeout: number | null,
+  ): GoJudgeCommand {
     const process = ProcessRunMapper.#objectOf(run.process);
     const args = ProcessRunMapper.#argumentsOf(process.arguments);
     const env = ProcessRunMapper.#environmentOf(process.environment);
     const stdin = ProcessRunMapper.#textOf(process.stdin);
-    const limit = limits.seconds * ProcessRunMapper.#NANOSECONDS_PER_SECOND;
+    const limit = ProcessRunMapper.#limitOf(limits, timeout);
     const common = {
       env,
       files: [
@@ -79,18 +87,18 @@ export class ProcessRunMapper {
     };
   }
 
+  // A sandbox that is busy, down or refusing is the platform's outage, not the author's
+  // error: the run gets no result and the round tries again later.
   static toResult(id: string, outcome: SandboxOutcome): ProcessResult | null {
     switch (outcome.kind) {
       case SandboxOutcomeKind.Ran:
         return ProcessRunMapper.#resultOf(id, outcome.result);
-      case SandboxOutcomeKind.Rejected:
-        return null;
       case SandboxOutcomeKind.TimedOut:
         return new ProcessTimedOut(id);
+      case SandboxOutcomeKind.Rejected:
       case SandboxOutcomeKind.Unreachable:
-        return new SandboxFailed(id, ProcessRunMapper.#UNREACHABLE);
       case SandboxOutcomeKind.Refused:
-        return new SandboxFailed(id, ProcessRunMapper.#REFUSED);
+        return null;
     }
   }
 
@@ -100,12 +108,21 @@ export class ProcessRunMapper {
     const timedOut: string = GoJudgeStatus.TimeLimitExceeded;
     const exited = result.status === accepted || result.status === nonzero;
 
+    const stdout = result.files?.stdout ?? '';
+    const stderr = result.files?.stderr ?? '';
+    const holdsNul =
+      stdout.includes(ProcessRunMapper.#NUL) ||
+      stderr.includes(ProcessRunMapper.#NUL);
+
+    if (exited && holdsNul)
+      return new SandboxFailed(id, ProcessRunMapper.#HOLDS_NUL);
+
     if (exited)
       return new ProcessExited({
         id,
         code: result.exitStatus ?? 0,
-        stdout: result.files?.stdout ?? '',
-        stderr: result.files?.stderr ?? '',
+        stdout,
+        stderr,
       });
 
     if (result.status === timedOut) return new ProcessTimedOut(id);
@@ -114,6 +131,18 @@ export class ProcessRunMapper {
       id,
       `The sandbox stopped the process: ${result.status}`,
     );
+  }
+
+  // The sandbox's own limit, or less when the task's deadline is nearer.
+  static #limitOf(limits: SandboxLimits, timeout: number | null): number {
+    const sandbox = limits.seconds * ProcessRunMapper.#NANOSECONDS_PER_SECOND;
+
+    if (timeout === null) return sandbox;
+
+    const remaining = Math.ceil(
+      timeout * ProcessRunMapper.#NANOSECONDS_PER_MILLISECOND,
+    );
+    return Math.min(sandbox, remaining);
   }
 
   static #objectOf(value: JsonValue): JsonObject {

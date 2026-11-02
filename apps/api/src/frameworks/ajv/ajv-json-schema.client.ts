@@ -1,8 +1,12 @@
-import { Injectable } from '@nestjs/common';
-import { Ajv, type Options, type ValidateFunction } from 'ajv';
-import { Ajv2019 } from 'ajv/dist/2019.js';
-import { Ajv2020 } from 'ajv/dist/2020.js';
-import ajvFormats from 'ajv-formats';
+import { extname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  type ResiliencePolicy,
+  ResilienceService,
+  ResilienceTimeoutError,
+} from '@nestjs/resilience';
+import { Piscina } from 'piscina';
 import type {
   JsonObject,
   JsonValue,
@@ -11,122 +15,82 @@ import { JsonSchemaOutcomeKind } from '../../interface-adapters/workflows/schema
 import {
   JsonSchemaClient,
   type JsonSchemaCompilation,
+  type JsonSchemaTimedOut,
   type JsonSchemaVerdict,
 } from '../../interface-adapters/workflows/schemas/interfaces.js';
+import { ENGINE_CONCURRENCY } from '../workflows/engine.constants.js';
+import type { AjvAnswer, AjvTask } from './ajv.worker.js';
 
-interface CompiledSchema {
-  readonly compiler: Ajv | Ajv2019 | Ajv2020;
-  readonly schema: JsonObject;
-  readonly validate: ValidateFunction | null;
-  readonly failure: string;
-}
-
+// Ajv runs author schemas in worker threads: the `schemas` preset's timeout terminates the
+// worker of a validation that backtracks without end.
 @Injectable()
-export class AjvJsonSchemaClient implements JsonSchemaClient {
-  private static readonly DRAFT_2019 =
-    'https://json-schema.org/draft/2019-09/schema';
-  private static readonly DRAFT_2020 =
-    'https://json-schema.org/draft/2020-12/schema';
-  private static readonly CACHED = 256;
-  // A schema with an `$id` compiles again instead of failing as a duplicate.
-  private static readonly OPTIONS: Options = {
-    allErrors: true,
-    strict: false,
-    addUsedSchema: false,
-  };
+export class AjvJsonSchemaClient
+  implements JsonSchemaClient, OnApplicationShutdown
+{
+  private static readonly PRESET = 'schemas';
+  // The worker beside this file: `.ts` where the sources run (tests), `.js` in the build.
+  private static readonly WORKER = new URL(
+    `./ajv.worker${extname(fileURLToPath(import.meta.url))}`,
+    import.meta.url,
+  ).href;
 
-  private readonly draft07 = new Ajv(AjvJsonSchemaClient.OPTIONS);
-  private readonly draft2019 = new Ajv2019(AjvJsonSchemaClient.OPTIONS);
-  private readonly draft2020 = new Ajv2020(AjvJsonSchemaClient.OPTIONS);
-  private readonly compiled = new Map<string, CompiledSchema>();
+  // A worker per running instance and one for the checks of a publish, as for jq.
+  private readonly pool = new Piscina<AjvTask, AjvAnswer>({
+    filename: AjvJsonSchemaClient.WORKER,
+    minThreads: 1,
+    maxThreads: ENGINE_CONCURRENCY + 1,
+    idleTimeout: 30_000,
+  });
+  private readonly policy: ResiliencePolicy;
 
-  constructor() {
-    ajvFormats.default(this.draft07);
-    ajvFormats.default(this.draft2019);
-    ajvFormats.default(this.draft2020);
+  constructor(resilience: ResilienceService) {
+    this.policy = resilience.preset(AjvJsonSchemaClient.PRESET);
   }
 
-  compile(schema: JsonObject): JsonSchemaCompilation {
-    const compiled = this.#compiled(schema);
-
-    if (compiled.validate === null)
-      return { kind: JsonSchemaOutcomeKind.Unusable, reason: compiled.failure };
-
-    return { kind: JsonSchemaOutcomeKind.Compiled };
-  }
-
-  validate(schema: JsonObject, data: JsonValue): JsonSchemaVerdict {
-    const compiled = this.#compiled(schema);
-    const validate = compiled.validate;
-
-    if (validate === null)
-      return { kind: JsonSchemaOutcomeKind.Unusable, reason: compiled.failure };
-
-    const valid = validate(data);
-
-    if (valid) return { kind: JsonSchemaOutcomeKind.Valid };
-
-    const reason = this.draft07.errorsText(validate.errors, {
-      dataVar: 'value',
-    });
-    return { kind: JsonSchemaOutcomeKind.Invalid, reason };
-  }
-
-  // Ajv keeps every schema it compiled, so an entry that leaves the cache leaves Ajv too.
-  #compiled(schema: JsonObject): CompiledSchema {
-    const key = JSON.stringify(schema);
-    const cached = this.compiled.get(key);
-
-    if (cached !== undefined) {
-      this.compiled.delete(key);
-      this.compiled.set(key, cached);
-      return cached;
-    }
-
-    const compiler = this.#compilerFor(schema);
-    const compiled = this.#compile(compiler, schema);
-    this.compiled.set(key, compiled);
-
-    if (this.compiled.size > AjvJsonSchemaClient.CACHED) this.#evictOldest();
-
-    return compiled;
-  }
-
-  #compile(
-    compiler: Ajv | Ajv2019 | Ajv2020,
-    schema: JsonObject,
-  ): CompiledSchema {
+  async compile(schema: JsonObject): Promise<JsonSchemaCompilation> {
     try {
-      const validate = compiler.compile(schema);
-      return { compiler, schema, validate, failure: '' };
+      const answer = await this.#run({ schema, validates: false, data: null });
+
+      if (answer.unusable)
+        return { kind: JsonSchemaOutcomeKind.Unusable, reason: answer.reason };
+
+      return { kind: JsonSchemaOutcomeKind.Compiled };
     } catch (error) {
-      compiler.removeSchema(schema);
-      const failure = error instanceof Error ? error.message : String(error);
-      return { compiler, schema, validate: null, failure };
+      return AjvJsonSchemaClient.interruptionOf(error);
     }
   }
 
-  #evictOldest(): void {
-    const [oldest] = this.compiled.entries();
+  async validate(
+    schema: JsonObject,
+    data: JsonValue,
+  ): Promise<JsonSchemaVerdict> {
+    try {
+      const answer = await this.#run({ schema, validates: true, data });
 
-    if (oldest === undefined) return;
+      if (answer.unusable)
+        return { kind: JsonSchemaOutcomeKind.Unusable, reason: answer.reason };
 
-    const [key, entry] = oldest;
-    this.compiled.delete(key);
-    entry.compiler.removeSchema(entry.schema);
+      if (!answer.valid)
+        return { kind: JsonSchemaOutcomeKind.Invalid, reason: answer.reason };
+
+      return { kind: JsonSchemaOutcomeKind.Valid };
+    } catch (error) {
+      return AjvJsonSchemaClient.interruptionOf(error);
+    }
   }
 
-  #compilerFor(schema: JsonObject): Ajv | Ajv2019 | Ajv2020 {
-    const dialect = schema.$schema;
+  async onApplicationShutdown(): Promise<void> {
+    await this.pool.close();
+  }
 
-    if (typeof dialect !== 'string') return this.draft07;
+  async #run(task: AjvTask): Promise<AjvAnswer> {
+    return this.policy.execute(({ signal }) => this.pool.run(task, { signal }));
+  }
 
-    if (dialect.startsWith(AjvJsonSchemaClient.DRAFT_2020))
-      return this.draft2020;
+  private static interruptionOf(error: unknown): JsonSchemaTimedOut {
+    if (error instanceof ResilienceTimeoutError)
+      return { kind: JsonSchemaOutcomeKind.TimedOut };
 
-    if (dialect.startsWith(AjvJsonSchemaClient.DRAFT_2019))
-      return this.draft2019;
-
-    return this.draft07;
+    throw error;
   }
 }

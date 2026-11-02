@@ -17,7 +17,13 @@ export type InvitationTokenBody = z.infer<typeof InvitationTokenBody>;
 
 export const AcceptInvitationBody = z.strictObject({
   token: z.string().min(32),
-  name: z.string().trim().min(1).max(120),
+  // Control characters would reach mail headers through the name.
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .regex(/^\P{Cc}*$/u, 'Control characters are not allowed'),
   password: NewPassword,
 });
 

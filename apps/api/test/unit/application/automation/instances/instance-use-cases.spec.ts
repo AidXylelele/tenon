@@ -1,6 +1,7 @@
 import { InstanceProgressKind } from '../../../../../src/domain/automation/instances/enums.js';
 import { Phase } from '../../../../../src/domain/automation/language/phase.js';
 import { ServiceResponded } from '../../../../../src/domain/automation/language/results/service-responded.js';
+import { ServiceTimedOut } from '../../../../../src/domain/automation/language/results/service-timed-out.js';
 import { SubWorkflowStartKind } from '../../../../../src/application/automation/instances/enums.js';
 import { WorkDeferredError } from '../../../../../src/application/errors.js';
 import { ProcessDetached } from '../../../../../src/domain/automation/instances/domain-events/process-detached.js';
@@ -103,6 +104,184 @@ describe('StartInstance', () => {
     await expect(unknownVersion).rejects.toThrow(VersionNotFoundError);
     await expect(unknownWorkflow).rejects.toThrow(WorkflowNotFoundError);
   });
+});
+
+describe('timeouts of work in progress', () => {
+  const timeoutType = 'https://serverlessworkflow.io/spec/1.0.0/errors/timeout';
+
+  // Answers after `seconds`, as the service gateway does: an answer past the call's
+  // deadline is a time-out, and `deferred` gives no answer at all.
+  function slowWorld(seconds: number, document: string, deferred = false) {
+    const world = instanceWorld((call) => {
+      const elapsed = world.clock.time.getTime() + seconds * 1000;
+      world.clock.time = new Date(elapsed);
+      const late = call.deadline !== null && call.deadline < world.clock.time;
+
+      if (deferred) return null;
+
+      if (late) return new ServiceTimedOut(call.id);
+
+      return ok(call.id);
+    });
+    const started = world.publish(document).then(() =>
+      world.start.execute({
+        target: WorkflowTarget.of(orders, null),
+        input: {},
+        userId: 'user-1',
+        key: null,
+      }),
+    );
+    return { world, started };
+  }
+
+  const timedFetch = {
+    fetch: {
+      call: 'http',
+      with: { method: 'get', endpoint: 'https://orders.example/1' },
+      timeout: { after: { seconds: 2 } },
+    },
+  };
+
+  it('a_call_carries_the_deadline_of_its_task', async () => {
+    const document = documentOf('orders', '1.0.0', [timedFetch]);
+    const { world, started } = slowWorld(1, document);
+    const instance = await started;
+    const startedAt = world.clock.time.getTime();
+
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    const deadline = world.services.calls[0]?.deadline?.getTime();
+    expect(deadline).toBe(startedAt + 2000);
+  });
+
+  it('a_call_that_outlasts_its_task_timeout_faults_the_task_with_a_timeout_error', async () => {
+    const document = documentOf('orders', '1.0.0', [timedFetch]);
+    const { world, started } = slowWorld(20, document);
+    const instance = await started;
+
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    const saved = await world.instances.find(instance.id);
+    expect(saved?.phase).toBe(Phase.Faulted);
+    expect(saved?.error?.type).toBe(timeoutType);
+    expect(saved?.error?.instance).toBe('/do/0/fetch');
+  });
+
+  it('a_deadline_that_passed_while_a_call_waited_for_room_interrupts_its_task', async () => {
+    const document = documentOf('orders', '1.0.0', [timedFetch]);
+    const { world, started } = slowWorld(20, document, true);
+    const instance = await started;
+
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    const saved = await world.instances.find(instance.id);
+    expect(saved?.phase).toBe(Phase.Faulted);
+    expect(saved?.error?.type).toBe(timeoutType);
+    expect(saved?.error?.instance).toBe('/do/0/fetch');
+  });
+
+  it('a_call_that_answers_in_time_completes_when_its_answer_arrived', async () => {
+    const document = documentOf('orders', '1.0.0', [timedFetch]);
+    const { world, started } = slowWorld(1, document);
+    const instance = await started;
+    const startedAt = world.clock.time.getTime();
+
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    const saved = await world.instances.find(instance.id);
+    expect(saved?.phase).toBe(Phase.Completed);
+    expect(saved?.endedAt?.getTime()).toBe(startedAt + 1000);
+  });
+
+  it('the_workflow_timeout_interrupts_a_call_in_progress', async () => {
+    const document = JSON.stringify({
+      document: {
+        dsl: '1.0.3',
+        namespace: 'default',
+        name: 'orders',
+        version: '1.0.0',
+      },
+      timeout: { after: { seconds: 5 } },
+      do: [fetchOrder, { done: { set: { done: true } } }],
+    });
+    const { world, started } = slowWorld(20, document);
+    const instance = await started;
+
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    const saved = await world.instances.find(instance.id);
+    expect(saved?.phase).toBe(Phase.Faulted);
+    expect(saved?.error?.type).toBe(timeoutType);
+    expect(saved?.output).toBeNull();
+  });
+});
+
+describe('answers in the order they arrive', () => {
+  it('the_first_competing_branch_to_finish_wins_whatever_its_place', async () => {
+    const call = (host: string) => ({
+      call: 'http',
+      with: { method: 'get', endpoint: `https://${host}.example/` },
+    });
+    const document = documentOf('orders', '1.0.0', [
+      {
+        race: {
+          fork: {
+            compete: true,
+            branches: [{ slow: call('slow') }, { fast: call('fast') }],
+          },
+        },
+      },
+    ]);
+    const world = instanceWorld(
+      (asked) => ok(asked.id),
+      () => null,
+      (asked) => (JSON.stringify(asked.endpoint.uri).includes('slow') ? 50 : 5),
+    );
+    await world.publish(document);
+    const instance = await world.start.execute({
+      target: WorkflowTarget.of(orders, null),
+      input: {},
+      userId: 'user-1',
+      key: null,
+    });
+
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    const saved = await world.instances.find(instance.id);
+    const records = Array.from(world.instances.taskRows.values());
+    const slow = records.find((record) => record.reference.endsWith('/slow'));
+    const fast = records.find((record) => record.reference.endsWith('/fast'));
+    expect(saved?.phase).toBe(Phase.Completed);
+    expect(fast?.phase).toBe('completed');
+    expect(slow?.phase).toBe('cancelled');
+  });
+});
+
+describe('the task-execution limit', () => {
+  it('an_instance_that_reaches_10000_task_executions_faults_at_the_task_that_spawns_more', async () => {
+    const world = instanceWorld();
+    await world.publish(
+      documentOf('orders', '1.0.0', [
+        { each: { for: { in: '${ . }' }, do: [{ one: { set: { x: 1 } } }] } },
+      ]),
+    );
+    const items = Array.from({ length: 10_001 }, (_, index) => index);
+    const instance = await world.start.execute({
+      target: WorkflowTarget.of(orders, null),
+      input: items,
+      userId: 'user-1',
+      key: null,
+    });
+
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    const saved = await world.instances.find(instance.id);
+    expect(saved?.phase).toBe(Phase.Faulted);
+    expect(saved?.error?.instance).toBe('/do/0/each');
+    expect(saved?.error?.detail).toBe(
+      'The instance reached its limit of 10,000 task executions',
+    );
+  }, 60_000);
 });
 
 describe('AdvanceInstance', () => {

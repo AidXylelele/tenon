@@ -51,6 +51,10 @@ import { TaskInstance } from './task-instance.js';
 
 export class WorkflowInstance {
   static readonly #RUN_FAILED = 'The run of the instance failed';
+  // The default limit of task executions per instance (spec, Assumptions).
+  static readonly #EXECUTION_LIMIT = 10_000;
+  static readonly #LIMIT_REACHED =
+    'The instance reached its limit of 10,000 task executions';
   static readonly #NOT_NAMED = 'The workflow is not the one the run task names';
 
   readonly #id: string;
@@ -63,6 +67,9 @@ export class WorkflowInstance {
   readonly #startedAt: Date;
   readonly #version: number;
   readonly #tasks: TaskInstance[];
+  // Lookups by id and the tasks still running, so a pass costs what runs, not what ran.
+  readonly #byId: Map<string, TaskInstance>;
+  #running: TaskInstance[];
   readonly #produced: ProducedEvents;
   readonly #events: InstanceEvent[];
   #phase: Phase;
@@ -89,6 +96,11 @@ export class WorkflowInstance {
     this.#endedAt = props.endedAt;
     this.#executions = props.executions;
     this.#tasks = props.tasks.slice();
+    this.#byId = new Map();
+    this.#running = [];
+
+    for (const task of this.#tasks) this.#index(task);
+
     this.#version = props.version;
     this.#events = [];
     this.#changed = false;
@@ -244,10 +256,23 @@ export class WorkflowInstance {
     if (this.#phase.isTerminal()) return RoundWork.none();
 
     const round = this.#round(definition, runtime, now);
-    const works = this.#activeTasks().map((task) => {
+    const works: RoundWork[] = [];
+    let exporting = false;
+
+    // One export per pass, so each sees the context the one before it left (fork branches
+    // that end together would otherwise overwrite one another's exports).
+    for (const task of this.#activeTasks()) {
+      const exports = task.exportsContext();
+
+      if (exports && exporting) continue;
+
+      if (exports) exporting = true;
+
       const scope = this.#scopeOf(task, round);
-      return task.work(scope);
-    });
+      const work = task.work(scope);
+      works.push(work);
+    }
+
     return RoundWork.combined(works);
   }
 
@@ -267,6 +292,10 @@ export class WorkflowInstance {
       this.#follow(task, change, round);
     }
 
+    // The results arrived at `now`: a task whose time ran out meanwhile, or around whose
+    // work the workflow's did, is interrupted, as the standard's timeouts require.
+    for (const task of this.#activeTasks()) this.#expire(task, round);
+
     this.#settle(round);
   }
 
@@ -275,7 +304,10 @@ export class WorkflowInstance {
 
     const root = JsonPointer.root();
     const error = ErrorType.Runtime.errorAt(root, WorkflowInstance.#RUN_FAILED);
+    this.#faultWith(error, now);
+  }
 
+  #faultWith(error: WorkflowError, now: Date): void {
     for (const task of this.#activeTasks()) this.#abandon(task, now);
 
     this.#end(Phase.Faulted, now);
@@ -295,7 +327,7 @@ export class WorkflowInstance {
   requestedSubWorkflows(): readonly RequestedSubWorkflow[] {
     const requested: RequestedSubWorkflow[] = [];
 
-    for (const task of this.#tasks) {
+    for (const task of this.#activeTasks()) {
       const request = task.requestedSubWorkflow();
 
       if (request === null) continue;
@@ -452,19 +484,23 @@ export class WorkflowInstance {
   }
 
   #fire(task: TaskInstance, round: RoundContext): void {
+    const expired = this.#expire(task, round);
+
+    if (expired || !task.isDue(round.now)) return;
+
     const scope = this.#scopeOf(task, round);
-
-    if (task.hasElapsed(round.now)) {
-      const timedOut = task.timeOut(scope);
-      this.#follow(task, timedOut, round);
-      return;
-    }
-
-    if (!task.isDue(round.now)) return;
-
     const none = RoundResults.none();
     const resumed = task.record(none, scope);
     this.#follow(task, resumed, round);
+  }
+
+  #expire(task: TaskInstance, round: RoundContext): boolean {
+    if (task.isTerminal() || !task.hasElapsed(round.now)) return false;
+
+    const scope = this.#scopeOf(task, round);
+    const timedOut = task.timeOut(scope);
+    this.#follow(task, timedOut, round);
+    return true;
   }
 
   #answer(
@@ -531,6 +567,17 @@ export class WorkflowInstance {
     if (task.isCancelled()) return;
 
     for (const start of change.starts) {
+      const spent = this.#executions >= WorkflowInstance.#EXECUTION_LIMIT;
+
+      if (spent) {
+        const error = ErrorType.Runtime.errorAt(
+          task.reference,
+          WorkflowInstance.#LIMIT_REACHED,
+        );
+        this.#faultWith(error, round.now);
+        return;
+      }
+
       const child = this.#created(task.id, start, round);
       const scope = this.#scopeOf(child, round);
       const begun = child.begin(scope);
@@ -689,8 +736,8 @@ export class WorkflowInstance {
 
     for (let next = pending.pop(); next !== undefined; next = pending.pop()) {
       const parentId = next.id;
-      const children = this.#tasks.filter(
-        (task) => task.parentId === parentId && !task.isTerminal(),
+      const children = this.#activeTasks().filter(
+        (task) => task.parentId === parentId,
       );
 
       for (const child of children) {
@@ -747,7 +794,14 @@ export class WorkflowInstance {
     });
     this.#executions += 1;
     this.#tasks.push(task);
+    this.#index(task);
     return task;
+  }
+
+  #index(task: TaskInstance): void {
+    this.#byId.set(task.id, task);
+
+    if (!task.isTerminal()) this.#running.push(task);
   }
 
   #scopeOf(task: TaskInstance, round: RoundContext): TaskScope {
@@ -780,17 +834,36 @@ export class WorkflowInstance {
       runtime: round.runtime,
       variables: task.variables,
       startedAt: task.startedAt,
+      deadline: this.#deadlineOf(task),
       now: round.now,
     };
   }
 
+  #deadlineOf(task: TaskInstance): Date | null {
+    let earliest = task.deadline();
+    let current = task;
+
+    while (!current.isRoot()) {
+      current = this.#parentOf(current);
+      const deadline = current.deadline();
+      const earlier =
+        deadline !== null && (earliest === null || deadline < earliest);
+
+      if (earlier) earliest = deadline;
+    }
+
+    return earliest;
+  }
+
+  // A copy, since following a change starts tasks while the caller goes through these.
   #activeTasks(): readonly TaskInstance[] {
-    return this.#tasks.filter((task) => !task.isTerminal());
+    this.#running = this.#running.filter((task) => !task.isTerminal());
+    return this.#running.slice();
   }
 
   #parentOf(task: TaskInstance): TaskInstance {
-    const parentId = task.parentId;
-    const parent = this.#tasks.find((candidate) => candidate.id === parentId);
+    const parentId = task.parentId ?? '';
+    const parent = this.#byId.get(parentId);
 
     if (parent === undefined)
       throw new InconsistentProgressError(
@@ -801,7 +874,7 @@ export class WorkflowInstance {
   }
 
   #requesting(instanceId: string): TaskInstance | null {
-    const task = this.#tasks.find(
+    const task = this.#activeTasks().find(
       (candidate) =>
         candidate.requestedSubWorkflow() !== null &&
         this.#subWorkflowIdOf(candidate) === instanceId,

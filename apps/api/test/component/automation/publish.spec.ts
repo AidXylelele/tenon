@@ -130,6 +130,18 @@ describe('publishing workflows', () => {
       .type(YAML)
       .send(greeting('1.0.0', 'goodbye'))
       .expect(409);
+    await request(t.server)
+      .post('/api/v1/workflows/check')
+      .set(editor)
+      .type(YAML)
+      .send(greeting('1.0.0', 'goodbye'))
+      .expect(409);
+    await request(t.server)
+      .post('/api/v1/workflows/check')
+      .set(editor)
+      .type(YAML)
+      .send(greeting('1.0.0', 'hello'))
+      .expect(204);
   });
 
   it('a_later_version_becomes_current', async () => {

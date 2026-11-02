@@ -44,6 +44,11 @@ export const workflowInstance = pgTable(
       table.startedAt,
       table.id,
     ),
-    index('workflow_instance_started_idx').on(table.startedAt),
+    index('workflow_instance_started_idx').on(table.startedAt, table.id),
+    index('workflow_instance_phase_started_idx').on(
+      table.phase,
+      table.startedAt,
+      table.id,
+    ),
   ],
 );

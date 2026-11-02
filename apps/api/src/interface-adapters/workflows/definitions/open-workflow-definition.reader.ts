@@ -8,14 +8,56 @@ import { DefinitionMapper } from './mappers/definition.mapper.js';
 
 @Injectable()
 export class OpenWorkflowDefinitionReader implements DefinitionReader {
+  private static readonly ROOT = '';
+  private static readonly OUT_OF_TIME =
+    'The document could not be read in time';
+  private static readonly OUT_OF_MEMORY =
+    'The document needs more memory than a document may use';
+  // A published text never changes and a Definition is immutable, so the rounds of a version's
+  // instances read it from here instead of parsing and mapping it again.
+  private static readonly CACHED = 64;
+
+  private readonly definitions = new Map<string, Definition>();
+
   constructor(private readonly client: OpenWorkflowClient) {}
 
-  read(text: string): Definition {
-    const outcome = this.client.parse(text);
+  async read(text: string): Promise<Definition> {
+    const cached = this.definitions.get(text);
+
+    if (cached !== undefined) return cached;
+
+    const outcome = await this.client.parse(text);
 
     if (outcome.kind === DslOutcomeKind.Failure)
       throw new InvalidDocumentError(outcome.pointer, outcome.failure);
 
-    return DefinitionMapper.toDomain(outcome.workflow, outcome.document);
+    if (outcome.kind === DslOutcomeKind.TimedOut)
+      throw new InvalidDocumentError(
+        OpenWorkflowDefinitionReader.ROOT,
+        OpenWorkflowDefinitionReader.OUT_OF_TIME,
+      );
+
+    if (outcome.kind === DslOutcomeKind.Exhausted)
+      throw new InvalidDocumentError(
+        OpenWorkflowDefinitionReader.ROOT,
+        OpenWorkflowDefinitionReader.OUT_OF_MEMORY,
+      );
+
+    const definition = DefinitionMapper.toDomain(
+      outcome.workflow,
+      outcome.document,
+    );
+    this.#remember(text, definition);
+    return definition;
+  }
+
+  #remember(text: string, definition: Definition): void {
+    this.definitions.set(text, definition);
+
+    if (this.definitions.size <= OpenWorkflowDefinitionReader.CACHED) return;
+
+    const [oldest] = this.definitions.keys();
+
+    if (oldest !== undefined) this.definitions.delete(oldest);
   }
 }

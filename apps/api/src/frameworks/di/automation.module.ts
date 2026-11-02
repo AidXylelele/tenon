@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventRepository } from '../../application/automation/events/ports.js';
 import { AdvanceInstance } from '../../application/automation/instances/advance-instance.js';
+import { WorkAnswers } from '../../application/automation/instances/work-answers.js';
 import { BeginRound } from '../../application/automation/instances/begin-round.js';
 import { CompleteSubWorkflow } from '../../application/automation/instances/complete-sub-workflow.js';
 import { FaultInstance } from '../../application/automation/instances/fault-instance.js';
@@ -172,6 +173,7 @@ import { EngineModule } from './engine.module.js';
     StartInstance,
     BeginRound,
     RecordRound,
+    WorkAnswers,
     AdvanceInstance,
     FaultInstance,
     StartSubWorkflow,
@@ -188,4 +190,13 @@ import { EngineModule } from './engine.module.js';
     WorkflowDetachedOutboxHandler,
   ],
 })
-export class AutomationModule {}
+export class AutomationModule implements OnApplicationShutdown {
+  constructor(
+    private readonly endpoints: EndpointDispatcher,
+    private readonly sandbox: SandboxPool,
+  ) {}
+
+  async onApplicationShutdown(): Promise<void> {
+    await Promise.all([this.endpoints.close(), this.sandbox.close()]);
+  }
+}

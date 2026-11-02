@@ -6,7 +6,11 @@ export function createSandboxPool(
   sandboxUrl: string,
   token: string,
 ): SandboxPool {
-  const pool = new Pool(sandboxUrl, { connections: 16 });
+  // An answer holds at most two capped output files, so 4 MiB bounds it.
+  const pool = new Pool(sandboxUrl, {
+    connections: 16,
+    maxResponseSize: 4 * 1024 * 1024,
+  });
   const authorization = `Bearer ${token}`;
   return pool.compose(
     (dispatch) => (options: Dispatcher.DispatchOptions, handler) => {

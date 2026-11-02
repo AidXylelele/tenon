@@ -16,6 +16,7 @@ import type {
 } from '../../../src/domain/automation/language/interfaces.js';
 import { JsonPointer } from '../../../src/domain/automation/language/json-pointer.js';
 import { ProcessReturn } from '../../../src/domain/automation/language/process-return.js';
+import { ProcessTimedOut } from '../../../src/domain/automation/language/results/process-timed-out.js';
 import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.js';
 import { GoJudgeSandboxClient } from '../../../src/frameworks/go-judge/go-judge-sandbox.client.js';
 import { createSandboxPool } from '../../../src/frameworks/go-judge/sandbox-pool.js';
@@ -23,9 +24,16 @@ import { SandboxGateway } from '../../../src/interface-adapters/sandbox/sandbox.
 
 const TOKEN = 'integration-sandbox-token-0123456789abcdef';
 const at = JsonPointer.root().at('do').at(0).at('run');
+const clock = { now: () => new Date() };
 
 function script(language: ScriptLanguage, process: JsonObject): ProcessRun {
-  return { id: 'task-1:process', kind: RunKind.Script, language, process };
+  return {
+    id: 'task-1:process',
+    kind: RunKind.Script,
+    language,
+    process,
+    deadline: null,
+  };
 }
 
 describe('SandboxGateway', () => {
@@ -59,12 +67,16 @@ describe('SandboxGateway', () => {
       pool,
       moduleRef.get(ResilienceService),
     );
-    runner = new SandboxGateway(client, {
-      seconds: 2,
-      memoryBytes: 128 * 1024 * 1024,
-      processes: 16,
-      outputBytes: 1024 * 1024,
-    });
+    runner = new SandboxGateway(
+      client,
+      {
+        seconds: 2,
+        memoryBytes: 128 * 1024 * 1024,
+        processes: 16,
+        outputBytes: 1024 * 1024,
+      },
+      clock,
+    );
   }, 600_000);
 
   afterAll(async () => {
@@ -107,6 +119,7 @@ describe('SandboxGateway', () => {
         environment: { GREETING: 'hello' },
         stdin: 'in',
       },
+      deadline: null,
     };
 
     const [result] = await runner.runAll([run]);
@@ -148,5 +161,66 @@ describe('SandboxGateway', () => {
     const [result] = await runner.runAll([run]);
 
     expect(result?.outcome(ProcessReturn.Stdout, at).failure?.status).toBe(500);
+  });
+
+  it('a_sandbox_that_is_down_or_refuses_gives_no_result_so_the_run_waits', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ResilienceModule],
+    }).compile();
+    const resilience = moduleRef.get(ResilienceService);
+    const url = `http://${container.getHost()}:${String(container.getMappedPort(5050))}`;
+    const refusing = new SandboxGateway(
+      new GoJudgeSandboxClient(
+        createSandboxPool(url, 'wrong-token'),
+        resilience,
+      ),
+      { seconds: 2, memoryBytes: 1, processes: 1, outputBytes: 1 },
+      clock,
+    );
+    const down = new SandboxGateway(
+      new GoJudgeSandboxClient(
+        createSandboxPool('http://127.0.0.1:9', TOKEN),
+        resilience,
+      ),
+      { seconds: 2, memoryBytes: 1, processes: 1, outputBytes: 1 },
+      clock,
+    );
+    const run = script(ScriptLanguage.JavaScript, { code: 'console.log(1)' });
+
+    const refused = await refusing.runAll([run]);
+    const unreachable = await down.runAll([run]);
+
+    expect(refused).toEqual([]);
+    expect(unreachable).toEqual([]);
+  });
+
+  it('a_process_stops_at_its_task_deadline', async () => {
+    const deadline = new Date(Date.now() + 1000);
+    const run: ProcessRun = {
+      id: 'task-1:process',
+      kind: RunKind.Script,
+      language: ScriptLanguage.JavaScript,
+      process: { code: 'setTimeout(() => console.log("late"), 10000);' },
+      deadline,
+    };
+    const started = performance.now();
+
+    const [result] = await runner.runAll([run]);
+
+    const elapsed = performance.now() - started;
+    expect(result).toBeInstanceOf(ProcessTimedOut);
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  it('output_holding_a_nul_character_faults_the_task', async () => {
+    const run = script(ScriptLanguage.JavaScript, {
+      code: 'process.stdout.write("a\\u0000b")',
+    });
+
+    const [result] = await runner.runAll([run]);
+
+    expect(result?.outcome(ProcessReturn.Stdout, at).failure?.detail).toBe(
+      'The process wrote a NUL character, which a value cannot hold',
+    );
   });
 });

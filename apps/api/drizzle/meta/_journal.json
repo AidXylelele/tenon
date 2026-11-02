@@ -50,6 +50,13 @@
       "when": 1793575542372,
       "tag": "0006_workflow_instance",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793608259624,
+      "tag": "0007_instance_list_indexes",
+      "breakpoints": true
     }
   ]
 }

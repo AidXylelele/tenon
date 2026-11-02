@@ -21,12 +21,12 @@ export class RecordRound {
 
     if (instance === null) throw new InstanceNotFoundError();
 
-    for (const results of command.recorded)
+    for (const answer of command.recorded)
       instance.record(
-        results,
+        answer.results,
         command.definition,
         command.runtime,
-        command.now,
+        answer.at,
       );
 
     await this.instances.save(instance);

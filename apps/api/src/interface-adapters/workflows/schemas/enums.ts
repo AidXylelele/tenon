@@ -3,4 +3,5 @@ export enum JsonSchemaOutcomeKind {
   Valid = 'valid',
   Invalid = 'invalid',
   Unusable = 'unusable',
+  TimedOut = 'timed-out',
 }

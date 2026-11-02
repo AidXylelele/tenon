@@ -11,6 +11,7 @@ export enum EndpointOutcomeKind {
   TimedOut = 'timed-out',
   Unreachable = 'unreachable',
   Unauthorized = 'unauthorized',
+  Invalid = 'invalid',
 }
 
 export enum RequestPreparationKind {

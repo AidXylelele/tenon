@@ -42,8 +42,8 @@ export class RunShellTask extends Task implements ProcessTask {
     return ProcessProgress.enter(scope);
   }
 
-  runFrom(id: string, process: JsonValue): ProcessRun {
-    return { id, kind: RunKind.Shell, language: null, process };
+  runFrom(id: string, process: JsonValue, deadline: Date | null): ProcessRun {
+    return { id, kind: RunKind.Shell, language: null, process, deadline };
   }
 
   protected override get ownExpressions(): readonly Expression[] {
