@@ -19,7 +19,7 @@ import type {
   SandboxOutcome,
 } from '../interfaces.js';
 
-export class ProcessRunMapper {
+export class GoJudgeRunMapper {
   static readonly #NANOSECONDS_PER_SECOND = 1_000_000_000;
   static readonly #NANOSECONDS_PER_MILLISECOND = 1_000_000;
   static readonly #PATH = 'PATH=/usr/local/bin:/usr/bin:/bin';
@@ -34,11 +34,11 @@ export class ProcessRunMapper {
     limits: SandboxLimits,
     timeout: number | null,
   ): GoJudgeCommand {
-    const process = ProcessRunMapper.#objectOf(run.process);
-    const args = ProcessRunMapper.#argumentsOf(process.arguments);
-    const env = ProcessRunMapper.#environmentOf(process.environment);
-    const stdin = ProcessRunMapper.#textOf(process.stdin);
-    const limit = ProcessRunMapper.#limitOf(limits, timeout);
+    const process = GoJudgeRunMapper.#objectOf(run.process);
+    const args = GoJudgeRunMapper.#argumentsOf(process.arguments);
+    const env = GoJudgeRunMapper.#environmentOf(process.environment);
+    const stdin = GoJudgeRunMapper.#textOf(process.stdin);
+    const limit = GoJudgeRunMapper.#limitOf(limits, timeout);
     const common = {
       env,
       files: [
@@ -53,9 +53,9 @@ export class ProcessRunMapper {
     };
 
     if (run.kind === RunKind.Shell) {
-      const command = ProcessRunMapper.#textOf(process.command);
+      const command = GoJudgeRunMapper.#textOf(process.command);
       return {
-        args: [ProcessRunMapper.#SHELL, '-c', command, 'sh'].concat(args),
+        args: [GoJudgeRunMapper.#SHELL, '-c', command, 'sh'].concat(args),
         copyIn: {},
         env: common.env,
         files: common.files,
@@ -66,14 +66,14 @@ export class ProcessRunMapper {
       };
     }
 
-    const code = ProcessRunMapper.#textOf(process.code);
+    const code = GoJudgeRunMapper.#textOf(process.code);
     const interpreter =
       run.language === ScriptLanguage.Python
-        ? ProcessRunMapper.#PYTHON
-        : ProcessRunMapper.#NODE;
+        ? GoJudgeRunMapper.#PYTHON
+        : GoJudgeRunMapper.#NODE;
     return {
-      args: [interpreter, ProcessRunMapper.#SCRIPT].concat(args),
-      copyIn: { [ProcessRunMapper.#SCRIPT]: { content: code } },
+      args: [interpreter, GoJudgeRunMapper.#SCRIPT].concat(args),
+      copyIn: { [GoJudgeRunMapper.#SCRIPT]: { content: code } },
       env: common.env,
       files: common.files,
       cpuLimit: common.cpuLimit,
@@ -89,7 +89,7 @@ export class ProcessRunMapper {
   static toResult(id: string, outcome: SandboxOutcome): ProcessResult | null {
     switch (outcome.kind) {
       case SandboxOutcomeKind.Ran:
-        return ProcessRunMapper.#resultOf(id, outcome.result);
+        return GoJudgeRunMapper.#resultOf(id, outcome.result);
       case SandboxOutcomeKind.Rejected:
       case SandboxOutcomeKind.Unreachable:
       case SandboxOutcomeKind.Refused:
@@ -122,12 +122,12 @@ export class ProcessRunMapper {
 
   // The sandbox's own limit, or less when the task's deadline is nearer.
   static #limitOf(limits: SandboxLimits, timeout: number | null): number {
-    const sandbox = limits.seconds * ProcessRunMapper.#NANOSECONDS_PER_SECOND;
+    const sandbox = limits.seconds * GoJudgeRunMapper.#NANOSECONDS_PER_SECOND;
 
     if (timeout === null) return sandbox;
 
     const remaining = Math.ceil(
-      timeout * ProcessRunMapper.#NANOSECONDS_PER_MILLISECOND,
+      timeout * GoJudgeRunMapper.#NANOSECONDS_PER_MILLISECOND,
     );
     return Math.min(sandbox, remaining);
   }
@@ -152,15 +152,15 @@ export class ProcessRunMapper {
   static #argumentsOf(value: JsonValue | undefined): readonly string[] {
     if (!Array.isArray(value)) return [];
 
-    return value.map((item) => ProcessRunMapper.#textOf(item));
+    return value.map((item) => GoJudgeRunMapper.#textOf(item));
   }
 
   static #environmentOf(value: JsonValue | undefined): readonly string[] {
-    const declared = ProcessRunMapper.#objectOf(value ?? null);
-    const variables = [ProcessRunMapper.#PATH];
+    const declared = GoJudgeRunMapper.#objectOf(value ?? null);
+    const variables = [GoJudgeRunMapper.#PATH];
 
     for (const name of Object.keys(declared)) {
-      const text = ProcessRunMapper.#textOf(declared[name]);
+      const text = GoJudgeRunMapper.#textOf(declared[name]);
       variables.push(`${name}=${text}`);
     }
 

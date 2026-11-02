@@ -11,8 +11,6 @@ import { invitation as invitations } from '../schema/index.js';
 
 @Injectable()
 export class DrizzleInvitationQueries implements InvitationQueries {
-  // Through the transaction host, so a query inside a use case's transaction shares its
-  // connection instead of taking a second one from the pool.
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   listPending(): Promise<PendingInvitation[]> {

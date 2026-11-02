@@ -1,12 +1,10 @@
 import { SessionService } from '@nestjs/authentication';
 import { Injectable } from '@nestjs/common';
-import { Sessions } from '../../../application/identity/ports.js';
+import type { Sessions } from '../../../application/identity/ports.js';
 
 @Injectable()
-export class SessionsGateway extends Sessions {
-  constructor(private readonly sessions: SessionService) {
-    super();
-  }
+export class SessionsGateway implements Sessions {
+  constructor(private readonly sessions: SessionService) {}
 
   async endAll(userId: string, except: string | null): Promise<void> {
     if (except === null) {

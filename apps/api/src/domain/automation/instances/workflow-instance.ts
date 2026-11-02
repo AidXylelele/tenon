@@ -621,7 +621,8 @@ export class WorkflowInstance {
   }
 
   #abandon(task: TaskInstance, now: Date): void {
-    const announced = task.abandon(now);
+    const announced = task.isUnderway();
+    task.abandon(now);
 
     if (announced) this.#produced.taskCancelled(task, now);
   }

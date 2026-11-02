@@ -42,8 +42,6 @@ import { KeysetPage } from '../keyset-page.js';
 export class DrizzleInstanceQueries
   implements InstanceQueries, SubWorkflowQueries
 {
-  // Through the transaction host, so a query inside a use case's transaction shares its
-  // connection instead of taking a second one from the pool.
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   async list(

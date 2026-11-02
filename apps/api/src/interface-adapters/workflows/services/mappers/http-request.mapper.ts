@@ -28,8 +28,8 @@ export class HttpRequestMapper {
       url.searchParams.append(name, value);
     }
 
-    const headers = HttpRequestMapper.headersOf(args.headers);
-    const body = HttpRequestMapper.bodyOf(args.body, headers);
+    const headers = HttpRequestMapper.headersOf(args.headers, args.body);
+    const body = HttpRequestMapper.bodyOf(args.body);
     const method = HttpRequestMapper.textOf(args.method).toUpperCase();
     const location = url.toString();
     return {
@@ -83,7 +83,11 @@ export class HttpRequestMapper {
     return String(value);
   }
 
-  static headersOf(value: JsonValue | undefined): Record<string, string> {
+  // A body sent as JSON is announced as JSON unless the author named its type.
+  static headersOf(
+    value: JsonValue | undefined,
+    body: JsonValue | undefined,
+  ): Record<string, string> {
     const declared = HttpRequestMapper.objectOf(value);
     const headers: Record<string, string> = {};
 
@@ -92,18 +96,23 @@ export class HttpRequestMapper {
       headers[lowered] = HttpRequestMapper.textOf(declared[name]);
     }
 
+    const json = HttpRequestMapper.#isJson(body);
+
+    if (json)
+      headers[HttpRequestMapper.#CONTENT_TYPE] ??= HttpRequestMapper.#JSON;
+
     return headers;
   }
 
-  static bodyOf(
-    value: JsonValue | undefined,
-    headers: Record<string, string>,
-  ): string | null {
+  static bodyOf(value: JsonValue | undefined): string | null {
     if (value === undefined || value === null) return null;
 
     if (typeof value === 'string') return value;
 
-    headers[HttpRequestMapper.#CONTENT_TYPE] ??= HttpRequestMapper.#JSON;
     return JSON.stringify(value);
+  }
+
+  static #isJson(body: JsonValue | undefined): boolean {
+    return body !== undefined && body !== null && typeof body !== 'string';
   }
 }

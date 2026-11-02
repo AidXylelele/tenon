@@ -224,13 +224,16 @@ export class TaskInstance {
     return this.#advance(step, scope.now);
   }
 
-  abandon(now: Date): boolean {
-    if (this.isTerminal()) return false;
+  // Past its entry and not ended: its cancellation is announced.
+  isUnderway(): boolean {
+    return !this.isTerminal() && this.phase !== Phase.Pending;
+  }
 
-    const entered = this.phase !== Phase.Pending;
+  abandon(now: Date): void {
+    if (this.isTerminal()) return;
+
     this.#cancelled = true;
     this.#endedAt = now;
-    return entered;
   }
 
   #changed(step: Step<TaskProgress>, now: Date): TaskChange | null {

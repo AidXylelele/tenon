@@ -49,7 +49,7 @@ export interface DocumentRequest {
   readonly timeout: number | null;
 }
 
-export interface Responded {
+export interface EndpointResponded {
   readonly kind: EndpointOutcomeKind.Responded;
   readonly status: number;
   readonly headers: Readonly<Record<string, string>>;
@@ -57,45 +57,50 @@ export interface Responded {
   readonly authorization: SentAuthorization | null;
 }
 
-export interface DocumentRead {
+export interface EndpointDocumentRead {
   readonly kind: EndpointOutcomeKind.Read;
   readonly document: JsonObject;
 }
 
-export interface Unreadable {
+export interface EndpointUnreadable {
   readonly kind: EndpointOutcomeKind.Unreadable;
 }
 
-export interface Rejected {
+export interface EndpointRejected {
   readonly kind: EndpointOutcomeKind.Rejected;
 }
 
-export interface TimedOut {
+export interface EndpointTimedOut {
   readonly kind: EndpointOutcomeKind.TimedOut;
 }
 
-export interface Unreachable {
+export interface EndpointUnreachable {
   readonly kind: EndpointOutcomeKind.Unreachable;
   readonly reason: string;
 }
 
-export interface Unauthorized {
+export interface EndpointUnauthorized {
   readonly kind: EndpointOutcomeKind.Unauthorized;
   readonly reason: string;
 }
 
 // The request cannot be sent as the author wrote it (a header value undici refuses).
-export interface Invalid {
+export interface EndpointInvalid {
   readonly kind: EndpointOutcomeKind.Invalid;
   readonly reason: string;
 }
 
 export type EndpointFailure =
-  Rejected | TimedOut | Unreachable | Unauthorized | Invalid;
+  | EndpointRejected
+  | EndpointTimedOut
+  | EndpointUnreachable
+  | EndpointUnauthorized
+  | EndpointInvalid;
 
-export type ExchangeOutcome = Responded | EndpointFailure;
+export type ExchangeOutcome = EndpointResponded | EndpointFailure;
 
-export type DocumentOutcome = DocumentRead | Unreadable | EndpointFailure;
+export type DocumentOutcome =
+  EndpointDocumentRead | EndpointUnreadable | EndpointFailure;
 
 export interface PreparedRequest {
   readonly kind: RequestPreparationKind.Prepared;

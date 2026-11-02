@@ -23,8 +23,6 @@ import {
 export class DrizzleWorkflowQueries
   implements WorkflowQueries, VersionDocuments
 {
-  // Through the transaction host, so a query inside a use case's transaction shares its
-  // connection instead of taking a second one from the pool.
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   async list(page: WorkflowPageRequest): Promise<WorkflowPage> {

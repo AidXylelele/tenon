@@ -106,18 +106,20 @@ export class Invitation {
   }
 
   #isExpired(now: Date): boolean {
-    return (
-      this.#status === InvitationStatus.Pending &&
-      this.#expiresAt.getTime() <= now.getTime()
-    );
+    return this.#expiresAt.getTime() <= now.getTime();
   }
 
-  assertPending(now: Date): void {
+  // Neither accepted nor revoked.
+  #assertOpen(): void {
     if (this.#status === InvitationStatus.Accepted)
       throw new InvitationUsedError();
 
     if (this.#status === InvitationStatus.Revoked)
       throw new InvitationRevokedError();
+  }
+
+  assertPending(now: Date): void {
+    this.#assertOpen();
 
     if (this.#isExpired(now)) throw new InvitationExpiredError();
   }
@@ -131,11 +133,7 @@ export class Invitation {
   }
 
   revoke(now: Date): void {
-    if (this.#status === InvitationStatus.Accepted)
-      throw new InvitationUsedError();
-
-    if (this.#status === InvitationStatus.Revoked)
-      throw new InvitationRevokedError();
+    this.#assertOpen();
 
     this.#status = InvitationStatus.Revoked;
     this.#revokedAt = now;

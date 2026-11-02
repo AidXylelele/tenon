@@ -79,7 +79,7 @@ export class WorkflowsController {
       text: document.text,
       publisherId: user.id,
     });
-    const status = published.created ? 201 : 200;
+    const status = published.created ? HttpStatus.CREATED : HttpStatus.OK;
     response.status(status);
     return WorkflowPresenter.published(published);
   }

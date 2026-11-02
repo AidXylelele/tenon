@@ -14,7 +14,7 @@ import type {
   DocumentOutcome,
   ExchangeOutcome,
   HttpRequest,
-  Responded,
+  EndpointResponded,
 } from '../interfaces.js';
 
 export class ServiceResultMapper {
@@ -62,7 +62,7 @@ export class ServiceResultMapper {
   static #responded(
     call: ServiceCall,
     request: HttpRequest,
-    outcome: Responded,
+    outcome: EndpointResponded,
   ): ServiceResult {
     const content = ServiceResultMapper.#contentOf(outcome);
 
@@ -105,7 +105,7 @@ export class ServiceResultMapper {
   }
 
   // undefined: a JSON body that does not parse.
-  static #contentOf(outcome: Responded): JsonValue | undefined {
+  static #contentOf(outcome: EndpointResponded): JsonValue | undefined {
     const declared = outcome.headers['content-type'] ?? '';
     const essence = declared.split(';')[0] ?? '';
     const type = essence.trim().toLowerCase();
@@ -125,7 +125,7 @@ export class ServiceResultMapper {
     }
   }
 
-  static #authorizationOf(outcome: Responded): JsonObject | null {
+  static #authorizationOf(outcome: EndpointResponded): JsonObject | null {
     const sent = outcome.authorization;
 
     if (sent === null) return null;

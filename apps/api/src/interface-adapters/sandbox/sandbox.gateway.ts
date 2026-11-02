@@ -5,7 +5,7 @@ import type { ProcessRun } from '../../domain/automation/language/interfaces.js'
 import type { ProcessResult } from '../../domain/automation/language/results/process-result.js';
 import { ProcessTimedOut } from '../../domain/automation/language/results/process-timed-out.js';
 import { SandboxClient, SandboxLimits } from './interfaces.js';
-import { ProcessRunMapper } from './mappers/process-run.mapper.js';
+import { GoJudgeRunMapper } from './mappers/go-judge-run.mapper.js';
 
 @Injectable()
 export class SandboxGateway implements ProcessRunner {
@@ -22,8 +22,8 @@ export class SandboxGateway implements ProcessRunner {
     // that outlives it, and the instance judges the answer's time.
     if (timeout !== null && timeout <= 0) return new ProcessTimedOut(run.id);
 
-    const command = ProcessRunMapper.toCommand(run, this.limits, timeout);
+    const command = GoJudgeRunMapper.toCommand(run, this.limits, timeout);
     const outcome = await this.client.run(command);
-    return ProcessRunMapper.toResult(run.id, outcome);
+    return GoJudgeRunMapper.toResult(run.id, outcome);
   }
 }
