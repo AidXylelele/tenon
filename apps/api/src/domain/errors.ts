@@ -89,6 +89,14 @@ export class StaleWriteError extends ConflictError {
   }
 }
 
+// A round's results arrived after another round of the instance began (a worker that lost its
+// lease resumed): they belong to nothing any more.
+export class StaleRoundError extends ConflictError {
+  constructor() {
+    super('A later round of the instance began');
+  }
+}
+
 export abstract class DefinitionRejectedError extends RuleViolationError {
   readonly pointer: string;
 

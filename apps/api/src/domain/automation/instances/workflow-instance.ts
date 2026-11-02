@@ -26,6 +26,7 @@ import type { WorkflowError } from '../language/workflow-error.js';
 import type { WorkflowName } from '../language/workflow-name.js';
 import type { Workflow } from '../workflows/workflow.js';
 import type { WorkflowVersion } from '../workflows/workflow-version.js';
+import { StaleRoundError } from '../../errors.js';
 import { DerivedId } from './derived-id.js';
 import { ProcessDetached } from './domain-events/process-detached.js';
 import { WorkflowDetached } from './domain-events/workflow-detached.js';
@@ -71,6 +72,7 @@ export class WorkflowInstance {
   #error: WorkflowError | null;
   #context: JsonValue;
   #endedAt: Date | null;
+  #rounds: number;
   #changed: boolean;
 
   constructor(props: WorkflowInstanceProps) {
@@ -87,6 +89,7 @@ export class WorkflowInstance {
     this.#origin = props.origin;
     this.#startedAt = props.startedAt;
     this.#endedAt = props.endedAt;
+    this.#rounds = props.rounds;
     this.#tasks = new TaskTree(props.id, props.tasks, props.executions);
     this.#version = props.version;
     this.#events = [];
@@ -132,6 +135,7 @@ export class WorkflowInstance {
       endedAt: null,
       sequence: 0,
       executions: 0,
+      rounds: 0,
       tasks: [],
       version: 0,
     });
@@ -211,6 +215,10 @@ export class WorkflowInstance {
     return this.#tasks.executions;
   }
 
+  get rounds(): number {
+    return this.#rounds;
+  }
+
   get tasks(): readonly TaskInstance[] {
     return this.#tasks.tasks;
   }
@@ -223,10 +231,13 @@ export class WorkflowInstance {
     return this.#changed;
   }
 
+  // Every round is counted, so results of an earlier round can be told apart (fencing).
   beginRound(definition: Definition, runtime: JsonObject, now: Date): void {
     if (this.#phase.isTerminal()) return;
 
     const round = this.#round(definition, runtime, now);
+    this.#rounds += 1;
+    this.#changed = true;
 
     if (this.#phase === Phase.Pending) this.#run(round);
 
@@ -284,6 +295,11 @@ export class WorkflowInstance {
     for (const task of this.#tasks.active()) this.#expire(task, round);
 
     this.#settle(round);
+  }
+
+  // The results of round `round` are recorded only while no later round began.
+  confirmRound(round: number): void {
+    if (round !== this.#rounds) throw new StaleRoundError();
   }
 
   fault(now: Date): void {

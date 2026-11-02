@@ -60,6 +60,7 @@ export class AdvanceInstance {
 
     const progress = await this.recordRound.execute({
       instanceId: command.instanceId,
+      round: instance.rounds,
       runtime: command.runtime,
       now,
       definition,

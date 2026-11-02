@@ -57,6 +57,8 @@ export interface RecordedAnswer {
 
 export interface RecordRoundCommand {
   readonly instanceId: string;
+  // The round that produced the results.
+  readonly round: number;
   readonly runtime: JsonObject;
   readonly now: Date;
   readonly definition: Definition;
@@ -98,6 +100,10 @@ export interface StartDetachedWorkflowCommand {
 
 export abstract class WorkflowInstanceRepository {
   abstract find(id: string): Promise<WorkflowInstance | null>;
+  // The instance, or InstanceNotFoundError.
+  abstract get(id: string): Promise<WorkflowInstance>;
+  // The instance with its tasks, its domain events and the events it produced (lifecycle and
+  // emitted), in the caller's transaction.
   abstract save(instance: WorkflowInstance): Promise<void>;
 }
 

@@ -69,16 +69,16 @@ export function instanceWorld(
     versions,
     clock,
   );
-  const instances = new InMemoryWorkflowInstanceRepository();
   const runs = new RecordingInstanceRuns();
   const events = new RecordingEventRepository();
+  const instances = new InMemoryWorkflowInstanceRepository(events);
   const services = new ScriptedServiceCaller(respond, delay);
   const processes = new ScriptedProcessRunner(exit);
   const workflowQueries = new InMemoryWorkflowQueries(versions);
   const instanceQueries = new InMemoryInstanceQueries(instances);
   const readDefinition = new ReadVersionDefinition(workflowQueries, reader);
-  const beginRound = new BeginRound(instances, readDefinition, events);
-  const recordRound = new RecordRound(instances, events);
+  const beginRound = new BeginRound(instances, readDefinition);
+  const recordRound = new RecordRound(instances);
   return {
     clock,
     workflows,
@@ -102,21 +102,19 @@ export function instanceWorld(
       new WorkAnswers(expressions, schemas, services, processes),
       clock,
     ),
-    fault: new FaultInstance(instances, events, clock),
+    fault: new FaultInstance(instances, clock),
     startSubWorkflow: new StartSubWorkflow(
       instances,
       instanceQueries,
       workflows,
       versions,
       readDefinition,
-      events,
       clock,
     ),
     completeSubWorkflow: new CompleteSubWorkflow(
       instances,
       instanceQueries,
       readDefinition,
-      events,
       clock,
     ),
     startDetached: new StartDetachedWorkflow(

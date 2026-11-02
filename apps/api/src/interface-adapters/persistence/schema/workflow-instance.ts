@@ -35,6 +35,7 @@ export const workflowInstance = pgTable(
     endedAt: timestamp('ended_at', { withTimezone: true }),
     sequence: integer('sequence').notNull(),
     executions: integer('executions').notNull(),
+    rounds: integer('rounds').notNull().default(0),
     version: integer('version').notNull(),
   },
   (table) => [

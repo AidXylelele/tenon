@@ -12,6 +12,7 @@ import { WorkflowTarget } from '../../../../../src/domain/automation/language/wo
 import { VersionReference } from '../../../../../src/domain/automation/workflows/version-reference.js';
 import {
   InstanceNotFoundError,
+  StaleRoundError,
   VersionNotFoundError,
   WorkflowNotFoundError,
 } from '../../../../../src/domain/errors.js';
@@ -282,6 +283,46 @@ describe('the task-execution limit', () => {
       'The instance reached its limit of 10,000 task executions',
     );
   }, 60_000);
+});
+
+describe('rounds that a later round superseded', () => {
+  it('a_round_that_resumes_after_another_worker_took_the_instance_records_nothing', async () => {
+    let delays = 0;
+    let answers = 0;
+    const world = instanceWorld(
+      (call) => {
+        answers += 1;
+
+        if (answers === 1) return ok(call.id);
+
+        return new ServiceTimedOut(call.id);
+      },
+      () => null,
+      () => {
+        delays += 1;
+
+        if (delays === 1) return 50;
+
+        return 0;
+      },
+    );
+    await world.publish(documentOf('orders', '1.0.0', [fetchOrder]));
+    const instance = await world.start.execute({
+      target: WorkflowTarget.of(orders, null),
+      input: {},
+      userId: 'user-1',
+      key: null,
+    });
+
+    const frozen = world.advance.execute({ instanceId: instance.id, runtime });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await world.advance.execute({ instanceId: instance.id, runtime });
+
+    await expect(frozen).rejects.toThrow(StaleRoundError);
+    const saved = await world.instances.find(instance.id);
+    expect(saved?.phase).toBe(Phase.Completed);
+    expect(saved?.output).toEqual({ id: 1 });
+  });
 });
 
 describe('AdvanceInstance', () => {

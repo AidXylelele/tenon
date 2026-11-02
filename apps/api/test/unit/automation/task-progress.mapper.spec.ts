@@ -1,3 +1,4 @@
+import { CallKind } from '../../../src/domain/automation/language/enums.js';
 import { DueTime } from '../../../src/domain/automation/language/due-time.js';
 import { ErrorType } from '../../../src/domain/automation/language/error-type.js';
 import { FlowDirective } from '../../../src/domain/automation/language/flow-directive.js';
@@ -14,7 +15,11 @@ import {
   EndingKind,
   TaskStage,
 } from '../../../src/interface-adapters/persistence/enums.js';
-import type { TaskProgressState } from '../../../src/interface-adapters/persistence/interfaces.js';
+import type {
+  KindProgressState,
+  TaskProgressState,
+} from '../../../src/interface-adapters/persistence/interfaces.js';
+import { ProgressKind } from '../../../src/interface-adapters/persistence/enums.js';
 import { KindProgressMapper } from '../../../src/interface-adapters/persistence/mappers/progress/kind-progress.mapper.js';
 import { TaskProgressMapper } from '../../../src/interface-adapters/persistence/mappers/progress/task-progress.mapper.js';
 import {
@@ -321,6 +326,25 @@ describe('TaskProgressMapper', () => {
     );
     expect(states[0]?.detachedWorkflow?.versionId).toBe('version-1');
     expect(states[1]?.directive).toBe(FlowDirective.End);
+  });
+
+  it('a_call_stored_before_deadlines_travelled_with_the_work_has_none', () => {
+    const state: KindProgressState = {
+      kind: ProgressKind.Calling,
+      call: {
+        id: 'task-1:call',
+        kind: CallKind.Http,
+        endpoint: { uri: 'https://pets.example/1', authentication: null },
+        arguments: { method: 'get' },
+        authentication: null,
+        input: {},
+      },
+    };
+
+    const restored = KindProgressMapper.toDomain(stored(state));
+
+    const call: unknown = Reflect.get(restored, 'call');
+    expect(call).toMatchObject({ id: 'task-1:call', deadline: null });
   });
 
   it('a_body_that_ended_is_never_stored', () => {

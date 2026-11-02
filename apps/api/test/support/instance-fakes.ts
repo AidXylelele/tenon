@@ -27,7 +27,10 @@ import type {
 import type { Event } from '../../src/domain/automation/events/event.js';
 import type { InstanceEvent } from '../../src/domain/automation/instances/interfaces.js';
 import type { WorkflowInstance } from '../../src/domain/automation/instances/workflow-instance.js';
-import { StaleWriteError } from '../../src/domain/errors.js';
+import {
+  InstanceNotFoundError,
+  StaleWriteError,
+} from '../../src/domain/errors.js';
 import type {
   TaskInstanceRow,
   WorkflowInstanceRow,
@@ -51,6 +54,10 @@ import type { InMemoryWorkflowVersionRepository } from './fakes.js';
 // Stores rows through the persistence mappers, as the real repository does, so a reload never
 // shares state with the copy that was saved and brings back only the active tasks.
 export class InMemoryWorkflowInstanceRepository implements WorkflowInstanceRepository {
+  constructor(
+    private readonly events: RecordingEventRepository = new RecordingEventRepository(),
+  ) {}
+
   readonly rows = new Map<string, WorkflowInstanceRow>();
   readonly taskRows = new Map<string, TaskInstanceRow>();
   readonly domainEvents: InstanceEvent[] = [];
@@ -58,6 +65,14 @@ export class InMemoryWorkflowInstanceRepository implements WorkflowInstanceRepos
 
   async find(id: string): Promise<WorkflowInstance | null> {
     return this.load(id);
+  }
+
+  async get(id: string): Promise<WorkflowInstance> {
+    const instance = this.load(id);
+
+    if (instance === null) throw new InstanceNotFoundError();
+
+    return instance;
   }
 
   load(id: string): WorkflowInstance | null {
@@ -91,6 +106,8 @@ export class InMemoryWorkflowInstanceRepository implements WorkflowInstanceRepos
       this.taskRows.set(taskRow.id, structuredClone(taskRow));
     }
 
+    const produced = instance.takeProducedEvents();
+    await this.events.addAll(produced);
     const events = instance.takeDomainEvents();
     this.domainEvents.push(...events);
     this.saves += 1;

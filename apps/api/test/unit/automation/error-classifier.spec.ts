@@ -1,6 +1,7 @@
 import { WorkDeferredError } from '../../../src/application/errors.js';
 import {
   InstanceNotFoundError,
+  StaleRoundError,
   StaleWriteError,
   VersionNotFoundError,
 } from '../../../src/domain/errors.js';
@@ -17,8 +18,11 @@ function failure(message: string, code: string, cause?: unknown): Error {
 describe('ErrorClassifier', () => {
   const classifier = new ErrorClassifier(new PostgresTransientFailures());
 
-  it('a_missing_instance_is_settled', () => {
-    const kind = classifier.classify(new InstanceNotFoundError());
+  it.each([
+    ['a_missing_instance', new InstanceNotFoundError()],
+    ['a_round_another_round_superseded', new StaleRoundError()],
+  ])('%s_is_settled', (_name, error) => {
+    const kind = classifier.classify(error);
 
     expect(kind).toBe(ErrorClass.Settled);
   });

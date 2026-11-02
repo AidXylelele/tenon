@@ -6,9 +6,13 @@ import {
 } from '@nestjs-cls/transactional';
 import { Outbox } from '@nestjs/outbox';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { EventRepository } from '../../../application/automation/events/ports.js';
 import type { WorkflowInstanceRepository } from '../../../application/automation/instances/ports.js';
 import type { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
-import { StaleWriteError } from '../../../domain/errors.js';
+import {
+  InstanceNotFoundError,
+  StaleWriteError,
+} from '../../../domain/errors.js';
 import type { DrizzleTx } from '../interfaces.js';
 import { DomainEventMapper } from '../mappers/domain-event.mapper.js';
 import { TaskInstanceMapper } from '../mappers/task-instance.mapper.js';
@@ -25,6 +29,7 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
   constructor(
     private readonly txHost: TransactionHost<DrizzleTx>,
     private readonly outbox: Outbox,
+    private readonly events: EventRepository,
   ) {}
 
   async find(id: string): Promise<WorkflowInstance | null> {
@@ -42,6 +47,14 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
       .orderBy(asc(tasks.execution));
     const loaded = active.map((task) => TaskInstanceMapper.toEntity(task));
     return WorkflowInstanceMapper.toEntity(row, loaded);
+  }
+
+  async get(id: string): Promise<WorkflowInstance> {
+    const instance = await this.find(id);
+
+    if (instance === null) throw new InstanceNotFoundError();
+
+    return instance;
   }
 
   @Transactional(Propagation.Mandatory)
@@ -77,8 +90,12 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
         });
     }
 
-    const events = instance.takeDomainEvents();
-    const entries = events.map((event) => DomainEventMapper.toEntry(event));
+    const produced = instance.takeProducedEvents();
+    await this.events.addAll(produced);
+    const domainEvents = instance.takeDomainEvents();
+    const entries = domainEvents.map((event) =>
+      DomainEventMapper.toEntry(event),
+    );
 
     if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
   }
@@ -99,6 +116,7 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
           endedAt: sql`excluded.ended_at`,
           sequence: sql`excluded.sequence`,
           executions: sql`excluded.executions`,
+          rounds: sql`excluded.rounds`,
           version: sql`excluded.version`,
         },
         setWhere: eq(instances.version, instance.version),

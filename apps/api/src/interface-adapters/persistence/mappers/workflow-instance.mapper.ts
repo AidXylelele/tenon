@@ -27,6 +27,7 @@ export class WorkflowInstanceMapper {
       endedAt: instance.endedAt,
       sequence: instance.sequence,
       executions: instance.executions,
+      rounds: instance.rounds,
       version: instance.version,
     };
   }
@@ -55,6 +56,7 @@ export class WorkflowInstanceMapper {
       endedAt: row.endedAt,
       sequence: row.sequence,
       executions: row.executions,
+      rounds: row.rounds,
       tasks,
       version: row.version,
     });

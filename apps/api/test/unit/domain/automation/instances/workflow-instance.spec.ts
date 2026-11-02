@@ -628,6 +628,7 @@ describe('WorkflowInstance', () => {
       endedAt: null,
       sequence: instance.sequence,
       executions: instance.executions,
+      rounds: instance.rounds,
       tasks: [leaf],
       version: 1,
     });

@@ -1,36 +1,28 @@
-import { extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
-import {
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from '@nestjs/resilience';
-import { Piscina } from 'piscina';
+import { ResilienceService } from '@nestjs/resilience';
 import type {
   JsonObject,
   JsonValue,
 } from '../../domain/automation/language/interfaces.js';
 import { JqOutcomeKind } from '../../interface-adapters/workflows/expressions/enums.js';
 import {
+  type JqAborted,
   JqClient,
   type JqCompilation,
   type JqEvaluation,
   type JqTimedOut,
 } from '../../interface-adapters/workflows/expressions/interfaces.js';
+import { WorkerRunKind } from '../piscina/enums.js';
+import type { WorkerExhausted, WorkerTimedOut } from '../piscina/interfaces.js';
+import { WorkerPool } from '../piscina/worker-pool.js';
 import { ENGINE_CONCURRENCY } from '../workflows/engine.constants.js';
 import type { JqRun, JqRunResult } from './jq.worker.js';
 
-// jq-wasm computes synchronously, so a runaway program is stopped by terminating the worker
-// thread it runs on: the `jq` preset's timeout aborts the task, and Piscina terminates its worker.
+// jq-wasm computes synchronously, so a program runs in a worker that the `jq` preset's timeout
+// stops; the client adds the sandbox prelude and reads jq's answers.
 @Injectable()
 export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
   private static readonly PRESET = 'jq';
-  // The worker beside this file: `.ts` where the sources run (tests), `.js` in the build.
-  private static readonly WORKER = new URL(
-    `./jq.worker${extname(fileURLToPath(import.meta.url))}`,
-    import.meta.url,
-  ).href;
   private static readonly PRELUDE = [
     'def env: error("env is not available to workflow expressions");',
     'def input: error("input is not available to workflow expressions");',
@@ -52,18 +44,18 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
   private static readonly UNBOUND = 'null';
   private static readonly COMPACT = '-c';
 
-  // A worker per running instance and one for the compilations of a publish, so a program
-  // never waits behind another instance's runaway; idle workers beyond one stop after 30 s.
-  private readonly pool = new Piscina<JqRun, JqRunResult>({
-    filename: PiscinaJqClient.WORKER,
-    minThreads: 1,
-    maxThreads: ENGINE_CONCURRENCY + 1,
-    idleTimeout: 30_000,
-  });
-  private readonly policy: ResiliencePolicy;
+  private readonly workers: WorkerPool<JqRun, JqRunResult>;
 
   constructor(resilience: ResilienceService) {
-    this.policy = resilience.preset(PiscinaJqClient.PRESET);
+    const policy = resilience.preset(PiscinaJqClient.PRESET);
+    // A worker per running instance and one for the compilations of a publish, so a program
+    // never waits behind another instance's runaway.
+    this.workers = new WorkerPool(policy, {
+      moduleUrl: import.meta.url,
+      worker: 'jq.worker',
+      maxThreads: ENGINE_CONCURRENCY + 1,
+      heapMb: null,
+    });
   }
 
   async compile(program: string): Promise<JqCompilation> {
@@ -71,18 +63,19 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
     const wrapped = PiscinaJqClient.wrapped(program);
     const query = `empty | (${wrapped})`;
 
-    try {
-      const result = await this.#run({ input: null, query, flags });
+    const run = await this.workers.run({ input: null, query, flags });
 
-      if (result.aborted) return { kind: JqOutcomeKind.Aborted };
+    if (run.kind !== WorkerRunKind.Done)
+      return PiscinaJqClient.interruptionOf(run);
 
-      if (result.exitCode === 0) return { kind: JqOutcomeKind.Compiled };
+    const result = run.result;
 
-      const failure = PiscinaJqClient.failureOf(result.stderr);
-      return { kind: JqOutcomeKind.Failure, failure };
-    } catch (error) {
-      return PiscinaJqClient.interruptionOf(error);
-    }
+    if (result.aborted) return { kind: JqOutcomeKind.Aborted };
+
+    if (result.exitCode === 0) return { kind: JqOutcomeKind.Compiled };
+
+    const failure = PiscinaJqClient.failureOf(result.stderr);
+    return { kind: JqOutcomeKind.Failure, failure };
   }
 
   async evaluate(
@@ -104,29 +97,26 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
     const input = JSON.stringify(data);
     const query = PiscinaJqClient.wrapped(program);
 
-    try {
-      const result = await this.#run({ input, query, flags });
+    const run = await this.workers.run({ input, query, flags });
 
-      if (result.aborted) return { kind: JqOutcomeKind.Aborted };
+    if (run.kind !== WorkerRunKind.Done)
+      return PiscinaJqClient.interruptionOf(run);
 
-      if (result.exitCode !== 0) {
-        const failure = PiscinaJqClient.failureOf(result.stderr);
-        return { kind: JqOutcomeKind.Failure, failure };
-      }
+    const result = run.result;
 
-      const values = JSON.parse(result.stdout) as JsonValue[];
-      return { kind: JqOutcomeKind.Evaluated, values };
-    } catch (error) {
-      return PiscinaJqClient.interruptionOf(error);
+    if (result.aborted) return { kind: JqOutcomeKind.Aborted };
+
+    if (result.exitCode !== 0) {
+      const failure = PiscinaJqClient.failureOf(result.stderr);
+      return { kind: JqOutcomeKind.Failure, failure };
     }
+
+    const values = JSON.parse(result.stdout) as JsonValue[];
+    return { kind: JqOutcomeKind.Evaluated, values };
   }
 
-  async onApplicationShutdown(): Promise<void> {
-    await this.pool.close();
-  }
-
-  async #run(task: JqRun): Promise<JqRunResult> {
-    return this.policy.execute(({ signal }) => this.pool.run(task, { signal }));
+  onApplicationShutdown(): Promise<void> {
+    return this.workers.close();
   }
 
   #bindings(program: string): string[] {
@@ -164,10 +154,12 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
       .replace(PiscinaJqClient.LOCATION, '');
   }
 
-  private static interruptionOf(error: unknown): JqTimedOut {
-    if (error instanceof ResilienceTimeoutError)
+  private static interruptionOf(
+    run: WorkerTimedOut | WorkerExhausted,
+  ): JqTimedOut | JqAborted {
+    if (run.kind === WorkerRunKind.TimedOut)
       return { kind: JqOutcomeKind.TimedOut };
 
-    throw error;
+    return { kind: JqOutcomeKind.Aborted };
   }
 }

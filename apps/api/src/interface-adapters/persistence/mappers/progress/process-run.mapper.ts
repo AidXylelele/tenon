@@ -23,7 +23,8 @@ export class ProcessRunMapper {
   static toDomain(state: ProcessRunState | null): ProcessRun | null {
     if (state === null) return null;
 
-    const deadline = InstantMapper.toDomain(state.deadline);
+    const stored = state.deadline ?? null;
+    const deadline = InstantMapper.toDomain(stored);
     return {
       id: state.id,
       kind: state.kind,

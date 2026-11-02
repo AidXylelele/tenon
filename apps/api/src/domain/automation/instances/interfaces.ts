@@ -125,6 +125,8 @@ export interface WorkflowInstanceProps {
   readonly endedAt: Date | null;
   readonly sequence: number;
   readonly executions: number;
+  // The rounds begun: a round records its results only while it is the latest.
+  readonly rounds: number;
   readonly tasks: readonly TaskInstance[];
   readonly version: number;
 }

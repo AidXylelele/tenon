@@ -88,8 +88,10 @@ export class GoJudgeSandboxClient implements SandboxClient {
     if (error instanceof BulkheadFullError)
       return { kind: SandboxOutcomeKind.Rejected };
 
-    if (error instanceof ResilienceTimeoutError)
+    if (error instanceof ResilienceTimeoutError) {
+      GoJudgeSandboxClient.LOGGER.warn('The sandbox did not answer in time');
       return { kind: SandboxOutcomeKind.TimedOut };
+    }
 
     const transport =
       error instanceof Error && typeof Reflect.get(error, 'code') === 'string';

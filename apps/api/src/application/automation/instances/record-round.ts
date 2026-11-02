@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import type { InstanceProgress } from '../../../domain/automation/instances/interfaces.js';
-import { InstanceNotFoundError } from '../../../domain/errors.js';
-import { EventRepository } from '../events/ports.js';
 import {
   type RecordRoundCommand,
   WorkflowInstanceRepository,
@@ -10,16 +8,13 @@ import {
 
 @Injectable()
 export class RecordRound {
-  constructor(
-    private readonly instances: WorkflowInstanceRepository,
-    private readonly events: EventRepository,
-  ) {}
+  constructor(private readonly instances: WorkflowInstanceRepository) {}
 
   @Transactional()
   async execute(command: RecordRoundCommand): Promise<InstanceProgress> {
-    const instance = await this.instances.find(command.instanceId);
+    const instance = await this.instances.get(command.instanceId);
 
-    if (instance === null) throw new InstanceNotFoundError();
+    instance.confirmRound(command.round);
 
     for (const answer of command.recorded)
       instance.record(
@@ -30,8 +25,6 @@ export class RecordRound {
       );
 
     await this.instances.save(instance);
-    const produced = instance.takeProducedEvents();
-    await this.events.addAll(produced);
     return instance.progress(command.now);
   }
 }

@@ -117,6 +117,8 @@ services:
     ports:
       - '127.0.0.1:${API_PORT:-53000}:3000'
     init: true
+    # A node that ended (a crash, a lost database) comes back; its work resumes after its lease.
+    restart: unless-stopped
     # The engine lets a running round finish for up to 90 s on shutdown (engine.module.ts).
     stop_grace_period: 100s
     read_only: true

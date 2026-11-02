@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
-import { InstanceNotFoundError } from '../../../domain/errors.js';
-import { EventRepository } from '../events/ports.js';
 import { Clock } from '../language/ports.js';
 import {
   WorkflowRepository,
@@ -25,7 +23,6 @@ export class StartSubWorkflow {
     private readonly workflows: WorkflowRepository,
     private readonly versions: WorkflowVersionRepository,
     private readonly readDefinition: ReadVersionDefinition,
-    private readonly events: EventRepository,
     private readonly clock: Clock,
   ) {}
 
@@ -34,9 +31,7 @@ export class StartSubWorkflow {
     command: StartSubWorkflowCommand,
   ): Promise<StartedSubWorkflowResult> {
     const now = this.clock.now();
-    const parent = await this.instances.find(command.instanceId);
-
-    if (parent === null) throw new InstanceNotFoundError();
+    const parent = await this.instances.get(command.instanceId);
 
     const request = parent.requestedSubWorkflow(command.subWorkflowId);
 
@@ -66,8 +61,6 @@ export class StartSubWorkflow {
     }
 
     await this.instances.save(parent);
-    const produced = parent.takeProducedEvents();
-    await this.events.addAll(produced);
     return { kind: SubWorkflowStartKind.Answered };
   }
 }

@@ -1,12 +1,5 @@
-import { extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
-import {
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from '@nestjs/resilience';
-import { Piscina } from 'piscina';
+import { ResilienceService } from '@nestjs/resilience';
 import type {
   JsonObject,
   JsonValue,
@@ -15,82 +8,73 @@ import { JsonSchemaOutcomeKind } from '../../interface-adapters/workflows/schema
 import {
   JsonSchemaClient,
   type JsonSchemaCompilation,
-  type JsonSchemaTimedOut,
   type JsonSchemaVerdict,
 } from '../../interface-adapters/workflows/schemas/interfaces.js';
+import { WorkerRunKind } from '../piscina/enums.js';
+import { WorkerPool } from '../piscina/worker-pool.js';
 import { ENGINE_CONCURRENCY } from '../workflows/engine.constants.js';
 import type { AjvAnswer, AjvTask } from './ajv.worker.js';
 
-// Ajv runs author schemas in worker threads: the `schemas` preset's timeout terminates the
-// worker of a validation that backtracks without end.
+// Ajv trusts its schemas, so an author's schema compiles and validates in a worker that the
+// `schemas` preset's timeout stops when a pattern backtracks without end.
 @Injectable()
 export class AjvJsonSchemaClient
   implements JsonSchemaClient, OnApplicationShutdown
 {
   private static readonly PRESET = 'schemas';
-  // The worker beside this file: `.ts` where the sources run (tests), `.js` in the build.
-  private static readonly WORKER = new URL(
-    `./ajv.worker${extname(fileURLToPath(import.meta.url))}`,
-    import.meta.url,
-  ).href;
 
-  // A worker per running instance and one for the checks of a publish, as for jq.
-  private readonly pool = new Piscina<AjvTask, AjvAnswer>({
-    filename: AjvJsonSchemaClient.WORKER,
-    minThreads: 1,
-    maxThreads: ENGINE_CONCURRENCY + 1,
-    idleTimeout: 30_000,
-  });
-  private readonly policy: ResiliencePolicy;
+  private readonly workers: WorkerPool<AjvTask, AjvAnswer>;
 
   constructor(resilience: ResilienceService) {
-    this.policy = resilience.preset(AjvJsonSchemaClient.PRESET);
+    const policy = resilience.preset(AjvJsonSchemaClient.PRESET);
+    // A worker per running instance and one for the checks of a publish, as for jq.
+    this.workers = new WorkerPool(policy, {
+      moduleUrl: import.meta.url,
+      worker: 'ajv.worker',
+      maxThreads: ENGINE_CONCURRENCY + 1,
+      heapMb: null,
+    });
   }
 
   async compile(schema: JsonObject): Promise<JsonSchemaCompilation> {
-    try {
-      const answer = await this.#run({ schema, validates: false, data: null });
+    const run = await this.workers.run({
+      schema,
+      validates: false,
+      data: null,
+    });
 
-      if (answer.unusable)
-        return { kind: JsonSchemaOutcomeKind.Unusable, reason: answer.reason };
+    if (run.kind !== WorkerRunKind.Done)
+      return { kind: JsonSchemaOutcomeKind.TimedOut };
 
-      return { kind: JsonSchemaOutcomeKind.Compiled };
-    } catch (error) {
-      return AjvJsonSchemaClient.interruptionOf(error);
-    }
+    const answer = run.result;
+
+    if (answer.unusable)
+      return { kind: JsonSchemaOutcomeKind.Unusable, reason: answer.reason };
+
+    return { kind: JsonSchemaOutcomeKind.Compiled };
   }
 
   async validate(
     schema: JsonObject,
     data: JsonValue,
   ): Promise<JsonSchemaVerdict> {
-    try {
-      const answer = await this.#run({ schema, validates: true, data });
+    const run = await this.workers.run({ schema, validates: true, data });
 
-      if (answer.unusable)
-        return { kind: JsonSchemaOutcomeKind.Unusable, reason: answer.reason };
-
-      if (!answer.valid)
-        return { kind: JsonSchemaOutcomeKind.Invalid, reason: answer.reason };
-
-      return { kind: JsonSchemaOutcomeKind.Valid };
-    } catch (error) {
-      return AjvJsonSchemaClient.interruptionOf(error);
-    }
-  }
-
-  async onApplicationShutdown(): Promise<void> {
-    await this.pool.close();
-  }
-
-  async #run(task: AjvTask): Promise<AjvAnswer> {
-    return this.policy.execute(({ signal }) => this.pool.run(task, { signal }));
-  }
-
-  private static interruptionOf(error: unknown): JsonSchemaTimedOut {
-    if (error instanceof ResilienceTimeoutError)
+    if (run.kind !== WorkerRunKind.Done)
       return { kind: JsonSchemaOutcomeKind.TimedOut };
 
-    throw error;
+    const answer = run.result;
+
+    if (answer.unusable)
+      return { kind: JsonSchemaOutcomeKind.Unusable, reason: answer.reason };
+
+    if (!answer.valid)
+      return { kind: JsonSchemaOutcomeKind.Invalid, reason: answer.reason };
+
+    return { kind: JsonSchemaOutcomeKind.Valid };
+  }
+
+  onApplicationShutdown(): Promise<void> {
+    return this.workers.close();
   }
 }

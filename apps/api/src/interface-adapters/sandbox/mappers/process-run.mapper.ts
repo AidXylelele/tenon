@@ -83,17 +83,17 @@ export class ProcessRunMapper {
     };
   }
 
-  // A sandbox that is busy, down or refusing is the platform's outage, not the author's
-  // error: the run gets no result and the round tries again later.
+  // A sandbox that is busy, down, refusing or stuck is the platform's outage, not the author's
+  // error: the run gets no result and the round tries again later. A process that outlives its
+  // limit is the sandbox's answer (TimeLimitExceeded); no answer in time means it is stuck.
   static toResult(id: string, outcome: SandboxOutcome): ProcessResult | null {
     switch (outcome.kind) {
       case SandboxOutcomeKind.Ran:
         return ProcessRunMapper.#resultOf(id, outcome.result);
-      case SandboxOutcomeKind.TimedOut:
-        return new ProcessTimedOut(id);
       case SandboxOutcomeKind.Rejected:
       case SandboxOutcomeKind.Unreachable:
       case SandboxOutcomeKind.Refused:
+      case SandboxOutcomeKind.TimedOut:
         return null;
     }
   }
