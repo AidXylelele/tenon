@@ -12,7 +12,7 @@ import type {
   JsonObject,
   JsonValue,
 } from '../../../domain/automation/language/interfaces.js';
-import type { TaskProgressState, WorkflowErrorState } from '../interfaces.js';
+import type { TaskProgressState, WorkflowErrorState } from './interfaces.js';
 import { workflowInstance } from './workflow-instance.js';
 
 export const taskInstance = pgTable(

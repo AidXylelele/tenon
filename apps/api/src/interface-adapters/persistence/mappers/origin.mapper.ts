@@ -1,8 +1,8 @@
 import type { Origin } from '../../../domain/automation/instances/interfaces.js';
 import { ParentOrigin } from '../../../domain/automation/instances/origins/parent-origin.js';
 import { UserOrigin } from '../../../domain/automation/instances/origins/user-origin.js';
-import { OriginKind } from '../enums.js';
-import type { OriginState } from '../interfaces.js';
+import { OriginKind } from '../schema/enums.js';
+import type { OriginState } from '../schema/interfaces.js';
 
 export class OriginMapper {
   static toState(origin: Origin): OriginState {

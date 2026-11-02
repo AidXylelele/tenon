@@ -14,12 +14,12 @@ import { OutputStage } from '../../../src/domain/automation/language/stages/outp
 import {
   EndingKind,
   TaskStage,
-} from '../../../src/interface-adapters/persistence/enums.js';
+} from '../../../src/interface-adapters/persistence/schema/enums.js';
 import type {
   KindProgressState,
   TaskProgressState,
-} from '../../../src/interface-adapters/persistence/interfaces.js';
-import { ProgressKind } from '../../../src/interface-adapters/persistence/enums.js';
+} from '../../../src/interface-adapters/persistence/schema/interfaces.js';
+import { ProgressKind } from '../../../src/interface-adapters/persistence/schema/enums.js';
 import { KindProgressMapper } from '../../../src/interface-adapters/persistence/mappers/progress/kind-progress.mapper.js';
 import { TaskProgressMapper } from '../../../src/interface-adapters/persistence/mappers/progress/task-progress.mapper.js';
 import {

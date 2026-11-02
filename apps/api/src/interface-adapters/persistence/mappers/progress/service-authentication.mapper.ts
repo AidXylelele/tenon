@@ -1,5 +1,5 @@
 import type { ServiceAuthentication } from '../../../../domain/automation/language/interfaces.js';
-import type { ServiceAuthenticationState } from '../../interfaces.js';
+import type { ServiceAuthenticationState } from '../../schema/interfaces.js';
 
 export class ServiceAuthenticationMapper {
   static toState(

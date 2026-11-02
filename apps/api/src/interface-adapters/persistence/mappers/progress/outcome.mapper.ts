@@ -1,5 +1,5 @@
 import { Outcome } from '../../../../domain/automation/language/outcome.js';
-import type { OutcomeState } from '../../interfaces.js';
+import type { OutcomeState } from '../../schema/interfaces.js';
 import { CloudEventMapper } from './cloud-event.mapper.js';
 import { DetachedWorkflowMapper } from './detached-workflow.mapper.js';
 import { FlowDirectiveMapper } from './flow-directive.mapper.js';

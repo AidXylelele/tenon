@@ -1,5 +1,5 @@
 import { CloudEvent } from '../../../../domain/automation/language/cloud-event.js';
-import type { CloudEventState } from '../../interfaces.js';
+import type { CloudEventState } from '../../schema/interfaces.js';
 
 export class CloudEventMapper {
   static toState(event: CloudEvent | null): CloudEventState | null {

@@ -8,7 +8,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { JsonValue } from '../../../domain/automation/language/interfaces.js';
-import type { OriginState, WorkflowErrorState } from '../interfaces.js';
+import type { OriginState, WorkflowErrorState } from './interfaces.js';
 import { workflow } from './workflow.js';
 import { workflowVersion } from './workflow-version.js';
 

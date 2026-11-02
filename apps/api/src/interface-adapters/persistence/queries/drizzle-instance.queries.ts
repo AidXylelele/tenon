@@ -29,7 +29,7 @@ import { EventOriginKind } from '../../../domain/automation/events/enums.js';
 import type { SubWorkflowEnding } from '../../../domain/automation/language/interfaces.js';
 import { Phase } from '../../../domain/automation/language/phase.js';
 import type { DrizzleTx } from '../interfaces.js';
-import { OriginKind } from '../enums.js';
+import { OriginKind } from '../schema/enums.js';
 import { WorkflowErrorMapper } from '../mappers/progress/workflow-error.mapper.js';
 import {
   event as events,

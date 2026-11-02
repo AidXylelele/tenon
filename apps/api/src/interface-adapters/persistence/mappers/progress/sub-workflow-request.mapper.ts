@@ -1,7 +1,7 @@
 import type { SubWorkflowRequest } from '../../../../domain/automation/language/interfaces.js';
 import { WorkflowName } from '../../../../domain/automation/language/workflow-name.js';
 import { WorkflowTarget } from '../../../../domain/automation/language/workflow-target.js';
-import type { SubWorkflowRequestState } from '../../interfaces.js';
+import type { SubWorkflowRequestState } from '../../schema/interfaces.js';
 
 export class SubWorkflowRequestMapper {
   static toState(request: SubWorkflowRequest): SubWorkflowRequestState {

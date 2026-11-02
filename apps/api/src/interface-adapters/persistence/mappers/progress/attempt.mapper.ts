@@ -1,5 +1,5 @@
 import { Attempt } from '../../../../domain/automation/language/attempt.js';
-import type { AttemptState } from '../../interfaces.js';
+import type { AttemptState } from '../../schema/interfaces.js';
 import { InstantMapper } from './instant.mapper.js';
 
 export class AttemptMapper {

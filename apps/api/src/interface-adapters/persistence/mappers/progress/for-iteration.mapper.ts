@@ -1,5 +1,5 @@
 import { ForIteration } from '../../../../domain/automation/language/for-iteration.js';
-import type { ForIterationState } from '../../interfaces.js';
+import type { ForIterationState } from '../../schema/interfaces.js';
 
 export class ForIterationMapper {
   static toState(iteration: ForIteration): ForIterationState {

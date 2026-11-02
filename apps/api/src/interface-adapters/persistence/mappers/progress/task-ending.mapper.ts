@@ -1,7 +1,7 @@
 import { InconsistentProgressError } from '../../../../domain/errors.js';
 import type { TaskEnding } from '../../../../domain/automation/language/endings/task-ending.js';
-import { EndingKind } from '../../enums.js';
-import type { TaskEndingState } from '../../interfaces.js';
+import { EndingKind } from '../../schema/enums.js';
+import type { TaskEndingState } from '../../schema/interfaces.js';
 import { FlowDirectiveMapper } from './flow-directive.mapper.js';
 import { OutcomeMapper } from './outcome.mapper.js';
 import { WorkflowErrorMapper } from './workflow-error.mapper.js';

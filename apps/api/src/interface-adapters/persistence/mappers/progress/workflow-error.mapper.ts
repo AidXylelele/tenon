@@ -1,5 +1,5 @@
 import { WorkflowError } from '../../../../domain/automation/language/workflow-error.js';
-import type { WorkflowErrorState } from '../../interfaces.js';
+import type { WorkflowErrorState } from '../../schema/interfaces.js';
 
 export class WorkflowErrorMapper {
   static toState(error: WorkflowError): WorkflowErrorState;

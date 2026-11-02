@@ -1,5 +1,5 @@
 import type { ProcessRun } from '../../../../domain/automation/language/interfaces.js';
-import type { ProcessRunState } from '../../interfaces.js';
+import type { ProcessRunState } from '../../schema/interfaces.js';
 import { InstantMapper } from './instant.mapper.js';
 
 export class ProcessRunMapper {

@@ -6,8 +6,8 @@ import { ExportCheckStage } from '../../../../domain/automation/language/stages/
 import { ExportStage } from '../../../../domain/automation/language/stages/export-stage.js';
 import { OutputStage } from '../../../../domain/automation/language/stages/output-stage.js';
 import type { TaskProgress } from '../../../../domain/automation/language/stages/task-progress.js';
-import { TaskStage } from '../../enums.js';
-import type { TaskProgressState } from '../../interfaces.js';
+import { TaskStage } from '../../schema/enums.js';
+import type { TaskProgressState } from '../../schema/interfaces.js';
 import { InstantMapper } from './instant.mapper.js';
 import { KindProgressMapper } from './kind-progress.mapper.js';
 import { OutcomeMapper } from './outcome.mapper.js';

@@ -15,8 +15,8 @@ import { RunningProgress } from '../../../../domain/automation/language/progress
 import { SubWorkflowProgress } from '../../../../domain/automation/language/progress/sub-workflow-progress.js';
 import { SwitchProgress } from '../../../../domain/automation/language/progress/switch-progress.js';
 import { TryProgress } from '../../../../domain/automation/language/progress/try-progress.js';
-import { ProgressKind } from '../../enums.js';
-import type { KindProgressState } from '../../interfaces.js';
+import { ProgressKind } from '../../schema/enums.js';
+import type { KindProgressState } from '../../schema/interfaces.js';
 import { AttemptMapper } from './attempt.mapper.js';
 import { ForIterationMapper } from './for-iteration.mapper.js';
 import { SubWorkflowRequestMapper } from './sub-workflow-request.mapper.js';

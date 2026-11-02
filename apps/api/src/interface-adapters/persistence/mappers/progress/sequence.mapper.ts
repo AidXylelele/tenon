@@ -1,5 +1,5 @@
 import { Sequence } from '../../../../domain/automation/language/sequence.js';
-import type { SequenceState } from '../../interfaces.js';
+import type { SequenceState } from '../../schema/interfaces.js';
 
 export class SequenceMapper {
   static toState(sequence: Sequence): SequenceState {

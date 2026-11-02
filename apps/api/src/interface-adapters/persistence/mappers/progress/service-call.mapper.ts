@@ -1,5 +1,5 @@
 import type { ServiceCall } from '../../../../domain/automation/language/interfaces.js';
-import type { ServiceCallState } from '../../interfaces.js';
+import type { ServiceCallState } from '../../schema/interfaces.js';
 import { InstantMapper } from './instant.mapper.js';
 import { ServiceAuthenticationMapper } from './service-authentication.mapper.js';
 

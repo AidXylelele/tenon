@@ -1,6 +1,6 @@
 import type { DetachedWorkflow } from '../../../../domain/automation/language/interfaces.js';
 import { WorkflowName } from '../../../../domain/automation/language/workflow-name.js';
-import type { DetachedWorkflowState } from '../../interfaces.js';
+import type { DetachedWorkflowState } from '../../schema/interfaces.js';
 
 export class DetachedWorkflowMapper {
   static toState(

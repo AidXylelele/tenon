@@ -11,7 +11,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import type { AccountType } from '../../../domain/identity/enums.js';
-import type { AccountConfig } from '../interfaces.js';
+import type { AccountConfig } from './interfaces.js';
 import { user } from './user.js';
 
 export const account = pgTable(

@@ -1,6 +1,6 @@
 import { FlowDirective } from '../../../../domain/automation/language/flow-directive.js';
 import { JsonPointer } from '../../../../domain/automation/language/json-pointer.js';
-import type { FlowDirectiveState } from '../../interfaces.js';
+import type { FlowDirectiveState } from '../../schema/interfaces.js';
 
 export class FlowDirectiveMapper {
   static toState(directive: FlowDirective): FlowDirectiveState;
