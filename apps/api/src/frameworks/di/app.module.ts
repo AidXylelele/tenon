@@ -19,6 +19,8 @@ import { LoggingModule } from './logging.module.js';
 import { OutboxModule } from './outbox.module.js';
 import { ResilienceModule } from './resilience.module.js';
 import { DatabaseUnavailableFilter } from '../express/database-unavailable.filter.js';
+import { DatabaseHealthIndicator } from '../drizzle/database-health.indicator.js';
+import { DatabaseProbe } from '../../interface-adapters/api/interfaces.js';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { DatabaseUnavailableFilter } from '../express/database-unavailable.filte
   providers: [
     { provide: APP_PIPE, useValue: new StandardSchemaValidationPipe() },
     // Nest asks the global filters last to first: domain errors first, the database's outages next.
+    DatabaseHealthIndicator,
+    { provide: DatabaseProbe, useExisting: DatabaseHealthIndicator },
     { provide: APP_FILTER, useClass: DatabaseUnavailableFilter },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
   ],

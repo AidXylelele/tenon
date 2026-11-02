@@ -22,6 +22,7 @@ describe('authentication, authorization policies and error responses', () => {
   it('the_health_route_is_public', async () => {
     const response = await request(t.server).get('/api/v1/health').expect(200);
     expect(response.body).toMatchObject({ status: 'ok' });
+    expect(response.body.details.database.status).toBe('up');
   });
 
   it('a_protected_route_without_a_cookie_is_refused_as_unauthenticated', async () => {
