@@ -13,7 +13,10 @@ import {
   ServiceCaller,
   WorkflowInstanceRepository,
 } from '../../application/automation/instances/ports.js';
-import { InstanceQueries } from '../../application/automation/instances/queries.js';
+import {
+  InstanceQueries,
+  SubWorkflowQueries,
+} from '../../application/automation/instances/queries.js';
 import { RecordRound } from '../../application/automation/instances/record-round.js';
 import { RunDetachedProcess } from '../../application/automation/instances/run-detached-process.js';
 import { StartDetachedWorkflow } from '../../application/automation/instances/start-detached-workflow.js';
@@ -32,7 +35,10 @@ import {
   WorkflowVersionRepository,
 } from '../../application/automation/workflows/ports.js';
 import { PublishVersion } from '../../application/automation/workflows/publish-version.js';
-import { WorkflowQueries } from '../../application/automation/workflows/queries.js';
+import {
+  VersionDocuments,
+  WorkflowQueries,
+} from '../../application/automation/workflows/queries.js';
 import { ReadVersionDefinition } from '../../application/automation/workflows/read-version-definition.js';
 import { WorkflowPolicy } from '../../application/automation/workflows/workflow.policy.js';
 import { ConformanceController } from '../../interface-adapters/api/controllers/conformance.controller.js';
@@ -154,6 +160,7 @@ import { EngineModule } from './engine.module.js';
     },
     DrizzleWorkflowQueries,
     { provide: WorkflowQueries, useExisting: DrizzleWorkflowQueries },
+    { provide: VersionDocuments, useExisting: DrizzleWorkflowQueries },
     DrizzleWorkflowInstanceRepository,
     {
       provide: WorkflowInstanceRepository,
@@ -163,6 +170,7 @@ import { EngineModule } from './engine.module.js';
     { provide: EventRepository, useExisting: DrizzleEventRepository },
     DrizzleInstanceQueries,
     { provide: InstanceQueries, useExisting: DrizzleInstanceQueries },
+    { provide: SubWorkflowQueries, useExisting: DrizzleInstanceQueries },
     { provide: RunClient, useClass: EngineRunClient },
     InstanceRunsGateway,
     { provide: InstanceRuns, useExisting: InstanceRunsGateway },

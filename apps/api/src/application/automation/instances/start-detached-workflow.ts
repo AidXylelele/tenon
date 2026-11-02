@@ -16,13 +16,13 @@ import {
   type StartDetachedWorkflowCommand,
   WorkflowInstanceRepository,
 } from './ports.js';
-import { InstanceQueries } from './queries.js';
+import { SubWorkflowQueries } from './queries.js';
 
 @Injectable()
 export class StartDetachedWorkflow {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
-    private readonly queries: InstanceQueries,
+    private readonly queries: SubWorkflowQueries,
     private readonly workflows: WorkflowRepository,
     private readonly versions: WorkflowVersionRepository,
     private readonly runs: InstanceRuns,

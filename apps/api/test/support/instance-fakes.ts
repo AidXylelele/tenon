@@ -5,24 +5,14 @@ import type {
   ServiceCaller,
   WorkflowInstanceRepository,
 } from '../../src/application/automation/instances/ports.js';
-import type {
-  InstancePage,
-  InstanceQueries,
-  InstanceView,
-  EventPage,
-  TaskRecordPage,
-} from '../../src/application/automation/instances/queries.js';
+import type { SubWorkflowQueries } from '../../src/application/automation/instances/queries.js';
 import {
   Clock,
   type SchemaValidator,
 } from '../../src/application/automation/language/ports.js';
 import type {
-  WorkflowPageRequest,
   VersionDocument,
-  VersionSummary,
-  WorkflowPage,
-  WorkflowQueries,
-  WorkflowSummary,
+  VersionDocuments,
 } from '../../src/application/automation/workflows/queries.js';
 import type { Event } from '../../src/domain/automation/events/event.js';
 import type { InstanceEvent } from '../../src/domain/automation/instances/interfaces.js';
@@ -47,7 +37,6 @@ import type { ProcessResult } from '../../src/domain/automation/language/results
 import type { ServiceResult } from '../../src/domain/automation/language/results/service-result.js';
 import { Validated } from '../../src/domain/automation/language/results/validated.js';
 import type { ValidationResult } from '../../src/domain/automation/language/results/validation-result.js';
-import type { WorkflowName } from '../../src/domain/automation/language/workflow-name.js';
 import { DocumentFormat } from '../../src/domain/automation/workflows/enums.js';
 import type { InMemoryWorkflowVersionRepository } from './fakes.js';
 
@@ -191,29 +180,8 @@ export class AcceptingSchemaValidator implements SchemaValidator {
   }
 }
 
-export class InMemoryWorkflowQueries implements WorkflowQueries {
+export class InMemoryVersionDocuments implements VersionDocuments {
   constructor(private readonly store: InMemoryWorkflowVersionRepository) {}
-
-  async list(page: WorkflowPageRequest): Promise<WorkflowPage> {
-    return { items: [], next: page.after };
-  }
-
-  async get(name: WorkflowName): Promise<WorkflowSummary | null> {
-    return {
-      namespace: name.namespace,
-      name: name.name,
-      isOn: false,
-      currentVersion: null,
-    };
-  }
-
-  async versions(): Promise<readonly VersionSummary[]> {
-    return [];
-  }
-
-  async document(): Promise<VersionDocument | null> {
-    return null;
-  }
 
   async documentOf(versionId: string): Promise<VersionDocument | null> {
     const version = this.store.versions.find(
@@ -226,30 +194,14 @@ export class InMemoryWorkflowQueries implements WorkflowQueries {
   }
 }
 
-export class InMemoryInstanceQueries implements InstanceQueries {
+export class InMemorySubWorkflowQueries implements SubWorkflowQueries {
   constructor(private readonly instances: InMemoryWorkflowInstanceRepository) {}
-
-  async list(): Promise<InstancePage> {
-    return { items: [], next: null };
-  }
 
   async exists(id: string): Promise<boolean> {
     return this.instances.rows.has(id);
   }
 
-  async get(): Promise<InstanceView | null> {
-    return null;
-  }
-
-  async tasks(): Promise<TaskRecordPage> {
-    return { items: [], next: null };
-  }
-
-  async lifecycleEvents(): Promise<EventPage> {
-    return { items: [], next: null };
-  }
-
-  async subWorkflowEnding(id: string): Promise<SubWorkflowEnding | null> {
+  async endingOf(id: string): Promise<SubWorkflowEnding | null> {
     const instance = this.instances.load(id);
 
     if (instance === null) return null;

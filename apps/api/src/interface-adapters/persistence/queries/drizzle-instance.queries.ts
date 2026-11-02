@@ -20,6 +20,7 @@ import type {
   InstancePageRequest,
   InstancePosition,
   InstanceQueries,
+  SubWorkflowQueries,
   InstanceView,
   PositionPageRequest,
   TaskRecordPage,
@@ -38,7 +39,9 @@ import {
 import { KeysetPage } from '../keyset-page.js';
 
 @Injectable()
-export class DrizzleInstanceQueries implements InstanceQueries {
+export class DrizzleInstanceQueries
+  implements InstanceQueries, SubWorkflowQueries
+{
   // Through the transaction host, so a query inside a use case's transaction shares its
   // connection instead of taking a second one from the pool.
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
@@ -171,7 +174,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
     return { items, next: slice.next };
   }
 
-  async subWorkflowEnding(id: string): Promise<SubWorkflowEnding | null> {
+  async endingOf(id: string): Promise<SubWorkflowEnding | null> {
     const [row] = await this.txHost.tx
       .select({
         phase: instances.phase,

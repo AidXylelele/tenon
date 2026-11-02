@@ -15,13 +15,13 @@ import {
   type StartSubWorkflowCommand,
   WorkflowInstanceRepository,
 } from './ports.js';
-import { InstanceQueries } from './queries.js';
+import { SubWorkflowQueries } from './queries.js';
 
 @Injectable()
 export class StartSubWorkflow {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
-    private readonly queries: InstanceQueries,
+    private readonly queries: SubWorkflowQueries,
     private readonly workflows: WorkflowRepository,
     private readonly versions: WorkflowVersionRepository,
     private readonly readDefinition: ReadVersionDefinition,

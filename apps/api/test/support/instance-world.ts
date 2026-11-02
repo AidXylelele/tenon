@@ -28,9 +28,9 @@ import {
 import {
   AcceptingSchemaValidator,
   FixedClock,
-  InMemoryInstanceQueries,
+  InMemorySubWorkflowQueries,
   InMemoryWorkflowInstanceRepository,
-  InMemoryWorkflowQueries,
+  InMemoryVersionDocuments,
   RecordingEventRepository,
   RecordingInstanceRuns,
   ScriptedProcessRunner,
@@ -74,9 +74,9 @@ export function instanceWorld(
   const instances = new InMemoryWorkflowInstanceRepository(events);
   const services = new ScriptedServiceCaller(respond, delay);
   const processes = new ScriptedProcessRunner(exit);
-  const workflowQueries = new InMemoryWorkflowQueries(versions);
-  const instanceQueries = new InMemoryInstanceQueries(instances);
-  const readDefinition = new ReadVersionDefinition(workflowQueries, reader);
+  const documents = new InMemoryVersionDocuments(versions);
+  const subWorkflows = new InMemorySubWorkflowQueries(instances);
+  const readDefinition = new ReadVersionDefinition(documents, reader);
   const beginRound = new BeginRound(instances, readDefinition);
   const recordRound = new RecordRound(instances);
   return {
@@ -84,7 +84,7 @@ export function instanceWorld(
     workflows,
     versions,
     instances,
-    instanceQueries,
+    subWorkflows,
     runs,
     events,
     services,
@@ -105,7 +105,7 @@ export function instanceWorld(
     fault: new FaultInstance(instances, clock),
     startSubWorkflow: new StartSubWorkflow(
       instances,
-      instanceQueries,
+      subWorkflows,
       workflows,
       versions,
       readDefinition,
@@ -113,13 +113,13 @@ export function instanceWorld(
     ),
     completeSubWorkflow: new CompleteSubWorkflow(
       instances,
-      instanceQueries,
+      subWorkflows,
       readDefinition,
       clock,
     ),
     startDetached: new StartDetachedWorkflow(
       instances,
-      instanceQueries,
+      subWorkflows,
       workflows,
       versions,
       runs,

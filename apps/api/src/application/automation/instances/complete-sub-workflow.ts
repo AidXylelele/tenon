@@ -7,13 +7,13 @@ import {
   type CompleteSubWorkflowCommand,
   WorkflowInstanceRepository,
 } from './ports.js';
-import { InstanceQueries } from './queries.js';
+import { SubWorkflowQueries } from './queries.js';
 
 @Injectable()
 export class CompleteSubWorkflow {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
-    private readonly queries: InstanceQueries,
+    private readonly queries: SubWorkflowQueries,
     private readonly readDefinition: ReadVersionDefinition,
     private readonly clock: Clock,
   ) {}
@@ -23,7 +23,7 @@ export class CompleteSubWorkflow {
     const now = this.clock.now();
     const parent = await this.instances.get(command.instanceId);
 
-    const ending = await this.queries.subWorkflowEnding(command.subWorkflowId);
+    const ending = await this.queries.endingOf(command.subWorkflowId);
     const definition = await this.readDefinition.execute(parent.versionId);
     const context = new RoundContext({
       definition,

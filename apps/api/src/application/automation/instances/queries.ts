@@ -109,5 +109,10 @@ export abstract class InstanceQueries {
     id: string,
     page: PositionPageRequest,
   ): Promise<EventPage>;
-  abstract subWorkflowEnding(id: string): Promise<SubWorkflowEnding | null>;
+}
+
+// What a run reads about another instance by value, without loading it.
+export abstract class SubWorkflowQueries {
+  abstract exists(id: string): Promise<boolean>;
+  abstract endingOf(id: string): Promise<SubWorkflowEnding | null>;
 }

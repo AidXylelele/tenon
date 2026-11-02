@@ -3,6 +3,7 @@ import { TransactionHost } from '@nestjs-cls/transactional';
 import { and, asc, eq, gt, or, type SQL, sql } from 'drizzle-orm';
 import type {
   VersionDocument,
+  VersionDocuments,
   VersionSummary,
   WorkflowPage,
   WorkflowPageRequest,
@@ -19,7 +20,9 @@ import {
 } from '../schema/index.js';
 
 @Injectable()
-export class DrizzleWorkflowQueries implements WorkflowQueries {
+export class DrizzleWorkflowQueries
+  implements WorkflowQueries, VersionDocuments
+{
   // Through the transaction host, so a query inside a use case's transaction shares its
   // connection instead of taking a second one from the pool.
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}

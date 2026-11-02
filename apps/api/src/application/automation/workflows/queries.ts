@@ -47,5 +47,9 @@ export abstract class WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionDocument | null>;
+}
+
+// The document of a version a run executes.
+export abstract class VersionDocuments {
   abstract documentOf(versionId: string): Promise<VersionDocument | null>;
 }

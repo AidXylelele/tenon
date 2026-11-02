@@ -79,13 +79,13 @@ Rules:
 
 **Ports.** Abstract classes in `application/automation/*/ports.ts` and `queries.ts`:
 
-| Module    | Ports                                                                                                                                                          | Queries                                                |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| workflows | WorkflowRepository, WorkflowVersionRepository, RecurringStarts                                                                                                 | WorkflowQueries (lists, documents, trigger candidates) |
-| language  | DefinitionReader (document text in, Definition out), ExpressionEvaluator, SchemaValidator (every module uses them, as every module uses the `language` domain) | —                                                      |
-| instances | WorkflowInstanceRepository, InstanceRuns, ServiceCaller, ProcessRunner                                                                                         | InstanceQueries (lists, history, progress)             |
-| events    | EventRepository, CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway                          | EventQueries (candidates, catch-up), ConnectionQueries |
-| secrets   | SecretRepository                                                                                                                                               | SecretQueries (`valuesFor`, `namesOwnedBy`)            |
+| Module    | Ports                                                                                                                                                          | Queries                                                                                                             |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| workflows | WorkflowRepository, WorkflowVersionRepository, RecurringStarts                                                                                                 | WorkflowQueries (the API's lists and documents, trigger candidates), VersionDocuments (the document a run executes) |
+| language  | DefinitionReader (document text in, Definition out), ExpressionEvaluator, SchemaValidator (every module uses them, as every module uses the `language` domain) | —                                                                                                                   |
+| instances | WorkflowInstanceRepository, InstanceRuns, ServiceCaller, ProcessRunner                                                                                         | InstanceQueries (the API's lists, history, progress), SubWorkflowQueries (what a run reads about another instance)  |
+| events    | EventRepository, CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway                          | EventQueries (candidates, catch-up), ConnectionQueries                                                              |
+| secrets   | SecretRepository                                                                                                                                               | SecretQueries (`valuesFor`, `namesOwnedBy`)                                                                         |
 
 **Time.** A use case reads the clock once per operation through the `Clock` port, except `AdvanceInstance`, which reads it as each answer arrives, so results, deadlines and lifecycle times carry the time they happened (`application/automation/language/ports.ts`), which `EngineClock` implements over the engine's time source, so `ManualWorkflowClock` drives HTTP starts and engine runs alike in tests; the time is then passed as a value. A retry's jitter sample derives from its work id, which is pure and stable on replay. The domain reads no clock.
 
@@ -133,7 +133,7 @@ Gaps this closes:
 AdvanceInstance({ instanceId, runtime }):
   now = clock.now()
   { context, instance } = BeginRound({ instanceId, now, runtime })        // @Transactional
-      instance = instances.get(id);  definition = definitions.read(queries.documentOf(instance.versionId))
+      instance = instances.get(id);  definition = definitions.read(documents.documentOf(instance.versionId))
       context = RoundContext(definition, runtime, now)
       instance.beginRound(context);  instances.save(instance)                  // save writes nothing when unchanged
       events.addAll(instance.takeProducedEvents())                               // save writes the domain events to the outbox
