@@ -5,6 +5,7 @@ import {
   ResilienceService,
   ResilienceTimeoutError,
 } from '@nestjs/resilience';
+import { errors } from 'undici';
 import { SandboxOutcomeKind } from '../../interface-adapters/sandbox/enums.js';
 import {
   type GoJudgeCommand,
@@ -19,6 +20,25 @@ export class GoJudgeSandboxClient implements SandboxClient {
   private static readonly PRESET = 'processes';
   private static readonly RUN = '/run';
   private static readonly LOGGER = new Logger(GoJudgeSandboxClient.name);
+  // The statuses with which go-judge refuses a command, its message in a JSON string.
+  private static readonly REFUSING: readonly number[] = [400, 404, 500];
+  // The connection failures: anything else is a defect, not an outage.
+  private static readonly UNREACHABLE: readonly string[] = [
+    'ECONNREFUSED',
+    'ECONNRESET',
+    'EPIPE',
+    'ENOTFOUND',
+    'EAI_AGAIN',
+    'ETIMEDOUT',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'UND_ERR_SOCKET',
+    'UND_ERR_CONNECT_TIMEOUT',
+    'UND_ERR_HEADERS_TIMEOUT',
+    'UND_ERR_BODY_TIMEOUT',
+    'UND_ERR_CLOSED',
+    'UND_ERR_DESTROYED',
+  ];
 
   private readonly policy: ResiliencePolicy;
 
@@ -52,6 +72,13 @@ export class GoJudgeSandboxClient implements SandboxClient {
       signal,
     });
     const text = await response.body.text();
+    const refusal = GoJudgeSandboxClient.refusalOf(response.statusCode, text);
+
+    if (refusal !== null) {
+      GoJudgeSandboxClient.LOGGER.warn(`The sandbox refused a run: ${refusal}`);
+      return { kind: SandboxOutcomeKind.Failed };
+    }
+
     const result = GoJudgeSandboxClient.resultOf(text);
 
     if (response.statusCode >= 300 || result === null) {
@@ -62,6 +89,22 @@ export class GoJudgeSandboxClient implements SandboxClient {
     }
 
     return { kind: SandboxOutcomeKind.Ran, result };
+  }
+
+  private static refusalOf(status: number, text: string): string | null {
+    if (!GoJudgeSandboxClient.REFUSING.includes(status)) return null;
+
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return null;
+    }
+
+    if (typeof parsed !== 'string') return null;
+
+    return parsed;
   }
 
   private static resultOf(text: string): GoJudgeResult | null {
@@ -93,10 +136,18 @@ export class GoJudgeSandboxClient implements SandboxClient {
       return { kind: SandboxOutcomeKind.TimedOut };
     }
 
-    const transport =
-      error instanceof Error && typeof Reflect.get(error, 'code') === 'string';
+    if (error instanceof errors.ResponseExceededMaxSizeError) {
+      GoJudgeSandboxClient.LOGGER.warn('The sandbox answered beyond its bound');
+      return { kind: SandboxOutcomeKind.Oversized };
+    }
 
-    if (transport) {
+    const code: unknown =
+      error instanceof Error ? Reflect.get(error, 'code') : undefined;
+    const transport =
+      typeof code === 'string' &&
+      GoJudgeSandboxClient.UNREACHABLE.includes(code);
+
+    if (transport && error instanceof Error) {
       GoJudgeSandboxClient.LOGGER.warn(
         `The sandbox could not be reached: ${error.message}`,
       );

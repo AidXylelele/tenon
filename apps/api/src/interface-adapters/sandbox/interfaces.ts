@@ -48,8 +48,19 @@ export interface SandboxUnreachable {
   readonly kind: SandboxOutcomeKind.Unreachable;
 }
 
+// An answer that is not the sandbox's (a proxy's page, a gateway status): an outage.
 export interface SandboxRefused {
   readonly kind: SandboxOutcomeKind.Refused;
+}
+
+// An answer larger than its bound, which repeating the run would only repeat.
+export interface SandboxOversized {
+  readonly kind: SandboxOutcomeKind.Oversized;
+}
+
+// go-judge's own refusal of this command (400, 404 or 500 with its message).
+export interface SandboxFailure {
+  readonly kind: SandboxOutcomeKind.Failed;
 }
 
 export type SandboxOutcome =
@@ -57,7 +68,9 @@ export type SandboxOutcome =
   | SandboxRejected
   | SandboxTimedOut
   | SandboxUnreachable
-  | SandboxRefused;
+  | SandboxRefused
+  | SandboxOversized
+  | SandboxFailure;
 
 export abstract class SandboxClient {
   abstract run(command: GoJudgeCommand): Promise<SandboxOutcome>;

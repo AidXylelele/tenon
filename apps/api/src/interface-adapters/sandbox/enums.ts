@@ -10,4 +10,6 @@ export enum SandboxOutcomeKind {
   TimedOut = 'timed-out',
   Unreachable = 'unreachable',
   Refused = 'refused',
+  Oversized = 'oversized',
+  Failed = 'failed',
 }

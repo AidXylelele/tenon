@@ -62,6 +62,9 @@ services:
     networks: [sandbox]
     environment:
       ES_AUTH_TOKEN: ${SANDBOX_TOKEN:?set SANDBOX_TOKEN in .env}
+      # go-judge queues runs beyond its parallelism, and the API's 35 s preset counts the queue:
+      # keep it at least 8 (the `processes` bulkhead) times the API processes that run scripts.
+      ES_PARALLELISM: ${SANDBOX_PARALLELISM:-8}
     ports:
       - '127.0.0.1:${SANDBOX_PORT:-55050}:5050'
     healthcheck:

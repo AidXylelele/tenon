@@ -12,11 +12,12 @@ import type { Env } from './config.module.js';
   providers: [
     {
       provide: SandboxPool,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) =>
+      inject: [ConfigService, SandboxLimits],
+      useFactory: (config: ConfigService<Env, true>, limits: SandboxLimits) =>
         createSandboxPool(
           config.get('SANDBOX_URL', { infer: true }),
           config.get('SANDBOX_TOKEN', { infer: true }),
+          limits,
         ),
     },
     {

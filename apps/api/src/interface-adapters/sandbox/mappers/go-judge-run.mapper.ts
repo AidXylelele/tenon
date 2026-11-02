@@ -20,6 +20,9 @@ import type {
 } from '../interfaces.js';
 
 export class GoJudgeRunMapper {
+  static readonly #OVERSIZED =
+    'The output of the process is larger than the sandbox answers';
+  static readonly #REFUSED = 'The sandbox refused to run the process';
   static readonly #NANOSECONDS_PER_SECOND = 1_000_000_000;
   static readonly #NANOSECONDS_PER_MILLISECOND = 1_000_000;
   static readonly #PATH = 'PATH=/usr/local/bin:/usr/bin:/bin';
@@ -83,13 +86,18 @@ export class GoJudgeRunMapper {
     };
   }
 
-  // A sandbox that is busy, down, refusing or stuck is the platform's outage, not the author's
-  // error: the run gets no result and the round tries again later. A process that outlives its
-  // limit is the sandbox's answer (TimeLimitExceeded); no answer in time means it is stuck.
+  // A sandbox that is busy, down, stuck or answers with another's page is the platform's outage,
+  // not the author's error: the run gets no result and the round tries again later. A process
+  // that outlives its limit is the sandbox's answer (TimeLimitExceeded), and so are go-judge's
+  // own refusal of the command and an answer beyond its bound: repeating them repeats them.
   static toResult(id: string, outcome: SandboxOutcome): ProcessResult | null {
     switch (outcome.kind) {
       case SandboxOutcomeKind.Ran:
         return GoJudgeRunMapper.#resultOf(id, outcome.result);
+      case SandboxOutcomeKind.Oversized:
+        return new SandboxFailed(id, GoJudgeRunMapper.#OVERSIZED);
+      case SandboxOutcomeKind.Failed:
+        return new SandboxFailed(id, GoJudgeRunMapper.#REFUSED);
       case SandboxOutcomeKind.Rejected:
       case SandboxOutcomeKind.Unreachable:
       case SandboxOutcomeKind.Refused:

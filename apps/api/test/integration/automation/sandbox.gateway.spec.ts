@@ -21,9 +21,16 @@ import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.j
 import { GoJudgeSandboxClient } from '../../../src/frameworks/go-judge/go-judge-sandbox.client.js';
 import { createSandboxPool } from '../../../src/frameworks/go-judge/sandbox-pool.js';
 import { SystemClock } from '../../support/instance-fakes.js';
+import type { GoJudgeFile } from '../../../src/interface-adapters/sandbox/interfaces.js';
 import { SandboxGateway } from '../../../src/interface-adapters/sandbox/sandbox.gateway.js';
 
 const TOKEN = 'integration-sandbox-token-0123456789abcdef';
+const limits = {
+  seconds: 2,
+  memoryBytes: 128 * 1024 * 1024,
+  processes: 16,
+  outputBytes: 1024 * 1024,
+};
 const at = JsonPointer.root().at('do').at(0).at('run');
 const clock = new SystemClock();
 
@@ -40,6 +47,8 @@ function script(language: ScriptLanguage, process: JsonObject): ProcessRun {
 describe('SandboxGateway', () => {
   let container: StartedTestContainer;
   let runner: SandboxGateway;
+  let client: GoJudgeSandboxClient;
+  let url: string;
 
   beforeAll(async () => {
     const context = fileURLToPath(
@@ -59,25 +68,13 @@ describe('SandboxGateway', () => {
         }),
       )
       .start();
-    const url = `http://${container.getHost()}:${String(container.getMappedPort(5050))}`;
+    url = `http://${container.getHost()}:${String(container.getMappedPort(5050))}`;
     const moduleRef = await Test.createTestingModule({
       imports: [ResilienceModule],
     }).compile();
-    const pool = createSandboxPool(url, TOKEN);
-    const client = new GoJudgeSandboxClient(
-      pool,
-      moduleRef.get(ResilienceService),
-    );
-    runner = new SandboxGateway(
-      client,
-      {
-        seconds: 2,
-        memoryBytes: 128 * 1024 * 1024,
-        processes: 16,
-        outputBytes: 1024 * 1024,
-      },
-      clock,
-    );
+    const pool = createSandboxPool(url, TOKEN, limits);
+    client = new GoJudgeSandboxClient(pool, moduleRef.get(ResilienceService));
+    runner = new SandboxGateway(client, limits, clock);
   }, 600_000);
 
   afterAll(async () => {
@@ -170,20 +167,21 @@ describe('SandboxGateway', () => {
     }).compile();
     const resilience = moduleRef.get(ResilienceService);
     const url = `http://${container.getHost()}:${String(container.getMappedPort(5050))}`;
+    const tiny = { seconds: 2, memoryBytes: 1, processes: 1, outputBytes: 1 };
     const refusing = new SandboxGateway(
       new GoJudgeSandboxClient(
-        createSandboxPool(url, 'wrong-token'),
+        createSandboxPool(url, 'wrong-token', tiny),
         resilience,
       ),
-      { seconds: 2, memoryBytes: 1, processes: 1, outputBytes: 1 },
+      tiny,
       clock,
     );
     const down = new SandboxGateway(
       new GoJudgeSandboxClient(
-        createSandboxPool('http://127.0.0.1:9', TOKEN),
+        createSandboxPool('http://127.0.0.1:9', TOKEN, tiny),
         resilience,
       ),
-      { seconds: 2, memoryBytes: 1, processes: 1, outputBytes: 1 },
+      tiny,
       clock,
     );
     const run = script(ScriptLanguage.JavaScript, { code: 'console.log(1)' });
@@ -193,6 +191,54 @@ describe('SandboxGateway', () => {
 
     expect(refused).toBeNull();
     expect(unreachable).toBeNull();
+  });
+
+  it('output_that_json_escapes_six_times_over_comes_back_whole', async () => {
+    const run = script(ScriptLanguage.Python, { code: "print('<' * 800_000)" });
+
+    const result = await runner.run(run);
+
+    const stdout = result?.outcome(ProcessReturn.Stdout, at).output;
+    expect(typeof stdout === 'string' && stdout.length).toBe(800_001);
+  });
+
+  it('an_answer_beyond_the_pool_bound_faults_the_task_instead_of_waiting', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [ResilienceModule],
+    }).compile();
+    const narrow = { ...limits, outputBytes: 1024 };
+    const bounded = new SandboxGateway(
+      new GoJudgeSandboxClient(
+        createSandboxPool(url, TOKEN, narrow),
+        moduleRef.get(ResilienceService),
+      ),
+      limits,
+      clock,
+    );
+    const run = script(ScriptLanguage.Python, { code: "print('<' * 200_000)" });
+
+    const result = await bounded.run(run);
+
+    expect(result?.outcome(ProcessReturn.Stdout, at).failure?.detail).toBe(
+      'The output of the process is larger than the sandbox answers',
+    );
+  });
+
+  it('a_command_go_judge_refuses_is_an_answer_not_an_outage', async () => {
+    // go-judge answers 404 with its message for a file it does not hold.
+    const missing = { fileId: 'missing' } as unknown as GoJudgeFile;
+    const outcome = await client.run({
+      args: ['/bin/true'],
+      env: [],
+      files: [],
+      cpuLimit: 1_000_000_000,
+      clockLimit: 1_000_000_000,
+      memoryLimit: 64 * 1024 * 1024,
+      procLimit: 1,
+      copyIn: { 'a.txt': missing },
+    });
+
+    expect(outcome).toEqual({ kind: 'failed' });
   });
 
   it('a_process_stops_at_its_task_deadline', async () => {
