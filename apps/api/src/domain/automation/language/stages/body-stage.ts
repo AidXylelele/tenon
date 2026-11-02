@@ -10,15 +10,17 @@ import { Phase } from '../phase.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import type { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
+import type { BodyScope } from '../scopes/body-scope.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
 import type { TaskEnding } from '../endings/task-ending.js';
 import { EndedStage } from './ended-stage.js';
 import { OutputStage } from './output-stage.js';
-import { TaskProgress } from './task-progress.js';
+import { ActiveStage } from './active-stage.js';
+import type { TaskProgress } from './task-progress.js';
 import type { DueTime } from '../due-time.js';
 
-export class BodyStage extends TaskProgress {
+export class BodyStage extends ActiveStage {
   readonly #input: JsonValue;
   readonly #deadline: DueTime;
   readonly #body: KindProgress;
@@ -105,17 +107,14 @@ export class BodyStage extends TaskProgress {
   }
 
   work(scope: TaskScope): RoundWork {
-    const bodyScope = scope.forBody(this.#input, this.#deadline);
+    const bodyScope = this.#bodyScope(scope);
     return this.#body.work(bodyScope);
   }
 
   record(results: RoundResults, scope: TaskScope): Step<TaskProgress> {
-    const bodyScope = scope.forBody(this.#input, this.#deadline);
+    const bodyScope = this.#bodyScope(scope);
     const step = this.#body.record(results, bodyScope);
-
-    if (step.progress === this.#body) return Step.of<TaskProgress>(this);
-
-    return BodyStage.#following(this.#input, this.#deadline, step, scope);
+    return this.#after(step, scope);
   }
 
   childEnded(
@@ -123,27 +122,28 @@ export class BodyStage extends TaskProgress {
     ending: TaskEnding,
     scope: TaskScope,
   ): Step<TaskProgress> {
-    const bodyScope = scope.forBody(this.#input, this.#deadline);
+    const bodyScope = this.#bodyScope(scope);
     const step = this.#body.childEnded(child, ending, bodyScope);
-
-    if (step.progress === this.#body) return Step.of<TaskProgress>(this);
-
-    return BodyStage.#following(this.#input, this.#deadline, step, scope);
+    return this.#after(step, scope);
   }
 
   subWorkflowAnswered(
     answer: SubWorkflowAnswer,
     scope: TaskScope,
   ): Step<TaskProgress> {
-    const bodyScope = scope.forBody(this.#input, this.#deadline);
+    const bodyScope = this.#bodyScope(scope);
     const step = this.#body.subWorkflowAnswered(answer, bodyScope);
+    return this.#after(step, scope);
+  }
 
+  #bodyScope(scope: TaskScope): BodyScope {
+    return scope.forBody(this.#input, this.#deadline);
+  }
+
+  // An unchanged body keeps the stage as it is.
+  #after(step: Step<KindProgress>, scope: TaskScope): Step<TaskProgress> {
     if (step.progress === this.#body) return Step.of<TaskProgress>(this);
 
     return BodyStage.#following(this.#input, this.#deadline, step, scope);
-  }
-
-  timeOut(scope: TaskScope): TaskProgress {
-    return EndedStage.timedOut(scope);
   }
 }

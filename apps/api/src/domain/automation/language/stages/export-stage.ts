@@ -1,6 +1,4 @@
-import { InconsistentProgressError } from '../../../errors.js';
 import type { ExportStageProps, JsonValue } from '../interfaces.js';
-import type { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
@@ -8,26 +6,16 @@ import { Step } from '../step.js';
 import type { WorkflowError } from '../workflow-error.js';
 import { EndedStage } from './ended-stage.js';
 import { ExportCheckStage } from './export-check-stage.js';
-import { TaskProgress } from './task-progress.js';
-import type { DueTime } from '../due-time.js';
+import { ResultStage } from './result-stage.js';
+import type { TaskProgress } from './task-progress.js';
 
-export class ExportStage extends TaskProgress {
+export class ExportStage extends ResultStage {
   readonly #input: JsonValue;
-  readonly #deadline: DueTime;
-  readonly #outcome: Outcome;
   readonly #output: JsonValue;
 
   constructor(props: ExportStageProps) {
-    super();
-
-    if (props.outcome.failure !== null)
-      throw new InconsistentProgressError(
-        'a task whose body failed has no output to transform',
-      );
-
+    super(props);
     this.#input = props.input;
-    this.#deadline = props.deadline;
-    this.#outcome = props.outcome;
     this.#output = props.output;
   }
 
@@ -40,16 +28,8 @@ export class ExportStage extends TaskProgress {
     return this.#input;
   }
 
-  get outcome(): Outcome {
-    return this.#outcome;
-  }
-
   get output(): JsonValue {
     return this.#output;
-  }
-
-  override deadline(): DueTime {
-    return this.#deadline;
   }
 
   override exportsContext(): boolean {
@@ -61,21 +41,16 @@ export class ExportStage extends TaskProgress {
     const validations = base.output.validationsFor(scope.prefix, this.#output);
     const args = scope.exportArguments(
       this.#input,
-      this.#outcome.output,
+      this.outcome.output,
       this.#output,
-      this.#outcome.authorization,
+      this.outcome.authorization,
     );
     const evaluations = base.export.evaluationsFor(
       scope.prefix,
       this.#output,
       args,
     );
-    return new RoundWork({
-      evaluations,
-      validations,
-      calls: [],
-      processes: [],
-    });
+    return RoundWork.checking(evaluations, validations);
   }
 
   record(results: RoundResults, scope: TaskScope): Step<TaskProgress> {
@@ -94,10 +69,11 @@ export class ExportStage extends TaskProgress {
     const exporting = scope.task.base.export;
     const context = exporting.contextFrom(scope.prefix, results, scope.context);
     const exported = exporting.changesContext();
+    const deadline = this.deadline();
     return ExportCheckStage.enter(
       {
-        deadline: this.#deadline,
-        outcome: this.#outcome,
+        deadline,
+        outcome: this.outcome,
         output: this.#output,
         context,
         exported,
@@ -108,10 +84,6 @@ export class ExportStage extends TaskProgress {
 
   childEnded(): Step<TaskProgress> {
     return Step.of<TaskProgress>(this);
-  }
-
-  timeOut(scope: TaskScope): TaskProgress {
-    return EndedStage.timedOut(scope);
   }
 
   #failureIn(results: RoundResults, scope: TaskScope): WorkflowError | null {

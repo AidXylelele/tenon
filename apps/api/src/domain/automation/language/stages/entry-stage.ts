@@ -6,10 +6,11 @@ import { Step } from '../step.js';
 import type { WorkflowError } from '../workflow-error.js';
 import { BodyStage } from './body-stage.js';
 import { EndedStage } from './ended-stage.js';
-import { TaskProgress } from './task-progress.js';
+import { ActiveStage } from './active-stage.js';
+import type { TaskProgress } from './task-progress.js';
 import { DueTime } from '../due-time.js';
 
-export class EntryStage extends TaskProgress {
+export class EntryStage extends ActiveStage {
   static begin(scope: TaskScope): Step<TaskProgress> {
     const entry = new EntryStage();
     return entry.settled(scope);
@@ -30,12 +31,7 @@ export class EntryStage extends TaskProgress {
     const from = base.input.evaluationsFor(prefix, rawInput, args);
     const evaluations = condition.concat(timeout, from);
     const validations = base.input.validationsFor(prefix, rawInput);
-    return new RoundWork({
-      evaluations,
-      validations,
-      calls: [],
-      processes: [],
-    });
+    return RoundWork.checking(evaluations, validations);
   }
 
   record(results: RoundResults, scope: TaskScope): Step<TaskProgress> {
@@ -73,10 +69,6 @@ export class EntryStage extends TaskProgress {
 
   childEnded(): Step<TaskProgress> {
     return Step.of<TaskProgress>(this);
-  }
-
-  timeOut(scope: TaskScope): TaskProgress {
-    return EndedStage.timedOut(scope);
   }
 
   #inputFailure(results: RoundResults, scope: TaskScope): WorkflowError | null {

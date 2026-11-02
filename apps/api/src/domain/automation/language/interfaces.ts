@@ -418,19 +418,20 @@ export interface BodyStageProps {
   readonly body: KindProgress;
 }
 
-export interface OutputStageProps {
-  readonly input: JsonValue;
+export interface ResultStageProps {
   readonly deadline: DueTime;
   readonly outcome: Outcome;
+}
+
+export interface OutputStageProps extends ResultStageProps {
+  readonly input: JsonValue;
 }
 
 export interface ExportStageProps extends OutputStageProps {
   readonly output: JsonValue;
 }
 
-export interface ExportCheckStageProps {
-  readonly deadline: DueTime;
-  readonly outcome: Outcome;
+export interface ExportCheckStageProps extends ResultStageProps {
   readonly output: JsonValue;
   readonly context: JsonValue;
   readonly exported: boolean;

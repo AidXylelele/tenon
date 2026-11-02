@@ -45,6 +45,27 @@ export class RoundWork {
     });
   }
 
+  static checking(
+    evaluations: readonly Evaluation[],
+    validations: readonly Validation[],
+  ): RoundWork {
+    return new RoundWork({
+      evaluations,
+      validations,
+      calls: [],
+      processes: [],
+    });
+  }
+
+  static validating(validations: readonly Validation[]): RoundWork {
+    return new RoundWork({
+      evaluations: [],
+      validations,
+      calls: [],
+      processes: [],
+    });
+  }
+
   static calling(call: ServiceCall): RoundWork {
     return new RoundWork({
       evaluations: [],

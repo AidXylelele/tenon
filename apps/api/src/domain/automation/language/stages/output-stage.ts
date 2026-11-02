@@ -1,31 +1,19 @@
-import { InconsistentProgressError } from '../../../errors.js';
 import type { JsonValue, OutputStageProps } from '../interfaces.js';
-import type { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
 import { EndedStage } from './ended-stage.js';
 import { ExportStage } from './export-stage.js';
-import { TaskProgress } from './task-progress.js';
-import type { DueTime } from '../due-time.js';
+import { ResultStage } from './result-stage.js';
+import type { TaskProgress } from './task-progress.js';
 
-export class OutputStage extends TaskProgress {
+export class OutputStage extends ResultStage {
   readonly #input: JsonValue;
-  readonly #deadline: DueTime;
-  readonly #outcome: Outcome;
 
   constructor(props: OutputStageProps) {
-    super();
-
-    if (props.outcome.failure !== null)
-      throw new InconsistentProgressError(
-        'a task whose body failed has no output to transform',
-      );
-
+    super(props);
     this.#input = props.input;
-    this.#deadline = props.deadline;
-    this.#outcome = props.outcome;
   }
 
   static enter(props: OutputStageProps, scope: TaskScope): Step<TaskProgress> {
@@ -37,20 +25,12 @@ export class OutputStage extends TaskProgress {
     return this.#input;
   }
 
-  get outcome(): Outcome {
-    return this.#outcome;
-  }
-
-  override deadline(): DueTime {
-    return this.#deadline;
-  }
-
   work(scope: TaskScope): RoundWork {
-    const rawOutput = this.#outcome.output;
+    const rawOutput = this.outcome.output;
     const args = scope.outputArguments(
       this.#input,
       rawOutput,
-      this.#outcome.authorization,
+      this.outcome.authorization,
     );
     const declared = scope.task.base.output;
     const evaluations = declared.evaluationsFor(scope.prefix, rawOutput, args);
@@ -72,13 +52,14 @@ export class OutputStage extends TaskProgress {
       return Step.of<TaskProgress>(faulted);
     }
 
-    const rawOutput = this.#outcome.output;
+    const rawOutput = this.outcome.output;
     const output = declared.valueFrom(scope.prefix, results, rawOutput);
+    const deadline = this.deadline();
     return ExportStage.enter(
       {
         input: this.#input,
-        deadline: this.#deadline,
-        outcome: this.#outcome,
+        deadline,
+        outcome: this.outcome,
         output,
       },
       scope,
@@ -87,10 +68,6 @@ export class OutputStage extends TaskProgress {
 
   childEnded(): Step<TaskProgress> {
     return Step.of<TaskProgress>(this);
-  }
-
-  timeOut(scope: TaskScope): TaskProgress {
-    return EndedStage.timedOut(scope);
   }
 
   subWorkflowAnswered(): Step<TaskProgress> {
