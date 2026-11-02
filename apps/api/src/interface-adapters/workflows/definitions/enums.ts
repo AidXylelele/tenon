@@ -16,11 +16,6 @@ export enum OAuth2Grant {
   ClientCredentials = 'client_credentials',
 }
 
-export enum ClientAuthentication {
-  SecretPost = 'client_secret_post',
-  SecretBasic = 'client_secret_basic',
-}
-
 export enum TokenRequestEncoding {
   Form = 'application/x-www-form-urlencoded',
 }

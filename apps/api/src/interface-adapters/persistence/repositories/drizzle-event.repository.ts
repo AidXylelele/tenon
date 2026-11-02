@@ -4,7 +4,6 @@ import {
   Transactional,
   TransactionHost,
 } from '@nestjs-cls/transactional';
-import type { EventRepository } from '../../../application/automation/events/ports.js';
 import type { Event } from '../../../domain/automation/events/event.js';
 import { Batches } from '../batches.js';
 import type { DrizzleTx } from '../interfaces.js';
@@ -12,7 +11,9 @@ import { EventMapper } from '../mappers/event.mapper.js';
 import { event as events } from '../schema/index.js';
 
 @Injectable()
-export class DrizzleEventRepository implements EventRepository {
+// The produced events' table, which the instance repository writes in its save. No use case
+// writes events yet, so it has no port.
+export class DrizzleEventRepository {
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
   @Transactional(Propagation.Mandatory)

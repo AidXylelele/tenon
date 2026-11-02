@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { EventRepository } from '../../application/automation/events/ports.js';
 import { AdvanceInstance } from '../../application/automation/instances/advance-instance.js';
 import { WorkAnswers } from '../../application/automation/instances/work-answers.js';
 import { BeginRound } from '../../application/automation/instances/begin-round.js';
@@ -126,7 +125,6 @@ import { ErrorClassifier } from '../resilience/error-classifier.js';
       useExisting: DrizzleWorkflowInstanceRepository,
     },
     DrizzleEventRepository,
-    { provide: EventRepository, useExisting: DrizzleEventRepository },
     DrizzleInstanceQueries,
     { provide: InstanceQueries, useExisting: DrizzleInstanceQueries },
     { provide: SubWorkflowQueries, useExisting: DrizzleInstanceQueries },

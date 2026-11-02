@@ -34,6 +34,17 @@ export enum AuthenticationScheme {
   Oidc = 'oidc',
 }
 
+// How an OAuth2 or OIDC client authenticates at the token endpoint.
+export enum ClientAuthentication {
+  SecretPost = 'client_secret_post',
+  SecretBasic = 'client_secret_basic',
+}
+
+// The standard's default OAuth2 endpoints, relative to the authority.
+export enum OAuth2Endpoint {
+  Token = '/oauth2/token',
+}
+
 export enum FlowKeyword {
   Continue = 'continue',
   Exit = 'exit',

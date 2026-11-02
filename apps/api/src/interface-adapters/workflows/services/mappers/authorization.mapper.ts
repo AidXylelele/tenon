@@ -1,6 +1,8 @@
 import {
   AuthenticationScheme,
   CallKind,
+  ClientAuthentication,
+  OAuth2Endpoint,
 } from '../../../../domain/automation/language/enums.js';
 import type {
   JsonValue,
@@ -12,8 +14,6 @@ import type { Authorization } from '../interfaces.js';
 import { HttpRequestMapper } from './http-request.mapper.js';
 
 export class AuthorizationMapper {
-  static readonly #TOKEN_PATH = '/oauth2/token';
-  static readonly #SECRET_BASIC = 'client_secret_basic';
   static readonly #TRAILING_SLASH = /\/$/;
 
   static ofCall(call: ServiceCall): Authorization | null {
@@ -49,14 +49,13 @@ export class AuthorizationMapper {
     const clientId = HttpRequestMapper.textOf(client.id);
     const clientSecret = HttpRequestMapper.textOf(client.secret);
     const secretInHeader =
-      client.authentication === AuthorizationMapper.#SECRET_BASIC;
+      client.authentication === ClientAuthentication.SecretBasic;
     const scopes = AuthorizationMapper.#textsOf(settings.scopes);
     const audiences = AuthorizationMapper.#textsOf(settings.audiences);
     const oauth2 = authentication.scheme === AuthenticationScheme.OAuth2;
     const endpoints = HttpRequestMapper.objectOf(settings.endpoints);
     const tokenPath =
-      HttpRequestMapper.textOf(endpoints.token) ||
-      AuthorizationMapper.#TOKEN_PATH;
+      HttpRequestMapper.textOf(endpoints.token) || OAuth2Endpoint.Token;
     const tokenEndpoint = oauth2 ? `${authority}${tokenPath}` : null;
     const issuer = oauth2 ? null : authority;
     return {

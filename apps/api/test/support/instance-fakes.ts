@@ -1,4 +1,3 @@
-import type { EventRepository } from '../../src/application/automation/events/ports.js';
 import type {
   InstanceRuns,
   ProcessRunner,
@@ -111,7 +110,7 @@ export class RecordingInstanceRuns implements InstanceRuns {
   }
 }
 
-export class RecordingEventRepository implements EventRepository {
+export class RecordingEventRepository {
   readonly events: Event[] = [];
 
   async addAll(events: readonly Event[]): Promise<void> {

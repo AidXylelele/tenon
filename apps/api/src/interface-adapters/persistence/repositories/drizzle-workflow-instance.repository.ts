@@ -6,7 +6,6 @@ import {
 } from '@nestjs-cls/transactional';
 import { Outbox } from '@nestjs/outbox';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
-import { EventRepository } from '../../../application/automation/events/ports.js';
 import type { WorkflowInstanceRepository } from '../../../application/automation/instances/ports.js';
 import type { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
 import {
@@ -22,13 +21,14 @@ import {
   taskInstance as tasks,
   workflowInstance as instances,
 } from '../schema/index.js';
+import { DrizzleEventRepository } from './drizzle-event.repository.js';
 
 @Injectable()
 export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceRepository {
   constructor(
     private readonly txHost: TransactionHost<DrizzleTx>,
     private readonly outbox: Outbox,
-    private readonly events: EventRepository,
+    private readonly events: DrizzleEventRepository,
   ) {}
 
   async find(id: string): Promise<WorkflowInstance | null> {

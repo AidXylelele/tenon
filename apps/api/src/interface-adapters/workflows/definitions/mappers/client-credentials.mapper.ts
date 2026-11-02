@@ -1,7 +1,10 @@
 import { UnsupportedConstructError } from '../../../../domain/errors.js';
-import { UnsupportedConstruct } from '../../../../domain/automation/language/enums.js';
+import {
+  ClientAuthentication,
+  UnsupportedConstruct,
+} from '../../../../domain/automation/language/enums.js';
 import type { JsonPointer } from '../../../../domain/automation/language/json-pointer.js';
-import { ClientAuthentication, TokenRequestEncoding } from '../enums.js';
+import { TokenRequestEncoding } from '../enums.js';
 import type * as Dsl from '../interfaces.js';
 import { KnownPropertiesMapper } from './known-properties.mapper.js';
 

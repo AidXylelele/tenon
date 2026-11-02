@@ -2,7 +2,7 @@ import { OutboxRelay } from '@nestjs/outbox';
 import { WorkflowWorker } from '@nestjs/workflows';
 import { sql } from 'drizzle-orm';
 import request from 'supertest';
-import { EventRepository } from '../../../src/application/automation/events/ports.js';
+import { DrizzleEventRepository } from '../../../src/interface-adapters/persistence/repositories/drizzle-event.repository.js';
 import {
   ProcessRunner,
   WorkflowInstanceRepository,
@@ -188,7 +188,7 @@ describe('instance persistence and reactions', () => {
       sql`select count(*)::int as count from event where origin_instance_id = ${id}`,
     );
     const [counted] = before.rows as { count: number }[];
-    const events = t.app.get(EventRepository);
+    const events = t.app.get(DrizzleEventRepository);
     const stored = await t.db.execute(
       sql`select source, event_id from event where origin_instance_id = ${id} limit 1`,
     );

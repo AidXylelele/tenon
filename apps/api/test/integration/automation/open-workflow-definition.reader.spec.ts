@@ -65,6 +65,24 @@ describe('OpenWorkflowDefinitionReader', () => {
     throw new Error('The definition was not rejected');
   }
 
+  it('a_text_read_often_stays_cached_while_many_others_pass_through', async () => {
+    const hot = workflowOf('do:\n  - hot:\n      set:\n        x: 1\n');
+    const parse = vi.spyOn(client, 'parse');
+    await read(hot);
+
+    for (let index = 0; index < 100; index += 1) {
+      const other = workflowOf(
+        `do:\n  - other${String(index)}:\n      set:\n        x: 1\n`,
+      );
+      await read(other);
+      await read(hot);
+    }
+
+    const hotParses = parse.mock.calls.filter(([text]) => text === hot);
+    parse.mockRestore();
+    expect(hotParses).toHaveLength(1);
+  });
+
   it('every_ctk_document_is_read_or_refused_as_outside_the_subset', async () => {
     const documents = ctkDocuments();
 
