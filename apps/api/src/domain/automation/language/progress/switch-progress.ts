@@ -39,7 +39,7 @@ export class SwitchProgress extends KindProgress {
     return Step.of<KindProgress>(this);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

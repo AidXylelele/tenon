@@ -29,6 +29,12 @@ export class Input {
     return this.#from?.expressions ?? [];
   }
 
+  get schemas(): readonly Schema[] {
+    if (this.#schema === null) return [];
+
+    return [this.#schema];
+  }
+
   evaluationsFor(
     prefix: string,
     rawInput: JsonValue,

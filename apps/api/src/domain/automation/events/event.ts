@@ -1,8 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { JsonObject, JsonValue } from '../language/interfaces.js';
-import type { EventOrigin, EventProps, ProducedEvent } from './interfaces.js';
+import type {
+  EmittedEventInput,
+  EventOrigin,
+  EventProps,
+  LifecycleEventInput,
+} from './interfaces.js';
 
 export class Event {
+  static readonly #JSON = 'application/json';
+
   readonly #id: string;
   readonly #source: string;
   readonly #eventId: string;
@@ -33,11 +40,32 @@ export class Event {
     this.#acceptedAt = props.acceptedAt;
   }
 
-  static produced(input: ProducedEvent): Event {
-    const cloudEvent = input.cloudEvent;
-    const time = Event.#timeOf(cloudEvent.time, input.now);
+  static lifecycle(input: LifecycleEventInput): Event {
+    const id = randomUUID();
+    const eventId = String(input.sequence);
     return new Event({
-      id: randomUUID(),
+      id,
+      source: input.source,
+      eventId,
+      type: input.type,
+      time: input.time,
+      subject: null,
+      dataContentType: Event.#JSON,
+      dataSchema: null,
+      data: input.data,
+      extensions: {},
+      origin: input.origin,
+      sequence: input.sequence,
+      acceptedAt: input.acceptedAt,
+    });
+  }
+
+  static emitted(input: EmittedEventInput): Event {
+    const cloudEvent = input.cloudEvent;
+    const id = randomUUID();
+    const time = cloudEvent.time ?? input.now;
+    return new Event({
+      id,
       source: cloudEvent.source,
       eventId: cloudEvent.id,
       type: cloudEvent.type,
@@ -51,12 +79,6 @@ export class Event {
       sequence: input.sequence,
       acceptedAt: input.now,
     });
-  }
-
-  static #timeOf(declared: string | null, now: Date): Date {
-    if (declared === null) return now;
-
-    return new Date(declared);
   }
 
   get id(): string {

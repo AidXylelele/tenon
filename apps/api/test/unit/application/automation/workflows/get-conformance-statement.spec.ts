@@ -10,6 +10,6 @@ describe('GetConformanceStatement', () => {
     expect(statement.scriptLanguages).toEqual(['js', 'python']);
     expect(statement.excluded).toContain('the wait task');
     expect(statement.excluded).toContain('use.secrets');
-    expect(statement.contradictions).toHaveLength(2);
+    expect(statement.contradictions).toHaveLength(3);
   });
 });

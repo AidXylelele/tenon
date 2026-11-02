@@ -7,7 +7,6 @@ import { EntryStage } from '../../../src/domain/automation/language/stages/entry
 import type { TaskProgress } from '../../../src/domain/automation/language/stages/task-progress.js';
 import { TaskEnding } from '../../../src/domain/automation/language/task-ending.js';
 import { WorkflowName } from '../../../src/domain/automation/language/workflow-name.js';
-import { WorkflowTarget } from '../../../src/domain/automation/language/workflow-target.js';
 import { InconsistentProgressError } from '../../../src/domain/errors.js';
 import { OutputStage } from '../../../src/domain/automation/language/stages/output-stage.js';
 import {
@@ -296,10 +295,9 @@ describe('TaskProgressMapper', () => {
 
   it('an_outcome_keeps_its_directive_and_detached_workflow', () => {
     const workflow = new WorkflowName('billing', 'archive');
-    const target = new WorkflowTarget(workflow, '1.0.0');
     const detached = Outcome.detachingWorkflow(
       { id: 1 },
-      { target, input: {} },
+      { workflow, versionId: 'version-1', input: {} },
     );
     const ended = Outcome.directed({ id: 1 }, FlowDirective.End);
 
@@ -313,9 +311,10 @@ describe('TaskProgressMapper', () => {
       return restored.outcome;
     });
 
-    expect(states[0]?.detachedWorkflow?.target.workflow.toString()).toBe(
+    expect(states[0]?.detachedWorkflow?.workflow.toString()).toBe(
       'billing/archive',
     );
+    expect(states[0]?.detachedWorkflow?.versionId).toBe('version-1');
     expect(states[1]?.directive).toBe(FlowDirective.End);
   });
 

@@ -1,5 +1,6 @@
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
 import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
+import type { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
 import type { Workflow } from '../../../domain/automation/workflows/workflow.js';
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 
@@ -41,5 +42,6 @@ export abstract class WorkflowVersionRepository {
     name: WorkflowName,
     semver: string,
   ): Promise<WorkflowVersion | null>;
+  abstract findBy(reference: VersionReference): Promise<WorkflowVersion | null>;
   abstract add(version: WorkflowVersion): Promise<void>;
 }

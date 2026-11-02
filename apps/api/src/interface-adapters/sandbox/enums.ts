@@ -3,3 +3,11 @@ export enum GoJudgeStatus {
   NonzeroExitStatus = 'Nonzero Exit Status',
   TimeLimitExceeded = 'Time Limit Exceeded',
 }
+
+export enum SandboxOutcomeKind {
+  Ran = 'ran',
+  Rejected = 'rejected',
+  TimedOut = 'timed-out',
+  Unreachable = 'unreachable',
+  Refused = 'refused',
+}

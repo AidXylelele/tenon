@@ -51,4 +51,4 @@ pnpm --filter api test:ctk    # the 21 CTK scenarios over HTTP, with the public 
 pnpm --filter api test:e2e    # Compose journeys, including fault injection (SC-003) and scale-out (SC-004)
 ```
 
-All suites must pass with zero tests skipped. The only CTK scenario expected not to pass is the recorded contradiction (FR-032).
+All suites must pass with zero tests skipped. The recorded contradiction (FR-032) runs too: its steps assert the fault the specification prescribes, with the error the kit expects in the output read from the instance's error.

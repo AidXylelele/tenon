@@ -121,6 +121,13 @@ export class InvalidExpressionError extends DefinitionRejectedError {
   }
 }
 
+export class InvalidSchemaError extends DefinitionRejectedError {
+  constructor(at: JsonPointer, failure: string) {
+    const pointer = at.toString();
+    super(pointer, `Invalid schema: ${failure}`);
+  }
+}
+
 export class DuplicateTaskError extends DefinitionRejectedError {
   constructor(name: string, at: JsonPointer) {
     const pointer = at.toString();

@@ -28,6 +28,7 @@ const envSchema = z.object({
     .default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.string().min(1),
+  DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(20),
   WEB_BASE_URL: z.url(),
   TRUSTED_ORIGINS: list,
   TRUSTED_PROXIES: list,

@@ -1,7 +1,8 @@
 import { InconsistentProgressError } from '../../errors.js';
 import type { FlowDirective } from './flow-directive.js';
+import type { CloudEvent } from './cloud-event.js';
 import type {
-  SubWorkflowRequest,
+  DetachedWorkflow,
   JsonObject,
   JsonValue,
   OutcomeProps,
@@ -14,9 +15,9 @@ export class Outcome {
   readonly #failure: WorkflowError | null;
   readonly #directive: FlowDirective | null;
   readonly #authorization: JsonObject | null;
-  readonly #emitted: JsonObject | null;
+  readonly #emitted: CloudEvent | null;
   readonly #detachedProcess: ProcessRun | null;
-  readonly #detachedWorkflow: SubWorkflowRequest | null;
+  readonly #detachedWorkflow: DetachedWorkflow | null;
 
   constructor(props: OutcomeProps) {
     const effects = [
@@ -101,9 +102,9 @@ export class Outcome {
     });
   }
 
-  static emitting(event: JsonObject): Outcome {
+  static emitting(output: JsonValue, event: CloudEvent): Outcome {
     return new Outcome({
-      output: event,
+      output,
       failure: null,
       directive: null,
       authorization: null,
@@ -127,7 +128,7 @@ export class Outcome {
 
   static detachingWorkflow(
     output: JsonValue,
-    child: SubWorkflowRequest,
+    detached: DetachedWorkflow,
   ): Outcome {
     return new Outcome({
       output,
@@ -136,7 +137,7 @@ export class Outcome {
       authorization: null,
       emitted: null,
       detachedProcess: null,
-      detachedWorkflow: child,
+      detachedWorkflow: detached,
     });
   }
 
@@ -160,7 +161,7 @@ export class Outcome {
     return this.#authorization;
   }
 
-  get emitted(): JsonObject | null {
+  get emitted(): CloudEvent | null {
     return this.#emitted;
   }
 
@@ -168,7 +169,7 @@ export class Outcome {
     return this.#detachedProcess;
   }
 
-  get detachedWorkflow(): SubWorkflowRequest | null {
+  get detachedWorkflow(): DetachedWorkflow | null {
     return this.#detachedWorkflow;
   }
 }

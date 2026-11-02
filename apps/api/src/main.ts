@@ -1,11 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './frameworks/di/app.module.js';
 import type { Env } from './frameworks/di/config.module.js';
-import { configureHttpApp } from './frameworks/http/configure-http-app.js';
+import { configureHttpApp } from './frameworks/express/configure-http-app.js';
+import { serveOpenApi } from './frameworks/swagger/open-api.js';
 
 const app = await NestFactory.create<NestExpressApplication>(AppModule, {
   bufferLogs: true,
@@ -19,19 +19,7 @@ configureHttpApp(app, {
 });
 app.enableShutdownHooks();
 
-const openApi = new DocumentBuilder()
-  .setTitle('Workflow Platform API')
-  .setVersion('1.0.0')
-  .addCookieAuth('sid', { type: 'apiKey', in: 'cookie' }, 'sessionCookie')
-  .build();
-SwaggerModule.setup(
-  'api/v1/docs',
-  app,
-  SwaggerModule.createDocument(app, openApi),
-  {
-    jsonDocumentUrl: 'api/v1/docs-json',
-  },
-);
+serveOpenApi(app);
 
 const servesHttp = config.get('HTTP', { infer: true }) === 'on';
 

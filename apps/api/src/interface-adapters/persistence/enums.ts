@@ -28,3 +28,8 @@ export enum EndingKind {
   Faulted = 'faulted',
   Skipped = 'skipped',
 }
+
+export enum OriginKind {
+  User = 'user',
+  Parent = 'parent',
+}

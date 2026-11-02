@@ -7,6 +7,7 @@ import type { FixedDuration } from './fixed-duration.js';
 import type { ReusableComponentsProps } from './interfaces.js';
 import type { JsonPointer } from './json-pointer.js';
 import type { RetryStrategy } from './retry-strategy.js';
+import type { Schema } from './schema.js';
 import type { Task } from './tasks/task.js';
 import type { Template } from './template.js';
 
@@ -56,6 +57,15 @@ export class ReusableComponents {
     for (const declared of components)
       for (const component of declared)
         for (const expression of component.expressions) found.push(expression);
+
+    return found;
+  }
+
+  get schemas(): readonly Schema[] {
+    const found: Schema[] = [];
+
+    for (const declared of this.#functions.values())
+      for (const schema of declared.schemas) found.push(schema);
 
     return found;
   }

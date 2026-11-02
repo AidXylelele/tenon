@@ -1,3 +1,5 @@
+import type { TransactionalAdapterDrizzleOrm } from '@nestjs-cls/transactional-adapter-drizzle-orm';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type {
   AuthenticationScheme,
   CallKind,
@@ -8,8 +10,22 @@ import type {
   JsonObject,
   JsonValue,
 } from '../../domain/automation/language/interfaces.js';
-import type { EndingKind, ProgressKind, TaskStage } from './enums.js';
+import type {
+  EndingKind,
+  OriginKind,
+  ProgressKind,
+  TaskStage,
+} from './enums.js';
+import type { DomainEventTopic } from '../enums.js';
+import type {
+  ProcessDetachedPayload,
+  WorkflowDetachedPayload,
+} from '../interfaces.js';
 import type * as schema from './schema/index.js';
+
+export abstract class Database extends NodePgDatabase<typeof schema> {}
+
+export type DrizzleTx = TransactionalAdapterDrizzleOrm<Database>;
 
 export type UserRow = typeof schema.user.$inferSelect;
 
@@ -24,6 +40,31 @@ export type InvitationRow = typeof schema.invitation.$inferSelect;
 export type WorkflowRow = typeof schema.workflow.$inferSelect;
 
 export type WorkflowVersionRow = typeof schema.workflowVersion.$inferSelect;
+
+export type WorkflowInstanceRow = typeof schema.workflowInstance.$inferSelect;
+
+export type TaskInstanceRow = typeof schema.taskInstance.$inferSelect;
+
+export type EventRow = typeof schema.event.$inferSelect;
+
+export interface OutboxEntry {
+  readonly topic: DomainEventTopic;
+  readonly key: string;
+  readonly payload: ProcessDetachedPayload | WorkflowDetachedPayload;
+}
+
+export interface UserOriginState {
+  readonly kind: OriginKind.User;
+  readonly userId: string;
+}
+
+export interface ParentOriginState {
+  readonly kind: OriginKind.Parent;
+  readonly instanceId: string;
+  readonly taskId: string;
+}
+
+export type OriginState = UserOriginState | ParentOriginState;
 
 export interface ServiceAuthenticationState {
   readonly scheme: AuthenticationScheme;
@@ -69,6 +110,26 @@ export interface SubWorkflowRequestState {
   readonly name: string;
   readonly version: string;
   readonly input: JsonValue;
+  readonly awaited: boolean;
+}
+
+export interface DetachedWorkflowState {
+  readonly namespace: string;
+  readonly name: string;
+  readonly versionId: string;
+  readonly input: JsonValue;
+}
+
+export interface CloudEventState {
+  readonly id: string;
+  readonly source: string;
+  readonly type: string;
+  readonly time: string | null;
+  readonly subject: string | null;
+  readonly dataContentType: string | null;
+  readonly dataSchema: string | null;
+  readonly data: JsonValue;
+  readonly extensions: JsonObject;
 }
 
 export interface OutcomeState {
@@ -76,9 +137,9 @@ export interface OutcomeState {
   readonly failure: WorkflowErrorState | null;
   readonly directive: FlowDirectiveState | null;
   readonly authorization: JsonObject | null;
-  readonly emitted: JsonObject | null;
+  readonly emitted: CloudEventState | null;
   readonly detachedProcess: ProcessRunState | null;
-  readonly detachedWorkflow: SubWorkflowRequestState | null;
+  readonly detachedWorkflow: DetachedWorkflowState | null;
 }
 
 export interface CompletedEndingState {

@@ -9,6 +9,7 @@ import type {
 import type { Definition } from '../../src/domain/automation/language/definition.js';
 import type { Expression } from '../../src/domain/automation/language/expression.js';
 import type { WorkflowName } from '../../src/domain/automation/language/workflow-name.js';
+import type { VersionReference } from '../../src/domain/automation/workflows/version-reference.js';
 import type { Workflow } from '../../src/domain/automation/workflows/workflow.js';
 import type { WorkflowVersion } from '../../src/domain/automation/workflows/workflow-version.js';
 import type {
@@ -33,9 +34,14 @@ import {
 import type { Invitation } from '../../src/domain/identity/invitation.js';
 import type { InvitationToken } from '../../src/domain/identity/invitation-token.js';
 import type { User } from '../../src/domain/identity/user.js';
-import { DefinitionMapper } from '../../src/interface-adapters/documents/mappers/definition.mapper.js';
-import type { JsonObject } from '../../src/domain/automation/language/interfaces.js';
-import type * as Dsl from '../../src/interface-adapters/documents/interfaces.js';
+import { DefinitionMapper } from '../../src/interface-adapters/workflows/definitions/mappers/definition.mapper.js';
+import type {
+  Evaluation,
+  JsonObject,
+} from '../../src/domain/automation/language/interfaces.js';
+import { Evaluated } from '../../src/domain/automation/language/results/evaluated.js';
+import type { EvaluationResult } from '../../src/domain/automation/language/results/evaluation-result.js';
+import type * as Dsl from '../../src/interface-adapters/workflows/definitions/interfaces.js';
 
 export class InMemoryUserRepository implements UserRepository {
   readonly users = new Map<string, User>();
@@ -225,6 +231,14 @@ export class FakeExpressionEvaluator implements ExpressionEvaluator {
     if (invalid !== undefined)
       throw new InvalidExpressionError(invalid.pointer, 'syntax error');
   }
+
+  async evaluateAll(
+    evaluations: readonly Evaluation[],
+  ): Promise<readonly EvaluationResult[]> {
+    return evaluations.map(
+      (evaluation) => new Evaluated(evaluation.id, evaluation.data),
+    );
+  }
 }
 
 export class InMemoryWorkflowRepository implements WorkflowRepository {
@@ -255,6 +269,16 @@ export class InMemoryWorkflowVersionRepository implements WorkflowVersionReposit
     const found = this.versions.find(
       (version) =>
         version.workflowId === workflow?.id && version.semver === semver,
+    );
+    return found ?? null;
+  }
+
+  async findBy(reference: VersionReference): Promise<WorkflowVersion | null> {
+    const found = this.versions.find(
+      (version) =>
+        version.id === reference.versionId ||
+        (version.workflowId === reference.workflowId &&
+          version.semver === reference.semver),
     );
     return found ?? null;
   }

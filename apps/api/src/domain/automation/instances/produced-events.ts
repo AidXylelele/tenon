@@ -1,8 +1,6 @@
-import { InconsistentProgressError } from '../../errors.js';
 import { EventOriginKind } from '../events/enums.js';
 import { Event } from '../events/event.js';
-import { CloudEvent } from '../language/cloud-event.js';
-import type { JsonObject } from '../language/interfaces.js';
+import type { CloudEvent } from '../language/cloud-event.js';
 import type { LifecycleNotice, LifecycleSubject } from './interfaces.js';
 import { LifecycleEvent } from './lifecycle-event.js';
 
@@ -21,7 +19,7 @@ export class ProducedEvents {
     return this.#sequence;
   }
 
-  announce(notice: LifecycleNotice): void {
+  announce(notice: LifecycleNotice, acceptedAt: Date): void {
     this.#sequence += 1;
     const lifecycle = new LifecycleEvent({
       type: notice.type,
@@ -31,20 +29,16 @@ export class ProducedEvents {
       output: notice.output,
       subject: this.#subject,
       sequence: this.#sequence,
+      acceptedAt,
     });
     const event = lifecycle.toEvent();
     this.#events.push(event);
   }
 
-  emit(emitted: JsonObject, now: Date): void {
-    const cloudEvent = CloudEvent.of(emitted);
-
-    if (cloudEvent === null)
-      throw new InconsistentProgressError('an emitted event is a CloudEvent');
-
+  emit(emitted: CloudEvent, now: Date): void {
     this.#sequence += 1;
-    const event = Event.produced({
-      cloudEvent,
+    const event = Event.emitted({
+      cloudEvent: emitted,
       origin: {
         kind: EventOriginKind.Emit,
         workflowId: this.#subject.workflowId,

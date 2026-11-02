@@ -172,9 +172,9 @@ The execution history shows the instance's phase and, for every task, its status
 3. **Given** a task that raises an error which nothing catches, **When** the instance runs, **Then** it ends faulted with that error: its type, status, title, detail and the location of the faulting task.
 4. **Given** a `try` task whose catch matches the error and declares a retry policy, **When** the guarded task fails, **Then** it is retried as the policy defines. The instance continues if a retry succeeds and follows the catch when the retries are exhausted. Every attempt is visible in the history.
 5. **Given** a task or workflow timeout, **When** it elapses, **Then** the task or instance faults with a timeout error.
-6. **Given** a start request repeated with the same idempotency key and the same input, **When** it arrives, **Then** the first instance is returned and only that instance exists. The same key with a different input is refused.
+6. **Given** a start request repeated with the same idempotency key, version and input, **When** it arrives, **Then** the first instance is returned and only that instance exists. Within 24 hours the same key with a different version or input is refused.
 7. **Given** a start that names no version, **When** it is accepted, **Then** the instance runs the workflow's current version. A start that names a version runs that version.
-8. **Given** any instance, **When** a signed-in user reads it, **Then** the response contains the phase, version, input, output or error, start and end times, and the task records.
+8. **Given** any instance, **When** a signed-in user reads it, **Then** the response contains the phase, version, input, output or error, and start and end times, and its task records and lifecycle events are readable page by page.
 
 ---
 
@@ -441,7 +441,7 @@ An author can pause an instance, resume it later, or cancel it.
 - **FR-008**: An author or an application MUST be able to start an instance with a JSON input, either of a named version or, when no version is named, of the workflow's current version.
   - If the version declares an input schema, the instance MUST validate the input as its first stage and MUST fault with a validation error when the input does not match.
   - An instance MUST run on the version it was started with until it ends.
-- **FR-009**: A start request MUST accept an idempotency key. Within 24 hours, a repeated request with the same key and the same input MUST return the original instance, and a request with the same key and a different input MUST be refused.
+- **FR-009**: A start request MUST accept an idempotency key. Within 24 hours, a repeated request with the same key and the same version and input MUST return the original instance, and a request with the same key and a different version or input MUST be refused. After 24 hours the same request still returns the original instance, and a different request with the same key starts a new one.
 - **FR-010**: The platform MUST execute instances with the standard's semantics:
   - flow directives (`continue`, `exit`, `end`, a task name) and the `if` condition;
   - the data-flow stages in the standard's order: input schema, `input.from`, execution, `output.as`, output schema, `export.as`, export schema;
@@ -453,7 +453,7 @@ An author can pause an instance, resume it later, or cancel it.
 - **FR-011**: The supported subset MUST be the following:
   - the tasks `do`, `set`, `switch`, `for`, `fork`, `try`, `raise`, `wait`, `listen` and `emit`;
   - `call` with the `http` and `openapi` types, used directly or through a function declared in the document's `use.functions`;
-  - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error. A target that does not exist, or an explicit version that is not published, faults the task with a configuration error when it starts.
+  - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error. A target that does not exist, or an explicit version that is not published, faults the task with a configuration error when it starts. When `await` is false, the task completes with its transformed input once the target is resolved, and the sub-workflow starts on the version resolved then.
   - `run` with the `script` type (JavaScript or Python, with inline `code`) and the `shell` type, executed as FR-012 defines. A script `source` (an external resource) is outside the subset.
 
   These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; `use.extensions`; digest authentication, OAuth2 or OIDC grants other than `client_credentials`, and the OAuth2 or OIDC settings that grant does not use (a client assertion or JWT authentication, `issuers`, a JSON token request, the revocation and introspection endpoints); a runtime expression as a retry delay, jitter or limit; and a fraction in a duration other than in the smallest of its hours, minutes or seconds (`P1.5D`, `PT1.5H30M`), which the platform cannot compute. The tasks `wait` and `listen`, `schedule`, `use.secrets` and the `$secrets` argument join the subset with the stories that run them; a version published before then is never checked again, so the platform refuses them until it runs them.
@@ -634,7 +634,7 @@ These constraints come from the request. They shape the plan, not the user-visib
 - **Standard.**
   - The standard is the Open Workflow Specification (CNCF Sandbox, formerly Serverless Workflow), DSL 1.0.3, the latest release.
   - Lifecycle event types use that release's `io.serverlessworkflow` namespace.
-  - Constructs that exist only on the unreleased 1.0.4 line wait until it is released (ER-002). They include runtime-generated `emit` ids, `outputUri`, `catch.then`, `schedule.read` and the `org.open-workflow-specification` namespace.
+  - Constructs that exist only on the unreleased 1.0.4 line wait until it is released (ER-002). They include `outputUri`, `catch.then`, `schedule.read` and the `org.open-workflow-specification` namespace.
 - **Additions to the standard.** The platform adds only two things. Both feed the standard's own mechanisms; neither adds a concept to the DSL.
   - **Webhooks** produce ordinary CloudEvents, which workflows consume with the standard's `schedule.on` and `listen`. Verifying provider-specific request signatures is not part of this feature.
   - **The on/off switch** governs the standard's `schedule`, which already provides the cron and interval starts used for polling.

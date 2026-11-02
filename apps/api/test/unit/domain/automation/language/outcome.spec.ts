@@ -1,3 +1,4 @@
+import { CloudEvent } from '../../../../../src/domain/automation/language/cloud-event.js';
 import { ErrorType } from '../../../../../src/domain/automation/language/error-type.js';
 import { FlowDirective } from '../../../../../src/domain/automation/language/flow-directive.js';
 import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
@@ -31,7 +32,17 @@ describe('Outcome', () => {
         failure: null,
         directive: FlowDirective.End,
         authorization: null,
-        emitted: { type: 'com.example.done' },
+        emitted: new CloudEvent({
+          id: '1',
+          source: 'https://orders.example',
+          type: 'com.example.done',
+          time: null,
+          subject: null,
+          dataContentType: null,
+          dataSchema: null,
+          data: null,
+          extensions: {},
+        }),
         detachedProcess: null,
         detachedWorkflow: null,
       });

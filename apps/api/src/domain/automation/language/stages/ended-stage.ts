@@ -54,7 +54,7 @@ export class EndedStage extends TaskProgress {
     return this;
   }
 
-  subWorkflowEnded(): Step<TaskProgress> {
+  subWorkflowAnswered(): Step<TaskProgress> {
     return Step.of<TaskProgress>(this);
   }
 }

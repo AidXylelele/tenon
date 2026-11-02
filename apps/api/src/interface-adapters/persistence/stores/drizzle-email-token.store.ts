@@ -7,7 +7,7 @@ import {
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { and, eq } from 'drizzle-orm';
-import type { DrizzleTx } from '../../interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { emailToken as tokens } from '../schema/index.js';
 
 @Injectable()

@@ -7,7 +7,7 @@ import {
   type IdempotencyStoredPayload,
 } from '@nestjs/idempotency';
 import { and, eq, gt, lte } from 'drizzle-orm';
-import { Database } from '../../interfaces.js';
+import { Database } from '../interfaces.js';
 import { idempotencyKey as records } from '../schema/index.js';
 
 const ACQUIRE_ATTEMPTS = 5;

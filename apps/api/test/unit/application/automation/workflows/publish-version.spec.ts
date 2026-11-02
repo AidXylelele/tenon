@@ -11,6 +11,10 @@ import {
   InMemoryWorkflowVersionRepository,
   JsonDefinitionReader,
 } from '../../../../support/fakes.js';
+import {
+  AcceptingSchemaValidator,
+  FixedClock,
+} from '../../../../support/instance-fakes.js';
 
 function documentText(version: string, greeting: string): string {
   return JSON.stringify({
@@ -25,8 +29,10 @@ function setUp() {
   const check = new CheckDocument(
     new JsonDefinitionReader(),
     new FakeExpressionEvaluator(),
+    new AcceptingSchemaValidator(),
   );
-  const publish = new PublishVersion(check, workflows, versions);
+  const clock = new FixedClock(new Date('2026-11-01T10:00:00.000Z'));
+  const publish = new PublishVersion(check, workflows, versions, clock);
   return { workflows, versions, publish };
 }
 

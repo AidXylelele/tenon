@@ -1,10 +1,10 @@
+import type { SubWorkflowAnswer } from '../language/answers/sub-workflow-answer.js';
 import type {
   JsonObject,
   JsonValue,
   SubWorkflowRequest,
 } from '../language/interfaces.js';
 import type { JsonPointer } from '../language/json-pointer.js';
-import type { Outcome } from '../language/outcome.js';
 import { Phase } from '../language/phase.js';
 import type { RoundResults } from '../language/round-results.js';
 import { RoundWork } from '../language/round-work.js';
@@ -22,6 +22,7 @@ import type {
 
 export class TaskInstance {
   readonly #id: string;
+  readonly #execution: number;
   readonly #reference: JsonPointer;
   readonly #name: string;
   readonly #parentId: string | null;
@@ -35,6 +36,7 @@ export class TaskInstance {
 
   constructor(props: TaskInstanceProps) {
     this.#id = props.id;
+    this.#execution = props.execution;
     this.#reference = props.reference;
     this.#name = props.name;
     this.#parentId = props.parentId;
@@ -51,6 +53,7 @@ export class TaskInstance {
     const progress = new EntryStage();
     return new TaskInstance({
       id: input.id,
+      execution: input.execution,
       reference: input.start.reference,
       name: input.name,
       parentId: input.parentId,
@@ -66,6 +69,10 @@ export class TaskInstance {
 
   get id(): string {
     return this.#id;
+  }
+
+  get execution(): number {
+    return this.#execution;
   }
 
   get reference(): JsonPointer {
@@ -138,7 +145,7 @@ export class TaskInstance {
     return this.#progress.runsBody();
   }
 
-  awaitedSubWorkflow(): SubWorkflowRequest | null {
+  requestedSubWorkflow(): SubWorkflowRequest | null {
     if (this.isTerminal()) return null;
 
     return this.#progress.subWorkflow();
@@ -194,10 +201,13 @@ export class TaskInstance {
     return this.#changed(step, scope.now);
   }
 
-  subWorkflowEnded(outcome: Outcome, scope: TaskScope): TaskChange | null {
+  subWorkflowAnswered(
+    answer: SubWorkflowAnswer,
+    scope: TaskScope,
+  ): TaskChange | null {
     if (this.isTerminal()) return null;
 
-    const step = this.#progress.subWorkflowEnded(outcome, scope);
+    const step = this.#progress.subWorkflowAnswered(answer, scope);
     return this.#changed(step, scope.now);
   }
 

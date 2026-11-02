@@ -1,3 +1,4 @@
+import type { SubWorkflowAnswer } from '../answers/sub-workflow-answer.js';
 import type { SubWorkflowRequest } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
 import type { Outcome } from '../outcome.js';
@@ -30,8 +31,8 @@ export abstract class KindProgress {
     scope: BodyScope,
   ): Step<KindProgress>;
 
-  abstract subWorkflowEnded(
-    outcome: Outcome,
+  abstract subWorkflowAnswered(
+    answer: SubWorkflowAnswer,
     scope: BodyScope,
   ): Step<KindProgress>;
 

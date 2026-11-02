@@ -52,7 +52,7 @@ export class DoProgress extends KindProgress {
     return DoProgress.#following(step);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

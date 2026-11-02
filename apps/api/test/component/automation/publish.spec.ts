@@ -308,7 +308,7 @@ describe('publishing workflows', () => {
     expect(statement.body.dsl).toEqual(['1.0.0', '1.0.1', '1.0.2', '1.0.3']);
     expect(statement.body.runs).toEqual(['workflow', 'script', 'shell']);
     expect(statement.body.excluded).toContain('the wait task');
-    expect(statement.body.contradictions).toHaveLength(2);
+    expect(statement.body.contradictions).toHaveLength(3);
   });
 
   it.each(DEFECTIVE_DOCUMENTS.map((document) => [document.defect, document]))(

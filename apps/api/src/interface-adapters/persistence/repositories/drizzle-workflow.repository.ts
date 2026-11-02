@@ -9,7 +9,7 @@ import type { WorkflowRepository } from '../../../application/automation/workflo
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
 import type { Workflow } from '../../../domain/automation/workflows/workflow.js';
 import { StaleWriteError } from '../../../domain/errors.js';
-import type { DrizzleTx } from '../../interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { WorkflowMapper } from '../mappers/workflow.mapper.js';
 import { workflow as workflows } from '../schema/index.js';
 import { isUniqueViolation } from '../unique-violation.js';
@@ -59,10 +59,15 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
       })
       .returning({ id: workflows.id });
 
-    try {
-      const saved = await upsert;
+    const saved = await this.#saved(upsert);
 
-      if (saved.length === 0) throw new StaleWriteError();
+    if (saved.length === 0) throw new StaleWriteError();
+  }
+
+  // A workflow registered under the same name by a concurrent publish is a stale write.
+  async #saved<T>(upsert: Promise<T[]>): Promise<T[]> {
+    try {
+      return await upsert;
     } catch (error) {
       const raced = isUniqueViolation(error);
 

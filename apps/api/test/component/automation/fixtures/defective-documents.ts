@@ -223,6 +223,25 @@ export const DEFECTIVE_DOCUMENTS: readonly DefectiveDocument[] = [
     pointer: '/do/0/a/output/as',
     tasks: "  - a:\n      set: { x: 1 }\n      output:\n        as: '. | {'\n",
   },
+  {
+    defect: 'an unusable workflow input schema',
+    pointer: '/input/schema',
+    tasks: '  - a:\n      set: { x: 1 }\n',
+    extra:
+      'input:\n  schema:\n    format: json\n    document:\n      type: nonsense\n',
+  },
+  {
+    defect: 'an unusable output schema of a nested task',
+    pointer: '/do/0/a/do/0/b/output/schema',
+    tasks:
+      '  - a:\n      do:\n        - b:\n            set: { y: 1 }\n            output:\n              schema:\n                document:\n                  minimum: high\n',
+  },
+  {
+    defect: 'an export schema that refers outside the document',
+    pointer: '/do/0/a/export/schema',
+    tasks:
+      "  - a:\n      set: { x: 1 }\n      export:\n        schema:\n          document:\n            $ref: 'https://example.com/order.json'\n",
+  },
 ];
 
 export function yamlOf(document: DefectiveDocument): string {

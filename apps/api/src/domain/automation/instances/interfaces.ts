@@ -2,8 +2,8 @@ import type { Definition } from '../language/definition.js';
 import type {
   JsonObject,
   JsonValue,
+  DetachedWorkflow,
   ProcessRun,
-  SubWorkflowRequest,
   TaskStart,
 } from '../language/interfaces.js';
 import type { JsonPointer } from '../language/json-pointer.js';
@@ -37,7 +37,7 @@ export interface WorkflowDetachedProps {
   readonly instanceId: string;
   readonly taskInstanceId: string;
   readonly subWorkflowId: string;
-  readonly request: SubWorkflowRequest;
+  readonly detached: DetachedWorkflow;
 }
 
 export interface LifecycleSubject {
@@ -62,10 +62,12 @@ export interface LifecycleNotice {
 export interface LifecycleEventProps extends LifecycleNotice {
   readonly subject: LifecycleSubject;
   readonly sequence: number;
+  readonly acceptedAt: Date;
 }
 
 export interface TaskInstanceProps {
   readonly id: string;
+  readonly execution: number;
   readonly reference: JsonPointer;
   readonly name: string;
   readonly parentId: string | null;
@@ -80,6 +82,7 @@ export interface TaskInstanceProps {
 
 export interface NewTaskInstance {
   readonly id: string;
+  readonly execution: number;
   readonly parentId: string | null;
   readonly name: string;
   readonly start: TaskStart;
@@ -127,24 +130,27 @@ export interface NewWorkflowInstance {
   readonly now: Date;
 }
 
+export interface InstanceIdentity {
+  readonly userId: string;
+  readonly workflowId: string;
+  readonly key: string | null;
+}
+
 export interface RequestedSubWorkflow {
   readonly taskId: string;
   readonly instanceId: string;
   readonly target: WorkflowTarget;
   readonly input: JsonValue;
-}
-
-export interface SubWorkflowEnding {
-  readonly phase: Phase;
-  readonly output: JsonValue;
-  readonly error: WorkflowError | null;
+  readonly awaited: boolean;
 }
 
 export interface NewSubWorkflowInstance {
+  readonly id: string;
   readonly parentId: string;
-  readonly request: RequestedSubWorkflow;
+  readonly taskId: string;
   readonly workflow: Workflow;
   readonly version: WorkflowVersion;
+  readonly input: JsonValue;
   readonly now: Date;
 }
 

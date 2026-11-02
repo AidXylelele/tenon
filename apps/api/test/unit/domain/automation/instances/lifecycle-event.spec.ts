@@ -22,6 +22,7 @@ describe('LifecycleEvent', () => {
       time: now,
       error: null,
       output: { value },
+      acceptedAt: now,
     });
 
   it('a_task_completed_event_carries_its_output_within_64_kib', () => {
@@ -38,7 +39,7 @@ describe('LifecycleEvent', () => {
     });
   });
 
-  it('an_output_that_would_pass_64_kib_is_left_out_of_the_event', () => {
+  it('the_event_keeps_the_whole_output_and_leaves_the_wire_format_to_the_adapters', () => {
     const large = 'x'.repeat(64 * 1024);
 
     const event = completed(large).toEvent();
@@ -47,6 +48,7 @@ describe('LifecycleEvent', () => {
       workflow: 'leads-instance-1.sales',
       task: '/do/0/enrich',
       completedAt: now.toISOString(),
+      output: large,
     });
   });
 });

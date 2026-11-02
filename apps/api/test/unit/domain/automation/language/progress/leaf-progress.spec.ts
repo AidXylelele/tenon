@@ -1,3 +1,5 @@
+import { SubWorkflowEnded } from '../../../../../../src/domain/automation/language/answers/sub-workflow-ended.js';
+import { Phase } from '../../../../../../src/domain/automation/language/phase.js';
 import {
   CallKind,
   RunKind,
@@ -7,7 +9,6 @@ import type { Definition } from '../../../../../../src/domain/automation/languag
 import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
 import type { JsonValue } from '../../../../../../src/domain/automation/language/interfaces.js';
 import { FlowDirective } from '../../../../../../src/domain/automation/language/flow-directive.js';
-import { Outcome } from '../../../../../../src/domain/automation/language/outcome.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
 import { ProcessExited } from '../../../../../../src/domain/automation/language/results/process-exited.js';
 import { ProcessTimedOut } from '../../../../../../src/domain/automation/language/results/process-timed-out.js';
@@ -28,6 +29,7 @@ function responded(id: string, status: number): ServiceResponded {
     status,
     headers: { 'content-type': 'application/json' },
     content: { id: 1, name: 'Rex' },
+    body: '',
     request: { method: 'get', uri: 'https://petstore.example/pet/1' },
     authorization: null,
   });
@@ -212,8 +214,38 @@ describe('leaf progress', () => {
       specversion: '1.0',
       time: now.toISOString(),
     };
+    const emitted = ending?.body?.emitted;
     expect(ending?.output).toEqual(event);
-    expect(ending?.body?.emitted).toEqual(event);
+    expect(emitted?.id).toBe('task-1');
+    expect(emitted?.source).toBe('https://fake-source.com');
+    expect(emitted?.type).toBe('greeted');
+    expect(emitted?.time).toEqual(now);
+  });
+
+  it('an_event_claiming_a_lifecycle_source_faults_the_task_with_a_runtime_error', () => {
+    const definition = definitionOf([
+      {
+        greet: {
+          emit: {
+            event: {
+              with: {
+                source: '/workflows/default/orders/instances/other',
+                type: 'io.serverlessworkflow.task.completed.v1',
+                id: '7',
+              },
+            },
+          },
+        },
+      },
+    ]);
+    const scope = scopeOf(definition, '/do/0/greet', {});
+
+    const ending = EntryStage.begin(scope).progress.ending();
+
+    expect(ending?.failure?.type).toBe(
+      'https://serverlessworkflow.io/spec/1.0.0/errors/runtime',
+    );
+    expect(ending?.body?.emitted ?? null).toBeNull();
   });
 
   it('an_event_whose_source_evaluates_to_no_text_faults_the_task_with_a_runtime_error', () => {
@@ -312,8 +344,12 @@ describe('leaf progress', () => {
       scope,
     ).progress;
 
-    const sent = Outcome.of({ sent: true });
-    const ending = awaiting.subWorkflowEnded(sent, scope).progress.ending();
+    const sent = new SubWorkflowEnded({
+      phase: Phase.Completed,
+      output: { sent: true },
+      error: null,
+    });
+    const ending = awaiting.subWorkflowAnswered(sent, scope).progress.ending();
 
     expect(awaiting.subWorkflow()?.input).toEqual({ order: 42 });
     expect(awaiting.subWorkflow()?.target.workflow.toString()).toBe(

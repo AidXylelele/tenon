@@ -106,7 +106,7 @@ export class CallProgress extends KindProgress {
     return ConcludedProgress.step(outcome);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

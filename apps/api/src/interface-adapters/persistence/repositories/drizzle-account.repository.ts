@@ -9,7 +9,7 @@ import type { Account } from '../../../domain/identity/account.js';
 import { AccountType } from '../../../domain/identity/enums.js';
 import { StaleWriteError, AccountExistsError } from '../../../domain/errors.js';
 import type { AccountRepository } from '../../../application/identity/ports.js';
-import type { DrizzleTx } from '../../interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { AccountMapper } from '../mappers/account.mapper.js';
 import { account as accounts } from '../schema/index.js';
 import { isUniqueViolation } from '../unique-violation.js';

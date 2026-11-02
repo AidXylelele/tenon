@@ -11,11 +11,12 @@ import { ProcessExited } from '../../../domain/automation/language/results/proce
 import type { ProcessResult } from '../../../domain/automation/language/results/process-result.js';
 import { ProcessTimedOut } from '../../../domain/automation/language/results/process-timed-out.js';
 import { SandboxFailed } from '../../../domain/automation/language/results/sandbox-failed.js';
-import { GoJudgeStatus } from '../enums.js';
+import { GoJudgeStatus, SandboxOutcomeKind } from '../enums.js';
 import type {
   GoJudgeCommand,
   GoJudgeResult,
   SandboxLimits,
+  SandboxOutcome,
 } from '../interfaces.js';
 
 export class ProcessRunMapper {
@@ -25,6 +26,8 @@ export class ProcessRunMapper {
   static readonly #PYTHON = '/usr/bin/python3';
   static readonly #SHELL = '/bin/sh';
   static readonly #SCRIPT = 'script';
+  static readonly #UNREACHABLE = 'The sandbox could not be reached';
+  static readonly #REFUSED = 'The sandbox refused to run the process';
 
   static toCommand(run: ProcessRun, limits: SandboxLimits): GoJudgeCommand {
     const process = ProcessRunMapper.#objectOf(run.process);
@@ -76,7 +79,22 @@ export class ProcessRunMapper {
     };
   }
 
-  static toResult(id: string, result: GoJudgeResult): ProcessResult {
+  static toResult(id: string, outcome: SandboxOutcome): ProcessResult | null {
+    switch (outcome.kind) {
+      case SandboxOutcomeKind.Ran:
+        return ProcessRunMapper.#resultOf(id, outcome.result);
+      case SandboxOutcomeKind.Rejected:
+        return null;
+      case SandboxOutcomeKind.TimedOut:
+        return new ProcessTimedOut(id);
+      case SandboxOutcomeKind.Unreachable:
+        return new SandboxFailed(id, ProcessRunMapper.#UNREACHABLE);
+      case SandboxOutcomeKind.Refused:
+        return new SandboxFailed(id, ProcessRunMapper.#REFUSED);
+    }
+  }
+
+  static #resultOf(id: string, result: GoJudgeResult): ProcessResult {
     const accepted: string = GoJudgeStatus.Accepted;
     const nonzero: string = GoJudgeStatus.NonzeroExitStatus;
     const timedOut: string = GoJudgeStatus.TimeLimitExceeded;

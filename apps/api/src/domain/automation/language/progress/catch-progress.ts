@@ -131,7 +131,7 @@ export class CatchProgress extends KindProgress {
     return scope.prefixFor(part);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

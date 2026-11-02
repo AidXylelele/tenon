@@ -6,13 +6,13 @@ import {
   SchemaValidationError,
 } from '@openworkflowspec/sdk';
 import type { JsonObject } from '../../domain/automation/language/interfaces.js';
-import { DslOutcomeKind } from '../../interface-adapters/documents/enums.js';
-import type * as Dsl from '../../interface-adapters/documents/interfaces.js';
+import { DslOutcomeKind } from '../../interface-adapters/workflows/definitions/enums.js';
+import type * as Dsl from '../../interface-adapters/workflows/definitions/interfaces.js';
 import {
   type DslFailure,
   type DslOutcome,
   OpenWorkflowClient,
-} from '../../interface-adapters/documents/interfaces.js';
+} from '../../interface-adapters/workflows/definitions/interfaces.js';
 
 @Injectable()
 export class SdkOpenWorkflowClient implements OpenWorkflowClient {

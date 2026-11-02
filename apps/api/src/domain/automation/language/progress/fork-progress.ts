@@ -127,7 +127,7 @@ export class ForkProgress extends KindProgress {
     return ConcludedProgress.step(unchanged);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

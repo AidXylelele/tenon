@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
 import { Workflow } from '../../../domain/automation/workflows/workflow.js';
+import { Clock } from '../language/ports.js';
 import { CheckDocument } from './check-document.js';
 import {
   type PublishedVersionResult,
@@ -16,13 +17,14 @@ export class PublishVersion {
     private readonly checkDocument: CheckDocument,
     private readonly workflows: WorkflowRepository,
     private readonly versions: WorkflowVersionRepository,
+    private readonly clock: Clock,
   ) {}
 
   @Transactional()
   async execute(
     command: PublishVersionCommand,
   ): Promise<PublishedVersionResult> {
-    const now = new Date();
+    const now = this.clock.now();
     const source = new SourceDocument({
       format: command.format,
       text: command.text,

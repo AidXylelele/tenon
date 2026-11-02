@@ -17,7 +17,7 @@ import { sql } from 'drizzle-orm';
 import { ConfigModule } from '../../../src/frameworks/di/config.module.js';
 import { DatabaseModule } from '../../../src/frameworks/di/database.module.js';
 import { EngineModule } from '../../../src/frameworks/di/engine.module.js';
-import { Database } from '../../../src/interface-adapters/interfaces.js';
+import { Database } from '../../../src/interface-adapters/persistence/interfaces.js';
 
 const wake = new WorkflowSignal<{ by: string }>('wake');
 

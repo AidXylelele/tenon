@@ -41,4 +41,5 @@ export abstract class WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionDocument | null>;
+  abstract documentOf(versionId: string): Promise<VersionDocument | null>;
 }

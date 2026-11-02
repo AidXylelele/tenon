@@ -27,6 +27,7 @@ jobs:
       - run: pnpm check-types
       - run: pnpm test
       - run: pnpm --filter api test:int
+      - run: pnpm --filter api test:ctk
 
   supply-chain:
     name: dependency audit and lockfile scan

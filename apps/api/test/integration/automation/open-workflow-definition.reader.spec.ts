@@ -15,7 +15,7 @@ import {
   UnsupportedConstructError,
 } from '../../../src/domain/errors.js';
 import { SdkOpenWorkflowClient } from '../../../src/frameworks/openworkflowspec/sdk-open-workflow.client.js';
-import { OpenWorkflowDefinitionReader } from '../../../src/interface-adapters/documents/open-workflow-definition.reader.js';
+import { OpenWorkflowDefinitionReader } from '../../../src/interface-adapters/workflows/definitions/open-workflow-definition.reader.js';
 import { ctkDocuments } from '../../support/ctk-documents.js';
 import { rejectionOf } from '../../support/language.js';
 

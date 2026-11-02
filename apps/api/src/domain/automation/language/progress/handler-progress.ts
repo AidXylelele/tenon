@@ -64,7 +64,7 @@ export class HandlerProgress extends KindProgress {
     return HandlerProgress.#following(step);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

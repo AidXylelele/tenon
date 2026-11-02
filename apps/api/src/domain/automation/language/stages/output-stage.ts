@@ -92,7 +92,7 @@ export class OutputStage extends TaskProgress {
     return EndedStage.timedOut(scope);
   }
 
-  subWorkflowEnded(): Step<TaskProgress> {
+  subWorkflowAnswered(): Step<TaskProgress> {
     return Step.of<TaskProgress>(this);
   }
 }

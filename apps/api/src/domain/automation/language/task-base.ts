@@ -6,6 +6,7 @@ import type { FlowDirective } from './flow-directive.js';
 import type { Input } from './input.js';
 import type { TaskBaseProps } from './interfaces.js';
 import type { Output } from './output.js';
+import type { Schema } from './schema.js';
 
 export class TaskBase {
   readonly #condition: Expression | null;
@@ -55,5 +56,12 @@ export class TaskBase {
     const exported = this.#export.expressions;
     const timeout = this.#timeout?.expressions ?? [];
     return condition.concat(input, output, exported, timeout);
+  }
+
+  get schemas(): readonly Schema[] {
+    const input = this.#input.schemas;
+    const output = this.#output.schemas;
+    const exported = this.#export.schemas;
+    return input.concat(output, exported);
   }
 }

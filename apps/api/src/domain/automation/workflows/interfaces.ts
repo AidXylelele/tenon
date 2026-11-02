@@ -33,3 +33,9 @@ export interface NewWorkflowVersion {
   readonly publisherId: string;
   readonly now: Date;
 }
+
+export interface VersionReferenceProps {
+  readonly versionId: string | null;
+  readonly workflowId: string | null;
+  readonly semver: string | null;
+}

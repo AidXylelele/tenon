@@ -1,11 +1,11 @@
 import type { INestApplication } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { sql } from 'drizzle-orm';
-import type { Database } from '../../src/interface-adapters/interfaces.js';
+import type { Database } from '../../src/interface-adapters/persistence/interfaces.js';
 
 export async function truncateAll(db: Database): Promise<void> {
   await db.execute(
-    sql`truncate table workflow_version, workflow, idempotency_key, invitation, email_token, session, account, "user" cascade`,
+    sql`truncate table event, task_instance, workflow_instance, workflow_version, workflow, idempotency_key, invitation, email_token, session, account, "user" cascade`,
   );
   await db.execute(
     sql`truncate table nest_outbox.messages, nest_outbox.inbox, nest_outbox.dead_letters`,

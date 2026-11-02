@@ -1,6 +1,7 @@
 import { Outcome } from '../../../../domain/automation/language/outcome.js';
 import type { OutcomeState } from '../../interfaces.js';
-import { SubWorkflowRequestMapper } from './sub-workflow-request.mapper.js';
+import { CloudEventMapper } from './cloud-event.mapper.js';
+import { DetachedWorkflowMapper } from './detached-workflow.mapper.js';
 import { FlowDirectiveMapper } from './flow-directive.mapper.js';
 import { ProcessRunMapper } from './process-run.mapper.js';
 import { WorkflowErrorMapper } from './workflow-error.mapper.js';
@@ -13,7 +14,8 @@ export class OutcomeMapper {
 
     const failure = WorkflowErrorMapper.toState(outcome.failure);
     const directive = FlowDirectiveMapper.toState(outcome.directive);
-    const detachedWorkflow = SubWorkflowRequestMapper.toState(
+    const emitted = CloudEventMapper.toState(outcome.emitted);
+    const detachedWorkflow = DetachedWorkflowMapper.toState(
       outcome.detachedWorkflow,
     );
     const detachedProcess = ProcessRunMapper.toState(outcome.detachedProcess);
@@ -22,7 +24,7 @@ export class OutcomeMapper {
       failure,
       directive,
       authorization: outcome.authorization,
-      emitted: outcome.emitted,
+      emitted,
       detachedProcess,
       detachedWorkflow,
     };
@@ -35,7 +37,8 @@ export class OutcomeMapper {
 
     const failure = WorkflowErrorMapper.toDomain(state.failure);
     const directive = FlowDirectiveMapper.toDomain(state.directive);
-    const detachedWorkflow = SubWorkflowRequestMapper.toDomain(
+    const emitted = CloudEventMapper.toDomain(state.emitted);
+    const detachedWorkflow = DetachedWorkflowMapper.toDomain(
       state.detachedWorkflow,
     );
     const detachedProcess = ProcessRunMapper.toDomain(state.detachedProcess);
@@ -44,7 +47,7 @@ export class OutcomeMapper {
       failure,
       directive,
       authorization: state.authorization,
-      emitted: state.emitted,
+      emitted,
       detachedProcess,
       detachedWorkflow,
     });

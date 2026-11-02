@@ -95,7 +95,7 @@ export class TryProgress extends KindProgress {
     return TryProgress.#following(this.#attempt, step, scope);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

@@ -9,6 +9,7 @@ import {
   FakeExpressionEvaluator,
   JsonDefinitionReader,
 } from '../../../../support/fakes.js';
+import { AcceptingSchemaValidator } from '../../../../support/instance-fakes.js';
 
 function documentText(tasks: readonly object[]): string {
   return JSON.stringify({
@@ -25,7 +26,8 @@ function documentText(tasks: readonly object[]): string {
 function checker(refused: ReadonlySet<string> = new Set()): CheckDocument {
   const definitions = new JsonDefinitionReader();
   const expressions = new FakeExpressionEvaluator(refused);
-  return new CheckDocument(definitions, expressions);
+  const schemas = new AcceptingSchemaValidator();
+  return new CheckDocument(definitions, expressions, schemas);
 }
 
 async function rejectionOf(

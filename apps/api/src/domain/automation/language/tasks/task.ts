@@ -6,6 +6,7 @@ import type { KindProgress } from '../progress/kind-progress.js';
 import type { Step } from '../step.js';
 import type { BodyScope } from '../scopes/body-scope.js';
 import type { ReusableComponents } from '../reusable-components.js';
+import type { Schema } from '../schema.js';
 import type { TaskBase } from '../task-base.js';
 import type { TaskList } from '../task-list.js';
 
@@ -45,6 +46,15 @@ export abstract class Task {
     const shared = this.#base.expressions;
     const own = this.ownExpressions;
     return shared.concat(own);
+  }
+
+  get schemas(): readonly Schema[] {
+    const found = Array.from(this.#base.schemas);
+
+    for (const list of this.children)
+      for (const schema of list.schemas) found.push(schema);
+
+    return found;
   }
 
   confirmCalls(components: ReusableComponents): void {

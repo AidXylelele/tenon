@@ -5,7 +5,7 @@ import {
   OutboxStorage,
 } from '@nestjs/outbox';
 import { fromDrizzle, PostgresOutboxStore } from '@nestjs/outbox/postgres';
-import { Database } from '../../interface-adapters/interfaces.js';
+import { Database } from '../../interface-adapters/persistence/interfaces.js';
 import type { Env } from './config.module.js';
 
 @Module({
@@ -15,6 +15,9 @@ import type { Env } from './config.module.js';
       useFactory: (config: ConfigService<Env, true>) => ({
         relay: {
           enabled: config.get('OUTBOX_RELAY', { infer: true }) === 'on',
+          // A detached process may run for the sandbox's 35 s budget, so a publish gets 60 s.
+          lease: '120s',
+          publishTimeout: '60s',
         },
         retry: { attempts: 20 },
       }),

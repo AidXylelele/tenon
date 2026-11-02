@@ -12,6 +12,7 @@ export class ServiceResponded extends ServiceResult {
   readonly #status: number;
   readonly #headers: JsonObject;
   readonly #content: JsonValue;
+  readonly #body: string;
   readonly #request: JsonObject;
   readonly #authorization: JsonObject | null;
 
@@ -20,6 +21,7 @@ export class ServiceResponded extends ServiceResult {
     this.#status = props.status;
     this.#headers = props.headers;
     this.#content = props.content;
+    this.#body = props.body;
     this.#request = props.request;
     this.#authorization = props.authorization;
   }
@@ -34,6 +36,10 @@ export class ServiceResponded extends ServiceResult {
 
   get content(): JsonValue {
     return this.#content;
+  }
+
+  get body(): string {
+    return this.#body;
   }
 
   get request(): JsonObject {

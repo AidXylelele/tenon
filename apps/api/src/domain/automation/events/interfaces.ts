@@ -24,7 +24,17 @@ export interface EventProps {
   readonly acceptedAt: Date;
 }
 
-export interface ProducedEvent {
+export interface LifecycleEventInput {
+  readonly source: string;
+  readonly type: string;
+  readonly time: Date;
+  readonly data: JsonObject;
+  readonly origin: EventOrigin;
+  readonly sequence: number;
+  readonly acceptedAt: Date;
+}
+
+export interface EmittedEventInput {
   readonly cloudEvent: CloudEvent;
   readonly origin: EventOrigin;
   readonly sequence: number;

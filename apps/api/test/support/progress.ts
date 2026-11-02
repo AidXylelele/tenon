@@ -16,8 +16,8 @@ import type { ServiceResult } from '../../src/domain/automation/language/results
 import { Validated } from '../../src/domain/automation/language/results/validated.js';
 import type { ValidationResult } from '../../src/domain/automation/language/results/validation-result.js';
 import type { RoundWork } from '../../src/domain/automation/language/round-work.js';
-import type * as Dsl from '../../src/interface-adapters/documents/interfaces.js';
-import { DefinitionMapper } from '../../src/interface-adapters/documents/mappers/definition.mapper.js';
+import type * as Dsl from '../../src/interface-adapters/workflows/definitions/interfaces.js';
+import { DefinitionMapper } from '../../src/interface-adapters/workflows/definitions/mappers/definition.mapper.js';
 
 export const now = new Date('2026-10-31T10:00:00.000Z');
 

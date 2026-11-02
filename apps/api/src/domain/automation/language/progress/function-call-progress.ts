@@ -96,7 +96,7 @@ export class FunctionCallProgress extends KindProgress {
     return new Step<KindProgress>(started, [start]);
   }
 
-  subWorkflowEnded(): Step<KindProgress> {
+  subWorkflowAnswered(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 }

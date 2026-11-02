@@ -12,7 +12,7 @@ import {
 import { Account } from '../../src/domain/identity/account.js';
 import { Role, UserStatus } from '../../src/domain/identity/enums.js';
 import { User } from '../../src/domain/identity/user.js';
-import type { Database } from '../../src/interface-adapters/interfaces.js';
+import type { Database } from '../../src/interface-adapters/persistence/interfaces.js';
 import {
   session,
   user as users,

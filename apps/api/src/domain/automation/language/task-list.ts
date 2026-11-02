@@ -3,6 +3,7 @@ import type { Expression } from './expression.js';
 import type { TaskListProps } from './interfaces.js';
 import type { JsonPointer } from './json-pointer.js';
 import type { ReusableComponents } from './reusable-components.js';
+import type { Schema } from './schema.js';
 import type { Task } from './tasks/task.js';
 
 export class TaskList {
@@ -29,6 +30,15 @@ export class TaskList {
 
     for (const task of this.#tasks)
       for (const expression of task.expressions) found.push(expression);
+
+    return found;
+  }
+
+  get schemas(): readonly Schema[] {
+    const found: Schema[] = [];
+
+    for (const task of this.#tasks)
+      for (const schema of task.schemas) found.push(schema);
 
     return found;
   }

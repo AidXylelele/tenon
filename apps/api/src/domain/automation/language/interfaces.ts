@@ -3,6 +3,7 @@ import type { Authentication } from './authentication.js';
 import type { Backoff } from './backoffs/backoff.js';
 import type { CallOutput } from './call-output.js';
 import type { CatchClause } from './catch-clause.js';
+import type { CloudEvent } from './cloud-event.js';
 import type { Definition } from './definition.js';
 import type { Endpoint } from './endpoint.js';
 import type {
@@ -43,6 +44,7 @@ import type { Template } from './template.js';
 import type { WorkflowError } from './workflow-error.js';
 import type { WorkflowName } from './workflow-name.js';
 import type { WorkflowTarget } from './workflow-target.js';
+import type { Phase } from './phase.js';
 
 export type JsonValue =
   string | number | boolean | null | JsonValue[] | JsonObject;
@@ -252,7 +254,12 @@ export interface CloudEventProps {
   readonly id: string;
   readonly source: string;
   readonly type: string;
-  readonly attributes: JsonObject;
+  readonly time: Date | null;
+  readonly subject: string | null;
+  readonly dataContentType: string | null;
+  readonly dataSchema: string | null;
+  readonly data: JsonValue;
+  readonly extensions: JsonObject;
 }
 
 export interface Evaluation {
@@ -313,6 +320,7 @@ export interface ServiceRespondedProps {
   readonly status: number;
   readonly headers: JsonObject;
   readonly content: JsonValue;
+  readonly body: string;
   readonly request: JsonObject;
   readonly authorization: JsonObject | null;
 }
@@ -341,6 +349,19 @@ export interface TaskStart {
 export interface SubWorkflowRequest {
   readonly target: WorkflowTarget;
   readonly input: JsonValue;
+  readonly awaited: boolean;
+}
+
+export interface DetachedWorkflow {
+  readonly workflow: WorkflowName;
+  readonly versionId: string;
+  readonly input: JsonValue;
+}
+
+export interface SubWorkflowEnding {
+  readonly phase: Phase;
+  readonly output: JsonValue;
+  readonly error: WorkflowError | null;
 }
 
 export interface OutcomeProps {
@@ -348,9 +369,9 @@ export interface OutcomeProps {
   readonly failure: WorkflowError | null;
   readonly directive: FlowDirective | null;
   readonly authorization: JsonObject | null;
-  readonly emitted: JsonObject | null;
+  readonly emitted: CloudEvent | null;
   readonly detachedProcess: ProcessRun | null;
-  readonly detachedWorkflow: SubWorkflowRequest | null;
+  readonly detachedWorkflow: DetachedWorkflow | null;
 }
 
 export interface TaskEndingProps {

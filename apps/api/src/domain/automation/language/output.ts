@@ -29,6 +29,12 @@ export class Output {
     return this.#as?.expressions ?? [];
   }
 
+  get schemas(): readonly Schema[] {
+    if (this.#schema === null) return [];
+
+    return [this.#schema];
+  }
+
   evaluationsFor(
     prefix: string,
     rawOutput: JsonValue,

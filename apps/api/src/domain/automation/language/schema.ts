@@ -17,6 +17,10 @@ export class Schema {
     this.#document = props.document;
   }
 
+  get pointer(): JsonPointer {
+    return this.#pointer;
+  }
+
   get document(): JsonObject {
     return this.#document;
   }

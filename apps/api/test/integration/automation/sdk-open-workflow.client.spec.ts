@@ -1,4 +1,4 @@
-import { DslOutcomeKind } from '../../../src/interface-adapters/documents/enums.js';
+import { DslOutcomeKind } from '../../../src/interface-adapters/workflows/definitions/enums.js';
 import { SdkOpenWorkflowClient } from '../../../src/frameworks/openworkflowspec/sdk-open-workflow.client.js';
 
 function header(dsl: string, tasks: string): string {

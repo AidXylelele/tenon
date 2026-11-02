@@ -103,7 +103,7 @@ export class EntryStage extends TaskProgress {
     return Step.of<TaskProgress>(faulted);
   }
 
-  subWorkflowEnded(): Step<TaskProgress> {
+  subWorkflowAnswered(): Step<TaskProgress> {
     return Step.of<TaskProgress>(this);
   }
 }

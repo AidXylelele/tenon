@@ -51,6 +51,12 @@ export class RoundResults {
     return evaluated && validated && responded && exited;
   }
 
+  deferredIn(work: RoundWork): number {
+    const calls = work.calls.filter((call) => !this.#responses.has(call.id));
+    const runs = work.processes.filter((run) => !this.#processes.has(run.id));
+    return calls.length + runs.length;
+  }
+
   failureOf(id: string, at: JsonPointer): WorkflowError | null {
     const evaluation = this.#evaluated.get(id);
 

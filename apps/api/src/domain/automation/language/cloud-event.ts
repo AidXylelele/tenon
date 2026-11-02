@@ -23,13 +23,34 @@ export class CloudEvent {
   readonly #id: string;
   readonly #source: string;
   readonly #type: string;
-  readonly #attributes: JsonObject;
+  readonly #time: Date | null;
+  readonly #subject: string | null;
+  readonly #dataContentType: string | null;
+  readonly #dataSchema: string | null;
+  readonly #data: JsonValue;
+  readonly #extensions: JsonObject;
 
-  private constructor(props: CloudEventProps) {
+  constructor(props: CloudEventProps) {
     this.#id = props.id;
     this.#source = props.source;
     this.#type = props.type;
-    this.#attributes = props.attributes;
+    this.#time = props.time;
+    this.#subject = props.subject;
+    this.#dataContentType = props.dataContentType;
+    this.#dataSchema = props.dataSchema;
+    this.#data = props.data;
+    this.#extensions = props.extensions;
+  }
+
+  static complete(value: JsonObject, id: string, now: Date): JsonObject {
+    const completed: Record<string, JsonValue | undefined> = {};
+
+    for (const name of Object.keys(value)) completed[name] = value[name];
+
+    completed.id ??= id;
+    completed.specversion ??= CloudEvent.#SPEC_VERSION;
+    completed.time ??= now.toISOString();
+    return completed;
   }
 
   static of(value: JsonValue): CloudEvent | null {
@@ -62,7 +83,23 @@ export class CloudEvent {
 
     if (!wellFormed) return null;
 
-    return new CloudEvent({ id, source, type, attributes: event });
+    const time = CloudEvent.#timeOf(event.time);
+    const subject = CloudEvent.#textOrNull(event.subject);
+    const dataContentType = CloudEvent.#textOrNull(event.datacontenttype);
+    const dataSchema = CloudEvent.#textOrNull(event.dataschema);
+    const data = event.data ?? null;
+    const extensions = CloudEvent.#extensionsOf(event);
+    return new CloudEvent({
+      id,
+      source,
+      type,
+      time,
+      subject,
+      dataContentType,
+      dataSchema,
+      data,
+      extensions,
+    });
   }
 
   static declares(value: JsonValue): value is JsonObject {
@@ -92,40 +129,46 @@ export class CloudEvent {
     return this.#type;
   }
 
-  get time(): string | null {
-    return CloudEvent.#textOrNull(this.#attributes.time);
+  get time(): Date | null {
+    return this.#time;
   }
 
   get subject(): string | null {
-    return CloudEvent.#textOrNull(this.#attributes.subject);
+    return this.#subject;
   }
 
   get dataContentType(): string | null {
-    return CloudEvent.#textOrNull(this.#attributes.datacontenttype);
+    return this.#dataContentType;
   }
 
   get dataSchema(): string | null {
-    return CloudEvent.#textOrNull(this.#attributes.dataschema);
+    return this.#dataSchema;
   }
 
   get data(): JsonValue {
-    return this.#attributes.data ?? null;
+    return this.#data;
   }
 
   get extensions(): JsonObject {
+    return this.#extensions;
+  }
+
+  static #extensionsOf(event: JsonObject): JsonObject {
     const extensions: Record<string, JsonValue | undefined> = {};
 
-    for (const name of Object.keys(this.#attributes)) {
+    for (const name of Object.keys(event)) {
       const context = CloudEvent.#CONTEXT.includes(name);
 
-      if (!context) extensions[name] = this.#attributes[name];
+      if (!context) extensions[name] = event[name];
     }
 
     return extensions;
   }
 
-  toJson(): JsonObject {
-    return this.#attributes;
+  static #timeOf(value: JsonValue | undefined): Date | null {
+    if (typeof value !== 'string') return null;
+
+    return new Date(value);
   }
 
   static #text(value: JsonValue | undefined): boolean {

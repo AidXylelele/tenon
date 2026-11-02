@@ -1,3 +1,4 @@
+import type { SubWorkflowAnswer } from '../answers/sub-workflow-answer.js';
 import type { JsonValue, SubWorkflowRequest } from '../interfaces.js';
 import { Outcome } from '../outcome.js';
 import type { RoundResults } from '../round-results.js';
@@ -58,34 +59,30 @@ export class RunWorkflowProgress extends KindProgress {
     }
 
     const input = RunWorkflowProgress.#subWorkflowInput(results, scope);
-    const request: SubWorkflowRequest = { target: scope.task.target, input };
-
-    if (!scope.task.awaits) {
-      const detached = Outcome.detachingWorkflow(scope.input, request);
-      return ConcludedProgress.step(detached);
-    }
-
-    const awaiting = new RunWorkflowProgress(request);
-    return Step.of<KindProgress>(awaiting);
+    const request: SubWorkflowRequest = {
+      target: scope.task.target,
+      input,
+      awaited: scope.task.awaits,
+    };
+    const requesting = new RunWorkflowProgress(request);
+    return Step.of<KindProgress>(requesting);
   }
 
   childEnded(): Step<KindProgress> {
     return Step.of<KindProgress>(this);
   }
 
-  subWorkflowEnded(
-    outcome: Outcome,
+  subWorkflowAnswered(
+    answer: SubWorkflowAnswer,
     scope: BodyScope<RunWorkflowTask>,
   ): Step<KindProgress> {
     if (this.#request === null) return Step.of<KindProgress>(this);
 
-    const failure = outcome.failure;
+    const outcome = answer.outcomeFor(this.#request, scope);
 
-    if (failure === null) return ConcludedProgress.step(outcome);
+    if (outcome === null) return Step.of<KindProgress>(this);
 
-    const escalated = failure.raisedAt(scope.task.reference);
-    const failed = Outcome.failed(escalated);
-    return ConcludedProgress.step(failed);
+    return ConcludedProgress.step(outcome);
   }
 
   static #subWorkflowInput(

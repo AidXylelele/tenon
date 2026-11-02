@@ -1,4 +1,5 @@
 import { InconsistentProgressError } from '../../../errors.js';
+import type { SubWorkflowAnswer } from '../answers/sub-workflow-answer.js';
 import type {
   BodyStageProps,
   SubWorkflowRequest,
@@ -6,7 +7,6 @@ import type {
 } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
 import { Phase } from '../phase.js';
-import type { Outcome } from '../outcome.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import type { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
@@ -131,9 +131,12 @@ export class BodyStage extends TaskProgress {
     return BodyStage.#following(this.#input, this.#deadline, step, scope);
   }
 
-  subWorkflowEnded(outcome: Outcome, scope: TaskScope): Step<TaskProgress> {
+  subWorkflowAnswered(
+    answer: SubWorkflowAnswer,
+    scope: TaskScope,
+  ): Step<TaskProgress> {
     const bodyScope = new BodyScope(scope, this.#input);
-    const step = this.#body.subWorkflowEnded(outcome, bodyScope);
+    const step = this.#body.subWorkflowAnswered(answer, bodyScope);
 
     if (step.progress === this.#body) return Step.of<TaskProgress>(this);
 

@@ -1,15 +1,21 @@
+import { randomUUID } from 'node:crypto';
 import { InconsistentProgressError } from '../../errors.js';
 import type { Event } from '../events/event.js';
 import type { Definition } from '../language/definition.js';
 import { ErrorType } from '../language/error-type.js';
+import type { SubWorkflowAnswer } from '../language/answers/sub-workflow-answer.js';
+import { SubWorkflowDetached } from '../language/answers/sub-workflow-detached.js';
+import { SubWorkflowEnded } from '../language/answers/sub-workflow-ended.js';
+import { SubWorkflowRefused } from '../language/answers/sub-workflow-refused.js';
 import type {
   JsonObject,
   JsonValue,
+  SubWorkflowEnding,
   TaskScopeProps,
   TaskStart,
 } from '../language/interfaces.js';
 import { JsonPointer } from '../language/json-pointer.js';
-import { Outcome } from '../language/outcome.js';
+import type { Outcome } from '../language/outcome.js';
 import { Phase } from '../language/phase.js';
 import { RoundResults } from '../language/round-results.js';
 import { RoundWork } from '../language/round-work.js';
@@ -19,19 +25,21 @@ import type { TaskEnding } from '../language/task-ending.js';
 import type { Task } from '../language/tasks/task.js';
 import type { WorkflowError } from '../language/workflow-error.js';
 import type { WorkflowName } from '../language/workflow-name.js';
+import type { Workflow } from '../workflows/workflow.js';
+import type { WorkflowVersion } from '../workflows/workflow-version.js';
 import { DerivedId } from './derived-id.js';
 import { ProcessDetached } from './domain-events/process-detached.js';
 import { WorkflowDetached } from './domain-events/workflow-detached.js';
 import { InstanceProgressKind } from './enums.js';
 import type {
   InstanceEvent,
+  InstanceIdentity,
   InstanceProgress,
   NewSubWorkflowInstance,
   NewWorkflowInstance,
   Origin,
   RequestedSubWorkflow,
   RoundContext,
-  SubWorkflowEnding,
   TaskChange,
   TaskFollowUp,
   WorkflowInstanceProps,
@@ -43,8 +51,7 @@ import { TaskInstance } from './task-instance.js';
 
 export class WorkflowInstance {
   static readonly #RUN_FAILED = 'The run of the instance failed';
-  static readonly #NOT_RUNNABLE =
-    'The workflow to run does not exist, or the version it names is not published';
+  static readonly #NOT_NAMED = 'The workflow is not the one the run task names';
 
   readonly #id: string;
   readonly #workflowId: string;
@@ -96,6 +103,13 @@ export class WorkflowInstance {
     );
   }
 
+  static idFor(identity: InstanceIdentity): string {
+    if (identity.key === null) return randomUUID();
+
+    const parts = [identity.userId, identity.workflowId, identity.key];
+    return DerivedId.of(parts);
+  }
+
   static start(input: NewWorkflowInstance): WorkflowInstance {
     const workflow = input.workflow;
     const version = input.version;
@@ -127,22 +141,12 @@ export class WorkflowInstance {
   }
 
   static startSubWorkflow(input: NewSubWorkflowInstance): WorkflowInstance {
-    const request = input.request;
-    const target = request.target;
-    const named = target.workflow.equals(input.workflow.name);
-    const current = input.workflow.isCurrent(input.version);
-    const pinned = input.version.semver === target.version;
-    const runnable = target.isLatest() ? current : pinned;
-
-    if (!named || !runnable)
-      throw new TypeError('The version is not the one the run task names');
-
-    const origin = new ParentOrigin(input.parentId, request.taskId);
+    const origin = new ParentOrigin(input.parentId, input.taskId);
     return WorkflowInstance.start({
-      id: request.instanceId,
+      id: input.id,
       workflow: input.workflow,
       version: input.version,
-      input: request.input,
+      input: input.input,
       origin,
       now: input.now,
     });
@@ -276,20 +280,23 @@ export class WorkflowInstance {
 
     this.#end(Phase.Faulted, now);
     this.#error = error;
-    this.#produced.announce({
-      type: LifecycleEventType.WorkflowFaulted,
-      task: null,
-      time: now,
-      error,
-      output: null,
-    });
+    this.#produced.announce(
+      {
+        type: LifecycleEventType.WorkflowFaulted,
+        task: null,
+        time: now,
+        error,
+        output: null,
+      },
+      now,
+    );
   }
 
   requestedSubWorkflows(): readonly RequestedSubWorkflow[] {
     const requested: RequestedSubWorkflow[] = [];
 
     for (const task of this.#tasks) {
-      const request = task.awaitedSubWorkflow();
+      const request = task.requestedSubWorkflow();
 
       if (request === null) continue;
 
@@ -299,45 +306,82 @@ export class WorkflowInstance {
         instanceId,
         target: request.target,
         input: request.input,
+        awaited: request.awaited,
       });
     }
 
     return requested;
   }
 
-  refuseSubWorkflow(
+  requestedSubWorkflow(instanceId: string): RequestedSubWorkflow | null {
+    const requested = this.requestedSubWorkflows();
+    const request = requested.find(
+      (candidate) => candidate.instanceId === instanceId,
+    );
+    return request ?? null;
+  }
+
+  answerSubWorkflow(
     instanceId: string,
+    workflow: Workflow | null,
+    version: WorkflowVersion | null,
     definition: Definition,
     runtime: JsonObject,
     now: Date,
-  ): void {
-    const task = this.#awaiting(instanceId);
+  ): WorkflowInstance | null {
+    const request = this.requestedSubWorkflow(instanceId);
+    const task = this.#requesting(instanceId);
 
-    if (this.#phase.isTerminal() || task === null) return;
+    if (this.#phase.isTerminal() || request === null || task === null)
+      return null;
 
-    const error = ErrorType.Configuration.errorAt(
-      task.reference,
-      WorkflowInstance.#NOT_RUNNABLE,
-    );
-    const refused = Outcome.failed(error);
     const round = this.#round(definition, runtime, now);
-    this.#subWorkflowEnded(task, refused, round);
+
+    if (workflow === null || version === null) {
+      const refused = new SubWorkflowRefused();
+      this.#answer(task, refused, round);
+      return null;
+    }
+
+    const named = request.target.workflow.equals(workflow.name);
+
+    if (!named) throw new TypeError(WorkflowInstance.#NOT_NAMED);
+
+    if (!request.awaited) {
+      const detached = new SubWorkflowDetached({
+        workflow: workflow.name,
+        versionId: version.id,
+        input: request.input,
+      });
+      this.#answer(task, detached, round);
+      return null;
+    }
+
+    return WorkflowInstance.startSubWorkflow({
+      id: request.instanceId,
+      parentId: this.#id,
+      taskId: request.taskId,
+      workflow,
+      version,
+      input: request.input,
+      now,
+    });
   }
 
   completeSubWorkflow(
     instanceId: string,
-    ending: SubWorkflowEnding,
+    ending: SubWorkflowEnding | null,
     definition: Definition,
     runtime: JsonObject,
     now: Date,
   ): void {
-    const task = this.#awaiting(instanceId);
-    const outcome = WorkflowInstance.#outcomeOf(ending);
+    const task = this.#requesting(instanceId);
 
-    if (this.#phase.isTerminal() || task === null || outcome === null) return;
+    if (this.#phase.isTerminal() || task === null) return;
 
     const round = this.#round(definition, runtime, now);
-    this.#subWorkflowEnded(task, outcome, round);
+    const ended = new SubWorkflowEnded(ending);
+    this.#answer(task, ended, round);
   }
 
   progress(now: Date): InstanceProgress {
@@ -369,14 +413,6 @@ export class WorkflowInstance {
     return this.#events.splice(0);
   }
 
-  static #outcomeOf(ending: SubWorkflowEnding): Outcome | null {
-    if (ending.phase === Phase.Completed) return Outcome.of(ending.output);
-
-    if (ending.phase !== Phase.Faulted || ending.error === null) return null;
-
-    return Outcome.failed(ending.error);
-  }
-
   #round(definition: Definition, runtime: JsonObject, now: Date): RoundContext {
     const own =
       definition.workflow.equals(this.#workflow) &&
@@ -393,13 +429,16 @@ export class WorkflowInstance {
   #run(round: RoundContext): void {
     this.#phase = Phase.Running;
     this.#changed = true;
-    this.#produced.announce({
-      type: LifecycleEventType.WorkflowStarted,
-      task: null,
-      time: this.#startedAt,
-      error: null,
-      output: null,
-    });
+    this.#produced.announce(
+      {
+        type: LifecycleEventType.WorkflowStarted,
+        task: null,
+        time: this.#startedAt,
+        error: null,
+        output: null,
+      },
+      round.now,
+    );
     const variables: JsonObject = {};
     const start: TaskStart = {
       reference: round.definition.root.reference,
@@ -428,13 +467,13 @@ export class WorkflowInstance {
     this.#follow(task, resumed, round);
   }
 
-  #subWorkflowEnded(
+  #answer(
     task: TaskInstance,
-    outcome: Outcome,
+    answer: SubWorkflowAnswer,
     round: RoundContext,
   ): void {
     const scope = this.#scopeOf(task, round);
-    const change = task.subWorkflowEnded(outcome, scope);
+    const change = task.subWorkflowAnswered(answer, scope);
     this.#follow(task, change, round);
     this.#settle(round);
   }
@@ -461,12 +500,22 @@ export class WorkflowInstance {
     now: Date,
   ): void {
     if (change.entered) {
-      this.#announceTask(LifecycleEventType.TaskCreated, task, task.startedAt);
-      this.#announceTask(LifecycleEventType.TaskStarted, task, task.startedAt);
+      this.#announceTask(
+        LifecycleEventType.TaskCreated,
+        task,
+        task.startedAt,
+        now,
+      );
+      this.#announceTask(
+        LifecycleEventType.TaskStarted,
+        task,
+        task.startedAt,
+        now,
+      );
     }
 
     if (change.retried)
-      this.#announceTask(LifecycleEventType.TaskRetried, task, now);
+      this.#announceTask(LifecycleEventType.TaskRetried, task, now, now);
 
     queue.push({ task, change });
   }
@@ -523,29 +572,35 @@ export class WorkflowInstance {
     const failure = ending.failure;
 
     if (failure !== null) {
-      this.#produced.announce({
-        type: LifecycleEventType.TaskFaulted,
-        task: task.reference,
-        time: now,
-        error: failure,
-        output: null,
-      });
+      this.#produced.announce(
+        {
+          type: LifecycleEventType.TaskFaulted,
+          task: task.reference,
+          time: now,
+          error: failure,
+          output: null,
+        },
+        now,
+      );
       return;
     }
 
-    this.#produced.announce({
-      type: LifecycleEventType.TaskCompleted,
-      task: task.reference,
-      time: now,
-      error: null,
-      output: { value: ending.output },
-    });
+    this.#produced.announce(
+      {
+        type: LifecycleEventType.TaskCompleted,
+        task: task.reference,
+        time: now,
+        error: null,
+        output: { value: ending.output },
+      },
+      now,
+    );
   }
 
   #act(task: TaskInstance, body: Outcome, now: Date): void {
     const emitted = body.emitted;
     const run = body.detachedProcess;
-    const request = body.detachedWorkflow;
+    const detachedWorkflow = body.detachedWorkflow;
 
     if (emitted !== null) this.#produced.emit(emitted, now);
 
@@ -558,13 +613,13 @@ export class WorkflowInstance {
       this.#events.push(detached);
     }
 
-    if (request !== null) {
+    if (detachedWorkflow !== null) {
       const subWorkflowId = this.#subWorkflowIdOf(task);
       const detached = new WorkflowDetached({
         instanceId: this.#id,
         taskInstanceId: task.id,
         subWorkflowId,
-        request,
+        detached: detachedWorkflow,
       });
       this.#events.push(detached);
     }
@@ -576,25 +631,31 @@ export class WorkflowInstance {
     if (failure !== null) {
       this.#end(Phase.Faulted, now);
       this.#error = failure;
-      this.#produced.announce({
-        type: LifecycleEventType.WorkflowFaulted,
-        task: null,
-        time: now,
-        error: failure,
-        output: null,
-      });
+      this.#produced.announce(
+        {
+          type: LifecycleEventType.WorkflowFaulted,
+          task: null,
+          time: now,
+          error: failure,
+          output: null,
+        },
+        now,
+      );
       return;
     }
 
     this.#end(Phase.Completed, now);
     this.#output = ending.output;
-    this.#produced.announce({
-      type: LifecycleEventType.WorkflowCompleted,
-      task: null,
-      time: now,
-      error: null,
-      output: { value: ending.output },
-    });
+    this.#produced.announce(
+      {
+        type: LifecycleEventType.WorkflowCompleted,
+        task: null,
+        time: now,
+        error: null,
+        output: { value: ending.output },
+      },
+      now,
+    );
   }
 
   #end(phase: Phase, now: Date): void {
@@ -643,19 +704,27 @@ export class WorkflowInstance {
     const announced = task.abandon(now);
 
     if (announced)
-      this.#announceTask(LifecycleEventType.TaskCancelled, task, now);
+      this.#announceTask(LifecycleEventType.TaskCancelled, task, now, now);
   }
 
-  #announceTask(type: LifecycleEventType, task: TaskInstance, at: Date): void {
+  #announceTask(
+    type: LifecycleEventType,
+    task: TaskInstance,
+    at: Date,
+    now: Date,
+  ): void {
     if (task.isRoot()) return;
 
-    this.#produced.announce({
-      type,
-      task: task.reference,
-      time: at,
-      error: null,
-      output: null,
-    });
+    this.#produced.announce(
+      {
+        type,
+        task: task.reference,
+        time: at,
+        error: null,
+        output: null,
+      },
+      now,
+    );
   }
 
   #created(
@@ -663,12 +732,14 @@ export class WorkflowInstance {
     start: TaskStart,
     round: RoundContext,
   ): TaskInstance {
-    const execution = String(this.#executions);
-    const parts = [this.#id, execution];
+    const execution = this.#executions;
+    const counted = String(execution);
+    const parts = [this.#id, counted];
     const id = DerivedId.of(parts);
     const name = round.definition.taskAt(start.reference).name;
     const task = TaskInstance.create({
       id,
+      execution,
       parentId,
       name,
       start,
@@ -729,10 +800,10 @@ export class WorkflowInstance {
     return parent;
   }
 
-  #awaiting(instanceId: string): TaskInstance | null {
+  #requesting(instanceId: string): TaskInstance | null {
     const task = this.#tasks.find(
       (candidate) =>
-        candidate.awaitedSubWorkflow() !== null &&
+        candidate.requestedSubWorkflow() !== null &&
         this.#subWorkflowIdOf(candidate) === instanceId,
     );
     return task ?? null;

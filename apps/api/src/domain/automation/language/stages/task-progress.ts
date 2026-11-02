@@ -1,6 +1,6 @@
+import type { SubWorkflowAnswer } from '../answers/sub-workflow-answer.js';
 import type { SubWorkflowRequest } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
-import type { Outcome } from '../outcome.js';
 import { Phase } from '../phase.js';
 import { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
@@ -43,8 +43,8 @@ export abstract class TaskProgress {
     scope: TaskScope,
   ): Step<TaskProgress>;
 
-  abstract subWorkflowEnded(
-    outcome: Outcome,
+  abstract subWorkflowAnswered(
+    answer: SubWorkflowAnswer,
     scope: TaskScope,
   ): Step<TaskProgress>;
 

@@ -2,7 +2,7 @@ import type { JsonValue } from './interfaces.js';
 import type { ServiceResponded } from './results/service-responded.js';
 
 export class OutputFormat {
-  static readonly Raw = new OutputFormat('raw', (response) => response.content);
+  static readonly Raw = new OutputFormat('raw', (response) => response.body);
   static readonly Content = new OutputFormat(
     'content',
     (response) => response.content,

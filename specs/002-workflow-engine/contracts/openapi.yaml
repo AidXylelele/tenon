@@ -180,7 +180,8 @@ paths:
                 version:
                   {
                     type: string,
-                    description: Semantic version; the current version when omitted,
+                    minLength: 1,
+                    description: 'A published semantic version, or `latest`; the current version when omitted',
                   }
                 input:
                   {
@@ -196,7 +197,18 @@ paths:
                   { schema: { $ref: '#/components/schemas/InstanceSummary' } },
               },
           }
+        '400':
+          {
+            description: 'The body, the path or the idempotency key is malformed',
+          }
+        '403': { description: The user may not start instances }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          { description: A request with the same idempotency key is in flight }
+        '422':
+          {
+            description: 'The idempotency key was used with another version or input within 24 hours',
+          }
 
   /instances:
     get:
@@ -224,6 +236,7 @@ paths:
         - { $ref: '#/components/parameters/Cursor' }
         - { $ref: '#/components/parameters/Limit' }
       responses:
+        '400': { description: A filter or the cursor is malformed }
         '200':
           {
             description: Page of instances,
@@ -237,8 +250,9 @@ paths:
     parameters: [{ $ref: '#/components/parameters/Id' }]
     get:
       tags: [instances]
-      summary: Read an instance with its active and finished task records
+      summary: Read an instance; its task records and lifecycle events are paged at /tasks and /events
       responses:
+        '400': { description: The id is not a UUID }
         '200':
           {
             description: Instance,
@@ -257,9 +271,10 @@ paths:
       parameters:
         [
           { $ref: '#/components/parameters/Cursor' },
-          { $ref: '#/components/parameters/Limit' },
+          { $ref: '#/components/parameters/PageLimit' },
         ]
       responses:
+        '400': { description: The cursor or the limit is malformed }
         '200':
           {
             description: Page of task records,
@@ -278,9 +293,10 @@ paths:
       parameters:
         [
           { $ref: '#/components/parameters/Cursor' },
-          { $ref: '#/components/parameters/Limit' },
+          { $ref: '#/components/parameters/PageLimit' },
         ]
       responses:
+        '400': { description: The cursor or the limit is malformed }
         '200':
           {
             description: Page of CloudEvents,
@@ -348,7 +364,7 @@ paths:
                 },
             }
       responses:
-        '202': { description: Accepted, or a duplicate acknowledged }
+        '202': { description: 'Accepted, or a duplicate acknowledged' }
         '413': { description: Above the event size limit }
         '422': { description: Not a valid CloudEvent }
 
@@ -635,6 +651,12 @@ components:
         in: query,
         schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
       }
+    PageLimit:
+      {
+        name: limit,
+        in: query,
+        schema: { type: integer, minimum: 1, maximum: 500, default: 100 },
+      }
     IdempotencyKey:
       {
         name: Idempotency-Key,
@@ -721,7 +743,7 @@ components:
         publishedAt: { type: string, format: date-time }
     WorkflowError:
       type: object
-      required: [type, status]
+      required: [type, status, instance]
       properties:
         type: { type: string, format: uri }
         status: { type: integer }
@@ -755,11 +777,6 @@ components:
                   ],
               }
             parentId: { type: [string, 'null'], format: uuid }
-            activeTasks:
-              {
-                type: array,
-                items: { $ref: '#/components/schemas/TaskRecord' },
-              }
     InstancePage:
       type: object
       properties:
@@ -773,7 +790,7 @@ components:
         }
     TaskRecord:
       type: object
-      required: [id, reference, name, status]
+      required: [id, reference, name, status, retries, startedAt]
       properties:
         id: { type: string, format: uuid }
         reference: { type: string, description: JSON Pointer of the task }
@@ -782,9 +799,14 @@ components:
           {
             oneOf: [{ $ref: '#/components/schemas/Phase' }, { const: skipped }],
           }
-        parentId: { type: [string, 'null'], format: uuid }
-        input: {}
-        output: {}
+        parentId:
+          {
+            type: [string, 'null'],
+            format: uuid,
+            description: The enclosing task's record; null for a top-level task,
+          }
+        input: { description: 'The raw input, as `$task.input`' }
+        output: { description: The transformed output }
         error:
           {
             oneOf:
@@ -793,19 +815,12 @@ components:
                 { type: 'null' },
               ],
           }
-        attempts:
-          type: array
-          items:
-            {
-              type: object,
-              properties:
-                {
-                  number: { type: integer },
-                  at: { type: string, format: date-time },
-                  error: { $ref: '#/components/schemas/WorkflowError' },
-                },
-            }
-        startedAt: { type: [string, 'null'], format: date-time }
+        retries:
+          {
+            type: integer,
+            description: 'Retries of a `try` task; every attempt is its own record and a `task.retried` event',
+          }
+        startedAt: { type: string, format: date-time }
         endedAt: { type: [string, 'null'], format: date-time }
     TaskRecordPage:
       type: object
@@ -828,8 +843,8 @@ components:
         datacontenttype: { type: string }
         dataschema: { type: string }
         data: {}
-        sequence: { type: string }
       additionalProperties: true
+      description: 'A CloudEvent. A lifecycle event of an instance has its sequence as `id`, and leaves `output` out when that would make it larger than 64 KiB'
     CloudEventPage:
       type: object
       properties:
@@ -869,8 +884,7 @@ components:
           {
             type: object,
             minProperties: 1,
-            description: CloudEvent attributes; values are literals or regular expressions,
-            as in the DSL event filter,
+            description: 'CloudEvent attributes; values are literals or regular expressions, as in the DSL event filter',
           }
     Subscription:
       type: object

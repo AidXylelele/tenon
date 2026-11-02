@@ -11,6 +11,11 @@ export class WorkflowTarget {
     this.#version = version;
   }
 
+  static of(workflow: WorkflowName, version: string | null): WorkflowTarget {
+    const named = version ?? WorkflowTarget.#LATEST;
+    return new WorkflowTarget(workflow, named);
+  }
+
   get workflow(): WorkflowName {
     return this.#workflow;
   }

@@ -4,7 +4,7 @@ import { ClsPluginTransactional } from '@nestjs-cls/transactional';
 import { TransactionalAdapterDrizzleOrm } from '@nestjs-cls/transactional-adapter-drizzle-orm';
 import { ClsModule } from 'nestjs-cls';
 import pg from 'pg';
-import { Database } from '../../interface-adapters/interfaces.js';
+import { Database } from '../../interface-adapters/persistence/interfaces.js';
 import { createDatabase } from '../drizzle/client.js';
 import type { Env } from './config.module.js';
 
@@ -30,6 +30,7 @@ import type { Env } from './config.module.js';
       useFactory: (config: ConfigService<Env, true>) =>
         new pg.Pool({
           connectionString: config.get('DATABASE_URL', { infer: true }),
+          max: config.get('DATABASE_POOL_SIZE', { infer: true }),
         }),
     },
     { provide: Database, inject: [pg.Pool], useFactory: createDatabase },

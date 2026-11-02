@@ -114,4 +114,5 @@ export enum DslVersion {
 export enum Contradiction {
   CommunicationErrorType = 'CTK try.feature filters on https://serverlessworkflow.io/dsl/errors/types/communication, which the specification does not define; the platform raises https://serverlessworkflow.io/spec/1.0.0/errors/communication',
   EmitEventShape = 'dsl-reference types emit.event as event properties, while its example and the schema put them under emit.event.with; the platform follows the schema',
+  EmitEventId = 'dsl-reference requires an id when emitting an event, while the schema and CTK emit.feature leave it out; the platform generates the id when it is missing',
 }

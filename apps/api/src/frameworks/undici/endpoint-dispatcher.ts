@@ -1,8 +1,10 @@
 import { lookup as resolve, type LookupAddress } from 'node:dns';
 import { isIP, type LookupFunction } from 'node:net';
-import { Agent, buildConnector } from 'undici';
-import type { EndpointDispatcher } from '../../interface-adapters/endpoints/interfaces.js';
+import { Agent, buildConnector, Dispatcher } from 'undici';
 import { AddressPolicy, AddressRefusedError } from './address-policy.js';
+
+// Every request to an endpoint an author chose, so tests can replace it with a MockAgent.
+export abstract class EndpointDispatcher extends Dispatcher {}
 
 export function createEndpointDispatcher(
   allowList: readonly string[],

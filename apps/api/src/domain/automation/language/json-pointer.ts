@@ -13,6 +13,16 @@ export class JsonPointer {
     return new JsonPointer(tokens);
   }
 
+  static parse(text: string): JsonPointer {
+    const parts = text.split(JsonPointer.#SEPARATOR).slice(1);
+    const tokens = parts.map((part) =>
+      part
+        .replaceAll('~1', JsonPointer.#SEPARATOR)
+        .replaceAll('~0', JsonPointer.#TILDE),
+    );
+    return new JsonPointer(tokens);
+  }
+
   get tokens(): readonly string[] {
     return this.#tokens;
   }

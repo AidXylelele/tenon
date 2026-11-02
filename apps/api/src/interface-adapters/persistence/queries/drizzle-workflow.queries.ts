@@ -9,7 +9,7 @@ import type {
   WorkflowSummary,
 } from '../../../application/automation/workflows/queries.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import { Database } from '../../interfaces.js';
+import { Database } from '../interfaces.js';
 import {
   workflow as workflows,
   workflowVersion as versions,
@@ -104,6 +104,14 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
           eq(versions.semver, version),
         ),
       );
+    return row ?? null;
+  }
+
+  async documentOf(versionId: string): Promise<VersionDocument | null> {
+    const [row] = await this.db
+      .select({ format: versions.sourceFormat, text: versions.sourceText })
+      .from(versions)
+      .where(eq(versions.id, versionId));
     return row ?? null;
   }
 

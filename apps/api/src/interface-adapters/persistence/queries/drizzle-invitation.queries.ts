@@ -5,7 +5,7 @@ import type {
   PendingInvitation,
 } from '../../../application/identity/queries.js';
 import { InvitationStatus } from '../../../domain/identity/enums.js';
-import { Database } from '../../interfaces.js';
+import { Database } from '../interfaces.js';
 import { invitation as invitations } from '../schema/index.js';
 
 @Injectable()

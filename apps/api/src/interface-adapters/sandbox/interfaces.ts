@@ -1,6 +1,4 @@
-import { Dispatcher } from 'undici';
-
-export abstract class SandboxPool extends Dispatcher {}
+import type { SandboxOutcomeKind } from './enums.js';
 
 export abstract class SandboxLimits {
   abstract readonly seconds: number;
@@ -31,4 +29,36 @@ export interface GoJudgeResult {
   readonly exitStatus?: number;
   readonly error?: string;
   readonly files?: Readonly<Record<string, string>>;
+}
+
+export interface SandboxRan {
+  readonly kind: SandboxOutcomeKind.Ran;
+  readonly result: GoJudgeResult;
+}
+
+export interface SandboxRejected {
+  readonly kind: SandboxOutcomeKind.Rejected;
+}
+
+export interface SandboxTimedOut {
+  readonly kind: SandboxOutcomeKind.TimedOut;
+}
+
+export interface SandboxUnreachable {
+  readonly kind: SandboxOutcomeKind.Unreachable;
+}
+
+export interface SandboxRefused {
+  readonly kind: SandboxOutcomeKind.Refused;
+}
+
+export type SandboxOutcome =
+  | SandboxRan
+  | SandboxRejected
+  | SandboxTimedOut
+  | SandboxUnreachable
+  | SandboxRefused;
+
+export abstract class SandboxClient {
+  abstract run(command: GoJudgeCommand): Promise<SandboxOutcome>;
 }

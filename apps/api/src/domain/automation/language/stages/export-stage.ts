@@ -119,7 +119,7 @@ export class ExportStage extends TaskProgress {
     return base.export.failureIn(scope.prefix, results, at);
   }
 
-  subWorkflowEnded(): Step<TaskProgress> {
+  subWorkflowAnswered(): Step<TaskProgress> {
     return Step.of<TaskProgress>(this);
   }
 }

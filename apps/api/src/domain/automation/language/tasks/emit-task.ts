@@ -1,6 +1,7 @@
 import { MalformedEventError } from '../../../errors.js';
 import { CloudEvent } from '../cloud-event.js';
 import { ErrorType } from '../error-type.js';
+import { LifecycleSource } from '../lifecycle-source.js';
 import type { Expression } from '../expression.js';
 import type { EmitTaskProps, JsonValue, ValueTask } from '../interfaces.js';
 import type { KindProgress } from '../progress/kind-progress.js';
@@ -13,9 +14,10 @@ import { Task } from './task.js';
 import type { Template } from '../template.js';
 
 export class EmitTask extends Task implements ValueTask {
-  static readonly #SPEC_VERSION = '1.0';
   static readonly #MALFORMED =
     'The event to emit is not a well-formed CloudEvent';
+  static readonly #RESERVED =
+    "The source of the event to emit belongs to the platform's lifecycle events";
 
   readonly #event: Template;
 
@@ -45,19 +47,22 @@ export class EmitTask extends Task implements ValueTask {
 
     if (!CloudEvent.declares(value)) return Outcome.failed(malformed);
 
-    const completed: Record<string, JsonValue | undefined> = {};
-
-    for (const name of Object.keys(value)) completed[name] = value[name];
-
-    completed.id ??= scope.id;
-    completed.specversion ??= EmitTask.#SPEC_VERSION;
-    completed.time ??= scope.now.toISOString();
+    const completed = CloudEvent.complete(value, scope.id, scope.now);
     const event = CloudEvent.of(completed);
 
     if (event === null) return Outcome.failed(malformed);
 
-    const json = event.toJson();
-    return Outcome.emitting(json);
+    const reserved = LifecycleSource.claims(event.source);
+
+    if (reserved) {
+      const error = ErrorType.Runtime.errorAt(
+        this.reference,
+        EmitTask.#RESERVED,
+      );
+      return Outcome.failed(error);
+    }
+
+    return Outcome.emitting(completed, event);
   }
 
   protected override get ownExpressions(): readonly Expression[] {

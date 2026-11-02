@@ -4,12 +4,13 @@ import {
   Transactional,
   TransactionHost,
 } from '@nestjs-cls/transactional';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import type { WorkflowVersionRepository } from '../../../application/automation/workflows/ports.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
+import type { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 import { StaleWriteError } from '../../../domain/errors.js';
-import type { DrizzleTx } from '../../interfaces.js';
+import type { DrizzleTx } from '../interfaces.js';
 import { WorkflowVersionMapper } from '../mappers/workflow-version.mapper.js';
 import {
   workflow as workflows,
@@ -42,6 +43,23 @@ export class DrizzleWorkflowVersionRepository implements WorkflowVersionReposito
     return WorkflowVersionMapper.toEntity(found.version);
   }
 
+  async findBy(reference: VersionReference): Promise<WorkflowVersion | null> {
+    const versionId = reference.versionId;
+
+    if (versionId !== null) return this.#first(eq(versions.id, versionId));
+
+    const workflowId = reference.workflowId;
+    const semver = reference.semver;
+
+    if (workflowId === null || semver === null) return null;
+
+    const pinned = and(
+      eq(versions.workflowId, workflowId),
+      eq(versions.semver, semver),
+    );
+    return this.#first(pinned);
+  }
+
   @Transactional(Propagation.Mandatory)
   async add(version: WorkflowVersion): Promise<void> {
     const row = WorkflowVersionMapper.toRow(version);
@@ -55,5 +73,16 @@ export class DrizzleWorkflowVersionRepository implements WorkflowVersionReposito
 
       throw error;
     }
+  }
+
+  async #first(condition: SQL | undefined): Promise<WorkflowVersion | null> {
+    const [found] = await this.txHost.tx
+      .select()
+      .from(versions)
+      .where(condition);
+
+    if (!found) return null;
+
+    return WorkflowVersionMapper.toEntity(found);
   }
 }

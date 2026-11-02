@@ -10,6 +10,7 @@ import type { DefinitionProps, JsonObject, JsonValue } from './interfaces.js';
 import { JsonPointer } from './json-pointer.js';
 import type { Output } from './output.js';
 import type { ReusableComponents } from './reusable-components.js';
+import type { Schema } from './schema.js';
 import type { Task } from './tasks/task.js';
 import { TaskBase } from './task-base.js';
 import type { TaskList } from './task-list.js';
@@ -88,6 +89,14 @@ export class Definition {
     const body = this.#body.expressions;
     const components = this.#components.expressions;
     return input.concat(output, timeout, body, components);
+  }
+
+  get schemas(): readonly Schema[] {
+    const input = this.#input.schemas;
+    const output = this.#output.schemas;
+    const body = this.#body.schemas;
+    const components = this.#components.schemas;
+    return input.concat(output, body, components);
   }
 
   taskAt(reference: JsonPointer): Task {

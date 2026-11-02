@@ -15,6 +15,7 @@ export class SubWorkflowRequestMapper {
       name: target.workflow.name,
       version: target.version,
       input: request.input,
+      awaited: request.awaited,
     };
   }
 
@@ -25,6 +26,6 @@ export class SubWorkflowRequestMapper {
 
     const workflow = new WorkflowName(state.namespace, state.name);
     const target = new WorkflowTarget(workflow, state.version);
-    return { target, input: state.input };
+    return { target, input: state.input, awaited: state.awaited };
   }
 }

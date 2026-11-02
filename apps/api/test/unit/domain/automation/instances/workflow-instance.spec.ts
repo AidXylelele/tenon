@@ -1,5 +1,6 @@
 import { EventOriginKind } from '../../../../../src/domain/automation/events/enums.js';
 import { ProcessDetached } from '../../../../../src/domain/automation/instances/domain-events/process-detached.js';
+import { WorkflowDetached } from '../../../../../src/domain/automation/instances/domain-events/workflow-detached.js';
 import { InstanceProgressKind } from '../../../../../src/domain/automation/instances/enums.js';
 import { WorkflowInstance } from '../../../../../src/domain/automation/instances/workflow-instance.js';
 import type { Definition } from '../../../../../src/domain/automation/language/definition.js';
@@ -39,6 +40,7 @@ const ok = (id: string): ServiceResponded =>
     status: 200,
     headers: {},
     content: { id },
+    body: '',
     request: {},
     authorization: null,
   });
@@ -352,13 +354,17 @@ describe('WorkflowInstance', () => {
       if (request === undefined) throw new Error('request');
 
       const target = published(childDefinition);
-      const instance = WorkflowInstance.startSubWorkflow({
-        parentId: parent.id,
-        request,
-        workflow: target.workflow,
-        version: target.version,
+      const instance = parent.answerSubWorkflow(
+        request.instanceId,
+        target.workflow,
+        target.version,
+        definition,
+        runtime,
         now,
-      });
+      );
+
+      if (instance === null) throw new Error('sub-workflow');
+
       instance.beginRound(childDefinition, runtime, now);
       return instance;
     }
@@ -436,12 +442,104 @@ describe('WorkflowInstance', () => {
 
       if (request === undefined) throw new Error('request');
 
-      parent.refuseSubWorkflow(request.instanceId, definition, runtime, now);
+      const subWorkflow = parent.answerSubWorkflow(
+        request.instanceId,
+        null,
+        null,
+        definition,
+        runtime,
+        now,
+      );
+
+      expect(subWorkflow).toBeNull();
 
       expect(parent.phase).toBe(Phase.Faulted);
       expect(parent.error?.status).toBe(400);
       expect(parent.error?.instance).toBe('/do/0/invoice');
     });
+  });
+
+  describe('detached sub-workflows', () => {
+    const definition = definitionOf([
+      {
+        archive: {
+          run: {
+            workflow: {
+              namespace: 'billing',
+              name: 'archive',
+              version: 'latest',
+            },
+            await: false,
+          },
+        },
+      },
+    ]);
+    const target = definitionOf(
+      [{ keep: { set: { kept: true } } }],
+      {},
+      null,
+      'billing/archive',
+    );
+
+    it('a_detached_request_answered_by_its_version_completes_the_task_with_its_input', () => {
+      const parent = started(definition, { id: 7 });
+      parent.beginRound(definition, runtime, now);
+      parent.takeProducedEvents();
+      const request = parent.requestedSubWorkflows()[0];
+      const resolved = published(target);
+
+      if (request === undefined) throw new Error('request');
+
+      const child = parent.answerSubWorkflow(
+        request.instanceId,
+        resolved.workflow,
+        resolved.version,
+        definition,
+        runtime,
+        later(1),
+      );
+
+      const [detached] = parent.takeDomainEvents();
+      expect(request.awaited).toBe(false);
+      expect(child).toBeNull();
+      expect(parent.phase).toBe(Phase.Completed);
+      expect(parent.output).toEqual({ id: 7 });
+      expect(detached).toBeInstanceOf(WorkflowDetached);
+      expect(
+        detached instanceof WorkflowDetached && detached.detached.versionId,
+      ).toBe(resolved.version.id);
+      expect(typesOf(parent)).toEqual(['task.completed', 'workflow.completed']);
+    });
+
+    it('the_end_of_a_detached_sub_workflow_never_answers_its_task_again', () => {
+      const parent = started(definition, { id: 7 });
+      parent.beginRound(definition, runtime, now);
+      const request = parent.requestedSubWorkflows()[0];
+
+      if (request === undefined) throw new Error('request');
+
+      parent.completeSubWorkflow(
+        request.instanceId,
+        { phase: Phase.Completed, output: { kept: true }, error: null },
+        definition,
+        runtime,
+        now,
+      );
+
+      expect(parent.phase).toBe(Phase.Waiting);
+      expect(parent.requestedSubWorkflows()).toHaveLength(1);
+    });
+  });
+
+  it('lifecycle_events_are_accepted_when_their_round_records_them', () => {
+    const definition = definitionOf([{ first: { set: { a: 1 } } }]);
+    const instance = started(definition);
+
+    instance.beginRound(definition, runtime, later(5));
+
+    const [workflowStarted] = instance.takeProducedEvents();
+    expect(workflowStarted?.time).toEqual(now);
+    expect(workflowStarted?.acceptedAt).toEqual(later(5));
   });
 
   it('an_engine_failure_faults_the_instance_and_cancels_its_active_tasks', () => {
