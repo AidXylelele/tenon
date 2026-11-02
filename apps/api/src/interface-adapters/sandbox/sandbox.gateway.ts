@@ -15,30 +15,15 @@ export class SandboxGateway implements ProcessRunner {
     private readonly clock: Clock,
   ) {}
 
-  async runAll(runs: readonly ProcessRun[]): Promise<readonly ProcessResult[]> {
-    const settled = await Promise.all(runs.map((run) => this.#run(run)));
-    return settled.filter((result) => result !== null);
-  }
+  async run(run: ProcessRun): Promise<ProcessResult | null> {
+    const timeout = this.clock.remainingUntil(run.deadline);
 
-  async #run(run: ProcessRun): Promise<ProcessResult | null> {
-    const timeout = this.#timeoutOf(run);
-
+    // A deadline that passed before the process starts is a time-out; the sandbox stops one
+    // that outlives it, and the instance judges the answer's time.
     if (timeout !== null && timeout <= 0) return new ProcessTimedOut(run.id);
 
     const command = ProcessRunMapper.toCommand(run, this.limits, timeout);
     const outcome = await this.client.run(command);
-    const left = this.#timeoutOf(run);
-
-    // An answer that arrives after the task's deadline is a time-out.
-    if (left !== null && left < 0) return new ProcessTimedOut(run.id);
-
     return ProcessRunMapper.toResult(run.id, outcome);
-  }
-
-  #timeoutOf(run: ProcessRun): number | null {
-    if (run.deadline === null) return null;
-
-    const now = this.clock.now();
-    return run.deadline.getTime() - now.getTime();
   }
 }

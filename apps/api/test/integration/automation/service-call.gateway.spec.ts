@@ -14,6 +14,7 @@ import { ServiceResponded } from '../../../src/domain/automation/language/result
 import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.js';
 import type { EndpointDispatcher } from '../../../src/frameworks/undici/endpoint-dispatcher.js';
 import { UndiciEndpointClient } from '../../../src/frameworks/undici/undici-endpoint.client.js';
+import { SystemClock } from '../../support/instance-fakes.js';
 import { ServiceCallGateway } from '../../../src/interface-adapters/workflows/services/service-call.gateway.js';
 
 const at = JsonPointer.root().at('do').at(0).at('getPet');
@@ -49,7 +50,7 @@ describe('ServiceCallGateway', () => {
     agent.disableNetConnect();
     const dispatcher = agent as unknown as EndpointDispatcher;
     const client = new UndiciEndpointClient(dispatcher, resilience);
-    const clock = { now: () => new Date() };
+    const clock = new SystemClock();
     caller = new ServiceCallGateway(client, clock);
   });
 
@@ -63,7 +64,7 @@ describe('ServiceCallGateway', () => {
       .intercept({ path: '/v2/pet/1', method: 'GET' })
       .reply(200, { id: 1, name: 'Rex' }, json);
 
-    const [result] = await caller.callAll([httpCall()]);
+    const result = await caller.call(httpCall());
 
     expect(result).toBeInstanceOf(ServiceResponded);
     const outcome = result?.outcome(content, at);
@@ -80,7 +81,7 @@ describe('ServiceCallGateway', () => {
     });
     const response = new CallOutput(OutputFormat.Response, false);
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(response, at).output).toEqual({
       request: {
@@ -116,7 +117,7 @@ describe('ServiceCallGateway', () => {
 
     const response = new CallOutput(OutputFormat.Response, false);
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(content, at).authorization).toEqual({
       scheme: 'Basic',
@@ -162,7 +163,7 @@ describe('ServiceCallGateway', () => {
       },
     });
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(content, at).output).toEqual({ id: 1 });
   });
@@ -185,7 +186,7 @@ describe('ServiceCallGateway', () => {
       },
     });
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(content, at).failure?.status).toBe(401);
   });
@@ -224,7 +225,7 @@ describe('ServiceCallGateway', () => {
       arguments: { operationId: 'getPetById', parameters: { petId: 7 } },
     });
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(content, at).output).toEqual({ id: 7 });
   });
@@ -243,7 +244,7 @@ describe('ServiceCallGateway', () => {
       arguments: { operationId: 'getPetById', parameters: {} },
     });
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(content, at).failure?.status).toBe(400);
   });
@@ -259,7 +260,7 @@ describe('ServiceCallGateway', () => {
       endpoint: { uri: 'https://down.example/', authentication: null },
     });
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(content, at).failure?.title).toBe(
       'Communication Error',
@@ -276,7 +277,7 @@ describe('ServiceCallGateway', () => {
       endpoint: { uri: 'https://big.example/', authentication: null },
     });
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(content, at).failure?.detail).toBe(
       'The response is larger than 1 MiB',
@@ -294,7 +295,7 @@ describe('ServiceCallGateway', () => {
     });
     const raw = new CallOutput(OutputFormat.Raw, false);
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result?.outcome(raw, at).output).toBe('AAEC');
   });
@@ -309,7 +310,7 @@ describe('ServiceCallGateway', () => {
     const call = httpCall({ deadline });
     const started = performance.now();
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     const elapsed = performance.now() - started;
     expect(result).toBeInstanceOf(ServiceTimedOut);
@@ -320,7 +321,7 @@ describe('ServiceCallGateway', () => {
     const deadline = new Date(Date.now() - 1);
     const call = httpCall({ deadline });
 
-    const [result] = await caller.callAll([call]);
+    const result = await caller.call(call);
 
     expect(result).toBeInstanceOf(ServiceTimedOut);
   });
@@ -342,7 +343,7 @@ describe('ServiceCallGateway', () => {
         .intercept({ path: '/v2/pet/1', method: 'GET' })
         .reply(200, bytes, { headers: { 'content-type': type } });
 
-      const [result] = await caller.callAll([httpCall()]);
+      const result = await caller.call(httpCall());
 
       expect(result?.outcome(content, at).output).toEqual(expected);
     },
@@ -354,7 +355,7 @@ describe('ServiceCallGateway', () => {
       .intercept({ path: '/v2/pet/1', method: 'GET' })
       .reply(200, '{not json', json);
 
-    const [result] = await caller.callAll([httpCall()]);
+    const result = await caller.call(httpCall());
 
     expect(result?.outcome(content, at).failure?.type).toBe(
       'https://serverlessworkflow.io/spec/1.0.0/errors/communication',
@@ -367,7 +368,7 @@ describe('ServiceCallGateway', () => {
       .intercept({ path: '/v2/pet/1', method: 'GET' })
       .reply(200, 'a\u0000b', { headers: { 'content-type': 'text/plain' } });
 
-    const [result] = await caller.callAll([httpCall()]);
+    const result = await caller.call(httpCall());
 
     expect(result?.outcome(content, at).failure?.detail).toBe(
       'The response content holds a NUL character, which a value cannot hold',

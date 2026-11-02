@@ -284,15 +284,15 @@ export class WorkflowInstance {
 
     const round = this.#round(definition, runtime, now);
 
+    // The results arrived at `now`: a task whose time ran out by then, or around whose work the
+    // workflow's did, is interrupted first, so an answer that came too late is a time-out.
+    for (const task of this.#tasks.active()) this.#expire(task, round);
+
     for (const task of this.#tasks.active()) {
       const scope = this.#scopeOf(task, round);
       const change = task.record(results, scope);
       this.#follow(task, change, round);
     }
-
-    // The results arrived at `now`: a task whose time ran out meanwhile, or around whose
-    // work the workflow's did, is interrupted, as the standard's timeouts require.
-    for (const task of this.#tasks.active()) this.#expire(task, round);
 
     this.#settle(round);
   }

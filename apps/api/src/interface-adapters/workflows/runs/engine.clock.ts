@@ -1,8 +1,10 @@
-import type { Clock } from '../../../application/automation/language/ports.js';
+import { Clock } from '../../../application/automation/language/ports.js';
 import type { EngineTime } from './interfaces.js';
 
-export class EngineClock implements Clock {
-  constructor(readonly source: EngineTime) {}
+export class EngineClock extends Clock {
+  constructor(readonly source: EngineTime) {
+    super();
+  }
 
   now(): Date {
     const time = this.source.now();

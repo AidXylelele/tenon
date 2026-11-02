@@ -17,14 +17,11 @@ class GatedProcessRunner extends ProcessRunner {
   open = false;
   readonly runs: ProcessRun[] = [];
 
-  async runAll(runs: readonly ProcessRun[]): Promise<readonly ProcessResult[]> {
-    if (!this.open) return [];
+  async run(run: ProcessRun): Promise<ProcessResult | null> {
+    if (!this.open) return null;
 
-    this.runs.push(...runs);
-    return runs.map(
-      (run) =>
-        new ProcessExited({ id: run.id, code: 0, stdout: '', stderr: '' }),
-    );
+    this.runs.push(run);
+    return new ProcessExited({ id: run.id, code: 0, stdout: '', stderr: '' });
   }
 }
 

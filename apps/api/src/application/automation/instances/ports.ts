@@ -111,14 +111,11 @@ export abstract class InstanceRuns {
   abstract start(instanceId: string): Promise<void>;
 }
 
+// No result: the item is still to be done (a full bulkhead, a sandbox outage), architecture §3.
 export abstract class ServiceCaller {
-  abstract callAll(
-    calls: readonly ServiceCall[],
-  ): Promise<readonly ServiceResult[]>;
+  abstract call(call: ServiceCall): Promise<ServiceResult | null>;
 }
 
 export abstract class ProcessRunner {
-  abstract runAll(
-    runs: readonly ProcessRun[],
-  ): Promise<readonly ProcessResult[]>;
+  abstract run(run: ProcessRun): Promise<ProcessResult | null>;
 }

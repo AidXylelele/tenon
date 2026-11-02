@@ -10,13 +10,8 @@ export class RunDetachedProcess {
 
   async execute(command: RunDetachedProcessCommand): Promise<void> {
     const work = RoundWork.running(command.run);
-    const processes = await this.processes.runAll(work.processes);
-    const results = new RoundResults({
-      evaluated: [],
-      validated: [],
-      responses: [],
-      processes,
-    });
+    const process = await this.processes.run(command.run);
+    const results = RoundResults.exited(process);
     const deferred = results.deferredIn(work);
 
     if (deferred > 0) throw new WorkDeferredError();

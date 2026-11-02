@@ -44,9 +44,7 @@ export class WorkAnswers {
 
   #answersTo(work: RoundWork): Promise<WorkAnswer>[] {
     const answers: Promise<WorkAnswer>[] = [];
-    const computes = work.evaluations.length + work.validations.length > 0;
-
-    if (computes) answers.push(this.#computed(work));
+    if (work.computes()) answers.push(this.#computed(work));
 
     for (const call of work.calls) answers.push(this.#called(call));
 
@@ -61,36 +59,21 @@ export class WorkAnswers {
       this.schemas.validateAll(work.validations),
     ] as const;
     const [evaluated, validated] = await Promise.all(computations);
-    const results = new RoundResults({
-      evaluated,
-      validated,
-      responses: [],
-      processes: [],
-    });
+    const results = RoundResults.computed(evaluated, validated);
     return { results, deferred: 0 };
   }
 
   async #called(call: ServiceCall): Promise<WorkAnswer> {
-    const responses = await this.services.callAll([call]);
-    const results = new RoundResults({
-      evaluated: [],
-      validated: [],
-      responses,
-      processes: [],
-    });
+    const response = await this.services.call(call);
+    const results = RoundResults.responded(response);
     const asked = RoundWork.calling(call);
     const deferred = results.deferredIn(asked);
     return { results, deferred };
   }
 
   async #ran(run: ProcessRun): Promise<WorkAnswer> {
-    const processes = await this.processes.runAll([run]);
-    const results = new RoundResults({
-      evaluated: [],
-      validated: [],
-      responses: [],
-      processes,
-    });
+    const process = await this.processes.run(run);
+    const results = RoundResults.exited(process);
     const asked = RoundWork.running(run);
     const deferred = results.deferredIn(asked);
     return { results, deferred };

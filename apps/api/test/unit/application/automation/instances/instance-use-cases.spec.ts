@@ -110,17 +110,14 @@ describe('StartInstance', () => {
 describe('timeouts of work in progress', () => {
   const timeoutType = 'https://serverlessworkflow.io/spec/1.0.0/errors/timeout';
 
-  // Answers after `seconds`, as the service gateway does: an answer past the call's
-  // deadline is a time-out, and `deferred` gives no answer at all.
+  // Answers after `seconds`, however late; `deferred` gives no answer at all. The instance
+  // judges an answer that came after its task's deadline.
   function slowWorld(seconds: number, document: string, deferred = false) {
     const world = instanceWorld((call) => {
       const elapsed = world.clock.time.getTime() + seconds * 1000;
       world.clock.time = new Date(elapsed);
-      const late = call.deadline !== null && call.deadline < world.clock.time;
 
       if (deferred) return null;
-
-      if (late) return new ServiceTimedOut(call.id);
 
       return ok(call.id);
     });

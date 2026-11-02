@@ -20,16 +20,11 @@ export class ServiceCallGateway implements ServiceCaller {
     private readonly clock: Clock,
   ) {}
 
-  async callAll(
-    calls: readonly ServiceCall[],
-  ): Promise<readonly ServiceResult[]> {
-    const settled = await Promise.all(calls.map((call) => this.#call(call)));
-    return settled.filter((result) => result !== null);
-  }
+  async call(call: ServiceCall): Promise<ServiceResult | null> {
+    const timeout = this.clock.remainingUntil(call.deadline);
 
-  async #call(call: ServiceCall): Promise<ServiceResult | null> {
-    const timeout = this.#timeoutOf(call);
-
+    // A deadline that passed before the request leaves is a time-out; one that passes while it
+    // is out aborts it, and the instance judges the answer's time.
     if (timeout !== null && timeout <= 0) return new ServiceTimedOut(call.id);
 
     if (call.kind === CallKind.Http) {
@@ -71,7 +66,7 @@ export class ServiceCallGateway implements ServiceCaller {
 
     const request = preparation.request;
     const authorization = AuthorizationMapper.ofCall(call);
-    const timeout = this.#timeoutOf(call);
+    const timeout = this.clock.remainingUntil(call.deadline);
 
     if (timeout !== null && timeout <= 0) return new ServiceTimedOut(call.id);
 
@@ -80,18 +75,6 @@ export class ServiceCallGateway implements ServiceCaller {
       authorization,
       timeout,
     });
-    const left = this.#timeoutOf(call);
-
-    // An answer that arrives after the task's deadline is a time-out.
-    if (left !== null && left < 0) return new ServiceTimedOut(call.id);
-
     return ServiceResultMapper.toResult(call, request, outcome);
-  }
-
-  #timeoutOf(call: ServiceCall): number | null {
-    if (call.deadline === null) return null;
-
-    const now = this.clock.now();
-    return call.deadline.getTime() - now.getTime();
   }
 }

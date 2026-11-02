@@ -22,12 +22,9 @@ import { inTransaction, truncateAll } from '../../support/db.js';
 class RecordingProcessRunner extends ProcessRunner {
   readonly runs: ProcessRun[] = [];
 
-  async runAll(runs: readonly ProcessRun[]): Promise<readonly ProcessResult[]> {
-    this.runs.push(...runs);
-    return runs.map(
-      (run) =>
-        new ProcessExited({ id: run.id, code: 0, stdout: '', stderr: '' }),
-    );
+  async run(run: ProcessRun): Promise<ProcessResult> {
+    this.runs.push(run);
+    return new ProcessExited({ id: run.id, code: 0, stdout: '', stderr: '' });
   }
 }
 

@@ -83,6 +83,10 @@ export class RoundWork {
     return this.#calls.length + this.#processes.length > 0;
   }
 
+  computes(): boolean {
+    return this.#evaluations.length + this.#validations.length > 0;
+  }
+
   isEmpty(): boolean {
     const evaluations = this.#evaluations.length;
     const validations = this.#validations.length;

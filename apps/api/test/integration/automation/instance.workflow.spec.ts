@@ -20,25 +20,20 @@ import { truncateAll } from '../../support/db.js';
 class OnceBusyServiceCaller extends ServiceCaller {
   calls = 0;
 
-  async callAll(
-    calls: readonly ServiceCall[],
-  ): Promise<readonly ServiceResult[]> {
+  async call(call: ServiceCall): Promise<ServiceResult | null> {
     this.calls += 1;
 
-    if (this.calls === 1) return [];
+    if (this.calls === 1) return null;
 
-    return calls.map(
-      (call) =>
-        new ServiceResponded({
-          id: call.id,
-          status: 200,
-          headers: {},
-          content: { answered: true },
-          body: '',
-          request: {},
-          authorization: null,
-        }),
-    );
+    return new ServiceResponded({
+      id: call.id,
+      status: 200,
+      headers: {},
+      content: { answered: true },
+      body: '',
+      request: {},
+      authorization: null,
+    });
   }
 }
 

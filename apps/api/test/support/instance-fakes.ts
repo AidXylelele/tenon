@@ -12,9 +12,9 @@ import type {
   EventPage,
   TaskRecordPage,
 } from '../../src/application/automation/instances/queries.js';
-import type {
+import {
   Clock,
-  SchemaValidator,
+  type SchemaValidator,
 } from '../../src/application/automation/language/ports.js';
 import type {
   PageRequest,
@@ -130,8 +130,16 @@ export class RecordingEventRepository implements EventRepository {
   }
 }
 
-export class FixedClock implements Clock {
-  constructor(public time: Date) {}
+export class SystemClock extends Clock {
+  now(): Date {
+    return new Date();
+  }
+}
+
+export class FixedClock extends Clock {
+  constructor(public time: Date) {
+    super();
+  }
 
   now(): Date {
     return this.time;
@@ -147,18 +155,13 @@ export class ScriptedServiceCaller implements ServiceCaller {
     private readonly delay: (call: ServiceCall) => number = () => 0,
   ) {}
 
-  async callAll(
-    calls: readonly ServiceCall[],
-  ): Promise<readonly ServiceResult[]> {
-    this.calls.push(...calls);
-    const waits = calls.map((call) => this.delay(call));
-    const longest = Math.max(0, ...waits);
+  async call(call: ServiceCall): Promise<ServiceResult | null> {
+    this.calls.push(call);
+    const wait = this.delay(call);
 
-    if (longest > 0)
-      await new Promise((resolve) => setTimeout(resolve, longest));
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
 
-    const results = calls.map((call) => this.respond(call));
-    return results.filter((result) => result !== null);
+    return this.respond(call);
   }
 }
 
@@ -170,10 +173,9 @@ export class ScriptedProcessRunner implements ProcessRunner {
       null,
   ) {}
 
-  async runAll(runs: readonly ProcessRun[]): Promise<readonly ProcessResult[]> {
-    this.runs.push(...runs);
-    const results = runs.map((run) => this.exit(run));
-    return results.filter((result) => result !== null);
+  async run(run: ProcessRun): Promise<ProcessResult | null> {
+    this.runs.push(run);
+    return this.exit(run);
   }
 }
 

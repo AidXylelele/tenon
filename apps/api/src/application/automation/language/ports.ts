@@ -21,6 +21,14 @@ export abstract class ExpressionEvaluator {
 
 export abstract class Clock {
   abstract now(): Date;
+
+  // The milliseconds left until `deadline`; null when there is none.
+  remainingUntil(deadline: Date | null): number | null {
+    if (deadline === null) return null;
+
+    const now = this.now();
+    return deadline.getTime() - now.getTime();
+  }
 }
 
 export abstract class SchemaValidator {

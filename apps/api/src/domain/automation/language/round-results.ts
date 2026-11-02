@@ -29,6 +29,46 @@ export class RoundResults {
     });
   }
 
+  static computed(
+    evaluated: readonly EvaluationResult[],
+    validated: readonly ValidationResult[],
+  ): RoundResults {
+    return new RoundResults({
+      evaluated,
+      validated,
+      responses: [],
+      processes: [],
+    });
+  }
+
+  // No response: the call is still to be made (a full bulkhead).
+  static responded(response: ServiceResult | null): RoundResults {
+    const responses: ServiceResult[] = [];
+
+    if (response !== null) responses.push(response);
+
+    return new RoundResults({
+      evaluated: [],
+      validated: [],
+      responses,
+      processes: [],
+    });
+  }
+
+  // No result: the process is still to be run (a full bulkhead, a sandbox outage).
+  static exited(process: ProcessResult | null): RoundResults {
+    const processes: ProcessResult[] = [];
+
+    if (process !== null) processes.push(process);
+
+    return new RoundResults({
+      evaluated: [],
+      validated: [],
+      responses: [],
+      processes,
+    });
+  }
+
   static #byId<R extends { readonly id: string }>(
     results: readonly R[],
   ): ReadonlyMap<string, R> {
