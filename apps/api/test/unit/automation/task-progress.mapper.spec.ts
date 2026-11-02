@@ -126,6 +126,27 @@ const progresses: Record<string, () => TaskProgress> = {
     begun({
       paint: { do: [{ a: { set: { a: 1 } } }, { b: { set: { b: 2 } } }] },
     }),
+  for_collecting_its_items: () =>
+    begun({
+      loop: { for: { in: '.items' }, do: [{ mark: { set: { a: 1 } } }] },
+    }),
+  for_checking_its_condition_before_an_item: () => {
+    const definition = definitionOf([
+      {
+        loop: {
+          for: { in: '.items' },
+          while: '.go',
+          do: [{ mark: { set: { a: 1 } } }],
+        },
+      },
+    ]);
+    const scope = scopeOf(definition, '/do/0/loop', { items: [1, 2] });
+    const collecting = EntryStage.begin(scope).progress;
+    const results = answer(collecting.work(scope), {
+      evaluate: evaluatedAs(() => [1, 2]),
+    });
+    return collecting.record(results, scope).progress;
+  },
   for_in_the_middle_of_an_iteration: () => {
     const definition = definitionOf([
       { loop: { for: { in: '.items' }, do: [{ mark: { set: { a: 1 } } }] } },
@@ -238,7 +259,9 @@ describe('TaskProgressMapper', () => {
       'body/function',
       'body/sub-workflow',
       'body/do',
-      'body/for',
+      'body/for-collecting',
+      'body/for-checking',
+      'body/for-iterating',
       'body/fork',
       'body/switch',
       'body/try',

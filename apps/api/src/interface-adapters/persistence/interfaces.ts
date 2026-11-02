@@ -250,12 +250,25 @@ export interface DoProgressState {
   readonly sequence: SequenceState;
 }
 
-export interface ForProgressState {
-  readonly kind: ProgressKind.For;
-  readonly items: readonly JsonValue[] | null;
+export interface ForIterationState {
+  readonly items: readonly JsonValue[];
   readonly index: number;
   readonly data: JsonValue;
-  readonly sequence: SequenceState | null;
+}
+
+export interface ForCollectingProgressState {
+  readonly kind: ProgressKind.ForCollecting;
+}
+
+export interface ForCheckingProgressState {
+  readonly kind: ProgressKind.ForChecking;
+  readonly iteration: ForIterationState;
+}
+
+export interface ForIteratingProgressState {
+  readonly kind: ProgressKind.ForIterating;
+  readonly iteration: ForIterationState;
+  readonly sequence: SequenceState;
 }
 
 export interface ForkProgressState {
@@ -303,7 +316,9 @@ export type KindProgressState =
   | FunctionProgressState
   | SubWorkflowProgressState
   | DoProgressState
-  | ForProgressState
+  | ForCollectingProgressState
+  | ForCheckingProgressState
+  | ForIteratingProgressState
   | ForkProgressState
   | SwitchProgressState
   | TryProgressState

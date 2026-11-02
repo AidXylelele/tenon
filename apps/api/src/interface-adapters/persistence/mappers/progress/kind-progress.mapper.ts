@@ -2,7 +2,9 @@ import { InconsistentProgressError } from '../../../../domain/errors.js';
 import { CallingProgress } from '../../../../domain/automation/language/progress/calling-progress.js';
 import { CatchProgress } from '../../../../domain/automation/language/progress/catch-progress.js';
 import { DoProgress } from '../../../../domain/automation/language/progress/do-progress.js';
-import { ForProgress } from '../../../../domain/automation/language/progress/for-progress.js';
+import { ForCheckingProgress } from '../../../../domain/automation/language/progress/for-checking-progress.js';
+import { ForCollectingProgress } from '../../../../domain/automation/language/progress/for-collecting-progress.js';
+import { ForIteratingProgress } from '../../../../domain/automation/language/progress/for-iterating-progress.js';
 import { ForkProgress } from '../../../../domain/automation/language/progress/fork-progress.js';
 import { DefinitionProgress } from '../../../../domain/automation/language/progress/definition-progress.js';
 import { FunctionProgress } from '../../../../domain/automation/language/progress/function-progress.js';
@@ -16,6 +18,7 @@ import { TryProgress } from '../../../../domain/automation/language/progress/try
 import { ProgressKind } from '../../enums.js';
 import type { KindProgressState } from '../../interfaces.js';
 import { AttemptMapper } from './attempt.mapper.js';
+import { ForIterationMapper } from './for-iteration.mapper.js';
 import { SubWorkflowRequestMapper } from './sub-workflow-request.mapper.js';
 import { InstantMapper } from './instant.mapper.js';
 import { ProcessRunMapper } from './process-run.mapper.js';
@@ -61,15 +64,18 @@ export class KindProgressMapper {
       return { kind: ProgressKind.Handler, sequence };
     }
 
-    if (progress instanceof ForProgress) {
+    if (progress instanceof ForCollectingProgress)
+      return { kind: ProgressKind.ForCollecting };
+
+    if (progress instanceof ForCheckingProgress) {
+      const iteration = ForIterationMapper.toState(progress.iteration);
+      return { kind: ProgressKind.ForChecking, iteration };
+    }
+
+    if (progress instanceof ForIteratingProgress) {
+      const iteration = ForIterationMapper.toState(progress.iteration);
       const sequence = SequenceMapper.toState(progress.sequence);
-      return {
-        kind: ProgressKind.For,
-        items: progress.items,
-        index: progress.index,
-        data: progress.data,
-        sequence,
-      };
+      return { kind: ProgressKind.ForIterating, iteration, sequence };
     }
 
     if (progress instanceof ForkProgress)
@@ -129,14 +135,16 @@ export class KindProgressMapper {
         const sequence = SequenceMapper.toDomain(state.sequence);
         return new HandlerProgress(sequence);
       }
-      case ProgressKind.For: {
+      case ProgressKind.ForCollecting:
+        return new ForCollectingProgress();
+      case ProgressKind.ForChecking: {
+        const iteration = ForIterationMapper.toDomain(state.iteration);
+        return new ForCheckingProgress(iteration);
+      }
+      case ProgressKind.ForIterating: {
+        const iteration = ForIterationMapper.toDomain(state.iteration);
         const sequence = SequenceMapper.toDomain(state.sequence);
-        return new ForProgress({
-          items: state.items,
-          index: state.index,
-          data: state.data,
-          sequence,
-        });
+        return new ForIteratingProgress({ iteration, sequence });
       }
       case ProgressKind.Fork:
         return new ForkProgress({

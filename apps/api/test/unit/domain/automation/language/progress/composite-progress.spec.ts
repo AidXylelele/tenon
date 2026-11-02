@@ -2,7 +2,8 @@ import { FlowDirective } from '../../../../../../src/domain/automation/language/
 import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
 import { ForkProgress } from '../../../../../../src/domain/automation/language/progress/fork-progress.js';
-import { ForProgress } from '../../../../../../src/domain/automation/language/progress/for-progress.js';
+import { ForIteration } from '../../../../../../src/domain/automation/language/for-iteration.js';
+import { ForCheckingProgress } from '../../../../../../src/domain/automation/language/progress/for-checking-progress.js';
 import { Sequence } from '../../../../../../src/domain/automation/language/sequence.js';
 import {
   InconsistentProgressError,
@@ -134,6 +135,64 @@ describe('composite progress', () => {
     expect(ended?.output).toEqual({ seen: 'blue' });
   });
 
+  it('a_for_checks_its_while_before_each_item_on_the_data_so_far', () => {
+    const definition = definitionOf([
+      {
+        loop: {
+          for: { each: 'color', in: '.colors' },
+          while: '${ .seen != "red" }',
+          do: [{ mark: { set: { seen: '${ $color }' } } }],
+        },
+      },
+    ]);
+    const scope = scopeOf(definition, '/do/0/loop', {
+      colors: ['red', 'blue'],
+    });
+    const collecting = EntryStage.begin(scope).progress;
+    const markAt = '/do/0/loop/do/0/mark';
+
+    const checking = collecting.record(
+      answer(collecting.work(scope), {
+        evaluate: evaluatedAs(() => ['red', 'blue']),
+      }),
+      scope,
+    ).progress;
+    const firstCheck = checking.work(scope);
+    const first = checking.record(
+      answer(firstCheck, { evaluate: evaluatedAs(() => true) }),
+      scope,
+    );
+    const checkingAgain = first.progress.childEnded(
+      pointerOf(markAt),
+      completedAt(definition, markAt, { seen: 'red' }),
+      scope,
+    ).progress;
+    const secondCheck = checkingAgain.work(scope);
+    const ended = checkingAgain
+      .record(
+        answer(secondCheck, { evaluate: evaluatedAs(() => false) }),
+        scope,
+      )
+      .progress.ending();
+
+    expect(firstCheck.evaluations).toEqual([
+      expect.objectContaining({
+        data: { colors: ['red', 'blue'] },
+        arguments: expect.objectContaining({ color: 'red', index: 0 }),
+      }),
+    ]);
+    expect(first.starts).toEqual([
+      expect.objectContaining({ variables: { color: 'red', index: 0 } }),
+    ]);
+    expect(secondCheck.evaluations).toEqual([
+      expect.objectContaining({
+        data: { seen: 'red' },
+        arguments: expect.objectContaining({ color: 'blue', index: 1 }),
+      }),
+    ]);
+    expect(ended?.output).toEqual({ seen: 'red' });
+  });
+
   it('a_for_over_an_empty_collection_completes_with_its_input', () => {
     const definition = definitionOf([
       { loop: { for: { in: '.items' }, do: [{ mark: { set: { a: 1 } } }] } },
@@ -178,17 +237,15 @@ describe('composite progress', () => {
     },
   );
 
-  it('a_for_iterating_before_it_collected_its_items_is_refused', () => {
-    const sequence = new Sequence({ position: 0, variables: {} });
-    const build = () =>
-      new ForProgress({ items: null, index: 0, data: {}, sequence });
+  it.each([-1, 0.5, 3])('a_for_at_item_%d_of_two_is_refused', (index) => {
+    const build = () => new ForIteration({ items: [1, 2], index, data: {} });
 
     expect(build).toThrow(InconsistentProgressError);
   });
 
-  it.each([-1, 0.5, 2])('a_for_at_item_%d_of_two_is_refused', (index) => {
-    const build = () =>
-      new ForProgress({ items: [1, 2], index, data: {}, sequence: null });
+  it('a_for_checks_no_condition_past_its_last_item', () => {
+    const over = new ForIteration({ items: [1, 2], index: 2, data: {} });
+    const build = () => new ForCheckingProgress(over);
 
     expect(build).toThrow(InconsistentProgressError);
   });

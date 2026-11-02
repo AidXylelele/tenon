@@ -1,12 +1,15 @@
-import { ReservedVariableError } from '../../../errors.js';
+import {
+  InconsistentProgressError,
+  ReservedVariableError,
+} from '../../../errors.js';
 import { DefaultVariable, RuntimeArgument } from '../enums.js';
 import type { Expression } from '../expression.js';
+import type { ForIteration } from '../for-iteration.js';
 import type { ForTaskProps, JsonObject, JsonValue } from '../interfaces.js';
 import type { JsonPointer } from '../json-pointer.js';
 import type { KindProgress } from '../progress/kind-progress.js';
-import { ForProgress } from '../progress/for-progress.js';
+import { ForCollectingProgress } from '../progress/for-collecting-progress.js';
 import type { Step } from '../step.js';
-import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { TaskList } from '../task-list.js';
 
@@ -49,7 +52,15 @@ export class ForTask extends Task {
     return this.#collection;
   }
 
-  get whilst(): Expression | null {
+  isGuarded(): boolean {
+    return this.#whilst !== null;
+  }
+
+  // The `while` condition, which only a guarded loop checks.
+  get whilst(): Expression {
+    if (this.#whilst === null)
+      throw new InconsistentProgressError('a for without while checks nothing');
+
     return this.#whilst;
   }
 
@@ -61,14 +72,14 @@ export class ForTask extends Task {
     return [this.#body];
   }
 
-  enter(scope: BodyScope<ForTask>): Step<KindProgress> {
-    return ForProgress.enter(scope);
+  enter(): Step<KindProgress> {
+    return ForCollectingProgress.enter();
   }
 
-  variablesFor(item: JsonValue, index: number): JsonObject {
+  variablesFor(iteration: ForIteration): JsonObject {
     const variables: Record<string, JsonValue> = {};
-    variables[this.#each] = item;
-    variables[this.#at] = index;
+    variables[this.#each] = iteration.item;
+    variables[this.#at] = iteration.index;
     return variables;
   }
 

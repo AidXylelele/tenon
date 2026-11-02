@@ -20,6 +20,7 @@ import type { Expression } from './expression.js';
 import type { ExpressionDuration } from './expression-duration.js';
 import type { FixedDuration } from './fixed-duration.js';
 import type { FlowDirective } from './flow-directive.js';
+import type { ForIteration } from './for-iteration.js';
 import type { Input } from './input.js';
 import type { JsonPointer } from './json-pointer.js';
 import type { Outcome } from './outcome.js';
@@ -440,11 +441,15 @@ export interface SequenceProps {
   readonly variables: JsonObject;
 }
 
-export interface ForProgressProps {
-  readonly items: readonly JsonValue[] | null;
+export interface ForIterationProps {
+  readonly items: readonly JsonValue[];
   readonly index: number;
   readonly data: JsonValue;
-  readonly sequence: Sequence | null;
+}
+
+export interface ForIteratingProgressProps {
+  readonly iteration: ForIteration;
+  readonly sequence: Sequence;
 }
 
 export interface ForkProgressProps {
