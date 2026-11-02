@@ -1,6 +1,5 @@
 import type { InstanceProgress } from '../../../domain/automation/instances/interfaces.js';
 import type { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
-import type { Definition } from '../../../domain/automation/language/definition.js';
 import type {
   JsonObject,
   JsonValue,
@@ -14,6 +13,7 @@ import type { WorkflowName } from '../../../domain/automation/language/workflow-
 import type { WorkflowTarget } from '../../../domain/automation/language/workflow-target.js';
 import type { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
 import type { SubWorkflowStartKind } from './enums.js';
+import type { RoundContext } from '../../../domain/automation/instances/round-context.js';
 
 export interface StartInstanceCommand {
   readonly target: WorkflowTarget;
@@ -39,7 +39,7 @@ export interface BeginRoundCommand {
 }
 
 export interface BegunRoundResult {
-  readonly definition: Definition;
+  readonly context: RoundContext;
   readonly instance: WorkflowInstance;
 }
 
@@ -59,9 +59,8 @@ export interface RecordRoundCommand {
   readonly instanceId: string;
   // The round that produced the results.
   readonly round: number;
-  readonly runtime: JsonObject;
-  readonly now: Date;
-  readonly definition: Definition;
+  // As of the last answer.
+  readonly context: RoundContext;
   readonly recorded: readonly RecordedAnswer[];
 }
 

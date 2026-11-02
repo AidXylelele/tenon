@@ -132,22 +132,23 @@ Gaps this closes:
 ```text
 AdvanceInstance({ instanceId, runtime }):
   now = clock.now()
-  { definition, instance } = BeginRound({ instanceId, now, runtime })     // @Transactional
-      instance = instances.find(id);  definition = definitions.read(queries.documentOf(instance.versionId))
-      instance.beginRound(definition, runtime, now);  instances.save(instance)   // save writes nothing when unchanged
+  { context, instance } = BeginRound({ instanceId, now, runtime })        // @Transactional
+      instance = instances.get(id);  definition = definitions.read(queries.documentOf(instance.versionId))
+      context = RoundContext(definition, runtime, now)
+      instance.beginRound(context);  instances.save(instance)                  // save writes nothing when unchanged
       events.addAll(instance.takeProducedEvents())                               // save writes the domain events to the outbox
   recorded = []
   repeat:                                                    // pure work is never saved on its own
-    work = instance.pendingWork(definition, runtime, now)    // at most one context export per pass
+    work = instance.pendingWork(context)                      // at most one context export per pass
     if work is empty: stop
     for each answer of WorkAnswers.inArrivalOrder(work):     // expressions and schemas together, then each
-      now = clock.now()                                      // call and process as it ends
-      instance.record(answer.results, definition, runtime, now);  recorded.push({ answer.results, at: now })
+      context = context.at(clock.now())                      // call and process as it ends
+      instance.record(answer.results, context);  recorded.push({ answer.results, at: context.now })
     if work.endsRound(): stop                                 // it had calls or processes
-  if recorded is not empty: RecordRound({ instanceId, recorded, definition, runtime, now })   // @Transactional
-      current = instances.find(id);  for each { results, at } of recorded: current.record(results, …, at)
+  if recorded is not empty: RecordRound({ instanceId, round, context, recorded })   // @Transactional
+      current = instances.get(id);  for each { results, at } of recorded: current.record(results, context.at(at))
       instances.save(current);  events.addAll(current.takeProducedEvents())
-  return { progress: current.progress(now), deferred: work the outside did not start }
+  return { progress: current.progress(context.now), deferred: work the outside did not start }
 ```
 
 `runtime` (`$runtime`: name, version) is configuration, passed as a value like the time.

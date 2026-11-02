@@ -3,6 +3,7 @@ import { ProcessDetached } from '../../../../../src/domain/automation/instances/
 import { WorkflowDetached } from '../../../../../src/domain/automation/instances/domain-events/workflow-detached.js';
 import { InstanceProgressKind } from '../../../../../src/domain/automation/instances/enums.js';
 import { WorkflowInstance } from '../../../../../src/domain/automation/instances/workflow-instance.js';
+import { RunnableVersion } from '../../../../../src/domain/automation/workflows/runnable-version.js';
 import type { Definition } from '../../../../../src/domain/automation/language/definition.js';
 import { ErrorType } from '../../../../../src/domain/automation/language/error-type.js';
 import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
@@ -10,8 +11,8 @@ import { Phase } from '../../../../../src/domain/automation/language/phase.js';
 import { ServiceResponded } from '../../../../../src/domain/automation/language/results/service-responded.js';
 import { ValidationFailed } from '../../../../../src/domain/automation/language/results/validation-failed.js';
 import {
+  roundAt,
   published,
-  runtime,
   settle,
   started,
   typesOf,
@@ -68,7 +69,7 @@ describe('WorkflowInstance', () => {
     ]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
 
     expect(instance.phase).toBe(Phase.Completed);
     expect(instance.output).toEqual({ b: 2 });
@@ -90,7 +91,7 @@ describe('WorkflowInstance', () => {
     const definition = definitionOf([{ first: { set: { a: 1 } } }]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     const [started_, created] = instance.takeProducedEvents();
 
     expect(started_?.source).toBe(
@@ -128,7 +129,7 @@ describe('WorkflowInstance', () => {
     );
     const instance = started(definition, {});
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     settle(instance, definition, now, {
       validate: (id) => new ValidationFailed(id, 'orderId is required'),
     });
@@ -144,7 +145,7 @@ describe('WorkflowInstance', () => {
     const definition = definitionOf([{ fail: { raise: { error: failing } } }]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
 
     expect(instance.phase).toBe(Phase.Faulted);
     expect(instance.error?.toJson()).toEqual({
@@ -168,7 +169,7 @@ describe('WorkflowInstance', () => {
     ]);
     const instance = started(definition, { kept: true });
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     settle(instance, definition, now, {
       evaluate: evaluatedAs(() => false),
     });
@@ -197,10 +198,10 @@ describe('WorkflowInstance', () => {
     ]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     const parked = instance.progress(now);
-    instance.beginRound(definition, runtime, later(1));
-    instance.beginRound(definition, runtime, later(2));
+    instance.beginRound(roundAt(definition, later(1)));
+    instance.beginRound(roundAt(definition, later(2)));
     const types = typesOf(instance);
 
     expect(parked).toEqual({
@@ -227,9 +228,9 @@ describe('WorkflowInstance', () => {
     ]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     const waiting = instance.progress(now);
-    instance.beginRound(definition, runtime, later(5));
+    instance.beginRound(roundAt(definition, later(5)));
 
     expect(waiting.wakeAt).toEqual(later(5));
     expect(instance.phase).toBe(Phase.Faulted);
@@ -252,8 +253,8 @@ describe('WorkflowInstance', () => {
       },
     ]);
     const instance = started(definition);
-    instance.beginRound(definition, runtime, now);
-    const work = instance.pendingWork(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
+    const work = instance.pendingWork(roundAt(definition, now));
     const first = work.calls[0];
 
     if (first === undefined) throw new Error('call');
@@ -290,7 +291,7 @@ describe('WorkflowInstance', () => {
     ]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     const emitted = instance
       .takeProducedEvents()
       .find((event) => event.origin.kind === EventOriginKind.Emit);
@@ -307,7 +308,7 @@ describe('WorkflowInstance', () => {
     ]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     const events = instance.takeDomainEvents();
     const again = instance.takeDomainEvents();
 
@@ -355,23 +356,20 @@ describe('WorkflowInstance', () => {
       const target = published(childDefinition);
       const instance = parent.answerSubWorkflow(
         request.instanceId,
-        target.workflow,
-        target.version,
-        definition,
-        runtime,
-        now,
+        RunnableVersion.found(target.workflow, target.version),
+        roundAt(definition, now),
       );
 
       if (instance === null) throw new Error('sub-workflow');
 
-      instance.beginRound(childDefinition, runtime, now);
+      instance.beginRound(roundAt(childDefinition, now));
       return instance;
     }
 
     it('an_awaiting_run_task_requests_its_child_by_a_derived_id', () => {
       const parent = started(definition, { id: 42 });
 
-      parent.beginRound(definition, runtime, now);
+      parent.beginRound(roundAt(definition, now));
       const requested = parent.requestedSubWorkflows();
       const progress = parent.progress(now);
 
@@ -383,7 +381,7 @@ describe('WorkflowInstance', () => {
 
     it('a_completed_child_completes_its_run_task_with_its_output', () => {
       const parent = started(definition, { id: 42 });
-      parent.beginRound(definition, runtime, now);
+      parent.beginRound(roundAt(definition, now));
       const instance = childOf(parent, child);
 
       parent.completeSubWorkflow(
@@ -393,9 +391,7 @@ describe('WorkflowInstance', () => {
           output: instance.output,
           error: instance.error,
         },
-        definition,
-        runtime,
-        now,
+        roundAt(definition, now),
       );
 
       expect(parent.phase).toBe(Phase.Completed);
@@ -404,7 +400,7 @@ describe('WorkflowInstance', () => {
 
     it('a_faulted_child_faults_its_run_task_with_its_error_at_the_task', () => {
       const parent = started(definition, { id: 42 });
-      parent.beginRound(definition, runtime, now);
+      parent.beginRound(roundAt(definition, now));
       const instance = childOf(parent, failingChild);
 
       parent.completeSubWorkflow(
@@ -414,9 +410,7 @@ describe('WorkflowInstance', () => {
           output: instance.output,
           error: instance.error,
         },
-        definition,
-        runtime,
-        now,
+        roundAt(definition, now),
       );
 
       expect(parent.phase).toBe(Phase.Faulted);
@@ -426,7 +420,7 @@ describe('WorkflowInstance', () => {
 
     it('a_sub_workflow_of_another_workflow_than_the_task_names_is_refused', () => {
       const parent = started(definition, { id: 42 });
-      parent.beginRound(definition, runtime, now);
+      parent.beginRound(roundAt(definition, now));
       const other = definitionOf([{ send: { set: { sent: true } } }]);
 
       const start = () => childOf(parent, other);
@@ -436,18 +430,15 @@ describe('WorkflowInstance', () => {
 
     it('a_refused_child_faults_its_run_task_with_a_configuration_error', () => {
       const parent = started(definition, { id: 42 });
-      parent.beginRound(definition, runtime, now);
+      parent.beginRound(roundAt(definition, now));
       const request = parent.requestedSubWorkflows()[0];
 
       if (request === undefined) throw new Error('request');
 
       const subWorkflow = parent.answerSubWorkflow(
         request.instanceId,
-        null,
-        null,
-        definition,
-        runtime,
-        now,
+        RunnableVersion.found(null, null),
+        roundAt(definition, now),
       );
 
       expect(subWorkflow).toBeNull();
@@ -482,7 +473,7 @@ describe('WorkflowInstance', () => {
 
     it('a_detached_request_answered_by_its_version_completes_the_task_with_its_input', () => {
       const parent = started(definition, { id: 7 });
-      parent.beginRound(definition, runtime, now);
+      parent.beginRound(roundAt(definition, now));
       parent.takeProducedEvents();
       const request = parent.requestedSubWorkflows()[0];
       const resolved = published(target);
@@ -491,11 +482,8 @@ describe('WorkflowInstance', () => {
 
       const child = parent.answerSubWorkflow(
         request.instanceId,
-        resolved.workflow,
-        resolved.version,
-        definition,
-        runtime,
-        later(1),
+        RunnableVersion.found(resolved.workflow, resolved.version),
+        roundAt(definition, later(1)),
       );
 
       const [detached] = parent.takeDomainEvents();
@@ -512,7 +500,7 @@ describe('WorkflowInstance', () => {
 
     it('the_end_of_a_detached_sub_workflow_never_answers_its_task_again', () => {
       const parent = started(definition, { id: 7 });
-      parent.beginRound(definition, runtime, now);
+      parent.beginRound(roundAt(definition, now));
       const request = parent.requestedSubWorkflows()[0];
 
       if (request === undefined) throw new Error('request');
@@ -520,9 +508,7 @@ describe('WorkflowInstance', () => {
       parent.completeSubWorkflow(
         request.instanceId,
         { phase: Phase.Completed, output: { kept: true }, error: null },
-        definition,
-        runtime,
-        now,
+        roundAt(definition, now),
       );
 
       expect(parent.phase).toBe(Phase.Waiting);
@@ -534,7 +520,7 @@ describe('WorkflowInstance', () => {
     const definition = definitionOf([{ first: { set: { a: 1 } } }]);
     const instance = started(definition);
 
-    instance.beginRound(definition, runtime, later(5));
+    instance.beginRound(roundAt(definition, later(5)));
 
     const [workflowStarted] = instance.takeProducedEvents();
     expect(workflowStarted?.time).toEqual(now);
@@ -544,7 +530,7 @@ describe('WorkflowInstance', () => {
   it('an_engine_failure_faults_the_instance_and_cancels_its_active_tasks', () => {
     const definition = definitionOf([{ slow: call('https://slow.example/') }]);
     const instance = started(definition);
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     instance.takeProducedEvents();
 
     instance.fault(later(1));
@@ -557,11 +543,11 @@ describe('WorkflowInstance', () => {
   it('a_terminal_instance_never_changes_again', () => {
     const definition = definitionOf([{ first: { set: { a: 1 } } }]);
     const instance = started(definition);
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     instance.takeProducedEvents();
 
     instance.fault(later(1));
-    instance.beginRound(definition, runtime, later(2));
+    instance.beginRound(roundAt(definition, later(2)));
 
     expect(instance.phase).toBe(Phase.Completed);
     expect(instance.takeProducedEvents()).toHaveLength(0);
@@ -576,7 +562,7 @@ describe('WorkflowInstance', () => {
     const second = started(definition);
 
     for (const instance of [first, second]) {
-      instance.beginRound(definition, runtime, now);
+      instance.beginRound(roundAt(definition, now));
       settle(instance, definition, now, { respond: (id) => ok(id) });
     }
 
@@ -591,7 +577,7 @@ describe('WorkflowInstance', () => {
       { gated: { if: '${ .go }', set: { a: 1 } } },
     ]);
     const instance = started(definition);
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     instance.takeProducedEvents();
 
     instance.fault(later(1));
@@ -607,7 +593,7 @@ describe('WorkflowInstance', () => {
       { b: { set: { b: 2 } } },
     ]);
     const instance = started(definition);
-    instance.beginRound(definition, runtime, now);
+    instance.beginRound(roundAt(definition, now));
     const leaf = instance.tasks.find((task) => task.name === 'a');
 
     if (leaf === undefined) throw new Error('leaf');
@@ -633,7 +619,7 @@ describe('WorkflowInstance', () => {
       version: 1,
     });
     // A task's scope holds the deadlines of the tasks around it, so its work is refused.
-    const work = () => restored.pendingWork(definition, runtime, now);
+    const work = () => restored.pendingWork(roundAt(definition, now));
 
     expect(work).toThrow(InconsistentProgressError);
   });
@@ -649,7 +635,7 @@ describe('WorkflowInstance', () => {
     const instance = started(definition);
 
     const begin = () => {
-      instance.beginRound(other, runtime, now);
+      instance.beginRound(roundAt(other, now));
     };
 
     expect(begin).toThrow(TypeError);

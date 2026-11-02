@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { RunnableVersion } from '../../../domain/automation/workflows/runnable-version.js';
 import { Transactional } from '@nestjs-cls/transactional';
 import { UserOrigin } from '../../../domain/automation/instances/origins/user-origin.js';
 import { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
@@ -51,10 +52,10 @@ export class StartInstance {
     if (existing !== null) return existing;
 
     const origin = new UserOrigin(command.userId);
+    const runnable = new RunnableVersion({ workflow, version });
     const instance = WorkflowInstance.start({
       id,
-      workflow,
-      version,
+      runnable,
       input: command.input,
       origin,
       now,

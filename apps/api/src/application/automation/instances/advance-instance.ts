@@ -22,28 +22,27 @@ export class AdvanceInstance {
     command: AdvanceInstanceCommand,
   ): Promise<AdvancedInstanceResult> {
     const startedAt = this.clock.now();
-    const round = {
+    const begun = await this.beginRound.execute({
       instanceId: command.instanceId,
       runtime: command.runtime,
       now: startedAt,
-    };
-    const begun = await this.beginRound.execute(round);
+    });
     const instance = begun.instance;
-    const definition = begun.definition;
     const recorded: RecordedAnswer[] = [];
+    let context = begun.context;
     let deferred = 0;
-    let now = startedAt;
 
     for (
-      let work = instance.pendingWork(definition, command.runtime, now);
+      let work = instance.pendingWork(context);
       !work.isEmpty();
-      work = instance.pendingWork(definition, command.runtime, now)
+      work = instance.pendingWork(context)
     ) {
       // Each answer is recorded at the time it arrived.
       for await (const answer of this.answers.inArrivalOrder(work)) {
-        now = this.clock.now();
-        instance.record(answer.results, definition, command.runtime, now);
-        recorded.push({ results: answer.results, at: now });
+        const arrivedAt = this.clock.now();
+        context = context.at(arrivedAt);
+        instance.record(answer.results, context);
+        recorded.push({ results: answer.results, at: arrivedAt });
         deferred += answer.deferred;
       }
 
@@ -54,16 +53,14 @@ export class AdvanceInstance {
     const nothingRecorded = recorded.length === 0;
 
     if (nothingRecorded) {
-      const progress = instance.progress(now);
+      const progress = instance.progress(context.now);
       return { progress, deferred };
     }
 
     const progress = await this.recordRound.execute({
       instanceId: command.instanceId,
       round: instance.rounds,
-      runtime: command.runtime,
-      now,
-      definition,
+      context,
       recorded,
     });
     return { progress, deferred };

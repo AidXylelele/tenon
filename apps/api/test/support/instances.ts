@@ -5,8 +5,10 @@ import type {
 } from '../../src/domain/automation/language/interfaces.js';
 import type { Origin } from '../../src/domain/automation/instances/interfaces.js';
 import { UserOrigin } from '../../src/domain/automation/instances/origins/user-origin.js';
+import { RoundContext } from '../../src/domain/automation/instances/round-context.js';
 import { WorkflowInstance } from '../../src/domain/automation/instances/workflow-instance.js';
 import { DocumentFormat } from '../../src/domain/automation/workflows/enums.js';
+import { RunnableVersion } from '../../src/domain/automation/workflows/runnable-version.js';
 import { SourceDocument } from '../../src/domain/automation/workflows/source-document.js';
 import { Workflow } from '../../src/domain/automation/workflows/workflow.js';
 import type { WorkflowVersion } from '../../src/domain/automation/workflows/workflow-version.js';
@@ -36,6 +38,10 @@ export function published(definition: Definition): Published {
   return { workflow, version };
 }
 
+export function roundAt(definition: Definition, at: Date = now): RoundContext {
+  return new RoundContext({ definition, runtime, now: at });
+}
+
 export function started(
   definition: Definition,
   input: JsonValue | undefined = {},
@@ -43,10 +49,10 @@ export function started(
   origin: Origin = new UserOrigin('user-1'),
 ): WorkflowInstance {
   const { workflow, version } = published(definition);
+  const runnable = new RunnableVersion({ workflow, version });
   return WorkflowInstance.start({
     id,
-    workflow,
-    version,
+    runnable,
     input,
     origin,
     now,
@@ -60,14 +66,14 @@ export function settle(
   answers: Answers = {},
 ): void {
   for (let round = 0; round < 50; round += 1) {
-    const work = instance.pendingWork(definition, runtime, at);
+    const work = instance.pendingWork(roundAt(definition, at));
     const outside = work.calls.length + work.processes.length > 0;
 
     if (work.isEmpty() || (outside && !answers.respond && !answers.exit))
       return;
 
     const results = answer(work, answers);
-    instance.record(results, definition, runtime, at);
+    instance.record(results, roundAt(definition, at));
   }
 
   throw new Error('The instance did not settle');

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { RunnableVersion } from '../../../domain/automation/workflows/runnable-version.js';
 import { Transactional } from '@nestjs-cls/transactional';
 import { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
 import {
@@ -43,12 +44,12 @@ export class StartDetachedWorkflow {
 
     if (version === null) throw new VersionNotFoundError();
 
+    const runnable = new RunnableVersion({ workflow, version });
     const subWorkflow = WorkflowInstance.startSubWorkflow({
       id: command.subWorkflowId,
       parentId: command.parentId,
       taskId: command.taskInstanceId,
-      workflow,
-      version,
+      runnable,
       input: command.input,
       now,
     });

@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import type { Event } from '../events/event.js';
-import type { Definition } from '../language/definition.js';
 import { ErrorType } from '../language/error-type.js';
 import type { SubWorkflowAnswer } from '../language/answers/sub-workflow-answer.js';
 import { SubWorkflowDetached } from '../language/answers/sub-workflow-detached.js';
@@ -24,8 +23,7 @@ import type { TaskEnding } from '../language/endings/task-ending.js';
 import type { Task } from '../language/tasks/task.js';
 import type { WorkflowError } from '../language/workflow-error.js';
 import type { WorkflowName } from '../language/workflow-name.js';
-import type { Workflow } from '../workflows/workflow.js';
-import type { WorkflowVersion } from '../workflows/workflow-version.js';
+import type { RunnableVersion } from '../workflows/runnable-version.js';
 import { StaleRoundError } from '../../errors.js';
 import { DerivedId } from './derived-id.js';
 import { ProcessDetached } from './domain-events/process-detached.js';
@@ -39,13 +37,13 @@ import type {
   NewWorkflowInstance,
   Origin,
   RequestedSubWorkflow,
-  RoundContext,
   TaskChange,
   TaskFollowUp,
   WorkflowInstanceProps,
 } from './interfaces.js';
 import { ParentOrigin } from './origins/parent-origin.js';
 import { ProducedEvents } from './produced-events.js';
+import type { RoundContext } from './round-context.js';
 import type { TaskInstance } from './task-instance.js';
 import { TaskTree } from './task-tree.js';
 
@@ -113,12 +111,8 @@ export class WorkflowInstance {
   }
 
   static start(input: NewWorkflowInstance): WorkflowInstance {
-    const workflow = input.workflow;
-    const version = input.version;
-
-    if (version.workflowId !== workflow.id)
-      throw new TypeError('The version belongs to another workflow');
-
+    const workflow = input.runnable.workflow;
+    const version = input.runnable.version;
     const instance = new WorkflowInstance({
       id: input.id,
       workflowId: workflow.id,
@@ -147,8 +141,7 @@ export class WorkflowInstance {
     const origin = new ParentOrigin(input.parentId, input.taskId);
     return WorkflowInstance.start({
       id: input.id,
-      workflow: input.workflow,
-      version: input.version,
+      runnable: input.runnable,
       input: input.input,
       origin,
       now: input.now,
@@ -232,10 +225,10 @@ export class WorkflowInstance {
   }
 
   // Every round is counted, so results of an earlier round can be told apart (fencing).
-  beginRound(definition: Definition, runtime: JsonObject, now: Date): void {
+  beginRound(round: RoundContext): void {
     if (this.#phase.isTerminal()) return;
 
-    const round = this.#round(definition, runtime, now);
+    this.#confirmOwn(round);
     this.#rounds += 1;
     this.#changed = true;
 
@@ -246,14 +239,10 @@ export class WorkflowInstance {
     this.#settle(round);
   }
 
-  pendingWork(
-    definition: Definition,
-    runtime: JsonObject,
-    now: Date,
-  ): RoundWork {
+  pendingWork(round: RoundContext): RoundWork {
     if (this.#phase.isTerminal()) return RoundWork.none();
 
-    const round = this.#round(definition, runtime, now);
+    this.#confirmOwn(round);
     const works: RoundWork[] = [];
     let exporting = false;
 
@@ -274,15 +263,10 @@ export class WorkflowInstance {
     return RoundWork.combined(works);
   }
 
-  record(
-    results: RoundResults,
-    definition: Definition,
-    runtime: JsonObject,
-    now: Date,
-  ): void {
+  record(results: RoundResults, round: RoundContext): void {
     if (this.#phase.isTerminal()) return;
 
-    const round = this.#round(definition, runtime, now);
+    this.#confirmOwn(round);
 
     // The results arrived at `now`: a task whose time ran out by then, or around whose work the
     // workflow's did, is interrupted first, so an answer that came too late is a time-out.
@@ -322,44 +306,41 @@ export class WorkflowInstance {
     return this.#tasks.requests();
   }
 
-  requestedSubWorkflow(instanceId: string): RequestedSubWorkflow | null {
+  requestedSubWorkflow(subWorkflowId: string): RequestedSubWorkflow | null {
     const requested = this.requestedSubWorkflows();
     const request = requested.find(
-      (candidate) => candidate.instanceId === instanceId,
+      (candidate) => candidate.instanceId === subWorkflowId,
     );
     return request ?? null;
   }
 
+  // `runnable`: the version the task's target names, none when it is not published.
   answerSubWorkflow(
-    instanceId: string,
-    workflow: Workflow | null,
-    version: WorkflowVersion | null,
-    definition: Definition,
-    runtime: JsonObject,
-    now: Date,
+    subWorkflowId: string,
+    runnable: RunnableVersion | null,
+    round: RoundContext,
   ): WorkflowInstance | null {
-    const request = this.requestedSubWorkflow(instanceId);
-    const task = this.#tasks.requesting(instanceId);
+    const request = this.requestedSubWorkflow(subWorkflowId);
+    const task = this.#tasks.requesting(subWorkflowId);
 
     if (this.#phase.isTerminal() || request === null || task === null)
       return null;
 
-    const round = this.#round(definition, runtime, now);
+    this.#confirmOwn(round);
 
-    if (workflow === null || version === null) {
+    if (runnable === null) {
       const refused = new SubWorkflowRefused();
       this.#answer(task, refused, round);
       return null;
     }
 
-    const named = request.target.workflow.equals(workflow.name);
-
-    if (!named) throw new TypeError(WorkflowInstance.#NOT_NAMED);
+    if (!runnable.isNamedBy(request.target))
+      throw new TypeError(WorkflowInstance.#NOT_NAMED);
 
     if (!request.awaited) {
       const detached = new SubWorkflowDetached({
-        workflow: workflow.name,
-        versionId: version.id,
+        workflow: runnable.workflow.name,
+        versionId: runnable.version.id,
         input: request.input,
       });
       this.#answer(task, detached, round);
@@ -370,25 +351,22 @@ export class WorkflowInstance {
       id: request.instanceId,
       parentId: this.#id,
       taskId: request.taskId,
-      workflow,
-      version,
+      runnable,
       input: request.input,
-      now,
+      now: round.now,
     });
   }
 
   completeSubWorkflow(
-    instanceId: string,
+    subWorkflowId: string,
     ending: SubWorkflowEnding | null,
-    definition: Definition,
-    runtime: JsonObject,
-    now: Date,
+    round: RoundContext,
   ): void {
-    const task = this.#tasks.requesting(instanceId);
+    const task = this.#tasks.requesting(subWorkflowId);
 
     if (this.#phase.isTerminal() || task === null) return;
 
-    const round = this.#round(definition, runtime, now);
+    this.#confirmOwn(round);
     const ended = new SubWorkflowEnded(ending);
     this.#answer(task, ended, round);
   }
@@ -423,7 +401,8 @@ export class WorkflowInstance {
     return this.#events.splice(0);
   }
 
-  #round(definition: Definition, runtime: JsonObject, now: Date): RoundContext {
+  #confirmOwn(round: RoundContext): void {
+    const definition = round.definition;
     const own =
       definition.workflow.equals(this.#workflow) &&
       definition.version === this.#semver;
@@ -432,8 +411,6 @@ export class WorkflowInstance {
       throw new TypeError(
         'The definition is not the version the instance runs',
       );
-
-    return { definition, runtime, now };
   }
 
   #run(round: RoundContext): void {
@@ -620,7 +597,7 @@ export class WorkflowInstance {
   #settle(round: RoundContext): void {
     if (this.#phase.isTerminal()) return;
 
-    const work = this.pendingWork(round.definition, round.runtime, round.now);
+    const work = this.pendingWork(round);
 
     if (work.isEmpty()) {
       this.#become(Phase.Waiting);

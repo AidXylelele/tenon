@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
+import { RoundContext } from '../../../domain/automation/instances/round-context.js';
 import { Clock } from '../language/ports.js';
 import { ReadVersionDefinition } from '../workflows/read-version-definition.js';
 import {
@@ -24,13 +25,12 @@ export class CompleteSubWorkflow {
 
     const ending = await this.queries.subWorkflowEnding(command.subWorkflowId);
     const definition = await this.readDefinition.execute(parent.versionId);
-    parent.completeSubWorkflow(
-      command.subWorkflowId,
-      ending,
+    const context = new RoundContext({
       definition,
-      command.runtime,
+      runtime: command.runtime,
       now,
-    );
+    });
+    parent.completeSubWorkflow(command.subWorkflowId, ending, context);
     await this.instances.save(parent);
   }
 }

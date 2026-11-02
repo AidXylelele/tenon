@@ -16,15 +16,12 @@ export class RecordRound {
 
     instance.confirmRound(command.round);
 
-    for (const answer of command.recorded)
-      instance.record(
-        answer.results,
-        command.definition,
-        command.runtime,
-        answer.at,
-      );
+    for (const answer of command.recorded) {
+      const arrived = command.context.at(answer.at);
+      instance.record(answer.results, arrived);
+    }
 
     await this.instances.save(instance);
-    return instance.progress(command.now);
+    return instance.progress(command.context.now);
   }
 }

@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
+import { RoundContext } from '../../../domain/automation/instances/round-context.js';
+import { RunnableVersion } from '../../../domain/automation/workflows/runnable-version.js';
 import { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
 import { Clock } from '../language/ports.js';
 import {
@@ -45,14 +47,17 @@ export class StartSubWorkflow {
     const workflow = await this.workflows.findByName(target.workflow);
     const reference = VersionReference.forTarget(workflow, target);
     const version = await this.versions.findBy(reference);
+    const runnable = RunnableVersion.found(workflow, version);
     const definition = await this.readDefinition.execute(parent.versionId);
+    const context = new RoundContext({
+      definition,
+      runtime: command.runtime,
+      now,
+    });
     const subWorkflow = parent.answerSubWorkflow(
       command.subWorkflowId,
-      workflow,
-      version,
-      definition,
-      command.runtime,
-      now,
+      runnable,
+      context,
     );
 
     if (subWorkflow !== null) {

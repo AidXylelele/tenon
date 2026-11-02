@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
+import { RoundContext } from '../../../domain/automation/instances/round-context.js';
 import { ReadVersionDefinition } from '../workflows/read-version-definition.js';
 import {
   type BeginRoundCommand,
@@ -19,8 +20,13 @@ export class BeginRound {
     const instance = await this.instances.get(command.instanceId);
 
     const definition = await this.readDefinition.execute(instance.versionId);
-    instance.beginRound(definition, command.runtime, command.now);
+    const context = new RoundContext({
+      definition,
+      runtime: command.runtime,
+      now: command.now,
+    });
+    instance.beginRound(context);
     await this.instances.save(instance);
-    return { definition, instance };
+    return { context, instance };
   }
 }

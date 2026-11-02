@@ -13,8 +13,7 @@ import type { TaskEnding } from '../language/endings/task-ending.js';
 import type { WorkflowError } from '../language/workflow-error.js';
 import type { WorkflowName } from '../language/workflow-name.js';
 import type { WorkflowTarget } from '../language/workflow-target.js';
-import type { Workflow } from '../workflows/workflow.js';
-import type { WorkflowVersion } from '../workflows/workflow-version.js';
+import type { RunnableVersion } from '../workflows/runnable-version.js';
 import type { ProcessDetached } from './domain-events/process-detached.js';
 import type { WorkflowDetached } from './domain-events/workflow-detached.js';
 import type { InstanceProgressKind } from './enums.js';
@@ -133,8 +132,7 @@ export interface WorkflowInstanceProps {
 
 export interface NewWorkflowInstance {
   readonly id: string;
-  readonly workflow: Workflow;
-  readonly version: WorkflowVersion;
+  readonly runnable: RunnableVersion;
   readonly input: JsonValue | undefined;
   readonly origin: Origin;
   readonly now: Date;
@@ -158,8 +156,7 @@ export interface NewSubWorkflowInstance {
   readonly id: string;
   readonly parentId: string;
   readonly taskId: string;
-  readonly workflow: Workflow;
-  readonly version: WorkflowVersion;
+  readonly runnable: RunnableVersion;
   readonly input: JsonValue;
   readonly now: Date;
 }
@@ -170,7 +167,7 @@ export interface InstanceProgress {
   readonly subWorkflows: readonly string[];
 }
 
-export interface RoundContext {
+export interface RoundContextProps {
   readonly definition: Definition;
   readonly runtime: JsonObject;
   readonly now: Date;

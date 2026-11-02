@@ -3,6 +3,8 @@ import type { DslVersion } from '../language/enums.js';
 import type { WorkflowName } from '../language/workflow-name.js';
 import type { DocumentFormat } from './enums.js';
 import type { SourceDocument } from './source-document.js';
+import type { Workflow } from './workflow.js';
+import type { WorkflowVersion } from './workflow-version.js';
 
 export interface SourceDocumentProps {
   readonly format: DocumentFormat;
@@ -38,4 +40,9 @@ export interface VersionReferenceProps {
   readonly versionId: string | null;
   readonly workflowId: string | null;
   readonly semver: string | null;
+}
+
+export interface RunnableVersionProps {
+  readonly workflow: Workflow;
+  readonly version: WorkflowVersion;
 }
