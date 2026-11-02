@@ -519,6 +519,12 @@ Moved to run time after comparing with AWS Step Functions and Camunda: other wor
   - The stage comments say what they do.
   - Not applied: the API's phase list stays a zod enum. A const tuple of the names in the domain is against the domain's style.
 - **The domain, L1 of round 2.** "A variable never takes a runtime argument's name" had two owners, `ForTask` and `TryTask`. `VariableName` owns it now: a `for`'s `each` and `at` and a catch's `as` are `VariableName`s, and `CatchClause` takes its own pointer, as `Expression` and `Template` do.
+- **The regression on the rebuilt stand** (NEW3: sanity load, the fixes end to end, FT-1 to FT-3, graceful shutdown) passed. It found two defects:
+  - When an instance ended in mid-pass, a task that had ended but was not yet followed up stayed `completed` without its `task.completed` or its emitted event. This happened at the execution limit, with an `emit` branch that ended as it began. Such tasks are now withdrawn: cancelled, announced before the workflow's end, and their effects never act. The unit test and the stand both show it.
+  - Every boot warned that the idempotency interceptor runs inside another. That other is the no-op interceptor nestjs-cls registers, whose context comes from its middleware. `IdempotencyModule` is now imported first.
+
+  FT-7 (500 during a database outage, not 503) and FT-9 (a run whose save failed waits its full lease) stay as recorded.
+
 - **The re-verification** (FT-1 to FT-4 on the fixed build). The PostgreSQL kill, the frozen worker and the paused sandbox pass. A stage has stored its deadline since US2, so a stage without one is corrupt, not old: an instant that is not a time is refused when read (`InconsistentProgressError`), not when written back. An instance whose stored state can be neither read nor written faults neither in its round nor in its fault step: the run ends `failed` and the instance stays `running`. That is the `@nestjs/workflows` state of a run that needs a person, and `retry(id)` runs it again from its journal once the cause is fixed. Not applied: a direct `faulted` write past the aggregate, which would be a second owner of the fault rule and would skip the lifecycle events.
 
 **Round 17** (2026-11-02, the final review and the first QA round on a local stand: three isolated stacks of PostgreSQL, Mailpit and go-judge with API nodes in their roles; two static reviewers (DDD, Clean Architecture and libraries) and four QA agents (identity and the contract, the runtime against DSL 1.0.3, performance, fault tolerance)). Applied:

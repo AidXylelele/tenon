@@ -229,6 +229,12 @@ export class TaskInstance {
     return !this.isTerminal() && this.phase !== Phase.Pending;
   }
 
+  // A task that ended but whose ending its instance had not acted on when the instance ended:
+  // the ending never takes effect, so the task counts as cancelled.
+  withdraw(): void {
+    this.#cancelled = true;
+  }
+
   abandon(now: Date): void {
     if (this.isTerminal()) return;
 

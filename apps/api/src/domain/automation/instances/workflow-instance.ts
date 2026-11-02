@@ -483,7 +483,7 @@ export class WorkflowInstance {
     const queue: TaskFollowUp[] = [];
     this.#accept(task, change, queue, round.now);
 
-    // Nothing follows the end: a fault leaves ended tasks in the queue that must not act.
+    // Nothing follows the end: the tasks left in the queue were withdrawn or abandoned.
     for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
       if (this.#phase.isTerminal()) return;
 
@@ -520,6 +520,7 @@ export class WorkflowInstance {
           task.reference,
           WorkflowInstance.#LIMIT_REACHED,
         );
+        this.#withdraw(queue, round.now);
         this.#faultWith(error, round.now);
         return;
       }
@@ -539,6 +540,7 @@ export class WorkflowInstance {
     this.#ended(task, ending, round.now);
 
     if (task.isRoot()) {
+      this.#withdraw(queue, round.now);
       this.#conclude(ending, round.now);
       return;
     }
@@ -628,6 +630,19 @@ export class WorkflowInstance {
 
     this.#phase = phase;
     this.#changed = true;
+  }
+
+  // The tasks that ended in this pass but are not followed up when the instance ends: their
+  // endings never act, and their cancellation is announced before the instance's end.
+  #withdraw(queue: readonly TaskFollowUp[], now: Date): void {
+    for (const followUp of queue) {
+      const ending = followUp.change.ending;
+
+      if (ending === null || ending.isSkipped()) continue;
+
+      followUp.task.withdraw();
+      this.#produced.taskCancelled(followUp.task, now);
+    }
   }
 
   #abandonChildrenOf(parent: TaskInstance, now: Date): void {

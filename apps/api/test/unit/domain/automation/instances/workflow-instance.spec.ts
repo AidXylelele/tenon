@@ -759,8 +759,15 @@ describe('WorkflowInstance', () => {
     settle(instance, definition, now, { evaluate: collected });
     const types = typesOf(instance);
 
+    const emit = instance.tasks.find(
+      (task) => task.reference.toString() === '/do/1/split/fork/branches/1/b2',
+    );
+
     expect(instance.phase).toBe(Phase.Faulted);
     expect(types.at(-1)).toBe('workflow.faulted');
+    expect(types).not.toContain('com.example.done');
+    expect(types.at(-2)).toBe('task.cancelled');
+    expect(emit?.phase).toBe(Phase.Cancelled);
     expect(instance.takeDomainEvents()).toEqual([]);
   });
 

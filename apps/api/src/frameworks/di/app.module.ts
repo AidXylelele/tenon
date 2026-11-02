@@ -23,9 +23,11 @@ import { ResilienceModule } from './resilience.module.js';
   imports: [
     ConfigModule,
     LoggingModule,
+    // First, so its global interceptor wraps the handlers directly: the one nestjs-cls registers
+    // does nothing here (the context comes from its middleware), yet would sit outside it.
+    IdempotencyModule,
     DatabaseModule,
     OutboxModule,
-    IdempotencyModule,
     IdentityModule,
     AuthorizationModule.forRoot(),
     ResilienceModule,
