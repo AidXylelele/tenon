@@ -169,36 +169,31 @@ The loop is framework glue (`frameworks/workflows/instance.workflow.ts`); every 
 ```text
 @Workflow('instance', { version: 1 })
 run(ctx, { instanceId }):
-  attempted = the sub-workflow ids this run has stepped for (rebuilt on every replay)
-  awaited = the handles of the children this run waits for
-  busy = 1 s
+  run = RunState(instanceId)            // attempted ids, awaited children, the busy pause; rebuilt on every replay
   for round = 1, 2, …:
     try
-      progress = ctx.step("advance-" + round, untilParked(instanceId, attempted),
-                          { retry: STEPS, round = 1: compensate: controller.fault(instanceId) })
+      progress = step("advance-" + round, untilParked(run), round = 1: compensate: controller.fault(instanceId))
       if progress is settled or progress.kind = ended: return
-      changed = false
-      for each id of progress.subWorkflows not in attempted:
-        add id to attempted
-        start = ctx.step("start-" + id, controller.startSubWorkflow(instanceId, id), { retry: STEPS })
-        if start is settled: return
-        if start = started: awaited[id] = ctx.startChild(InstanceWorkflow, { instanceId: id }, { id, parentClose: 'abandon' })
-        changed = true                                   // started or answered
-      if changed: continue
-      if progress.kind = busy: ctx.sleep("busy-" + round, busy); busy = min(2 × busy, 30 s); continue
-      busy = 1 s
+      requested = run.unattempted(progress.subWorkflows)
+      if requested: for each id: run.attempt(id)                                   // #startAll
+                      started = step("start-" + id, controller.startSubWorkflow(instanceId, id))
+                      if started is settled: return
+                      if started = started: run.await(id, ctx.startChild(InstanceWorkflow, { instanceId: id }, { id, parentClose: 'abandon' }))
+                    continue
+      if progress.kind = busy: ctx.sleep("busy-" + round, run.busy()); continue     // 1 s doubling to 30 s
+      run.rested()
       if progress.kind = run: continue
-      winner = ctx.waitForAny("park-" + round, { timer: ctx.timer({ until: progress.wakeAt }) when set, each awaited handle })
-      if winner is an awaited child:
-        remove it from awaited
-        ctx.step("ended-" + round, controller.completeSubWorkflow(instanceId, winner.key), { retry: STEPS })
+      winner = ctx.waitForAny("park-" + round, run.conditions(progress.wakeAt))     // the timer and each awaited child
+      if run.ended(winner.key): step("ended-" + round, controller.completeSubWorkflow(instanceId, winner.key))
     catch (error)
       if isWorkflowInterrupt(error): throw error
-      ctx.step("fault-" + round, controller.fault(instanceId), { retry: STEPS }); return
+      step("fault-" + round, controller.fault(instanceId)); return
 
-untilParked(instanceId, attempted):                          // inside one step, within a 10 s budget
+step(name, work): ctx.step(name, classified(work), { retry: 10 attempts, 1 s doubling to 1 min })   // the one owner
+
+untilParked(run):                                            // inside one step, within a 10 s budget
   repeat: progress = controller.advance(instanceId)
-          stop unless progress.kind = run, no listed id is new to attempted, and the budget lasts
+          stop unless progress.kind = run, it lists no unattempted id, the budget lasts and the step's signal holds
 ```
 
 **Constraints:**

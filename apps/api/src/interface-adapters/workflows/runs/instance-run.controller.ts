@@ -12,8 +12,8 @@ import { SubWorkflowStepMapper } from './mappers/sub-workflow-step.mapper.js';
 export class InstanceRunController {
   constructor(
     private readonly advanceInstance: AdvanceInstance,
-    private readonly startSubWorkflow: StartSubWorkflow,
-    private readonly completeSubWorkflow: CompleteSubWorkflow,
+    private readonly subWorkflowStart: StartSubWorkflow,
+    private readonly subWorkflowCompletion: CompleteSubWorkflow,
     private readonly faultInstance: FaultInstance,
     private readonly runtime: PlatformRuntime,
   ) {}
@@ -27,12 +27,12 @@ export class InstanceRunController {
     return RoundProgressMapper.toRound(advanced);
   }
 
-  async start(
+  async startSubWorkflow(
     instanceId: string,
     subWorkflowId: string,
   ): Promise<SubWorkflowStepKind> {
     const runtime = this.runtime.descriptor;
-    const started = await this.startSubWorkflow.execute({
+    const started = await this.subWorkflowStart.execute({
       instanceId,
       subWorkflowId,
       runtime,
@@ -40,9 +40,12 @@ export class InstanceRunController {
     return SubWorkflowStepMapper.toStep(started);
   }
 
-  async ended(instanceId: string, subWorkflowId: string): Promise<void> {
+  async completeSubWorkflow(
+    instanceId: string,
+    subWorkflowId: string,
+  ): Promise<void> {
     const runtime = this.runtime.descriptor;
-    await this.completeSubWorkflow.execute({
+    await this.subWorkflowCompletion.execute({
       instanceId,
       subWorkflowId,
       runtime,

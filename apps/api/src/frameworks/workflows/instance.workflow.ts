@@ -1,11 +1,11 @@
 import {
-  type ChildWorkflowHandle,
   isWorkflowInterrupt,
+  type Journaled,
   Workflow,
-  type WorkflowCondition,
   type WorkflowContext,
   type WorkflowRetryOptions,
   type WorkflowRunner,
+  type WorkflowStepOptions,
 } from '@nestjs/workflows';
 import {
   RoundProgressKind,
@@ -16,18 +16,20 @@ import type {
   InstanceRunInput,
   RoundProgress,
 } from '../../interface-adapters/workflows/runs/interfaces.js';
+import { RoundTurn } from './enums.js';
+import { RunState } from './run-state.js';
 import { StepErrors } from './step-errors.js';
 
+// The run of one instance (architecture §4): rounds until the instance ends, starting the
+// sub-workflows it asks for, resting while capacity is short and parking until it is due.
 @Workflow('instance', { version: 1 })
 export class InstanceWorkflow implements WorkflowRunner<
   InstanceRunInput,
   void
 > {
-  private static readonly FIRST_BUSY_MS = 1_000;
-  private static readonly LAST_BUSY_MS = 30_000;
   private static readonly BUDGET_MS = 10_000;
   // A PostgreSQL failover of several minutes delays an instance instead of faulting it.
-  private static readonly STEPS: WorkflowRetryOptions = {
+  private static readonly STEP_RETRY: WorkflowRetryOptions = {
     attempts: 10,
     backoff: { delay: '1s', maxDelay: '1m', jitter: 'equal' },
   };
@@ -38,130 +40,159 @@ export class InstanceWorkflow implements WorkflowRunner<
   ) {}
 
   async run(ctx: WorkflowContext, input: InstanceRunInput): Promise<void> {
-    const instanceId = input.instanceId;
-    const attempted = new Set<string>();
-    const awaited = new Map<string, ChildWorkflowHandle<void>>();
-    let busy = InstanceWorkflow.FIRST_BUSY_MS;
+    const run = new RunState(input.instanceId);
 
     for (let round = 1; ; round += 1) {
       try {
-        const attemptedIds = Array.from(attempted);
-        const firstRound = round === 1;
-        const compensation = {
-          compensate: () =>
-            this.errors.classified(() => this.controller.fault(instanceId)),
-        };
-        const options = firstRound
-          ? { retry: InstanceWorkflow.STEPS, ...compensation }
-          : { retry: InstanceWorkflow.STEPS };
-        const progress = await ctx.step(
-          `advance-${String(round)}`,
-          ({ signal }) =>
-            this.errors.classified(() =>
-              this.#untilParked(instanceId, attemptedIds, signal),
-            ),
-          options,
-        );
+        const turn = await this.#round(ctx, run, round);
 
-        if (progress === null || progress.kind === RoundProgressKind.Ended)
-          return;
-
-        let changed = false;
-
-        for (const subWorkflowId of progress.subWorkflows) {
-          if (attempted.has(subWorkflowId)) continue;
-
-          attempted.add(subWorkflowId);
-          const step = await ctx.step(
-            `start-${subWorkflowId}`,
-            () =>
-              this.errors.classified(() =>
-                this.controller.start(instanceId, subWorkflowId),
-              ),
-            { retry: InstanceWorkflow.STEPS },
-          );
-
-          if (step === null) return;
-
-          changed = true;
-
-          if (step !== SubWorkflowStepKind.Started) continue;
-
-          const handle = await ctx.startChild(
-            InstanceWorkflow,
-            { instanceId: subWorkflowId },
-            { id: subWorkflowId, parentClose: 'abandon' },
-          );
-          awaited.set(subWorkflowId, handle);
-        }
-
-        if (changed) continue;
-
-        if (progress.kind === RoundProgressKind.Busy) {
-          await ctx.sleep(`busy-${String(round)}`, busy);
-          busy = Math.min(busy * 2, InstanceWorkflow.LAST_BUSY_MS);
-          continue;
-        }
-
-        busy = InstanceWorkflow.FIRST_BUSY_MS;
-
-        if (progress.kind === RoundProgressKind.Run) continue;
-
-        const conditions: Record<string, WorkflowCondition> = {};
-
-        if (progress.wakeAt !== null)
-          conditions.timer = ctx.timer({ until: progress.wakeAt });
-
-        for (const [subWorkflowId, handle] of awaited)
-          conditions[subWorkflowId] = handle;
-
-        const winner = await ctx.waitForAny(
-          `park-${String(round)}`,
-          conditions,
-        );
-
-        if (!awaited.has(winner.key)) continue;
-
-        awaited.delete(winner.key);
-        const recorded = await ctx.step(
-          `ended-${String(round)}`,
-          () =>
-            this.errors.classified(async () => {
-              await this.controller.ended(instanceId, winner.key);
-              return true;
-            }),
-          { retry: InstanceWorkflow.STEPS },
-        );
-
-        if (recorded === null) return;
+        if (turn === RoundTurn.Stop) return;
       } catch (error) {
         if (isWorkflowInterrupt(error)) throw error;
 
-        await ctx.step(
-          `fault-${String(round)}`,
-          () => this.errors.classified(() => this.controller.fault(instanceId)),
-          { retry: InstanceWorkflow.STEPS },
+        await this.#step(ctx, `fault-${String(round)}`, () =>
+          this.controller.fault(run.instanceId),
         );
         return;
       }
     }
   }
 
+  async #round(
+    ctx: WorkflowContext,
+    run: RunState,
+    round: number,
+  ): Promise<RoundTurn> {
+    const progress = await this.#advance(ctx, run, round);
+
+    if (progress === null || progress.kind === RoundProgressKind.Ended)
+      return RoundTurn.Stop;
+
+    const requested = run.unattempted(progress.subWorkflows);
+
+    if (requested.length > 0) return this.#startAll(ctx, run, requested);
+
+    if (progress.kind === RoundProgressKind.Busy)
+      return this.#rest(ctx, run, round);
+
+    run.rested();
+
+    if (progress.kind === RoundProgressKind.Run) return RoundTurn.Next;
+
+    return this.#park(ctx, run, round, progress.wakeAt);
+  }
+
+  // The first round's step registers the fault as its compensation (architecture §4).
+  #advance(
+    ctx: WorkflowContext,
+    run: RunState,
+    round: number,
+  ): Promise<Journaled<RoundProgress | null>> {
+    const name = `advance-${String(round)}`;
+    const work = (signal: AbortSignal) => this.#untilParked(run, signal);
+
+    if (round > 1) return this.#step(ctx, name, work);
+
+    const compensate = () =>
+      this.errors.classified(() => this.controller.fault(run.instanceId));
+    return this.#step(ctx, name, work, { compensate });
+  }
+
+  async #startAll(
+    ctx: WorkflowContext,
+    run: RunState,
+    requested: readonly string[],
+  ): Promise<RoundTurn> {
+    for (const subWorkflowId of requested) {
+      run.attempt(subWorkflowId);
+      const started = await this.#step(ctx, `start-${subWorkflowId}`, () =>
+        this.controller.startSubWorkflow(run.instanceId, subWorkflowId),
+      );
+
+      if (started === null) return RoundTurn.Stop;
+
+      if (started !== SubWorkflowStepKind.Started) continue;
+
+      const child = { instanceId: subWorkflowId };
+      const handle = await ctx.startChild(InstanceWorkflow, child, {
+        id: subWorkflowId,
+        parentClose: 'abandon',
+      });
+      run.await(subWorkflowId, handle);
+    }
+
+    return RoundTurn.Next;
+  }
+
+  async #rest(
+    ctx: WorkflowContext,
+    run: RunState,
+    round: number,
+  ): Promise<RoundTurn> {
+    const pause = run.busy();
+    await ctx.sleep(`busy-${String(round)}`, pause);
+    return RoundTurn.Next;
+  }
+
+  async #park(
+    ctx: WorkflowContext,
+    run: RunState,
+    round: number,
+    wakeAt: number | null,
+  ): Promise<RoundTurn> {
+    const conditions = run.conditions(ctx, wakeAt);
+    const winner = await ctx.waitForAny(`park-${String(round)}`, conditions);
+    const ended = run.ended(winner.key);
+
+    if (!ended) return RoundTurn.Next;
+
+    // `true`, because a settled error journals as `null`.
+    const recorded = await this.#step(
+      ctx,
+      `ended-${String(round)}`,
+      async () => {
+        await this.controller.completeSubWorkflow(run.instanceId, winner.key);
+        return true;
+      },
+    );
+
+    if (recorded === null) return RoundTurn.Stop;
+
+    return RoundTurn.Next;
+  }
+
+  // Every step classifies its errors inside the step, because the journal keeps no error class,
+  // and retries transient ones alike.
+  #step<T>(
+    ctx: WorkflowContext,
+    name: string,
+    work: (signal: AbortSignal) => Promise<T>,
+    options: WorkflowStepOptions<T | null> = {},
+  ): Promise<Journaled<T | null>> {
+    const retried: WorkflowStepOptions<T | null> = {
+      retry: InstanceWorkflow.STEP_RETRY,
+      compensate: options.compensate,
+    };
+    return ctx.step(
+      name,
+      ({ signal }) => this.errors.classified(() => work(signal)),
+      retried,
+    );
+  }
+
   // Rounds repeat within one step while the instance can run on, so a short run costs one entry.
   // The step's signal (a shutdown, a lost lease) lets the round in progress end but starts no
   // other, so a worker that lost the instance repeats no work its successor took over.
   async #untilParked(
-    instanceId: string,
-    attempted: readonly string[],
+    run: RunState,
     signal: AbortSignal,
   ): Promise<RoundProgress> {
     const deadline = performance.now() + InstanceWorkflow.BUDGET_MS;
 
     for (;;) {
-      const progress = await this.controller.advance(instanceId);
-      const listsNew = progress.subWorkflows.some(
-        (id) => !attempted.includes(id),
-      );
+      const progress = await this.controller.advance(run.instanceId);
+      const requested = run.unattempted(progress.subWorkflows);
+      const listsNew = requested.length > 0;
       const spent = performance.now() >= deadline;
       const runsOn = progress.kind === RoundProgressKind.Run;
 
