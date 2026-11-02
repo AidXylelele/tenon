@@ -34,11 +34,18 @@ export class JsonSchemaValidator implements SchemaValidator {
     }
   }
 
-  validateAll(
+  // One after another, as evaluations go: the pool holds a worker per running instance.
+  async validateAll(
     validations: readonly Validation[],
   ): Promise<readonly ValidationResult[]> {
-    const results = validations.map((validation) => this.#validate(validation));
-    return Promise.all(results);
+    const results: ValidationResult[] = [];
+
+    for (const validation of validations) {
+      const result = await this.#validate(validation);
+      results.push(result);
+    }
+
+    return results;
   }
 
   async #validate(validation: Validation): Promise<ValidationResult> {

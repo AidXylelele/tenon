@@ -27,10 +27,6 @@ export class ProcessRunMapper {
   static readonly #PYTHON = '/usr/bin/python3';
   static readonly #SHELL = '/bin/sh';
   static readonly #SCRIPT = 'script';
-  // PostgreSQL keeps no U+0000 in jsonb, so output holding one cannot be recorded.
-  static readonly #NUL = '\u0000';
-  static readonly #HOLDS_NUL =
-    'The process wrote a NUL character, which a value cannot hold';
 
   // `timeout`: the milliseconds left before the awaiting task's deadline; null: none.
   static toCommand(
@@ -108,21 +104,12 @@ export class ProcessRunMapper {
     const timedOut: string = GoJudgeStatus.TimeLimitExceeded;
     const exited = result.status === accepted || result.status === nonzero;
 
-    const stdout = result.files?.stdout ?? '';
-    const stderr = result.files?.stderr ?? '';
-    const holdsNul =
-      stdout.includes(ProcessRunMapper.#NUL) ||
-      stderr.includes(ProcessRunMapper.#NUL);
-
-    if (exited && holdsNul)
-      return new SandboxFailed(id, ProcessRunMapper.#HOLDS_NUL);
-
     if (exited)
       return new ProcessExited({
         id,
         code: result.exitStatus ?? 0,
-        stdout,
-        stderr,
+        stdout: result.files?.stdout ?? '',
+        stderr: result.files?.stderr ?? '',
       });
 
     if (result.status === timedOut) return new ProcessTimedOut(id);

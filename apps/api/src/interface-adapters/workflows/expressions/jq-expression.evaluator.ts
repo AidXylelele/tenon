@@ -15,11 +15,6 @@ export class JqExpressionEvaluator implements ExpressionEvaluator {
     'The expression produced more than one value';
   private static readonly OUT_OF_TIME = 'The expression ran out of time';
   private static readonly OUT_OF_MEMORY = 'The expression ran out of memory';
-  // PostgreSQL keeps no U+0000 in jsonb, so a value holding one cannot be recorded. In JSON
-  // text the character is the escape `\u0000` after an even number of backslashes.
-  private static readonly NUL = /(?:^|[^\\])(?:\\\\)*\\u0000/;
-  private static readonly HOLDS_NUL =
-    'The expression produced a NUL character, which a value cannot hold';
 
   constructor(private readonly client: JqClient) {}
 
@@ -88,14 +83,6 @@ export class JqExpressionEvaluator implements ExpressionEvaluator {
       return new EvaluationFailed(evaluation.id, JqExpressionEvaluator.SEVERAL);
 
     const value = values[0] ?? null;
-    const text = JSON.stringify(value);
-
-    if (JqExpressionEvaluator.NUL.test(text))
-      return new EvaluationFailed(
-        evaluation.id,
-        JqExpressionEvaluator.HOLDS_NUL,
-      );
-
     return new Evaluated(evaluation.id, value);
   }
 }

@@ -25,11 +25,6 @@ export class ServiceResultMapper {
   static readonly #TEXT_TYPE =
     /^(?:text\/[\w.+-]+|application\/(?:[\w.+-]+\+)?(?:xml|yaml))$/;
   static readonly #NOT_JSON = 'The response content is not valid JSON';
-  // PostgreSQL keeps no U+0000 in jsonb, so content holding one cannot be recorded. In JSON
-  // text the character is the escape `\u0000` after an even number of backslashes.
-  static readonly #NUL = /(?:^|[^\\])(?:\\\\)*\\u0000/;
-  static readonly #HOLDS_NUL =
-    'The response content holds a NUL character, which a value cannot hold';
   static readonly #AUTHORIZATION = 'authorization';
   static readonly #REDACTED = '[redacted]';
 
@@ -74,11 +69,6 @@ export class ServiceResultMapper {
     // A body that claims JSON and is not is an invalid response, a communication error.
     if (content === undefined)
       return new CommunicationFailed(call.id, ServiceResultMapper.#NOT_JSON);
-
-    const text = JSON.stringify(content);
-
-    if (ServiceResultMapper.#NUL.test(text))
-      return new CommunicationFailed(call.id, ServiceResultMapper.#HOLDS_NUL);
 
     const body = outcome.body.toString('base64');
     const sent = outcome.authorization;

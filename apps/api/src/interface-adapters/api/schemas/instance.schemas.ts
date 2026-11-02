@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { NulCharacter } from '../../../domain/automation/language/nul-character.js';
 
 const Json = z.json();
 
@@ -24,12 +25,9 @@ const Phase = z.enum([
   'completed',
 ]);
 
-// PostgreSQL keeps no U+0000 in jsonb, so an input holding one is refused here. In JSON text
-// the character is the escape `\u0000` after an even number of backslashes.
-const NUL = /(?:^|[^\\])(?:\\\\)*\\u0000/;
-
+// PostgreSQL keeps no U+0000 in jsonb, so an input holding one is refused here.
 const StoredJson = Json.refine(
-  (value) => !NUL.test(JSON.stringify(value)),
+  (value) => !NulCharacter.isIn(value),
   'NUL characters are not allowed',
 );
 
