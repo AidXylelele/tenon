@@ -717,6 +717,48 @@ describe('WorkflowInstance', () => {
     expect(instance.output).toEqual({ context: { a: 1, b: 2 } });
   });
 
+  it('an_export_evaluated_on_a_context_a_literal_export_then_replaced_is_evaluated_again', () => {
+    const definition = definitionOf([
+      {
+        split: {
+          fork: {
+            branches: [
+              {
+                b: {
+                  ...call('https://pets.example/1'),
+                  export: { as: { b: 2 } },
+                },
+              },
+              {
+                a: {
+                  set: { a: 1 },
+                  export: { as: '${ $context + { a: 1 } }' },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { read: { set: { context: '${ $context }' } } },
+    ]);
+    const merged = evaluatedAs((evaluation) => {
+      const context = (evaluation.arguments.context ?? {}) as JsonObject;
+      const named = /\{ (\w+): (\d+) \}/.exec(evaluation.program);
+
+      if (evaluation.program === '$context') return context;
+
+      if (named === null) return evaluation.data;
+
+      return { ...context, [named[1] ?? '']: Number(named[2]) };
+    });
+    const instance = started(definition);
+
+    instance.beginRound(roundAt(definition, now));
+    settle(instance, definition, now, { evaluate: merged, respond: ok });
+
+    expect(instance.output).toEqual({ context: { b: 2, a: 1 } });
+  });
+
   it('nothing_follows_the_fault_at_the_execution_limit', () => {
     const items = Array.from({ length: 9_995 }, (item, index) => index);
     const definition = definitionOf([
@@ -770,6 +812,50 @@ describe('WorkflowInstance', () => {
     expect(emit?.phase).toBe(Phase.Cancelled);
     expect(instance.takeDomainEvents()).toEqual([]);
   });
+
+  it.each([
+    ['a_competing_branch_wins', { compete: true }, { set: { w: 1 } }],
+    [
+      'a_sibling_branch_faults',
+      {},
+      { raise: { error: { type: failing.type, status: 500, title: 'Boom' } } },
+    ],
+  ])(
+    'when_%s_an_ended_task_of_the_cancelled_branch_never_acts',
+    (_case, options, first) => {
+      const emit = {
+        d: {
+          emit: {
+            event: {
+              with: { source: 'https://example.com', type: 'com.example.d' },
+            },
+          },
+        },
+      };
+      const definition = definitionOf([
+        {
+          split: {
+            fork: {
+              ...options,
+              branches: [{ b1: first }, { b2: { do: [emit] } }],
+            },
+          },
+        },
+      ]);
+      const instance = started(definition);
+
+      instance.beginRound(roundAt(definition, now));
+      settle(instance, definition, now);
+      const types = typesOf(instance);
+      const d = instance.tasks.find((task) =>
+        task.reference.toString().endsWith('/b2/do/0/d'),
+      );
+
+      expect(types).not.toContain('com.example.d');
+      expect(d?.phase).toBe(Phase.Cancelled);
+      expect(d?.output).toBeNull();
+    },
+  );
 
   it('the_results_of_a_round_a_later_round_superseded_are_refused', () => {
     const definition = definitionOf([{ first: { set: { a: '${ .a }' } } }]);

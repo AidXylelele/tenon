@@ -525,6 +525,21 @@ Moved to run time after comparing with AWS Step Functions and Camunda: other wor
 
   FT-7 is fixed afterwards. A transient PostgreSQL failure on an HTTP request answers 503 with `Retry-After: 5`, as RFC 9110 asks for a temporary inability. `DatabaseUnavailableFilter` (`frameworks/express`) answers it, using the classification of `frameworks/drizzle`, and a component test pins it. On the stand, a stopped PostgreSQL first answered 500: the refused connection (`ECONNREFUSED`, the cause of Drizzle's query error) was no transient failure to the PostgreSQL classification. That classification now counts the connection codes in the cause chain, which the engine's steps also gain, and the stand answers 503 throughout the stop. FT-8 is fixed too: the health route asks the database (`select 1` within 1.5 s, Terminus's `HealthIndicatorService`) and answers 503 while it is down, so a load balancer sends traffic to another node. The API adapter owns the contract (`DatabaseProbe`), and `frameworks/drizzle` implements it. FT-9 (a run whose save failed waits its full lease) is the library's `handBack`, and stays as recorded. So does FT-10: a query on an open connection waits out a network partition until TCP keepalive gives up. pg's client-side `query_timeout` would fail the query, but it keeps the connection, so every later query on it would wait out the timeout again. A bound needs the connection destroyed on timeout, which the pool does not offer.
 
+- **The third critic round, domain.**
+  - A task that ended as it began still acted after its ancestor was abandoned, for example when a competing branch won, a sibling faulted or a branch took `then: end`. When a subtree's body stops, its tasks now end with it: the running ones are abandoned, and those that ended in this pass but are not followed up yet are withdrawn. The root's own call to withdraw is gone, because this covers it.
+  - A withdrawn task stores no output and no error, and `withdraw` is a guarded command beside the query `hasEnded()`.
+  - An export can still evaluate `export.as` on a context that another task's literal export replaced in the same pass, since a literal export has no work for the one-export gate to hold back. The work id of `export.as` now carries a digest of the canonical context it read (`WorkKey.onContext`). A result for a context that changed answers nothing, and the export runs again on the new one, the same on a replay.
+  - Unit tests and the critic's reproductions cover each case.
+  - Decisions on the open lows:
+    - L3 (awaited or detached decided twice) and L5 (`answerSubWorkflow` looks the request up twice): the answers guard their own case and the aggregate decides, so it stays.
+    - L6 (`tasks` hands out entities): only the repository reads it, and a read model would copy the state for no reader.
+    - L10 (three use cases build the round context): each reads a different input.
+    - L11: the null check is the domain's result.
+    - L15 (the timeout union): two classes, one place each.
+    - L9's duplicate accessors are prop getters, as the style asks.
+    - L12's reads: `ResolveSessionUser` gives the policies their principal, a `User`.
+
+    All of these stay.
 - **The re-verification** (FT-1 to FT-4 on the fixed build). The PostgreSQL kill, the frozen worker and the paused sandbox pass. A stage has stored its deadline since US2, so a stage without one is corrupt, not old: an instant that is not a time is refused when read (`InconsistentProgressError`), not when written back. An instance whose stored state can be neither read nor written faults neither in its round nor in its fault step: the run ends `failed` and the instance stays `running`. That is the `@nestjs/workflows` state of a run that needs a person, and `retry(id)` runs it again from its journal once the cause is fixed. Not applied: a direct `faulted` write past the aggregate, which would be a second owner of the fault rule and would skip the lifecycle events.
 
 **Round 17** (2026-11-02, the final review and the first QA round on a local stand: three isolated stacks of PostgreSQL, Mailpit and go-judge with API nodes in their roles; two static reviewers (DDD, Clean Architecture and libraries) and four QA agents (identity and the contract, the runtime against DSL 1.0.3, performance, fault tolerance)). Applied:

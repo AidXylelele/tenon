@@ -102,11 +102,16 @@ export class TaskInstance {
     return this.#variables;
   }
 
+  // A cancelled task has neither: an ending it was withdrawn from never took effect.
   get output(): JsonValue {
+    if (this.#cancelled) return null;
+
     return this.#progress.ending()?.output ?? null;
   }
 
   get error(): WorkflowError | null {
+    if (this.#cancelled) return null;
+
     return this.#progress.ending()?.failure ?? null;
   }
 
@@ -229,10 +234,18 @@ export class TaskInstance {
     return !this.isTerminal() && this.phase !== Phase.Pending;
   }
 
-  // A task that ended but whose ending its instance had not acted on when the instance ended:
-  // the ending never takes effect, so the task counts as cancelled.
-  withdraw(): void {
+  // Ended and not cancelled: an ending its instance may still withdraw.
+  hasEnded(): boolean {
+    return this.isTerminal() && !this.#cancelled;
+  }
+
+  // A task that ended but whose ending its instance had not acted on: the ending never takes
+  // effect, so the task counts as cancelled.
+  withdraw(now: Date): void {
+    if (!this.hasEnded()) return;
+
     this.#cancelled = true;
+    this.#endedAt = now;
   }
 
   abandon(now: Date): void {

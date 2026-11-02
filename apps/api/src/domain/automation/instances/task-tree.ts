@@ -104,6 +104,19 @@ export class TaskTree {
     return found;
   }
 
+  // Whether the task runs inside the ancestor, at any depth.
+  isWithin(task: TaskInstance, ancestor: TaskInstance): boolean {
+    let current = task;
+
+    while (!current.isRoot()) {
+      current = this.parentOf(current);
+
+      if (current === ancestor) return true;
+    }
+
+    return false;
+  }
+
   // The earliest deadline of the task and the tasks around it, the workflow's included.
   deadlineOf(task: TaskInstance): DueTime {
     let earliest = task.deadline();

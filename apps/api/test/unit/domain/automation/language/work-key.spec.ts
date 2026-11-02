@@ -16,6 +16,16 @@ describe('WorkKey', () => {
     expect(third.idAt(pointer)).toBe('task-1:while-3:/do/0/loop/while');
   });
 
+  it('work_on_the_context_is_identified_by_the_context_whatever_its_key_order', () => {
+    const one = key.onContext({ a: 1, b: [1, { c: 2, d: 3 }] });
+    const reordered = key.onContext({ b: [1, { d: 3, c: 2 }], a: 1 });
+    const other = key.onContext({ a: 2 });
+
+    expect(one.idAt(pointer)).toBe(reordered.idAt(pointer));
+    expect(one.idAt(pointer)).not.toBe(other.idAt(pointer));
+    expect(one.idAt(pointer)).toMatch(/^task-1:context-[0-9a-f]{16}:\/do/);
+  });
+
   it('the_task_s_own_work_is_identified_by_its_name_and_count', () => {
     expect(key.idFor('call')).toBe('task-1:call');
     expect(key.countedIdFor('retry', 2)).toBe('task-1:retry-2');

@@ -520,7 +520,7 @@ export class WorkflowInstance {
           task.reference,
           WorkflowInstance.#LIMIT_REACHED,
         );
-        this.#withdraw(queue, round.now);
+        this.#withdrawAll(queue, round.now);
         this.#faultWith(error, round.now);
         return;
       }
@@ -531,7 +531,7 @@ export class WorkflowInstance {
       this.#accept(child, begun, queue, round.now);
     }
 
-    if (!task.runsBody()) this.#abandonChildrenOf(task, round.now);
+    if (!task.runsBody()) this.#abandonChildrenOf(task, queue, round.now);
 
     const ending = change.ending;
 
@@ -540,7 +540,6 @@ export class WorkflowInstance {
     this.#ended(task, ending, round.now);
 
     if (task.isRoot()) {
-      this.#withdraw(queue, round.now);
       this.#conclude(ending, round.now);
       return;
     }
@@ -632,23 +631,41 @@ export class WorkflowInstance {
     this.#changed = true;
   }
 
-  // The tasks that ended in this pass but are not followed up when the instance ends: their
-  // endings never act, and their cancellation is announced before the instance's end.
-  #withdraw(queue: readonly TaskFollowUp[], now: Date): void {
-    for (const followUp of queue) {
-      const ending = followUp.change.ending;
-
-      if (ending === null || ending.isSkipped()) continue;
-
-      followUp.task.withdraw();
-      this.#produced.taskCancelled(followUp.task, now);
-    }
-  }
-
-  #abandonChildrenOf(parent: TaskInstance, now: Date): void {
+  // The tasks of a subtree whose body no longer runs end with it: those still running are
+  // abandoned, and those that ended in this pass but are not followed up yet are withdrawn.
+  #abandonChildrenOf(
+    parent: TaskInstance,
+    queue: readonly TaskFollowUp[],
+    now: Date,
+  ): void {
     const descendants = this.#tasks.activeDescendantsOf(parent);
 
     for (const descendant of descendants) this.#abandon(descendant, now);
+
+    for (const followUp of queue) {
+      const within = this.#tasks.isWithin(followUp.task, parent);
+
+      if (within) this.#withdraw(followUp, now);
+    }
+  }
+
+  // The instance ends in mid-pass: no follow-up left in the queue acts.
+  #withdrawAll(queue: readonly TaskFollowUp[], now: Date): void {
+    for (const followUp of queue) this.#withdraw(followUp, now);
+  }
+
+  // An ending not acted on never takes effect: the task is cancelled, and announced as such.
+  #withdraw(followUp: TaskFollowUp, now: Date): void {
+    const ending = followUp.change.ending;
+
+    if (ending === null || ending.isSkipped()) return;
+
+    const task = followUp.task;
+
+    if (!task.hasEnded()) return;
+
+    task.withdraw(now);
+    this.#produced.taskCancelled(task, now);
   }
 
   #abandon(task: TaskInstance, now: Date): void {

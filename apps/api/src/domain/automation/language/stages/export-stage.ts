@@ -46,11 +46,8 @@ export class ExportStage extends ResultStage {
       this.#output,
       this.outcome.authorization,
     );
-    const evaluations = base.export.evaluationsFor(
-      scope.key,
-      this.#output,
-      args,
-    );
+    const key = scope.key.onContext(scope.context);
+    const evaluations = base.export.evaluationsFor(key, this.#output, args);
     return RoundWork.checking(evaluations, validations);
   }
 
@@ -68,7 +65,8 @@ export class ExportStage extends ResultStage {
     }
 
     const exporting = scope.task.base.export;
-    const context = exporting.contextFrom(scope.key, results, scope.context);
+    const key = scope.key.onContext(scope.context);
+    const context = exporting.contextFrom(key, results, scope.context);
     const exported = exporting.changesContext();
     const deadline = this.deadline();
     return ExportCheckStage.enter(
@@ -94,7 +92,8 @@ export class ExportStage extends ResultStage {
 
     if (invalid !== null) return invalid;
 
-    return base.export.failureIn(scope.key, results, at);
+    const key = scope.key.onContext(scope.context);
+    return base.export.failureIn(key, results, at);
   }
 
   subWorkflowAnswered(): Step<TaskProgress> {
