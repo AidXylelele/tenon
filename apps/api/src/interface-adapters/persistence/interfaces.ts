@@ -23,6 +23,11 @@ import type {
 } from '../interfaces.js';
 import type * as schema from './schema/index.js';
 
+export interface KeysetSlice<R, P> {
+  readonly items: readonly R[];
+  readonly next: P | null;
+}
+
 export abstract class Database extends NodePgDatabase<typeof schema> {}
 
 export type DrizzleTx = TransactionalAdapterDrizzleOrm<Database>;

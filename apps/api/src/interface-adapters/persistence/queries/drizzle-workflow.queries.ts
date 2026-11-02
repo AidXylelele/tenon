@@ -2,21 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { and, asc, eq, gt, or, type SQL, sql } from 'drizzle-orm';
 import type {
-  PageRequest,
   VersionDocument,
   VersionSummary,
   WorkflowPage,
+  WorkflowPageRequest,
+  WorkflowPosition,
   WorkflowQueries,
   WorkflowSummary,
 } from '../../../application/automation/workflows/queries.js';
 import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
 import type { DrizzleTx } from '../interfaces.js';
+import { KeysetPage } from '../keyset-page.js';
 import {
   workflow as workflows,
   workflowVersion as versions,
 } from '../schema/index.js';
-
-const SEPARATOR = '\n';
 
 @Injectable()
 export class DrizzleWorkflowQueries implements WorkflowQueries {
@@ -24,8 +24,8 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
   // connection instead of taking a second one from the pool.
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
 
-  async list(page: PageRequest): Promise<WorkflowPage> {
-    const after = this.#after(page.cursor);
+  async list(page: WorkflowPageRequest): Promise<WorkflowPage> {
+    const after = this.#after(page.after);
     const fetched = page.limit + 1;
     const rows = await this.txHost.tx
       .select({
@@ -39,16 +39,10 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
       .where(after)
       .orderBy(asc(workflows.namespace), asc(workflows.name))
       .limit(fetched);
-    const items = rows.slice(0, page.limit);
-    const last = items.at(-1);
-    const hasMore = rows.length > page.limit;
-    const next =
-      hasMore && last
-        ? Buffer.from(`${last.namespace}${SEPARATOR}${last.name}`).toString(
-            'base64url',
-          )
-        : null;
-    return { items, next };
+    return KeysetPage.of(rows, page.limit, (last) => ({
+      namespace: last.namespace,
+      name: last.name,
+    }));
   }
 
   async get(name: WorkflowName): Promise<WorkflowSummary | null> {
@@ -118,11 +112,11 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
     return row ?? null;
   }
 
-  #after(cursor: string | null): SQL | undefined {
-    if (cursor === null) return undefined;
+  #after(position: WorkflowPosition | null): SQL | undefined {
+    if (position === null) return undefined;
 
-    const decoded = Buffer.from(cursor, 'base64url').toString();
-    const [namespace = '', name = ''] = decoded.split(SEPARATOR);
+    const namespace = position.namespace;
+    const name = position.name;
     return or(
       gt(workflows.namespace, namespace),
       and(eq(workflows.namespace, namespace), gt(workflows.name, name)),

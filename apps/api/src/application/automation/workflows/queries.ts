@@ -8,13 +8,19 @@ export interface WorkflowSummary {
   readonly currentVersion: string | null;
 }
 
-export interface WorkflowPage {
-  readonly items: readonly WorkflowSummary[];
-  readonly next: string | null;
+// The last workflow of a page, in the list's order.
+export interface WorkflowPosition {
+  readonly namespace: string;
+  readonly name: string;
 }
 
-export interface PageRequest {
-  readonly cursor: string | null;
+export interface WorkflowPage {
+  readonly items: readonly WorkflowSummary[];
+  readonly next: WorkflowPosition | null;
+}
+
+export interface WorkflowPageRequest {
+  readonly after: WorkflowPosition | null;
   readonly limit: number;
 }
 
@@ -34,7 +40,7 @@ export interface VersionDocument {
 }
 
 export abstract class WorkflowQueries {
-  abstract list(page: PageRequest): Promise<WorkflowPage>;
+  abstract list(page: WorkflowPageRequest): Promise<WorkflowPage>;
   abstract get(name: WorkflowName): Promise<WorkflowSummary | null>;
   abstract versions(name: WorkflowName): Promise<readonly VersionSummary[]>;
   abstract document(

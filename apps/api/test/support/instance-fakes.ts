@@ -17,7 +17,7 @@ import {
   type SchemaValidator,
 } from '../../src/application/automation/language/ports.js';
 import type {
-  PageRequest,
+  WorkflowPageRequest,
   VersionDocument,
   VersionSummary,
   WorkflowPage,
@@ -194,8 +194,8 @@ export class AcceptingSchemaValidator implements SchemaValidator {
 export class InMemoryWorkflowQueries implements WorkflowQueries {
   constructor(private readonly store: InMemoryWorkflowVersionRepository) {}
 
-  async list(page: PageRequest): Promise<WorkflowPage> {
-    return { items: [], next: page.cursor };
+  async list(page: WorkflowPageRequest): Promise<WorkflowPage> {
+    return { items: [], next: page.after };
   }
 
   async get(name: WorkflowName): Promise<WorkflowSummary | null> {

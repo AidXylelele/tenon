@@ -15,6 +15,7 @@ import type {
   WorkflowPageResponse,
   WorkflowResponse,
 } from '../schemas/workflow.schemas.js';
+import { CursorMapper } from '../mappers/cursor.mapper.js';
 
 export class WorkflowPresenter {
   static published(result: PublishedVersionResult): VersionResponse {
@@ -56,7 +57,8 @@ export class WorkflowPresenter {
     const items = page.items.map((workflow) =>
       WorkflowPresenter.workflow(workflow),
     );
-    return { items, next: page.next };
+    const next = CursorMapper.fromWorkflowPosition(page.next);
+    return { items, next };
   }
 
   static conformance(statement: ConformanceStatement): ConformanceResponse {

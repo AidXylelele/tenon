@@ -7,6 +7,10 @@ import { DEFECTIVE_DOCUMENTS, yamlOf } from './fixtures/defective-documents.js';
 
 const YAML = 'application/yaml';
 
+function named(name: string): string {
+  return `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: ${name}\n  version: '1.0.0'\ndo:\n  - hello:\n      set:\n        greeting: hi\n`;
+}
+
 function greeting(version: string, text: string): string {
   return `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: greet\n  version: '${version}'\ndo:\n  - hello:\n      set:\n        greeting: ${text}\n`;
 }
@@ -236,6 +240,46 @@ describe('publishing workflows', () => {
 
     expect(checked.body).toEqual(refused.body);
     expect(checked.body).toMatchObject({ pointer: '/do/0/compute/set/value' });
+  });
+
+  it('a_workflow_cursor_the_api_did_not_give_out_is_refused', async () => {
+    const foreign = Buffer.from('default\ngreet\nextra').toString('base64url');
+
+    await request(t.server)
+      .get(`/api/v1/workflows?cursor=${foreign}`)
+      .set(viewer)
+      .expect(400);
+    await request(t.server)
+      .get('/api/v1/workflows?cursor=not%20a%20cursor')
+      .set(viewer)
+      .expect(400);
+  });
+
+  it('the_workflow_list_pages_by_its_cursor', async () => {
+    for (const name of ['page-a', 'page-b', 'page-c'])
+      await request(t.server)
+        .post('/api/v1/workflows')
+        .set(editor)
+        .type(YAML)
+        .send(named(name))
+        .expect(201);
+
+    const first = await request(t.server)
+      .get('/api/v1/workflows?limit=2')
+      .set(viewer)
+      .expect(200);
+    const second = await request(t.server)
+      .get(`/api/v1/workflows?limit=2&cursor=${String(first.body.next)}`)
+      .set(viewer)
+      .expect(200);
+
+    const names = [...first.body.items, ...second.body.items].map(
+      (item: { name: string }) => item.name,
+    );
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toEqual(
+      expect.arrayContaining(['page-a', 'page-b', 'page-c']),
+    );
   });
 
   it('a_malformed_json_document_is_refused_at_its_root', async () => {

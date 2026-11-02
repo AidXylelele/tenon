@@ -42,6 +42,7 @@ import {
   WorkflowParams,
   WorkflowResponse,
 } from '../schemas/workflow.schemas.js';
+import { CursorMapper } from '../mappers/cursor.mapper.js';
 
 @ApiTags('workflows')
 @ApiCookieAuth('sessionCookie')
@@ -89,8 +90,8 @@ export class WorkflowsController {
   async list(
     @Query({ schema: ListWorkflowsQuery }) query: ListWorkflowsQuery,
   ): Promise<WorkflowPageResponse> {
-    const cursor = query.cursor ?? null;
-    const page = await this.workflows.list({ cursor, limit: query.limit });
+    const after = CursorMapper.toWorkflowPosition(query.cursor);
+    const page = await this.workflows.list({ after, limit: query.limit });
     return WorkflowPresenter.page(page);
   }
 

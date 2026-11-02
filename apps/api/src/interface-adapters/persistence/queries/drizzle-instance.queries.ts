@@ -35,6 +35,7 @@ import {
   taskInstance as tasks,
   workflowInstance as instances,
 } from '../schema/index.js';
+import { KeysetPage } from '../keyset-page.js';
 
 @Injectable()
 export class DrizzleInstanceQueries implements InstanceQueries {
@@ -62,14 +63,10 @@ export class DrizzleInstanceQueries implements InstanceQueries {
       .where(and(...conditions))
       .orderBy(desc(instances.startedAt), desc(instances.id))
       .limit(fetched);
-    const items = rows.slice(0, page.limit);
-    const last = items.at(-1);
-
-    if (rows.length <= page.limit || last === undefined)
-      return { items, next: null };
-
-    const next = { startedAt: last.startedAt, id: last.id };
-    return { items, next };
+    return KeysetPage.of(rows, page.limit, (last) => ({
+      startedAt: last.startedAt,
+      id: last.id,
+    }));
   }
 
   async exists(id: string): Promise<boolean> {
@@ -125,7 +122,8 @@ export class DrizzleInstanceQueries implements InstanceQueries {
       )
       .orderBy(asc(tasks.execution))
       .limit(page.limit + 1);
-    const items = rows.slice(0, page.limit).map((row) => ({
+    const slice = KeysetPage.of(rows, page.limit, (last) => last.execution);
+    const items = slice.items.map((row) => ({
       id: row.id,
       reference: row.reference,
       name: row.name,
@@ -138,10 +136,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
       startedAt: row.startedAt,
       endedAt: row.endedAt,
     }));
-    const last = rows.at(page.limit - 1);
-    const hasMore = rows.length > page.limit;
-    const next = hasMore && last ? last.execution : null;
-    return { items, next };
+    return { items, next: slice.next };
   }
 
   async lifecycleEvents(
@@ -161,7 +156,8 @@ export class DrizzleInstanceQueries implements InstanceQueries {
       )
       .orderBy(asc(events.sequence))
       .limit(page.limit + 1);
-    const items = rows.slice(0, page.limit).map((row) => ({
+    const slice = KeysetPage.of(rows, page.limit, (last) => last.sequence);
+    const items = slice.items.map((row) => ({
       id: row.eventId,
       source: row.source,
       type: row.type,
@@ -172,10 +168,7 @@ export class DrizzleInstanceQueries implements InstanceQueries {
       data: row.data ?? null,
       extensions: row.extensions,
     }));
-    const last = rows.at(page.limit - 1);
-    const hasMore = rows.length > page.limit;
-    const next = hasMore && last ? last.sequence : null;
-    return { items, next };
+    return { items, next: slice.next };
   }
 
   async subWorkflowEnding(id: string): Promise<SubWorkflowEnding | null> {
