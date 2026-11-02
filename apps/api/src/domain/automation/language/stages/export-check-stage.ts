@@ -40,6 +40,10 @@ export class ExportCheckStage extends ResultStage {
     return this.#exported;
   }
 
+  override holdsExport(): boolean {
+    return this.#exported;
+  }
+
   work(scope: TaskScope): RoundWork {
     const exporting = scope.task.base.export;
     const validations = exporting.validationsFor(scope.key, this.#context);

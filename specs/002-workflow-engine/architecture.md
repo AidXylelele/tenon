@@ -139,7 +139,7 @@ AdvanceInstance({ instanceId, runtime }):
       events.addAll(instance.takeProducedEvents())                               // save writes the domain events to the outbox
   recorded = []
   repeat:                                                    // pure work is never saved on its own
-    work = instance.pendingWork(context)                      // at most one context export per pass
+    work = instance.pendingWork(context)                      // one context export at a time
     if work is empty: stop
     for each answer of WorkAnswers.inArrivalOrder(work):     // expressions and schemas together, then each
       context = context.at(clock.now())                      // call and process as it ends

@@ -244,12 +244,13 @@ export class WorkflowInstance {
 
     this.#confirmOwn(round);
     const works: RoundWork[] = [];
-    let exporting = false;
+    const active = this.#tasks.active();
+    let exporting = active.some((task) => task.holdsExport());
 
-    // One export per pass, so each sees the context the one before it left (fork branches
-    // that end together would otherwise overwrite one another's exports).
-    for (const task of this.#tasks.active()) {
-      const exports = task.exportsContext();
+    // One export at a time, from `export.as` until its task ends, so each sees the context the
+    // one before it left (fork branches would otherwise overwrite one another's exports).
+    for (const task of active) {
+      const exports = task.evaluatesExport();
 
       if (exports && exporting) continue;
 
@@ -471,8 +472,12 @@ export class WorkflowInstance {
     const queue: TaskFollowUp[] = [];
     this.#accept(task, change, queue, round.now);
 
-    for (let next = queue.shift(); next !== undefined; next = queue.shift())
+    // Nothing follows the end: a fault leaves ended tasks in the queue that must not act.
+    for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+      if (this.#phase.isTerminal()) return;
+
       this.#followUp(next, queue, round);
+    }
   }
 
   #accept(

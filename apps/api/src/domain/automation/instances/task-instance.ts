@@ -146,8 +146,12 @@ export class TaskInstance {
     return this.#progress.runsBody();
   }
 
-  exportsContext(): boolean {
-    return !this.isTerminal() && this.#progress.exportsContext();
+  evaluatesExport(): boolean {
+    return !this.isTerminal() && this.#progress.evaluatesExport();
+  }
+
+  holdsExport(): boolean {
+    return !this.isTerminal() && this.#progress.holdsExport();
   }
 
   requestedSubWorkflow(): SubWorkflowRequest | null {

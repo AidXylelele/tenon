@@ -34,8 +34,13 @@ export abstract class TaskProgress {
     return false;
   }
 
-  // The stage evaluates `export.as`, whose result replaces the workflow's context.
-  exportsContext(): boolean {
+  // The stage evaluates `export.as` on the workflow's context.
+  evaluatesExport(): boolean {
+    return false;
+  }
+
+  // The stage holds an evaluated export that replaces the workflow's context when the task ends.
+  holdsExport(): boolean {
     return false;
   }
 

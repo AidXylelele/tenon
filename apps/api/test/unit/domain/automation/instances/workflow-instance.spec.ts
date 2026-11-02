@@ -5,6 +5,7 @@ import { InstanceProgressKind } from '../../../../../src/domain/automation/insta
 import { WorkflowInstance } from '../../../../../src/domain/automation/instances/workflow-instance.js';
 import { RunnableVersion } from '../../../../../src/domain/automation/workflows/runnable-version.js';
 import type { Definition } from '../../../../../src/domain/automation/language/definition.js';
+import type { JsonObject } from '../../../../../src/domain/automation/language/interfaces.js';
 import { ErrorType } from '../../../../../src/domain/automation/language/error-type.js';
 import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
 import { Phase } from '../../../../../src/domain/automation/language/phase.js';
@@ -622,6 +623,142 @@ describe('WorkflowInstance', () => {
     const work = () => restored.pendingWork(roundAt(definition, now));
 
     expect(work).toThrow(InconsistentProgressError);
+  });
+
+  it.each([
+    ['first', ['a', 'b']],
+    ['second', ['b', 'a']],
+  ])(
+    'a_branch_export_under_its_schema_check_as_the_%s_branch_is_kept_by_its_sibling',
+    (position, order) => {
+      const exported = (name: string, value: number) =>
+        `\${ $context + { ${name}: ${String(value)} } }`;
+      const branches: Record<string, JsonObject> = {
+        a: {
+          a: {
+            set: { a: 1 },
+            export: {
+              as: exported('a', 1),
+              schema: { format: 'json', document: { type: 'object' } },
+            },
+          },
+        },
+        b: { b: { set: { b: 2 }, export: { as: exported('b', 2) } } },
+      };
+      const declared = order.map((name) => branches[name] ?? {});
+      const definition = definitionOf([
+        { split: { fork: { branches: declared } } },
+        { read: { set: { context: '${ $context }' } } },
+      ]);
+      const merged = evaluatedAs((evaluation) => {
+        const context = (evaluation.arguments.context ?? {}) as JsonObject;
+        const named = /\{ (\w+): (\d+) \}/.exec(evaluation.program);
+
+        if (evaluation.program === '$context') return context;
+
+        if (named === null) return evaluation.data;
+
+        return { ...context, [named[1] ?? '']: Number(named[2]) };
+      });
+      const instance = started(definition);
+
+      instance.beginRound(roundAt(definition, now));
+      settle(instance, definition, now, { evaluate: merged });
+
+      expect(instance.output).toEqual({ context: { a: 1, b: 2 } });
+    },
+  );
+
+  it('a_branch_that_reaches_its_export_later_waits_for_the_one_under_its_schema_check', () => {
+    const definition = definitionOf([
+      {
+        split: {
+          fork: {
+            branches: [
+              {
+                b: {
+                  ...call('https://pets.example/1'),
+                  export: { as: '${ $context + { b: 2 } }' },
+                },
+              },
+              {
+                a: {
+                  set: { a: 1 },
+                  export: {
+                    as: '${ $context + { a: 1 } }',
+                    schema: { format: 'json', document: { type: 'object' } },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+      { read: { set: { context: '${ $context }' } } },
+    ]);
+    const merged = evaluatedAs((evaluation) => {
+      const context = (evaluation.arguments.context ?? {}) as JsonObject;
+      const named = /\{ (\w+): (\d+) \}/.exec(evaluation.program);
+
+      if (evaluation.program === '$context') return context;
+
+      if (named === null) return evaluation.data;
+
+      return { ...context, [named[1] ?? '']: Number(named[2]) };
+    });
+    const instance = started(definition);
+
+    instance.beginRound(roundAt(definition, now));
+    settle(instance, definition, now, { evaluate: merged, respond: ok });
+
+    expect(instance.output).toEqual({ context: { a: 1, b: 2 } });
+  });
+
+  it('nothing_follows_the_fault_at_the_execution_limit', () => {
+    const items = Array.from({ length: 9_995 }, (item, index) => index);
+    const definition = definitionOf([
+      {
+        loop: {
+          for: { in: '${ .items }' },
+          do: [{ one: { set: { x: 1 } } }],
+        },
+      },
+      {
+        split: {
+          fork: {
+            branches: [
+              { b1: { do: [{ inner: { set: { y: 1 } } }] } },
+              {
+                b2: {
+                  emit: {
+                    event: {
+                      with: {
+                        source: 'https://example.com',
+                        type: 'com.example.done',
+                      },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+    ]);
+    const collected = evaluatedAs((evaluation) => {
+      if (evaluation.program === '.items') return items;
+
+      return evaluation.data;
+    });
+    const instance = started(definition, {});
+
+    instance.beginRound(roundAt(definition, now));
+    settle(instance, definition, now, { evaluate: collected });
+    const types = typesOf(instance);
+
+    expect(instance.phase).toBe(Phase.Faulted);
+    expect(types.at(-1)).toBe('workflow.faulted');
+    expect(instance.takeDomainEvents()).toEqual([]);
   });
 
   it('a_round_with_the_definition_of_another_version_is_refused', () => {

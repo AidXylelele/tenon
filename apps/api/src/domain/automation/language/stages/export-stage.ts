@@ -32,7 +32,7 @@ export class ExportStage extends ResultStage {
     return this.#output;
   }
 
-  override exportsContext(): boolean {
+  override evaluatesExport(): boolean {
     return true;
   }
 

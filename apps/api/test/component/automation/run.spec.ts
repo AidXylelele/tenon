@@ -92,38 +92,48 @@ describe('running workflows', () => {
     await t.app.get(WorkflowWorker).drain();
   }
 
-  it('fork_branches_that_end_together_each_add_their_export_to_the_context', async () => {
-    const branch = (name: string, value: number) => ({
-      [name]: {
-        set: { [name]: value },
-        export: { as: `\${ $context + { ${name}: ${String(value)} } }` },
-      },
-    });
-    await publish(
-      documentOf('exports', [
-        {
-          split: {
-            fork: {
-              branches: [branch('a', 1), branch('b', 2), branch('c', 3)],
-            },
+  it.each([
+    ['without', false],
+    ['with', true],
+  ])(
+    'fork_branches_that_end_together_each_add_their_export_to_the_context_%s_a_context_schema',
+    async (wording, checked) => {
+      const schema = { format: 'json', document: { type: 'object' } };
+      const branch = (name: string, value: number) => ({
+        [name]: {
+          set: { [name]: value },
+          export: {
+            as: `\${ $context + { ${name}: ${String(value)} } }`,
+            ...(checked ? { schema } : {}),
           },
         },
-        { read: { set: { context: '${ $context }' } } },
-      ]),
-    );
+      });
+      await publish(
+        documentOf('exports', [
+          {
+            split: {
+              fork: {
+                branches: [branch('a', 1), branch('b', 2), branch('c', 3)],
+              },
+            },
+          },
+          { read: { set: { context: '${ $context }' } } },
+        ]),
+      );
 
-    const started = await start('exports', { input: {} });
-    await drain();
-    const instance = await request(t.server)
-      .get(`/api/v1/instances/${String(started.body.id)}`)
-      .set(viewer)
-      .expect(200);
+      const started = await start('exports', { input: {} });
+      await drain();
+      const instance = await request(t.server)
+        .get(`/api/v1/instances/${String(started.body.id)}`)
+        .set(viewer)
+        .expect(200);
 
-    expect(instance.body).toMatchObject({
-      phase: 'completed',
-      output: { context: { a: 1, b: 2, c: 3 } },
-    });
-  });
+      expect(instance.body).toMatchObject({
+        phase: 'completed',
+        output: { context: { a: 1, b: 2, c: 3 } },
+      });
+    },
+  );
 
   it('a_loop_over_thousands_of_items_completes_in_one_round', async () => {
     await publish(
