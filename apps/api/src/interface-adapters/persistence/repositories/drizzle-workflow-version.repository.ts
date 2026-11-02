@@ -16,7 +16,7 @@ import {
   workflow as workflows,
   workflowVersion as versions,
 } from '../schema/index.js';
-import { isUniqueViolation } from '../unique-violation.js';
+import { UniqueViolation } from '../unique-violation.js';
 
 @Injectable()
 export class DrizzleWorkflowVersionRepository implements WorkflowVersionRepository {
@@ -64,15 +64,8 @@ export class DrizzleWorkflowVersionRepository implements WorkflowVersionReposito
   async add(version: WorkflowVersion): Promise<void> {
     const row = WorkflowVersionMapper.toRow(version);
 
-    try {
-      await this.txHost.tx.insert(versions).values(row);
-    } catch (error) {
-      const raced = isUniqueViolation(error);
-
-      if (raced) throw new StaleWriteError();
-
-      throw error;
-    }
+    const insert = this.txHost.tx.insert(versions).values(row);
+    await UniqueViolation.translated(insert, () => new StaleWriteError());
   }
 
   async #first(condition: SQL | undefined): Promise<WorkflowVersion | null> {

@@ -12,7 +12,7 @@ import type { AccountRepository } from '../../../application/identity/ports.js';
 import type { DrizzleTx } from '../interfaces.js';
 import { AccountMapper } from '../mappers/account.mapper.js';
 import { account as accounts } from '../schema/index.js';
-import { isUniqueViolation } from '../unique-violation.js';
+import { UniqueViolation } from '../unique-violation.js';
 
 @Injectable()
 export class DrizzleAccountRepository implements AccountRepository {
@@ -36,15 +36,12 @@ export class DrizzleAccountRepository implements AccountRepository {
       })
       .returning({ id: accounts.id });
 
-    try {
-      const saved = await upsert;
+    const saved = await UniqueViolation.translated(
+      upsert,
+      () => new AccountExistsError(),
+    );
 
-      if (saved.length === 0) throw new StaleWriteError();
-    } catch (error) {
-      if (isUniqueViolation(error)) throw new AccountExistsError();
-
-      throw error;
-    }
+    if (saved.length === 0) throw new StaleWriteError();
   }
 
   findByEmail(email: string): Promise<Account | null> {

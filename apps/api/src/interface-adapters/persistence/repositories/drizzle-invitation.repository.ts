@@ -16,7 +16,7 @@ import type { InvitationRepository } from '../../../application/identity/ports.j
 import type { DrizzleTx } from '../interfaces.js';
 import { InvitationMapper } from '../mappers/invitation.mapper.js';
 import { invitation as invitations } from '../schema/index.js';
-import { isUniqueViolation } from '../unique-violation.js';
+import { UniqueViolation } from '../unique-violation.js';
 
 @Injectable()
 export class DrizzleInvitationRepository implements InvitationRepository {
@@ -42,15 +42,12 @@ export class DrizzleInvitationRepository implements InvitationRepository {
       })
       .returning({ id: invitations.id });
 
-    try {
-      const saved = await upsert;
+    const saved = await UniqueViolation.translated(
+      upsert,
+      () => new StaleWriteError(),
+    );
 
-      if (saved.length === 0) throw new StaleWriteError();
-    } catch (error) {
-      if (isUniqueViolation(error)) throw new StaleWriteError();
-
-      throw error;
-    }
+    if (saved.length === 0) throw new StaleWriteError();
   }
 
   async getById(id: string): Promise<Invitation> {

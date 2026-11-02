@@ -13,6 +13,7 @@ import {
   InstanceNotFoundError,
   StaleWriteError,
 } from '../../../domain/errors.js';
+import { Batches } from '../batches.js';
 import type { DrizzleTx } from '../interfaces.js';
 import { DomainEventMapper } from '../mappers/domain-event.mapper.js';
 import { TaskInstanceMapper } from '../mappers/task-instance.mapper.js';
@@ -24,8 +25,6 @@ import {
 
 @Injectable()
 export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceRepository {
-  private static readonly BATCH = 1_000;
-
   constructor(
     private readonly txHost: TransactionHost<DrizzleTx>,
     private readonly outbox: Outbox,
@@ -66,14 +65,7 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
       TaskInstanceMapper.toRow(task, instance.id),
     );
 
-    // PostgreSQL binds at most 65,535 parameters per statement, so rows go in batches.
-    for (
-      let start = 0;
-      start < rows.length;
-      start += DrizzleWorkflowInstanceRepository.BATCH
-    ) {
-      const end = start + DrizzleWorkflowInstanceRepository.BATCH;
-      const batch = rows.slice(start, end);
+    for (const batch of Batches.of(rows))
       await this.txHost.tx
         .insert(tasks)
         .values(batch)
@@ -88,7 +80,6 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
             endedAt: sql`excluded.ended_at`,
           },
         });
-    }
 
     const produced = instance.takeProducedEvents();
     await this.events.addAll(produced);

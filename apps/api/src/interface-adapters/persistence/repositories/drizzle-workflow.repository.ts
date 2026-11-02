@@ -12,7 +12,7 @@ import { StaleWriteError } from '../../../domain/errors.js';
 import type { DrizzleTx } from '../interfaces.js';
 import { WorkflowMapper } from '../mappers/workflow.mapper.js';
 import { workflow as workflows } from '../schema/index.js';
-import { isUniqueViolation } from '../unique-violation.js';
+import { UniqueViolation } from '../unique-violation.js';
 
 @Injectable()
 export class DrizzleWorkflowRepository implements WorkflowRepository {
@@ -40,14 +40,7 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
     const nextVersion = workflow.version + 1;
     const upsert = this.txHost.tx
       .insert(workflows)
-      .values({
-        id: row.id,
-        namespace: row.namespace,
-        name: row.name,
-        isOn: row.isOn,
-        currentVersionId: row.currentVersionId,
-        version: nextVersion,
-      })
+      .values({ ...row, version: nextVersion })
       .onConflictDoUpdate({
         target: workflows.id,
         set: {
@@ -59,21 +52,12 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
       })
       .returning({ id: workflows.id });
 
-    const saved = await this.#saved(upsert);
+    // A workflow registered under the same name by a concurrent publish is a stale write.
+    const saved = await UniqueViolation.translated(
+      upsert,
+      () => new StaleWriteError(),
+    );
 
     if (saved.length === 0) throw new StaleWriteError();
-  }
-
-  // A workflow registered under the same name by a concurrent publish is a stale write.
-  async #saved<T>(upsert: Promise<T[]>): Promise<T[]> {
-    try {
-      return await upsert;
-    } catch (error) {
-      const raced = isUniqueViolation(error);
-
-      if (raced) throw new StaleWriteError();
-
-      throw error;
-    }
   }
 }
