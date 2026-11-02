@@ -12,6 +12,11 @@ const list = z
       .filter((item) => item.length > 0),
   );
 
+// Addresses and networks a service call may reach although they are private (`10.0.0.0/8`).
+const addresses = list.pipe(
+  z.array(z.union([z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()])),
+);
+
 const optional = z.string().default('');
 
 const role = z.enum(['on', 'off']).default('on');
@@ -37,7 +42,7 @@ const envSchema = z.object({
   ENGINE_WORKER: role,
   OUTBOX_RELAY: role,
   SECRETS_KEY: encryptionKey,
-  OUTBOUND_ALLOW_LIST: list,
+  OUTBOUND_ALLOW_LIST: addresses,
   SANDBOX_URL: z.url(),
   SANDBOX_TOKEN: z.string().min(32),
   SMTP_HOST: z.string().min(1),

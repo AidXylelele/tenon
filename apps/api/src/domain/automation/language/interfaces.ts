@@ -378,16 +378,6 @@ export interface OutcomeProps {
   readonly detachedWorkflow: DetachedWorkflow | null;
 }
 
-export interface TaskEndingProps {
-  readonly output: JsonValue;
-  readonly failure: WorkflowError | null;
-  readonly directive: FlowDirective | null;
-  readonly skipped: boolean;
-  readonly exported: boolean;
-  readonly context: JsonValue;
-  readonly body: Outcome | null;
-}
-
 export interface TaskCompletion {
   readonly output: JsonValue;
   readonly then: FlowDirective;

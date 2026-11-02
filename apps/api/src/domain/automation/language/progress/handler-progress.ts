@@ -1,3 +1,4 @@
+import { InconsistentProgressError } from '../../../errors.js';
 import type { JsonPointer } from '../json-pointer.js';
 import { Outcome } from '../outcome.js';
 import { RoundWork } from '../round-work.js';
@@ -58,7 +59,10 @@ export class HandlerProgress extends KindProgress {
   ): Step<KindProgress> {
     const handler = scope.task.catchClause.handler;
 
-    if (handler === null) return Step.of<KindProgress>(this);
+    if (handler === null)
+      throw new InconsistentProgressError(
+        'a catch handler runs only where the catch declares one',
+      );
 
     const step = this.#sequence.childEnded(child, ending, handler);
     return HandlerProgress.#following(step);

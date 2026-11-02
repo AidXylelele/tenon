@@ -16,7 +16,6 @@ import { DatabaseModule } from './database.module.js';
 import { IdempotencyModule } from './idempotency.module.js';
 import { IdentityModule } from './identity.module.js';
 import { LoggingModule } from './logging.module.js';
-import { MailModule } from './mail.module.js';
 import { OutboxModule } from './outbox.module.js';
 import { ResilienceModule } from './resilience.module.js';
 
@@ -27,7 +26,6 @@ import { ResilienceModule } from './resilience.module.js';
     DatabaseModule,
     OutboxModule,
     IdempotencyModule,
-    MailModule,
     IdentityModule,
     AuthorizationModule.forRoot(),
     ResilienceModule,

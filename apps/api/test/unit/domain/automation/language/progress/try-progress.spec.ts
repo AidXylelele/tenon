@@ -1,6 +1,11 @@
 import { Attempt } from '../../../../../../src/domain/automation/language/attempt.js';
 import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
+import { DueTime } from '../../../../../../src/domain/automation/language/due-time.js';
+import { HandlerProgress } from '../../../../../../src/domain/automation/language/progress/handler-progress.js';
 import { RetryProgress } from '../../../../../../src/domain/automation/language/progress/retry-progress.js';
+import type { BodyScope } from '../../../../../../src/domain/automation/language/scopes/body-scope.js';
+import { Sequence } from '../../../../../../src/domain/automation/language/sequence.js';
+import type { TryTask } from '../../../../../../src/domain/automation/language/tasks/try-task.js';
 import { InconsistentProgressError } from '../../../../../../src/domain/errors.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
 import { type TaskEnding } from '../../../../../../src/domain/automation/language/endings/task-ending.js';
@@ -269,5 +274,20 @@ describe('RetryProgress', () => {
     const build = () => new RetryProgress({ attempt, wakeAt: now });
 
     expect(build).toThrow(InconsistentProgressError);
+  });
+
+  it('a_handler_restored_for_a_catch_without_one_is_refused_as_corrupt_state', () => {
+    const definition = definitionOf([
+      { tryGetPet: { try: [getPet], catch: {} } },
+    ]);
+    const scope = scopeOf(definition, '/do/0/tryGetPet', {});
+    const body = scope.forBody({}, DueTime.None) as BodyScope<TryTask>;
+    const sequence = new Sequence({ position: 0, variables: {} });
+    const handler = new HandlerProgress(sequence);
+    const ending = completedAt(definition, getPetAt, {});
+
+    const end = () => handler.childEnded(pointerOf(getPetAt), ending, body);
+
+    expect(end).toThrow(InconsistentProgressError);
   });
 });

@@ -2,6 +2,7 @@ import {
   isWorkflowInterrupt,
   type Journaled,
   Workflow,
+  type WorkflowCondition,
   type WorkflowContext,
   type WorkflowRetryOptions,
   type WorkflowRunner,
@@ -73,7 +74,7 @@ export class InstanceWorkflow implements WorkflowRunner<
     if (requested.length > 0) return this.#startAll(ctx, run, requested);
 
     if (progress.kind === RoundProgressKind.Busy)
-      return this.#rest(ctx, run, round);
+      return this.#rest(ctx, run, round, progress.wakeAt);
 
     run.rested();
 
@@ -124,24 +125,37 @@ export class InstanceWorkflow implements WorkflowRunner<
     return RoundTurn.Next;
   }
 
-  async #rest(
+  // Deferred work waits a growing pause, which a due deadline or an awaited child ends early.
+  #rest(
     ctx: WorkflowContext,
     run: RunState,
     round: number,
+    wakeAt: number | null,
   ): Promise<RoundTurn> {
     const pause = run.busy();
-    await ctx.sleep(`busy-${String(round)}`, pause);
-    return RoundTurn.Next;
+    const conditions = run.conditions(ctx, wakeAt);
+    conditions.rest = ctx.timer(pause);
+    return this.#waitFor(ctx, run, `busy-${String(round)}`, round, conditions);
   }
 
-  async #park(
+  #park(
     ctx: WorkflowContext,
     run: RunState,
     round: number,
     wakeAt: number | null,
   ): Promise<RoundTurn> {
     const conditions = run.conditions(ctx, wakeAt);
-    const winner = await ctx.waitForAny(`park-${String(round)}`, conditions);
+    return this.#waitFor(ctx, run, `park-${String(round)}`, round, conditions);
+  }
+
+  async #waitFor(
+    ctx: WorkflowContext,
+    run: RunState,
+    name: string,
+    round: number,
+    conditions: Record<string, WorkflowCondition>,
+  ): Promise<RoundTurn> {
+    const winner = await ctx.waitForAny(name, conditions);
     const ended = run.ended(winner.key);
 
     if (!ended) return RoundTurn.Next;

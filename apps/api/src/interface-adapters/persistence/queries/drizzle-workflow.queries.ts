@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
-import { and, asc, eq, gt, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, eq, type SQL, sql } from 'drizzle-orm';
 import type {
   VersionDocument,
   VersionDocuments,
@@ -113,14 +113,10 @@ export class DrizzleWorkflowQueries
     return row ?? null;
   }
 
+  // A row comparison, which the unique (namespace, name) index answers, as for instances.
   #after(position: WorkflowPosition | null): SQL | undefined {
     if (position === null) return undefined;
 
-    const namespace = position.namespace;
-    const name = position.name;
-    return or(
-      gt(workflows.namespace, namespace),
-      and(eq(workflows.namespace, namespace), gt(workflows.name, name)),
-    );
+    return sql`(${workflows.namespace}, ${workflows.name}) > (${position.namespace}, ${position.name})`;
   }
 }

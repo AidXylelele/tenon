@@ -48,6 +48,6 @@ import type { Env } from './config.module.js';
     { provide: Mailing, useExisting: MailGateway },
     MailOutboxHandler,
   ],
-  exports: [MailGateway, Mailing],
+  exports: [Mailing],
 })
 export class MailModule {}

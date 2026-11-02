@@ -130,10 +130,6 @@ export class TaskInstance {
     return this.#parentId === null;
   }
 
-  isSkipped(): boolean {
-    return this.phase === null;
-  }
-
   isTerminal(): boolean {
     return this.phase?.isTerminal() ?? true;
   }
