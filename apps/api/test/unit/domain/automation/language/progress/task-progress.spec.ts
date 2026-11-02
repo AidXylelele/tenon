@@ -62,7 +62,7 @@ describe('TaskProgress', () => {
     });
     const ending = begun.record(results, scope).progress.ending();
 
-    expect(ending?.skipped).toBe(true);
+    expect(ending?.isSkipped()).toBe(true);
     expect(ending?.output).toEqual({ vip: false });
     expect(ending?.directive).toBe(FlowDirective.Continue);
   });
@@ -141,8 +141,7 @@ describe('TaskProgress', () => {
       expect.objectContaining({ output: 1 }),
     );
     expect(ended.ending()?.output).toBe(1);
-    expect(ended.ending()?.exported).toBe(true);
-    expect(ended.ending()?.context).toEqual({ last: 1 });
+    expect(ended.ending()?.contextOr(null)).toEqual({ last: 1 });
   });
 
   it('an_elapsed_deadline_faults_the_task_with_a_timeout_error', () => {

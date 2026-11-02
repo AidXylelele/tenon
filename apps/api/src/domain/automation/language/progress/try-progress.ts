@@ -6,7 +6,7 @@ import { RoundWork } from '../round-work.js';
 import type { BodyScope } from '../scopes/body-scope.js';
 import { Sequence } from '../sequence.js';
 import { Step } from '../step.js';
-import type { TaskEnding } from '../task-ending.js';
+import type { TaskEnding } from '../endings/task-ending.js';
 import type { TryTask } from '../tasks/try-task.js';
 import type { WorkflowError } from '../workflow-error.js';
 import { CatchProgress } from './catch-progress.js';

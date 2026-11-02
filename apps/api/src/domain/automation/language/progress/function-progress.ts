@@ -1,7 +1,7 @@
 import type { JsonPointer } from '../json-pointer.js';
 import { RoundWork } from '../round-work.js';
 import { Step } from '../step.js';
-import type { TaskEnding } from '../task-ending.js';
+import type { TaskEnding } from '../endings/task-ending.js';
 import { ConcludedProgress } from './concluded-progress.js';
 import { KindProgress } from './kind-progress.js';
 

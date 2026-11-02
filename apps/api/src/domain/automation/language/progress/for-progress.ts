@@ -8,7 +8,7 @@ import { RoundWork } from '../round-work.js';
 import type { BodyScope } from '../scopes/body-scope.js';
 import { Sequence } from '../sequence.js';
 import { Step } from '../step.js';
-import type { TaskEnding } from '../task-ending.js';
+import type { TaskEnding } from '../endings/task-ending.js';
 import type { ForTask } from '../tasks/for-task.js';
 import { ConcludedProgress } from './concluded-progress.js';
 import { KindProgress } from './kind-progress.js';

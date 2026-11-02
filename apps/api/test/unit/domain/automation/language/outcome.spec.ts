@@ -3,8 +3,9 @@ import { ErrorType } from '../../../../../src/domain/automation/language/error-t
 import { FlowDirective } from '../../../../../src/domain/automation/language/flow-directive.js';
 import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
 import { Outcome } from '../../../../../src/domain/automation/language/outcome.js';
-import { TaskEnding } from '../../../../../src/domain/automation/language/task-ending.js';
 import { InconsistentProgressError } from '../../../../../src/domain/errors.js';
+import { CompletedEnding } from '../../../../../src/domain/automation/language/endings/completed-ending.js';
+import { SkippedEnding } from '../../../../../src/domain/automation/language/endings/skipped-ending.js';
 
 const at = JsonPointer.root().at('do').at(0).at('greet');
 const failure = ErrorType.Runtime.errorAt(at, null);
@@ -63,7 +64,7 @@ describe('TaskEnding', () => {
   it('a_completed_ending_whose_body_failed_is_refused', () => {
     const outcome = Outcome.failed(failure);
     const build = () =>
-      TaskEnding.completed({
+      new CompletedEnding({
         output: null,
         then: FlowDirective.Continue,
         exported: false,
@@ -76,7 +77,7 @@ describe('TaskEnding', () => {
 
   it('a_completed_ending_follows_the_directive_of_its_body', () => {
     const outcome = Outcome.directed({ a: 1 }, FlowDirective.End);
-    const ending = TaskEnding.completed({
+    const ending = new CompletedEnding({
       output: { a: 1 },
       then: FlowDirective.Continue,
       exported: false,
@@ -88,7 +89,7 @@ describe('TaskEnding', () => {
   });
 
   it('a_skipped_ending_keeps_its_raw_input_and_runs_no_body', () => {
-    const ending = TaskEnding.skipped({ a: 1 }, FlowDirective.Exit);
+    const ending = new SkippedEnding({ a: 1 }, FlowDirective.Exit);
 
     expect(ending.output).toEqual({ a: 1 });
     expect(ending.directive).toBe(FlowDirective.Exit);

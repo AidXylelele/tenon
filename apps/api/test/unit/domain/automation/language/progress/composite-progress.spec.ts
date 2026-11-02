@@ -1,7 +1,6 @@
 import { FlowDirective } from '../../../../../../src/domain/automation/language/flow-directive.js';
 import { ErrorType } from '../../../../../../src/domain/automation/language/error-type.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
-import { TaskEnding } from '../../../../../../src/domain/automation/language/task-ending.js';
 import { ForkProgress } from '../../../../../../src/domain/automation/language/progress/fork-progress.js';
 import { ForProgress } from '../../../../../../src/domain/automation/language/progress/for-progress.js';
 import { Sequence } from '../../../../../../src/domain/automation/language/sequence.js';
@@ -18,6 +17,8 @@ import {
   scopeOf,
 } from '../../../../../support/progress.js';
 import { rejectionOf } from '../../../../../support/language.js';
+import { FaultedEnding } from '../../../../../../src/domain/automation/language/endings/faulted-ending.js';
+import { SkippedEnding } from '../../../../../../src/domain/automation/language/endings/skipped-ending.js';
 
 const colors = [
   { setRed: { set: { colors: '${ .colors + ["red"] }' }, then: 'setGreen' } },
@@ -78,7 +79,7 @@ describe('composite progress', () => {
     const error = ErrorType.Runtime.errorAt(childAt, 'boom');
 
     const ending = started
-      .childEnded(childAt, TaskEnding.faulted(error), scope)
+      .childEnded(childAt, new FaultedEnding(error), scope)
       .progress.ending();
 
     expect(ending?.failure).toBe(error);
@@ -373,7 +374,7 @@ describe('composite progress', () => {
     const racing = EntryStage.begin(scope).progress;
     const skippedAt = '/do/0/race/fork/branches/0/skipped';
     const realAt = '/do/0/race/fork/branches/1/real';
-    const skipped = TaskEnding.skipped(
+    const skipped = new SkippedEnding(
       { raw: true },
       definition.taskAt(pointerOf(skippedAt)).base.then,
     );

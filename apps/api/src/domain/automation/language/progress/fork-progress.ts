@@ -5,7 +5,7 @@ import { Outcome } from '../outcome.js';
 import { RoundWork } from '../round-work.js';
 import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
-import type { TaskEnding } from '../task-ending.js';
+import type { TaskEnding } from '../endings/task-ending.js';
 import type { ForkTask } from '../tasks/fork-task.js';
 import { ConcludedProgress } from './concluded-progress.js';
 import { KindProgress } from './kind-progress.js';
@@ -113,7 +113,7 @@ export class ForkProgress extends KindProgress {
     pending: readonly number[],
     scope: BodyScope<ForkTask>,
   ): Step<KindProgress> {
-    if (!ending.skipped) {
+    if (!ending.isSkipped()) {
       const won = ending.outcome();
       return ConcludedProgress.step(won);
     }

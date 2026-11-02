@@ -12,7 +12,7 @@ import type { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
-import type { TaskEnding } from '../task-ending.js';
+import type { TaskEnding } from '../endings/task-ending.js';
 import { EndedStage } from './ended-stage.js';
 import { OutputStage } from './output-stage.js';
 import { TaskProgress } from './task-progress.js';

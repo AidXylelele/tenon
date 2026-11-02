@@ -6,7 +6,7 @@ import { RoundResults } from '../round-results.js';
 import type { RoundWork } from '../round-work.js';
 import type { BodyScope } from '../scopes/body-scope.js';
 import { Step } from '../step.js';
-import type { TaskEnding } from '../task-ending.js';
+import type { TaskEnding } from '../endings/task-ending.js';
 import { DueTime } from '../due-time.js';
 
 export abstract class KindProgress {

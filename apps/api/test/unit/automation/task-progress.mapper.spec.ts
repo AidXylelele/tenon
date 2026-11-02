@@ -7,7 +7,7 @@ import { Outcome } from '../../../src/domain/automation/language/outcome.js';
 import { ConcludedProgress } from '../../../src/domain/automation/language/progress/concluded-progress.js';
 import { EntryStage } from '../../../src/domain/automation/language/stages/entry-stage.js';
 import type { TaskProgress } from '../../../src/domain/automation/language/stages/task-progress.js';
-import { TaskEnding } from '../../../src/domain/automation/language/task-ending.js';
+import { type TaskEnding } from '../../../src/domain/automation/language/endings/task-ending.js';
 import { WorkflowName } from '../../../src/domain/automation/language/workflow-name.js';
 import { InconsistentProgressError } from '../../../src/domain/errors.js';
 import { OutputStage } from '../../../src/domain/automation/language/stages/output-stage.js';
@@ -31,6 +31,7 @@ import {
   pointerOf,
   scopeOf,
 } from '../../support/progress.js';
+import { FaultedEnding } from '../../../src/domain/automation/language/endings/faulted-ending.js';
 
 const getPetAt = '/do/0/tryGetPet/try/0/getPet';
 const getPet = {
@@ -48,7 +49,7 @@ function stored<T>(state: T): T {
 function notFound(): TaskEnding {
   const at = pointerOf(getPetAt);
   const error = ErrorType.Communication.errorWithStatus(404, at, null);
-  return TaskEnding.faulted(error);
+  return new FaultedEnding(error);
 }
 
 function begun(
@@ -360,6 +361,17 @@ describe('TaskProgressMapper', () => {
     const restore = () => TaskProgressMapper.toDomain(state);
 
     expect(restore).toThrow(InconsistentProgressError);
+  });
+
+  it('a_stage_whose_deadline_is_not_a_time_is_refused_when_read', () => {
+    const state = {
+      stage: TaskStage.Output,
+      input: {},
+      outcome: { output: null, directive: null, failure: null, effect: null },
+    } as unknown as TaskProgressState;
+    const restore = () => TaskProgressMapper.toDomain(state);
+
+    expect(restore).toThrow('a stored instant is not a time');
   });
 
   it('a_faulted_ending_is_restored_from_its_error_alone', () => {

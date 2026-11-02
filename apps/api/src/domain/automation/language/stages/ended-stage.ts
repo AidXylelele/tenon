@@ -3,9 +3,11 @@ import type { Phase } from '../phase.js';
 import { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
-import { TaskEnding } from '../task-ending.js';
+import { type TaskEnding } from '../endings/task-ending.js';
 import type { WorkflowError } from '../workflow-error.js';
 import { TaskProgress } from './task-progress.js';
+import { FaultedEnding } from '../endings/faulted-ending.js';
+import { SkippedEnding } from '../endings/skipped-ending.js';
 
 export class EndedStage extends TaskProgress {
   readonly #ending: TaskEnding;
@@ -16,7 +18,7 @@ export class EndedStage extends TaskProgress {
   }
 
   static faulted(error: WorkflowError): EndedStage {
-    const ending = TaskEnding.faulted(error);
+    const ending = new FaultedEnding(error);
     return new EndedStage(ending);
   }
 
@@ -26,7 +28,7 @@ export class EndedStage extends TaskProgress {
   }
 
   static skipped(scope: TaskScope): EndedStage {
-    const ending = TaskEnding.skipped(scope.rawInput, scope.task.base.then);
+    const ending = new SkippedEnding(scope.rawInput, scope.task.base.then);
     return new EndedStage(ending);
   }
 

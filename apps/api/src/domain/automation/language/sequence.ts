@@ -9,7 +9,7 @@ import type { JsonPointer } from './json-pointer.js';
 import type { TaskList } from './task-list.js';
 import { Outcome } from './outcome.js';
 import { Step } from './step.js';
-import type { TaskEnding } from './task-ending.js';
+import type { TaskEnding } from './endings/task-ending.js';
 
 export class Sequence {
   readonly #position: number;

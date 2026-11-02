@@ -2,7 +2,7 @@ import { EventOriginKind } from '../events/enums.js';
 import { Event } from '../events/event.js';
 import type { CloudEvent } from '../language/cloud-event.js';
 import type { JsonValue } from '../language/interfaces.js';
-import type { TaskEnding } from '../language/task-ending.js';
+import type { TaskEnding } from '../language/endings/task-ending.js';
 import type { WorkflowError } from '../language/workflow-error.js';
 import type {
   LifecycleNotice,

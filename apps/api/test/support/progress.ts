@@ -7,7 +7,7 @@ import type {
 } from '../../src/domain/automation/language/interfaces.js';
 import { JsonPointer } from '../../src/domain/automation/language/json-pointer.js';
 import { Outcome } from '../../src/domain/automation/language/outcome.js';
-import { TaskEnding } from '../../src/domain/automation/language/task-ending.js';
+import { type TaskEnding } from '../../src/domain/automation/language/endings/task-ending.js';
 import { TaskScope } from '../../src/domain/automation/language/scopes/task-scope.js';
 import { Evaluated } from '../../src/domain/automation/language/results/evaluated.js';
 import type { EvaluationResult } from '../../src/domain/automation/language/results/evaluation-result.js';
@@ -19,6 +19,7 @@ import type { ValidationResult } from '../../src/domain/automation/language/resu
 import type { RoundWork } from '../../src/domain/automation/language/round-work.js';
 import type * as Dsl from '../../src/interface-adapters/workflows/definitions/interfaces.js';
 import { DefinitionMapper } from '../../src/interface-adapters/workflows/definitions/mappers/definition.mapper.js';
+import { CompletedEnding } from '../../src/domain/automation/language/endings/completed-ending.js';
 
 export const now = new Date('2026-10-31T10:00:00.000Z');
 
@@ -124,7 +125,7 @@ export function completedAt(
   const pointer = pointerOf(reference);
   const then = definition.taskAt(pointer).base.then;
   const outcome = Outcome.of(output);
-  return TaskEnding.completed({
+  return new CompletedEnding({
     output,
     then,
     exported: false,

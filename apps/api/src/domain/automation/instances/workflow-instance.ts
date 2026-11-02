@@ -20,7 +20,7 @@ import { RoundResults } from '../language/round-results.js';
 import { RoundWork } from '../language/round-work.js';
 import { TaskScope } from '../language/scopes/task-scope.js';
 import { WorkflowScope } from '../language/scopes/workflow-scope.js';
-import type { TaskEnding } from '../language/task-ending.js';
+import type { TaskEnding } from '../language/endings/task-ending.js';
 import type { Task } from '../language/tasks/task.js';
 import type { WorkflowError } from '../language/workflow-error.js';
 import type { WorkflowName } from '../language/workflow-name.js';
@@ -559,13 +559,13 @@ export class WorkflowInstance {
   }
 
   #ended(task: TaskInstance, ending: TaskEnding, now: Date): void {
-    if (ending.skipped) return;
+    if (ending.isSkipped()) return;
 
     const body = ending.body;
 
     if (body !== null) this.#act(task, body, now);
 
-    if (ending.exported) this.#context = ending.context;
+    this.#context = ending.contextOr(this.#context);
 
     this.#produced.taskEnded(task, ending, now);
   }

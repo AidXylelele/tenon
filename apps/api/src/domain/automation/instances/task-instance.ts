@@ -12,7 +12,7 @@ import type { TaskScope } from '../language/scopes/task-scope.js';
 import { EntryStage } from '../language/stages/entry-stage.js';
 import type { TaskProgress } from '../language/stages/task-progress.js';
 import { Step } from '../language/step.js';
-import type { TaskEnding } from '../language/task-ending.js';
+import type { TaskEnding } from '../language/endings/task-ending.js';
 import type { WorkflowError } from '../language/workflow-error.js';
 import type {
   NewTaskInstance,

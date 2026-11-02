@@ -3,7 +3,7 @@ import { ErrorType } from '../../../../../../src/domain/automation/language/erro
 import { RetryProgress } from '../../../../../../src/domain/automation/language/progress/retry-progress.js';
 import { InconsistentProgressError } from '../../../../../../src/domain/errors.js';
 import { EntryStage } from '../../../../../../src/domain/automation/language/stages/entry-stage.js';
-import { TaskEnding } from '../../../../../../src/domain/automation/language/task-ending.js';
+import { type TaskEnding } from '../../../../../../src/domain/automation/language/endings/task-ending.js';
 import {
   answer,
   completedAt,
@@ -13,6 +13,7 @@ import {
   pointerOf,
   scopeOf,
 } from '../../../../../support/progress.js';
+import { FaultedEnding } from '../../../../../../src/domain/automation/language/endings/faulted-ending.js';
 
 const getPetAt = '/do/0/tryGetPet/try/0/getPet';
 const getPet = {
@@ -25,7 +26,7 @@ const getPet = {
 function notFound(): TaskEnding {
   const at = pointerOf(getPetAt);
   const error = ErrorType.Communication.errorWithStatus(404, at, null);
-  return TaskEnding.faulted(error);
+  return new FaultedEnding(error);
 }
 
 describe('TryProgress', () => {

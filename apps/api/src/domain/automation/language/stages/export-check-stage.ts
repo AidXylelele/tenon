@@ -5,10 +5,10 @@ import type { RoundResults } from '../round-results.js';
 import { RoundWork } from '../round-work.js';
 import type { TaskScope } from '../scopes/task-scope.js';
 import { Step } from '../step.js';
-import { TaskEnding } from '../task-ending.js';
 import { EndedStage } from './ended-stage.js';
 import { TaskProgress } from './task-progress.js';
 import type { DueTime } from '../due-time.js';
+import { CompletedEnding } from '../endings/completed-ending.js';
 
 export class ExportCheckStage extends TaskProgress {
   readonly #deadline: DueTime;
@@ -86,7 +86,7 @@ export class ExportCheckStage extends TaskProgress {
       return Step.of<TaskProgress>(faulted);
     }
 
-    const ending = TaskEnding.completed({
+    const ending = new CompletedEnding({
       output: this.#output,
       then: scope.task.base.then,
       exported: this.#exported,
