@@ -37,6 +37,12 @@ describe('ErrorClassifier', () => {
       new Error('query failed', { cause: failure('terminating', '57P01') }),
     ],
     ['a_pool_timeout', new Error('timeout exceeded when trying to connect')],
+    [
+      'a_refused_connection_found_through_the_query_error',
+      new Error('Failed query', {
+        cause: failure('connect ECONNREFUSED', 'ECONNREFUSED'),
+      }),
+    ],
   ])('%s_is_transient', (_name, error) => {
     const kind = classifier.classify(error);
 

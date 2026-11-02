@@ -15,6 +15,16 @@ export class PostgresTransientFailures {
     'timeout exceeded when trying to connect',
     'Connection terminated',
   ];
+  // The server could not be reached, which Drizzle reports as the cause of its query error.
+  private static readonly CONNECTION_FAILURES: readonly string[] = [
+    'ECONNREFUSED',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'EPIPE',
+    'EHOSTUNREACH',
+    'ENETUNREACH',
+    'EAI_AGAIN',
+  ];
 
   includes(error: unknown): boolean {
     for (
@@ -35,8 +45,11 @@ export class PostgresTransientFailures {
       const pool = PostgresTransientFailures.POOL_FAILURES.some((failure) =>
         current instanceof Error ? current.message.includes(failure) : false,
       );
+      const unreachable =
+        typeof code === 'string' &&
+        PostgresTransientFailures.CONNECTION_FAILURES.includes(code);
 
-      if (transientClass || pool) return true;
+      if (transientClass || pool || unreachable) return true;
     }
 
     return false;
