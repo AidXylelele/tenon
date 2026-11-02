@@ -279,7 +279,7 @@ Error handling is framework work: use cases never catch, and an adapter catches 
 
 | Operation           | Transaction                                                                                          | Guarantee                                                                                     |
 | ------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| HTTP command        | `@Transactional`                                                                                     | Atomic; a stale write is a 409                                                                |
+| HTTP command        | `@Transactional`                                                                                     | Atomic; a stale write is a 409, a transient PostgreSQL failure a 503 with `Retry-After`       |
 | Start               | Insert + run start; derived ids                                                                      | One instance and one run, however often the start is repeated                                 |
 | Round               | Begin and save; compute with no transaction; then record, save and add the Events in one transaction | No event without its change; recorded results are never recomputed; work in flight may repeat |
 | Wake                | In the change's transaction                                                                          | No lost wakes (proven in S0)                                                                  |
