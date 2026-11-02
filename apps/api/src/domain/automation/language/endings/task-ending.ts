@@ -25,7 +25,7 @@ export abstract class TaskEnding {
     return current;
   }
 
-  // An ending that ends the workflow (`then: end`, `then: exit` at the root) as an outcome.
+  // An ending that ends the workflow (`then: end`) as an outcome.
   workflowEnd(): Outcome | null {
     const directive = this.directive;
 

@@ -49,7 +49,7 @@ export class Expression {
     data: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
-    const id = key.idOf(this.#pointer);
+    const id = key.idAt(this.#pointer);
     const evaluation: Evaluation = {
       id,
       program: this.#program,
@@ -64,12 +64,12 @@ export class Expression {
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    const id = key.idOf(this.#pointer);
+    const id = key.idAt(this.#pointer);
     return results.failureOf(id, at);
   }
 
   fill(key: WorkKey, results: RoundResults): JsonValue {
-    const id = key.idOf(this.#pointer);
+    const id = key.idAt(this.#pointer);
     return results.valueOf(id);
   }
 

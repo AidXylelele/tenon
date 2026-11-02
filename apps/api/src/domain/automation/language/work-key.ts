@@ -20,7 +20,7 @@ export class WorkKey {
   }
 
   // A template's expression or schema, by where the document declares it.
-  idOf(pointer: JsonPointer): string {
+  idAt(pointer: JsonPointer): string {
     const at = pointer.toString();
     return `${this.#prefix}${at}`;
   }

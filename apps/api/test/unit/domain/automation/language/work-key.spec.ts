@@ -7,13 +7,13 @@ describe('WorkKey', () => {
   const pointer = JsonPointer.root().at('do').at(0).at('loop').at('while');
 
   it('a_declared_expression_is_identified_by_its_pointer', () => {
-    expect(key.idOf(pointer)).toBe('task-1:/do/0/loop/while');
+    expect(key.idAt(pointer)).toBe('task-1:/do/0/loop/while');
   });
 
   it('a_pass_of_a_repeating_stage_is_identified_by_its_count', () => {
     const third = key.within('while', 3);
 
-    expect(third.idOf(pointer)).toBe('task-1:while-3:/do/0/loop/while');
+    expect(third.idAt(pointer)).toBe('task-1:while-3:/do/0/loop/while');
   });
 
   it('the_task_s_own_work_is_identified_by_its_name_and_count', () => {

@@ -9,6 +9,7 @@ import { ExportCheckStage } from './export-check-stage.js';
 import { ResultStage } from './result-stage.js';
 import type { TaskProgress } from './task-progress.js';
 
+// The task's output checked against `output.schema` and `export.as` evaluated on it, in one pass.
 export class ExportStage extends ResultStage {
   readonly #input: JsonValue;
   readonly #output: JsonValue;

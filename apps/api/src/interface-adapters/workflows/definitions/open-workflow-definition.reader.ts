@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { DefinitionReader } from '../../../application/automation/language/ports.js';
 import type { Definition } from '../../../domain/automation/language/definition.js';
@@ -6,6 +5,7 @@ import { InvalidDocumentError } from '../../../domain/errors.js';
 import { DslOutcomeKind } from './enums.js';
 import { OpenWorkflowClient } from './interfaces.js';
 import { DefinitionMapper } from './mappers/definition.mapper.js';
+import type { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
 
 @Injectable()
 export class OpenWorkflowDefinitionReader implements DefinitionReader {
@@ -18,16 +18,13 @@ export class OpenWorkflowDefinitionReader implements DefinitionReader {
   // instances read it from here instead of parsing and mapping it again. The least recently read
   // goes first, so drafts under check do not push out the versions that run.
   private static readonly CACHED = 64;
-  private static readonly DIGEST = 'sha256';
 
   private readonly definitions = new Map<string, Definition>();
 
   constructor(private readonly client: OpenWorkflowClient) {}
 
-  async read(text: string): Promise<Definition> {
-    const key = createHash(OpenWorkflowDefinitionReader.DIGEST)
-      .update(text)
-      .digest('hex');
+  async read(source: SourceDocument): Promise<Definition> {
+    const key = source.fingerprint;
     const cached = this.definitions.get(key);
 
     if (cached !== undefined) {
@@ -36,6 +33,7 @@ export class OpenWorkflowDefinitionReader implements DefinitionReader {
       return cached;
     }
 
+    const text = source.text;
     const outcome = await this.client.parse(text);
 
     if (outcome.kind === DslOutcomeKind.Failure)

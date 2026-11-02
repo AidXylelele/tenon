@@ -21,6 +21,8 @@ import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.j
 import { SdkOpenWorkflowClient } from '../../../src/frameworks/openworkflowspec/sdk-open-workflow.client.js';
 import { OpenWorkflowDefinitionReader } from '../../../src/interface-adapters/workflows/definitions/open-workflow-definition.reader.js';
 import { ctkDocuments } from '../../support/ctk-documents.js';
+import { DocumentFormat } from '../../../src/domain/automation/workflows/enums.js';
+import { SourceDocument } from '../../../src/domain/automation/workflows/source-document.js';
 
 const DOCUMENT = `document:
   dsl: '1.0.3'
@@ -50,12 +52,13 @@ describe('OpenWorkflowDefinitionReader', () => {
   });
 
   function read(text: string): Promise<Definition> {
-    return reader.read(text);
+    const source = new SourceDocument({ format: DocumentFormat.Yaml, text });
+    return reader.read(source);
   }
 
   async function refusalOf(text: string): Promise<DefinitionRejectedError> {
     try {
-      await reader.read(text);
+      await read(text);
     } catch (error) {
       if (error instanceof DefinitionRejectedError) return error;
 

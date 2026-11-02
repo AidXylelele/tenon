@@ -35,6 +35,10 @@ export class CursorMapper {
     return Buffer.from(named).toString(CursorMapper.#ENCODING);
   }
 
+  static toInstancePosition(cursor: string): InstancePosition;
+  static toInstancePosition(
+    cursor: string | undefined,
+  ): InstancePosition | null;
   static toInstancePosition(
     cursor: string | undefined,
   ): InstancePosition | null {
@@ -46,6 +50,8 @@ export class CursorMapper {
     return { startedAt, id };
   }
 
+  static fromInstancePosition(position: InstancePosition): string;
+  static fromInstancePosition(position: InstancePosition | null): string | null;
   static fromInstancePosition(
     position: InstancePosition | null,
   ): string | null {
@@ -55,12 +61,16 @@ export class CursorMapper {
     return `${milliseconds}${CursorMapper.#SEPARATOR}${position.id}`;
   }
 
+  static toPosition(cursor: string): number;
+  static toPosition(cursor: string | undefined): number | null;
   static toPosition(cursor: string | undefined): number | null {
     if (cursor === undefined) return null;
 
     return Number(cursor);
   }
 
+  static fromPosition(position: number): string;
+  static fromPosition(position: number | null): string | null;
   static fromPosition(position: number | null): string | null {
     if (position === null) return null;
 

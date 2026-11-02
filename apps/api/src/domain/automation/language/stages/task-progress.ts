@@ -63,9 +63,10 @@ export abstract class TaskProgress {
 
   protected settled(scope: TaskScope): Step<TaskProgress> {
     const work = this.work(scope);
-    const waiting = !work.isEmpty() || this.ending() !== null;
+    // A stage with work waits for its answers, and an ended one has nothing left to do.
+    const stays = !work.isEmpty() || this.ending() !== null;
 
-    if (waiting) return Step.of<TaskProgress>(this);
+    if (stays) return Step.of<TaskProgress>(this);
 
     const none = RoundResults.none();
     return this.record(none, scope);

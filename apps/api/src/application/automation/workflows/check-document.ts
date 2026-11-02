@@ -26,7 +26,7 @@ export class CheckDocument {
       format: query.format,
       text: query.text,
     });
-    const definition = await this.definitions.read(query.text);
+    const definition = await this.definitions.read(source);
     await this.expressions.check(definition.expressions);
     await this.schemas.check(definition.schemas);
     const existing = await this.versions.find(

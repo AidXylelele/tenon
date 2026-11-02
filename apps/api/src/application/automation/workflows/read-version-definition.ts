@@ -3,6 +3,7 @@ import type { Definition } from '../../../domain/automation/language/definition.
 import { VersionNotFoundError } from '../../../domain/errors.js';
 import { DefinitionReader } from '../language/ports.js';
 import { VersionDocuments } from './queries.js';
+import { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
 
 @Injectable()
 export class ReadVersionDefinition {
@@ -16,6 +17,10 @@ export class ReadVersionDefinition {
 
     if (document === null) throw new VersionNotFoundError();
 
-    return this.definitions.read(document.text);
+    const source = new SourceDocument({
+      format: document.format,
+      text: document.text,
+    });
+    return this.definitions.read(source);
   }
 }

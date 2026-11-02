@@ -1,12 +1,23 @@
 import { z } from 'zod';
 import { NulCharacter } from '../../../domain/automation/language/nul-character.js';
+import { CursorMapper } from '../mappers/cursor.mapper.js';
 
 const Json = z.json();
 
-// The queries' cursors: the last start time in milliseconds and id, or the last position.
-const InstanceCursor = z.string().regex(/^\d{1,16}_[0-9a-f-]{36}$/);
+// The queries' cursors, only as the API gives them out: `CursorMapper` owns their format.
+const InstanceCursor = z.string().refine((cursor) => {
+  const position = CursorMapper.toInstancePosition(cursor);
+  const canonical = CursorMapper.fromInstancePosition(position) === cursor;
+  const identified = z.uuid().safeParse(position.id).success;
+  return canonical && identified;
+});
 
-const PositionCursor = z.string().regex(/^\d{1,15}$/);
+const PositionCursor = z.string().refine((cursor) => {
+  const position = CursorMapper.toPosition(cursor);
+  const canonical = CursorMapper.fromPosition(position) === cursor;
+  const counted = Number.isSafeInteger(position) && position >= 0;
+  return canonical && counted;
+});
 
 const AnyJson = z.unknown();
 

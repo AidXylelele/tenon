@@ -7,9 +7,10 @@ import type {
 import type { EvaluationResult } from '../../../domain/automation/language/results/evaluation-result.js';
 import type { ValidationResult } from '../../../domain/automation/language/results/validation-result.js';
 import type { Schema } from '../../../domain/automation/language/schema.js';
+import type { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
 
 export abstract class DefinitionReader {
-  abstract read(text: string): Promise<Definition>;
+  abstract read(source: SourceDocument): Promise<Definition>;
 }
 
 export abstract class ExpressionEvaluator {

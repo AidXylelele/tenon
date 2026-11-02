@@ -42,6 +42,7 @@ import type {
 import { Evaluated } from '../../src/domain/automation/language/results/evaluated.js';
 import type { EvaluationResult } from '../../src/domain/automation/language/results/evaluation-result.js';
 import type * as Dsl from '../../src/interface-adapters/workflows/definitions/interfaces.js';
+import { type SourceDocument } from '../../src/domain/automation/workflows/source-document.js';
 
 export class InMemoryUserRepository implements UserRepository {
   readonly users = new Map<string, User>();
@@ -206,9 +207,9 @@ export class RecordingSessions implements Sessions {
 }
 
 export class JsonDefinitionReader implements DefinitionReader {
-  async read(text: string): Promise<Definition> {
+  async read(source: SourceDocument): Promise<Definition> {
     try {
-      const document = JSON.parse(text) as JsonObject;
+      const document = JSON.parse(source.text) as JsonObject;
       const workflow = document as unknown as Dsl.Workflow;
       return DefinitionMapper.toDomain(workflow, document);
     } catch (error) {

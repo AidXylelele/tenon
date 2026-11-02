@@ -27,7 +27,7 @@ export class Schema {
   }
 
   validationsFor(key: WorkKey, data: JsonValue): readonly Validation[] {
-    const id = key.idOf(this.#pointer);
+    const id = key.idAt(this.#pointer);
     const validation: Validation = { id, schema: this.#document, data };
     return [validation];
   }
@@ -37,7 +37,7 @@ export class Schema {
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    const id = key.idOf(this.#pointer);
+    const id = key.idAt(this.#pointer);
     return results.failureOf(id, at);
   }
 }
