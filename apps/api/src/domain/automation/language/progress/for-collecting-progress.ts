@@ -22,11 +22,7 @@ export class ForCollectingProgress extends KindProgress {
   work(scope: BodyScope<ForTask>): RoundWork {
     const args = scope.definitionArguments();
     const collection = scope.task.collection;
-    const evaluations = collection.evaluationsFor(
-      scope.prefix,
-      scope.input,
-      args,
-    );
+    const evaluations = collection.evaluationsFor(scope.key, scope.input, args);
     return RoundWork.evaluating(evaluations);
   }
 
@@ -38,11 +34,11 @@ export class ForCollectingProgress extends KindProgress {
 
     const collection = scope.task.collection;
     const at = scope.task.reference;
-    const failure = collection.failureIn(scope.prefix, results, at);
+    const failure = collection.failureIn(scope.key, results, at);
 
     if (failure !== null) return ConcludedProgress.failed(failure);
 
-    const value = collection.fill(scope.prefix, results);
+    const value = collection.fill(scope.key, results);
 
     if (value !== null && !Array.isArray(value)) {
       const error = ErrorType.Expression.errorAt(

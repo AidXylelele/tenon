@@ -10,6 +10,7 @@ import type {
 import type { RoundResults } from '../round-results.js';
 import { CallTask } from './call-task.js';
 import type { Template } from '../template.js';
+import type { WorkKey } from '../work-key.js';
 
 export class OpenApiCallTask extends CallTask {
   readonly #document: Endpoint;
@@ -52,15 +53,14 @@ export class OpenApiCallTask extends CallTask {
 
   protected callFrom(
     id: string,
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     input: JsonValue,
     deadline: Date | null,
   ): ServiceCall {
-    const endpoint = this.#document.filled(prefix, results);
-    const args = this.#arguments.fill(prefix, results);
-    const authentication =
-      this.#authentication?.filled(prefix, results) ?? null;
+    const endpoint = this.#document.filled(key, results);
+    const args = this.#arguments.fill(key, results);
+    const authentication = this.#authentication?.filled(key, results) ?? null;
     return {
       id,
       kind: CallKind.OpenApi,

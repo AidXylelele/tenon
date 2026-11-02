@@ -15,6 +15,7 @@ import type { RoundResults } from '../round-results.js';
 import type { BodyScope } from '../scopes/body-scope.js';
 import { Task } from './task.js';
 import type { SwitchCase } from '../switch-case.js';
+import type { WorkKey } from '../work-key.js';
 
 export class SwitchTask extends Task {
   readonly #cases: readonly SwitchCase[];
@@ -45,14 +46,14 @@ export class SwitchTask extends Task {
   }
 
   evaluationsFor(
-    prefix: string,
+    key: WorkKey,
     data: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
     const evaluations: Evaluation[] = [];
 
     for (const switchCase of this.#cases) {
-      const found = switchCase.when?.evaluationsFor(prefix, data, args) ?? [];
+      const found = switchCase.when?.evaluationsFor(key, data, args) ?? [];
 
       for (const evaluation of found) evaluations.push(evaluation);
     }
@@ -60,17 +61,17 @@ export class SwitchTask extends Task {
     return evaluations;
   }
 
-  outcomeFor(input: JsonValue, prefix: string, results: RoundResults): Outcome {
+  outcomeFor(input: JsonValue, key: WorkKey, results: RoundResults): Outcome {
     for (const switchCase of this.#cases) {
       const when = switchCase.when;
 
       if (when === null) continue;
 
-      const failure = when.failureIn(prefix, results, this.reference);
+      const failure = when.failureIn(key, results, this.reference);
 
       if (failure !== null) return Outcome.failed(failure);
 
-      const matched = when.holds(prefix, results);
+      const matched = when.holds(key, results);
 
       if (matched) return Outcome.directed(input, switchCase.then);
     }

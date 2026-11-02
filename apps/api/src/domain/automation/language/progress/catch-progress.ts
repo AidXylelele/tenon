@@ -11,6 +11,7 @@ import type { WorkflowError } from '../workflow-error.js';
 import { ConcludedProgress } from './concluded-progress.js';
 import { HandlerProgress } from './handler-progress.js';
 import { KindProgress } from './kind-progress.js';
+import type { WorkKey } from '../work-key.js';
 import { RetryProgress } from './retry-progress.js';
 
 export class CatchProgress extends KindProgress {
@@ -44,9 +45,9 @@ export class CatchProgress extends KindProgress {
 
   work(scope: BodyScope<TryTask>): RoundWork {
     const args = this.#arguments(scope);
-    const prefix = this.#prefix(scope);
+    const key = this.#key(scope);
     const evaluations = scope.task.catchClause.evaluationsFor(
-      prefix,
+      key,
       scope.input,
       args,
     );
@@ -60,16 +61,16 @@ export class CatchProgress extends KindProgress {
     if (!answered) return Step.of<KindProgress>(this);
 
     const clause = scope.task.catchClause;
-    const prefix = this.#prefix(scope);
+    const key = this.#key(scope);
     const at = scope.task.reference;
-    const failure = clause.failureIn(prefix, results, at);
+    const failure = clause.failureIn(key, results, at);
 
     if (failure !== null) {
       const failed = Outcome.failed(failure);
       return ConcludedProgress.step(failed);
     }
 
-    const caught = clause.catches(prefix, results);
+    const caught = clause.catches(key, results);
 
     if (!caught) {
       const uncaught = Outcome.failed(this.#error);
@@ -77,7 +78,7 @@ export class CatchProgress extends KindProgress {
     }
 
     const retry = clause.retry;
-    const retries = clause.retries(prefix, results);
+    const retries = clause.retries(key, results);
 
     if (retry !== null && retries) return this.#retrying(retry, scope);
 
@@ -94,8 +95,7 @@ export class CatchProgress extends KindProgress {
     scope: BodyScope<TryTask>,
   ): Step<KindProgress> {
     const attempt = this.#attempt.next();
-    const part = `${CatchProgress.#RETRY}-${attempt.count}`;
-    const workId = scope.workId(part);
+    const workId = scope.key.countedIdFor(CatchProgress.#RETRY, attempt.count);
     const delay = retry.delayFor(attempt.count, workId);
     const allowed = retry.allows(attempt, delay, scope.now);
 
@@ -126,9 +126,9 @@ export class CatchProgress extends KindProgress {
     return scope.definitionArgumentsWith(additions);
   }
 
-  #prefix(scope: BodyScope): string {
-    const part = `${CatchProgress.#CATCH}-${this.#attempt.count}`;
-    return scope.prefixFor(part);
+  #key(scope: BodyScope): WorkKey {
+    const count = this.#attempt.count;
+    return scope.key.within(CatchProgress.#CATCH, count);
   }
 
   subWorkflowAnswered(): Step<KindProgress> {

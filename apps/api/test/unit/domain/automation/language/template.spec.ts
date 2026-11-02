@@ -1,6 +1,7 @@
 import { JsonPointer } from '../../../../../src/domain/automation/language/json-pointer.js';
 import { RoundWork } from '../../../../../src/domain/automation/language/round-work.js';
 import { Template } from '../../../../../src/domain/automation/language/template.js';
+import { WorkKey } from '../../../../../src/domain/automation/language/work-key.js';
 import { answer, evaluatedAs } from '../../../../support/progress.js';
 
 describe('Template', () => {
@@ -35,7 +36,8 @@ describe('Template filling', () => {
       value: { greeting: '${ .name }', fixed: 'hi', list: ['${ .age }'] },
     });
 
-    const evaluations = template.evaluationsFor('t:', { name: 'Ann' }, {});
+    const key = WorkKey.of('t');
+    const evaluations = template.evaluationsFor(key, { name: 'Ann' }, {});
     const results = answer(RoundWork.evaluating(evaluations), {
       evaluate: evaluatedAs((evaluation) =>
         evaluation.program === '.name' ? 'Ann' : 30,
@@ -46,7 +48,7 @@ describe('Template filling', () => {
       't:/do/0/greet/set/greeting',
       't:/do/0/greet/set/list/0',
     ]);
-    expect(template.fill('t:', results)).toEqual({
+    expect(template.fill(key, results)).toEqual({
       greeting: 'Ann',
       fixed: 'hi',
       list: [30],

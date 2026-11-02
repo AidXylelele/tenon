@@ -9,6 +9,7 @@ import type {
 import type { RoundResults } from '../round-results.js';
 import { CallTask } from './call-task.js';
 import type { Template } from '../template.js';
+import type { WorkKey } from '../work-key.js';
 
 export class HttpCallTask extends CallTask {
   readonly #endpoint: Endpoint;
@@ -41,13 +42,13 @@ export class HttpCallTask extends CallTask {
 
   protected callFrom(
     id: string,
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     input: JsonValue,
     deadline: Date | null,
   ): ServiceCall {
-    const endpoint = this.#endpoint.filled(prefix, results);
-    const args = this.#arguments.fill(prefix, results);
+    const endpoint = this.#endpoint.filled(key, results);
+    const args = this.#arguments.fill(key, results);
     return {
       id,
       kind: CallKind.Http,

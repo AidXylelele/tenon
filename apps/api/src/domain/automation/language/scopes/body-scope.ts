@@ -8,6 +8,7 @@ import type { Task } from '../tasks/task.js';
 import type { Template } from '../template.js';
 import type { WorkflowError } from '../workflow-error.js';
 import type { TaskScope } from './task-scope.js';
+import type { WorkKey } from '../work-key.js';
 
 // A task's scope while its body runs: around the transformed input, it evaluates, checks and
 // fills the body's templates, and offers nothing of the stages that follow.
@@ -51,16 +52,8 @@ export class BodyScope<T extends Task = Task> {
     return this.#scope.now;
   }
 
-  get prefix(): string {
-    return this.#scope.prefix;
-  }
-
-  prefixFor(part: string): string {
-    return this.#scope.prefixFor(part);
-  }
-
-  workId(part: string): string {
-    return this.#scope.workId(part);
+  get key(): WorkKey {
+    return this.#scope.key;
   }
 
   variablesWith(additions: JsonObject): JsonObject {
@@ -68,12 +61,12 @@ export class BodyScope<T extends Task = Task> {
   }
 
   evaluating(templates: readonly (Expression | Template)[]): RoundWork {
-    const prefix = this.#scope.prefix;
+    const key = this.#scope.key;
     const args = this.definitionArguments();
     const evaluations: Evaluation[] = [];
 
     for (const template of templates) {
-      const found = template.evaluationsFor(prefix, this.#input, args);
+      const found = template.evaluationsFor(key, this.#input, args);
 
       for (const evaluation of found) evaluations.push(evaluation);
     }
@@ -85,11 +78,11 @@ export class BodyScope<T extends Task = Task> {
     templates: readonly (Expression | Template)[],
     results: RoundResults,
   ): WorkflowError | null {
-    const prefix = this.#scope.prefix;
+    const key = this.#scope.key;
     const at = this.#scope.task.reference;
 
     for (const template of templates) {
-      const failure = template.failureIn(prefix, results, at);
+      const failure = template.failureIn(key, results, at);
 
       if (failure !== null) return failure;
     }
@@ -98,8 +91,8 @@ export class BodyScope<T extends Task = Task> {
   }
 
   filled(template: Expression | Template, results: RoundResults): JsonValue {
-    const prefix = this.#scope.prefix;
-    return template.fill(prefix, results);
+    const key = this.#scope.key;
+    return template.fill(key, results);
   }
 
   // The scope's own entry arguments, so the root's rules (WorkflowScope) hold in its body too.

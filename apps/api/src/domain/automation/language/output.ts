@@ -11,6 +11,7 @@ import type { RoundResults } from './round-results.js';
 import type { Schema } from './schema.js';
 import type { Template } from './template.js';
 import type { WorkflowError } from './workflow-error.js';
+import type { WorkKey } from './work-key.js';
 
 export class Output {
   readonly #as: Expression | Template | null;
@@ -36,40 +37,40 @@ export class Output {
   }
 
   evaluationsFor(
-    prefix: string,
+    key: WorkKey,
     rawOutput: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
-    return this.#as?.evaluationsFor(prefix, rawOutput, args) ?? [];
+    return this.#as?.evaluationsFor(key, rawOutput, args) ?? [];
   }
 
   failureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    return this.#as?.failureIn(prefix, results, at) ?? null;
+    return this.#as?.failureIn(key, results, at) ?? null;
   }
 
   valueFrom(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     rawOutput: JsonValue,
   ): JsonValue {
     if (this.#as === null) return rawOutput;
 
-    return this.#as.fill(prefix, results);
+    return this.#as.fill(key, results);
   }
 
-  validationsFor(prefix: string, value: JsonValue): readonly Validation[] {
-    return this.#schema?.validationsFor(prefix, value) ?? [];
+  validationsFor(key: WorkKey, value: JsonValue): readonly Validation[] {
+    return this.#schema?.validationsFor(key, value) ?? [];
   }
 
   validationFailureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    return this.#schema?.failureIn(prefix, results, at) ?? null;
+    return this.#schema?.failureIn(key, results, at) ?? null;
   }
 }

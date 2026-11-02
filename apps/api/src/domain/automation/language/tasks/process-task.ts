@@ -25,7 +25,7 @@ export abstract class ProcessTask extends LeafTask {
   }
 
   defined(results: RoundResults, scope: BodyScope): Step<KindProgress> {
-    const id = scope.workId(ProcessTask.#PROCESS);
+    const id = scope.key.idFor(ProcessTask.#PROCESS);
     const value = scope.filled(this.process, results);
 
     // A detached process outlives its task, so no deadline of the task applies to it.

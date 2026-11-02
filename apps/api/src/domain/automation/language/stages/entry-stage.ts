@@ -22,15 +22,14 @@ export class EntryStage extends ActiveStage {
 
   work(scope: TaskScope): RoundWork {
     const base = scope.task.base;
-    const prefix = scope.prefix;
+    const key = scope.key;
     const args = scope.entryArguments();
     const rawInput = scope.rawInput;
-    const condition =
-      base.condition?.evaluationsFor(prefix, rawInput, args) ?? [];
-    const timeout = base.timeout?.evaluationsFor(prefix, rawInput, args) ?? [];
-    const from = base.input.evaluationsFor(prefix, rawInput, args);
+    const condition = base.condition?.evaluationsFor(key, rawInput, args) ?? [];
+    const timeout = base.timeout?.evaluationsFor(key, rawInput, args) ?? [];
+    const from = base.input.evaluationsFor(key, rawInput, args);
     const evaluations = condition.concat(timeout, from);
-    const validations = base.input.validationsFor(prefix, rawInput);
+    const validations = base.input.validationsFor(key, rawInput);
     return RoundWork.checking(evaluations, validations);
   }
 
@@ -43,11 +42,11 @@ export class EntryStage extends ActiveStage {
     const condition = scope.task.base.condition;
     const at = scope.task.reference;
     const conditionFailure =
-      condition?.failureIn(scope.prefix, results, at) ?? null;
+      condition?.failureIn(scope.key, results, at) ?? null;
 
     if (conditionFailure !== null) return this.#faulted(conditionFailure);
 
-    const satisfied = condition?.holds(scope.prefix, results) ?? true;
+    const satisfied = condition?.holds(scope.key, results) ?? true;
 
     if (!satisfied) {
       const skipped = EndedStage.skipped(scope);
@@ -59,7 +58,7 @@ export class EntryStage extends ActiveStage {
     if (failure !== null) return this.#faulted(failure);
 
     const input = scope.task.base.input.valueFrom(
-      scope.prefix,
+      scope.key,
       results,
       scope.rawInput,
     );
@@ -74,12 +73,12 @@ export class EntryStage extends ActiveStage {
   #inputFailure(results: RoundResults, scope: TaskScope): WorkflowError | null {
     const base = scope.task.base;
     const at = scope.task.reference;
-    const prefix = scope.prefix;
-    const timeout = base.timeout?.failureIn(prefix, results, at) ?? null;
+    const key = scope.key;
+    const timeout = base.timeout?.failureIn(key, results, at) ?? null;
 
     if (timeout !== null) return timeout;
 
-    return base.input.failureIn(prefix, results, at);
+    return base.input.failureIn(key, results, at);
   }
 
   #deadlineFrom(results: RoundResults, scope: TaskScope): DueTime {
@@ -87,7 +86,7 @@ export class EntryStage extends ActiveStage {
 
     if (timeout === null) return DueTime.None;
 
-    const duration = timeout.resolve(scope.prefix, results);
+    const duration = timeout.resolve(scope.key, results);
     const end = duration.endFrom(scope.startedAt);
     return DueTime.of(end);
   }

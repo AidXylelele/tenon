@@ -6,6 +6,7 @@ import type {
 } from './interfaces.js';
 import type { RoundResults } from './round-results.js';
 import type { Template } from './template.js';
+import type { WorkKey } from './work-key.js';
 
 export class Authentication {
   readonly #scheme: AuthenticationScheme;
@@ -28,8 +29,8 @@ export class Authentication {
     return this.#settings.expressions;
   }
 
-  filled(prefix: string, results: RoundResults): ServiceAuthentication {
-    const settings = this.#settings.fill(prefix, results);
+  filled(key: WorkKey, results: RoundResults): ServiceAuthentication {
+    const settings = this.#settings.fill(key, results);
     return { scheme: this.#scheme, settings };
   }
 }

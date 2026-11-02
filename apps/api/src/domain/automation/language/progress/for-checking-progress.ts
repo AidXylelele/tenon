@@ -9,6 +9,7 @@ import type { ForTask } from '../tasks/for-task.js';
 import { ConcludedProgress } from './concluded-progress.js';
 import { ForIteratingProgress } from './for-iterating-progress.js';
 import { KindProgress } from './kind-progress.js';
+import type { WorkKey } from '../work-key.js';
 
 // A `for` with `while`, before an item: the condition, evaluated on the data so far, decides
 // whether the item runs or the loop ends.
@@ -36,9 +37,9 @@ export class ForCheckingProgress extends KindProgress {
     const task = scope.task;
     const additions = task.variablesFor(this.#iteration);
     const args = scope.definitionArgumentsWith(additions);
-    const prefix = this.#prefix(scope);
+    const key = this.#key(scope);
     const data = this.#iteration.data;
-    const evaluations = task.whilst.evaluationsFor(prefix, data, args);
+    const evaluations = task.whilst.evaluationsFor(key, data, args);
     return RoundWork.evaluating(evaluations);
   }
 
@@ -49,13 +50,13 @@ export class ForCheckingProgress extends KindProgress {
     if (!answered) return Step.of<KindProgress>(this);
 
     const whilst = scope.task.whilst;
-    const prefix = this.#prefix(scope);
+    const key = this.#key(scope);
     const at = scope.task.reference;
-    const failure = whilst.failureIn(prefix, results, at);
+    const failure = whilst.failureIn(key, results, at);
 
     if (failure !== null) return ConcludedProgress.failed(failure);
 
-    const continues = whilst.holds(prefix, results);
+    const continues = whilst.holds(key, results);
 
     if (continues) return ForIteratingProgress.start(this.#iteration, scope);
 
@@ -71,9 +72,8 @@ export class ForCheckingProgress extends KindProgress {
     return Step.of<KindProgress>(this);
   }
 
-  #prefix(scope: BodyScope): string {
-    const index = String(this.#iteration.index);
-    const part = `${ForCheckingProgress.#WHILE}-${index}`;
-    return scope.prefixFor(part);
+  #key(scope: BodyScope): WorkKey {
+    const index = this.#iteration.index;
+    return scope.key.within(ForCheckingProgress.#WHILE, index);
   }
 }

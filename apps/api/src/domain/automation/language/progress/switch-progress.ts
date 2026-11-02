@@ -14,11 +14,7 @@ export class SwitchProgress extends KindProgress {
 
   work(scope: BodyScope<SwitchTask>): RoundWork {
     const args = scope.definitionArguments();
-    const evaluations = scope.task.evaluationsFor(
-      scope.prefix,
-      scope.input,
-      args,
-    );
+    const evaluations = scope.task.evaluationsFor(scope.key, scope.input, args);
     return RoundWork.evaluating(evaluations);
   }
 
@@ -31,7 +27,7 @@ export class SwitchProgress extends KindProgress {
 
     if (!answered) return Step.of<KindProgress>(this);
 
-    const outcome = scope.task.outcomeFor(scope.input, scope.prefix, results);
+    const outcome = scope.task.outcomeFor(scope.input, scope.key, results);
     return ConcludedProgress.step(outcome);
   }
 

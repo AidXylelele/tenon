@@ -38,7 +38,7 @@ export class ExportStage extends ResultStage {
 
   work(scope: TaskScope): RoundWork {
     const base = scope.task.base;
-    const validations = base.output.validationsFor(scope.prefix, this.#output);
+    const validations = base.output.validationsFor(scope.key, this.#output);
     const args = scope.exportArguments(
       this.#input,
       this.outcome.output,
@@ -46,7 +46,7 @@ export class ExportStage extends ResultStage {
       this.outcome.authorization,
     );
     const evaluations = base.export.evaluationsFor(
-      scope.prefix,
+      scope.key,
       this.#output,
       args,
     );
@@ -67,7 +67,7 @@ export class ExportStage extends ResultStage {
     }
 
     const exporting = scope.task.base.export;
-    const context = exporting.contextFrom(scope.prefix, results, scope.context);
+    const context = exporting.contextFrom(scope.key, results, scope.context);
     const exported = exporting.changesContext();
     const deadline = this.deadline();
     return ExportCheckStage.enter(
@@ -89,11 +89,11 @@ export class ExportStage extends ResultStage {
   #failureIn(results: RoundResults, scope: TaskScope): WorkflowError | null {
     const base = scope.task.base;
     const at = scope.task.reference;
-    const invalid = base.output.validationFailureIn(scope.prefix, results, at);
+    const invalid = base.output.validationFailureIn(scope.key, results, at);
 
     if (invalid !== null) return invalid;
 
-    return base.export.failureIn(scope.prefix, results, at);
+    return base.export.failureIn(scope.key, results, at);
   }
 
   subWorkflowAnswered(): Step<TaskProgress> {

@@ -13,6 +13,7 @@ import type { RetryStrategy } from './retry-strategy.js';
 import type { RoundResults } from './round-results.js';
 import type { TaskList } from './task-list.js';
 import type { WorkflowError } from './workflow-error.js';
+import type { WorkKey } from './work-key.js';
 
 export class CatchClause {
   readonly #filter: ErrorFilter;
@@ -59,33 +60,32 @@ export class CatchClause {
   }
 
   evaluationsFor(
-    prefix: string,
+    key: WorkKey,
     data: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
-    const condition = this.#condition.evaluationsFor(prefix, data, args);
-    const retry =
-      this.#retry?.condition.evaluationsFor(prefix, data, args) ?? [];
+    const condition = this.#condition.evaluationsFor(key, data, args);
+    const retry = this.#retry?.condition.evaluationsFor(key, data, args) ?? [];
     return condition.concat(retry);
   }
 
   failureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    const condition = this.#condition.failureIn(prefix, results, at);
+    const condition = this.#condition.failureIn(key, results, at);
 
     if (condition !== null) return condition;
 
-    return this.#retry?.condition.failureIn(prefix, results, at) ?? null;
+    return this.#retry?.condition.failureIn(key, results, at) ?? null;
   }
 
-  catches(prefix: string, results: RoundResults): boolean {
-    return this.#condition.holds(prefix, results);
+  catches(key: WorkKey, results: RoundResults): boolean {
+    return this.#condition.holds(key, results);
   }
 
-  retries(prefix: string, results: RoundResults): boolean {
-    return this.#retry?.condition.holds(prefix, results) ?? false;
+  retries(key: WorkKey, results: RoundResults): boolean {
+    return this.#retry?.condition.holds(key, results) ?? false;
   }
 }

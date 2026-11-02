@@ -8,6 +8,7 @@ import type {
 import type { JsonPointer } from './json-pointer.js';
 import type { RoundResults } from './round-results.js';
 import type { WorkflowError } from './workflow-error.js';
+import type { WorkKey } from './work-key.js';
 
 export class Template {
   readonly #pointer: JsonPointer;
@@ -31,14 +32,14 @@ export class Template {
   }
 
   evaluationsFor(
-    prefix: string,
+    key: WorkKey,
     data: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
     const found: Evaluation[] = [];
 
     for (const expression of this.expressions) {
-      const evaluations = expression.evaluationsFor(prefix, data, args);
+      const evaluations = expression.evaluationsFor(key, data, args);
 
       for (const evaluation of evaluations) found.push(evaluation);
     }
@@ -47,12 +48,12 @@ export class Template {
   }
 
   failureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
     for (const expression of this.expressions) {
-      const failure = expression.failureIn(prefix, results, at);
+      const failure = expression.failureIn(key, results, at);
 
       if (failure !== null) return failure;
     }
@@ -60,14 +61,14 @@ export class Template {
     return null;
   }
 
-  fill(prefix: string, results: RoundResults): JsonValue {
-    return this.#filled(this.#value, this.#pointer, prefix, results);
+  fill(key: WorkKey, results: RoundResults): JsonValue {
+    return this.#filled(this.#value, this.#pointer, key, results);
   }
 
   #filled(
     value: JsonValue,
     at: JsonPointer,
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
   ): JsonValue {
     if (typeof value === 'string') {
@@ -76,7 +77,7 @@ export class Template {
       if (!runtime) return value;
 
       const expression = Expression.of({ text: value, pointer: at });
-      return expression.fill(prefix, results);
+      return expression.fill(key, results);
     }
 
     if (value === null || typeof value !== 'object') return value;
@@ -84,18 +85,18 @@ export class Template {
     if (Array.isArray(value))
       return value.map((item, index) => {
         const itemAt = at.at(index);
-        return this.#filled(item, itemAt, prefix, results);
+        return this.#filled(item, itemAt, key, results);
       });
 
     const filled: Record<string, JsonValue> = {};
 
-    for (const key of Object.keys(value)) {
-      const item = value[key];
+    for (const property of Object.keys(value)) {
+      const item = value[property];
 
       if (item === undefined) continue;
 
-      const itemAt = at.at(key);
-      filled[key] = this.#filled(item, itemAt, prefix, results);
+      const itemAt = at.at(property);
+      filled[property] = this.#filled(item, itemAt, key, results);
     }
 
     return filled;

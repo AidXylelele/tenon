@@ -3,6 +3,7 @@ import type { Expression } from './expression.js';
 import type { EndpointProps, ServiceEndpoint } from './interfaces.js';
 import type { RoundResults } from './round-results.js';
 import type { Template } from './template.js';
+import type { WorkKey } from './work-key.js';
 
 export class Endpoint {
   readonly #uri: Template;
@@ -35,10 +36,9 @@ export class Endpoint {
     return uri.concat(authentication);
   }
 
-  filled(prefix: string, results: RoundResults): ServiceEndpoint {
-    const uri = this.#uri.fill(prefix, results);
-    const authentication =
-      this.#authentication?.filled(prefix, results) ?? null;
+  filled(key: WorkKey, results: RoundResults): ServiceEndpoint {
+    const uri = this.#uri.fill(key, results);
+    const authentication = this.#authentication?.filled(key, results) ?? null;
     return { uri, authentication };
   }
 }

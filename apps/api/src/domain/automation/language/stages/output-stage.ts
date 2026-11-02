@@ -33,7 +33,7 @@ export class OutputStage extends ResultStage {
       this.outcome.authorization,
     );
     const declared = scope.task.base.output;
-    const evaluations = declared.evaluationsFor(scope.prefix, rawOutput, args);
+    const evaluations = declared.evaluationsFor(scope.key, rawOutput, args);
     return RoundWork.evaluating(evaluations);
   }
 
@@ -45,7 +45,7 @@ export class OutputStage extends ResultStage {
 
     const declared = scope.task.base.output;
     const at = scope.task.reference;
-    const failure = declared.failureIn(scope.prefix, results, at);
+    const failure = declared.failureIn(scope.key, results, at);
 
     if (failure !== null) {
       const faulted = EndedStage.faulted(failure);
@@ -53,7 +53,7 @@ export class OutputStage extends ResultStage {
     }
 
     const rawOutput = this.outcome.output;
-    const output = declared.valueFrom(scope.prefix, results, rawOutput);
+    const output = declared.valueFrom(scope.key, results, rawOutput);
     const deadline = this.deadline();
     return ExportStage.enter(
       {

@@ -4,6 +4,7 @@ import { JsonPointer } from '../json-pointer.js';
 import type { Task } from '../tasks/task.js';
 import type { DueTime } from '../due-time.js';
 import { BodyScope } from './body-scope.js';
+import { WorkKey } from '../work-key.js';
 
 export class TaskScope<T extends Task = Task> {
   static readonly #MILLISECONDS_PER_SECOND = 1000;
@@ -109,16 +110,8 @@ export class TaskScope<T extends Task = Task> {
     return new BodyScope(this, input, earliest);
   }
 
-  get prefix(): string {
-    return `${this.#id}:`;
-  }
-
-  prefixFor(part: string): string {
-    return `${this.#id}:${part}:`;
-  }
-
-  workId(part: string): string {
-    return `${this.#id}:${part}`;
+  get key(): WorkKey {
+    return WorkKey.of(this.#id);
   }
 
   variablesWith(additions: JsonObject): JsonObject {

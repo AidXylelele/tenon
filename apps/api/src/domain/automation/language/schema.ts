@@ -7,6 +7,7 @@ import type {
 import type { JsonPointer } from './json-pointer.js';
 import type { RoundResults } from './round-results.js';
 import type { WorkflowError } from './workflow-error.js';
+import type { WorkKey } from './work-key.js';
 
 export class Schema {
   readonly #pointer: JsonPointer;
@@ -25,18 +26,18 @@ export class Schema {
     return this.#document;
   }
 
-  validationsFor(prefix: string, data: JsonValue): readonly Validation[] {
-    const id = this.#pointer.idIn(prefix);
+  validationsFor(key: WorkKey, data: JsonValue): readonly Validation[] {
+    const id = key.idOf(this.#pointer);
     const validation: Validation = { id, schema: this.#document, data };
     return [validation];
   }
 
   failureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    const id = this.#pointer.idIn(prefix);
+    const id = key.idOf(this.#pointer);
     return results.failureOf(id, at);
   }
 }

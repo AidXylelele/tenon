@@ -42,7 +42,7 @@ export class ExportCheckStage extends ResultStage {
 
   work(scope: TaskScope): RoundWork {
     const exporting = scope.task.base.export;
-    const validations = exporting.validationsFor(scope.prefix, this.#context);
+    const validations = exporting.validationsFor(scope.key, this.#context);
     return RoundWork.validating(validations);
   }
 
@@ -54,7 +54,7 @@ export class ExportCheckStage extends ResultStage {
 
     const exporting = scope.task.base.export;
     const at = scope.task.reference;
-    const failure = exporting.validationFailureIn(scope.prefix, results, at);
+    const failure = exporting.validationFailureIn(scope.key, results, at);
 
     if (failure !== null) {
       const faulted = EndedStage.faulted(failure);

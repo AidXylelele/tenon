@@ -8,6 +8,7 @@ import type {
 import type { JsonPointer } from './json-pointer.js';
 import type { RoundResults } from './round-results.js';
 import type { WorkflowError } from './workflow-error.js';
+import type { WorkKey } from './work-key.js';
 
 export class ErrorCondition {
   readonly #when: Expression | null;
@@ -29,31 +30,30 @@ export class ErrorCondition {
   }
 
   evaluationsFor(
-    prefix: string,
+    key: WorkKey,
     data: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
-    const when = this.#when?.evaluationsFor(prefix, data, args) ?? [];
-    const exceptWhen =
-      this.#exceptWhen?.evaluationsFor(prefix, data, args) ?? [];
+    const when = this.#when?.evaluationsFor(key, data, args) ?? [];
+    const exceptWhen = this.#exceptWhen?.evaluationsFor(key, data, args) ?? [];
     return when.concat(exceptWhen);
   }
 
   failureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    const when = this.#when?.failureIn(prefix, results, at) ?? null;
+    const when = this.#when?.failureIn(key, results, at) ?? null;
 
     if (when !== null) return when;
 
-    return this.#exceptWhen?.failureIn(prefix, results, at) ?? null;
+    return this.#exceptWhen?.failureIn(key, results, at) ?? null;
   }
 
-  holds(prefix: string, results: RoundResults): boolean {
-    const when = this.#when?.holds(prefix, results) ?? true;
-    const excepted = this.#exceptWhen?.holds(prefix, results) ?? false;
+  holds(key: WorkKey, results: RoundResults): boolean {
+    const when = this.#when?.holds(key, results) ?? true;
+    const excepted = this.#exceptWhen?.holds(key, results) ?? false;
     return when && !excepted;
   }
 }

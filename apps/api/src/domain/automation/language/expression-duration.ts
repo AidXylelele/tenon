@@ -6,6 +6,7 @@ import type { Evaluation, JsonObject, JsonValue } from './interfaces.js';
 import type { JsonPointer } from './json-pointer.js';
 import type { RoundResults } from './round-results.js';
 import type { WorkflowError } from './workflow-error.js';
+import type { WorkKey } from './work-key.js';
 
 export class ExpressionDuration {
   readonly #expression: Expression;
@@ -23,24 +24,24 @@ export class ExpressionDuration {
   }
 
   evaluationsFor(
-    prefix: string,
+    key: WorkKey,
     data: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
-    return this.#expression.evaluationsFor(prefix, data, args);
+    return this.#expression.evaluationsFor(key, data, args);
   }
 
   failureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    const failure = this.#expression.failureIn(prefix, results, at);
+    const failure = this.#expression.failureIn(key, results, at);
 
     if (failure !== null) return failure;
 
     try {
-      this.resolve(prefix, results);
+      this.resolve(key, results);
       return null;
     } catch (error) {
       if (!(error instanceof InvalidValueError)) throw error;
@@ -49,8 +50,8 @@ export class ExpressionDuration {
     }
   }
 
-  resolve(prefix: string, results: RoundResults): FixedDuration {
-    const value = this.#expression.fill(prefix, results);
+  resolve(key: WorkKey, results: RoundResults): FixedDuration {
+    const value = this.#expression.fill(key, results);
     return FixedDuration.fromValue(value);
   }
 }

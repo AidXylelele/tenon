@@ -8,6 +8,7 @@ import type {
 import type { JsonPointer } from './json-pointer.js';
 import type { RoundResults } from './round-results.js';
 import type { WorkflowError } from './workflow-error.js';
+import type { WorkKey } from './work-key.js';
 
 export class Expression {
   static readonly #RUNTIME = /^\s*\$\{([\s\S]*)\}\s*$/;
@@ -44,11 +45,11 @@ export class Expression {
   }
 
   evaluationsFor(
-    prefix: string,
+    key: WorkKey,
     data: JsonValue,
     args: JsonObject,
   ): readonly Evaluation[] {
-    const id = this.#pointer.idIn(prefix);
+    const id = key.idOf(this.#pointer);
     const evaluation: Evaluation = {
       id,
       program: this.#program,
@@ -59,21 +60,21 @@ export class Expression {
   }
 
   failureIn(
-    prefix: string,
+    key: WorkKey,
     results: RoundResults,
     at: JsonPointer,
   ): WorkflowError | null {
-    const id = this.#pointer.idIn(prefix);
+    const id = key.idOf(this.#pointer);
     return results.failureOf(id, at);
   }
 
-  fill(prefix: string, results: RoundResults): JsonValue {
-    const id = this.#pointer.idIn(prefix);
+  fill(key: WorkKey, results: RoundResults): JsonValue {
+    const id = key.idOf(this.#pointer);
     return results.valueOf(id);
   }
 
-  holds(prefix: string, results: RoundResults): boolean {
-    const value = this.fill(prefix, results);
+  holds(key: WorkKey, results: RoundResults): boolean {
+    const value = this.fill(key, results);
     return value !== false && value !== null;
   }
 }

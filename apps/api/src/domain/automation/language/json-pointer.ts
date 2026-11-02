@@ -39,11 +39,6 @@ export class JsonPointer {
     return new JsonPointer(tokens);
   }
 
-  idIn(prefix: string): string {
-    const pointer = this.toString();
-    return `${prefix}${pointer}`;
-  }
-
   toString(): string {
     const parts = this.#tokens.map((token) => {
       const tildeEscaped = token.replaceAll(JsonPointer.#TILDE, '~0');
