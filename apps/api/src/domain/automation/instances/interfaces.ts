@@ -21,6 +21,7 @@ import type { LifecycleEventType } from './lifecycle-event-type.js';
 import type { ParentOrigin } from './origins/parent-origin.js';
 import type { UserOrigin } from './origins/user-origin.js';
 import type { TaskInstance } from './task-instance.js';
+import type { RoundResults } from '../language/round-results.js';
 
 export type Origin = UserOrigin | ParentOrigin;
 
@@ -165,6 +166,12 @@ export interface InstanceProgress {
   readonly kind: InstanceProgressKind;
   readonly wakeAt: Date | null;
   readonly subWorkflows: readonly string[];
+}
+
+// Results and the time they arrived, which the instance records them at.
+export interface RoundAnswer {
+  readonly results: RoundResults;
+  readonly at: Date;
 }
 
 export interface RoundContextProps {

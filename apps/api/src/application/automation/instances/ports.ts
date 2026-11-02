@@ -14,6 +14,7 @@ import type { WorkflowTarget } from '../../../domain/automation/language/workflo
 import type { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
 import type { SubWorkflowStartKind } from './enums.js';
 import type { RoundContext } from '../../../domain/automation/instances/round-context.js';
+import type { RoundAnswer } from '../../../domain/automation/instances/interfaces.js';
 
 export interface StartInstanceCommand {
   readonly target: WorkflowTarget;
@@ -49,19 +50,13 @@ export interface WorkAnswer {
   readonly deferred: number;
 }
 
-// Results and the time they arrived, which the instance records them at.
-export interface RecordedAnswer {
-  readonly results: RoundResults;
-  readonly at: Date;
-}
-
 export interface RecordRoundCommand {
   readonly instanceId: string;
   // The round that produced the results.
   readonly round: number;
   // As of the last answer.
   readonly context: RoundContext;
-  readonly recorded: readonly RecordedAnswer[];
+  readonly recorded: readonly RoundAnswer[];
 }
 
 export interface FaultInstanceCommand {

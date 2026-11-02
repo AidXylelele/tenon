@@ -23,7 +23,10 @@ import {
   evaluatedAs,
   now,
 } from '../../../../support/progress.js';
-import { InconsistentProgressError } from '../../../../../src/domain/errors.js';
+import {
+  InconsistentProgressError,
+  StaleRoundError,
+} from '../../../../../src/domain/errors.js';
 
 const later = (seconds: number): Date => {
   const time = now.getTime() + seconds * 1000;
@@ -759,6 +762,21 @@ describe('WorkflowInstance', () => {
     expect(instance.phase).toBe(Phase.Faulted);
     expect(types.at(-1)).toBe('workflow.faulted');
     expect(instance.takeDomainEvents()).toEqual([]);
+  });
+
+  it('the_results_of_a_round_a_later_round_superseded_are_refused', () => {
+    const definition = definitionOf([{ first: { set: { a: '${ .a }' } } }]);
+    const instance = started(definition);
+    instance.beginRound(roundAt(definition, now));
+    const superseded = instance.rounds;
+    instance.beginRound(roundAt(definition, later(1)));
+    const context = roundAt(definition, later(1));
+
+    const record = () => {
+      instance.recordRound(superseded, [], context);
+    };
+
+    expect(record).toThrow(StaleRoundError);
   });
 
   it('a_round_with_the_definition_of_another_version_is_refused', () => {

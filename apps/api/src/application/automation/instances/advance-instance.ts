@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { RoundAnswer } from '../../../domain/automation/instances/interfaces.js';
 import { Clock } from '../language/ports.js';
 import { BeginRound } from './begin-round.js';
 import type {
   AdvancedInstanceResult,
   AdvanceInstanceCommand,
-  RecordedAnswer,
 } from './ports.js';
 import { RecordRound } from './record-round.js';
 import { WorkAnswers } from './work-answers.js';
@@ -28,7 +28,7 @@ export class AdvanceInstance {
       now: startedAt,
     });
     const instance = begun.instance;
-    const recorded: RecordedAnswer[] = [];
+    const recorded: RoundAnswer[] = [];
     let context = begun.context;
     let deferred = 0;
 

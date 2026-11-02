@@ -146,7 +146,7 @@ AdvanceInstance({ instanceId, runtime }):
       instance.record(answer.results, context);  recorded.push({ answer.results, at: context.now })
     if work.endsRound(): stop                                 // it had calls or processes
   if recorded is not empty: RecordRound({ instanceId, round, context, recorded })   // @Transactional
-      current = instances.get(id);  for each { results, at } of recorded: current.record(results, context.at(at))
+      current = instances.get(id);  current.recordRound(round, recorded, context)   // StaleRoundError when superseded
       instances.save(current);  events.addAll(current.takeProducedEvents())
   return { progress: current.progress(context.now), deferred: work the outside did not start }
 ```
@@ -154,7 +154,7 @@ AdvanceInstance({ instanceId, runtime }):
 `runtime` (`$runtime`: name, version) is configuration, passed as a value like the time.
 
 - A round saves at the boundaries of side effects: a call, a process, a sub-workflow, parking, the end. Expressions and schemas are pure and run in process, so a crash only computes them again; one HTTP task costs one round instead of one per stage. `RecordRound` replays the recorded results on the instance it reloads. Work ids are positional (a task's id derives from the instance id and its execution number), so nothing outside the run changes task state between the two transactions: other writers (a listen's event in US7, a sub-workflow's start) only signal the run, which records the change in its own step, as `StartSubWorkflow` and `CompleteSubWorkflow` do. A cancel is the one exception, and it discards the round.
-- **Fencing.** `beginRound` counts the round, and `RecordRound` records only into the round that produced the results (`confirmRound`): a worker that resumes after it lost its lease meets `StaleRoundError`, which ends its step, and the worker that took over decides.
+- **Fencing.** `beginRound` counts the round, and `RecordRound` records only into the round that produced the results (`recordRound(round, answers, context)` refuses a superseded round): a worker that resumes after it lost its lease meets `StaleRoundError`, which ends its step, and the worker that took over decides.
 - **Arrival order.** `WorkAnswers` (an application service over the four computation ports) yields a pass's answers as they arrive: expressions and schemas together, then each call and process. The instance records each at its time, so the first `compete` branch to finish wins; the round still waits for the losers' calls, which the platform cannot interrupt, before it saves.
 - **Deadlines in flight.** A call or process carries the earliest deadline of its task and the tasks around it (the workflow's included). The gateways turn it into a budget (`Clock.remainingUntil`): undici gets an abort signal, go-judge a smaller `clockLimit`, and work whose deadline already passed is not sent. Before each answer is recorded the instance fires every deadline elapsed by its time (`#expire`), so an answer that came too late is a time-out and a workflow timeout interrupts a call in progress.
 - **Limits.** An instance faults with a runtime error at the task that would start its 10,001st task execution (the default of the spec's Assumptions). Task and event rows are written in batches of 1,000, under PostgreSQL's 65,535 parameters per statement.

@@ -37,6 +37,7 @@ import type {
   NewWorkflowInstance,
   Origin,
   RequestedSubWorkflow,
+  RoundAnswer,
   TaskChange,
   TaskFollowUp,
   WorkflowInstanceProps,
@@ -282,9 +283,19 @@ export class WorkflowInstance {
     this.#settle(round);
   }
 
-  // The results of round `round` are recorded only while no later round began.
-  confirmRound(round: number): void {
+  // The results of round `round`, each at the time it arrived, recorded only while no later
+  // round began: a worker that lost the instance records nothing over its successor.
+  recordRound(
+    round: number,
+    answers: readonly RoundAnswer[],
+    context: RoundContext,
+  ): void {
     if (round !== this.#rounds) throw new StaleRoundError();
+
+    for (const answer of answers) {
+      const arrived = context.at(answer.at);
+      this.record(answer.results, arrived);
+    }
   }
 
   fault(now: Date): void {

@@ -14,12 +14,7 @@ export class RecordRound {
   async execute(command: RecordRoundCommand): Promise<InstanceProgress> {
     const instance = await this.instances.get(command.instanceId);
 
-    instance.confirmRound(command.round);
-
-    for (const answer of command.recorded) {
-      const arrived = command.context.at(answer.at);
-      instance.record(answer.results, arrived);
-    }
+    instance.recordRound(command.round, command.recorded, command.context);
 
     await this.instances.save(instance);
     return instance.progress(command.context.now);
