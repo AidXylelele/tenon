@@ -1,6 +1,4 @@
-import { ReservedVariableError } from '../../../errors.js';
 import type { CatchClause } from '../catch-clause.js';
-import { RuntimeArgument } from '../enums.js';
 import type { Expression } from '../expression.js';
 import type { TryTaskProps } from '../interfaces.js';
 import type { KindProgress } from '../progress/kind-progress.js';
@@ -16,14 +14,6 @@ export class TryTask extends Task {
 
   constructor(props: TryTaskProps) {
     super(props);
-    const variable = props.catchClause.variable;
-    const reserved: readonly string[] = Object.values(RuntimeArgument);
-
-    if (reserved.includes(variable)) {
-      const asAt = props.reference.at('catch').at('as');
-      throw new ReservedVariableError(variable, asAt);
-    }
-
     this.#body = props.body;
     this.#catchClause = props.catchClause;
   }

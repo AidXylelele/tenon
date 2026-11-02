@@ -13,24 +13,27 @@ import type { RetryStrategy } from './retry-strategy.js';
 import type { RoundResults } from './round-results.js';
 import type { TaskList } from './task-list.js';
 import type { WorkflowError } from './workflow-error.js';
+import { VariableName } from './variable-name.js';
 import type { WorkKey } from './work-key.js';
 
 export class CatchClause {
   readonly #filter: ErrorFilter;
-  readonly #as: string;
+  readonly #as: VariableName;
   readonly #condition: ErrorCondition;
   readonly #retry: RetryStrategy | null;
   readonly #handler: TaskList | null;
 
   constructor(props: CatchClauseProps) {
     this.#filter = props.filter;
-    this.#as = props.as ?? DefaultVariable.Error;
+    const as = props.as ?? DefaultVariable.Error;
+    const asAt = props.reference.at('as');
+    this.#as = new VariableName(as, asAt);
     this.#condition = props.condition;
     this.#retry = props.retry;
     this.#handler = props.handler;
   }
 
-  get variable(): string {
+  get variable(): VariableName {
     return this.#as;
   }
 
@@ -55,7 +58,7 @@ export class CatchClause {
 
   variablesFor(error: WorkflowError): JsonObject {
     const variables: Record<string, JsonValue> = {};
-    variables[this.#as] = error.toJson();
+    variables[this.#as.name] = error.toJson();
     return variables;
   }
 

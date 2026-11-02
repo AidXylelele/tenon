@@ -30,6 +30,13 @@ export class CatchClauseMapper {
     );
     const handlerAt = at.at('do');
     const handler = TaskListMapper.toDomain(node.do, handlerAt, components);
-    return new CatchClause({ filter, as, condition, retry, handler });
+    return new CatchClause({
+      reference: at,
+      filter,
+      as,
+      condition,
+      retry,
+      handler,
+    });
   }
 }

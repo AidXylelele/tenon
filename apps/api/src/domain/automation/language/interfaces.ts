@@ -112,6 +112,7 @@ export interface RetryStrategyProps {
 }
 
 export interface CatchClauseProps {
+  readonly reference: JsonPointer;
   readonly filter: ErrorFilter;
   readonly as: string | null;
   readonly condition: ErrorCondition;

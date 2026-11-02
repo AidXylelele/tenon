@@ -470,4 +470,21 @@ describe('composite progress', () => {
       expect(rejection.pointer).toBe(pointer);
     },
   );
+
+  it('a_caught_error_named_like_a_runtime_argument_is_refused', () => {
+    const build = () =>
+      definitionOf([
+        {
+          guard: {
+            try: [{ a: { set: { a: 1 } } }],
+            catch: { as: 'context' },
+          },
+        },
+      ]);
+
+    const rejection = rejectionOf(build);
+
+    expect(rejection).toBeInstanceOf(ReservedVariableError);
+    expect(rejection.pointer).toBe('/do/0/guard/catch/as');
+  });
 });

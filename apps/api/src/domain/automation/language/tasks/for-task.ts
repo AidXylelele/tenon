@@ -1,21 +1,18 @@
-import {
-  InconsistentProgressError,
-  ReservedVariableError,
-} from '../../../errors.js';
-import { DefaultVariable, RuntimeArgument } from '../enums.js';
+import { InconsistentProgressError } from '../../../errors.js';
+import { DefaultVariable } from '../enums.js';
 import type { Expression } from '../expression.js';
 import type { ForIteration } from '../for-iteration.js';
 import type { ForTaskProps, JsonObject, JsonValue } from '../interfaces.js';
-import type { JsonPointer } from '../json-pointer.js';
 import type { KindProgress } from '../progress/kind-progress.js';
 import { ForCollectingProgress } from '../progress/for-collecting-progress.js';
 import type { Step } from '../step.js';
 import { Task } from './task.js';
+import { VariableName } from '../variable-name.js';
 import type { TaskList } from '../task-list.js';
 
 export class ForTask extends Task {
-  readonly #each: string;
-  readonly #at: string;
+  readonly #each: VariableName;
+  readonly #at: VariableName;
   readonly #collection: Expression;
   readonly #whilst: Expression | null;
   readonly #body: TaskList;
@@ -25,26 +22,20 @@ export class ForTask extends Task {
     const each = props.each ?? DefaultVariable.Item;
     const at = props.at ?? DefaultVariable.Index;
     const loopAt = props.reference.at('for');
-    ForTask.#confirmVariable(each, loopAt.at('each'));
-    ForTask.#confirmVariable(at, loopAt.at('at'));
-    this.#each = each;
-    this.#at = at;
+    const eachAt = loopAt.at('each');
+    const atAt = loopAt.at('at');
+    this.#each = new VariableName(each, eachAt);
+    this.#at = new VariableName(at, atAt);
     this.#collection = props.collection;
     this.#whilst = props.whilst;
     this.#body = props.body;
   }
 
-  static #confirmVariable(name: string, at: JsonPointer): void {
-    const reserved: readonly string[] = Object.values(RuntimeArgument);
-
-    if (reserved.includes(name)) throw new ReservedVariableError(name, at);
-  }
-
-  get each(): string {
+  get each(): VariableName {
     return this.#each;
   }
 
-  get at(): string {
+  get at(): VariableName {
     return this.#at;
   }
 
@@ -78,8 +69,8 @@ export class ForTask extends Task {
 
   variablesFor(iteration: ForIteration): JsonObject {
     const variables: Record<string, JsonValue> = {};
-    variables[this.#each] = iteration.item;
-    variables[this.#at] = iteration.index;
+    variables[this.#each.name] = iteration.item;
+    variables[this.#at.name] = iteration.index;
     return variables;
   }
 
