@@ -1,5 +1,4 @@
-import { Module, type OnApplicationShutdown } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Module } from '@nestjs/common';
 import { EventRepository } from '../../application/automation/events/ports.js';
 import { AdvanceInstance } from '../../application/automation/instances/advance-instance.js';
 import { WorkAnswers } from '../../application/automation/instances/work-answers.js';
@@ -52,14 +51,8 @@ import { DrizzleEventRepository } from '../../interface-adapters/persistence/rep
 import { DrizzleWorkflowInstanceRepository } from '../../interface-adapters/persistence/repositories/drizzle-workflow-instance.repository.js';
 import { DrizzleWorkflowVersionRepository } from '../../interface-adapters/persistence/repositories/drizzle-workflow-version.repository.js';
 import { DrizzleWorkflowRepository } from '../../interface-adapters/persistence/repositories/drizzle-workflow.repository.js';
-import {
-  SandboxClient,
-  SandboxLimits,
-} from '../../interface-adapters/sandbox/interfaces.js';
 import { SandboxGateway } from '../../interface-adapters/sandbox/sandbox.gateway.js';
-import { OpenWorkflowClient } from '../../interface-adapters/workflows/definitions/interfaces.js';
 import { OpenWorkflowDefinitionReader } from '../../interface-adapters/workflows/definitions/open-workflow-definition.reader.js';
-import { JqClient } from '../../interface-adapters/workflows/expressions/interfaces.js';
 import { JqExpressionEvaluator } from '../../interface-adapters/workflows/expressions/jq-expression.evaluator.js';
 import { EngineClock } from '../../interface-adapters/workflows/runs/engine.clock.js';
 import { InstanceRunController } from '../../interface-adapters/workflows/runs/instance-run.controller.js';
@@ -68,33 +61,31 @@ import {
   PlatformRuntime,
   RunClient,
 } from '../../interface-adapters/workflows/runs/interfaces.js';
-import { JsonSchemaClient } from '../../interface-adapters/workflows/schemas/interfaces.js';
 import { JsonSchemaValidator } from '../../interface-adapters/workflows/schemas/json-schema.validator.js';
-import { EndpointClient } from '../../interface-adapters/workflows/services/interfaces.js';
 import { ServiceCallGateway } from '../../interface-adapters/workflows/services/service-call.gateway.js';
-import { AjvJsonSchemaClient } from '../ajv/ajv-json-schema.client.js';
-import { PostgresTransientFailures } from '../drizzle/postgres-transient-failures.js';
-import { ErrorClassifier } from '../resilience/error-classifier.js';
-import { PiscinaJqClient } from '../jq/piscina-jq.client.js';
-import { SdkOpenWorkflowClient } from '../openworkflowspec/sdk-open-workflow.client.js';
 import { OutboxErrors } from '../outbox/outbox-errors.js';
 import { ProcessDetachedOutboxHandler } from '../outbox/process-detached-outbox.handler.js';
 import { WorkflowDetachedOutboxHandler } from '../outbox/workflow-detached-outbox.handler.js';
-import {
-  createEndpointDispatcher,
-  EndpointDispatcher,
-} from '../undici/endpoint-dispatcher.js';
-import { GoJudgeSandboxClient } from '../go-judge/go-judge-sandbox.client.js';
-import { createSandboxPool, SandboxPool } from '../go-judge/sandbox-pool.js';
-import { UndiciEndpointClient } from '../undici/undici-endpoint.client.js';
 import { EngineRunClient } from '../workflows/engine-run.client.js';
 import { InstanceWorkflow } from '../workflows/instance.workflow.js';
 import { StepErrors } from '../workflows/step-errors.js';
-import type { Env } from './config.module.js';
+import { AjvModule } from './ajv.module.js';
 import { EngineModule } from './engine.module.js';
+import { GoJudgeModule } from './go-judge.module.js';
+import { JqModule } from './jq.module.js';
+import { OpenWorkflowSpecModule } from './open-workflow-spec.module.js';
+import { UndiciModule } from './undici.module.js';
+import { ErrorClassifier } from '../resilience/error-classifier.js';
 
 @Module({
-  imports: [EngineModule],
+  imports: [
+    EngineModule,
+    UndiciModule,
+    GoJudgeModule,
+    JqModule,
+    AjvModule,
+    OpenWorkflowSpecModule,
+  ],
   controllers: [
     WorkflowsController,
     ConformanceController,
@@ -108,48 +99,16 @@ import { EngineModule } from './engine.module.js';
       provide: PlatformRuntime,
       useValue: { descriptor: { name: 'workflow-platform', version: '0.0.1' } },
     },
-    { provide: OpenWorkflowClient, useClass: SdkOpenWorkflowClient },
     OpenWorkflowDefinitionReader,
     { provide: DefinitionReader, useExisting: OpenWorkflowDefinitionReader },
-    { provide: JqClient, useClass: PiscinaJqClient },
     JqExpressionEvaluator,
     { provide: ExpressionEvaluator, useExisting: JqExpressionEvaluator },
-    { provide: JsonSchemaClient, useClass: AjvJsonSchemaClient },
     JsonSchemaValidator,
     { provide: SchemaValidator, useExisting: JsonSchemaValidator },
-    {
-      provide: EndpointDispatcher,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) =>
-        createEndpointDispatcher(
-          config.get('OUTBOUND_ALLOW_LIST', { infer: true }),
-        ),
-    },
-    { provide: EndpointClient, useClass: UndiciEndpointClient },
     ServiceCallGateway,
     { provide: ServiceCaller, useExisting: ServiceCallGateway },
-    {
-      provide: SandboxPool,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) =>
-        createSandboxPool(
-          config.get('SANDBOX_URL', { infer: true }),
-          config.get('SANDBOX_TOKEN', { infer: true }),
-        ),
-    },
-    {
-      provide: SandboxLimits,
-      useValue: {
-        seconds: 30,
-        memoryBytes: 256 * 1024 * 1024,
-        processes: 50,
-        outputBytes: 1024 * 1024,
-      },
-    },
-    { provide: SandboxClient, useClass: GoJudgeSandboxClient },
     SandboxGateway,
     { provide: ProcessRunner, useExisting: SandboxGateway },
-    PostgresTransientFailures,
     ErrorClassifier,
     DrizzleWorkflowRepository,
     { provide: WorkflowRepository, useExisting: DrizzleWorkflowRepository },
@@ -171,7 +130,8 @@ import { EngineModule } from './engine.module.js';
     DrizzleInstanceQueries,
     { provide: InstanceQueries, useExisting: DrizzleInstanceQueries },
     { provide: SubWorkflowQueries, useExisting: DrizzleInstanceQueries },
-    { provide: RunClient, useClass: EngineRunClient },
+    EngineRunClient,
+    { provide: RunClient, useExisting: EngineRunClient },
     InstanceRunsGateway,
     { provide: InstanceRuns, useExisting: InstanceRunsGateway },
     CheckDocument,
@@ -198,13 +158,4 @@ import { EngineModule } from './engine.module.js';
     WorkflowDetachedOutboxHandler,
   ],
 })
-export class AutomationModule implements OnApplicationShutdown {
-  constructor(
-    private readonly endpoints: EndpointDispatcher,
-    private readonly sandbox: SandboxPool,
-  ) {}
-
-  async onApplicationShutdown(): Promise<void> {
-    await Promise.all([this.endpoints.close(), this.sandbox.close()]);
-  }
-}
+export class AutomationModule {}

@@ -11,6 +11,7 @@ import { ClsModule } from 'nestjs-cls';
 import pg from 'pg';
 import { Database } from '../../interface-adapters/persistence/interfaces.js';
 import { createDatabase } from '../drizzle/database.js';
+import { PostgresTransientFailures } from '../drizzle/postgres-transient-failures.js';
 import type { Env } from './config.module.js';
 
 @Global()
@@ -60,8 +61,9 @@ import type { Env } from './config.module.js';
       },
     },
     { provide: Database, inject: [pg.Pool], useFactory: createDatabase },
+    PostgresTransientFailures,
   ],
-  exports: [Database],
+  exports: [Database, PostgresTransientFailures],
 })
 export class DatabaseModule implements OnApplicationShutdown {
   private static readonly LOGGER = new Logger('PostgreSQL');
