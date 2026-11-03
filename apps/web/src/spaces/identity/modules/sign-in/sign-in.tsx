@@ -1,7 +1,7 @@
 import { InfoIcon } from 'lucide-react';
 import { Alert, AlertDescription } from '@/libs/ui/components/alert';
 import { AuthCard } from '../../__shared_context/auth-card';
-import { returnPath } from '../../__shared_context/form-state';
+import { returnPath } from './return-path';
 import { SignInForm } from './sign-in-form';
 
 const REASONS: Record<string, string> = {

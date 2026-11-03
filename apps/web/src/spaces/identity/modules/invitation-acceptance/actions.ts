@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { acceptInvitation } from '@/libs/data-access/identity';
-import { field, type FormState } from '../../__shared_context/form-state';
+import { field, type FormState } from '@/libs/forms/form-state';
 
 export async function acceptInvitationAction(
   _previous: FormState,

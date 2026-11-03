@@ -7,7 +7,8 @@ import {
   turnWorkflow,
 } from '@/libs/data-access/automation';
 import type { Outcome } from '@/libs/data-access/problem';
-import type { InstanceSummary, JsonValue } from '@/libs/data-access/types';
+import type { InstanceSummary } from '@/libs/data-access/types';
+import type { JsonValue } from '@/libs/document-text/json';
 
 export async function startAction(
   namespace: string,

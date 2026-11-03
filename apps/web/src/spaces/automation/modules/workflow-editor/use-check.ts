@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Problem } from '@/libs/data-access/problem';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import { checkAction } from './actions';
 
 export type CheckState =

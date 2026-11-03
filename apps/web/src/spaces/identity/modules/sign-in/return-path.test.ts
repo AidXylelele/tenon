@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { returnPath } from './form-state';
+import { returnPath } from './return-path';
 
 describe('the page to return to after signing in', () => {
   it('is_a_path_of_the_console_with_its_query', () => {

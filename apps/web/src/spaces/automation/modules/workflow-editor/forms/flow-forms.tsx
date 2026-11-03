@@ -1,12 +1,15 @@
 'use client';
 
 import { PlusIcon, XIcon } from 'lucide-react';
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
+import {
+  isObject,
+  type JsonObject,
+  type JsonValue,
+} from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import { Field, FieldLabel } from '@/libs/ui/components/field';
 import { Input } from '@/libs/ui/components/input';
 import { Switch } from '@/libs/ui/components/switch';
-import { isObject } from '../../../__shared_context/document/json';
 import {
   ERROR_TYPE_BASE,
   RAISE_TYPES,

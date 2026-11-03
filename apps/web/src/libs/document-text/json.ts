@@ -1,13 +1,19 @@
-import { pointerOf, tokensOf } from '@/libs/document-text/json-pointer';
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
+import { pointerOf, tokensOf } from './json-pointer';
 
-// Immutable reads and writes into a JSON document by RFC 6901 pointer. A write returns a new
-// document; nothing it was given changes.
+// JSON values, and immutable reads and writes into a JSON document by RFC 6901 pointer. A write
+// returns a new document; nothing it was given changes.
 
+export type JsonValue =
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+export type JsonObject = { [key: string]: JsonValue };
+
+// Whether a value is a JSON object: neither null nor an array.
 export function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+// The value at the pointer, or undefined where the path does not exist.
 export function valueAt(
   document: JsonValue,
   pointer: string,
@@ -23,6 +29,7 @@ export function valueAt(
   return node;
 }
 
+// The document with the value set at the pointer; objects missing on the way are created.
 export function withValue(
   document: JsonObject,
   pointer: string,
@@ -71,6 +78,7 @@ export function withMember(
   return withValue(document, pointer, value);
 }
 
+// The node with the value written at the end of the tokens' path.
 function written(
   node: JsonValue | undefined,
   tokens: readonly string[],

@@ -1,5 +1,5 @@
 import { isWithin } from '@/libs/document-text/json-pointer';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import type { Problem } from '@/libs/data-access/problem';
 import { allEntries } from './tasks';
 

@@ -1,5 +1,10 @@
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
-import { isObject, valueAt, withValue } from './json';
+import {
+  isObject,
+  type JsonObject,
+  type JsonValue,
+  valueAt,
+  withValue,
+} from '@/libs/document-text/json';
 
 // The secrets a draft's calls authenticate with (`basic` or `bearer` with `use`), declared in
 // `use.secrets` as the check requires (002 US8 scenario 4).

@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useActionState } from 'react';
+import { IDLE } from '@/libs/forms/form-state';
 import { Field, FieldGroup, FieldLabel } from '@/libs/ui/components/field';
 import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
-import { IDLE } from '../../__shared_context/form-state';
 import { signInAction } from './actions';
 
 export function SignInForm({ next }: { readonly next: string }) {

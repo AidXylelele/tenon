@@ -2,11 +2,8 @@
 
 import { redirect } from 'next/navigation';
 import { signIn } from '@/libs/data-access/identity';
-import {
-  field,
-  type FormState,
-  returnPath,
-} from '../../__shared_context/form-state';
+import { field, type FormState } from '@/libs/forms/form-state';
+import { returnPath } from './return-path';
 
 export async function signInAction(
   _previous: FormState,

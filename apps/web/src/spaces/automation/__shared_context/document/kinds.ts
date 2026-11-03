@@ -1,5 +1,5 @@
 import type { Specification } from '@openworkflowspec/sdk';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import type { TaskKind } from './tasks';
 
 // What each kind of task is called, what it does in plain words, and the task a builder adds

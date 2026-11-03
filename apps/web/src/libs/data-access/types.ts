@@ -1,10 +1,7 @@
+import type { JsonObject, JsonValue } from '@/libs/document-text/json';
+
 // The API's resources as the console reads them, written from the contracts of features 001
 // and 002. Unknown fields are ignored (Postel's law).
-
-export type JsonValue =
-  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
-
-export type JsonObject = { [key: string]: JsonValue };
 
 export interface Page<T> {
   readonly items: T[];

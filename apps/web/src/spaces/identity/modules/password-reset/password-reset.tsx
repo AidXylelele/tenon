@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useActionState } from 'react';
+import { IDLE } from '@/libs/forms/form-state';
 import {
   Field,
   FieldDescription,
@@ -11,11 +12,7 @@ import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
 import { AuthCard } from '../../__shared_context/auth-card';
-import {
-  IDLE,
-  PASSWORD_MAX,
-  PASSWORD_MIN,
-} from '../../__shared_context/form-state';
+import { PASSWORD_MAX, PASSWORD_MIN } from '../../__shared_context/password';
 import { resetPasswordAction } from './actions';
 
 export function PasswordReset({ token }: { readonly token: string }) {

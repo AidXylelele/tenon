@@ -1,5 +1,4 @@
-import type { JsonObject } from '@/libs/data-access/types';
-import { isObject } from './json';
+import { isObject, type JsonObject } from '@/libs/document-text/json';
 
 // The `document` header of a draft and the version a new edit proposes.
 

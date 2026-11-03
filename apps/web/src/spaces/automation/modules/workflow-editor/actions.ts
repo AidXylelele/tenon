@@ -2,7 +2,8 @@
 
 import { checkDocument, publishDocument } from '@/libs/data-access/automation';
 import type { Outcome, Problem } from '@/libs/data-access/problem';
-import type { JsonObject, Version } from '@/libs/data-access/types';
+import type { Version } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 
 // The platform's check of a draft: null when publishing would accept it (002 FR-003).
 export async function checkAction(draft: JsonObject): Promise<Problem | null> {

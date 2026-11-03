@@ -15,10 +15,14 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { codeOf, type Problem } from '@/libs/data-access/problem';
-import type {
-  ConformanceStatement,
-  JsonObject,
-} from '@/libs/data-access/types';
+import type { ConformanceStatement } from '@/libs/data-access/types';
+import {
+  isObject,
+  type JsonObject,
+  valueAt,
+  withMember,
+  withValue,
+} from '@/libs/document-text/json';
 import { pointerOf, tokensOf } from '@/libs/document-text/json-pointer';
 import {
   formatOf,
@@ -56,12 +60,6 @@ import {
   nextVersion,
   sizeOf,
 } from '../../__shared_context/document/draft';
-import {
-  isObject,
-  valueAt,
-  withMember,
-  withValue,
-} from '../../__shared_context/document/json';
 import { infoOf, newTask } from '../../__shared_context/document/kinds';
 import { locate } from '../../__shared_context/document/problems';
 import {

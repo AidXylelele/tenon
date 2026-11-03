@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { RefreshControl } from './refresh-control';
+import { intervalOf, RefreshControl } from './refresh-control';
 import { chooseRefresh } from './refresh-preference';
 
 const refresh = vi.fn();
@@ -86,5 +86,17 @@ describe('the refresh control', () => {
     expect(paused).toBeInTheDocument();
     expect(refresh).toHaveBeenCalledTimes(1);
     visibility.mockRestore();
+  });
+});
+
+describe('the interval in force', () => {
+  it.each([
+    ['auto', 'in-flight', 5_000],
+    ['auto', 'open', 60_000],
+    ['auto', 'ended', null],
+    ['10000', 'ended', 10_000],
+    ['off', 'in-flight', null],
+  ] as const)('%s_on_a_page_%s_is_%s', (choice, activity, interval) => {
+    expect(intervalOf(choice, activity)).toBe(interval);
   });
 });

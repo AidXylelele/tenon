@@ -8,13 +8,14 @@ import {
   WebhookIcon,
 } from 'lucide-react';
 import { Link } from '@/libs/routing/link';
-import {
-  instances,
-  recentInstances,
-  workflows,
-} from '@/libs/data-access/automation';
+import { instances, workflows } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
-import type { InstanceSummary, Phase } from '@/libs/data-access/types';
+import type {
+  InstanceSummary,
+  Page,
+  Phase,
+  Read,
+} from '@/libs/data-access/types';
 import { RefreshControl } from '@/libs/live/refresh-control';
 import { Button } from '@/libs/ui/components/button';
 import {
@@ -26,6 +27,7 @@ import {
   CardTitle,
 } from '@/libs/ui/components/card';
 import { PageHeader } from '@/libs/ui/composites/page-header';
+import { toneClasses } from '@/libs/ui/composites/status';
 import { Duration, Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
 import { instanceHref, workflowHref } from '../../__shared_context/links';
@@ -34,8 +36,9 @@ import {
   PhaseStatus,
   phaseLabel,
   phaseTone,
-  toneClasses,
 } from '../../__shared_context/vocabulary';
+
+const DAY_MS = 24 * 3_600_000;
 
 // What the platform is doing (FR-025): what starts by itself, the last day's runs by phase,
 // what failed and what is running now.
@@ -43,7 +46,7 @@ export async function Overview() {
   const [user, active, day, running, waiting] = await Promise.all([
     currentUser(),
     workflows('active'),
-    recentInstances(24),
+    lastDay(),
     instances({ phase: 'running', limit: 8 }),
     instances({ phase: 'waiting', limit: 8 }),
   ]);
@@ -358,6 +361,12 @@ function Quiet({ children }: { readonly children: React.ReactNode }) {
   return (
     <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>
   );
+}
+
+// The runs started in the last day, newest first, up to 200.
+function lastDay(): Promise<Read<Page<InstanceSummary>>> {
+  const startedFrom = new Date(Date.now() - DAY_MS).toISOString();
+  return instances({ startedFrom, limit: 200 });
 }
 
 function countByPhase(runs: readonly InstanceSummary[]): Map<Phase, number> {

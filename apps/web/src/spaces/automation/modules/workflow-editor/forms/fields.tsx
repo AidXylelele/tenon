@@ -3,7 +3,7 @@
 import { CodeEditor } from '@/libs/code-editor/code-editor';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
+import type { JsonObject, JsonValue } from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import {
   Field,

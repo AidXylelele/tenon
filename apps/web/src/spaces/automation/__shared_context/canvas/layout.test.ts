@@ -1,6 +1,6 @@
 import ELK from 'elkjs/lib/elk.bundled.js';
 import { describe, expect, it } from 'vitest';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import { graphOf, type Graph } from './graph';
 import {
   type Box,

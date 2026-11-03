@@ -3,6 +3,7 @@
 import { MailCheckIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useActionState } from 'react';
+import { IDLE } from '@/libs/forms/form-state';
 import {
   Alert,
   AlertDescription,
@@ -17,7 +18,6 @@ import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
 import { AuthCard } from '../../__shared_context/auth-card';
-import { IDLE } from '../../__shared_context/form-state';
 import { requestRecoveryAction } from './actions';
 
 // The answer is the same whether or not the address has an account (001 spec).

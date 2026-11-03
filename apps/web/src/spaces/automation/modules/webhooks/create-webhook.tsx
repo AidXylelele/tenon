@@ -4,6 +4,7 @@ import { CircleCheckIcon, PlusIcon } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import type { Problem } from '@/libs/data-access/problem';
 import type { CreatedWebhook } from '@/libs/data-access/types';
+import { field } from '@/libs/forms/form-state';
 import {
   Alert,
   AlertDescription,
@@ -39,8 +40,8 @@ export function CreateWebhook() {
   const [pending, start] = useTransition();
 
   function submit(form: FormData) {
-    const name = String(form.get('name') ?? '').trim();
-    const eventType = String(form.get('eventType') ?? '').trim();
+    const name = field(form, 'name').trim();
+    const eventType = field(form, 'eventType').trim();
     setProblem(null);
     start(async () => {
       const outcome = await createWebhookAction(name, eventType);

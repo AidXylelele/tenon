@@ -1,6 +1,6 @@
 'use client';
 
-import { isObject } from '../../../__shared_context/document/json';
+import { isObject } from '@/libs/document-text/json';
 import { JsonField, TextField } from './fields';
 import { type TaskFormProps, taskEditor } from './task-form';
 

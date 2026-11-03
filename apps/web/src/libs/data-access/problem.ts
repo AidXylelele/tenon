@@ -1,3 +1,5 @@
+import { isObject } from '@/libs/document-text/json';
+
 // A refusal of the API as an RFC 9457 problem. Feature 002 answers problem+json; feature 001
 // and the framework's own answers (413, 415, 503) keep Nest's `{ statusCode, message, error }`,
 // which is read into the same shape.
@@ -22,7 +24,7 @@ export type Outcome<T> =
 const ABOUT_BLANK = 'about:blank';
 
 export function problemOf(status: number, body: unknown): Problem {
-  const fields = isRecord(body) ? body : {};
+  const fields = isObject(body) ? body : {};
   const title =
     textOf(fields.title) ?? textOf(fields.error) ?? `HTTP ${status}`;
   const detail = textOf(fields.detail) ?? messageOf(fields.message) ?? title;
@@ -55,10 +57,6 @@ export function unreachable(detail: string): Problem {
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function textOf(value: unknown): string | null {
   if (typeof value !== 'string' || value === '') return null;
 
@@ -78,7 +76,7 @@ function isText(value: unknown): value is string {
 function locationsOf(value: unknown): ProblemLocation[] {
   if (!Array.isArray(value)) return [];
 
-  return value.filter(isRecord).flatMap((item) => {
+  return value.filter(isObject).flatMap((item) => {
     const pointer = textOf(item.pointer);
     const detail = textOf(item.detail);
 

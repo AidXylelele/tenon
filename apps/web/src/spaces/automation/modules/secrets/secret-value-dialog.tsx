@@ -4,6 +4,7 @@ import { KeyRoundIcon, PencilIcon, PlusIcon } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import type { Problem } from '@/libs/data-access/problem';
+import { field } from '@/libs/forms/form-state';
 import { Button } from '@/libs/ui/components/button';
 import {
   Dialog,
@@ -47,7 +48,7 @@ export function SecretValueDialog({ name }: { readonly name?: string }) {
   }
 
   function submit(form: FormData) {
-    const chosen = replacing ? name : String(form.get('name') ?? '').trim();
+    const chosen = replacing ? name : field(form, 'name').trim();
     setProblem(null);
     start(async () => {
       const outcome = replacing

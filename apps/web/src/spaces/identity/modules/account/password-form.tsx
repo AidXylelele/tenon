@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { IDLE } from '@/libs/forms/form-state';
 import {
   Field,
   FieldDescription,
@@ -11,11 +12,7 @@ import {
 import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
-import {
-  IDLE,
-  PASSWORD_MAX,
-  PASSWORD_MIN,
-} from '../../__shared_context/form-state';
+import { PASSWORD_MAX, PASSWORD_MIN } from '../../__shared_context/password';
 import { changePasswordAction } from './actions';
 
 export function PasswordForm() {

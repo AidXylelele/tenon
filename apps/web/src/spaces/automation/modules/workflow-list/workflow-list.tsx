@@ -21,9 +21,9 @@ import {
   TableRow,
 } from '@/libs/ui/components/table';
 import { PageHeader } from '@/libs/ui/composites/page-header';
+import { Status } from '@/libs/ui/composites/status';
 import { canAuthor } from '../../__shared_context/access';
 import { workflowHref } from '../../__shared_context/links';
-import { Status } from '../../__shared_context/vocabulary';
 
 interface WorkflowListProps {
   readonly status: WorkflowStatus;

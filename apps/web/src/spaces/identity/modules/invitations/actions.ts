@@ -3,7 +3,7 @@
 import { refresh } from 'next/cache';
 import { invite, revokeInvitation } from '@/libs/data-access/identity';
 import type { Role } from '@/libs/data-access/types';
-import { field, type FormState } from '../../__shared_context/form-state';
+import { field, type FormState } from '@/libs/forms/form-state';
 
 const ROLES: readonly Role[] = ['admin', 'editor', 'viewer'];
 

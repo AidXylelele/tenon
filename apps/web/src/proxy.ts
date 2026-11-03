@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import {
-  REQUEST_URL_HEADER,
   SECURE_SESSION_COOKIE,
   SESSION_COOKIE,
+  SIGN_IN_AGAIN_HEADER,
 } from '@/libs/data-access/session-cookie';
 
 // Pages a visitor reaches without a session.
@@ -14,24 +14,26 @@ const ANONYMOUS = [
 ];
 
 // Runs before every page: a nonce-based Content Security Policy (docs, Content Security
-// Policy), the URL being rendered for the app, and the optimistic session check that sends a
-// visitor without a session to sign in (docs, Authentication). The API decides the rest.
+// Policy), where the app sends a person whose session ends while the page renders, and the
+// optimistic session check that sends a visitor without a session to sign in (docs,
+// Authentication). The API decides the rest.
 export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const here = `${pathname}${search}`;
 
   if (!isAnonymous(pathname) && !hasSession(request)) {
-    const signIn = new URL('/sign-in', request.url);
-    signIn.searchParams.set('next', here);
+    const signIn = signInOf(here, request.url);
     return NextResponse.redirect(signIn);
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const policy = policyOf(nonce);
+  const ended = signInOf(here, request.url, 'ended');
+  const signInAgain = `${ended.pathname}${ended.search}`;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', policy);
-  requestHeaders.set(REQUEST_URL_HEADER, here);
+  requestHeaders.set(SIGN_IN_AGAIN_HEADER, signInAgain);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy', policy);
@@ -54,6 +56,16 @@ function isAnonymous(pathname: string): boolean {
   return ANONYMOUS.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
+}
+
+// The sign-in page, which returns to `here` afterwards; a reason says why the person signs in.
+function signInOf(here: string, base: string, reason?: string): URL {
+  const url = new URL('/sign-in', base);
+
+  if (reason !== undefined) url.searchParams.set('reason', reason);
+
+  url.searchParams.set('next', here);
+  return url;
 }
 
 function hasSession(request: NextRequest): boolean {

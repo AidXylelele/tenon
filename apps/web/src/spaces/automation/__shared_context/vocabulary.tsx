@@ -1,61 +1,12 @@
-import { cn } from 'cn';
 import type {
   DeliveryStatus,
   Phase,
   TaskStatus,
   Trigger,
 } from '@/libs/data-access/types';
+import { Status, type Tone } from '@/libs/ui/composites/status';
 
-// The words and colours of the run's states. Colour carries state only: blue runs, amber
-// waits, violet is held, green completed, red failed, grey ended otherwise (research R8).
-
-export type Tone =
-  'idle' | 'busy' | 'waiting' | 'held' | 'done' | 'failed' | 'ended';
-
-const TONE: Record<
-  Tone,
-  { readonly dot: string; readonly text: string; readonly line: string }
-> = {
-  idle: {
-    dot: 'bg-muted-foreground/50',
-    text: 'text-muted-foreground',
-    line: 'bg-border',
-  },
-  busy: {
-    dot: 'bg-sky-500',
-    text: 'text-sky-700 dark:text-sky-300',
-    line: 'bg-sky-500',
-  },
-  waiting: {
-    dot: 'bg-amber-500',
-    text: 'text-amber-700 dark:text-amber-300',
-    line: 'bg-amber-500',
-  },
-  held: {
-    dot: 'bg-violet-500',
-    text: 'text-violet-700 dark:text-violet-300',
-    line: 'bg-violet-500',
-  },
-  done: {
-    dot: 'bg-emerald-500',
-    text: 'text-emerald-700 dark:text-emerald-400',
-    line: 'bg-emerald-500',
-  },
-  failed: {
-    dot: 'bg-red-500',
-    text: 'text-red-700 dark:text-red-400',
-    line: 'bg-red-500',
-  },
-  ended: {
-    dot: 'bg-zinc-400',
-    text: 'text-muted-foreground',
-    line: 'bg-zinc-300 dark:bg-zinc-700',
-  },
-};
-
-export function toneClasses(tone: Tone) {
-  return TONE[tone];
-}
+// The words of the run's states and the tone that colours each (research R8).
 
 const PHASE: Record<Phase, { readonly label: string; readonly tone: Tone }> = {
   pending: { label: 'Pending', tone: 'idle' },
@@ -153,47 +104,6 @@ export function deliveryLabel(status: DeliveryStatus): string {
 
 export function deliveryTone(status: DeliveryStatus): Tone {
   return DELIVERY[status].tone;
-}
-
-interface StatusProps {
-  readonly tone: Tone;
-  readonly label: string;
-  // Whether the state is changing as it is shown: its dot pulses.
-  readonly live?: boolean;
-  readonly className?: string;
-}
-
-// A state as a coloured dot and its word.
-export function Status({ tone, label, live = false, className }: StatusProps) {
-  const classes = TONE[tone];
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 text-sm font-medium',
-        classes.text,
-        className,
-      )}
-    >
-      <span className="relative flex size-2" aria-hidden>
-        {live && (
-          <span
-            className={cn(
-              'absolute inline-flex size-full animate-ping rounded-full opacity-60',
-              classes.dot,
-            )}
-          />
-        )}
-        <span
-          className={cn(
-            'relative inline-flex size-2 rounded-full',
-            classes.dot,
-          )}
-        />
-      </span>
-      {label}
-    </span>
-  );
 }
 
 export function PhaseStatus({

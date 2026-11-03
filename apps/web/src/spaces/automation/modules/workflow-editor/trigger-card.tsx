@@ -1,7 +1,7 @@
 'use client';
 
 import { CalendarClockIcon, HandIcon, RadioIcon } from 'lucide-react';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import {
   Card,
   CardContent,

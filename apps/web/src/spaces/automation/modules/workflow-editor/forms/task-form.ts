@@ -1,5 +1,9 @@
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
-import { valueAt, withMember } from '../../../__shared_context/document/json';
+import {
+  type JsonObject,
+  type JsonValue,
+  valueAt,
+  withMember,
+} from '@/libs/document-text/json';
 
 export interface TaskFormProps {
   readonly task: JsonObject;

@@ -4,9 +4,9 @@
 export const SESSION_COOKIE = 'console_session';
 export const SECURE_SESSION_COOKIE = '__Host-console_session';
 
-// The request header through which `proxy.ts` tells the app the URL being rendered, so an
-// ended session returns there after signing in.
-export const REQUEST_URL_HEADER = 'x-console-url';
+// The request header through which `proxy.ts` tells the app where a person whose session ended
+// signs in again, so they return to the page being rendered afterwards.
+export const SIGN_IN_AGAIN_HEADER = 'x-console-sign-in-again';
 
 export function sessionCookieName(secure: boolean): string {
   return secure ? SECURE_SESSION_COOKIE : SESSION_COOKIE;

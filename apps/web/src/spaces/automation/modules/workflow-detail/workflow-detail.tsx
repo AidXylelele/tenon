@@ -17,6 +17,7 @@ import {
 } from '@/libs/ui/components/alert';
 import { Badge } from '@/libs/ui/components/badge';
 import { Button } from '@/libs/ui/components/button';
+import { ConfirmAction } from '@/libs/ui/composites/confirm-action';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
@@ -31,7 +32,7 @@ import {
 import { InstanceTable } from '../../__shared_context/instance-table';
 import { versionHref, workflowHref } from '../../__shared_context/links';
 import { isUnended } from '../../__shared_context/vocabulary';
-import { ArchiveButton } from './archive-button';
+import { archiveAction } from './actions';
 import { OnOffSwitch } from './on-off-switch';
 import { StartDialog } from './start-dialog';
 
@@ -90,7 +91,15 @@ export async function WorkflowDetail({
         actions={
           author && current !== null ? (
             <>
-              <ArchiveButton namespace={namespace} name={name} />
+              <ConfirmAction
+                icon={<ArchiveIcon data-icon="inline-start" />}
+                label="Archive"
+                title={`Archive ${name}?`}
+                description="It is turned off, takes no new version and starts no run. Its versions and past runs stay readable. Archiving cannot be undone."
+                actionLabel="Archive"
+                action={archiveAction.bind(null, namespace, name)}
+                success={`${name} archived`}
+              />
               <Button variant="outline" asChild>
                 <Link href={`${base}/edit`}>
                   <PencilIcon data-icon="inline-start" />

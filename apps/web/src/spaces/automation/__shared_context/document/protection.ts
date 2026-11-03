@@ -1,5 +1,8 @@
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
-import { isObject } from './json';
+import {
+  isObject,
+  type JsonObject,
+  type JsonValue,
+} from '@/libs/document-text/json';
 import {
   entriesAt,
   entryAt,

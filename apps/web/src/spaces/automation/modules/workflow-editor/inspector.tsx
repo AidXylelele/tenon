@@ -8,7 +8,7 @@ import {
   Trash2Icon,
 } from 'lucide-react';
 import { useState } from 'react';
-import type { JsonObject } from '@/libs/data-access/types';
+import { isObject, type JsonObject } from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import {
   DropdownMenu,
@@ -31,7 +31,6 @@ import {
   TabsTrigger,
 } from '@/libs/ui/components/tabs';
 import { Textarea } from '@/libs/ui/components/textarea';
-import { isObject } from '../../__shared_context/document/json';
 import { infoOf } from '../../__shared_context/document/kinds';
 import type { LocatedProblem } from '../../__shared_context/document/problems';
 import {

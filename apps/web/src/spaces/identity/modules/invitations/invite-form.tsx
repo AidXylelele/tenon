@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { IDLE } from '@/libs/forms/form-state';
 import { Field, FieldLabel } from '@/libs/ui/components/field';
 import { Input } from '@/libs/ui/components/input';
 import {
@@ -13,7 +14,6 @@ import {
 } from '@/libs/ui/components/select';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
-import { IDLE } from '../../__shared_context/form-state';
 import { inviteAction } from './actions';
 
 export function InviteForm() {

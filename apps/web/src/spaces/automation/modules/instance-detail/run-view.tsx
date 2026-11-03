@@ -6,9 +6,9 @@ import { useMemo, useState, useTransition } from 'react';
 import type {
   CloudEvent,
   Instance,
-  JsonObject,
   TaskRecord,
 } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import { Spinner } from '@/libs/ui/components/spinner';
 import {

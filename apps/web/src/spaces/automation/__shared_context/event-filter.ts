@@ -1,8 +1,5 @@
-import type {
-  EventFilter,
-  JsonObject,
-  JsonValue,
-} from '@/libs/data-access/types';
+import type { EventFilter } from '@/libs/data-access/types';
+import type { JsonValue } from '@/libs/document-text/json';
 
 // A subscription's filter in plain words: "type is com.example.order.paid, source /shop".
 export function describeFilter(filter: EventFilter): string {
@@ -16,8 +13,4 @@ function describeValue(value: JsonValue): string {
     return value.startsWith('${') ? `where ${value}` : `is ${value}`;
 
   return `contains ${JSON.stringify(value)}`;
-}
-
-export function isFilterObject(value: JsonValue): value is JsonObject {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

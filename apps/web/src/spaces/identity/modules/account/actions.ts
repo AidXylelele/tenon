@@ -1,7 +1,7 @@
 'use server';
 
 import { changePassword } from '@/libs/data-access/identity';
-import { field, type FormState } from '../../__shared_context/form-state';
+import { field, type FormState } from '@/libs/forms/form-state';
 
 export async function changePasswordAction(
   _previous: FormState,

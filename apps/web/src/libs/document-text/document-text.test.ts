@@ -44,6 +44,32 @@ describe('a document as text', () => {
     expect(range && YAML_TEXT.slice(range.from, range.to)).toContain('with:');
   });
 
+  it('aliases_expand_up_to_a_bound_and_past_it_are_refused', () => {
+    const many = Array.from({ length: 101 }, () => '*a').join(', ');
+    const text = `a: &a x\nb: [${many}]\n`;
+
+    const few = parseText('a: &a x\nb: [*a, *a]\n');
+    const parsed = parseText(text);
+
+    expect(few).toEqual({ ok: true, value: { a: 'x', b: ['x', 'x'] } });
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('writes_yaml_without_folding_long_lines', () => {
+    const endpoint = `https://crm.example.com/${'a'.repeat(120)}`;
+    const value = { endpoint };
+
+    expect(stringifyText(value, 'yaml')).toBe(`endpoint: ${endpoint}\n`);
+  });
+
+  it('writes_json_indented_with_a_final_newline', () => {
+    expect(stringifyText({ a: 1 }, 'json')).toBe('{\n  "a": 1\n}\n');
+  });
+
+  it('a_pointer_into_text_without_a_document_has_no_range', () => {
+    expect(rangeOf('', '/do')).toBeNull();
+  });
+
   it('tells_json_from_yaml', () => {
     expect(formatOf('  {"a": 1}')).toBe('json');
     expect(formatOf('a: 1')).toBe('yaml');

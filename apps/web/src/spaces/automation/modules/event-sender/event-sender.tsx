@@ -5,7 +5,8 @@ import { Link } from '@/libs/routing/link';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import type { Problem } from '@/libs/data-access/problem';
-import type { CloudEvent, JsonValue } from '@/libs/data-access/types';
+import type { CloudEvent } from '@/libs/data-access/types';
+import type { JsonValue } from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import {
   Card,

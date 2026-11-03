@@ -1,7 +1,8 @@
 'use client';
 
 import { CircleAlertIcon, CrosshairIcon, PencilIcon } from 'lucide-react';
-import type { Instance, JsonObject } from '@/libs/data-access/types';
+import type { Instance } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import { Link } from '@/libs/routing/link';
 import { isWithin } from '@/libs/document-text/json-pointer';

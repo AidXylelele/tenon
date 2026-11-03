@@ -6,7 +6,7 @@ import {
   workflow,
 } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import {
   Empty,
   EmptyDescription,

@@ -2,14 +2,17 @@
 
 import { CodeEditor } from '@/libs/code-editor/code-editor';
 import { scriptLanguageName } from '../../../__shared_context/document/summary';
-import type { JsonObject } from '@/libs/data-access/types';
+import {
+  isObject,
+  type JsonObject,
+  withMember,
+} from '@/libs/document-text/json';
 import {
   Field,
   FieldDescription,
   FieldLabel,
 } from '@/libs/ui/components/field';
 import { Switch } from '@/libs/ui/components/switch';
-import { isObject, withMember } from '../../../__shared_context/document/json';
 import { uriOf } from '../../../__shared_context/document/summary';
 import { useEditing, useFieldProblem } from '../editing-context';
 import { ChoiceField, JsonField, PairsField, TextField } from './fields';

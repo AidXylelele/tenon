@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { type Outcome, problemOf, unreachable } from './problem';
 import {
   issuedSession,
-  REQUEST_URL_HEADER,
+  SIGN_IN_AGAIN_HEADER,
   sessionCookieName,
 } from './session-cookie';
 
@@ -39,8 +39,8 @@ export class ApiError extends Error {
   }
 }
 
-// One request to the API with the session forwarded. A 401 on a signed-in call ends at the
-// sign-in page, which returns to the page being rendered.
+// One request to the API with the session forwarded. A 401 on a signed-in call ends where the
+// app said a person signs in again, which returns to the page being rendered.
 export async function send(
   path: string,
   options: RequestOptions = {},
@@ -207,9 +207,14 @@ async function bodyOfResponse(response: Response): Promise<unknown> {
   }
 }
 
+// Sends the person to sign in again at the address `proxy.ts` gave this request. A request the
+// proxy did not see (a prefetch) has none, and fails as unauthorized.
 async function signInAgain(): Promise<never> {
   const requestHeaders = await headers();
-  const back = requestHeaders.get(REQUEST_URL_HEADER) ?? '/';
-  const next = encodeURIComponent(back);
-  redirect(`/sign-in?reason=ended&next=${next}`);
+  const address = requestHeaders.get(SIGN_IN_AGAIN_HEADER);
+
+  if (address === null)
+    throw new ApiError(401, 'The session has ended; sign in again');
+
+  redirect(address);
 }

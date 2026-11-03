@@ -17,9 +17,9 @@ import {
 import { cn } from 'cn';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrefersDark } from '@/libs/ui/hooks/use-prefers-dark';
-import type { JsonObject, Phase } from '@/libs/data-access/types';
+import type { Phase } from '@/libs/data-access/types';
+import { isObject, type JsonObject } from '@/libs/document-text/json';
 import { Spinner } from '@/libs/ui/components/spinner';
-import { isObject } from '../document/json';
 import { describeTrigger, triggerOf } from '../document/trigger';
 import type { TaskProgress } from '../outline/progress';
 import { CanvasProvider, type CanvasState } from './canvas-context';

@@ -1,6 +1,6 @@
 'use client';
 
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import {
   Field,
   FieldDescription,

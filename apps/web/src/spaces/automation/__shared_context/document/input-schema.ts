@@ -1,5 +1,8 @@
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
-import { isObject } from './json';
+import {
+  isObject,
+  type JsonObject,
+  type JsonValue,
+} from '@/libs/document-text/json';
 
 // The fields of a workflow's input when its schema is a flat object of plain values, so a
 // start can offer a form; any other schema is given as JSON (spec, Assumptions).

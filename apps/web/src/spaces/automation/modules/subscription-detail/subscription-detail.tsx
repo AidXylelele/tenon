@@ -1,3 +1,4 @@
+import { Trash2Icon } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { subscription as subscriptionOf } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
@@ -18,18 +19,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/libs/ui/components/table';
+import { ConfirmAction } from '@/libs/ui/composites/confirm-action';
 import { JsonBlock } from '@/libs/ui/composites/json-block';
 import { PageHeader } from '@/libs/ui/composites/page-header';
+import { Status } from '@/libs/ui/composites/status';
 import { Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
 import { AuthorsOnly } from '../../__shared_context/authors-only';
-import { DeleteButton } from '../../__shared_context/delete-button';
 import { describeFilter } from '../../__shared_context/event-filter';
-import {
-  deliveryLabel,
-  deliveryTone,
-  Status,
-} from '../../__shared_context/vocabulary';
+import { deliveryLabel, deliveryTone } from '../../__shared_context/vocabulary';
 import { deleteSubscriptionAction } from './actions';
 
 // A subscription and its 50 most recent deliveries, live while any is being retried (spec
@@ -62,10 +60,15 @@ export async function SubscriptionDetail({ id }: { readonly id: string }) {
         title={subscription.name}
         description={`Takes events where ${describeFilter(subscription.filter)}.`}
         actions={
-          <DeleteButton
-            what={subscription.name}
-            consequence="Nothing more is delivered to it, and its pending retries stop."
-            onDelete={deleteSubscriptionAction.bind(null, subscription.id)}
+          <ConfirmAction
+            icon={<Trash2Icon />}
+            label={`Delete ${subscription.name}`}
+            size="icon-sm"
+            title={`Delete ${subscription.name}?`}
+            description="Nothing more is delivered to it, and its pending retries stop."
+            actionLabel="Delete"
+            action={deleteSubscriptionAction.bind(null, subscription.id)}
+            success={`${subscription.name} deleted`}
           />
         }
       />

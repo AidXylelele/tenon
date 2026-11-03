@@ -1,6 +1,11 @@
 import { pointerOf, tokensOf } from '@/libs/document-text/json-pointer';
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
-import { isObject, valueAt, withValue } from './json';
+import {
+  isObject,
+  type JsonObject,
+  type JsonValue,
+  valueAt,
+  withValue,
+} from '@/libs/document-text/json';
 
 // The task lists of a draft: what kind each task is, which lists it holds, and the edits a
 // builder makes to them. A task list is the DSL's `[{ name: task }, …]`.

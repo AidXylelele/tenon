@@ -10,8 +10,6 @@ import type {
   Instance,
   InstanceFilter,
   InstanceSummary,
-  JsonObject,
-  JsonValue,
   Page,
   Read,
   Secret,
@@ -23,6 +21,7 @@ import type {
   Workflow,
   WorkflowStatus,
 } from './types';
+import type { JsonObject, JsonValue } from '@/libs/document-text/json';
 
 // The automation routes of feature 002, one function per route.
 
@@ -249,13 +248,4 @@ export async function conformance(): Promise<ConformanceStatement> {
 
 function stamped<T extends object>(value: T): Read<T> {
   return { ...value, readAt: Date.now() };
-}
-
-// The runs started in the last `hours`, newest first, up to 200; `phase` narrows them.
-export function recentInstances(
-  hours: number,
-  phase?: InstanceFilter['phase'],
-): Promise<Read<Page<InstanceSummary>>> {
-  const startedFrom = new Date(Date.now() - hours * 3_600_000).toISOString();
-  return instances({ startedFrom, phase, limit: 200 });
 }

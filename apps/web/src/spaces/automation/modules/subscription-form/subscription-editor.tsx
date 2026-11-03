@@ -6,12 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import { codeOf, type Problem } from '@/libs/data-access/problem';
-import type {
-  DeliveryScheme,
-  Endpoint,
-  JsonObject,
-  JsonValue,
-} from '@/libs/data-access/types';
+import type { DeliveryScheme, Endpoint } from '@/libs/data-access/types';
+import type { JsonObject, JsonValue } from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import {
   Card,

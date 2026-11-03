@@ -1,6 +1,6 @@
 'use client';
 
-import type { JsonObject } from '@/libs/data-access/types';
+import { type JsonObject, withMember } from '@/libs/document-text/json';
 import {
   Card,
   CardContent,
@@ -9,7 +9,6 @@ import {
   CardTitle,
 } from '@/libs/ui/components/card';
 import { headerOf } from '../../__shared_context/document/draft';
-import { withMember } from '../../__shared_context/document/json';
 import { TextField } from './forms/fields';
 
 interface HeaderCardProps {

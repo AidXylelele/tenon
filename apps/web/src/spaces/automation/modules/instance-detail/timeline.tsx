@@ -1,10 +1,10 @@
 import { ChevronRightIcon } from 'lucide-react';
 import type { TaskRecord } from '@/libs/data-access/types';
 import { JsonBlock } from '@/libs/ui/composites/json-block';
+import { Status } from '@/libs/ui/composites/status';
 import { Countdown, Duration, Time } from '@/libs/ui/composites/time';
 import { attemptsOf } from '../../__shared_context/outline/progress';
 import {
-  Status,
   taskStatusLabel,
   taskStatusTone,
 } from '../../__shared_context/vocabulary';

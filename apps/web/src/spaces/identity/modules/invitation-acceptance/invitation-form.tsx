@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { IDLE } from '@/libs/forms/form-state';
 import {
   Field,
   FieldDescription,
@@ -10,11 +11,7 @@ import {
 import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
-import {
-  IDLE,
-  PASSWORD_MAX,
-  PASSWORD_MIN,
-} from '../../__shared_context/form-state';
+import { PASSWORD_MAX, PASSWORD_MIN } from '../../__shared_context/password';
 import { acceptInvitationAction } from './actions';
 
 export function InvitationForm({

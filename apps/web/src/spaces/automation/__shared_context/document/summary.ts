@@ -1,5 +1,4 @@
-import type { JsonValue } from '@/libs/data-access/types';
-import { isObject } from './json';
+import { isObject, type JsonValue } from '@/libs/document-text/json';
 import { durationOf, durationText } from './trigger';
 import type { TaskEntry } from './tasks';
 

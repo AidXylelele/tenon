@@ -1,5 +1,4 @@
-import type { JsonObject } from '@/libs/data-access/types';
-import { isObject } from '../document/json';
+import { isObject, type JsonObject } from '@/libs/document-text/json';
 import {
   type Protection,
   protectionOf,

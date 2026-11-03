@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import { inputFieldsOf, inputFrom } from './input-schema';
 
 const withSchema = (document: JsonObject): JsonObject => ({

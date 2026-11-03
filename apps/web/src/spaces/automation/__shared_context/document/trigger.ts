@@ -1,5 +1,8 @@
-import type { JsonObject, JsonValue } from '@/libs/data-access/types';
-import { isObject } from './json';
+import {
+  isObject,
+  type JsonObject,
+  type JsonValue,
+} from '@/libs/document-text/json';
 
 // What starts a workflow, read from and written to its `schedule` (DSL 1.0.3). Anything the
 // forms do not cover stays as `custom` and is kept untouched.

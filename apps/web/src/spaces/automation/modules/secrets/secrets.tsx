@@ -1,4 +1,4 @@
-import { KeyRoundIcon } from 'lucide-react';
+import { KeyRoundIcon, Trash2Icon } from 'lucide-react';
 import { secrets } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
 import {
@@ -16,11 +16,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/libs/ui/components/table';
+import { ConfirmAction } from '@/libs/ui/composites/confirm-action';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
 import { AuthorsOnly } from '../../__shared_context/authors-only';
-import { DeleteButton } from '../../__shared_context/delete-button';
 import { deleteSecretAction } from './actions';
 import { SecretValueDialog } from './secret-value-dialog';
 
@@ -80,10 +80,15 @@ export async function Secrets() {
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <SecretValueDialog name={secret.name} />
-                      <DeleteButton
-                        what={secret.name}
-                        consequence="Runs that need it fail with an authorization error until a secret of this name exists again."
-                        onDelete={deleteSecretAction.bind(null, secret.name)}
+                      <ConfirmAction
+                        icon={<Trash2Icon />}
+                        label={`Delete ${secret.name}`}
+                        size="icon-sm"
+                        title={`Delete ${secret.name}?`}
+                        description="Runs that need it fail with an authorization error until a secret of this name exists again."
+                        actionLabel="Delete"
+                        action={deleteSecretAction.bind(null, secret.name)}
+                        success={`${secret.name} deleted`}
                       />
                     </div>
                   </TableCell>

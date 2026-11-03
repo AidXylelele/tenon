@@ -1,4 +1,4 @@
-import { WebhookIcon } from 'lucide-react';
+import { Trash2Icon, WebhookIcon } from 'lucide-react';
 import { webhooks } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
 import {
@@ -16,11 +16,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/libs/ui/components/table';
+import { ConfirmAction } from '@/libs/ui/composites/confirm-action';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
 import { AuthorsOnly } from '../../__shared_context/authors-only';
-import { DeleteButton } from '../../__shared_context/delete-button';
 import { deleteWebhookAction } from './actions';
 import { CreateWebhook } from './create-webhook';
 
@@ -77,10 +77,15 @@ export async function Webhooks() {
                     <Time value={webhook.createdAt} />
                   </TableCell>
                   <TableCell>
-                    <DeleteButton
-                      what={webhook.name}
-                      consequence="Its URL stops working at once; calls to it are refused as unknown."
-                      onDelete={deleteWebhookAction.bind(null, webhook.id)}
+                    <ConfirmAction
+                      icon={<Trash2Icon />}
+                      label={`Delete ${webhook.name}`}
+                      size="icon-sm"
+                      title={`Delete ${webhook.name}?`}
+                      description="Its URL stops working at once; calls to it are refused as unknown."
+                      actionLabel="Delete"
+                      action={deleteWebhookAction.bind(null, webhook.id)}
+                      success={`${webhook.name} deleted`}
                     />
                   </TableCell>
                 </TableRow>

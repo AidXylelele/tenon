@@ -370,6 +370,14 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
   - Vitest coverage thresholds are set per tier.
   - The dependency graph is checked in CI with no allowed exceptions. The tool, `dependency-cruiser` or an ESLint rule, is the owner's choice: the 2026-10-28 decision kept lint to strict TypeScript.
 
+### Made in T120
+
+- **JSON types.** `JsonValue` and `JsonObject` moved with the JSON reads and writes into `document-text`, so the two libs that need them no longer form a cycle.
+- **Sign-in address.** `proxy.ts`, which already sends a visitor without a session to sign in, gives each request the address for signing in again (`x-console-sign-in-again`). On a 401, `data-access` redirects there.
+  - Next's `unauthorized()` was not used: it is marked experimental (`authInterrupts`) in 16.4.
+  - A request the proxy does not see (a prefetch) fails as unauthorized.
+- **Confirm-then-act.** The webhook, secret, notification and archive buttons use the `ui` composite `ConfirmAction`. The run controls confirm before a navigation and keep their own dialog.
+
 ### Order
 
 Bottom up, one slice per tier: libs, then operations, then features, then spaces, then entries, then governance. In each slice, modules change in place: suites, a browser check of every route, and the critic round run before its commit.

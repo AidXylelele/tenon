@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { JsonObject } from '@/libs/data-access/types';
+import type { JsonObject } from '@/libs/document-text/json';
 import {
   allEntries,
   entriesAt,

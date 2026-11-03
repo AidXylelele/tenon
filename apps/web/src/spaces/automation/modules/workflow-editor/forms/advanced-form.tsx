@@ -9,7 +9,7 @@ import {
   FieldLabel,
 } from '@/libs/ui/components/field';
 import { parseText, stringifyText } from '@/libs/document-text/document-text';
-import { isObject } from '../../../__shared_context/document/json';
+import { isObject } from '@/libs/document-text/json';
 import { useFieldProblem } from '../editing-context';
 import type { TaskFormProps } from './task-form';
 
