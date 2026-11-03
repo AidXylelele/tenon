@@ -100,7 +100,8 @@ apps/web/src/
     ├── ui/                          design system: shadcn components + composites (page header, submit button, JSON block, copy, time)
     ├── data-access/                 the only API client (server-only): session cookie, problems, typed resources
     ├── live/                        route refresh while in flight, with its status
-    └── document-text/               YAML and JSON text: parse with positions, stringify, JSON Pointer → range
+    ├── document-text/               YAML and JSON text: parse with positions, stringify, JSON Pointer → range
+    └── routing/                     route segments (a malformed escape is a 404) and search parameters
 ```
 
 **Structure decision**: Two bounded contexts of the API give two spaces, `identity` (001) and `automation` (002). The frames that every page shares are the `shell` space. Code that one space needs stays in its `__shared_context`; no feature or operation is created until a second space needs it (R2).

@@ -26,8 +26,8 @@ export function EmitForm(props: TaskFormProps) {
         mono
         value={edit.text('/emit/event/with/source')}
         onChange={(source) => edit.set('/emit/event/with/source', source)}
-        placeholder="/workflows/sales"
-        description="Who sends it, as a URI."
+        placeholder="https://shop.example.com"
+        description="Who sends it, as a URI with a scheme, such as https://shop.example.com."
       />
       <TextField
         id="emit-subject"

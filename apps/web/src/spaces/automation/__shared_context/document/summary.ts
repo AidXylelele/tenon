@@ -41,12 +41,12 @@ export function summaryOf(entry: TaskEntry): string {
           : 0;
       const how =
         isObject(task.fork) && task.fork.compete === true ? ', first wins' : '';
-      return `${branches} branches side by side${how}`;
+      return `${countOf(branches, 'branch', 'branches')} side by side${how}`;
     }
     case 'try':
       return 'Try, and handle failures';
     case 'do':
-      return Array.isArray(task.do) ? `${task.do.length} steps` : 'Steps';
+      return Array.isArray(task.do) ? countOf(task.do.length, 'step') : 'Steps';
     case 'run-workflow': {
       const namespace = textAt(task.run, ['workflow', 'namespace']) ?? '';
       const name = textAt(task.run, ['workflow', 'name']) ?? '';
@@ -88,4 +88,8 @@ function textAt(
   }
 
   return typeof node === 'string' ? node : null;
+}
+
+function countOf(count: number, one: string, many = `${one}s`): string {
+  return `${count} ${count === 1 ? one : many}`;
 }

@@ -53,4 +53,4 @@
 
 ## Polish
 
-- [ ] T090 Lint, types, unit and component suites green; the quickstart journeys on the running stack; README of `apps/web`
+- [x] T090 Lint, types, unit and component suites green; the quickstart journeys on the running stack; README of `apps/web`

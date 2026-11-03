@@ -97,7 +97,10 @@ export const KINDS: readonly KindInfo[] = [
       ({
         emit: {
           event: {
-            with: { source: '/workflows', type: 'com.example.happened' },
+            with: {
+              source: 'https://workflows.example.com',
+              type: 'com.example.happened',
+            },
           },
         },
       }) satisfies Specification.EmitTask,
