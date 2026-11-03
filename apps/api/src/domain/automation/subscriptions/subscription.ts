@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import type { Result } from '../../result.js';
+import { SubscriptionRefusal } from './enums.js';
 import type {
   DeliveryEndpoint,
   NewSubscription,
@@ -26,9 +28,17 @@ export class Subscription {
     this.#createdAt = props.createdAt;
   }
 
-  static create(input: NewSubscription): Subscription {
+  // Deliveries authenticate only with a secret their owner keeps (US6 AS2).
+  static create(
+    input: NewSubscription,
+  ): Result<Subscription, SubscriptionRefusal> {
+    const secret = input.endpoint.secret;
+
+    if (secret !== null && !input.ownedSecrets.includes(secret))
+      return { ok: false, failure: SubscriptionRefusal.ForeignSecret };
+
     const id = randomUUID();
-    return new Subscription({
+    const subscription = new Subscription({
       id,
       ownerId: input.ownerId,
       name: input.name,
@@ -37,6 +47,11 @@ export class Subscription {
       types: input.types,
       createdAt: input.now,
     });
+    return { ok: true, value: subscription };
+  }
+
+  isOwnedBy(ownerId: string): boolean {
+    return this.#ownerId === ownerId;
   }
 
   get id(): string {

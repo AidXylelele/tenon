@@ -7,6 +7,7 @@ export type CloudEvent = JsonObject;
 
 export interface AcceptedEvent {
   readonly sequence: number;
+  readonly type: string;
   readonly cloudEvent: CloudEvent;
   readonly origin: EventOrigin;
   readonly instanceId: string | null;

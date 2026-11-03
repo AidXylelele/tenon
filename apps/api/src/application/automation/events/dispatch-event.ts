@@ -20,8 +20,7 @@ export class DispatchEvent {
 
     if (event === null) return;
 
-    const type = event.cloudEvent.type as string;
-    const listening = await this.listeners.ofType(type, event.acceptedAt);
+    const listening = await this.listeners.ofType(event.type, event.acceptedAt);
 
     for (const listener of listening)
       await this.deliveries.deliver(listener, event);

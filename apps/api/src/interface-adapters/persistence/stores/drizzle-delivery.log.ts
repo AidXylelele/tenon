@@ -11,8 +11,8 @@ import type { Subscription } from '../../../domain/automation/subscriptions/subs
 import type { DrizzleTx } from '../interfaces.js';
 import { delivery as deliveries } from '../schema/index.js';
 
-// One row per delivery: pending when scheduled, counting its attempts, delivered or failed at
-// its end. A delivered one stays delivered whatever a late attempt reports.
+// One row per delivery, as the use cases report it. A delivered one stays as it is: the
+// condition only fences an attempt that ran meanwhile.
 @Injectable()
 export class DrizzleDeliveryLog implements DeliveryLog {
   constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
@@ -20,28 +20,46 @@ export class DrizzleDeliveryLog implements DeliveryLog {
   async pending(
     subscription: Subscription,
     event: AcceptedEvent,
+    at: Date,
   ): Promise<void> {
-    const createdAt = new Date();
     await this.txHost.tx
       .insert(deliveries)
       .values({
         subscriptionId: subscription.id,
         sequence: event.sequence,
         eventId: event.cloudEvent.id as string,
-        type: event.cloudEvent.type as string,
+        type: event.type,
         status: DeliveryStatus.Pending,
-        createdAt,
+        createdAt: at,
       })
       .onConflictDoNothing();
   }
 
-  async attempted(
+  async delivered(command: DeliveryCommand, at: Date): Promise<void> {
+    await this.#attempted(command, DeliveryStatus.Delivered, null, at);
+  }
+
+  async refused(
     command: DeliveryCommand,
+    error: string,
+    at: Date,
+  ): Promise<void> {
+    await this.#attempted(command, DeliveryStatus.Pending, error, at);
+  }
+
+  async failed(command: DeliveryCommand, at: Date): Promise<void> {
+    await this.txHost.tx
+      .update(deliveries)
+      .set({ status: DeliveryStatus.Failed, lastAttemptAt: at })
+      .where(this.#open(command));
+  }
+
+  async #attempted(
+    command: DeliveryCommand,
+    status: DeliveryStatus,
     error: string | null,
     at: Date,
   ): Promise<void> {
-    const status =
-      error === null ? DeliveryStatus.Delivered : DeliveryStatus.Pending;
     await this.txHost.tx
       .update(deliveries)
       .set({
@@ -51,24 +69,14 @@ export class DrizzleDeliveryLog implements DeliveryLog {
         firstAttemptAt: sql`coalesce(${deliveries.firstAttemptAt}, ${at})`,
         lastAttemptAt: at,
       })
-      .where(
-        and(this.#of(command), ne(deliveries.status, DeliveryStatus.Delivered)),
-      );
+      .where(this.#open(command));
   }
 
-  async failed(command: DeliveryCommand, at: Date): Promise<void> {
-    await this.txHost.tx
-      .update(deliveries)
-      .set({ status: DeliveryStatus.Failed, lastAttemptAt: at })
-      .where(
-        and(this.#of(command), ne(deliveries.status, DeliveryStatus.Delivered)),
-      );
-  }
-
-  #of(command: DeliveryCommand) {
+  #open(command: DeliveryCommand) {
     return and(
       eq(deliveries.subscriptionId, command.subscriptionId),
       eq(deliveries.sequence, command.sequence),
+      ne(deliveries.status, DeliveryStatus.Delivered),
     );
   }
 }

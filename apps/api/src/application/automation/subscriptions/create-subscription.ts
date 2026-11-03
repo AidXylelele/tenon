@@ -10,7 +10,7 @@ import {
   SubscriptionRepository,
 } from './ports.js';
 
-// A subscription whose filter compiles, authenticating with a secret its owner keeps.
+// A subscription whose filter compiles; the subscription decides which secret it may use.
 @Injectable()
 export class CreateSubscription {
   constructor(
@@ -29,30 +29,21 @@ export class CreateSubscription {
 
     if (problem !== null) return { ok: false, failure: problem };
 
-    const secret = command.endpoint.secret;
-
-    if (secret !== null) {
-      const owned = await this.secrets.namesOf(command.ownerId);
-
-      if (!owned.includes(secret))
-        return {
-          ok: false,
-          failure: {
-            pointer: '/endpoint/authentication/secret',
-            detail: `'${secret}' is not one of your secrets`,
-          },
-        };
-    }
-
+    const owned = await this.secrets.namesOf(command.ownerId);
     const types = this.filters.typesOf(command.filter);
-    const subscription = Subscription.create({
+    const created = Subscription.create({
       ownerId: command.ownerId,
       name: command.name,
       endpoint: command.endpoint,
       filter: command.filter,
       types,
+      ownedSecrets: owned,
       now,
     });
+
+    if (!created.ok) return created;
+
+    const subscription = created.value;
     await this.subscriptions.add(subscription);
     return { ok: true, value: subscription };
   }

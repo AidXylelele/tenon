@@ -28,6 +28,7 @@ import { SubscriptionPolicy } from '../../../application/automation/subscription
 import type { User } from '../../../domain/identity/user.js';
 import { ProblemFilter } from '../filters/problem.filter.js';
 import { ProblemPresenter } from '../presenters/problem.presenter.js';
+import { SubscriptionEndpointMapper } from '../mappers/subscription-endpoint.mapper.js';
 import { SubscriptionPresenter } from '../presenters/subscription.presenter.js';
 import {
   CreateSubscriptionBody,
@@ -65,7 +66,7 @@ export class SubscriptionsController {
     @Body({ schema: CreateSubscriptionBody }) body: CreateSubscriptionBody,
     @CurrentUser() user: User,
   ): Promise<SubscriptionResponse> {
-    const endpoint = SubscriptionPresenter.endpointOf(body.endpoint);
+    const endpoint = SubscriptionEndpointMapper.toEndpoint(body.endpoint);
     const created = await this.createSubscription.execute({
       ownerId: user.id,
       name: body.name,
@@ -73,8 +74,7 @@ export class SubscriptionsController {
       filter: body.filter,
     });
 
-    if (!created.ok)
-      throw ProblemPresenter.invalidSubscription(created.failure);
+    if (!created.ok) throw ProblemPresenter.ofSubscription(created.failure);
 
     return SubscriptionPresenter.subscription(created.value);
   }

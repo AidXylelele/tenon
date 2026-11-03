@@ -51,6 +51,7 @@ describe('a delivery and the outbound address policy', () => {
     const error = await client.post(
       `http://localhost:${String(port)}/events`,
       null,
+      null,
       event,
     );
 
@@ -65,6 +66,7 @@ describe('a delivery and the outbound address policy', () => {
 
     const error = await client.post(
       `http://127.0.0.1:${String(port)}/events`,
+      null,
       null,
       event,
     );

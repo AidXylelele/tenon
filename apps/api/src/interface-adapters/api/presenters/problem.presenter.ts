@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { Missing } from '../../../application/automation/enums.js';
 import type { DefinitionProblem } from '../../../application/automation/workflows/ports.js';
+import { SubscriptionRefusal } from '../../../domain/automation/subscriptions/enums.js';
 import { SecretRefusal } from '../../../domain/automation/secrets/enums.js';
 import { InstanceRefusal } from '../../../domain/automation/instances/enums.js';
 import { WorkflowRefusal } from '../../../domain/automation/workflows/enums.js';
@@ -11,6 +12,7 @@ export type AutomationFailure =
   | WorkflowRefusal
   | InstanceRefusal
   | SecretRefusal
+  | SubscriptionRefusal
   | Missing;
 
 interface Described {
@@ -24,6 +26,7 @@ export class ProblemPresenter {
   private static readonly TYPE = 'urn:problem:';
   private static readonly INVALID = 'definition.invalid';
   private static readonly SUBSCRIPTION_INVALID = 'subscription.invalid';
+  private static readonly FILTER = '/filter';
 
   private static readonly DESCRIBED = new Map<string, Described>([
     [
@@ -91,6 +94,13 @@ export class ProblemPresenter {
       { status: HttpStatus.NOT_FOUND, title: 'The secret does not exist' },
     ],
     [
+      SubscriptionRefusal.ForeignSecret,
+      {
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        title: 'The secret is not one of yours',
+      },
+    ],
+    [
       Missing.Subscription,
       {
         status: HttpStatus.NOT_FOUND,
@@ -120,10 +130,17 @@ export class ProblemPresenter {
     });
   }
 
-  // A subscription refused at its first problem, located in the request.
-  static invalidSubscription(problem: DefinitionProblem): ProblemException {
+  // A subscription refused: its filter at the first problem, located in the request's
+  // `filter`, or a refusal the subscription named.
+  static ofSubscription(
+    failure: DefinitionProblem | SubscriptionRefusal,
+  ): ProblemException {
+    if (typeof failure !== 'object') return ProblemPresenter.of(failure);
+
+    const pointer = `${ProblemPresenter.FILTER}${failure.pointer}`;
+    const located = { pointer, detail: failure.detail };
     return ProblemPresenter.#located(
-      problem,
+      located,
       ProblemPresenter.SUBSCRIPTION_INVALID,
       'The subscription is invalid',
     );

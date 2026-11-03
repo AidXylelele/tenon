@@ -36,20 +36,29 @@ export class DeliverEvent {
     if (event === null) return { ok: true, value: false };
 
     const endpoint = subscription.endpoint;
-    const secret = endpoint.secret;
-    const credential = await this.secrets.valueOf(subscription.ownerId, secret);
+    let credential: string | null = null;
 
-    if (secret !== null && credential === null) {
-      const missing = `The secret '${secret}' is not available`;
-      await this.log.attempted(command, missing, now);
-      return { ok: false, failure: missing };
+    if (endpoint.secret !== null) {
+      credential = await this.secrets.valueOf(
+        subscription.ownerId,
+        endpoint.secret,
+      );
+
+      if (credential === null) {
+        const missing = `The secret '${endpoint.secret}' is not available`;
+        await this.log.refused(command, missing, now);
+        return { ok: false, failure: missing };
+      }
     }
 
     const error = await this.sender.send(endpoint, credential, event);
-    await this.log.attempted(command, error, now);
 
-    if (error !== null) return { ok: false, failure: error };
+    if (error !== null) {
+      await this.log.refused(command, error, now);
+      return { ok: false, failure: error };
+    }
 
+    await this.log.delivered(command, now);
     return { ok: true, value: true };
   }
 }

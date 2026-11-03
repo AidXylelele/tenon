@@ -1,10 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { OnOutboxMessage } from '@nestjs/outbox';
-import {
-  type AcceptedEventMessage,
-  EventDispatchController,
-} from '../../interface-adapters/messaging/event-dispatch.controller.js';
+import { EventDispatchController } from '../../interface-adapters/messaging/event-dispatch.controller.js';
 import { DrizzleEventStore } from '../../interface-adapters/persistence/stores/drizzle-event.store.js';
+import type { AcceptedEventMessage } from '../../interface-adapters/messaging/interfaces.js';
 import { OutboxErrors } from './outbox-errors.js';
 
 @Injectable()

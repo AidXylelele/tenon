@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { StartOnEvent } from '../../application/automation/schedules/start-on-event.js';
 import { SyncSchedule } from '../../application/automation/schedules/sync-schedule.js';
-import type { AcceptedEventMessage } from './event-dispatch.controller.js';
-
-export interface ScheduleChangedMessage {
-  readonly workflowId: string;
-}
+import type {
+  AcceptedEventMessage,
+  ScheduleChangedMessage,
+} from './interfaces.js';
 
 @Injectable()
 export class ScheduleController {

@@ -1,17 +1,26 @@
 import type { JsonObject } from '../../domain/automation/json.js';
 
-// The header a delivery authenticates with, or none.
-export interface DeliveryAuthorization {
-  readonly scheme: 'Basic' | 'Bearer';
-  readonly parameter: string;
+// What an accepted event's outbox message carries.
+export interface AcceptedEventMessage {
+  readonly sequence: number;
 }
 
-// Posts an event in CloudEvents' HTTP structured mode; null when a 2xx answered, why not
-// otherwise. The address policy refuses private destinations (FR-022).
+// What a changed schedule's outbox message carries.
+export interface ScheduleChangedMessage {
+  readonly workflowId: string;
+}
+
+export type DeliveryScheme = 'basic' | 'bearer';
+
+// Posts an event in CloudEvents' HTTP structured mode, authenticated with a secret's value (a
+// basic one holds `username` and `password`, a bearer one the token or `token`); null when a
+// 2xx answered, why not otherwise, never repeating the credential. The address policy refuses
+// private destinations (FR-022).
 export abstract class DeliveryClient {
   abstract post(
     uri: string,
-    authorization: DeliveryAuthorization | null,
+    scheme: DeliveryScheme | null,
+    credential: string | null,
     event: JsonObject,
   ): Promise<string | null>;
 }

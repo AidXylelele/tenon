@@ -39,9 +39,7 @@ export class DrizzleSecretQueries implements SecretQueries {
     return rows.map((row) => row.name);
   }
 
-  async valueOf(ownerId: string, name: string | null): Promise<string | null> {
-    if (name === null) return null;
-
+  async valueOf(ownerId: string, name: string): Promise<string | null> {
     const [row] = await this.txHost.tx
       .select({ sealed: secrets.sealed })
       .from(secrets)

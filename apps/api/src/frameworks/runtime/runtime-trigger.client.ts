@@ -6,7 +6,7 @@ import type { EventFilters } from './execution/events/event-filters.js';
 
 // `schedule.on`: an event satisfies `one` by its filter and `any` by one of its filters, as a
 // `listen` matches them; publish refuses `all` and `until`, which would keep state between events.
-export class ScheduleTriggers implements TriggerClient {
+export class RuntimeTriggerClient implements TriggerClient {
   static readonly #AT = JsonPointer.ROOT.child('schedule').child('on');
 
   constructor(private readonly filters: EventFilters) {}
@@ -23,7 +23,7 @@ export class ScheduleTriggers implements TriggerClient {
         filter,
         event,
         correlation,
-        ScheduleTriggers.#AT,
+        RuntimeTriggerClient.#AT,
       );
 
       if (matches) return true;

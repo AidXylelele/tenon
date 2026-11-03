@@ -223,4 +223,21 @@ describe('delivering events to other applications (US6)', () => {
       errors: [{ pointer: '/filter/with/type' }],
     });
   });
+
+  it('a_subscription_authenticating_with_a_secret_its_owner_lacks_is_refused', async () => {
+    const response = await request(t.server)
+      .post('/api/v1/subscriptions')
+      .set(editor)
+      .send({
+        name: 'crm',
+        endpoint: {
+          uri: `${RECEIVER}/events`,
+          authentication: { scheme: 'bearer', secret: 'nobody-has-it' },
+        },
+        filter: { with: { type: 'com.example.order.paid' } },
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.type).toBe('urn:problem:subscription.foreign-secret');
+  });
 });

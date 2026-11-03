@@ -15,12 +15,12 @@ export class DeleteSubscription {
 
   @Transactional()
   async execute(command: SubscriptionCommand): Promise<SubscriptionResult> {
-    const subscription = await this.subscriptions.findById(
+    const subscription = await this.subscriptions.findOwned(
+      command.ownerId,
       command.subscriptionId,
     );
-    const owned = subscription?.ownerId === command.ownerId;
 
-    if (subscription === null || !owned)
+    if (subscription === null)
       return { ok: false, failure: Missing.Subscription };
 
     await this.subscriptions.remove(subscription);

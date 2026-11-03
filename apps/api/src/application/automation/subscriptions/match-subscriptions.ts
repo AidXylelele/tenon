@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EventStore } from '../events/ports.js';
+import { Clock } from '../ports.js';
 import {
   Deliveries,
   DeliveryLog,
@@ -22,15 +23,16 @@ export class MatchSubscriptions {
     private readonly filters: SubscriptionFilters,
     private readonly deliveries: Deliveries,
     private readonly log: DeliveryLog,
+    private readonly clock: Clock,
   ) {}
 
   async execute(command: MatchSubscriptionsCommand): Promise<void> {
+    const now = this.clock.now();
     const event = await this.events.find(command.sequence);
 
     if (event === null) return;
 
-    const type = event.cloudEvent.type as string;
-    const candidates = await this.subscriptions.ofType(type);
+    const candidates = await this.subscriptions.ofType(event.type);
 
     for (const subscription of candidates) {
       if (!subscription.takesEventsOf(event.acceptedAt)) continue;
@@ -39,7 +41,7 @@ export class MatchSubscriptions {
 
       if (!accepts) continue;
 
-      await this.log.pending(subscription, event);
+      await this.log.pending(subscription, event, now);
       await this.deliveries.schedule(subscription, event);
     }
   }

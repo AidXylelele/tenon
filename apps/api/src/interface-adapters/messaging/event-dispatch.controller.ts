@@ -1,9 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import type { AcceptedEventMessage } from './interfaces.js';
 import { DispatchEvent } from '../../application/automation/events/dispatch-event.js';
-
-export interface AcceptedEventMessage {
-  readonly sequence: number;
-}
 
 @Injectable()
 export class EventDispatchController {

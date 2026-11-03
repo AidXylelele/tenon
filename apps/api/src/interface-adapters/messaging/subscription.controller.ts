@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MatchSubscriptions } from '../../application/automation/subscriptions/match-subscriptions.js';
-import type { AcceptedEventMessage } from './event-dispatch.controller.js';
+import type { AcceptedEventMessage } from './interfaces.js';
 
 @Injectable()
 export class SubscriptionController {

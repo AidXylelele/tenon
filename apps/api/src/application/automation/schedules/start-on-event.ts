@@ -37,8 +37,7 @@ export class StartOnEvent {
 
     if (event === null) return;
 
-    const type = event.cloudEvent.type as string;
-    const candidates = await this.versions.findStartedOn(type);
+    const candidates = await this.versions.findStartedOn(event.type);
 
     for (const version of candidates) {
       const accepts = await this.triggers.accepts(version, event);

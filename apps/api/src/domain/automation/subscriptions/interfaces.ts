@@ -20,11 +20,13 @@ export interface SubscriptionProps {
   readonly createdAt: Date;
 }
 
+// `ownedSecrets`: the names of the owner's secrets, the only ones its deliveries may use.
 export interface NewSubscription {
   readonly ownerId: string;
   readonly name: string;
   readonly endpoint: DeliveryEndpoint;
   readonly filter: JsonObject;
   readonly types: readonly string[] | null;
+  readonly ownedSecrets: readonly string[];
   readonly now: Date;
 }

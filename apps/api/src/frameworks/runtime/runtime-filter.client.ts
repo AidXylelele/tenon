@@ -11,10 +11,10 @@ import { JsonWalk } from './document/json-walk.js';
 import type { EventFilters } from './execution/events/event-filters.js';
 import type { JqClient } from './interfaces.js';
 
-// A subscription's filter is the standard's event filter: checked as publish checks one, and
-// matched as a `listen` matches it.
-export class SubscriptionFilterClient implements FilterClient {
-  static readonly #AT = JsonPointer.ROOT.child('filter');
+// A subscription's filter is the standard's event filter: checked as publish checks one, with
+// pointers into the filter, and matched as a `listen` matches it.
+export class RuntimeFilterClient implements FilterClient {
+  static readonly #AT = JsonPointer.ROOT;
   static readonly #NONE = new Set<string>();
 
   constructor(
@@ -24,17 +24,14 @@ export class SubscriptionFilterClient implements FilterClient {
 
   async problemOf(filter: JsonObject): Promise<CheckProblem | null> {
     const attributes = (filter.with ?? {}) as JsonObject;
-    const values = JsonWalk.valuesOf(
-      attributes,
-      SubscriptionFilterClient.#NONE,
-    );
+    const values = JsonWalk.valuesOf(attributes, RuntimeFilterClient.#NONE);
 
     for (const located of values) {
       const text = located.value;
 
       if (typeof text !== 'string') continue;
 
-      const pointer = `/filter/with${located.pointer.toString()}`;
+      const pointer = `/with${located.pointer.toString()}`;
 
       if (Expressions.encloses(text)) {
         const program = Expressions.programOf(text);
@@ -66,7 +63,7 @@ export class SubscriptionFilterClient implements FilterClient {
       filter,
       event,
       correlation,
-      SubscriptionFilterClient.#AT,
+      RuntimeFilterClient.#AT,
     );
   }
 }

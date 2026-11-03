@@ -1,5 +1,6 @@
 import type { JsonObject } from '../../../domain/automation/json.js';
 import type { DeliveryEndpoint } from '../../../domain/automation/subscriptions/interfaces.js';
+import type { SubscriptionRefusal } from '../../../domain/automation/subscriptions/enums.js';
 import type { Subscription } from '../../../domain/automation/subscriptions/subscription.js';
 import type { Result } from '../../../domain/result.js';
 import type { AcceptedEvent } from '../events/ports.js';
@@ -23,11 +24,10 @@ export interface DeliveryCommand {
   readonly sequence: number;
 }
 
-export interface FailedDeliveryCommand extends DeliveryCommand {
-  readonly error: string;
-}
-
-export type CreateSubscriptionResult = Result<Subscription, DefinitionProblem>;
+export type CreateSubscriptionResult = Result<
+  Subscription,
+  DefinitionProblem | SubscriptionRefusal
+>;
 
 export type SubscriptionResult = Result<undefined, Missing>;
 
@@ -37,6 +37,7 @@ export type AttemptResult = Result<boolean, string>;
 
 export abstract class SubscriptionRepository {
   abstract findById(id: string): Promise<Subscription | null>;
+  abstract findOwned(ownerId: string, id: string): Promise<Subscription | null>;
   // The subscriptions that may take events of this type.
   abstract ofType(type: string): Promise<Subscription[]>;
   abstract add(subscription: Subscription): Promise<void>;
@@ -60,8 +61,9 @@ export abstract class Deliveries {
   ): Promise<void>;
 }
 
-// Sends an event to an endpoint in CloudEvents' HTTP structured mode; null when a 2xx answered,
-// the error otherwise. The address policy refuses private destinations (FR-022).
+// Sends an event to an endpoint in CloudEvents' HTTP structured mode, authenticated with the
+// secret's value if any; null when a 2xx answered, the error otherwise (never the credential).
+// The address policy refuses private destinations (FR-022).
 export abstract class EventSender {
   abstract send(
     endpoint: DeliveryEndpoint,
@@ -70,15 +72,18 @@ export abstract class EventSender {
   ): Promise<string | null>;
 }
 
-// What the owner reads of each delivery: pending, delivered or failed, with the last error.
+// What the owner reads of each delivery (US6 AS6): pending until an attempt delivers it, with
+// each attempt counted and the last error kept, or failed once its attempts are spent.
 export abstract class DeliveryLog {
   abstract pending(
     subscription: Subscription,
     event: AcceptedEvent,
+    at: Date,
   ): Promise<void>;
-  abstract attempted(
+  abstract delivered(command: DeliveryCommand, at: Date): Promise<void>;
+  abstract refused(
     command: DeliveryCommand,
-    error: string | null,
+    error: string,
     at: Date,
   ): Promise<void>;
   abstract failed(command: DeliveryCommand, at: Date): Promise<void>;

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
 import { OnOutboxMessage, type OutboxHandlerContext } from '@nestjs/outbox';
-import type { AcceptedEventMessage } from '../../interface-adapters/messaging/event-dispatch.controller.js';
 import { SubscriptionController } from '../../interface-adapters/messaging/subscription.controller.js';
 import type { DrizzleTx } from '../../interface-adapters/persistence/interfaces.js';
 import { DrizzleEventStore } from '../../interface-adapters/persistence/stores/drizzle-event.store.js';
+import type { AcceptedEventMessage } from '../../interface-adapters/messaging/interfaces.js';
 import { OutboxErrors } from './outbox-errors.js';
 
 // An accepted event schedules its deliveries in one transaction with this consumer's inbox, so
