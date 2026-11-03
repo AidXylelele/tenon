@@ -36,9 +36,11 @@ export interface ArchiveWorkflowCommand {
 export type ArchiveResult = Result<void, Missing>;
 
 export abstract class DefinitionChecker {
-  // The definition the runtime can run, or the document's first problem (FR-002).
+  // The definition the runtime can run, or the document's first problem (FR-002); `secrets`
+  // are the names of the publisher's secrets, the only ones its `use.secrets` may name (US8).
   abstract check(
     document: JsonObject,
+    secrets: readonly string[],
   ): Promise<Result<CheckedDefinition, DefinitionProblem>>;
 }
 

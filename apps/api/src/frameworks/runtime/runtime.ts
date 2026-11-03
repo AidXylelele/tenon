@@ -30,6 +30,10 @@ export class Runtime {
     const context = new RunContext(plan, durability, observer, this.descriptor);
     const unbounded = Scope.root(context, null);
     const workflow = context.workflow;
+    // Read on every execution and never journaled: a replaced value counts from the next one.
+    const names = workflow.use?.secrets ?? [];
+    const secrets = await observer.secrets(plan.instanceId, names);
+    context.keepSecrets(secrets);
     const started = await Journal.value(unbounded, 'input', async () => {
       const args = context.argumentsFor(plan.input);
       const input = await this.flow.input(
@@ -42,8 +46,10 @@ export class Runtime {
       return { input, deadline };
     });
 
-    if (!started.ok)
-      return { kind: RunOutcomeKind.Faulted, error: started.error };
+    if (!started.ok) {
+      const error = context.masked(started.error);
+      return { kind: RunOutcomeKind.Faulted, error };
+    }
 
     const scope = Scope.root(context, started.value.deadline);
     const ending = await this.runner.list(
@@ -55,8 +61,10 @@ export class Runtime {
     if (ending.kind === EndingKind.Stopped)
       return { kind: RunOutcomeKind.Stopped };
 
-    if (ending.kind === EndingKind.Faulted)
-      return { kind: RunOutcomeKind.Faulted, error: ending.error };
+    if (ending.kind === EndingKind.Faulted) {
+      const error = context.masked(ending.error);
+      return { kind: RunOutcomeKind.Faulted, error };
+    }
 
     const ended = await Journal.value(scope, 'output', () => {
       const args = context.argumentsFor(ending.output);
@@ -68,9 +76,13 @@ export class Runtime {
       );
     });
 
-    if (!ended.ok) return { kind: RunOutcomeKind.Faulted, error: ended.error };
+    if (!ended.ok) {
+      const error = context.masked(ended.error);
+      return { kind: RunOutcomeKind.Faulted, error };
+    }
 
-    return { kind: RunOutcomeKind.Completed, output: ended.value };
+    const output = context.masked(ended.value);
+    return { kind: RunOutcomeKind.Completed, output };
   }
 
   // The workflow's timeout counts from its start (FR-014); one written as an expression is

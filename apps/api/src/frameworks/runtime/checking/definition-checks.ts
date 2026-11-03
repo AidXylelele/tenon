@@ -8,6 +8,7 @@ import type {
 import type { DefinitionCheck } from '../interfaces.js';
 import { EventTypes } from '../document/event-types.js';
 import { Fingerprint } from './fingerprint.js';
+import { SecretCheck } from './secret-check.js';
 import type { SchemaCheck } from './schema-check.js';
 
 // What the runtime refuses to run, decided as a compiler would: the standard's schema first,
@@ -18,7 +19,10 @@ export class DefinitionChecks implements RuntimeChecks {
     private readonly checks: readonly DefinitionCheck[],
   ) {}
 
-  async check(document: JsonObject): Promise<CheckVerdict> {
+  async check(
+    document: JsonObject,
+    secrets: readonly string[],
+  ): Promise<CheckVerdict> {
     const schemaProblem = this.schema.problemOf(document);
 
     if (schemaProblem !== null)
@@ -31,6 +35,11 @@ export class DefinitionChecks implements RuntimeChecks {
 
       if (problem !== null) return { kind: VerdictKind.Invalid, problem };
     }
+
+    const foreign = SecretCheck.firstProblem(workflow, secrets);
+
+    if (foreign !== null)
+      return { kind: VerdictKind.Invalid, problem: foreign };
 
     const declared = workflow.document;
     const fingerprint = Fingerprint.of(document);

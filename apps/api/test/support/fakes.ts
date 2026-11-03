@@ -1,3 +1,7 @@
+import type {
+  SecretQueries,
+  SecretView,
+} from '../../src/application/automation/secrets/queries.js';
 import type { TransactionHost } from '@nestjs-cls/transactional';
 import type {
   DefinitionChecker,
@@ -287,4 +291,21 @@ export function directTransactions(): TransactionHost {
     withTransaction: (work: () => Promise<unknown>) => work(),
   };
   return host as unknown as TransactionHost;
+}
+
+// The names of the secrets a publisher owns, as a test sets them.
+export class OwnedSecrets implements SecretQueries {
+  constructor(private readonly names: readonly string[] = []) {}
+
+  async list(): Promise<SecretView[]> {
+    return [];
+  }
+
+  async namesOf(): Promise<string[]> {
+    return this.names.slice();
+  }
+
+  async valuesFor(): Promise<Record<string, string>> {
+    return {};
+  }
 }

@@ -37,7 +37,11 @@ export type CheckVerdict = DocumentValid | DocumentInvalid;
 
 // What the runtime refuses to run, decided before a document is published (FR-002).
 export abstract class RuntimeChecks {
-  abstract check(document: JsonObject): Promise<CheckVerdict>;
+  // `secrets`: the names the document's `use.secrets` may name.
+  abstract check(
+    document: JsonObject,
+    secrets: readonly string[],
+  ): Promise<CheckVerdict>;
 }
 
 // What the runtime needs to run an instance: the published document and the instance's input.
@@ -94,6 +98,12 @@ export abstract class RunObserver {
   abstract unlisten(instanceId: string, key: string): Promise<void>;
   // An event an `emit` task published, accepted as any other event.
   abstract emitted(instanceId: string, event: JsonObject): Promise<void>;
+  // The values of the secrets named, of the publisher of the instance's version, as kept now;
+  // a missing name is a secret that does not exist (any more).
+  abstract secrets(
+    instanceId: string,
+    names: readonly string[],
+  ): Promise<Record<string, string>>;
 }
 
 // A sub-workflow a `run: workflow` task starts; a detached one is not awaited.

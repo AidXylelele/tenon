@@ -1,12 +1,17 @@
 import { HttpStatus } from '@nestjs/common';
 import { Missing } from '../../../application/automation/enums.js';
 import type { DefinitionProblem } from '../../../application/automation/workflows/ports.js';
+import { SecretRefusal } from '../../../domain/automation/secrets/enums.js';
 import { InstanceRefusal } from '../../../domain/automation/instances/enums.js';
 import { WorkflowRefusal } from '../../../domain/automation/workflows/enums.js';
 import { ProblemException } from '../filters/problem.exception.js';
 
 export type AutomationFailure =
-  DefinitionProblem | WorkflowRefusal | InstanceRefusal | Missing;
+  | DefinitionProblem
+  | WorkflowRefusal
+  | InstanceRefusal
+  | SecretRefusal
+  | Missing;
 
 interface Described {
   readonly status: number;
@@ -72,6 +77,17 @@ export class ProblemPresenter {
         status: HttpStatus.NOT_FOUND,
         title: 'The workflow instance does not exist',
       },
+    ],
+    [
+      SecretRefusal.NameTaken,
+      {
+        status: HttpStatus.CONFLICT,
+        title: 'You already have a secret of this name',
+      },
+    ],
+    [
+      Missing.Secret,
+      { status: HttpStatus.NOT_FOUND, title: 'The secret does not exist' },
     ],
     [
       Missing.Webhook,

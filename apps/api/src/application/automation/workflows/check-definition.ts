@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Workflow } from '../../../domain/automation/workflows/workflow.js';
 import { Clock } from '../ports.js';
+import { SecretQueries } from '../secrets/queries.js';
 import {
   DefinitionChecker,
   type PublishResult,
@@ -16,12 +17,14 @@ export class CheckDefinition {
     private readonly checker: DefinitionChecker,
     private readonly workflows: WorkflowRepository,
     private readonly versions: WorkflowVersionRepository,
+    private readonly secrets: SecretQueries,
     private readonly clock: Clock,
   ) {}
 
   async execute(command: PublishVersionCommand): Promise<PublishResult> {
     const now = this.clock.now();
-    const checked = await this.checker.check(command.document);
+    const secrets = await this.secrets.namesOf(command.publisherId);
+    const checked = await this.checker.check(command.document, secrets);
 
     if (!checked.ok) return checked;
 

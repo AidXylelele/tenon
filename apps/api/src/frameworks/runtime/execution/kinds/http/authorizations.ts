@@ -5,6 +5,7 @@ import type {
 import { AuthorizationKind, EndpointOutcomeKind } from '../../../enums.js';
 import type { Authorization, ExchangeOutcome } from '../../../interfaces.js';
 import type { Evaluator } from '../../evaluator.js';
+import { ErrorKind, TaskFault } from '../../faults.js';
 import type { Scope } from '../../scope.js';
 
 // An authentication policy as the endpoint client sends it: a header for basic and bearer, a
@@ -26,12 +27,13 @@ export class Authorizations {
 
     if (policy === null) return null;
 
-    const filled = (await this.evaluator.template(
+    const evaluated = (await this.evaluator.template(
       policy,
       input,
       args,
       scope.pointer,
     )) as JsonObject;
+    const filled = Authorizations.#withSecrets(evaluated, scope);
     const basic = filled.basic as JsonObject | undefined;
 
     if (basic !== undefined) {
@@ -53,6 +55,35 @@ export class Authorizations {
     if (scheme === undefined) return null;
 
     return Authorizations.#clientCredentials(scheme, oauth2 !== undefined);
+  }
+
+  // A secret-based policy (`basic: { use: name }`) takes its values from the secret; one that no
+  // longer exists, or that the publisher does not own, is an authorization error (DSL 1.0.3,
+  // "Secrets").
+  static #withSecrets(policy: JsonObject, scope: Scope): JsonObject {
+    const filled: Record<string, JsonValue> = {};
+
+    for (const [scheme, settings] of Object.entries(policy)) {
+      const named = (settings as JsonObject | undefined)?.use;
+
+      if (typeof named !== 'string') {
+        filled[scheme] = settings ?? null;
+        continue;
+      }
+
+      const value = scope.run.secrets[named];
+
+      if (value === undefined || value === null || typeof value !== 'object')
+        throw TaskFault.of(
+          ErrorKind.Authorization,
+          scope.pointer,
+          `The secret '${named}' is not available`,
+        );
+
+      filled[scheme] = value;
+    }
+
+    return filled;
   }
 
   // `$authorization` (DSL 1.0.3, "Authorization Descriptor") as the task's definition reads it:

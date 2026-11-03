@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AcceptEvent } from '../../../application/automation/events/accept-event.js';
 import { EventOrigin } from '../../../application/automation/events/enums.js';
+import { SecretQueries } from '../../../application/automation/secrets/queries.js';
 import { Listen } from '../../../application/automation/events/listen.js';
 import { Unlisten } from '../../../application/automation/events/unlisten.js';
 import { BeginInstance } from '../../../application/automation/instances/begin-instance.js';
@@ -47,6 +48,7 @@ export class InstanceRunController extends RunObserver {
     private readonly startSubWorkflow: StartSubWorkflow,
     private readonly acceptEvent: AcceptEvent,
     private readonly listenUseCase: Listen,
+    private readonly secretQueries: SecretQueries,
     private readonly unlistenUseCase: Unlisten,
   ) {
     super();
@@ -145,6 +147,13 @@ export class InstanceRunController extends RunObserver {
     if (child === null) return { phase: null, output: null, error: null };
 
     return { phase: child.phase, output: child.output, error: child.error };
+  }
+
+  secrets(
+    instanceId: string,
+    names: readonly string[],
+  ): Promise<Record<string, string>> {
+    return this.secretQueries.valuesFor(instanceId, names);
   }
 
   listen(

@@ -39,7 +39,7 @@ function documentWith(tasks: JsonObject[], rest: JsonObject = {}): JsonObject {
 }
 
 async function problemOf(document: JsonObject): Promise<unknown> {
-  const verdict: CheckVerdict = await checks.check(document);
+  const verdict: CheckVerdict = await checks.check(document, []);
 
   if (verdict.kind === VerdictKind.Valid) return null;
 
@@ -48,7 +48,7 @@ async function problemOf(document: JsonObject): Promise<unknown> {
 
 describe('the checks a document passes before it is published', () => {
   it('a_valid_document_gives_its_identity_and_a_fingerprint_of_its_content', async () => {
-    const verdict = await checks.check(aDocument());
+    const verdict = await checks.check(aDocument(), []);
 
     expect(verdict.kind).toBe(VerdictKind.Valid);
     const identity =
@@ -73,8 +73,8 @@ describe('the checks a document passes before it is published', () => {
       },
     };
 
-    const first = await checks.check(aDocument());
-    const second = await checks.check(reordered);
+    const first = await checks.check(aDocument(), []);
+    const second = await checks.check(reordered, []);
 
     const fingerprintOf = (verdict: CheckVerdict) =>
       verdict.kind === VerdictKind.Valid ? verdict.identity.fingerprint : null;

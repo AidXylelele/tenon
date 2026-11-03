@@ -471,11 +471,12 @@ export class TaskRunner implements Runner {
     const run = scope.run;
     const startedAt = run.durability.stepTime();
     const at = new Date(startedAt).toISOString();
+    const recorded = run.masked(input);
     await run.observer.taskStarted(run.plan.instanceId, {
       execution: scope.stepName,
       reference: scope.pointer.toString(),
       name: item.name,
-      input,
+      input: recorded,
       at,
     });
     return startedAt;
@@ -494,13 +495,15 @@ export class TaskRunner implements Runner {
     const run = scope.run;
     const endedAt = run.durability.stepTime();
     const at = new Date(endedAt).toISOString();
+    const recordedOutput = run.masked(output);
+    const recordedError = error === null ? null : run.masked(error);
     const directive = await run.observer.taskEnded(run.plan.instanceId, {
       execution: scope.stepName,
       reference: scope.pointer.toString(),
       name: item.name,
       status,
-      output,
-      error,
+      output: recordedOutput,
+      error: recordedError,
       at,
     });
 

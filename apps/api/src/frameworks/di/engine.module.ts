@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { WorkflowsModule, WorkflowStorage } from '@nestjs/workflows';
+import {
+  AesGcmPayloadCodec,
+  WorkflowsModule,
+  WorkflowStorage,
+} from '@nestjs/workflows';
 import { systemClock } from '@nestjs/workflows/core';
 import { fromDrizzle, PostgresWorkflowStore } from '@nestjs/workflows/postgres';
 import { EngineClock } from '../../interface-adapters/workflows/runs/engine.clock.js';
@@ -24,6 +28,11 @@ export class EngineClockModule {}
       inject: [ConfigService, EngineClock],
       useFactory: (config: ConfigService<Env, true>, clock: EngineClock) => ({
         clock: clock.source,
+        // Inputs, outputs and step results, which may hold what a secret gave, are encrypted.
+        codec: new AesGcmPayloadCodec({
+          keys: { v1: config.get('SECRETS_KEY', { infer: true }) },
+          current: 'v1',
+        }),
         worker: {
           enabled: config.get('ENGINE_WORKER', { infer: true }) === 'on',
           concurrency: ENGINE_CONCURRENCY,

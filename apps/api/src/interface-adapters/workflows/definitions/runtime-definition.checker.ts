@@ -16,8 +16,9 @@ export class RuntimeDefinitionChecker implements DefinitionChecker {
 
   async check(
     document: JsonObject,
+    secrets: readonly string[],
   ): Promise<Result<CheckedDefinition, DefinitionProblem>> {
-    const verdict = await this.runtime.check(document);
+    const verdict = await this.runtime.check(document, secrets);
 
     if (verdict.kind === VerdictKind.Invalid)
       return { ok: false, failure: verdict.problem };

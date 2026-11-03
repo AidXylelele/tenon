@@ -433,6 +433,24 @@ export class RecordingObserver extends RunObserver {
     return Promise.resolve();
   }
 
+  // The publisher's secrets, as a test sets them; a name not set does not exist.
+  secretValues: Record<string, string> = {};
+
+  secrets(
+    _instanceId: string,
+    names: readonly string[],
+  ): Promise<Record<string, string>> {
+    const values: Record<string, string> = {};
+
+    for (const name of names) {
+      const value = this.secretValues[name];
+
+      if (value !== undefined) values[name] = value;
+    }
+
+    return Promise.resolve(values);
+  }
+
   endedNamed(name: string): TaskEnded[] {
     return this.ended.filter((task) => task.name === name);
   }
@@ -513,7 +531,7 @@ export class RuntimeHarness {
   async problemOf(
     document: JsonObject,
   ): Promise<{ pointer: string; detail: string } | null> {
-    const verdict = await this.checks.check(document);
+    const verdict = await this.checks.check(document, []);
 
     if (verdict.kind === VerdictKind.Valid) return null;
 

@@ -6,6 +6,7 @@ import type {
 } from '../../../interface-adapters/workflows/interfaces.js';
 import { JsonPointer } from '../document/json-pointer.js';
 import type { Durability, RuntimeDescriptor } from '../interfaces.js';
+import { SecretValues } from './secret-values.js';
 import { DateTimes } from './date-times.js';
 import type { Race } from './race.js';
 import type { TaskMoment } from './task-moment.js';
@@ -21,6 +22,8 @@ export interface ContextHolder {
 export class RunContext implements ContextHolder {
   context: JsonObject = {};
   #stopped = false;
+  #secrets: JsonObject = {};
+  #masked: readonly string[] = [];
 
   constructor(
     readonly plan: RunPlan,
@@ -42,6 +45,27 @@ export class RunContext implements ContextHolder {
     this.#stopped = true;
   }
 
+  // `$secrets` (DSL 1.0.3): each value as JSON when it is a JSON object, as text otherwise.
+  get secrets(): JsonObject {
+    return this.#secrets;
+  }
+
+  // The values this execution read; nothing the platform records, shows or delivers keeps
+  // them (FR-007).
+  keepSecrets(values: Record<string, string>): void {
+    const secrets: Record<string, JsonValue> = {};
+
+    for (const [name, value] of Object.entries(values))
+      secrets[name] = SecretValues.parsed(value);
+
+    this.#secrets = secrets;
+    this.#masked = SecretValues.textsOf(secrets);
+  }
+
+  masked<T extends JsonValue>(value: T): T {
+    return SecretValues.masked(value, this.#masked);
+  }
+
   get workflowArgument(): JsonObject {
     const started = Date.parse(this.plan.startedAt);
     const startedAt = DateTimes.descriptorOf(started);
@@ -61,11 +85,13 @@ export class RunContext implements ContextHolder {
     };
   }
 
-  // The arguments of the workflow's own `input.from`, `timeout` and `output.as`.
+  // The arguments of the workflow's own `input.from`, `timeout` and `output.as`; `$secrets`
+  // is bound for `input.from`, the only place publish lets an expression name it.
   argumentsFor(input: JsonValue): JsonObject {
     return {
       context: this.context,
       input,
+      secrets: this.#secrets,
       workflow: this.workflowArgument,
       runtime: this.runtimeArgument,
     };

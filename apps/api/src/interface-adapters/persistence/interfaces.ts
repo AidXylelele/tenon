@@ -24,3 +24,12 @@ export type WorkflowVersionRow = typeof schema.workflowVersion.$inferSelect;
 export type WorkflowInstanceRow = typeof schema.workflowInstance.$inferSelect;
 
 export type WebhookRow = typeof schema.webhook.$inferSelect;
+
+export type SecretRow = typeof schema.secret.$inferSelect;
+
+// Seals a secret's value before it is stored and opens it when it is read: values are
+// encrypted at rest (FR-007).
+export abstract class Cipher {
+  abstract seal(value: string): string;
+  abstract open(sealed: string): string;
+}

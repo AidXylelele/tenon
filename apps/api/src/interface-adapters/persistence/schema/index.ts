@@ -11,3 +11,4 @@ export * from './task-progress.js';
 export * from './event.js';
 export * from './listener.js';
 export * from './webhook.js';
+export * from './secret.js';

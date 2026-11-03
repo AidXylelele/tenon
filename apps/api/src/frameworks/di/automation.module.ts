@@ -41,6 +41,19 @@ import { WorkflowSchedulesGateway } from '../../interface-adapters/workflows/sch
 import { ScheduleOutboxHandler } from '../outbox/schedule.outbox.handler.js';
 import { EngineScheduleClient } from '../workflows/engine-schedule.client.js';
 import { ScheduleWorkflow } from '../workflows/schedule.workflow.js';
+import { CreateSecret } from '../../application/automation/secrets/create-secret.js';
+import { DeleteSecret } from '../../application/automation/secrets/delete-secret.js';
+import { SecretRepository } from '../../application/automation/secrets/ports.js';
+import { SecretQueries } from '../../application/automation/secrets/queries.js';
+import { ReplaceSecret } from '../../application/automation/secrets/replace-secret.js';
+import { SecretPolicy } from '../../application/automation/secrets/secret.policy.js';
+import { SecretsController } from '../../interface-adapters/api/controllers/secrets.controller.js';
+import { Cipher } from '../../interface-adapters/persistence/interfaces.js';
+import { DrizzleSecretQueries } from '../../interface-adapters/persistence/queries/drizzle-secret.queries.js';
+import { DrizzleSecretRepository } from '../../interface-adapters/persistence/repositories/drizzle-secret.repository.js';
+import { AesGcmCipher } from '../crypto/aes-gcm.cipher.js';
+import { ConfigService } from '@nestjs/config';
+import type { Env } from './config.module.js';
 import { EventsController } from '../../interface-adapters/api/controllers/events.controller.js';
 import { DrizzleEventQueries } from '../../interface-adapters/persistence/queries/drizzle-event.queries.js';
 import { DrizzleInstanceNames } from '../../interface-adapters/persistence/queries/drizzle-instance-names.query.js';
@@ -108,12 +121,27 @@ import { RuntimeModule } from './runtime.module.js';
     EventsController,
     WebhooksController,
     HooksController,
+    SecretsController,
   ],
   providers: [
     WorkflowPolicy,
     InstancePolicy,
     WebhookPolicy,
+    SecretPolicy,
     { provide: Clock, useExisting: EngineClock },
+    {
+      provide: Cipher,
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) =>
+        new AesGcmCipher(config.get('SECRETS_KEY', { infer: true })),
+    },
+    CreateSecret,
+    ReplaceSecret,
+    DeleteSecret,
+    DrizzleSecretRepository,
+    { provide: SecretRepository, useExisting: DrizzleSecretRepository },
+    DrizzleSecretQueries,
+    { provide: SecretQueries, useExisting: DrizzleSecretQueries },
     CreateWebhook,
     DeleteWebhook,
     ReceiveWebhookCall,
