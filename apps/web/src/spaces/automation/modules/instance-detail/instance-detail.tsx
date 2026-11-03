@@ -10,6 +10,7 @@ import {
 import { currentUser } from '@/libs/data-access/identity';
 import type { Instance } from '@/libs/data-access/types';
 import { RefreshControl } from '@/libs/live/refresh-control';
+import { Crumbs } from '@/libs/ui/composites/crumbs';
 import { Duration, Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
 import { allEntries } from '../../__shared_context/document/tasks';
@@ -61,12 +62,16 @@ export async function InstanceDetail({ id, view }: InstanceDetailProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 border-b px-4 py-3 md:px-6">
         <div className="min-w-0 flex-1">
-          <Link
-            href={workflowHref(instance.namespace, instance.name)}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground"
-          >
-            {instance.namespace} / {instance.name}
-          </Link>
+          <Crumbs
+            trail={[
+              { label: 'Runs', href: '/instances' },
+              {
+                label: instance.name,
+                href: workflowHref(instance.namespace, instance.name),
+              },
+              { label: `Run ${instance.id.slice(0, 8)}` },
+            ]}
+          />
           <h1 className="flex flex-wrap items-center gap-3 text-lg font-semibold tracking-tight">
             Run of {instance.name}
             <PhaseStatus phase={instance.phase} />

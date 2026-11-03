@@ -37,8 +37,9 @@ export async function Webhooks() {
   return (
     <>
       <PageHeader
+        level={2}
         title="Webhooks"
-        description="URLs other applications call to send events in: a form submission, a payment, a new lead."
+        description="Addresses other applications call to send events in: a form submission, a payment, a new lead. A workflow that listens for the event starts or continues."
         actions={<CreateWebhook />}
       />
       {list.length === 0 ? (

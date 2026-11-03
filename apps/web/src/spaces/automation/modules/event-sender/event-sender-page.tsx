@@ -13,7 +13,8 @@ export async function EventSenderPage() {
   return (
     <>
       <PageHeader
-        title="Send an event"
+        level={2}
+        title="Test event"
         description="Try a trigger, a waiting step or a subscription with a CloudEvent, as another application would send it."
       />
       <EventSender />

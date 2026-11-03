@@ -30,8 +30,8 @@ export function InstanceTable({
           <TableRow>
             <TableHead>Phase</TableHead>
             {showWorkflow && <TableHead>Workflow</TableHead>}
-            <TableHead>Version</TableHead>
-            <TableHead>Started by</TableHead>
+            <TableHead className="hidden md:table-cell">Version</TableHead>
+            <TableHead className="hidden sm:table-cell">Started by</TableHead>
             <TableHead>Started</TableHead>
             <TableHead className="text-right">Duration</TableHead>
           </TableRow>
@@ -57,8 +57,12 @@ export function InstanceTable({
                   </span>
                 </TableCell>
               )}
-              <TableCell className="tabular-nums">{instance.version}</TableCell>
-              <TableCell>{triggerLabel(instance.trigger)}</TableCell>
+              <TableCell className="hidden tabular-nums md:table-cell">
+                {instance.version}
+              </TableCell>
+              <TableCell className="hidden sm:table-cell">
+                {triggerLabel(instance.trigger)}
+              </TableCell>
               <TableCell>
                 <Time value={instance.startedAt ?? instance.createdAt} />
               </TableCell>

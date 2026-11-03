@@ -76,11 +76,11 @@ export async function WorkflowDetail({
   return (
     <>
       <PageHeader
-        eyebrow={
-          <Link href="/workflows" className="hover:text-foreground">
-            Workflows / {namespace}
-          </Link>
-        }
+        crumbs={[
+          { label: 'Workflows', href: '/workflows' },
+          { label: namespace },
+          { label: name },
+        ]}
         title={
           header?.title !== undefined && header.title !== ''
             ? header.title

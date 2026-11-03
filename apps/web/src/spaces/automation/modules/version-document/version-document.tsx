@@ -35,14 +35,12 @@ export async function VersionDocument({
   return (
     <>
       <PageHeader
-        eyebrow={
-          <Link
-            href={workflowHref(namespace, name)}
-            className="hover:text-foreground"
-          >
-            {namespace} / {name}
-          </Link>
-        }
+        crumbs={[
+          { label: 'Workflows', href: '/workflows' },
+          { label: namespace },
+          { label: name, href: workflowHref(namespace, name) },
+          { label: `Version ${version}` },
+        ]}
         title={`Version ${version}`}
         description="The document as it was published. A version never changes."
         actions={

@@ -11,5 +11,5 @@ export async function deleteSubscriptionAction(
 
   if (!outcome.ok) return outcome;
 
-  redirect('/subscriptions');
+  redirect('/connections/notifications');
 }

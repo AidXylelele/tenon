@@ -3,7 +3,7 @@
 import {
   ActivityIcon,
   KeyRoundIcon,
-  LayoutDashboardIcon,
+  HouseIcon,
   PlusIcon,
   RadioTowerIcon,
   SearchIcon,
@@ -34,7 +34,7 @@ import { type FoundWorkflow, searchableWorkflowsAction } from './actions';
 const AUTHORS: readonly Role[] = ['admin', 'editor'];
 
 const PAGES = [
-  { href: '/', label: 'Overview', icon: LayoutDashboardIcon, roles: null },
+  { href: '/', label: 'Home', icon: HouseIcon, roles: null },
   { href: '/workflows', label: 'Workflows', icon: WaypointsIcon, roles: null },
   { href: '/instances', label: 'Runs', icon: ActivityIcon, roles: null },
   {
@@ -43,31 +43,46 @@ const PAGES = [
     icon: ActivityIcon,
     roles: null,
   },
-  { href: '/webhooks', label: 'Webhooks', icon: WebhookIcon, roles: AUTHORS },
   {
-    href: '/subscriptions',
-    label: 'Subscriptions',
+    href: '/connections/webhooks',
+    label: 'Webhooks',
+    icon: WebhookIcon,
+    roles: AUTHORS,
+  },
+  {
+    href: '/connections/notifications',
+    label: 'Notifications',
     icon: RadioTowerIcon,
     roles: AUTHORS,
   },
-  { href: '/events', label: 'Event tester', icon: SendIcon, roles: AUTHORS },
-  { href: '/secrets', label: 'Secrets', icon: KeyRoundIcon, roles: AUTHORS },
   {
-    href: '/conformance',
-    label: 'Supported standard',
-    icon: ShieldCheckIcon,
+    href: '/connections/test-event',
+    label: 'Send a test event',
+    icon: SendIcon,
+    roles: AUTHORS,
+  },
+  {
+    href: '/credentials',
+    label: 'Credentials',
+    icon: KeyRoundIcon,
+    roles: AUTHORS,
+  },
+  {
+    href: '/settings/account',
+    label: 'Account and password',
+    icon: UserIcon,
     roles: null,
   },
   {
-    href: '/team',
-    label: 'Invitations',
+    href: '/settings/team',
+    label: 'Team and invitations',
     icon: UsersIcon,
     roles: ['admin'] as readonly Role[],
   },
   {
-    href: '/account',
-    label: 'Account and password',
-    icon: UserIcon,
+    href: '/settings/standard',
+    label: 'Supported standard',
+    icon: ShieldCheckIcon,
     roles: null,
   },
 ] as const;
@@ -141,11 +156,11 @@ export function CommandPalette({ role }: { readonly role: Role | null }) {
                   <PlusIcon />
                   New workflow
                 </CommandItem>
-                <CommandItem onSelect={() => go('/webhooks')}>
+                <CommandItem onSelect={() => go('/connections/webhooks')}>
                   <WebhookIcon />
                   New webhook
                 </CommandItem>
-                <CommandItem onSelect={() => go('/events')}>
+                <CommandItem onSelect={() => go('/connections/test-event')}>
                   <SendIcon />
                   Send a test event
                 </CommandItem>

@@ -138,7 +138,7 @@ export function SubscriptionEditor({
       toast.success(`${outcome.value.name} subscribed`, {
         description: 'Matching events are delivered from now on.',
       });
-      router.push(`/subscriptions/${outcome.value.id}`);
+      router.push(`/connections/notifications/${outcome.value.id}`);
     });
   }
 
@@ -212,7 +212,7 @@ export function SubscriptionEditor({
                     <FieldDescription>
                       You have no secrets yet.{' '}
                       <Link
-                        href="/secrets"
+                        href="/credentials"
                         className="underline underline-offset-4"
                       >
                         Add one
@@ -370,7 +370,7 @@ export function SubscriptionEditor({
           {pending ? 'Subscribing…' : 'Subscribe'}
         </Button>
         <Button type="button" variant="ghost" asChild>
-          <Link href="/subscriptions">Cancel</Link>
+          <Link href="/connections/notifications">Cancel</Link>
         </Button>
       </div>
     </form>

@@ -1,4 +1,3 @@
-import { Link } from '@/libs/routing/link';
 import { notFound } from 'next/navigation';
 import { subscription as subscriptionOf } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
@@ -55,11 +54,11 @@ export async function SubscriptionDetail({ id }: { readonly id: string }) {
   return (
     <>
       <PageHeader
-        eyebrow={
-          <Link href="/subscriptions" className="hover:text-foreground">
-            Subscriptions
-          </Link>
-        }
+        crumbs={[
+          { label: 'Connections', href: '/connections/webhooks' },
+          { label: 'Notifications', href: '/connections/notifications' },
+          { label: subscription.name },
+        ]}
         title={subscription.name}
         description={`Takes events where ${describeFilter(subscription.filter)}.`}
         actions={

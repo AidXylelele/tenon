@@ -53,7 +53,8 @@ export async function Invitations() {
   return (
     <>
       <PageHeader
-        title="Invitations"
+        level={2}
+        title="Team"
         description="Invite people by email. A link lets them choose a name and password."
       />
       <Card>

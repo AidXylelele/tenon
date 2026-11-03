@@ -23,6 +23,7 @@ export async function Account() {
   return (
     <>
       <PageHeader
+        level={2}
         title="Account"
         description="Who you are signed in as, and your password."
       />

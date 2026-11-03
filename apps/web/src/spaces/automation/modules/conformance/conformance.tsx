@@ -17,6 +17,7 @@ export async function Conformance() {
   return (
     <>
       <PageHeader
+        level={2}
         title="Supported standard"
         description={`The Open Workflow DSL ${statement.dsl.join(', ')}. Publishing refuses anything outside what is listed here, so a run never fails for a construct the platform does not have.`}
       />

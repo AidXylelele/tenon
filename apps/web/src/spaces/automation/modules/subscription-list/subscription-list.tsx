@@ -30,15 +30,15 @@ export async function SubscriptionList() {
 
   if (!canAuthor(user))
     return (
-      <AuthorsOnly what="Subscriptions deliver events to other applications." />
+      <AuthorsOnly what="Notifications deliver events to other applications." />
     );
 
   const list = await subscriptions();
   const create = (
     <Button asChild>
-      <Link href="/subscriptions/new">
+      <Link href="/connections/notifications/new">
         <PlusIcon data-icon="inline-start" />
-        New subscription
+        New notification
       </Link>
     </Button>
   );
@@ -46,8 +46,9 @@ export async function SubscriptionList() {
   return (
     <>
       <PageHeader
-        title="Subscriptions"
-        description="Endpoints of other applications that get the events they ask for: emitted by workflows, sent in, or a run's lifecycle."
+        level={2}
+        title="Notifications"
+        description="Other applications told about the events they ask for: what workflows emit, what comes in, and when runs start and end."
         actions={create}
       />
       {list.length === 0 ? (
@@ -56,7 +57,7 @@ export async function SubscriptionList() {
             <EmptyMedia variant="icon">
               <RadioTowerIcon />
             </EmptyMedia>
-            <EmptyTitle>No subscriptions yet</EmptyTitle>
+            <EmptyTitle>No notifications yet</EmptyTitle>
             <EmptyDescription>
               Subscribe an endpoint to events by type, for example every failed
               run: io.serverlessworkflow.workflow.faulted.v1.
@@ -80,7 +81,7 @@ export async function SubscriptionList() {
                 <TableRow key={subscription.id} className="relative">
                   <TableCell>
                     <Link
-                      href={`/subscriptions/${subscription.id}`}
+                      href={`/connections/notifications/${subscription.id}`}
                       className="font-medium after:absolute after:inset-0 hover:underline"
                     >
                       {subscription.name}

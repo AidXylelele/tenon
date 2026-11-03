@@ -4,24 +4,23 @@ import { Suspense } from 'react';
 import { currentUser } from '@/libs/data-access/identity';
 import { Button } from '@/libs/ui/components/button';
 import { Separator } from '@/libs/ui/components/separator';
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from '@/libs/ui/components/sidebar';
+import { SidebarInset, SidebarTrigger } from '@/libs/ui/components/sidebar';
+import { BottomBar } from './bottom-bar';
 import { CommandPalette } from './command-palette';
 import { ConsoleSidebar } from './console-sidebar';
+import { FrameState } from './frame-state';
 
 // The frame of every console page: the navigation by role, a top bar with the search and the
-// main action, and the page, which decides its own width (research R12). The session is read
-// behind its own Suspense boundaries, so a navigation never waits for it.
+// main action, the page, which decides its own width, and on phones a bar of destinations
+// (research R15). The session is read behind its own Suspense boundaries, so a navigation never
+// waits for it.
 export function ConsoleFrame({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
+    <FrameState>
       <Suspense fallback={<ConsoleSidebar user={null} />}>
         <SignedInSidebar />
       </Suspense>
@@ -34,14 +33,22 @@ export function ConsoleFrame({
           </Suspense>
         </header>
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+        <Suspense fallback={<BottomBar role={null} />}>
+          <SignedInBottomBar />
+        </Suspense>
       </SidebarInset>
-    </SidebarProvider>
+    </FrameState>
   );
 }
 
 async function SignedInSidebar() {
   const user = await currentUser();
   return <ConsoleSidebar user={user} />;
+}
+
+async function SignedInBottomBar() {
+  const user = await currentUser();
+  return <BottomBar role={user?.role ?? null} />;
 }
 
 async function TopBar() {

@@ -203,13 +203,13 @@ export async function Overview() {
             text="From steps, without code."
           />
           <Quick
-            href="/webhooks"
+            href="/connections/webhooks"
             icon={<WebhookIcon />}
             title="Create a webhook"
             text="Let another application send events in."
           />
           <Quick
-            href="/events"
+            href="/connections/test-event"
             icon={<SendIcon />}
             title="Send a test event"
             text="Try a trigger or a waiting step."

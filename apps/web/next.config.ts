@@ -35,6 +35,40 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
   },
+  // The addresses of iteration 2, before Connections and Settings became pages with tabs
+  // (research R15).
+  async redirects() {
+    return [
+      {
+        source: '/webhooks',
+        destination: '/connections/webhooks',
+        permanent: true,
+      },
+      {
+        source: '/subscriptions',
+        destination: '/connections/notifications',
+        permanent: true,
+      },
+      {
+        source: '/subscriptions/:path*',
+        destination: '/connections/notifications/:path*',
+        permanent: true,
+      },
+      {
+        source: '/events',
+        destination: '/connections/test-event',
+        permanent: true,
+      },
+      { source: '/secrets', destination: '/credentials', permanent: true },
+      { source: '/account', destination: '/settings/account', permanent: true },
+      { source: '/team', destination: '/settings/team', permanent: true },
+      {
+        source: '/conformance',
+        destination: '/settings/standard',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

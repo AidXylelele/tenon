@@ -70,7 +70,7 @@
 
 - [x] T110 Refresh as Grafana does: one refresh control per live page, Auto/Off/intervals, 5 s minimum, hidden pages wait (FR-026, R14)
 - [x] T111 Lazy reads: a run's events on its Events view, versions on their tab, version documents cached per session, hover-only prefetch in lists (FR-027)
-- [ ] T112 Navigation: five destinations, Connections and Settings with tabs under new routes and redirects, breadcrumbs, icon sidebar, bottom bar on phones (FR-034, R15)
+- [x] T112 Navigation: five destinations, Connections and Settings with tabs under new routes and redirects, breadcrumbs, icon sidebar, bottom bar on phones (FR-034, R15)
 - [ ] T113 The canvas laid out by ELK: direction, orthogonal edges with placed labels, collapsible containers, `try` with its failure block, badges for a step protected alone, notes (FR-028–FR-030, R16)
 - [ ] T114 [US2] The step panel: fixed and resizable, Settings / If it fails / Data / Note, move up and down, duplicate, delete; a bottom sheet on phones (FR-031)
 - [ ] T115 [US2] The code editor: JavaScript and Python highlighting, syntax errors, fixed height, large editor, Prettier for JavaScript (FR-032, R17)

@@ -89,8 +89,10 @@ export async function WorkflowList({ status, cursor }: WorkflowListProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Workflow</TableHead>
-                <TableHead>Current version</TableHead>
-                <TableHead>Starts automatically</TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  Current version
+                </TableHead>
+                <TableHead>Starts by itself</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -110,7 +112,7 @@ export async function WorkflowList({ status, cursor }: WorkflowListProps) {
                       {workflow.namespace}
                     </div>
                   </TableCell>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="hidden tabular-nums sm:table-cell">
                     {workflow.currentVersion ?? '—'}
                   </TableCell>
                   <TableCell>

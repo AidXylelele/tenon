@@ -18,8 +18,13 @@ export async function SubscriptionForm() {
   return (
     <>
       <PageHeader
-        title="New subscription"
-        description="Deliver the events another application needs: what workflows emit, what comes in, and runs' lifecycle."
+        crumbs={[
+          { label: 'Connections', href: '/connections/webhooks' },
+          { label: 'Notifications', href: '/connections/notifications' },
+          { label: 'New' },
+        ]}
+        title="New notification"
+        description="Tell another application about the events it needs: what workflows emit, what comes in, and when runs start and end."
       />
       <SubscriptionEditor secretNames={owned.map((secret) => secret.name)} />
     </>

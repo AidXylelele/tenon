@@ -37,8 +37,8 @@ export async function Secrets() {
   return (
     <>
       <PageHeader
-        title="Secrets"
-        description="Credentials your workflows and subscriptions use. Only you and your runs read them; their values are never shown."
+        title="Credentials"
+        description="Passwords, tokens and keys your workflows and notifications use, kept as secrets. Only runs read them; a value is never shown after it is saved."
         actions={<SecretValueDialog />}
       />
       {list.length === 0 ? (

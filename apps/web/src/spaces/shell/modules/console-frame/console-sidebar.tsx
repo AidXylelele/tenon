@@ -1,24 +1,10 @@
 'use client';
 
-import {
-  ActivityIcon,
-  ChevronsUpDownIcon,
-  LayoutDashboardIcon,
-  KeyRoundIcon,
-  LogOutIcon,
-  type LucideIcon,
-  RadioTowerIcon,
-  SendIcon,
-  ShieldCheckIcon,
-  UserIcon,
-  UsersIcon,
-  WaypointsIcon,
-  WebhookIcon,
-} from 'lucide-react';
+import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from 'lucide-react';
 import { useLinkStatus } from 'next/link';
-import { Link } from '@/libs/routing/link';
 import { usePathname } from 'next/navigation';
 import type { Role, User } from '@/libs/data-access/types';
+import { Link } from '@/libs/routing/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +19,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -45,68 +30,12 @@ import {
 import { Spinner } from '@/libs/ui/components/spinner';
 import { BrandMark, PRODUCT_NAME } from '../../__shared_context/brand-mark';
 import { signOutAction } from './actions';
-
-interface Item {
-  readonly href: string;
-  readonly label: string;
-  readonly icon: LucideIcon;
-}
-
-interface Section {
-  readonly label: string;
-  readonly roles: readonly Role[];
-  readonly items: readonly Item[];
-}
-
-const EVERYONE: readonly Role[] = ['admin', 'editor', 'viewer'];
-const AUTHORS: readonly Role[] = ['admin', 'editor'];
-
-// What each role may open (002 FR-031): viewers read automations only (research R12).
-const SECTIONS: readonly Section[] = [
-  {
-    label: 'Workspace',
-    roles: EVERYONE,
-    items: [
-      { href: '/', label: 'Overview', icon: LayoutDashboardIcon },
-      { href: '/workflows', label: 'Workflows', icon: WaypointsIcon },
-      { href: '/instances', label: 'Runs', icon: ActivityIcon },
-    ],
-  },
-  {
-    label: 'Connections',
-    roles: AUTHORS,
-    items: [
-      { href: '/webhooks', label: 'Webhooks', icon: WebhookIcon },
-      { href: '/subscriptions', label: 'Subscriptions', icon: RadioTowerIcon },
-      { href: '/events', label: 'Event tester', icon: SendIcon },
-    ],
-  },
-  {
-    label: 'Credentials',
-    roles: AUTHORS,
-    items: [{ href: '/secrets', label: 'Secrets', icon: KeyRoundIcon }],
-  },
-];
-
-// Pages of the platform itself, at the foot of the navigation.
-const FOOT: readonly Section[] = [
-  {
-    label: 'Platform',
-    roles: EVERYONE,
-    items: [
-      {
-        href: '/conformance',
-        label: 'Supported standard',
-        icon: ShieldCheckIcon,
-      },
-    ],
-  },
-  {
-    label: 'Team',
-    roles: ['admin'],
-    items: [{ href: '/team', label: 'Invitations', icon: UsersIcon }],
-  },
-];
+import {
+  type Destination,
+  destinationsOf,
+  isUnder,
+  SETTINGS,
+} from './destinations';
 
 const ROLE_LABEL: Record<Role, string> = {
   admin: 'Administrator',
@@ -114,14 +43,12 @@ const ROLE_LABEL: Record<Role, string> = {
   viewer: 'Viewer',
 };
 
-// The console's navigation: the sections the user's role may open, the page in view, and the
-// user's menu. Without a user yet, it shows its shape while the session is read.
+// The console's navigation (research R15): the destinations the user's role may open, Settings
+// at the foot, and the user's menu. Without a user yet, it shows its shape while the session is
+// read.
 export function ConsoleSidebar({ user }: { readonly user: User | null }) {
   const pathname = usePathname();
-  const allowed = (section: Section) =>
-    user === null || section.roles.includes(user.role);
-  const sections = SECTIONS.filter(allowed);
-  const foot = FOOT.filter(allowed).flatMap((section) => section.items);
+  const destinations = destinationsOf(user?.role ?? null);
 
   return (
     <Sidebar collapsible="icon">
@@ -138,39 +65,33 @@ export function ConsoleSidebar({ user }: { readonly user: User | null }) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {sections.map((section) => (
-          <SidebarGroup key={section.label}>
-            <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {user === null
-                  ? section.items.map((item) => (
-                      <SidebarMenuItem key={item.href}>
-                        <SidebarMenuSkeleton showIcon />
-                      </SidebarMenuItem>
-                    ))
-                  : section.items.map((item) => (
-                      <NavItem
-                        key={item.href}
-                        item={item}
-                        active={isUnder(pathname, item.href)}
-                      />
-                    ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {destinations.map((destination) =>
+                user === null ? (
+                  <SidebarMenuItem key={destination.href}>
+                    <SidebarMenuSkeleton showIcon />
+                  </SidebarMenuItem>
+                ) : (
+                  <NavItem
+                    key={destination.href}
+                    item={destination}
+                    active={isUnder(pathname, destination.href)}
+                  />
+                ),
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
         {user !== null && (
           <SidebarMenu>
-            {foot.map((item) => (
-              <NavItem
-                key={item.href}
-                item={item}
-                active={isUnder(pathname, item.href)}
-              />
-            ))}
+            <NavItem
+              item={SETTINGS}
+              active={isUnder(pathname, SETTINGS.href)}
+            />
           </SidebarMenu>
         )}
         {user !== null && <UserMenu user={user} />}
@@ -184,7 +105,7 @@ function NavItem({
   item,
   active,
 }: {
-  readonly item: Item;
+  readonly item: Destination;
   readonly active: boolean;
 }) {
   const { isMobile, setOpenMobile } = useSidebar();
@@ -248,7 +169,7 @@ function UserMenu({ user }: { readonly user: User }) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/account">
+              <Link href="/settings/account">
                 <UserIcon />
                 Account and password
               </Link>
@@ -269,12 +190,6 @@ function UserMenu({ user }: { readonly user: User }) {
       </SidebarMenuItem>
     </SidebarMenu>
   );
-}
-
-function isUnder(pathname: string, href: string): boolean {
-  if (href === '/') return pathname === '/';
-
-  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function initialsOf(name: string): string {
