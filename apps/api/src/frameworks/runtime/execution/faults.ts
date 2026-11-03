@@ -65,15 +65,37 @@ export class TaskFault extends Error {
   }
 }
 
-// A fault a retry policy accepted: the engine repeats the step. It keeps only an error's name
-// and message, so the message carries the fault.
+// What the message of a `RetryableFault` carries: the engine keeps only an error's name and
+// message, and a step it gives up on still needs the fault and the attempt that raised it.
+export interface RetriedFault {
+  readonly error: JsonObject;
+  readonly attempt: number;
+}
+
+// A fault a retry policy accepted on an attempt: the engine repeats the step `delay` ms later.
 export class RetryableFault extends Error {
   readonly error: JsonObject;
+  readonly attempt: number;
+  readonly delay: number;
 
-  constructor(error: JsonObject) {
-    super(JSON.stringify(error));
+  constructor(error: JsonObject, attempt: number, delay: number) {
+    const retried: RetriedFault = { error, attempt };
+    super(JSON.stringify(retried));
     this.name = 'RetryableFault';
     this.error = error;
+    this.attempt = attempt;
+    this.delay = delay;
+  }
+}
+
+// A retried step the engine gave up on while its retry policy still retried it (the reserve for
+// outages on top of the policy's attempts was spent): the last attempt's fault, and its number.
+export class RetriesSpentFault extends TaskFault {
+  readonly attempt: number;
+
+  constructor(error: JsonObject, attempt: number) {
+    super(error);
+    this.attempt = attempt;
   }
 }
 

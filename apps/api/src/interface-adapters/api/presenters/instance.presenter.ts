@@ -57,6 +57,8 @@ export class InstancePresenter {
       error: task.error as ResponseJson,
       startedAt: task.startedAt.toISOString(),
       endedAt: task.endedAt?.toISOString() ?? null,
+      attempt: task.attempt,
+      retryAt: task.retryAt?.toISOString() ?? null,
     }));
     const next = page.next === null ? null : String(page.next);
     return { items, next };

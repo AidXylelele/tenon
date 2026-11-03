@@ -271,12 +271,10 @@ export interface DefinitionCheck {
   firstProblem(workflow: Specification.Workflow): Promise<CheckProblem | null>;
 }
 
-// How an engine step repeats: the engine waits `backoff(attempt)` milliseconds between attempts
-// and repeats only an error `retries` accepts.
+// How an engine step repeats for a retry policy: on a `RetryableFault`, after the delay it
+// carries, `attempts` times at most.
 export interface StepRetry {
   readonly attempts: number;
-  backoff(attempt: number): number;
-  retries(error: unknown): boolean;
 }
 
 export interface StepOptions {
@@ -290,6 +288,9 @@ export interface Durability {
   // The engine's clock, unjournaled: only a step's effect reads it, so its result keeps the
   // time (fork branches run concurrently, and journaled reads must come in a fixed order).
   stepTime(): number;
+  // `attempt`: the one a retry policy counts, 1 and one more after each `RetryableFault`; the
+  // engine's repeats after an outage or a crash run the same attempt again. A step whose retries
+  // the engine gave up on throws `RetriesSpentFault`.
   step<T>(
     name: string,
     effect: (attempt: number) => Promise<T>,

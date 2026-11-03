@@ -359,6 +359,8 @@ export const aTask = (status: TaskStatus = TaskStatus.Running): TaskRecord => ({
   input: { amount: 1 },
   output: null,
   error: null,
+  attempt: 1,
+  retryAt: null,
   at: T0,
 });
 

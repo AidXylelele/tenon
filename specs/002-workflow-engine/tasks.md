@@ -38,6 +38,9 @@ Stories run in dependency order: US1 → US2 → US3, then US7 → US5 → US4 �
 - [ ] T030 [US2] The remaining lifecycle events of FR-030: `task.created`, `task.retried`, `task.suspended`, `task.resumed`, and the workflow's correlation started and completed
 - [ ] T031 [US2] A lifecycle event leaves out its `output` when that would make it larger than 64 KiB (FR-030)
 - [ ] T032 [US2] Lifecycle events carry their sequence within the instance (FR-026)
+- [x] T033 [US2] A process that exits with another code than 0 faults with a runtime error (the end of its standard error, or its code), unless `return` is `code` or `all` (R7)
+- [x] T034 [US2] A failed connection of a service call names its reason: the address policy, DNS, refused, closed, TLS certificate, connect timeout (R6)
+- [x] T035 [US2] Every attempt a retry policy counts is its own record (`#n`) with its `attempt`; an outage repeats the same attempt; a retried fault, on a single task or in a task list, records `retryAt` decided where it arose; migration 0014 (FR-016, R15)
 
 ## US3 — Survive failures and scale out (P1)
 

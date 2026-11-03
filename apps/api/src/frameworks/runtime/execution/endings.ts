@@ -9,7 +9,15 @@ export enum EndingKind {
   Stopped = 'stopped',
 }
 
-// How a task ended: with its output and the directive that picks the next task, with an error,
+// A fault and the time an enclosing `try` runs its tasks again for it, decided where the fault
+// arose and journaled there, or null when none does.
+export interface Fault {
+  readonly kind: EndingKind.Faulted;
+  readonly error: JsonObject;
+  readonly retryAt: number | null;
+}
+
+// How a task ended: with its output and the directive that picks the next task, with a fault,
 // or stopped because the platform ended the instance.
 export type TaskEnding =
   | {
@@ -17,7 +25,7 @@ export type TaskEnding =
       readonly output: JsonValue;
       readonly then: string | null;
     }
-  | { readonly kind: EndingKind.Faulted; readonly error: JsonObject }
+  | Fault
   | { readonly kind: EndingKind.Stopped };
 
 // How a task list ended; `ended` when a task's `then: end` ends the whole workflow.
@@ -27,7 +35,7 @@ export type ListEnding =
       readonly output: JsonValue;
       readonly ended: boolean;
     }
-  | { readonly kind: EndingKind.Faulted; readonly error: JsonObject }
+  | Fault
   | { readonly kind: EndingKind.Stopped };
 
 export interface TaskItem {
@@ -35,11 +43,20 @@ export interface TaskItem {
   readonly task: Specification.Task;
 }
 
-// What a task does on a fault inside its step: retry it (the engine repeats the step) or let
-// the fault end it. A `try` around a single task decides so.
+// What a task does on a fault inside its step: retry it (the engine repeats the step after the
+// delay drawn for the attempt) or let the fault end it. A `try` around a single task decides so;
+// a fault it does not catch is for an enclosing `try`.
 export interface AttemptPolicy {
   readonly retry: StepRetry;
+  catches(error: JsonObject): Promise<boolean>;
   retries(error: JsonObject, attempt: number): Promise<boolean>;
+  delayAfter(attempt: number): number;
+}
+
+// How a `try` that runs its tasks again decides for a fault inside them: when it runs them again,
+// or null. A fault it does not catch is its enclosing `try`'s to decide.
+export interface ListRetry {
+  retryAt(error: JsonObject): Promise<number | null>;
 }
 
 // Runs tasks and task lists; composite kinds run their bodies through it.

@@ -116,6 +116,8 @@ The stores write them and the queries read them. None is an aggregate.
 | `listener`      | `ListenerStore` (`Listen`, `Unlisten`)                               | The `listen` tasks waiting now: instance, key, event types (`null` for any), `since`                                                                                                                                                                        |
 | `delivery`      | `DeliveryLog` (`MatchSubscriptions`, `DeliverEvent`, `FailDelivery`) | One row per subscription and event: `eventId`, `type`, `status` (`pending`, `delivered`, `failed`), `attempts`, `lastError`, `firstAttemptAt`, `lastAttemptAt`                                                                                              |
 
+A `task_progress` row also has its `attempt` (which attempt of the task its retry policy counts) and, for a fault a `try` retries, `retryAt` (research R15).
+
 The query ports are `WorkflowQueries`, `InstanceQueries`, `EventQueries`, `WebhookQueries`, `SecretQueries` and `SubscriptionQueries`.
 
 ## 5. State machines
@@ -176,7 +178,7 @@ The query ports are `WorkflowQueries`, `InstanceQueries`, `EventQueries`, `Webho
 | `workflow`          | id, namespace, name, status, turned_on, current_version_id, archived_at, version                                                             | unique (namespace, name)                                                                                     |
 | `workflow_version`  | id, workflow_id, semver, dsl, document jsonb, fingerprint, event_types text[], publisher_id, published_at                                    | unique (workflow_id, semver)                                                                                 |
 | `workflow_instance` | id, workflow_id, version_id, trigger, starter_id, origin_id, input, phase, output, error, created_at, started_at, ended_at, waiting, version | indexes (created_at, id) and (workflow_id, created_at, id), ascending (research R15)                         |
-| `task_progress`     | instance_id, execution, sequence, reference, name, status, input, output, error, started_at, ended_at                                        | primary key (instance_id, execution); index (instance_id, sequence); cascades with its instance              |
+| `task_progress`     | instance_id, execution, sequence, reference, name, status, input, output, error, started_at, ended_at, attempt, retry_at                     | primary key (instance_id, execution); index (instance_id, sequence); cascades with its instance              |
 | `event`             | sequence, source, event_id, type, origin, instance_id, cloud_event jsonb, accepted_at                                                        | unique (source, event_id); index (instance_id, sequence)                                                     |
 | `listener`          | instance_id, key, types text[], since                                                                                                        | primary key (instance_id, key); GIN on types; cascades with its instance                                     |
 | `webhook`           | id, name, event_type, token_fingerprint, created_at                                                                                          | unique token_fingerprint                                                                                     |
@@ -201,6 +203,7 @@ The libraries own their schemas, `nest_workflows` and `nest_outbox`, migrated by
 | `0011_schedules`           | `workflow.turned_on` and `workflow_version.event_types`                                    |
 | `0012_secrets`             | `secret`                                                                                   |
 | `0013_subscriptions`       | `subscription` and `delivery`                                                              |
+| `0014_task_attempts`       | `task_progress.attempt` and `retry_at`                                                     |
 
 ## 9. Building blocks and their sources (AR-001)
 

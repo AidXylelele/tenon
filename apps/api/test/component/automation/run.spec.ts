@@ -30,6 +30,17 @@ const SUMMARY_KEYS = [
   'version',
 ];
 
+interface LifecycleEvent {
+  readonly type: string;
+  readonly data: { readonly task?: string };
+}
+
+// The tasks the instance's lifecycle events of one task change name, in the order accepted.
+const tasksIn = (events: readonly LifecycleEvent[], change: string) =>
+  events
+    .filter((event) => event.type === `io.serverlessworkflow.task.${change}.v1`)
+    .map((event) => event.data.task);
+
 // A version whose output names it, so a run shows which version it ran.
 const aVersion = (version: string) =>
   aDocument({ version }, [{ greet: { set: { ranVersion: version } } }]);
@@ -519,6 +530,127 @@ describe('running a workflow and following its execution over HTTP', () => {
       });
       expect(statusesOf(tasks)).toEqual(['check:completed', 'refuse:faulted']);
       expect(tasks[1]?.error).toEqual(instance.error);
+    });
+
+    // Every attempt is its own record (FR-016, US2 AS4): a retried one ends faulted with when the
+    // next begins, and only the last fault is the task's, so it alone is a lifecycle event.
+    it('every_attempt_of_a_retried_task_is_its_own_record', async () => {
+      const refusal = {
+        type: `${ERRORS}validation`,
+        status: 400,
+        title: 'Lead refused',
+        detail: 'The lead has no email',
+      };
+      const document = aDocument({}, [
+        {
+          attempt: {
+            try: [{ refuse: { raise: { error: refusal } } }],
+            catch: {
+              retry: {
+                delay: { seconds: 1 },
+                limit: { attempt: { count: 1 } },
+              },
+            },
+          },
+        },
+      ]);
+      await publish(t, editor, document);
+
+      const started = await start(t, editor);
+      await drain(t);
+      const waiting = await tasksOf(t, viewer, started.id);
+      const due = run.clock.now() + 1000;
+      run.clock.advance('1s');
+      await drain(t);
+      const instance = await instanceOf(t, viewer, started.id);
+      const ended = await tasksOf(t, viewer, started.id);
+      const events = await request(t.server)
+        .get(`/api/v1/instances/${started.id}/events?limit=500`)
+        .set(viewer)
+        .expect(200);
+
+      const reference = '/do/0/attempt/try/0/refuse';
+      const error = { ...refusal, instance: reference };
+      const lifecycle = events.body.items as LifecycleEvent[];
+      const faulted = tasksIn(lifecycle, 'faulted');
+      const startedTasks = tasksIn(lifecycle, 'started');
+      expect(statusesOf(waiting)).toEqual([
+        'attempt:running',
+        'refuse:faulted',
+      ]);
+      expect(waiting[1]).toMatchObject({
+        execution: reference,
+        attempt: 1,
+        retryAt: new Date(due).toISOString(),
+        error,
+      });
+      expect(instance.phase).toBe('faulted');
+      expect(statusesOf(ended)).toEqual([
+        'attempt:faulted',
+        'refuse:faulted',
+        'refuse:faulted',
+      ]);
+      expect(ended[2]).toMatchObject({
+        execution: `${reference}#2`,
+        reference,
+        attempt: 2,
+        retryAt: null,
+        error,
+      });
+      expect(ended[0]).toMatchObject({ attempt: 1, retryAt: null });
+      expect(faulted).toEqual([reference, '/do/0/attempt']);
+      expect(startedTasks).toEqual(['/do/0/attempt', reference]);
+    });
+
+    // A task list's run again records like a single task's attempt: the fault the try retries
+    // says when, and is no lifecycle event of a fault.
+    it('a_retried_fault_in_a_task_list_says_when_its_tasks_run_again', async () => {
+      const refusal = { type: `${ERRORS}validation`, status: 400 };
+      const document = aDocument({}, [
+        {
+          attempt: {
+            try: [
+              { check: { set: { checked: true } } },
+              { refuse: { raise: { error: refusal } } },
+            ],
+            catch: {
+              retry: {
+                delay: { seconds: 1 },
+                limit: { attempt: { count: 1 } },
+              },
+            },
+          },
+        },
+      ]);
+      await publish(t, editor, document);
+
+      const started = await start(t, editor);
+      await drain(t);
+      const waiting = await tasksOf(t, viewer, started.id);
+      const due = run.clock.now() + 1000;
+      run.clock.advance('1s');
+      await drain(t);
+      const ended = await tasksOf(t, viewer, started.id);
+      const events = await request(t.server)
+        .get(`/api/v1/instances/${started.id}/events?limit=500`)
+        .set(viewer)
+        .expect(200);
+
+      const lifecycle = events.body.items as LifecycleEvent[];
+      expect(waiting[2]).toMatchObject({
+        execution: '/do/0/attempt/try/1/refuse',
+        status: 'faulted',
+        retryAt: new Date(due).toISOString(),
+      });
+      expect(ended[4]).toMatchObject({
+        execution: '/do/0/attempt#2/try/1/refuse',
+        status: 'faulted',
+        retryAt: null,
+      });
+      expect(tasksIn(lifecycle, 'faulted')).toEqual([
+        '/do/0/attempt/try/1/refuse',
+        '/do/0/attempt',
+      ]);
     });
 
     it('a_failing_expression_faults_with_an_expression_error_located_at_its_task', async () => {

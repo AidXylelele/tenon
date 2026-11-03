@@ -46,6 +46,8 @@ export interface InstancePage {
   readonly next: InstancePosition | null;
 }
 
+// `attempt`: which attempt of the task's step the execution is; `retryAt`: when the next attempt
+// begins, for a faulted attempt that is retried.
 export interface TaskRecordView {
   readonly execution: string;
   readonly reference: string;
@@ -56,6 +58,8 @@ export interface TaskRecordView {
   readonly error: JsonObject | null;
   readonly startedAt: Date;
   readonly endedAt: Date | null;
+  readonly attempt: number;
+  readonly retryAt: Date | null;
 }
 
 export interface TaskPage {

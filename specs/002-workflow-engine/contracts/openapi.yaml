@@ -895,6 +895,8 @@ components:
           error,
           startedAt,
           endedAt,
+          attempt,
+          retryAt,
         ]
       properties:
         execution:
@@ -917,6 +919,18 @@ components:
             - { type: 'null' }
         startedAt: { type: string, format: date-time }
         endedAt: { type: [string, 'null'], format: date-time }
+        attempt:
+          type: integer
+          minimum: 1
+          description: >
+            Which attempt of the task its retry policy counts; an attempt after the first has
+            its own execution, marked `#n`
+        retryAt:
+          type: [string, 'null']
+          format: date-time
+          description: >
+            When the task runs again, for a fault that a `try` retries: the task's next
+            attempt, or the try's tasks again
 
     TaskRecordPage:
       type: object

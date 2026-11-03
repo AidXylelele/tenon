@@ -8,6 +8,7 @@ import {
   JSON_HEADERS,
   RecordingObserver,
   RuntimeHarness,
+  ScriptedSandbox,
   aWorkflow,
 } from '../../support/runtime-harness.js';
 
@@ -639,4 +640,120 @@ describe('run: workflow and detached processes', () => {
       env: expect.arrayContaining(['GREETING=hi Ada']),
     });
   });
+});
+
+// A process faults the task when it exits with another code than 0, as Synapse's
+// `ScriptProcessExecutor` does, unless the author's `return` asks for the code.
+describe('run: script and run: shell, awaited', () => {
+  const RUNTIME = {
+    type: `${ERRORS}runtime`,
+    status: 500,
+    title: 'Runtime Error',
+  };
+  const TRACE = [
+    '/w/script:1',
+    'throw new Error("boom")',
+    '^',
+    '',
+    'Error: boom',
+    '    at Object.<anonymous> (/w/script:1:7)',
+  ].join('\n');
+
+  function script(rest: JsonObject = {}): JsonObject {
+    const run: JsonObject = {
+      script: { language: 'js', code: 'main()' },
+    };
+    return { compute: { run: Object.assign(run, rest) } };
+  }
+
+  it('a_process_that_exits_with_another_code_than_0_faults_with_its_standard_error', async () => {
+    h.sandbox.outcome = ScriptedSandbox.exited(1, '', `${TRACE}\n\n`);
+    const document = aWorkflow([script()]);
+
+    const { outcome } = await h.run(document, {});
+
+    expect(errorOf(outcome)).toEqual({
+      ...RUNTIME,
+      detail: TRACE,
+      instance: '/do/0/compute',
+    });
+  });
+
+  it('a_failed_process_that_wrote_no_standard_error_names_its_exit_code', async () => {
+    h.sandbox.outcome = ScriptedSandbox.exited(3, 'partial', ' \n');
+    const document = aWorkflow([
+      { compute: { run: { shell: { command: 'exit 3' } } } },
+    ]);
+
+    const { outcome } = await h.run(document, {});
+
+    expect(errorOf(outcome)).toMatchObject({
+      ...RUNTIME,
+      detail: 'The process exited with code 3',
+    });
+  });
+
+  it('a_long_standard_error_keeps_its_end', async () => {
+    const stderr = `${'x'.repeat(5_000)}\nValueError: boom`;
+    h.sandbox.outcome = ScriptedSandbox.exited(1, '', stderr);
+    const document = aWorkflow([script()]);
+
+    const { outcome } = await h.run(document, {});
+
+    const detail = errorOf(outcome).detail as string;
+    expect(detail).toHaveLength(2_001);
+    expect(detail.startsWith('…x')).toBe(true);
+    expect(detail.endsWith('\nValueError: boom')).toBe(true);
+  });
+
+  it('a_failed_process_is_caught_by_its_runtime_type', async () => {
+    h.sandbox.outcome = ScriptedSandbox.exited(1, '', 'Error: boom');
+    const document = aWorkflow([
+      {
+        attempt: {
+          try: [script()],
+          catch: {
+            errors: { with: { type: `${ERRORS}runtime` } },
+            do: [{ handle: { set: { failed: '${ $error.detail }' } } }],
+          },
+        },
+      },
+    ]);
+
+    const { outcome } = await h.run(document, {});
+
+    expect(outputOf(outcome)).toEqual({ failed: 'Error: boom' });
+  });
+
+  it.each([
+    ['code', 3],
+    ['all', { code: 3, stdout: 'out', stderr: 'err' }],
+  ])(
+    'return_%s_outputs_the_code_of_a_failed_process',
+    async (returned, expected) => {
+      h.sandbox.outcome = ScriptedSandbox.exited(3, 'out', 'err');
+      const document = aWorkflow([script({ return: returned })]);
+
+      const { outcome } = await h.run(document, {});
+
+      expect(outputOf(outcome)).toEqual(expected);
+    },
+  );
+
+  it.each([
+    ['stdout', 'out'],
+    ['stderr', 'err'],
+    ['code', 0],
+    ['none', null],
+  ])(
+    'a_process_that_exits_with_0_outputs_its_%s',
+    async (returned, expected) => {
+      h.sandbox.outcome = ScriptedSandbox.exited(0, 'out', 'err');
+      const document = aWorkflow([script({ return: returned })]);
+
+      const { outcome } = await h.run(document, {});
+
+      expect(outputOf(outcome)).toEqual(expected);
+    },
+  );
 });

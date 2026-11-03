@@ -8,7 +8,7 @@ import type { Evaluator } from '../evaluator.js';
 import type { EventFilters } from '../events/event-filters.js';
 import { ErrorKind, TaskFault } from '../faults.js';
 import { EventTypes } from '../../document/event-types.js';
-import { Journal } from '../journal.js';
+import { Journal, type Journaled } from '../journal.js';
 import type { Scope } from '../scope.js';
 
 interface Strategy {
@@ -53,7 +53,12 @@ export class ListenKind implements CompositeKind {
       return run.durability.stepTime();
     });
 
-    if (!began.ok) return { kind: EndingKind.Faulted, error: began.error };
+    if (!began.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: began.error,
+        retryAt: began.retryAt,
+      };
 
     const consumed: JsonObject[] = [];
     const matched = new Set<number>();
@@ -71,8 +76,9 @@ export class ListenKind implements CompositeKind {
           scope.pointer,
           'The listen outlasted its timeout',
         );
-        await this.#stop(scope, key);
-        return { kind: EndingKind.Faulted, error: timedOut.error };
+        const stopped = await this.#stop(scope, key, timedOut);
+        const retryAt = stopped.ok ? null : stopped.retryAt;
+        return { kind: EndingKind.Faulted, error: timedOut.error, retryAt };
       }
 
       const marker = `match${String(received)}`;
@@ -82,8 +88,12 @@ export class ListenKind implements CompositeKind {
       );
 
       if (!decided.ok) {
-        await this.#stop(scope, key);
-        return { kind: EndingKind.Faulted, error: decided.error };
+        await this.#stop(scope, key, null);
+        return {
+          kind: EndingKind.Faulted,
+          error: decided.error,
+          retryAt: decided.retryAt,
+        };
       }
 
       const match = decided.value as unknown as Match;
@@ -98,7 +108,7 @@ export class ListenKind implements CompositeKind {
       if (match.done) break;
     }
 
-    await this.#stop(scope, key);
+    await this.#stop(scope, key, null);
     const output = ListenKind.#read(consumed, read);
     return { kind: EndingKind.Completed, output, ended: false };
   }
@@ -178,11 +188,20 @@ export class ListenKind implements CompositeKind {
     return this.evaluator.condition(strategy.until, events, {}, scope.pointer);
   }
 
-  async #stop(scope: Scope, key: string): Promise<void> {
+  // The listen ends: its listener goes and the instance runs again. A timeout faults it in this
+  // step, where the retry of that fault is decided.
+  #stop(
+    scope: Scope,
+    key: string,
+    fault: TaskFault | null,
+  ): Promise<Journaled<null>> {
     const run = scope.run;
-    await Journal.value(scope, 'listened', async () => {
+    return Journal.value(scope, 'listened', async () => {
       await run.observer.unlisten(run.plan.instanceId, key);
       await run.observer.running(run.plan.instanceId);
+
+      if (fault !== null) throw fault;
+
       return null;
     });
   }

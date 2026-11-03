@@ -2,10 +2,15 @@ import {
   StepFailedError,
   type WorkflowContext,
   type WorkflowRetryOptions,
+  type WorkflowStepContext,
 } from '@nestjs/workflows';
 import type { JsonObject } from '../../domain/automation/json.js';
 import type { EngineTime } from '../../interface-adapters/workflows/runs/interfaces.js';
-import { TaskFault } from '../runtime/execution/faults.js';
+import {
+  type RetriedFault,
+  RetriesSpentFault,
+  RetryableFault,
+} from '../runtime/execution/faults.js';
 import type {
   Durability,
   GoJudgeCommand,
@@ -14,6 +19,11 @@ import type {
 } from '../runtime/interfaces.js';
 import { EVENT_SIGNAL, RESUME_SIGNAL } from './engine.constants.js';
 import type { StepErrors } from './step-errors.js';
+
+// A step's progress checkpoint: the last attempt a retry policy retried.
+interface RetriedAttempt {
+  readonly attempt: number;
+}
 
 // The runtime's durability on @nestjs/workflows: a step is `ctx.step`, a sleep `ctx.sleep`, a
 // held run waits for the resume signal. The engine also repeats a step through an outage of the
@@ -49,9 +59,9 @@ export class EngineDurability implements Durability {
     const retry = EngineDurability.#retryOf(options.retry);
 
     try {
-      const result = await this.ctx.step(
+      const result = await this.ctx.step<T, RetriedAttempt>(
         name,
-        (step) => this.errors.classified(() => effect(step.attempt)),
+        (step) => this.#attempted(step, effect),
         { retry },
       );
       return result as T;
@@ -62,8 +72,30 @@ export class EngineDurability implements Durability {
 
       if (!spent) throw error;
 
-      const fault = JSON.parse(error.cause.message) as JsonObject;
-      throw new TaskFault(fault);
+      const retried = JSON.parse(error.cause.message) as RetriedFault;
+      throw new RetriesSpentFault(retried.error, retried.attempt);
+    }
+  }
+
+  // The attempt a retry policy counts: one after the last it retried, which the step checkpoints
+  // as its progress. A repeat after an outage or a crash finds the same checkpoint, so it runs
+  // the same attempt again (the engine's own attempt counts both).
+  async #attempted<T>(
+    step: WorkflowStepContext<RetriedAttempt>,
+    effect: (attempt: number) => Promise<T>,
+  ): Promise<T> {
+    const retried = step.progress?.attempt ?? 0;
+    const attempt = retried + 1;
+
+    try {
+      return await this.errors.classified(() => effect(attempt));
+    } catch (error) {
+      if (error instanceof RetryableFault) {
+        const checkpoint: RetriedAttempt = { attempt };
+        await step.heartbeat(checkpoint);
+      }
+
+      throw error;
     }
   }
 
@@ -125,7 +157,8 @@ export class EngineDurability implements Durability {
     });
   }
 
-  // A retry policy's own attempts and delays, with a reserve for outages of the platform.
+  // A retry policy's own attempts, each after the delay its fault carries, with a reserve for
+  // outages of the platform.
   static #retryOf(retry: StepRetry | null): WorkflowRetryOptions {
     if (retry === null) return EngineDurability.OUTAGE;
 
@@ -136,7 +169,7 @@ export class EngineDurability implements Durability {
     return {
       attempts,
       backoff: (attempt, error) => {
-        if (retry.retries(error)) return retry.backoff(attempt);
+        if (error instanceof RetryableFault) return error.delay;
 
         const grown = EngineDurability.OUTAGE_DELAY_MS * 2 ** (attempt - 1);
         return Math.min(grown, EngineDurability.OUTAGE_MAX_DELAY_MS);

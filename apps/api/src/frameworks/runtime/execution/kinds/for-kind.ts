@@ -48,7 +48,12 @@ export class ForKind implements CompositeKind {
       return value;
     });
 
-    if (!items.ok) return { kind: EndingKind.Faulted, error: items.error };
+    if (!items.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: items.error,
+        retryAt: items.retryAt,
+      };
 
     const body = loop.do ?? [];
     let data = input;
@@ -65,7 +70,11 @@ export class ForKind implements CompositeKind {
       );
 
       if (!proceeds.ok)
-        return { kind: EndingKind.Faulted, error: proceeds.error };
+        return {
+          kind: EndingKind.Faulted,
+          error: proceeds.error,
+          retryAt: proceeds.retryAt,
+        };
 
       if (!proceeds.value) break;
 

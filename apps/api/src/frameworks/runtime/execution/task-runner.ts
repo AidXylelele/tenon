@@ -16,18 +16,25 @@ import {
   type TaskItem,
 } from './endings.js';
 import type { Evaluator } from './evaluator.js';
-import { ErrorKind, RetryableFault, TaskFault } from './faults.js';
+import {
+  ErrorKind,
+  RetriesSpentFault,
+  RetryableFault,
+  TaskFault,
+} from './faults.js';
 import type { TaskKindRegistry } from './task-kind-registry.js';
 import type { Scope } from './scope.js';
 import { TaskMoment } from './task-moment.js';
 
 // The journaled result of a task's step: what the task produced and what the platform answered.
-// `halted`: no task ran, because the run was stopped or the task's race was decided.
+// `halted`: no task ran, because the run was stopped or the task's race was decided. `retryAt`:
+// when the task runs again for its fault (its next attempt, or its enclosing try's tasks again).
 interface StepResult {
   readonly status: TaskStatus | null;
   readonly input: JsonValue;
   readonly output: JsonValue;
   readonly error: JsonObject | null;
+  readonly retryAt: number | null;
   readonly then: string | null;
   readonly context: JsonObject | null;
   readonly directive: RunDirective;
@@ -55,6 +62,7 @@ export class TaskRunner implements Runner {
     input: null,
     output: null,
     error: null,
+    retryAt: null,
     then: null,
     context: null,
     directive: RunDirective.Stop,
@@ -134,13 +142,15 @@ export class TaskRunner implements Runner {
       const result = await durability.step(scope.stepName, effect, options);
       return await this.#after(result, scope);
     } catch (error) {
-      if (!(error instanceof TaskFault)) throw error;
+      if (!(error instanceof RetriesSpentFault)) throw error;
 
-      // A retry policy spent its attempts: the last fault ends the task.
+      // The engine gave up on the step: its last attempt's fault ends the task, on that record;
+      // the task's own try caught it, so no enclosing try retries it.
+      const last = scope.attempted(error.attempt);
       const failed = () =>
         this.#ended(
           item,
-          scope,
+          last,
           input,
           TaskStatus.Faulted,
           null,
@@ -165,7 +175,8 @@ export class TaskRunner implements Runner {
     if (scope.halted) return TaskRunner.#HALTED;
 
     const task = item.task;
-    const startedAt = await this.#started(item, scope, input);
+    const attempted = scope.attempted(attempt);
+    const startedAt = await this.#started(item, attempted, input);
     const started = TaskMoment.started(item, startedAt, input);
 
     try {
@@ -175,7 +186,7 @@ export class TaskRunner implements Runner {
       if (!guarded)
         return await this.#ended(
           item,
-          scope,
+          attempted,
           input,
           TaskStatus.Skipped,
           input,
@@ -221,7 +232,7 @@ export class TaskRunner implements Runner {
       const then = body.then ?? task.then ?? null;
       return await this.#ended(
         item,
-        scope,
+        attempted,
         taskInput,
         TaskStatus.Completed,
         output,
@@ -232,22 +243,58 @@ export class TaskRunner implements Runner {
     } catch (error) {
       if (!(error instanceof TaskFault)) throw error;
 
+      const fault = error.error;
       const retrying =
-        policy !== null && (await policy.retries(error.error, attempt));
+        policy !== null && (await policy.retries(fault, attempt));
 
-      if (retrying) throw new RetryableFault(error.error);
+      // The attempt ends faulted with when the engine runs the next, on its clock; once the
+      // instance has ended, no next attempt is due.
+      if (retrying) {
+        const delay = policy.delayAfter(attempt);
+        const retryAt = scope.run.durability.stepTime() + delay;
+        const retried = await this.#ended(
+          item,
+          attempted,
+          input,
+          TaskStatus.Faulted,
+          null,
+          fault,
+          null,
+          null,
+          retryAt,
+        );
 
+        if (retried.directive === RunDirective.Stop) return retried;
+
+        throw new RetryableFault(fault, attempt, delay);
+      }
+
+      const retryAt = await TaskRunner.#retryAtOf(fault, scope, policy);
       return await this.#ended(
         item,
-        scope,
+        attempted,
         input,
         TaskStatus.Faulted,
         null,
-        error.error,
+        fault,
         null,
         null,
+        retryAt,
       );
     }
+  }
+
+  // When an enclosing try runs its tasks again for a fault the task's own try does not catch.
+  static async #retryAtOf(
+    error: JsonObject,
+    scope: Scope,
+    policy: AttemptPolicy | null,
+  ): Promise<number | null> {
+    const caught = policy !== null && (await policy.catches(error));
+
+    if (caught) return null;
+
+    return scope.retryAtOf(error);
   }
 
   async #composite(
@@ -341,6 +388,7 @@ export class TaskRunner implements Runner {
         input: taskInput,
         output: null,
         error: null,
+        retryAt: null,
         then: null,
         context: null,
         directive: RunDirective.Continue,
@@ -351,6 +399,7 @@ export class TaskRunner implements Runner {
     } catch (error) {
       if (!(error instanceof TaskFault)) throw error;
 
+      const retryAt = await scope.retryAtOf(error.error);
       const faulted = await this.#ended(
         item,
         scope,
@@ -360,6 +409,7 @@ export class TaskRunner implements Runner {
         error.error,
         null,
         null,
+        retryAt,
       );
       return TaskRunner.#begun(faulted, startedAt, null);
     }
@@ -375,6 +425,7 @@ export class TaskRunner implements Runner {
       input: result.input,
       output: result.output,
       error: result.error,
+      retryAt: result.retryAt,
       then: result.then,
       context: result.context,
       directive: result.directive,
@@ -393,6 +444,7 @@ export class TaskRunner implements Runner {
     const task = item.task;
     const taskInput = given.input;
 
+    // The fault of a task inside: its retry was decided where it arose.
     if (body.kind === EndingKind.Faulted)
       return this.#ended(
         item,
@@ -403,6 +455,7 @@ export class TaskRunner implements Runner {
         body.error,
         null,
         null,
+        body.retryAt,
       );
 
     try {
@@ -436,6 +489,7 @@ export class TaskRunner implements Runner {
     } catch (error) {
       if (!(error instanceof TaskFault)) throw error;
 
+      const retryAt = await scope.retryAtOf(error.error);
       return await this.#ended(
         item,
         scope,
@@ -445,6 +499,7 @@ export class TaskRunner implements Runner {
         error.error,
         null,
         null,
+        retryAt,
       );
     }
   }
@@ -477,11 +532,14 @@ export class TaskRunner implements Runner {
       reference: scope.pointer.toString(),
       name: item.name,
       input: recorded,
+      attempt: scope.attempt,
       at,
     });
     return startedAt;
   }
 
+  // The task's end; `retryAt`: when the task runs again for its fault (its next attempt, or its
+  // enclosing try's tasks again).
   async #ended(
     item: TaskItem,
     scope: Scope,
@@ -491,10 +549,12 @@ export class TaskRunner implements Runner {
     error: JsonObject | null,
     then: string | null,
     context: JsonObject | null,
+    retryAt: number | null = null,
   ): Promise<Journaled> {
     const run = scope.run;
     const endedAt = run.durability.stepTime();
     const at = new Date(endedAt).toISOString();
+    const next = retryAt === null ? null : new Date(retryAt).toISOString();
     const recordedOutput = run.masked(output);
     const recordedError = error === null ? null : run.masked(error);
     const directive = await run.observer.taskEnded(run.plan.instanceId, {
@@ -504,6 +564,8 @@ export class TaskRunner implements Runner {
       status,
       output: recordedOutput,
       error: recordedError,
+      attempt: scope.attempt,
+      retryAt: next,
       at,
     });
 
@@ -511,7 +573,17 @@ export class TaskRunner implements Runner {
     if (directive === RunDirective.Stop) run.stop();
 
     const halted = false;
-    return { status, input, output, error, then, context, directive, halted };
+    return {
+      status,
+      input,
+      output,
+      error,
+      retryAt,
+      then,
+      context,
+      directive,
+      halted,
+    };
   }
 
   // A step's result, applied where the run replays: its export replaces the context, and the
@@ -532,7 +604,11 @@ export class TaskRunner implements Runner {
     }
 
     if (result.status === TaskStatus.Faulted)
-      return { kind: EndingKind.Faulted, error: result.error ?? {} };
+      return {
+        kind: EndingKind.Faulted,
+        error: result.error ?? {},
+        retryAt: result.retryAt,
+      };
 
     return {
       kind: EndingKind.Completed,

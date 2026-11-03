@@ -22,6 +22,7 @@ import {
   type HttpRequest,
   type SentAuthorization,
 } from '../runtime/interfaces.js';
+import { AddressRefusedError } from './address-policy.js';
 import { EndpointDispatcher } from './endpoint-dispatcher.js';
 import { ResponseTooLargeError, TokenRefusedError } from './endpoint.errors.js';
 
@@ -39,6 +40,37 @@ export class UndiciEndpointClient implements EndpointClient {
   private static readonly MAXIMUM_BYTES = 1024 * 1024;
   private static readonly DISCOVERY = '/.well-known/openid-configuration';
   private static readonly UNREACHABLE = 'The service could not be reached';
+  private static readonly UNRESOLVED = 'The host name could not be resolved';
+  private static readonly CLOSED =
+    'The connection closed before the service answered';
+  private static readonly CONNECT_TIMEOUT = 'The connection timed out';
+  private static readonly CERTIFICATE_REFUSED =
+    "The service's TLS certificate was refused";
+  // Most of OpenSSL's certificate verification codes, which Node gives a TLS error, begin so.
+  private static readonly CERTIFICATE = 'CERT_';
+  // Why the connection failed, by the code Node (`net`, `dns`, `tls`) or undici
+  // (`lib/core/errors.js`) gives its error.
+  private static readonly REASONS = new Map<string, string>([
+    ['ENOTFOUND', UndiciEndpointClient.UNRESOLVED],
+    ['EAI_AGAIN', UndiciEndpointClient.UNRESOLVED],
+    ['ECONNREFUSED', 'The service refused the connection'],
+    ['ECONNRESET', UndiciEndpointClient.CLOSED],
+    ['EPIPE', UndiciEndpointClient.CLOSED],
+    ['UND_ERR_SOCKET', UndiciEndpointClient.CLOSED],
+    ['ETIMEDOUT', UndiciEndpointClient.CONNECT_TIMEOUT],
+    ['UND_ERR_CONNECT_TIMEOUT', UndiciEndpointClient.CONNECT_TIMEOUT],
+    [
+      'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+      UndiciEndpointClient.CERTIFICATE_REFUSED,
+    ],
+    [
+      'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+      UndiciEndpointClient.CERTIFICATE_REFUSED,
+    ],
+    ['DEPTH_ZERO_SELF_SIGNED_CERT', UndiciEndpointClient.CERTIFICATE_REFUSED],
+    ['SELF_SIGNED_CERT_IN_CHAIN', UndiciEndpointClient.CERTIFICATE_REFUSED],
+    ['ERR_TLS_CERT_ALTNAME_INVALID', UndiciEndpointClient.CERTIFICATE_REFUSED],
+  ]);
   private static readonly TOO_LARGE = 'The response is larger than 1 MiB';
   private static readonly TOKEN_REFUSED =
     'The authorization server refused the client credentials';
@@ -294,6 +326,10 @@ export class UndiciEndpointClient implements EndpointClient {
     if (error instanceof ResponseTooLargeError)
       return { kind: EndpointOutcomeKind.Unreachable, reason: error.message };
 
+    // The address policy says itself what it refused.
+    if (error instanceof AddressRefusedError)
+      return { kind: EndpointOutcomeKind.Unreachable, reason: error.message };
+
     const code: unknown =
       error instanceof Error ? Reflect.get(error, 'code') : undefined;
 
@@ -303,16 +339,23 @@ export class UndiciEndpointClient implements EndpointClient {
     )
       return { kind: EndpointOutcomeKind.Invalid, reason: error.message };
 
-    const transport =
-      error instanceof Error && typeof Reflect.get(error, 'code') === 'string';
+    const transport = error instanceof Error && typeof code === 'string';
 
-    if (transport)
-      return {
-        kind: EndpointOutcomeKind.Unreachable,
-        reason: UndiciEndpointClient.UNREACHABLE,
-      };
+    if (transport) {
+      const reason = UndiciEndpointClient.reasonOf(code);
+      return { kind: EndpointOutcomeKind.Unreachable, reason };
+    }
 
     throw error;
+  }
+
+  private static reasonOf(code: string): string {
+    const certificate = code.startsWith(UndiciEndpointClient.CERTIFICATE);
+
+    if (certificate) return UndiciEndpointClient.CERTIFICATE_REFUSED;
+
+    const reason = UndiciEndpointClient.REASONS.get(code);
+    return reason ?? UndiciEndpointClient.UNREACHABLE;
   }
 
   private static jsonOf(response: ReceivedResponse): JsonObject {

@@ -39,7 +39,12 @@ export class DetachedProcessKind implements CompositeKind {
       return command as unknown as JsonObject;
     });
 
-    if (!built.ok) return { kind: EndingKind.Faulted, error: built.error };
+    if (!built.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: built.error,
+        retryAt: built.retryAt,
+      };
 
     const command = built.value as unknown as GoJudgeCommand;
     await scope.run.durability.detachProcess(scope.named('process'), command);

@@ -152,6 +152,8 @@ export interface TaskBody {
   readonly error: Record<string, unknown> | null;
   readonly startedAt: string;
   readonly endedAt: string | null;
+  readonly attempt: number;
+  readonly retryAt: string | null;
 }
 
 export async function tasksOf(

@@ -94,6 +94,8 @@ export const TaskRecordResponse = z.object({
   error: z.json().nullable(),
   startedAt: z.iso.datetime(),
   endedAt: z.iso.datetime().nullable(),
+  attempt: z.number().int().min(1),
+  retryAt: z.iso.datetime().nullable(),
 });
 
 export const TaskPageResponse = z.object({

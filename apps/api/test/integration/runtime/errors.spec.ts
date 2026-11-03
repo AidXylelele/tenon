@@ -1,11 +1,16 @@
 import { TaskStatus } from '../../../src/application/automation/instances/enums.js';
+import { RunDirective } from '../../../src/domain/automation/instances/enums.js';
 import type { JsonObject } from '../../../src/domain/automation/json.js';
+import { SandboxOutcomeKind } from '../../../src/frameworks/runtime/enums.js';
 import { RunOutcomeKind } from '../../../src/interface-adapters/workflows/enums.js';
 import type { RunOutcome } from '../../../src/interface-adapters/workflows/interfaces.js';
 import {
   ERRORS,
   JSON_HEADERS,
+  RecordingObserver,
   RuntimeHarness,
+  STARTED_AT,
+  ScriptedSandbox,
   aWorkflow,
 } from '../../support/runtime-harness.js';
 
@@ -395,7 +400,7 @@ describe('retry', () => {
 
     expect(outputOf(outcome)).toMatchObject({ handled: { status: 409 } });
     expect(observer.startedNamed('fail')).toHaveLength(3);
-    expect(observer.endedNamed('fail')).toHaveLength(1);
+    expect(observer.endedNamed('fail')).toHaveLength(3);
     expect(durability.backoffs.map((b) => b.milliseconds)).toEqual([
       1000, 1000,
     ]);
@@ -547,8 +552,10 @@ describe('retry', () => {
 
     expect(outputOf(outcome)).toEqual({ up: true });
     expect(observer.startedNamed('check')).toHaveLength(3);
-    expect(observer.endedNamed('check')).toEqual([
-      expect.objectContaining({ status: TaskStatus.Completed }),
+    expect(observer.endedNamed('check').map((task) => task.status)).toEqual([
+      TaskStatus.Faulted,
+      TaskStatus.Faulted,
+      TaskStatus.Completed,
     ]);
     expect(durability.backoffs.map((b) => b.milliseconds)).toEqual([
       3000, 6000,
@@ -616,6 +623,226 @@ describe('retry', () => {
     expect(secondRun.observer.startedNamed('fail')).toHaveLength(1);
     expect(third.observer.startedNamed('fail')).toHaveLength(4);
     expect(outputOf(first.outcome)).toMatchObject({ handled: { status: 409 } });
+  });
+
+  // Each attempt of a step the engine retries is its own record (FR-016): it starts with its
+  // number, and a retried one ends faulted with when the next begins, on the engine's clock.
+  it('every_attempt_of_a_single_task_is_its_own_record', async () => {
+    const document = aWorkflow([
+      retried([{ fail: raising() }], {
+        delay: second,
+        backoff: { linear: {} },
+        limit: { attempt: { count: 2 } },
+      }),
+    ]);
+
+    const { observer } = await h.run(document, {});
+
+    const first = '/do/0/attempt/try/0/fail';
+    const started = Date.parse(STARTED_AT);
+    const starts = observer.startedNamed('fail');
+    expect(starts.map((task) => [task.execution, task.attempt])).toEqual([
+      [first, 1],
+      [`${first}#2`, 2],
+      [`${first}#3`, 3],
+    ]);
+    expect(observer.endedNamed('fail')).toEqual([
+      expect.objectContaining({
+        execution: first,
+        reference: first,
+        status: TaskStatus.Faulted,
+        error: expect.objectContaining({ status: 409 }),
+        retryAt: new Date(started + 1000).toISOString(),
+      }),
+      expect.objectContaining({
+        execution: `${first}#2`,
+        reference: first,
+        status: TaskStatus.Faulted,
+        retryAt: new Date(started + 3000).toISOString(),
+      }),
+      expect.objectContaining({
+        execution: `${first}#3`,
+        reference: first,
+        status: TaskStatus.Faulted,
+        retryAt: null,
+      }),
+    ]);
+  });
+
+  it('a_jittered_retry_announces_the_delay_the_engine_waits', async () => {
+    const document = aWorkflow([
+      retried([{ fail: raising() }], {
+        delay: second,
+        backoff: { constant: {} },
+        jitter: { from: { milliseconds: 100 }, to: { milliseconds: 300 } },
+        limit: { attempt: { count: 4 } },
+      }),
+    ]);
+
+    const { observer, durability } = await h.run(document, {});
+
+    let due = Date.parse(STARTED_AT);
+    const ended = observer.endedNamed('fail');
+    const announced = ended.map((task) => task.retryAt);
+    const waited: (string | null)[] = durability.backoffs.map((backoff) => {
+      due += backoff.milliseconds;
+      return new Date(due).toISOString();
+    });
+    expect(waited).toHaveLength(4);
+    expect(announced).toEqual(waited.concat([null]));
+  });
+
+  // The engine's reserve for outages was spent while the policy still retried: the last attempt
+  // that ran ends the task, on its own record.
+  it('a_step_the_engine_gives_up_on_ends_on_its_last_attempt_s_record', async () => {
+    const document = aWorkflow([
+      trying([{ fail: raising() }], {
+        retry: { delay: second, limit: { attempt: { count: 3 } } },
+      }),
+    ]);
+
+    const { outcome, observer, journal } = await h.run(
+      document,
+      {},
+      { stepAttempts: 2 },
+    );
+
+    const first = '/do/0/attempt/try/0/fail';
+    const ended = observer.endedNamed('fail');
+    expect(errorOf(outcome)).toMatchObject({ status: 409, instance: first });
+    expect(ended.map((task) => [task.execution, task.retryAt])).toEqual([
+      [first, new Date(Date.parse(STARTED_AT) + 1000).toISOString()],
+      [`${first}#2`, expect.any(String)],
+      [`${first}#2`, null],
+    ]);
+    expect(journal.get(first)).toMatchObject({ attempts: 2 });
+
+    const replayed = await h.run(document, {}, { journal, stepAttempts: 2 });
+
+    expect(errorOf(replayed.outcome)).toMatchObject({ status: 409 });
+    expect(replayed.observer.ended).toEqual([]);
+  });
+
+  // A task list's run again is new executions of its tasks; the fault the try retries says when,
+  // as a single task's attempt does, on the task and on the tasks it faulted on its way out.
+  it('a_task_list_s_retried_fault_says_when_its_tasks_run_again', async () => {
+    const document = aWorkflow([
+      retried(
+        [
+          { first: { set: { a: 1 } } },
+          { group: { do: [{ fail: raising() }] } },
+        ],
+        { delay: second, limit: { attempt: { count: 1 } } },
+      ),
+    ]);
+
+    const { observer, durability } = await h.run(document, {});
+
+    const due = new Date(Date.parse(STARTED_AT) + 1000).toISOString();
+    const starts = observer.startedNamed('fail');
+    expect(starts.map((task) => [task.execution, task.attempt])).toEqual([
+      ['/do/0/attempt/try/1/group/do/0/fail', 1],
+      ['/do/0/attempt#2/try/1/group/do/0/fail', 1],
+    ]);
+    expect(observer.endedNamed('fail').map((task) => task.retryAt)).toEqual([
+      due,
+      null,
+    ]);
+    expect(observer.endedNamed('group').map((task) => task.retryAt)).toEqual([
+      due,
+      null,
+    ]);
+    expect(durability.newSleeps.map((sleep) => sleep.milliseconds)).toEqual([
+      1000,
+    ]);
+  });
+
+  // The nearest try that catches a fault decides on it: here not the single task's own try.
+  it('a_fault_an_inner_try_does_not_catch_says_when_the_outer_try_runs_again', async () => {
+    const inner = trying([{ fail: raising() }], {
+      errors: { with: { status: 503 } },
+      retry: { delay: second, limit: { attempt: { count: 3 } } },
+    });
+    const document = aWorkflow([
+      retried([{ first: { set: { a: 1 } } }, inner], {
+        delay: { seconds: 2 },
+        limit: { attempt: { count: 1 } },
+      }),
+    ]);
+
+    const { observer } = await h.run(document, {});
+
+    const due = new Date(Date.parse(STARTED_AT) + 2000).toISOString();
+    const ended = observer.endedNamed('fail');
+    expect(ended.map((task) => [task.attempt, task.retryAt])).toEqual([
+      [1, due],
+      [1, null],
+    ]);
+  });
+
+  // An outage of the platform runs the same attempt again: the same record, and the policy's
+  // count is not spent on it.
+  it('an_outage_runs_the_same_attempt_again_and_spends_no_retry', async () => {
+    h.sandbox.queued.push(
+      { kind: SandboxOutcomeKind.Unreachable },
+      ScriptedSandbox.exited(1, '', 'Error: boom'),
+      ScriptedSandbox.exited(0, 'done', ''),
+    );
+    const document = aWorkflow([
+      trying(
+        [
+          {
+            compute: {
+              run: { script: { language: 'js', code: 'main()' } },
+            },
+          },
+        ],
+        { retry: { delay: second, limit: { attempt: { count: 1 } } } },
+      ),
+    ]);
+
+    const { outcome, observer } = await h.run(document, {});
+
+    const first = '/do/0/attempt/try/0/compute';
+    const starts = observer.startedNamed('compute');
+    const ended = observer.endedNamed('compute');
+    expect(outputOf(outcome)).toBe('done');
+    expect(starts.map((task) => [task.execution, task.attempt])).toEqual([
+      [first, 1],
+      [first, 1],
+      [`${first}#2`, 2],
+    ]);
+    expect(ended.map((task) => [task.execution, task.status])).toEqual([
+      [first, TaskStatus.Faulted],
+      [`${first}#2`, TaskStatus.Completed],
+    ]);
+  });
+
+  // The platform answers the retried attempt's end with stop (the instance ended meanwhile): the
+  // step ends there, so no worker runs another attempt.
+  it('a_retried_attempt_of_an_ended_instance_schedules_no_next_attempt', async () => {
+    const observer = new RecordingObserver((task) =>
+      task.retryAt === null ? RunDirective.Continue : RunDirective.Stop,
+    );
+    const document = aWorkflow([
+      retried([{ fail: raising() }], {
+        delay: second,
+        limit: { attempt: { count: 3 } },
+      }),
+    ]);
+
+    const { outcome, durability, journal } = await h.run(
+      document,
+      {},
+      { observer },
+    );
+
+    expect(outcome.kind).toBe(RunOutcomeKind.Stopped);
+    expect(observer.startedNamed('fail')).toHaveLength(1);
+    expect(durability.backoffs).toEqual([]);
+    expect(journal.get('/do/0/attempt/try/0/fail')).toMatchObject({
+      value: { status: TaskStatus.Faulted, directive: RunDirective.Stop },
+    });
   });
 
   it('a_retry_policy_declared_in_use_retries_is_used_by_name', async () => {

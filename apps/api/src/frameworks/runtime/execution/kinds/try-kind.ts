@@ -7,13 +7,15 @@ import {
   type AttemptPolicy,
   type CompositeKind,
   EndingKind,
+  type Fault,
   type ListEnding,
+  type ListRetry,
   type Runner,
   type TaskEnding,
   type TaskItem,
 } from '../endings.js';
 import type { Evaluator } from '../evaluator.js';
-import { RetryableFault } from '../faults.js';
+import { TaskFault } from '../faults.js';
 import { Journal } from '../journal.js';
 import type { Scope } from '../scope.js';
 import type { TaskKindRegistry } from '../task-kind-registry.js';
@@ -28,9 +30,10 @@ enum Verdict {
 
 // `try`: its tasks, and on a fault the `catch` decides. A caught error is retried while the
 // policy allows: a single task by the engine itself (the step's attempts and durable delays),
-// several tasks by running the list again after a durable sleep. Then `catch.do` runs, or the
-// task completes with its input when nothing was to be retried, or faults when the retries are
-// spent.
+// several tasks by running the list again after a durable sleep. Either way the retry is decided
+// where the fault arose, so the faulted task's record says when the next attempt begins. Then
+// `catch.do` runs, or the task completes with its input when nothing was to be retried, or
+// faults when the retries are spent.
 export class TryKind implements CompositeKind {
   constructor(
     private readonly evaluator: Evaluator,
@@ -85,11 +88,10 @@ export class TryKind implements CompositeKind {
     const firstAt = scope.startedAt;
     const durability = scope.run.durability;
     const attempts: AttemptPolicy = {
-      retry: {
-        attempts: policy.attempts,
-        backoff: (attempt) => policy.delayAfter(attempt),
-        retries: (error) => error instanceof RetryableFault,
-      },
+      retry: { attempts: policy.attempts },
+      catches: (error) =>
+        clause.catches(error, input, args, scope, this.evaluator),
+      delayAfter: (attempt) => policy.delayAfter(attempt),
       retries: async (error, attempt) => {
         const caught = await clause.catches(
           error,
@@ -129,7 +131,12 @@ export class TryKind implements CompositeKind {
       return caught ? Verdict.Spent : Verdict.Uncaught;
     });
 
-    if (!verdict.ok) return { kind: EndingKind.Faulted, error: verdict.error };
+    if (!verdict.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: verdict.error,
+        retryAt: verdict.retryAt,
+      };
 
     if (verdict.value === Verdict.Uncaught) return ending;
 
@@ -149,27 +156,44 @@ export class TryKind implements CompositeKind {
     const firstAt = scope.startedAt;
 
     for (let attempt = 1; ; attempt += 1) {
-      const attemptScope =
-        attempt === 1 ? scope : scope.again(`#${String(attempt)}`);
-      const ending = await runner.list(body, input, attemptScope.child('try'));
+      const attemptScope = scope.attempted(attempt);
+      // Where the fault arose, a condition this try cannot evaluate retries nothing; the try's
+      // own decision then evaluates it again and faults with its error.
+      const retry: ListRetry = {
+        retryAt: async (error) => {
+          try {
+            return await this.#retryAt(
+              clause,
+              policy,
+              error,
+              attempt,
+              firstAt,
+              input,
+              args,
+              scope,
+            );
+          } catch (thrown) {
+            if (!(thrown instanceof TaskFault)) throw thrown;
+
+            return null;
+          }
+        },
+      };
+      const bodyScope = attemptScope.child('try').retrying(retry);
+      const ending = await runner.list(body, input, bodyScope);
 
       if (ending.kind !== EndingKind.Faulted) return ending;
 
       const decision = await Journal.value(attemptScope, 'catch', () =>
-        this.#decide(
-          clause,
-          policy,
-          ending.error,
-          attempt,
-          firstAt,
-          input,
-          args,
-          attemptScope,
-        ),
+        this.#decide(clause, policy, ending, input, args, attemptScope),
       );
 
       if (!decision.ok)
-        return { kind: EndingKind.Faulted, error: decision.error };
+        return {
+          kind: EndingKind.Faulted,
+          error: decision.error,
+          retryAt: decision.retryAt,
+        };
 
       const verdict = decision.value;
 
@@ -185,9 +209,10 @@ export class TryKind implements CompositeKind {
     }
   }
 
-  // Uncaught, handled without retry, retries spent, or the delay before the next attempt; the
-  // time spent counts from the try's start on the engine's clock.
-  async #decide(
+  // When this try runs its tasks again for a fault of the given attempt, or null; the time spent
+  // counts from the try's start on the engine's clock. A fault it does not catch is for the
+  // enclosing try.
+  async #retryAt(
     clause: CatchClause,
     policy: RetryPolicy | null,
     error: JsonObject,
@@ -196,7 +221,43 @@ export class TryKind implements CompositeKind {
     input: JsonValue,
     args: JsonObject,
     scope: Scope,
+  ): Promise<number | null> {
+    const caught = await clause.catches(
+      error,
+      input,
+      args,
+      scope,
+      this.evaluator,
+    );
+
+    if (!caught) return scope.retryAtOf(error);
+
+    if (policy === null) return null;
+
+    const now = scope.run.durability.stepTime();
+    const elapsed = now - firstAt;
+    const allowed =
+      policy.allows(attempt, elapsed) &&
+      (await clause.retries(policy, error, input, args, scope, this.evaluator));
+
+    if (!allowed) return null;
+
+    const delay = policy.delayAfter(attempt);
+    return now + delay;
+  }
+
+  // Uncaught, handled without retry, retries spent, or the time left until the next attempt,
+  // which was decided where the fault arose. The conditions are evaluated again so that one the
+  // try cannot evaluate faults it.
+  async #decide(
+    clause: CatchClause,
+    policy: RetryPolicy | null,
+    ending: Fault,
+    input: JsonValue,
+    args: JsonObject,
+    scope: Scope,
   ): Promise<Verdict | number> {
+    const error = ending.error;
     const caught = await clause.catches(
       error,
       input,
@@ -209,14 +270,20 @@ export class TryKind implements CompositeKind {
 
     if (policy === null) return Verdict.Handled;
 
-    const elapsed = scope.run.durability.stepTime() - firstAt;
-    const allowed =
-      policy.allows(attempt, elapsed) &&
-      (await clause.retries(policy, error, input, args, scope, this.evaluator));
+    const retries = await clause.retries(
+      policy,
+      error,
+      input,
+      args,
+      scope,
+      this.evaluator,
+    );
+    const retryAt = ending.retryAt;
 
-    if (!allowed) return Verdict.Spent;
+    if (!retries || retryAt === null) return Verdict.Spent;
 
-    return policy.delayAfter(attempt);
+    const now = scope.run.durability.stepTime();
+    return Math.max(retryAt - now, 0);
   }
 
   #handled(
@@ -235,9 +302,25 @@ export class TryKind implements CompositeKind {
       return runner.list(handler, input, handlerScope);
     }
 
-    if (spent) return { kind: EndingKind.Faulted, error };
+    if (spent) return TryKind.#spent(error, scope);
 
     return { kind: EndingKind.Completed, output: input, ended: false };
+  }
+
+  // Spent retries without a handler fault the try itself, which an enclosing try may retry.
+  static async #spent(error: JsonObject, scope: Scope): Promise<ListEnding> {
+    const decided = await Journal.value(scope, 'spent', () =>
+      scope.retryAtOf(error),
+    );
+
+    if (!decided.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: decided.error,
+        retryAt: decided.retryAt,
+      };
+
+    return { kind: EndingKind.Faulted, error, retryAt: decided.value };
   }
 
   static #listed(

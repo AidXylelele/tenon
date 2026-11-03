@@ -8,6 +8,7 @@ import { JsonPointer } from '../document/json-pointer.js';
 import type { Durability, RuntimeDescriptor } from '../interfaces.js';
 import { SecretValues } from './secret-values.js';
 import { DateTimes } from './date-times.js';
+import type { ListRetry } from './endings.js';
 import type { Race } from './race.js';
 import type { TaskMoment } from './task-moment.js';
 
@@ -106,13 +107,18 @@ interface Place {
   readonly deadline: number | null;
   readonly startedAt: number | null;
   readonly races: readonly Race[];
+  readonly retry: ListRetry | null;
+  readonly attempt: number;
 }
 
 // Where a task runs: its pointer in the document (its `reference`), the name of its steps in
 // the journal (the pointer, with an iteration, an attempt or a visit when it runs again), the
 // variables its enclosing tasks bound (`$item`, `$index`, a caught error), the context it reads,
-// the deadline its own and enclosing timeouts set, and the races it may lose.
+// the deadline its own and enclosing timeouts set, the races it may lose, the `try` that may run
+// it again, and which attempt of its step it is.
 export class Scope {
+  static readonly #FIRST = 1;
+
   readonly #run: RunContext;
   readonly #place: Place;
 
@@ -130,6 +136,8 @@ export class Scope {
       deadline,
       startedAt: null,
       races: [],
+      retry: null,
+      attempt: Scope.#FIRST,
     });
   }
 
@@ -177,6 +185,20 @@ export class Scope {
     return `${this.stepName}@${suffix}`;
   }
 
+  get attempt(): number {
+    return this.#place.attempt;
+  }
+
+  // When the enclosing `try` runs its tasks again for this fault, or null; called in the step
+  // where the fault arose, so the decision is journaled with it.
+  retryAtOf(error: JsonObject): Promise<number | null> {
+    const retry = this.#place.retry;
+
+    if (retry === null) return Promise.resolve(null);
+
+    return retry.retryAt(error);
+  }
+
   replaceContext(context: JsonObject): void {
     this.#place.holder.context = context;
   }
@@ -185,7 +207,12 @@ export class Scope {
     const pointer = this.#place.pointer.child(token);
     const escaped = JsonPointer.escaped(token);
     const path = `${this.#place.path}/${escaped}`;
-    return this.#moved({ pointer, path, startedAt: null });
+    return this.#moved({
+      pointer,
+      path,
+      startedAt: null,
+      attempt: Scope.#FIRST,
+    });
   }
 
   // The same place reached again: a loop's iteration, a retry's attempt or a later visit.
@@ -194,12 +221,32 @@ export class Scope {
     return this.#moved({ path });
   }
 
+  // The same place on an attempt: the first keeps this scope's name, a later one is marked `#n`,
+  // so that every attempt is its own execution.
+  attempted(attempt: number): Scope {
+    if (attempt === Scope.#FIRST) return this;
+
+    const marker = `#${String(attempt)}`;
+    const path = `${this.#place.path}${marker}`;
+    return this.#moved({ path, attempt });
+  }
+
+  // The tasks of a `try` that runs them again on a fault it catches.
+  retrying(retry: ListRetry): Scope {
+    return this.#moved({ retry });
+  }
+
   // Somewhere else in the document (a declared function's body), journaled under this scope
   // apart from this scope's own steps (`@<suffix>`).
   elsewhere(pointer: JsonPointer, marker: string): Scope {
     const escaped = JsonPointer.escaped(marker);
     const path = `${this.#place.path}:${escaped}`;
-    return this.#moved({ pointer, path, startedAt: null });
+    return this.#moved({
+      pointer,
+      path,
+      startedAt: null,
+      attempt: Scope.#FIRST,
+    });
   }
 
   binding(variables: JsonObject): Scope {

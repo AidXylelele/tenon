@@ -28,7 +28,9 @@ export interface RestartInstanceCommand {
 
 export type InstanceResult = Result<void, InstanceRefusal | Missing>;
 
-// A task's execution as the progress view keeps it: started (running) or ended.
+// A task's execution as the progress view keeps it: started (running) or ended. `attempt`: which
+// attempt of the task it is, each its own execution; `retryAt`: when the task runs again, for a
+// fault a `try` retries.
 export interface TaskRecord {
   readonly execution: string;
   readonly reference: string;
@@ -37,6 +39,8 @@ export interface TaskRecord {
   readonly input: JsonValue;
   readonly output: JsonValue;
   readonly error: JsonObject | null;
+  readonly attempt: number;
+  readonly retryAt: Date | null;
   readonly at: Date;
 }
 

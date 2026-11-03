@@ -1,6 +1,7 @@
 import {
   bigserial,
   index,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
@@ -13,7 +14,7 @@ import type { JsonObject, JsonValue } from '../../../domain/automation/json.js';
 import { workflowInstance } from './workflow-instance.js';
 
 // The progress view: one row per execution of a task (an iteration, an attempt, a later visit),
-// written as the runtime reports it.
+// written as the runtime reports it. A faulted attempt that is retried says when the next begins.
 export const taskProgress = pgTable(
   'task_progress',
   {
@@ -30,6 +31,8 @@ export const taskProgress = pgTable(
     error: jsonb('error').$type<JsonObject>(),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
     endedAt: timestamp('ended_at', { withTimezone: true }),
+    attempt: integer('attempt').notNull().default(1),
+    retryAt: timestamp('retry_at', { withTimezone: true }),
   },
   (table) => [
     primaryKey({ columns: [table.instanceId, table.execution] }),

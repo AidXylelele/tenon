@@ -98,8 +98,9 @@ Adapters only map. Library instances, clients, presets and error handling live i
 - **Authentication.** Basic, bearer, and OAuth2 or OIDC client credentials.
 - **OpenAPI.** The document is dereferenced with `@apidevtools/json-schema-ref-parser`, external resolution off.
 - **Content.** JSON media types are parsed; `text/*`, XML and YAML are text; anything else is base64.
+- **Failed connections name their reason,** read from the code Node or undici (`lib/core/errors.js`) gives the error: the address policy's own refusal, a host name that does not resolve, a refused connection, one closed before the answer, a refused TLS certificate, a connect timeout. Anything else stays "The service could not be reached". The outcome kinds and error types do not change.
 
-**Why.** FR-021 and FR-022. Node exposes neither undici's `Agent` nor `MockAgent`.
+**Why.** FR-021 and FR-022. Node exposes neither undici's `Agent` nor `MockAgent`. One sentence for every failure hid the real cause from the author (probed 2026-11-03).
 
 ## R7. Scripts and shell commands (go-judge)
 
@@ -108,6 +109,7 @@ Adapters only map. Library instances, clients, presets and error handling live i
 - **Awaited processes.** An awaited `run: script` (`js`, `javascript`, `python`) or `run: shell` is one engine step in go-judge. Each process gets 30 s, 256 MiB, 50 processes and 1 MiB per output stream, with no network.
 - **Outages.** A full bulkhead, an unreachable sandbox, or an answer that is not go-judge's is an outage of the platform. The step is repeated later, and the author's task does not fault.
 - **Refusals.** go-judge's own refusal (400 or 404) is an answer, and the task faults with a runtime error.
+- **Exit codes.** A process that exits with another code than 0 faults the task with a runtime error. The detail is its standard error, trimmed and cut to its last 2,000 characters, or "The process exited with code N" when it wrote none. `return: code` and `return: all` keep the code as output, because the author asked for it. The DSL leaves this open; Synapse's `ScriptProcessExecutor` faults the same way.
 - **Detached processes.** `await: false` starts a `process` child that nobody awaits.
 - **Sandbox capacity.** `ES_PARALLELISM` is at least the `processes` bulkhead (8) times the API processes that run scripts.
 
@@ -215,6 +217,11 @@ Adapters only map. Library instances, clients, presets and error handling live i
 - **Instance lists.** The lists order by `created_at DESC, id DESC` on the ascending indexes `(created_at, id)` and `(workflow_id, created_at, id)`. A backward scan serves the `DESC` order. An index declared `DESC NULLS LAST` does not match the `NULLS FIRST` that `DESC` sorts by (PostgreSQL §11.4, "Indexes and ORDER BY"). Migration 0009 fixed this after k6.
 - **Pages.** Pages are keyset pages: read `limit + 1` rows and keep `limit`.
 - **Read models.** The stores write `task_progress`, `event`, `listener` and `delivery`, and the queries read them.
+- **Every attempt is its own task record** (FR-016, US2 AS4). The engine retries a single guarded task's step under one step name; each attempt the retry policy counts records under its own execution, the first under the step's name and attempt n marked `#n` (`Scope.attempted`, which a task list's run again also uses). The policy's count is not the engine's: a retried attempt checkpoints its number as the step's progress (`heartbeat`), so a repeat after an outage or a crash runs the same attempt again, resets the same record, and spends none of the policy's count.
+- **A retried fault says when, decided where it arose.** The decision is made in the step where the fault arose and journaled with it. A single task's attempt ends faulted with `retryAt`, and the engine waits the delay its `RetryableFault` carries, drawn once. In a task list, the nearest try that catches the fault decides (one that does not catch it asks its enclosing try), and every task the fault ends on its way out records that `retryAt`; the try then sleeps until it. A try whose retries are spent decides its own fault for its enclosing try in an `@spent` step.
+  - A later attempt's start and a retried fault produce no lifecycle event. The standard's `task.retried` stays open with T030; for a `try`, Synapse names the `try` task, at the decision to retry.
+  - When the engine gives up while the policy still retries (its outage reserve spent), `RetriesSpentFault` carries the last attempt, whose record ends the task. A retried attempt that the platform answers with stop (the instance ended) ends the step, so no worker runs another attempt.
+  - A crash after the checkpoint but before the engine records the failure runs the next attempt at once, before its `retryAt`.
 
 ## R16. Conformance (ER-001)
 
@@ -237,7 +244,7 @@ Adapters only map. Library instances, clients, presets and error handling live i
 | `try`                       | A single guarded task is retried by the engine's own step retries; several are run again after a durable sleep. Then `catch.do` runs if there is one. Without it, a caught error that was not to be retried completes the task with its input, and spent retries fault it with the last error |
 | Backoff                     | `constant`: the delay; `linear`: the delay × the attempt; `exponential`: the delay × 2^(attempt − 1). Backoff parameters, `limit.attempt.duration` and expressions as delays are refused                                                                                                      |
 | `catch.errors.with.details` | Matches the error's `detail`                                                                                                                                                                                                                                                                  |
-| Process output              | `return` picks stdout (the default), stderr, the code, all three, or none. A non-zero exit is not an error                                                                                                                                                                                    |
+| Process output              | `return` picks stdout (the default), stderr, the code, all three, or none. A non-zero exit faults with a runtime error unless `return` is `code` or `all` (R7)                                                                                                                                |
 | Communication error         | Type `https://serverlessworkflow.io/spec/1.0.0/errors/communication`                                                                                                                                                                                                                          |
 | Status-changed events       | Not produced                                                                                                                                                                                                                                                                                  |
 

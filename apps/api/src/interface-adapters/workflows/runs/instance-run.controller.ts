@@ -87,6 +87,8 @@ export class InstanceRunController extends RunObserver {
         input: task.input,
         output: null,
         error: null,
+        attempt: task.attempt,
+        retryAt: null,
         at,
       },
     });
@@ -94,6 +96,7 @@ export class InstanceRunController extends RunObserver {
 
   taskEnded(instanceId: string, task: TaskEnded): Promise<RunDirective> {
     const at = new Date(task.at);
+    const retryAt = task.retryAt === null ? null : new Date(task.retryAt);
     return this.recordTaskEnd.execute({
       instanceId,
       task: {
@@ -104,6 +107,8 @@ export class InstanceRunController extends RunObserver {
         input: null,
         output: task.output,
         error: task.error,
+        attempt: task.attempt,
+        retryAt,
         at,
       },
     });

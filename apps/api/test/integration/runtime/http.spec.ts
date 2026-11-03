@@ -2,6 +2,7 @@ import type {
   JsonObject,
   JsonValue,
 } from '../../../src/domain/automation/json.js';
+import { AddressRefusedError } from '../../../src/frameworks/undici/address-policy.js';
 import { RunOutcomeKind } from '../../../src/interface-adapters/workflows/enums.js';
 import type { RunOutcome } from '../../../src/interface-adapters/workflows/interfaces.js';
 import {
@@ -480,6 +481,81 @@ describe('what an HTTP call outputs', () => {
     expect(errorOf(outcome)).toMatchObject({
       type: `${ERRORS}communication`,
       status: 500,
+      detail: 'The service could not be reached',
+    });
+  });
+
+  // The codes Node (`net`, `dns`, `tls`) and undici (`lib/core/errors.js`) give a failed
+  // connection, each told as its reason.
+  it.each([
+    ['ENOTFOUND', 'The host name could not be resolved'],
+    ['EAI_AGAIN', 'The host name could not be resolved'],
+    ['ECONNREFUSED', 'The service refused the connection'],
+    ['ECONNRESET', 'The connection closed before the service answered'],
+    ['EPIPE', 'The connection closed before the service answered'],
+    ['UND_ERR_SOCKET', 'The connection closed before the service answered'],
+    ['CERT_HAS_EXPIRED', "The service's TLS certificate was refused"],
+    [
+      'DEPTH_ZERO_SELF_SIGNED_CERT',
+      "The service's TLS certificate was refused",
+    ],
+    ['SELF_SIGNED_CERT_IN_CHAIN', "The service's TLS certificate was refused"],
+    [
+      'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+      "The service's TLS certificate was refused",
+    ],
+    [
+      'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+      "The service's TLS certificate was refused",
+    ],
+    [
+      'ERR_TLS_CERT_ALTNAME_INVALID',
+      "The service's TLS certificate was refused",
+    ],
+    ['ETIMEDOUT', 'The connection timed out'],
+    ['UND_ERR_CONNECT_TIMEOUT', 'The connection timed out'],
+    ['EHOSTUNREACH', 'The service could not be reached'],
+  ])(
+    'a_connection_failing_with_%s_faults_with_its_reason',
+    async (code, detail) => {
+      const host = code.toLowerCase().replaceAll('_', '-');
+      const origin = `https://${host}.test`;
+      const failure = Object.assign(new Error(`connect ${code}`), { code });
+      h.agent
+        .get(origin)
+        .intercept({ path: '/a', method: 'GET' })
+        .replyWithError(failure);
+      const document = aWorkflow([
+        { go: http({ method: 'get', endpoint: `${origin}/a` }) },
+      ]);
+
+      const { outcome } = await h.run(document, {});
+
+      expect(errorOf(outcome)).toMatchObject({
+        type: `${ERRORS}communication`,
+        status: 500,
+        detail,
+        instance: '/do/0/go',
+      });
+    },
+  );
+
+  it('an_address_the_outbound_policy_refuses_faults_with_the_policy_s_reason', async () => {
+    const origin = 'https://refused-address.test';
+    h.agent
+      .get(origin)
+      .intercept({ path: '/a', method: 'GET' })
+      .replyWithError(new AddressRefusedError());
+    const document = aWorkflow([
+      { go: http({ method: 'get', endpoint: `${origin}/a` }) },
+    ]);
+
+    const { outcome } = await h.run(document, {});
+
+    expect(errorOf(outcome)).toMatchObject({
+      type: `${ERRORS}communication`,
+      detail:
+        'The address is private, loopback or link-local and not allow-listed',
     });
   });
 });

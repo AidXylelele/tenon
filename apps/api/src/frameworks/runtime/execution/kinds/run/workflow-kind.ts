@@ -59,7 +59,12 @@ export class WorkflowKind implements CompositeKind {
       return start.childId;
     });
 
-    if (!started.ok) return { kind: EndingKind.Faulted, error: started.error };
+    if (!started.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: started.error,
+        retryAt: started.retryAt,
+      };
 
     const childId = started.value;
 
@@ -84,7 +89,12 @@ export class WorkflowKind implements CompositeKind {
       );
     });
 
-    if (!ended.ok) return { kind: EndingKind.Faulted, error: ended.error };
+    if (!ended.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: ended.error,
+        retryAt: ended.retryAt,
+      };
 
     return { kind: EndingKind.Completed, output: ended.value, ended: false };
   }

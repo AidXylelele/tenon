@@ -38,7 +38,12 @@ export class FunctionCallKind implements CompositeKind {
       this.evaluator.template(arguments_, input, args, scope.pointer),
     );
 
-    if (!filled.ok) return { kind: EndingKind.Faulted, error: filled.error };
+    if (!filled.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: filled.error,
+        retryAt: filled.retryAt,
+      };
 
     const pointer = JsonPointer.ROOT.child('use')
       .child('functions')

@@ -30,6 +30,7 @@ export class LifecycleEventMapper {
     InstanceEventKind.Faulted,
     InstanceEventKind.Cancelled,
   ]);
+  static readonly #FIRST_ATTEMPT = 1;
   static readonly #TASK = new Map<TaskStatus, string>([
     [TaskStatus.Running, 'started'],
     [TaskStatus.Completed, 'completed'],
@@ -96,6 +97,12 @@ export class LifecycleEventMapper {
 
     if (change === undefined) return null;
 
+    // A retry's own changes are not the task's: the standard's `task.retried` tells them, which
+    // the platform does not produce yet.
+    const retrying = LifecycleEventMapper.#retrying(task);
+
+    if (retrying) return null;
+
     const time = task.at.toISOString();
     const data: Record<string, JsonValue> = {
       workflow: LifecycleEventMapper.#qualified(instanceId, names),
@@ -114,6 +121,16 @@ export class LifecycleEventMapper {
       time,
       data,
     );
+  }
+
+  // A later attempt's start, or a fault a `try` retries, which faults no task.
+  static #retrying(task: TaskRecord): boolean {
+    const laterStart =
+      task.status === TaskStatus.Running &&
+      task.attempt > LifecycleEventMapper.#FIRST_ATTEMPT;
+    const retriedFault =
+      task.status === TaskStatus.Faulted && task.retryAt !== null;
+    return laterStart || retriedFault;
   }
 
   // The source every lifecycle event of an instance has, which emitted events may not take.

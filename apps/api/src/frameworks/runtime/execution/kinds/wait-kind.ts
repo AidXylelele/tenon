@@ -36,7 +36,12 @@ export class WaitKind implements CompositeKind {
       return { sleep, overdue };
     });
 
-    if (!begun.ok) return { kind: EndingKind.Faulted, error: begun.error };
+    if (!begun.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: begun.error,
+        retryAt: begun.retryAt,
+      };
 
     const planned = begun.value;
     await run.durability.sleep(scope.named('sleep'), planned.sleep);
@@ -53,7 +58,12 @@ export class WaitKind implements CompositeKind {
       return null;
     });
 
-    if (!ended.ok) return { kind: EndingKind.Faulted, error: ended.error };
+    if (!ended.ok)
+      return {
+        kind: EndingKind.Faulted,
+        error: ended.error,
+        retryAt: ended.retryAt,
+      };
 
     return { kind: EndingKind.Completed, output: input, ended: false };
   }

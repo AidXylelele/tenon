@@ -123,6 +123,8 @@ export class DrizzleInstanceQueries implements InstanceQueries {
         error: progress.error,
         startedAt: progress.startedAt,
         endedAt: progress.endedAt,
+        attempt: progress.attempt,
+        retryAt: progress.retryAt,
       })
       .from(progress)
       .where(and(eq(progress.instanceId, id), later))
@@ -139,6 +141,8 @@ export class DrizzleInstanceQueries implements InstanceQueries {
       error: row.error,
       startedAt: row.startedAt,
       endedAt: row.endedAt,
+      attempt: row.attempt,
+      retryAt: row.retryAt,
     }));
     return { items, next: page.next };
   }

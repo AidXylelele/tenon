@@ -34,10 +34,16 @@ export class DrizzleTaskProgressStore implements TaskProgress {
         status: task.status,
         input: task.input,
         startedAt: task.at,
+        attempt: task.attempt,
       })
       .onConflictDoUpdate({
         target: [progress.instanceId, progress.execution],
-        set: { status: sql`excluded.status`, error: null, endedAt: null },
+        set: {
+          status: sql`excluded.status`,
+          error: null,
+          retryAt: null,
+          endedAt: null,
+        },
       });
     await this.#told(instanceId, task);
   }
@@ -54,6 +60,8 @@ export class DrizzleTaskProgressStore implements TaskProgress {
         input: task.input,
         output: task.output,
         error: task.error,
+        attempt: task.attempt,
+        retryAt: task.retryAt,
         startedAt: task.at,
         endedAt: task.at,
       })
@@ -63,6 +71,7 @@ export class DrizzleTaskProgressStore implements TaskProgress {
           status: sql`excluded.status`,
           output: sql`excluded.output`,
           error: sql`excluded.error`,
+          retryAt: sql`excluded.retry_at`,
           endedAt: sql`excluded.ended_at`,
         },
       });
@@ -89,6 +98,8 @@ export class DrizzleTaskProgressStore implements TaskProgress {
         input: row.input,
         output: null,
         error: null,
+        attempt: row.attempt,
+        retryAt: null,
         at,
       };
       await this.#told(instanceId, task);

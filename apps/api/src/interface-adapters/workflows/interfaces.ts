@@ -69,14 +69,18 @@ export interface RunPlan {
   readonly startedAt: string;
 }
 
+// `attempt`: which attempt of the task this execution is, above 1 when the task's retry policy
+// repeats it; each attempt is its own execution.
 export interface TaskStarted {
   readonly execution: string;
   readonly reference: string;
   readonly name: string;
   readonly input: JsonValue;
+  readonly attempt: number;
   readonly at: string;
 }
 
+// `retryAt`: when the task runs again for its fault, for a fault a `try` retries.
 export interface TaskEnded {
   readonly execution: string;
   readonly reference: string;
@@ -84,6 +88,8 @@ export interface TaskEnded {
   readonly status: TaskStatus;
   readonly output: JsonValue;
   readonly error: JsonObject | null;
+  readonly attempt: number;
+  readonly retryAt: string | null;
   readonly at: string;
 }
 

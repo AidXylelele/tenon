@@ -15,13 +15,20 @@ import { ResilienceModule } from '../../src/frameworks/di/resilience.module.js';
 import { WorkflowsModule } from '@nestjs/workflows';
 import { RuntimeModule } from '../../src/frameworks/di/runtime.module.js';
 import {
+  CapacityExhaustedError,
+  RetriesSpentFault,
   RetryableFault,
-  TaskFault,
 } from '../../src/frameworks/runtime/execution/faults.js';
-import type {
-  Durability,
-  GoJudgeCommand,
-  StepOptions,
+import {
+  GoJudgeStatus,
+  SandboxOutcomeKind,
+} from '../../src/frameworks/runtime/enums.js';
+import {
+  type Durability,
+  type GoJudgeCommand,
+  SandboxClient,
+  type SandboxOutcome,
+  type StepOptions,
 } from '../../src/frameworks/runtime/interfaces.js';
 import { Runtime } from '../../src/frameworks/runtime/runtime.js';
 import { EndpointDispatcher } from '../../src/frameworks/undici/endpoint-dispatcher.js';
@@ -48,6 +55,7 @@ export interface JournalEntry {
   readonly kind: EntryKind;
   readonly value?: JsonValue;
   readonly failed?: JsonObject;
+  readonly attempts?: number;
 }
 
 export type Journal = Map<string, JournalEntry>;
@@ -105,6 +113,9 @@ export interface DurabilityOptions {
   readonly crashBefore?: (name: string) => boolean;
   // A safety net against retry loops that never end.
   readonly maxAttempts?: number;
+  // The attempts the engine grants a retried step when fewer than its policy's (an outage spent
+  // the reserve on top of them).
+  readonly stepAttempts?: number;
   // The events sent to the run, in order; once none is left a wait for one times out (null).
   readonly events?: readonly JsonObject[];
 }
@@ -159,7 +170,8 @@ export class InMemoryDurability implements Durability {
     if (entry !== undefined) {
       this.calls.push({ kind: 'step', name, replayed: true });
 
-      if (entry.failed !== undefined) throw new TaskFault(entry.failed);
+      if (entry.failed !== undefined)
+        throw new RetriesSpentFault(entry.failed, entry.attempts ?? 1);
 
       return cloned(entry.value) as T;
     }
@@ -170,8 +182,13 @@ export class InMemoryDurability implements Durability {
     this.calls.push({ kind: 'step', name, replayed: false });
     const retry = options.retry;
     const maxAttempts = this.#options.maxAttempts ?? 50;
+    const granted = Math.min(
+      retry?.attempts ?? 0,
+      this.#options.stepAttempts ?? Number.MAX_SAFE_INTEGER,
+    );
+    let attempt = 1;
 
-    for (let attempt = 1; ; attempt += 1) {
+    for (let run = 1; ; run += 1) {
       this.executed.push(name);
 
       try {
@@ -180,22 +197,26 @@ export class InMemoryDurability implements Durability {
         this.journal.set(name, { kind: 'step', value: stored });
         return cloned(stored) as T;
       } catch (error) {
-        if (attempt >= maxAttempts)
-          throw new Error(`step "${name}" ran ${String(attempt)} attempts`);
+        if (run >= maxAttempts)
+          throw new Error(`step "${name}" ran ${String(run)} attempts`);
 
-        const again =
-          retry !== null && attempt < retry.attempts && retry.retries(error);
+        // An outage of the platform: the engine runs the same attempt again.
+        if (error instanceof CapacityExhaustedError) continue;
 
-        if (again) {
-          const milliseconds = retry.backoff(attempt);
+        const retried = error instanceof RetryableFault;
+
+        if (retried && attempt < granted) {
+          const milliseconds = error.delay;
           this.backoffs.push({ name, attempt, milliseconds });
           this.clock += milliseconds;
+          attempt += 1;
           continue;
         }
 
-        if (error instanceof RetryableFault) {
-          this.journal.set(name, { kind: 'step', failed: error.error });
-          throw new TaskFault(error.error);
+        if (retried) {
+          const failed = error.error;
+          this.journal.set(name, { kind: 'step', failed, attempts: attempt });
+          throw new RetriesSpentFault(failed, attempt);
         }
 
         throw error;
@@ -457,7 +478,31 @@ export class RecordingObserver extends RunObserver {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The runtime with its real jq, Ajv and undici clients; undici's dispatcher is a MockAgent.
+// go-judge, scripted: every run answers the next of the outcomes a test queued, then `outcome`.
+
+export class ScriptedSandbox extends SandboxClient {
+  readonly queued: SandboxOutcome[] = [];
+  outcome: SandboxOutcome = ScriptedSandbox.exited(0, '', '');
+
+  // A process that ran to its end with this code and these outputs.
+  static exited(code: number, stdout: string, stderr: string): SandboxOutcome {
+    const status =
+      code === 0 ? GoJudgeStatus.Accepted : GoJudgeStatus.NonzeroExitStatus;
+    return {
+      kind: SandboxOutcomeKind.Ran,
+      result: { status, exitStatus: code, files: { stdout, stderr } },
+    };
+  }
+
+  run(): Promise<SandboxOutcome> {
+    const next = this.queued.shift() ?? this.outcome;
+    return Promise.resolve(next);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// The runtime with its real jq, Ajv and undici clients; undici's dispatcher is a MockAgent and
+// go-judge is scripted.
 
 export const STARTED_AT = '2026-11-03T10:00:00.000Z';
 
@@ -469,6 +514,7 @@ export interface RunOptions {
   readonly clockStart?: number;
   readonly crashBefore?: (name: string) => boolean;
   readonly maxAttempts?: number;
+  readonly stepAttempts?: number;
   readonly events?: readonly JsonObject[];
   // Run a document the publish checks refuse (to probe the runtime alone).
   readonly unchecked?: boolean;
@@ -497,11 +543,13 @@ export class RuntimeHarness {
     readonly runtime: Runtime,
     readonly checks: RuntimeChecks,
     readonly agent: MockAgent,
+    readonly sandbox: ScriptedSandbox,
   ) {}
 
   static async start(): Promise<RuntimeHarness> {
     const agent = new MockAgent();
     agent.disableNetConnect();
+    const sandbox = new ScriptedSandbox();
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule,
@@ -512,11 +560,13 @@ export class RuntimeHarness {
     })
       .overrideProvider(EndpointDispatcher)
       .useValue(agent)
+      .overrideProvider(SandboxClient)
+      .useValue(sandbox)
       .compile();
     const context = await moduleRef.init();
     const runtime = context.get(Runtime);
     const checks = context.get(RuntimeChecks);
-    return new RuntimeHarness(context, runtime, checks, agent);
+    return new RuntimeHarness(context, runtime, checks, agent, sandbox);
   }
 
   close(): Promise<void> {
@@ -560,6 +610,7 @@ export class RuntimeHarness {
       start: options.clockStart ?? Date.parse(startedAt),
       crashBefore: options.crashBefore,
       maxAttempts: options.maxAttempts,
+      stepAttempts: options.stepAttempts,
       events: options.events,
     });
     const observer = options.observer ?? new RecordingObserver();
