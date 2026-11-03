@@ -4,6 +4,7 @@ import { cn } from 'cn';
 import { useRouter } from 'next/navigation';
 import {
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   useTransition,
@@ -36,10 +37,20 @@ export function LiveRefresh({
   );
   const now = useNow(active);
 
+  // A tick that finds the previous refresh still on its way skips, so a slow platform never
+  // gets a queue of refreshes.
+  const inFlight = useRef(refreshing);
+
+  useEffect(() => {
+    inFlight.current = refreshing;
+  }, [refreshing]);
+
   useEffect(() => {
     if (!active || !visible) return;
 
     const timer = setInterval(() => {
+      if (inFlight.current) return;
+
       startRefresh(() => router.refresh());
     }, intervalMs);
     return () => clearInterval(timer);

@@ -116,8 +116,10 @@ export function Editor({
   const published = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const check = useCheck(draft, textError === null);
-  const located =
-    check.kind === 'problem' ? locate(draft, check.problem) : null;
+  const located = useMemo(
+    () => (check.kind === 'problem' ? locate(draft, check.problem) : null),
+    [check, draft],
+  );
   const header = headerOf(draft);
   const entry = selected === null ? null : entryAt(draft, selected);
   const changed = draft !== initial;
@@ -191,7 +193,7 @@ export function Editor({
     update(removeTask(draft, entry.listPointer, entry.index));
     setSelected(null);
     toast(`Removed ${entry.name}`, {
-      action: { label: 'Undo', onClick: () => setDraft(before) },
+      action: { label: 'Undo', onClick: () => update(before) },
     });
   }
 

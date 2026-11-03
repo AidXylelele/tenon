@@ -2,6 +2,7 @@ import { ActivityIcon } from 'lucide-react';
 import Link from 'next/link';
 import { instances } from '@/libs/data-access/automation';
 import type { InstanceFilter } from '@/libs/data-access/types';
+import { type Query, single } from '@/libs/routing/segment';
 import { LiveRefresh } from '@/libs/live/live-refresh';
 import { Button } from '@/libs/ui/components/button';
 import {
@@ -13,16 +14,13 @@ import {
 } from '@/libs/ui/components/empty';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { InstanceTable } from '../../__shared_context/instance-table';
-import { isUnended } from '../../__shared_context/vocabulary';
+import { isUnended, PHASES } from '../../__shared_context/vocabulary';
 import { Filters } from './filters';
 
 // Runs newest first, filtered by what the address says, so a view can be shared and reloaded
 // (002 FR-016, spec US6).
-export async function InstanceList({
-  filter,
-}: {
-  readonly filter: InstanceFilter;
-}) {
+export async function InstanceList({ query }: { readonly query: Query }) {
+  const filter = filterOf(query);
   const page = await instances({ ...filter, limit: 50 });
   const live = page.items.some((instance) => isUnended(instance.phase));
   const filtered = Object.entries(filter).some(
@@ -38,7 +36,13 @@ export async function InstanceList({
       <PageHeader
         title="Runs"
         description="Every run of every workflow, newest first. Open one to follow it step by step."
-        actions={<LiveRefresh active={live} renderedAt={page.readAt} />}
+        actions={
+          <LiveRefresh
+            active
+            renderedAt={page.readAt}
+            intervalMs={live ? 2000 : 5000}
+          />
+        }
       />
       <Filters filter={filter} />
       {page.items.length === 0 ? (
@@ -87,4 +91,18 @@ function queryOf(filter: InstanceFilter): string {
     if (value !== undefined && value !== '') query.set(key, String(value));
 
   return query.toString();
+}
+
+// The filter the address gives; an unknown phase is no filter, as the API would refuse it.
+function filterOf(query: Query): InstanceFilter {
+  const phase = PHASES.find((each) => each === single(query, 'phase'));
+  return {
+    namespace: single(query, 'namespace'),
+    name: single(query, 'name'),
+    version: single(query, 'version'),
+    phase,
+    startedFrom: single(query, 'startedFrom'),
+    startedTo: single(query, 'startedTo'),
+    cursor: single(query, 'cursor'),
+  };
 }

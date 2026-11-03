@@ -56,9 +56,12 @@ export async function send(
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new ApiError(503, `The platform is not answering (${reason})`);
+  } catch {
+    // The cause (an address, a socket error) stays on the server; the person learns what to do.
+    throw new ApiError(
+      503,
+      'The platform is not answering; try again in a moment',
+    );
   }
 
   if (response.status === 401 && options.anonymous !== true)

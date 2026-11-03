@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { segment } from '@/libs/routing/segment';
 import { VersionDocument } from '@/spaces/automation/modules/version-document';
 
 export async function generateMetadata({
@@ -6,7 +7,7 @@ export async function generateMetadata({
 }: PageProps<'/workflows/[namespace]/[name]/versions/[version]'>): Promise<Metadata> {
   const { name, version } = await params;
   return {
-    title: `${decodeURIComponent(name)} ${decodeURIComponent(version)}`,
+    title: `${segment(name)} ${segment(version)}`,
   };
 }
 
@@ -16,9 +17,9 @@ export default async function VersionPage({
   const { namespace, name, version } = await params;
   return (
     <VersionDocument
-      namespace={decodeURIComponent(namespace)}
-      name={decodeURIComponent(name)}
-      version={decodeURIComponent(version)}
+      namespace={segment(namespace)}
+      name={segment(name)}
+      version={segment(version)}
     />
   );
 }

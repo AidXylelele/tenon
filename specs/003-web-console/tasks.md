@@ -42,14 +42,14 @@
 
 ## US7 — Connect other applications (P2)
 
-- [ ] T070 [US7] `automation/modules/webhooks` (URL once, copy, example call) and `secrets` (create, replace, delete)
-- [ ] T071 [US7] `automation/modules/event-sender`
-- [ ] T072 [US7] `automation/modules/subscription-list`, `subscription-form` (filter rows, authentication by secret, located problems), `subscription-detail` (live deliveries)
+- [x] T070 [US7] `automation/modules/webhooks` (URL once, copy, example call) and `secrets` (create, replace, delete)
+- [x] T071 [US7] `automation/modules/event-sender`
+- [x] T072 [US7] `automation/modules/subscription-list`, `subscription-form` (filter rows, authentication by secret, located problems), `subscription-detail` (live deliveries)
 
 ## US8 — Account and team (P3)
 
-- [ ] T080 [US8] `identity/modules/account` (password change, rotated cookie), `password-recovery`, `password-reset`
-- [ ] T081 [US8] `identity/modules/invitations` (admin) and `invitation-acceptance`
+- [x] T080 [US8] `identity/modules/account` (password change, rotated cookie), `password-recovery`, `password-reset`
+- [x] T081 [US8] `identity/modules/invitations` (admin) and `invitation-acceptance`
 
 ## Polish
 

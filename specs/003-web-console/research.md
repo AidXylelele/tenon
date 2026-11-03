@@ -78,7 +78,7 @@ Audit (2026-11-03): the production dependencies of `web` have no known vulnerabi
 
 - **Decision.**
   - Intervals: 1.5 s on an instance page; 2 s on lists, deliveries and recent instances.
-  - The refresh runs only while something shown is unended or pending. It pauses on `visibilitychange` while hidden, and stops when the page shows nothing in flight.
+  - A run's page refreshes only while the run has not ended. Lists, recent runs and deliveries always refresh: every 2 s while something they show is in flight, otherwise every 5 s, because a new run or delivery can appear at any time (found on the running stack: a delivery made right after the page opened never showed). Every view pauses on `visibilitychange` while hidden.
   - The view shows "Live · updated n s ago" and a dot that pulses while a refresh runs.
 - **Why.** SC-003 allows two seconds. Pausing a hidden tab is FR-019.
 
@@ -101,3 +101,25 @@ Audit (2026-11-03): the production dependencies of `web` have no known vulnerabi
   - **The check stays with the API.** It is the platform's (002 FR-003), and it covers what the schema does not: the subset, references, expressions, secrets. A second check in the console would be domain validation outside the API (constitution I, BFF) and could disagree with it.
   - **YAML.** The SDK reads YAML through js-yaml, which reports no source positions and does not bound aliases. `yaml` gives the line of a problem and bounds aliases.
   - **`buildGraph` and Mermaid.** Its graph has no edges for `when`, `try`/`catch`, retries, `for` and `compete`, and draws a phantom `switch` edge (verified on 2026-11-02). The run line reads the document's own nesting, which is exact.
+
+## R10. Critic round 1 (2026-11-03)
+
+An independent review of the tiers, the BFF rules and security found no import that breaks the tier graph.
+
+**Fixed:**
+
+- an open redirect through a tab or a newline in `next` (`returnPath` now resolves the path as a browser does);
+- the two pages that were prerendered without a CSP nonce (`connection()`);
+- the idempotency key lost when an input is changed and then restored (one key per distinct start);
+- `Infinity` from a form number;
+- filter rows keyed by position;
+- refreshes stacking on a slow API (a tick skips while one is in flight);
+- the network cause shown to the person;
+- a malformed `%` escape in a route giving a 500 (`segment()` makes it a 404);
+- route pages owning the phase vocabulary.
+
+**Argued against:**
+
+- **Declaring a picked secret in `use.secrets` (R5) is authoring, not validation.** A person who picks a secret in a form has said which secret the call uses. The builder writes the document that says so, as an editor adds an import. The check stays the API's and still refuses an undeclared name in code.
+- **Hiding the controls a phase does not allow, and the 1 MiB pre-check, are UX.** The API still refuses both: a 409 and a 413. The console only avoids offering what would fail.
+- **The tier graph is reviewed, not linted.** The owner decided on 2026-10-28: "people review architecture". The constitution's lint clause and CODEOWNERS predate that decision for the whole repository, and the gap is recorded here.

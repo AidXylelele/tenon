@@ -80,7 +80,7 @@ function valueOf(type: InputFieldType, text: string): JsonValue {
   if (type === 'string') return text;
 
   const number = Number(text);
-  return Number.isNaN(number) ? text : number;
+  return Number.isFinite(number) ? number : text;
 }
 
 function schemaOf(document: JsonObject | null): JsonObject | null {

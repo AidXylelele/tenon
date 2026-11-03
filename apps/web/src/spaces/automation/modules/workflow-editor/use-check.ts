@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Problem } from '@/libs/data-access/problem';
 import type { JsonObject } from '@/libs/data-access/types';
 import { checkAction } from './actions';
@@ -47,6 +47,10 @@ export function useCheck(draft: JsonObject, enabled: boolean): CheckState {
     return () => clearTimeout(timer);
   }, [draft, enabled]);
 
+  return useMemo(() => stateOf(answer, draft), [answer, draft]);
+}
+
+function stateOf(answer: Answer | null, draft: JsonObject): CheckState {
   if (answer === null || answer.draft !== draft) return { kind: 'checking' };
 
   if (answer.problem === null) return { kind: 'clean' };

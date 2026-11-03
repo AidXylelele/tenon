@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { connection } from 'next/server';
 import { Button } from '@/libs/ui/components/button';
 import {
   Empty,
@@ -8,7 +9,9 @@ import {
   EmptyTitle,
 } from '@/libs/ui/components/empty';
 
-export default function NotFound() {
+// Rendered per request, so its scripts carry the request's CSP nonce.
+export default async function NotFound() {
+  await connection();
   return (
     <main className="flex min-h-svh items-center justify-center p-6">
       <Empty>

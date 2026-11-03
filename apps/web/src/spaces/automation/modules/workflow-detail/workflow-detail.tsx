@@ -165,7 +165,11 @@ export async function WorkflowDetail({
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-base font-semibold">Recent runs</h2>
               <div className="flex items-center gap-3">
-                <LiveRefresh active={live} renderedAt={recent.readAt} />
+                <LiveRefresh
+                  active
+                  renderedAt={recent.readAt}
+                  intervalMs={live ? 2000 : 5000}
+                />
                 <Button variant="link" size="sm" asChild>
                   <Link
                     href={`/instances?namespace=${encodeURIComponent(namespace)}&name=${encodeURIComponent(name)}`}

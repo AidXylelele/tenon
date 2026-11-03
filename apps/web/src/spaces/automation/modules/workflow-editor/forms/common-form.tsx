@@ -35,11 +35,11 @@ export function CommonForm(props: TaskFormProps) {
 
   return (
     <Collapsible defaultOpen={used} className="rounded-lg border">
-      <CollapsibleTrigger className="group flex w-full items-center gap-2 px-3 py-2 text-sm font-medium">
+      <CollapsibleTrigger className="group grid w-full grid-cols-[1rem_minmax(0,1fr)] items-center gap-x-2 px-3 py-2 text-left text-sm font-medium">
         <ChevronRightIcon className="size-4 transition-transform group-data-[state=open]:rotate-90" />
         More options
-        <span className="font-normal text-muted-foreground">
-          condition, next step, output, timeout
+        <span className="col-start-2 truncate text-xs font-normal text-muted-foreground">
+          A condition, the next step, the output, a time limit
         </span>
       </CollapsibleTrigger>
       <CollapsibleContent className="flex flex-col gap-4 border-t p-3">

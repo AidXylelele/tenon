@@ -44,12 +44,23 @@ export function Time({ value, empty = '—' }: TimeProps) {
     return <span className="text-muted-foreground">{empty}</span>;
 
   const at = new Date(value);
-  const exact = at.toLocaleString();
-  const shown = now === null ? exact : relativeText(at.getTime(), now);
+
+  // The server and the first client render agree on a time that needs no locale; the
+  // person's own locale and zone take over once the page is live.
+  if (now === null)
+    return (
+      <time dateTime={value} className="whitespace-nowrap">
+        {`${value.slice(0, 16).replace('T', ' ')} UTC`}
+      </time>
+    );
 
   return (
-    <time dateTime={value} title={exact} className="whitespace-nowrap">
-      {shown}
+    <time
+      dateTime={value}
+      title={at.toLocaleString()}
+      className="whitespace-nowrap"
+    >
+      {relativeText(at.getTime(), now)}
     </time>
   );
 }

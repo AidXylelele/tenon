@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
+import { segment } from '@/libs/routing/segment';
 import { WorkflowDetail } from '@/spaces/automation/modules/workflow-detail';
 
 export async function generateMetadata({
   params,
 }: PageProps<'/workflows/[namespace]/[name]'>): Promise<Metadata> {
   const { name } = await params;
-  return { title: decodeURIComponent(name) };
+  return { title: segment(name) };
 }
 
 export default async function WorkflowPage({
@@ -16,8 +17,8 @@ export default async function WorkflowPage({
   const { start } = await searchParams;
   return (
     <WorkflowDetail
-      namespace={decodeURIComponent(namespace)}
-      name={decodeURIComponent(name)}
+      namespace={segment(namespace)}
+      name={segment(name)}
       starting={start === '1'}
     />
   );

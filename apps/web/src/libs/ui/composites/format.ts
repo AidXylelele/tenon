@@ -1,4 +1,5 @@
-const relative = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+// The console's language is English (spec, Assumptions); exact times keep the person's locale.
+const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
 const STEPS: ReadonlyArray<readonly [Intl.RelativeTimeFormatUnit, number]> = [
   ['second', 60],

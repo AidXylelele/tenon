@@ -79,7 +79,9 @@ export function StartDialog({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [pending, start] = useTransition();
-  const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
+  // One key per distinct start tried since the dialog opened, so going back to an input that
+  // may already have started a run reuses that run's key.
+  const keys = useRef(new Map<string, string>());
 
   function inputOf(): JsonValue | undefined {
     if (mode === 'form' && fields !== null) return inputFrom(fields, values);
@@ -93,10 +95,13 @@ export function StartDialog({
   }
 
   function keyFor(fingerprint: string): string {
-    if (attempt.current?.fingerprint !== fingerprint)
-      attempt.current = { fingerprint, key: crypto.randomUUID() };
+    const known = keys.current.get(fingerprint);
 
-    return attempt.current.key;
+    if (known !== undefined) return known;
+
+    const key = crypto.randomUUID();
+    keys.current.set(fingerprint, key);
+    return key;
   }
 
   function submit(event: React.FormEvent) {
@@ -116,7 +121,7 @@ export function StartDialog({
         return;
       }
 
-      attempt.current = null;
+      keys.current.clear();
       toast.success(`Started ${name}`, {
         description: 'Following the run live.',
       });
@@ -125,7 +130,14 @@ export function StartDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+
+        if (!next) keys.current.clear();
+      }}
+    >
       <DialogTrigger asChild>
         <Button>
           <PlayIcon data-icon="inline-start" />

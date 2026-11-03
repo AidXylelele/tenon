@@ -92,7 +92,9 @@ function Status({
       role="status"
       aria-live="polite"
     >
-      <span className="shrink-0">{icon}</span>
+      <span className="shrink-0" aria-hidden>
+        {icon}
+      </span>
       <span className="truncate">{children}</span>
     </span>
   );

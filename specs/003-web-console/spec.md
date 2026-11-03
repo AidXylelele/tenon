@@ -208,7 +208,7 @@ A signed-in person changes their password. Someone who forgot theirs requests a 
 
 - **FR-017**: Every action MUST show its pending state at once, block a second submission while pending, and end in a visible outcome: success, or the API's refusal with its title and detail; a refusal located in a request MUST be shown on its field.
 - **FR-018**: Navigation MUST show the target page's frame immediately and fill it as data arrives; a failure in one part of a page MUST NOT blank the rest.
-- **FR-019**: Live views MUST say when they were last updated, pause while the page is hidden, and stop once what they show has settled.
+- **FR-019**: Live views MUST say when they were last updated and pause while the page is hidden. A run's page stops once the run has ended; lists and deliveries keep refreshing, faster while anything they show is in flight, because new items can arrive at any time.
 
 **Quality**
 

@@ -15,14 +15,26 @@ export function field(form: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-// A path inside the console to return to after signing in; anything else (another origin,
-// a protocol-relative URL) returns to the start page.
+// A path inside the console to return to after signing in. It is resolved the way a browser
+// resolves it, so a value that leaves the console (another origin, `//host`, `/\\host`, a tab or
+// a newline that browsers strip) returns to the start page instead.
 export function returnPath(next: string | undefined): string {
-  if (next === undefined || !next.startsWith('/')) return '/workflows';
+  const start = '/workflows';
 
-  if (next.startsWith('//') || next.startsWith('/\\')) return '/workflows';
+  if (next === undefined || !next.startsWith('/')) return start;
 
-  return next;
+  const base = 'http://console.invalid';
+  let url: URL;
+
+  try {
+    url = new URL(next, base);
+  } catch {
+    return start;
+  }
+
+  if (url.origin !== base) return start;
+
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 export const PASSWORD_MIN = 12;
