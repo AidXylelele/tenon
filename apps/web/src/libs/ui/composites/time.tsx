@@ -1,6 +1,6 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { durationText, relativeText } from './format';
 
 const TICK_MS = 15_000;
@@ -59,9 +59,10 @@ interface DurationProps {
   readonly to: string | null;
 }
 
-// How long something took, or has taken so far while it runs.
+// How long something took, or has taken so far while it runs; a running one counts every
+// second.
 export function Duration({ from, to }: DurationProps) {
-  const now = useSyncExternalStore(clock.subscribe, nowOnClient, nowOnServer);
+  const now = useSecondTicks(to === null && from !== null);
 
   if (from === null) return <span className="text-muted-foreground">—</span>;
 
@@ -75,4 +76,23 @@ export function Duration({ from, to }: DurationProps) {
       {durationText(elapsed)}
     </span>
   );
+}
+
+// The current time each second while `running`; null on the server and before hydration.
+function useSecondTicks(running: boolean): number | null {
+  const [now, setNow] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!running) return;
+
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [running]);
+
+  return now;
 }

@@ -91,3 +91,13 @@ Audit (2026-11-03): the production dependencies of `web` have no known vulnerabi
   - Every route segment has a `loading.tsx` skeleton, so a dynamic route shows its frame at once (`02-guides/instant-navigation.md`: a layout that reads `cookies()` blocks navigation unless the read sits behind Suspense).
   - The console frame reads the session inside its own Suspense boundary.
   - `useLinkStatus` marks the clicked navigation item.
+
+## R9. The official TypeScript SDK: its types, not its runtime
+
+- **Decision.** The console imports `@openworkflowspec/sdk` (the same `1.0.3-alpha8` as the API) for its types only, as a dev dependency. The builder's task templates are written as `Specification.*` values (`satisfies Specification.CallHTTP`, …). They become the draft's JSON in one function (`newTask`).
+- **Why the types.** They tie every task the builder adds to the standard's own model at build time. On the first run they caught two templates whose lists were looser than DSL 1.0.3 allows. A type-only import puts nothing in the bundle.
+- **Why not the rest.**
+  - **Validation, `Classes` and builders.** On import, the SDK compiles the whole schema with Ajv (`new Ajv({ schemas: [workflow] })`, which generates code through `new Function`). In the browser that needs `script-src 'unsafe-eval'`, which the CSP refuses (R6), and it adds about 600 KB plus Ajv to a route that must open fast (SC-002).
+  - **The check stays with the API.** It is the platform's (002 FR-003), and it covers what the schema does not: the subset, references, expressions, secrets. A second check in the console would be domain validation outside the API (constitution I, BFF) and could disagree with it.
+  - **YAML.** The SDK reads YAML through js-yaml, which reports no source positions and does not bound aliases. `yaml` gives the line of a problem and bounds aliases.
+  - **`buildGraph` and Mermaid.** Its graph has no edges for `when`, `try`/`catch`, retries, `for` and `compete`, and draws a phantom `switch` edge (verified on 2026-11-02). The run line reads the document's own nesting, which is exact.

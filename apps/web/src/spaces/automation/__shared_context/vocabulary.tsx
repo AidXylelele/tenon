@@ -119,6 +119,20 @@ export function triggerLabel(trigger: Trigger): string {
   return TRIGGER[trigger];
 }
 
+const STARTED: Record<Trigger, string> = {
+  manual: 'Started by hand',
+  schedule: 'Started by its schedule',
+  event: 'Started by an event',
+  parent: 'Started by a parent run',
+  detached: 'Started detached from a run',
+  restart: 'Restarted',
+};
+
+// How a run began, as a phrase: "Started by its schedule".
+export function startedBy(trigger: Trigger): string {
+  return STARTED[trigger];
+}
+
 const DELIVERY: Record<
   DeliveryStatus,
   { readonly label: string; readonly tone: Tone }

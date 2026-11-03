@@ -19,26 +19,26 @@
 ## US2 — Build and publish without code (P1)
 
 - [x] T020 [US2] `automation/__shared_context/document`: tasks by pointer (insert, move, remove, rename, update), kinds, triggers, located problems, next version
-- [ ] T021 [US2] `automation/modules/workflow-editor`: header, trigger, task list with nesting, inspector forms per kind, live check, publish
-- [ ] T022 [US2] Routes `workflows/new` and `workflows/[namespace]/[name]/edit` with loading skeletons
+- [x] T021 [US2] `automation/modules/workflow-editor`: header, trigger, task list with nesting, inspector forms per kind, live check, publish
+- [x] T022 [US2] Routes `workflows/new` and `workflows/[namespace]/[name]/edit` with loading skeletons
 
 ## US3 — Start an instance and watch it run (P1)
 
-- [ ] T030 [US3] Start dialog: version, input as form or JSON, idempotency key kept across retries
-- [ ] T031 [US3] `automation/modules/instance-detail`: phase, outline with statuses, task timeline, events, input/output/error, controls by phase, live refresh
+- [x] T030 [US3] Start dialog: version, input as form or JSON, idempotency key kept across retries
+- [x] T031 [US3] `automation/modules/instance-detail`: phase, outline with statuses, task timeline, events, input/output/error, controls by phase, live refresh
 
 ## US5 — Manage workflows (P2)
 
-- [ ] T040 [US5] `automation/modules/workflow-list` (status filter, paging) and `workflow-detail` (trigger in words, on/off, versions, recent instances, archive)
-- [ ] T041 [US5] `automation/modules/conformance` and `version-document`
+- [x] T040 [US5] `automation/modules/workflow-list` (status filter, paging) and `workflow-detail` (trigger in words, on/off, versions, recent instances, archive)
+- [x] T041 [US5] `automation/modules/conformance` and `version-document`
 
 ## US6 — Find instances (P2)
 
-- [ ] T050 [US6] `automation/modules/instance-list`: filters in the address, paging, live while unended
+- [x] T050 [US6] `automation/modules/instance-list`: filters in the address, paging, live while unended
 
 ## US4 — Edit the document as code (P2)
 
-- [ ] T060 [US4] Code view in the editor: YAML/JSON, two-way with the draft, parse errors and problems at their line, paste and load a file
+- [x] T060 [US4] Code view in the editor: YAML/JSON, two-way with the draft, parse errors and problems at their line, paste and load a file
 
 ## US7 — Connect other applications (P2)
 

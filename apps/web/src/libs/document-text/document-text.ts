@@ -42,7 +42,8 @@ export function parseText(text: string): ParsedText {
   if (error !== undefined) {
     const [from, to] = error.pos;
     const position = error.linePos?.[0];
-    const message = error.message.split('\n')[0] ?? error.message;
+    const first = error.message.split('\n')[0] ?? error.message;
+    const message = first.replace(/ at line \d+, column \d+:?$/, '');
     return {
       ok: false,
       error: {

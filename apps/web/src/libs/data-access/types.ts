@@ -11,6 +11,10 @@ export interface Page<T> {
   readonly next: string | null;
 }
 
+// A value as the console read it, with when it arrived (ms since the epoch), so a live view
+// can say how fresh it is.
+export type Read<T> = T & { readonly readAt: number };
+
 export type Role = 'admin' | 'editor' | 'viewer';
 
 export interface User {

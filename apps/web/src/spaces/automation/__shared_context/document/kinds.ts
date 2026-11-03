@@ -1,8 +1,11 @@
+import type { Specification } from '@openworkflowspec/sdk';
 import type { JsonObject } from '@/libs/data-access/types';
 import type { TaskKind } from './tasks';
 
 // What each kind of task is called, what it does in plain words, and the task a builder adds
-// for it. Every template is a document the platform's check accepts.
+// for it. Every template is a document the platform's check accepts, and conforms to the
+// standard's own model: the official SDK's types check it at build time (research R9). Only
+// types are imported, so nothing of the SDK reaches the browser.
 
 export interface KindInfo {
   readonly kind: TaskKind;
@@ -10,7 +13,7 @@ export interface KindInfo {
   readonly description: string;
   readonly stem: string;
   readonly group: 'Work' | 'Events' | 'Flow';
-  readonly template: () => JsonObject;
+  readonly template: () => Specification.Task;
 }
 
 export const RAISE_TYPES = [
@@ -34,10 +37,11 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Send an HTTP request and keep the answer.',
     stem: 'callApi',
     group: 'Work',
-    template: () => ({
-      call: 'http',
-      with: { method: 'get', endpoint: 'https://example.com' },
-    }),
+    template: () =>
+      ({
+        call: 'http',
+        with: { method: 'get', endpoint: 'https://example.com' },
+      }) satisfies Specification.CallHTTP,
   },
   {
     kind: 'set',
@@ -45,7 +49,8 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Shape the data the next steps get.',
     stem: 'setData',
     group: 'Work',
-    template: () => ({ set: { message: 'Hello' } }),
+    template: () =>
+      ({ set: { message: 'Hello' } }) satisfies Specification.SetTask,
   },
   {
     kind: 'run-script',
@@ -53,9 +58,10 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Run JavaScript or Python in the sandbox.',
     stem: 'runScript',
     group: 'Work',
-    template: () => ({
-      run: { script: { language: 'js', code: 'console.log("hello")' } },
-    }),
+    template: () =>
+      ({
+        run: { script: { language: 'js', code: 'console.log("hello")' } },
+      }) satisfies Specification.RunTask,
   },
   {
     kind: 'run-shell',
@@ -63,7 +69,10 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Run a shell command in the sandbox.',
     stem: 'runCommand',
     group: 'Work',
-    template: () => ({ run: { shell: { command: 'echo hello' } } }),
+    template: () =>
+      ({
+        run: { shell: { command: 'echo hello' } },
+      }) satisfies Specification.RunTask,
   },
   {
     kind: 'run-workflow',
@@ -71,11 +80,12 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Start another workflow and wait for its output.',
     stem: 'runWorkflow',
     group: 'Work',
-    template: () => ({
-      run: {
-        workflow: { namespace: 'default', name: 'other', version: 'latest' },
-      },
-    }),
+    template: () =>
+      ({
+        run: {
+          workflow: { namespace: 'default', name: 'other', version: 'latest' },
+        },
+      }) satisfies Specification.RunTask,
   },
   {
     kind: 'emit',
@@ -83,11 +93,14 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Publish a CloudEvent to subscribers and listeners.',
     stem: 'sendEvent',
     group: 'Events',
-    template: () => ({
-      emit: {
-        event: { with: { source: '/workflows', type: 'com.example.happened' } },
-      },
-    }),
+    template: () =>
+      ({
+        emit: {
+          event: {
+            with: { source: '/workflows', type: 'com.example.happened' },
+          },
+        },
+      }) satisfies Specification.EmitTask,
   },
   {
     kind: 'listen',
@@ -95,9 +108,10 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Pause until an event of a type arrives.',
     stem: 'waitForEvent',
     group: 'Events',
-    template: () => ({
-      listen: { to: { one: { with: { type: 'com.example.approved' } } } },
-    }),
+    template: () =>
+      ({
+        listen: { to: { one: { with: { type: 'com.example.approved' } } } },
+      }) satisfies Specification.ListenTask,
   },
   {
     kind: 'wait',
@@ -105,7 +119,7 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Pause for a while.',
     stem: 'pause',
     group: 'Flow',
-    template: () => ({ wait: { minutes: 1 } }),
+    template: () => ({ wait: { minutes: 1 } }) satisfies Specification.WaitTask,
   },
   {
     kind: 'switch',
@@ -114,11 +128,11 @@ export const KINDS: readonly KindInfo[] = [
     stem: 'choose',
     group: 'Flow',
     template: () => {
-      const cases: JsonObject[] = [
+      const cases: Specification.SwitchTask['switch'] = [
         { matched: { when: '${ . != null }', then: 'continue' } },
         { otherwise: { then: 'continue' } },
       ];
-      return { switch: cases };
+      return { switch: cases } satisfies Specification.SwitchTask;
     },
   },
   {
@@ -127,10 +141,11 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Run steps once for every item of a list.',
     stem: 'forEach',
     group: 'Flow',
-    template: () => ({
-      for: { each: 'item', in: '${ .items }' },
-      do: [{ keepItem: { set: { item: '${ $item }' } } }],
-    }),
+    template: () =>
+      ({
+        for: { each: 'item', in: '${ .items }' },
+        do: [{ keepItem: { set: { item: '${ $item }' } } }],
+      }) satisfies Specification.ForTask,
   },
   {
     kind: 'fork',
@@ -139,11 +154,13 @@ export const KINDS: readonly KindInfo[] = [
     stem: 'inParallel',
     group: 'Flow',
     template: () => {
-      const branches: JsonObject[] = [
+      const branches: Specification.TaskList = [
         { first: { set: { first: true } } },
         { second: { set: { second: true } } },
       ];
-      return { fork: { compete: false, branches } };
+      return {
+        fork: { compete: false, branches },
+      } satisfies Specification.ForkTask;
     },
   },
   {
@@ -152,10 +169,13 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Retry or recover when steps fail.',
     stem: 'tryIt',
     group: 'Flow',
-    template: () => ({
-      try: [{ attempt: { set: { attempted: true } } }],
-      catch: { errors: { with: { type: `${ERROR_TYPE_BASE}communication` } } },
-    }),
+    template: () =>
+      ({
+        try: [{ attempt: { set: { attempted: true } } }],
+        catch: {
+          errors: { with: { type: `${ERROR_TYPE_BASE}communication` } },
+        },
+      }) satisfies Specification.TryTask,
   },
   {
     kind: 'do',
@@ -163,7 +183,10 @@ export const KINDS: readonly KindInfo[] = [
     description: 'Keep steps together under one name.',
     stem: 'group',
     group: 'Flow',
-    template: () => ({ do: [{ step: { set: { done: true } } }] }),
+    template: () =>
+      ({
+        do: [{ step: { set: { done: true } } }],
+      }) satisfies Specification.DoTask,
   },
   {
     kind: 'raise',
@@ -171,15 +194,16 @@ export const KINDS: readonly KindInfo[] = [
     description: 'End the run as failed, with a reason.',
     stem: 'fail',
     group: 'Flow',
-    template: () => ({
-      raise: {
-        error: {
-          type: `${ERROR_TYPE_BASE}runtime`,
-          status: 500,
-          title: 'Stopped on purpose',
+    template: () =>
+      ({
+        raise: {
+          error: {
+            type: `${ERROR_TYPE_BASE}runtime`,
+            status: 500,
+            title: 'Stopped on purpose',
+          },
         },
-      },
-    }),
+      }) satisfies Specification.RaiseTask,
   },
 ];
 
@@ -194,4 +218,10 @@ const ADVANCED: KindInfo = {
 
 export function infoOf(kind: TaskKind): KindInfo {
   return KINDS.find((info) => info.kind === kind) ?? ADVANCED;
+}
+
+// The task a builder adds for a kind, as the plain JSON the draft holds.
+export function newTask(kind: TaskKind): JsonObject {
+  const task = infoOf(kind).template();
+  return JSON.parse(JSON.stringify(task)) as JsonObject;
 }

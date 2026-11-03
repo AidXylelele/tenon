@@ -13,6 +13,7 @@ import type {
   JsonObject,
   JsonValue,
   Page,
+  Read,
   Secret,
   Subscription,
   SubscriptionDetail,
@@ -112,11 +113,11 @@ export function startInstance(
 
 export async function instances(
   filter: InstanceFilter,
-): Promise<Page<InstanceSummary>> {
+): Promise<Read<Page<InstanceSummary>>> {
   const page = await read<Page<InstanceSummary>>('/instances', {
     query: { ...filter },
   });
-  return page ?? { items: [], next: null };
+  return stamped(page ?? { items: [], next: null });
 }
 
 export function instance(id: string): Promise<Instance | null> {
@@ -126,11 +127,11 @@ export function instance(id: string): Promise<Instance | null> {
 export async function taskRecords(
   id: string,
   cursor?: number,
-): Promise<Page<TaskRecord>> {
+): Promise<Read<Page<TaskRecord>>> {
   const page = await read<Page<TaskRecord>>(`${instancePath(id)}/tasks`, {
     query: { cursor, limit: 500 },
   });
-  return page ?? { items: [], next: null };
+  return stamped(page ?? { items: [], next: null });
 }
 
 export async function instanceEvents(
@@ -212,8 +213,13 @@ export async function subscriptions(): Promise<Subscription[]> {
   return (await read<Subscription[]>('/subscriptions')) ?? [];
 }
 
-export function subscription(id: string): Promise<SubscriptionDetail | null> {
-  return read(`/subscriptions/${encodeURIComponent(id)}`);
+export async function subscription(
+  id: string,
+): Promise<Read<SubscriptionDetail> | null> {
+  const detail = await read<SubscriptionDetail>(
+    `/subscriptions/${encodeURIComponent(id)}`,
+  );
+  return detail === null ? null : stamped(detail);
 }
 
 export function createSubscription(
@@ -239,4 +245,8 @@ export async function conformance(): Promise<ConformanceStatement> {
   if (statement === null) throw new Error('The API states no conformance');
 
   return statement;
+}
+
+function stamped<T extends object>(value: T): Read<T> {
+  return { ...value, readAt: Date.now() };
 }
