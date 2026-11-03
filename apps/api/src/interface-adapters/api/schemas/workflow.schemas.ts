@@ -23,6 +23,7 @@ export const WorkflowResponse = z.object({
   namespace: z.string(),
   name: z.string(),
   status: z.enum(WorkflowStatus),
+  on: z.boolean(),
   currentVersion: z.string().nullable(),
 });
 

@@ -32,6 +32,7 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
         namespace: workflows.namespace,
         name: workflows.name,
         status: workflows.status,
+        on: workflows.on,
         currentVersion: versions.semver,
       })
       .from(workflows)
@@ -51,6 +52,7 @@ export class DrizzleWorkflowQueries implements WorkflowQueries {
         namespace: workflows.namespace,
         name: workflows.name,
         status: workflows.status,
+        on: workflows.on,
         currentVersion: versions.semver,
       })
       .from(workflows)

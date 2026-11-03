@@ -24,6 +24,23 @@ import { HooksController } from '../../interface-adapters/api/controllers/hooks.
 import { WebhooksController } from '../../interface-adapters/api/controllers/webhooks.controller.js';
 import { DrizzleWebhookQueries } from '../../interface-adapters/persistence/queries/drizzle-webhook.queries.js';
 import { DrizzleWebhookRepository } from '../../interface-adapters/persistence/repositories/drizzle-webhook.repository.js';
+import {
+  EventTriggers,
+  WorkflowSchedules,
+} from '../../application/automation/schedules/ports.js';
+import { StartOnEvent } from '../../application/automation/schedules/start-on-event.js';
+import { StartScheduledInstance } from '../../application/automation/schedules/start-scheduled-instance.js';
+import { SyncSchedule } from '../../application/automation/schedules/sync-schedule.js';
+import { TurnWorkflowOff } from '../../application/automation/workflows/turn-workflow-off.js';
+import { TurnWorkflowOn } from '../../application/automation/workflows/turn-workflow-on.js';
+import { ScheduleController } from '../../interface-adapters/messaging/schedule.controller.js';
+import { ScheduleClient } from '../../interface-adapters/workflows/interfaces.js';
+import { EventTriggersGateway } from '../../interface-adapters/workflows/schedules/event-triggers.gateway.js';
+import { ScheduleRunController } from '../../interface-adapters/workflows/schedules/schedule-run.controller.js';
+import { WorkflowSchedulesGateway } from '../../interface-adapters/workflows/schedules/workflow-schedules.gateway.js';
+import { ScheduleOutboxHandler } from '../outbox/schedule.outbox.handler.js';
+import { EngineScheduleClient } from '../workflows/engine-schedule.client.js';
+import { ScheduleWorkflow } from '../workflows/schedule.workflow.js';
 import { EventsController } from '../../interface-adapters/api/controllers/events.controller.js';
 import { DrizzleEventQueries } from '../../interface-adapters/persistence/queries/drizzle-event.queries.js';
 import { DrizzleInstanceNames } from '../../interface-adapters/persistence/queries/drizzle-instance-names.query.js';
@@ -165,6 +182,21 @@ import { RuntimeModule } from './runtime.module.js';
     ErrorClassifier,
     StepErrors,
     InstanceWorkflow,
+    ScheduleWorkflow,
+    TurnWorkflowOn,
+    TurnWorkflowOff,
+    SyncSchedule,
+    StartScheduledInstance,
+    StartOnEvent,
+    WorkflowSchedulesGateway,
+    { provide: WorkflowSchedules, useExisting: WorkflowSchedulesGateway },
+    EventTriggersGateway,
+    { provide: EventTriggers, useExisting: EventTriggersGateway },
+    EngineScheduleClient,
+    { provide: ScheduleClient, useExisting: EngineScheduleClient },
+    ScheduleRunController,
+    ScheduleController,
+    ScheduleOutboxHandler,
     ProcessWorkflow,
     OutboxErrors,
     InstanceEventsOutboxHandler,

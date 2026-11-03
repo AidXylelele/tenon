@@ -90,6 +90,7 @@ describe('CheckedDefinition and WorkflowVersion', () => {
       dsl: '1.0.3',
       fingerprint: 'fp',
       document,
+      eventTypes: null,
     });
 
     expect(definition.name).toBe(name);

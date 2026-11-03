@@ -24,6 +24,8 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { z } from 'zod';
+import { TurnWorkflowOff } from '../../../application/automation/workflows/turn-workflow-off.js';
+import { TurnWorkflowOn } from '../../../application/automation/workflows/turn-workflow-on.js';
 import { ArchiveWorkflow } from '../../../application/automation/workflows/archive-workflow.js';
 import { CheckDefinition } from '../../../application/automation/workflows/check-definition.js';
 import { PublishVersion } from '../../../application/automation/workflows/publish-version.js';
@@ -56,6 +58,8 @@ export class WorkflowsController {
     private readonly checkDefinition: CheckDefinition,
     private readonly publishVersion: PublishVersion,
     private readonly archiveWorkflow: ArchiveWorkflow,
+    private readonly turnWorkflowOn: TurnWorkflowOn,
+    private readonly turnWorkflowOff: TurnWorkflowOff,
     private readonly workflows: WorkflowQueries,
   ) {}
 
@@ -144,6 +148,36 @@ export class WorkflowsController {
     const archived = await this.archiveWorkflow.execute({ name });
 
     if (!archived.ok) throw ProblemPresenter.of(archived.failure);
+  }
+
+  // Automatic starts by the current version's schedule (FR-006); a no-op when already so.
+  @Post(':namespace/:name/turn-on')
+  @Can(WorkflowPolicy, 'author')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  @ApiConflictResponse()
+  async turnOn(
+    @Param({ schema: WorkflowParams }) params: WorkflowParams,
+  ): Promise<void> {
+    const name = new WorkflowName(params.namespace, params.name);
+    const turned = await this.turnWorkflowOn.execute({ name });
+
+    if (!turned.ok) throw ProblemPresenter.of(turned.failure);
+  }
+
+  @Post(':namespace/:name/turn-off')
+  @Can(WorkflowPolicy, 'author')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  async turnOff(
+    @Param({ schema: WorkflowParams }) params: WorkflowParams,
+  ): Promise<void> {
+    const name = new WorkflowName(params.namespace, params.name);
+    const turned = await this.turnWorkflowOff.execute({ name });
+
+    if (!turned.ok) throw ProblemPresenter.of(turned.failure);
   }
 
   @Get(':namespace/:name/versions')

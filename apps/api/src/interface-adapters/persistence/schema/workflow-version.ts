@@ -21,6 +21,7 @@ export const workflowVersion = pgTable(
     dsl: text('dsl').notNull(),
     document: jsonb('document').$type<JsonObject>().notNull(),
     fingerprint: text('fingerprint').notNull(),
+    eventTypes: text('event_types').array(),
     publisherId: uuid('publisher_id')
       .notNull()
       .references(() => user.id),

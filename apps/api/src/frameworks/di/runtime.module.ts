@@ -29,11 +29,16 @@ import { SetKind } from '../runtime/execution/kinds/set-kind.js';
 import { SwitchKind } from '../runtime/execution/kinds/switch-kind.js';
 import { TryKind } from '../runtime/execution/kinds/try-kind.js';
 import { WaitKind } from '../runtime/execution/kinds/wait-kind.js';
+import { CronCheck } from '../runtime/checking/cron-check.js';
+import { ScheduleTriggers } from '../runtime/schedule-triggers.js';
+import { EngineCronClient } from '../workflows/engine-cron.client.js';
+import { TriggerClient } from '../../interface-adapters/workflows/interfaces.js';
 import { ListenKind } from '../runtime/execution/kinds/listen-kind.js';
 import { EventFilters } from '../runtime/execution/events/event-filters.js';
 import { TaskKindRegistry } from '../runtime/execution/task-kind-registry.js';
 import { TaskRunner } from '../runtime/execution/task-runner.js';
 import {
+  CronClient,
   EndpointClient,
   JqClient,
   JsonSchemaClient,
@@ -54,10 +59,24 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
 @Module({
   imports: [JqModule, AjvModule, UndiciModule, GoJudgeModule],
   providers: [
+    { provide: CronClient, useClass: EngineCronClient },
+    {
+      provide: TriggerClient,
+      inject: [JqClient],
+      useFactory: (jq: JqClient) => {
+        const evaluator = new Evaluator(jq);
+        const filters = new EventFilters(evaluator);
+        return new ScheduleTriggers(filters);
+      },
+    },
     {
       provide: RuntimeChecks,
-      inject: [JqClient, JsonSchemaClient],
-      useFactory: (jq: JqClient, schemas: JsonSchemaClient) => {
+      inject: [JqClient, JsonSchemaClient, CronClient],
+      useFactory: (
+        jq: JqClient,
+        schemas: JsonSchemaClient,
+        crons: CronClient,
+      ) => {
         const schema = new SchemaCheck();
         const checks = [
           new DslVersionCheck(),
@@ -65,6 +84,7 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
           new TaskNameCheck(),
           new ReferenceCheck(),
           new DurationCheck(),
+          new CronCheck(crons),
           new ExpressionCheck(jq),
           new SchemaDocumentCheck(schemas),
         ];
@@ -124,6 +144,6 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
       },
     },
   ],
-  exports: [RuntimeChecks, Runtime, GoJudgeModule],
+  exports: [RuntimeChecks, Runtime, TriggerClient, GoJudgeModule],
 })
 export class RuntimeModule {}

@@ -84,5 +84,6 @@ export const aDefinition = (
     dsl: declared.dsl!,
     fingerprint,
     document,
+    eventTypes: null,
   });
 };

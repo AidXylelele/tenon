@@ -59,6 +59,9 @@ export abstract class WorkflowVersionRepository {
     name: WorkflowName,
     semver: string | null,
   ): Promise<WorkflowVersion | null>;
+  // The current versions of the workflows that are on whose `schedule.on` takes events of
+  // this type.
+  abstract findStartedOn(type: string): Promise<WorkflowVersion[]>;
   // Inserts a version once: the same version again is a no-op.
   abstract add(version: WorkflowVersion): Promise<void>;
 }

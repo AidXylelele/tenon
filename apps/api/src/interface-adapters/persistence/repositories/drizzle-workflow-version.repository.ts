@@ -4,7 +4,7 @@ import {
   Transactional,
   TransactionHost,
 } from '@nestjs-cls/transactional';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { WorkflowVersionRepository } from '../../../application/automation/workflows/ports.js';
 import type { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
@@ -73,6 +73,18 @@ export class DrizzleWorkflowVersionRepository implements WorkflowVersionReposito
     if (!found) return null;
 
     return WorkflowVersionMapper.toEntity(found.version);
+  }
+
+  async findStartedOn(type: string): Promise<WorkflowVersion[]> {
+    const takes = sql`(cardinality(${versions.eventTypes}) = 0 or ${type} = any(${versions.eventTypes}))`;
+    const rows = await this.txHost.tx
+      .select({ version: versions })
+      .from(versions)
+      .innerJoin(workflows, eq(workflows.currentVersionId, versions.id))
+      .where(
+        and(eq(workflows.on, true), isNotNull(versions.eventTypes), takes),
+      );
+    return rows.map((row) => WorkflowVersionMapper.toEntity(row.version));
   }
 
   // A version is written once: the same version again finds its row and writes nothing, while

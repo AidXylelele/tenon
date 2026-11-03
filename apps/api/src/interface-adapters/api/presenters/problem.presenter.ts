@@ -25,6 +25,10 @@ export class ProblemPresenter {
       { status: HttpStatus.CONFLICT, title: 'The workflow is archived' },
     ],
     [
+      WorkflowRefusal.Off,
+      { status: HttpStatus.CONFLICT, title: 'The workflow is off' },
+    ],
+    [
       WorkflowRefusal.VersionTaken,
       {
         status: HttpStatus.CONFLICT,

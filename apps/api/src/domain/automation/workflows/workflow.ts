@@ -2,13 +2,15 @@ import { randomUUID } from 'node:crypto';
 import type { Result } from '../../result.js';
 import { InstanceRefusal, TriggerKind } from '../instances/enums.js';
 import { WorkflowInstance } from '../instances/workflow-instance.js';
-import { WorkflowRefusal, WorkflowStatus } from './enums.js';
+import { WorkflowEventKind, WorkflowRefusal, WorkflowStatus } from './enums.js';
 import type {
   InstanceRestart,
   NewInstance,
   NewPublication,
   Publication,
+  ScheduledStart,
   StartRefusal,
+  WorkflowEvent,
   WorkflowProps,
 } from './interfaces.js';
 import type { WorkflowName } from './workflow-name.js';
@@ -19,13 +21,16 @@ export class Workflow {
   readonly #name: WorkflowName;
   readonly #version: number;
   #status: WorkflowStatus;
+  #on: boolean;
   #currentVersionId: string | null;
   #archivedAt: Date | null;
+  #events: WorkflowEvent[] = [];
 
   constructor(props: WorkflowProps) {
     this.#id = props.id;
     this.#name = props.name;
     this.#status = props.status;
+    this.#on = props.on;
     this.#currentVersionId = props.currentVersionId;
     this.#archivedAt = props.archivedAt;
     this.#version = props.version;
@@ -37,6 +42,7 @@ export class Workflow {
       id,
       name,
       status: WorkflowStatus.Active,
+      on: false,
       currentVersionId: null,
       archivedAt: null,
       version: 0,
@@ -55,6 +61,10 @@ export class Workflow {
     return this.#status;
   }
 
+  get on(): boolean {
+    return this.#on;
+  }
+
   get currentVersionId(): string | null {
     return this.#currentVersionId;
   }
@@ -65,6 +75,14 @@ export class Workflow {
 
   get version(): number {
     return this.#version;
+  }
+
+  get events(): readonly WorkflowEvent[] {
+    return this.#events;
+  }
+
+  clearEvents(): void {
+    this.#events = [];
   }
 
   // The same version again is the one already published; a new version needs an active
@@ -83,15 +101,41 @@ export class Workflow {
 
     const version = WorkflowVersion.publish(this.#id, input);
     this.#currentVersionId = version.id;
+
+    // The new version's schedule replaces the previous one (US4 AS4).
+    if (this.#on) this.#raise(WorkflowEventKind.ScheduleChanged);
+
     return { ok: true, value: { version, created: true } };
   }
 
-  // Whether archiving changed the workflow: an archived one stays as it was.
+  // Whether archiving changed the workflow: an archived one stays as it was, and is off.
   archive(now: Date): boolean {
     if (this.#isArchived()) return false;
 
     this.#status = WorkflowStatus.Archived;
     this.#archivedAt = now;
+    this.turnOff();
+    return true;
+  }
+
+  // Whether turning on changed the workflow; an archived one starts nothing by itself.
+  turnOn(): Result<boolean, WorkflowRefusal> {
+    if (this.#isArchived())
+      return { ok: false, failure: WorkflowRefusal.Archived };
+
+    if (this.#on) return { ok: true, value: false };
+
+    this.#on = true;
+    this.#raise(WorkflowEventKind.ScheduleChanged);
+    return { ok: true, value: true };
+  }
+
+  // Whether turning off changed the workflow; running instances and manual starts go on.
+  turnOff(): boolean {
+    if (!this.#on) return false;
+
+    this.#on = false;
+    this.#raise(WorkflowEventKind.ScheduleChanged);
     return true;
   }
 
@@ -103,7 +147,32 @@ export class Workflow {
     if (this.#isArchived())
       return { ok: false, failure: WorkflowRefusal.Archived };
 
-    const instance = WorkflowInstance.start(this.#id, input);
+    const id = randomUUID();
+    const instance = WorkflowInstance.start(id, this.#id, input);
+    return { ok: true, value: instance };
+  }
+
+  // Only while the workflow is on does its current version's schedule start instances
+  // (FR-006); an occurrence of an earlier version's schedule starts none.
+  startScheduledInstance(
+    start: ScheduledStart,
+  ): Result<WorkflowInstance, WorkflowRefusal> {
+    const own = start.version.workflowId === this.#id;
+
+    if (!own) throw new TypeError('The version belongs to another workflow');
+
+    if (!this.#on || start.version.id !== this.#currentVersionId)
+      return { ok: false, failure: WorkflowRefusal.Off };
+
+    const id = start.instanceId ?? randomUUID();
+    const instance = WorkflowInstance.start(id, this.#id, {
+      version: start.version,
+      input: start.input,
+      trigger: start.trigger,
+      starterId: null,
+      originId: null,
+      now: start.now,
+    });
     return { ok: true, value: instance };
   }
 
@@ -135,5 +204,9 @@ export class Workflow {
 
   #isArchived(): boolean {
     return this.#status === WorkflowStatus.Archived;
+  }
+
+  #raise(kind: WorkflowEventKind): void {
+    this.#events.push({ kind, workflowId: this.#id });
   }
 }

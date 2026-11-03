@@ -61,6 +61,21 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
     return rows.map((row) => WorkflowInstanceMapper.toEntity(row));
   }
 
+  async hasUnendedScheduled(workflowId: string): Promise<boolean> {
+    const [row] = await this.txHost.tx
+      .select({ id: instances.id })
+      .from(instances)
+      .where(
+        and(
+          eq(instances.workflowId, workflowId),
+          eq(instances.trigger, TriggerKind.Schedule),
+          isNull(instances.endedAt),
+        ),
+      )
+      .limit(1);
+    return row !== undefined;
+  }
+
   // An upsert fenced by the instance's version; what the engine must learn goes to the outbox in
   // the same transaction.
   @Transactional(Propagation.Mandatory)

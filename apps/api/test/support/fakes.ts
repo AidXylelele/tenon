@@ -214,6 +214,7 @@ export class FakeDefinitionChecker implements DefinitionChecker {
       dsl: header.dsl ?? '',
       fingerprint,
       document,
+      eventTypes: null,
     });
     return { ok: true, value: definition };
   }
@@ -268,6 +269,11 @@ export class InMemoryWorkflowVersionRepository implements WorkflowVersionReposit
     const workflow = await this.workflows.findByName(name);
     const current = workflow?.currentVersionId ?? '';
     return this.versions.get(current) ?? null;
+  }
+
+  // No workflow of these solitary tests is on.
+  async findStartedOn(): Promise<WorkflowVersion[]> {
+    return [];
   }
 
   async add(version: WorkflowVersion): Promise<void> {

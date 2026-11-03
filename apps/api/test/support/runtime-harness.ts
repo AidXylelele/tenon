@@ -12,6 +12,7 @@ import type {
 } from '../../src/domain/automation/json.js';
 import { ConfigModule } from '../../src/frameworks/di/config.module.js';
 import { ResilienceModule } from '../../src/frameworks/di/resilience.module.js';
+import { WorkflowsModule } from '@nestjs/workflows';
 import { RuntimeModule } from '../../src/frameworks/di/runtime.module.js';
 import {
   RetryableFault,
@@ -488,7 +489,12 @@ export class RuntimeHarness {
     const agent = new MockAgent();
     agent.disableNetConnect();
     const moduleRef = await Test.createTestingModule({
-      imports: [ConfigModule, ResilienceModule, RuntimeModule],
+      imports: [
+        ConfigModule,
+        ResilienceModule,
+        WorkflowsModule.forRoot({ worker: false, allowInMemoryStorage: true }),
+        RuntimeModule,
+      ],
     })
       .overrideProvider(EndpointDispatcher)
       .useValue(agent)

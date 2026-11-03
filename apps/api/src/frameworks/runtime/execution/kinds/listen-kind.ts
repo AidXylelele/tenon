@@ -7,6 +7,7 @@ import { type CompositeKind, EndingKind, type ListEnding } from '../endings.js';
 import type { Evaluator } from '../evaluator.js';
 import type { EventFilters } from '../events/event-filters.js';
 import { ErrorKind, TaskFault } from '../faults.js';
+import { EventTypes } from '../../document/event-types.js';
 import { Journal } from '../journal.js';
 import type { Scope } from '../scope.js';
 
@@ -197,21 +198,9 @@ export class ListenKind implements CompositeKind {
     return { kind: 'any', filters: (to.any ?? []) as JsonObject[], until };
   }
 
-  // The event types a listener narrows to: each filter's literal `type`, or none when a filter
-  // takes any type.
+  // The event types a listener narrows to, or none when a filter takes any type.
   static #typesOf(strategy: Strategy): string[] | null {
-    const types: string[] = [];
-
-    for (const filter of strategy.filters) {
-      const type = ((filter.with ?? {}) as JsonObject).type;
-      const literal = typeof type === 'string' && /^[\w.-]+$/.test(type);
-
-      if (!literal) return null;
-
-      types.push(type);
-    }
-
-    return types.length === 0 ? null : types;
+    return EventTypes.of(strategy.filters);
   }
 
   // The milliseconds left before the task's deadline, counted from the step that read `now`.

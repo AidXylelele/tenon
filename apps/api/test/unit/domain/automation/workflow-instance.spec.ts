@@ -11,12 +11,15 @@ import { WorkflowInstance } from '../../../../src/domain/automation/instances/wo
 const now = new Date('2026-11-03T10:00:00.000Z');
 const later = new Date('2026-11-03T10:05:00.000Z');
 
-function anInstance(phase: Phase = Phase.Pending): WorkflowInstance {
+function anInstance(
+  phase: Phase = Phase.Pending,
+  trigger: TriggerKind = TriggerKind.Manual,
+): WorkflowInstance {
   const props: WorkflowInstanceProps = {
     id: 'instance-1',
     workflowId: 'workflow-1',
     versionId: 'version-1',
-    trigger: TriggerKind.Manual,
+    trigger,
     starterId: 'author-1',
     originId: null,
     input: { amount: 1 },
@@ -190,5 +193,15 @@ describe('WorkflowInstance', () => {
     instance.clearEvents();
 
     expect(instance.events).toEqual([]);
+  });
+
+  it('only_a_completed_instance_its_schedule_started_continues_the_chain', () => {
+    const completed = anInstance(Phase.Completed, TriggerKind.Schedule);
+    const faulted = anInstance(Phase.Faulted, TriggerKind.Schedule);
+    const manual = anInstance(Phase.Completed, TriggerKind.Manual);
+
+    expect(completed.continuesSchedule).toBe(true);
+    expect(faulted.continuesSchedule).toBe(false);
+    expect(manual.continuesSchedule).toBe(false);
   });
 });

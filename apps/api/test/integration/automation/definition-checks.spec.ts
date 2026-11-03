@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { WorkflowsModule } from '@nestjs/workflows';
 import type { INestApplicationContext } from '@nestjs/common';
 import type { JsonObject } from '../../../src/domain/automation/json.js';
 import { ConfigModule } from '../../../src/frameworks/di/config.module.js';
@@ -16,7 +17,13 @@ let checks: RuntimeChecks;
 
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({
-    imports: [ConfigModule, ResilienceModule, RuntimeModule],
+    // The engine's in-memory store: a cron is checked by the engine's own reading of it.
+    imports: [
+      ConfigModule,
+      ResilienceModule,
+      WorkflowsModule.forRoot({ worker: false, allowInMemoryStorage: true }),
+      RuntimeModule,
+    ],
   }).compile();
   context = await moduleRef.init();
   checks = context.get(RuntimeChecks);

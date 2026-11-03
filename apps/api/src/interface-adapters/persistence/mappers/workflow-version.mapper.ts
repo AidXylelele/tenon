@@ -10,6 +10,7 @@ export class WorkflowVersionMapper {
       dsl: version.dsl,
       document: version.document,
       fingerprint: version.fingerprint,
+      eventTypes: version.eventTypes?.slice() ?? null,
       publisherId: version.publisherId,
       publishedAt: version.publishedAt,
     };
@@ -23,6 +24,7 @@ export class WorkflowVersionMapper {
       dsl: row.dsl,
       document: row.document,
       fingerprint: row.fingerprint,
+      eventTypes: row.eventTypes,
       publisherId: row.publisherId,
       publishedAt: row.publishedAt,
     });

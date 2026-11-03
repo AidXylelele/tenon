@@ -6,6 +6,7 @@ export interface WorkflowSummary {
   readonly namespace: string;
   readonly name: string;
   readonly status: WorkflowStatus;
+  readonly on: boolean;
   readonly currentVersion: string | null;
 }
 

@@ -6,6 +6,7 @@ import type {
 } from '../../src/application/automation/instances/ports.js';
 import { TaskStatus } from '../../src/application/automation/instances/enums.js';
 import type { Clock } from '../../src/application/automation/ports.js';
+import type { WorkflowSchedules } from '../../src/application/automation/schedules/ports.js';
 import type {
   WorkflowRepository,
   WorkflowVersionRepository,
@@ -94,6 +95,16 @@ export class StoredWorkflowInstanceRepository implements WorkflowInstanceReposit
     return rows.map((row) => new WorkflowInstance(row));
   }
 
+  async hasUnendedScheduled(workflowId: string): Promise<boolean> {
+    const rows = [...this.rows.values()];
+    return rows.some(
+      (row) =>
+        row.workflowId === workflowId &&
+        row.trigger === TriggerKind.Schedule &&
+        row.endedAt === null,
+    );
+  }
+
   async save(instance: WorkflowInstance): Promise<void> {
     const stored = this.rows.get(instance.id);
     const stale = stored !== undefined && stored.version !== instance.version;
@@ -127,6 +138,7 @@ function workflowRow(workflow: Workflow, version: number): WorkflowProps {
     id: workflow.id,
     name: workflow.name,
     status: workflow.status,
+    on: workflow.on,
     currentVersionId: workflow.currentVersionId,
     archivedAt: workflow.archivedAt,
     version,
@@ -205,6 +217,20 @@ export class StoredWorkflowVersionRepository implements WorkflowVersionRepositor
     if (current === null) return null;
 
     return this.versions.get(current) ?? null;
+  }
+
+  async findStartedOn(type: string): Promise<WorkflowVersion[]> {
+    const current = new Set<string | null>();
+
+    for (const row of this.workflows.rows.values())
+      if (row.on) current.add(row.currentVersionId);
+
+    return [...this.versions.values()].filter((version) => {
+      const types = version.eventTypes;
+      const takes =
+        types !== null && (types.length === 0 || types.includes(type));
+      return current.has(version.id) && takes;
+    });
   }
 
   async add(version: WorkflowVersion): Promise<void> {
@@ -335,3 +361,31 @@ export const aTask = (status: TaskStatus = TaskStatus.Running): TaskRecord => ({
   error: null,
   at: T0,
 });
+
+export interface ContinuedChain {
+  readonly instanceId: string;
+  readonly versionId: string;
+}
+
+// The engine's side of schedules, recorded: which workflows' schedules were applied or cleared
+// and which completed instances asked for the next link of a chain.
+export class RecordingSchedules implements WorkflowSchedules {
+  readonly applied: string[] = [];
+  readonly cleared: string[] = [];
+  readonly continued: ContinuedChain[] = [];
+
+  async apply(workflow: Workflow, version: WorkflowVersion): Promise<void> {
+    this.applied.push(`${workflow.id}@${version.id}`);
+  }
+
+  async clear(workflow: Workflow): Promise<void> {
+    this.cleared.push(workflow.id);
+  }
+
+  async continueAfter(
+    instance: WorkflowInstance,
+    version: WorkflowVersion,
+  ): Promise<void> {
+    this.continued.push({ instanceId: instance.id, versionId: version.id });
+  }
+}

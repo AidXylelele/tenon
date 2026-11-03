@@ -76,6 +76,11 @@ export type JsonSchemaCompilation =
 export type JsonSchemaVerdict =
   JsonSchemaValid | JsonSchemaInvalid | JsonSchemaUnusable | JsonSchemaTimedOut;
 
+// Whether the engine can run a cron expression (in UTC): null, or why not.
+export abstract class CronClient {
+  abstract problemOf(cron: string): Promise<string | null>;
+}
+
 export abstract class JsonSchemaClient {
   abstract compile(schema: JsonObject): Promise<JsonSchemaCompilation>;
   abstract validate(

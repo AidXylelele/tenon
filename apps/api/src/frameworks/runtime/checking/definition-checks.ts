@@ -6,6 +6,7 @@ import type {
   RuntimeChecks,
 } from '../../../interface-adapters/workflows/interfaces.js';
 import type { DefinitionCheck } from '../interfaces.js';
+import { EventTypes } from '../document/event-types.js';
 import { Fingerprint } from './fingerprint.js';
 import type { SchemaCheck } from './schema-check.js';
 
@@ -33,13 +34,25 @@ export class DefinitionChecks implements RuntimeChecks {
 
     const declared = workflow.document;
     const fingerprint = Fingerprint.of(document);
+    const eventTypes = DefinitionChecks.#eventTypesOf(workflow);
     const identity = {
       namespace: declared.namespace,
       name: declared.name,
       version: declared.version,
       dsl: declared.dsl,
       fingerprint,
+      eventTypes,
     };
     return { kind: VerdictKind.Valid, identity };
+  }
+
+  // The types `schedule.on` starts instances on: null without it, empty when any type.
+  static #eventTypesOf(workflow: Specification.Workflow): string[] | null {
+    const on = (workflow.schedule as JsonObject | undefined)?.on;
+
+    if (on === undefined) return null;
+
+    const filters = EventTypes.filtersOf(on as JsonObject);
+    return EventTypes.of(filters) ?? [];
   }
 }

@@ -10,6 +10,7 @@ export class CheckedDefinition {
   readonly #dsl: string;
   readonly #fingerprint: string;
   readonly #document: JsonObject;
+  readonly #eventTypes: readonly string[] | null;
 
   constructor(props: CheckedDefinitionProps) {
     this.#name = props.name;
@@ -17,6 +18,7 @@ export class CheckedDefinition {
     this.#dsl = props.dsl;
     this.#fingerprint = props.fingerprint;
     this.#document = props.document;
+    this.#eventTypes = props.eventTypes;
   }
 
   get name(): WorkflowName {
@@ -37,5 +39,9 @@ export class CheckedDefinition {
 
   get document(): JsonObject {
     return this.#document;
+  }
+
+  get eventTypes(): readonly string[] | null {
+    return this.#eventTypes;
   }
 }

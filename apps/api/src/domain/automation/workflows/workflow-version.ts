@@ -16,6 +16,7 @@ export class WorkflowVersion {
   readonly #dsl: string;
   readonly #fingerprint: string;
   readonly #document: JsonObject;
+  readonly #eventTypes: readonly string[] | null;
   readonly #publisherId: string;
   readonly #publishedAt: Date;
 
@@ -26,6 +27,7 @@ export class WorkflowVersion {
     this.#dsl = props.dsl;
     this.#fingerprint = props.fingerprint;
     this.#document = props.document;
+    this.#eventTypes = props.eventTypes;
     this.#publisherId = props.publisherId;
     this.#publishedAt = props.publishedAt;
   }
@@ -40,6 +42,7 @@ export class WorkflowVersion {
       dsl: definition.dsl,
       fingerprint: definition.fingerprint,
       document: definition.document,
+      eventTypes: definition.eventTypes,
       publisherId: input.publisherId,
       publishedAt: input.now,
     });
@@ -67,6 +70,11 @@ export class WorkflowVersion {
 
   get document(): JsonObject {
     return this.#document;
+  }
+
+  // The event types its schedule starts instances on: null when none, empty when any.
+  get eventTypes(): readonly string[] | null {
+    return this.#eventTypes;
   }
 
   get publisherId(): string {

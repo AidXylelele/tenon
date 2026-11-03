@@ -55,6 +55,8 @@ export abstract class WorkflowInstanceRepository {
   abstract find(id: string): Promise<WorkflowInstance | null>;
   // The children an instance awaits (its `run: workflow` tasks') that have not ended.
   abstract findAwaitedChildren(parentId: string): Promise<WorkflowInstance[]>;
+  // Whether an instance the workflow's schedule started has not ended.
+  abstract hasUnendedScheduled(workflowId: string): Promise<boolean>;
   abstract save(instance: WorkflowInstance): Promise<void>;
   abstract remove(instance: WorkflowInstance): Promise<void>;
 }

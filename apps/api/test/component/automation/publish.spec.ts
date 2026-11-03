@@ -59,6 +59,7 @@ describe('publishing workflow definitions over HTTP', () => {
       namespace: 'sales',
       name: 'route-lead',
       status: 'active',
+      on: false,
       currentVersion: '1.0.0',
     });
     expect(stored.body).toEqual(document);
@@ -200,6 +201,7 @@ describe('publishing workflow definitions over HTTP', () => {
         namespace: 'sales',
         name: 'route-lead',
         status: 'archived',
+        on: false,
         currentVersion: '1.0.0',
       },
     ]);

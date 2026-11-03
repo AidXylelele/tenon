@@ -29,6 +29,7 @@ export class RuntimeDefinitionChecker implements DefinitionChecker {
       version: identity.version,
       dsl: identity.dsl,
       fingerprint: identity.fingerprint,
+      eventTypes: identity.eventTypes,
       document,
     });
     return { ok: true, value: definition };

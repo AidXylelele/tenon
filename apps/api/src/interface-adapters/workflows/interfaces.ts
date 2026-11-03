@@ -13,6 +13,8 @@ export interface DefinitionIdentity {
   readonly version: string;
   readonly dsl: string;
   readonly fingerprint: string;
+  // The types `schedule.on` starts instances on: null without it, empty when any type.
+  readonly eventTypes: readonly string[] | null;
 }
 
 // The first problem of a document: an RFC 6901 pointer to it and what is wrong.
@@ -146,4 +148,28 @@ export abstract class RunClient {
     event: JsonObject,
     signalId: string,
   ): Promise<void>;
+}
+
+// The engine's schedules of a workflow, read from its version's document: the occurrences of a
+// cron or an interval, and the links of an `after` chain. `turnedOn` tells apart the chains
+// that each turn-on starts.
+export abstract class ScheduleClient {
+  abstract apply(
+    workflowId: string,
+    turnedOn: number,
+    document: JsonObject,
+  ): Promise<void>;
+  abstract clear(workflowId: string): Promise<void>;
+  // In the caller's transaction: the link after the completed instance, if the document has
+  // an `after`.
+  abstract continueAfter(
+    workflowId: string,
+    previousId: string,
+    document: JsonObject,
+  ): Promise<void>;
+}
+
+// Whether an event satisfies a document's `schedule.on`.
+export abstract class TriggerClient {
+  abstract accepts(document: JsonObject, event: JsonObject): Promise<boolean>;
 }

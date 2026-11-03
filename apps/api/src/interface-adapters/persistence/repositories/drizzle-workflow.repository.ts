@@ -4,6 +4,7 @@ import {
   Transactional,
   TransactionHost,
 } from '@nestjs-cls/transactional';
+import { Outbox } from '@nestjs/outbox';
 import { and, eq, sql } from 'drizzle-orm';
 import type { WorkflowRepository } from '../../../application/automation/workflows/ports.js';
 import type { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
@@ -16,7 +17,10 @@ import { UniqueViolation } from '../unique-violation.js';
 
 @Injectable()
 export class DrizzleWorkflowRepository implements WorkflowRepository {
-  constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTx>,
+    private readonly outbox: Outbox,
+  ) {}
 
   async findByName(name: WorkflowName): Promise<Workflow | null> {
     const [row] = await this.txHost.tx
@@ -56,6 +60,7 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
         target: workflows.id,
         set: {
           status: sql`excluded.status`,
+          on: sql`excluded.turned_on`,
           currentVersionId: sql`excluded.current_version_id`,
           archivedAt: sql`excluded.archived_at`,
           version: sql`excluded.version`,
@@ -71,5 +76,19 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
     );
 
     if (saved.length === 0) throw new StaleWriteError();
+
+    await this.#told(workflow);
+  }
+
+  // A schedule that changed reaches the engine after the commit, through the outbox.
+  async #told(workflow: Workflow): Promise<void> {
+    const entries = workflow.events.map((change) => ({
+      topic: change.kind,
+      key: change.workflowId,
+      payload: { workflowId: change.workflowId },
+    }));
+    workflow.clearEvents();
+
+    if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
   }
 }

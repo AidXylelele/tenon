@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { Result } from '../../result.js';
 import type { JsonObject, JsonValue } from '../json.js';
 import type { NewInstance } from '../workflows/interfaces.js';
@@ -7,7 +6,7 @@ import {
   InstanceRefusal,
   Phase,
   RunDirective,
-  type TriggerKind,
+  TriggerKind,
 } from './enums.js';
 import type { InstanceEvent, WorkflowInstanceProps } from './interfaces.js';
 
@@ -52,8 +51,11 @@ export class WorkflowInstance {
     this.#version = props.version;
   }
 
-  static start(workflowId: string, input: NewInstance): WorkflowInstance {
-    const id = randomUUID();
+  static start(
+    id: string,
+    workflowId: string,
+    input: NewInstance,
+  ): WorkflowInstance {
     return new WorkflowInstance({
       id,
       workflowId,
@@ -136,6 +138,14 @@ export class WorkflowInstance {
 
   get ended(): boolean {
     return WorkflowInstance.#ENDED.includes(this.#phase);
+  }
+
+  // Only a completed instance its schedule started continues an `after` chain; a faulted or
+  // cancelled one ends it (US4 AS2).
+  get continuesSchedule(): boolean {
+    return (
+      this.#trigger === TriggerKind.Schedule && this.#phase === Phase.Completed
+    );
   }
 
   get events(): readonly InstanceEvent[] {

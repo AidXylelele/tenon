@@ -59,17 +59,25 @@ export class SubsetCheck implements DefinitionCheck {
   }
 
   // An event-driven schedule starts an instance per event of one filter, or of any of several;
-  // waiting for all of them would hold state between events outside any instance.
+  // waiting for all of them, or until a condition, would hold state between events outside
+  // any instance.
   static #schedule(workflow: Specification.Workflow): CheckProblem | null {
     const schedule = workflow.schedule as JsonObject | undefined;
     const on = schedule?.on as JsonObject | undefined;
 
-    if (on?.all === undefined) return null;
+    if (on?.all !== undefined)
+      return {
+        pointer: '/schedule/on/all',
+        detail: 'a schedule on all of several events is not supported',
+      };
 
-    return {
-      pointer: '/schedule/on/all',
-      detail: 'a schedule on all of several events is not supported',
-    };
+    if (on?.until !== undefined)
+      return {
+        pointer: '/schedule/on/until',
+        detail: 'a schedule on events until a condition is not supported',
+      };
+
+    return null;
   }
 
   static #use(workflow: Specification.Workflow): CheckProblem | null {

@@ -28,15 +28,16 @@ import { WorkflowName } from '../../../../src/domain/automation/workflows/workfl
 import type { WorkflowVersion } from '../../../../src/domain/automation/workflows/workflow-version.js';
 import { aDefinition } from '../../../support/builders.js';
 import {
-  anInstanceIn,
-  aTask,
   FixedClock,
   RecordingInstanceRuns,
+  RecordingSchedules,
   RecordingTaskProgress,
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
   StoredWorkflowVersionRepository,
   T0,
+  aTask,
+  anInstanceIn,
 } from '../../../support/qa-fakes.js';
 
 const now = new Date('2026-11-03T12:00:00.000Z');
@@ -66,6 +67,7 @@ function setUp(...seed: WorkflowInstance[]) {
   const versions = new StoredWorkflowVersionRepository(workflows);
   const runs = new RecordingInstanceRuns(instances);
   const progress = new RecordingTaskProgress(instances);
+  const schedules = new RecordingSchedules();
   return {
     clock,
     instances,
@@ -73,6 +75,7 @@ function setUp(...seed: WorkflowInstance[]) {
     versions,
     runs,
     progress,
+    schedules,
     start: new StartInstance(workflows, versions, instances, runs, clock),
     restart: new RestartInstance(workflows, versions, instances, runs, clock),
     cancel: new CancelInstance(instances, progress, clock),
@@ -85,7 +88,13 @@ function setUp(...seed: WorkflowInstance[]) {
     waiting: new BeginWaiting(instances),
     running: new EndWaiting(instances),
     directive: new InstanceDirective(instances),
-    complete: new CompleteInstance(instances, progress, clock),
+    complete: new CompleteInstance(
+      instances,
+      progress,
+      versions,
+      schedules,
+      clock,
+    ),
     fault: new FaultInstance(instances, progress, clock),
   };
 }
