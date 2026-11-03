@@ -3,10 +3,12 @@ import type { JsonObject } from '../../../domain/automation/json.js';
 import { VerdictKind } from '../../../interface-adapters/workflows/enums.js';
 import type {
   CheckVerdict,
+  ConformanceStatement,
   RuntimeChecks,
 } from '../../../interface-adapters/workflows/interfaces.js';
 import type { DefinitionCheck } from '../interfaces.js';
 import { EventTypes } from '../document/event-types.js';
+import { Conformance } from '../conformance.js';
 import { Fingerprint } from './fingerprint.js';
 import { SecretCheck } from './secret-check.js';
 import type { SchemaCheck } from './schema-check.js';
@@ -53,6 +55,10 @@ export class DefinitionChecks implements RuntimeChecks {
       eventTypes,
     };
     return { kind: VerdictKind.Valid, identity };
+  }
+
+  statement(): ConformanceStatement {
+    return Conformance.statement();
   }
 
   // The types `schedule.on` starts instances on: null without it, empty when any type.

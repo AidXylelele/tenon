@@ -35,6 +35,18 @@ export interface ArchiveWorkflowCommand {
 
 export type ArchiveResult = Result<void, Missing>;
 
+// The subset of the standard the platform runs, as its statement of partial conformance.
+export interface ConformanceView {
+  readonly dsl: readonly string[];
+  readonly tasks: readonly string[];
+  readonly calls: readonly string[];
+  readonly runs: readonly string[];
+  readonly scriptLanguages: readonly string[];
+  readonly authentications: readonly string[];
+  readonly excluded: readonly string[];
+  readonly contradictions: readonly string[];
+}
+
 export abstract class DefinitionChecker {
   // The definition the runtime can run, or the document's first problem (FR-002); `secrets`
   // are the names of the publisher's secrets, the only ones its `use.secrets` may name (US8).
@@ -42,6 +54,8 @@ export abstract class DefinitionChecker {
     document: JsonObject,
     secrets: readonly string[],
   ): Promise<Result<CheckedDefinition, DefinitionProblem>>;
+  // What the checks hold documents to (ER-001).
+  abstract statement(): ConformanceView;
 }
 
 export abstract class WorkflowRepository {

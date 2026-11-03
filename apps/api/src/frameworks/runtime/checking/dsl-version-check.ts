@@ -1,14 +1,13 @@
 import type { Specification } from '@openworkflowspec/sdk';
 import type { CheckProblem } from '../../../interface-adapters/workflows/interfaces.js';
+import { Conformance } from '../conformance.js';
 import type { DefinitionCheck } from '../interfaces.js';
 
 // The released DSL versions only (FR-001): a pre-release has a schema of its own.
 export class DslVersionCheck implements DefinitionCheck {
-  static readonly #RELEASED = ['1.0.0', '1.0.1', '1.0.2', '1.0.3'];
-
   firstProblem(workflow: Specification.Workflow): Promise<CheckProblem | null> {
     const dsl = workflow.document.dsl;
-    const released = DslVersionCheck.#RELEASED.includes(dsl);
+    const released = Conformance.DSL.includes(dsl);
 
     if (released) return Promise.resolve(null);
 

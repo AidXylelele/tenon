@@ -35,13 +35,27 @@ export interface DocumentInvalid {
 
 export type CheckVerdict = DocumentValid | DocumentInvalid;
 
-// What the runtime refuses to run, decided before a document is published (FR-002).
+// The runtime's statement of partial conformance to the standard (ER-001).
+export interface ConformanceStatement {
+  readonly dsl: readonly string[];
+  readonly tasks: readonly string[];
+  readonly calls: readonly string[];
+  readonly runs: readonly string[];
+  readonly scriptLanguages: readonly string[];
+  readonly authentications: readonly string[];
+  readonly excluded: readonly string[];
+  readonly contradictions: readonly string[];
+}
+
+// What the runtime refuses to run, decided before a document is published (FR-002), against
+// the subset it states.
 export abstract class RuntimeChecks {
   // `secrets`: the names the document's `use.secrets` may name.
   abstract check(
     document: JsonObject,
     secrets: readonly string[],
   ): Promise<CheckVerdict>;
+  abstract statement(): ConformanceStatement;
 }
 
 // What the runtime needs to run an instance: the published document and the instance's input.

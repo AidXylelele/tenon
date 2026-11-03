@@ -292,4 +292,30 @@ describe('publishing workflow definitions over HTTP', () => {
       .send(aDocument())
       .expect(401);
   });
+
+  // ER-001: the subset is declared once, published here, and publish holds documents to it.
+  it('the_platform_states_its_partial_conformance_and_holds_documents_to_it', async () => {
+    const statement = await request(t.server)
+      .get('/api/v1/conformance')
+      .set(editor)
+      .expect(200);
+    const refused = await request(t.server)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .send(
+        aDocument({}, [
+          { remote: { call: 'grpc', with: { proto: { endpoint: 'x' } } } },
+        ]),
+      );
+
+    expect(statement.body).toMatchObject({
+      dsl: ['1.0.0', '1.0.1', '1.0.2', '1.0.3'],
+      runs: ['workflow', 'script', 'shell'],
+    });
+    expect(statement.body.excluded).toContain(
+      'call: grpc, asyncapi, a2a and mcp',
+    );
+    expect(statement.body.contradictions).toHaveLength(2);
+    expect(refused.status).toBe(422);
+  });
 });

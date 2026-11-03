@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  ConformanceView,
   DefinitionChecker,
   DefinitionProblem,
 } from '../../../application/automation/workflows/ports.js';
@@ -34,5 +35,9 @@ export class RuntimeDefinitionChecker implements DefinitionChecker {
       document,
     });
     return { ok: true, value: definition };
+  }
+
+  statement(): ConformanceView {
+    return this.runtime.statement();
   }
 }

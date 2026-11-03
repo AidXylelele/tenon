@@ -4,6 +4,7 @@ import type {
 } from '../../src/application/automation/secrets/queries.js';
 import type { TransactionHost } from '@nestjs-cls/transactional';
 import type {
+  ConformanceView,
   DefinitionChecker,
   DefinitionProblem,
   WorkflowRepository,
@@ -201,6 +202,19 @@ export class RecordingSessions implements Sessions {
 // Accepts any document with a `document` header, or refuses the ones it was told to.
 export class FakeDefinitionChecker implements DefinitionChecker {
   readonly refused = new Map<string, DefinitionProblem>();
+
+  statement(): ConformanceView {
+    return {
+      dsl: ['1.0.3'],
+      tasks: [],
+      calls: [],
+      runs: [],
+      scriptLanguages: [],
+      authentications: [],
+      excluded: [],
+      contradictions: [],
+    };
+  }
 
   async check(
     document: JsonObject,

@@ -8,9 +8,11 @@ import { JsonPointer } from '../document/json-pointer.js';
 import { JsonWalk } from '../document/json-walk.js';
 import type { LocatedTask } from '../document/located-task.js';
 import { TaskKinds } from '../document/task-kind.js';
+import { Conformance } from '../conformance.js';
 import type { DefinitionCheck } from '../interfaces.js';
 
-// What this runtime cannot run, refused at publish so that nothing is ignored silently (FR-011).
+// What this runtime cannot run, refused at publish so that nothing is ignored silently (FR-011);
+// the subset itself is declared in Conformance.
 export class SubsetCheck implements DefinitionCheck {
   static readonly #ROOT = new Set([
     'document',
@@ -21,8 +23,8 @@ export class SubsetCheck implements DefinitionCheck {
     'output',
     'schedule',
   ]);
-  static readonly #EXCLUDED_CALLS = new Set(['a2a', 'asyncapi', 'grpc', 'mcp']);
-  static readonly #LANGUAGES = new Set(['js', 'javascript', 'python']);
+  static readonly #EXCLUDED_CALLS = new Set(Conformance.EXCLUDED_CALLS);
+  static readonly #LANGUAGES = new Set(Conformance.SCRIPT_LANGUAGES);
   static readonly #CLIENT_AUTHENTICATIONS = new Set([
     'client_secret_post',
     'client_secret_basic',
