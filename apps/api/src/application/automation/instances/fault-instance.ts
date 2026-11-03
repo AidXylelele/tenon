@@ -3,6 +3,7 @@ import { Transactional } from '@nestjs-cls/transactional';
 import { Clock } from '../ports.js';
 import {
   type EndInstanceCommand,
+  TaskProgress,
   WorkflowInstanceRepository,
 } from './ports.js';
 
@@ -11,6 +12,7 @@ import {
 export class FaultInstance {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
+    private readonly progress: TaskProgress,
     private readonly clock: Clock,
   ) {}
 
@@ -24,5 +26,6 @@ export class FaultInstance {
     const error = command.error ?? {};
     instance.fault(error, now);
     await this.instances.save(instance);
+    await this.progress.cancelRunning(instance.id, now);
   }
 }

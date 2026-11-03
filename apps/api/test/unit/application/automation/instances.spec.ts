@@ -75,7 +75,7 @@ function setUp(...seed: WorkflowInstance[]) {
     progress,
     start: new StartInstance(workflows, versions, instances, runs, clock),
     restart: new RestartInstance(workflows, versions, instances, runs, clock),
-    cancel: new CancelInstance(instances, clock),
+    cancel: new CancelInstance(instances, progress, clock),
     suspend: new SuspendInstance(instances),
     resume: new ResumeInstance(instances),
     remove: new DeleteInstance(instances),
@@ -85,8 +85,8 @@ function setUp(...seed: WorkflowInstance[]) {
     waiting: new BeginWaiting(instances),
     running: new EndWaiting(instances),
     directive: new InstanceDirective(instances),
-    complete: new CompleteInstance(instances, clock),
-    fault: new FaultInstance(instances, clock),
+    complete: new CompleteInstance(instances, progress, clock),
+    fault: new FaultInstance(instances, progress, clock),
   };
 }
 
@@ -501,8 +501,7 @@ describe('cancelling an instance', () => {
     expect(fixture.instances.outbox).toHaveLength(1);
   });
 
-  // DEFECT (in-progress code): cancel-instance.ts cancels only the direct children; a child's own
-  // awaited children keep running although US9 AS3 says the sub-workflows it started are cancelled.
+  // US9 AS3: the sub-workflows a cancelled child started are cancelled too.
   it('the_grandchildren_it_awaits_through_a_child_end_too', async () => {
     const parent = anInstanceIn(Phase.Running);
     const child = anInstanceIn(Phase.Running, {
@@ -520,6 +519,31 @@ describe('cancelling an instance', () => {
     await fixture.cancel.execute(ofInstance);
 
     expect(fixture.instances.phaseOf('grandchild-1')).toBe(Phase.Cancelled);
+  });
+
+  it('the_tasks_still_running_in_it_and_its_children_end_cancelled', async () => {
+    const parent = anInstanceIn(Phase.Waiting);
+    const child = anInstanceIn(Phase.Running, {
+      id: 'child-1',
+      trigger: TriggerKind.Parent,
+      originId: 'instance-1',
+    });
+    const fixture = setUp(parent, child);
+
+    await fixture.cancel.execute(ofInstance);
+
+    expect(fixture.progress.cancellations).toEqual([
+      { instanceId: 'instance-1', at: now },
+      { instanceId: 'child-1', at: now },
+    ]);
+  });
+
+  it('a_refused_cancel_ends_no_task', async () => {
+    const fixture = setUp(anInstanceIn(Phase.Completed));
+
+    await fixture.cancel.execute(ofInstance);
+
+    expect(fixture.progress.cancellations).toEqual([]);
   });
 });
 
@@ -911,6 +935,34 @@ describe('the runtime reporting a run', () => {
       expect(fixture.instances.outbox).toEqual([]);
     },
   );
+
+  it('the_tasks_still_running_when_a_run_completes_end_cancelled', async () => {
+    const fixture = setUp(anInstanceIn(Phase.Running));
+
+    await fixture.complete.execute({
+      instanceId: 'instance-1',
+      output: { routed: true },
+      error: null,
+    });
+
+    expect(fixture.progress.cancellations).toEqual([
+      { instanceId: 'instance-1', at: now },
+    ]);
+  });
+
+  it('the_tasks_still_running_when_a_run_faults_end_cancelled', async () => {
+    const fixture = setUp(anInstanceIn(Phase.Running));
+
+    await fixture.fault.execute({
+      instanceId: 'instance-1',
+      output: null,
+      error: { type: 'runtime', status: 500 },
+    });
+
+    expect(fixture.progress.cancellations).toEqual([
+      { instanceId: 'instance-1', at: now },
+    ]);
+  });
 
   it.each(OPEN)('a_%s_instance_faults_with_its_error', async (phase) => {
     const fixture = setUp(anInstanceIn(phase));

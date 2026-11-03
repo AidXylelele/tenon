@@ -5,13 +5,15 @@ export interface ProblemLocation {
   readonly detail: string;
 }
 
-// An RFC 9457 problem: `type` names the kind of problem, `errors` locates it in the request.
+// An RFC 9457 problem: `type` names the kind of problem, `errors` locates it in the request,
+// `code` keeps the code a library refused with (an extension member, RFC 9457 3.2).
 export interface ProblemDetails {
   readonly type: string;
   readonly title: string;
   readonly status: number;
   readonly detail: string;
   readonly errors?: readonly ProblemLocation[];
+  readonly code?: string;
 }
 
 export class ProblemException extends HttpException {

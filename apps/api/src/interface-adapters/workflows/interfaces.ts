@@ -98,7 +98,8 @@ export abstract class RunObserver {
 export interface ChildRequest {
   readonly namespace: string;
   readonly name: string;
-  readonly version: string;
+  // The version named, or null for the current one (the standard's `latest`).
+  readonly version: string | null;
   readonly input: JsonValue;
   readonly detached: boolean;
 }

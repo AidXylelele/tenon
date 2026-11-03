@@ -6,11 +6,11 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   Post,
   Query,
   Res,
+  UseFilters,
 } from '@nestjs/common';
 import {
   ApiConflictResponse,
@@ -33,6 +33,8 @@ import type { JsonObject } from '../../../domain/automation/json.js';
 import { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 import type { User } from '../../../domain/identity/user.js';
 import { CursorMapper } from '../mappers/cursor.mapper.js';
+import { Missing } from '../../../application/automation/enums.js';
+import { ProblemFilter } from '../filters/problem.filter.js';
 import { ProblemPresenter } from '../presenters/problem.presenter.js';
 import { WorkflowPresenter } from '../presenters/workflow.presenter.js';
 import {
@@ -47,6 +49,7 @@ import {
 
 @ApiTags('workflows')
 @ApiCookieAuth('sessionCookie')
+@UseFilters(ProblemFilter)
 @Controller('workflows')
 export class WorkflowsController {
   constructor(
@@ -124,8 +127,7 @@ export class WorkflowsController {
     const workflowName = new WorkflowName(params.namespace, params.name);
     const workflow = await this.workflows.get(workflowName);
 
-    if (workflow === null)
-      throw new NotFoundException('The workflow does not exist');
+    if (workflow === null) throw ProblemPresenter.of(Missing.Workflow);
 
     return WorkflowPresenter.workflow(workflow);
   }
@@ -154,8 +156,7 @@ export class WorkflowsController {
     const workflowName = new WorkflowName(params.namespace, params.name);
     const versions = await this.workflows.versions(workflowName);
 
-    if (versions === null)
-      throw new NotFoundException('The workflow does not exist');
+    if (versions === null) throw ProblemPresenter.of(Missing.Workflow);
 
     return versions.map((version) => WorkflowPresenter.version(version));
   }
@@ -173,8 +174,7 @@ export class WorkflowsController {
       params.version,
     );
 
-    if (document === null)
-      throw new NotFoundException('The workflow version does not exist');
+    if (document === null) throw ProblemPresenter.of(Missing.Version);
 
     return document;
   }

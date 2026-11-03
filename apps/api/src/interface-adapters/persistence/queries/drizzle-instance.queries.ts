@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
-import { and, asc, desc, eq, gt, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, lte, type SQL, sql } from 'drizzle-orm';
 import type {
   InstanceDetail,
   InstanceFilter,
@@ -34,7 +34,14 @@ export class DrizzleInstanceQueries implements InstanceQueries {
         ? undefined
         : eq(workflows.namespace, filter.namespace),
       filter.name === null ? undefined : eq(workflows.name, filter.name),
+      filter.version === null ? undefined : eq(versions.semver, filter.version),
       filter.phase === null ? undefined : eq(instances.phase, filter.phase),
+      filter.startedFrom === null
+        ? undefined
+        : gte(instances.startedAt, filter.startedFrom),
+      filter.startedTo === null
+        ? undefined
+        : lte(instances.startedAt, filter.startedTo),
     );
     const fetched = limit + 1;
     const rows = await this.txHost.tx

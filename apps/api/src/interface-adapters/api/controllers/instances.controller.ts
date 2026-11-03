@@ -7,10 +7,10 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   Post,
   Query,
+  UseFilters,
 } from '@nestjs/common';
 import { Idempotent } from '@nestjs/idempotency';
 import {
@@ -37,12 +37,15 @@ import { WorkflowName } from '../../../domain/automation/workflows/workflow-name
 import type { User } from '../../../domain/identity/user.js';
 import { CursorMapper } from '../mappers/cursor.mapper.js';
 import { InstancePresenter } from '../presenters/instance.presenter.js';
+import { Missing } from '../../../application/automation/enums.js';
+import { ProblemFilter } from '../filters/problem.filter.js';
 import { ProblemPresenter } from '../presenters/problem.presenter.js';
 import {
   InstancePageResponse,
   InstanceParams,
   InstanceResponse,
   InstanceSummaryResponse,
+  LATEST,
   ListInstancesQuery,
   EventPageResponse,
   type ResponseJson,
@@ -52,8 +55,16 @@ import {
 } from '../schemas/instance.schemas.js';
 import { WorkflowParams } from '../schemas/workflow.schemas.js';
 
+// A start repeats another when it names the same version and input once defaults apply: an
+// omitted input is `{}`, an omitted version `latest` (FR-009).
+function startFingerprint(body: unknown): unknown {
+  const parsed = StartInstanceBody.safeParse(body);
+  return parsed.success ? parsed.data : body;
+}
+
 @ApiTags('instances')
 @ApiCookieAuth('sessionCookie')
+@UseFilters(ProblemFilter)
 @Controller()
 export class InstancesController {
   constructor(
@@ -70,7 +81,7 @@ export class InstancesController {
   // A repeated request with the same Idempotency-Key answers the first one's response (FR-009).
   @Post('workflows/:namespace/:name/instances')
   @Can(InstancePolicy, 'operate')
-  @Idempotent()
+  @Idempotent({ fingerprint: startFingerprint })
   @ApiCreatedResponse({ standardSchema: InstanceSummaryResponse })
   @ApiNotFoundResponse()
   @ApiConflictResponse()
@@ -80,7 +91,7 @@ export class InstancesController {
     @CurrentUser() user: User,
   ): Promise<InstanceSummaryResponse> {
     const name = new WorkflowName(params.namespace, params.name);
-    const version = body.version ?? null;
+    const version = body.version === LATEST ? null : body.version;
     const started = await this.startInstance.execute({
       name,
       version,
@@ -99,10 +110,17 @@ export class InstancesController {
   async list(
     @Query({ schema: ListInstancesQuery }) query: ListInstancesQuery,
   ): Promise<InstancePageResponse> {
+    const startedFrom =
+      query.startedFrom === undefined ? null : new Date(query.startedFrom);
+    const startedTo =
+      query.startedTo === undefined ? null : new Date(query.startedTo);
     const filter = {
       namespace: query.namespace ?? null,
       name: query.name ?? null,
+      version: query.version ?? null,
       phase: query.phase ?? null,
+      startedFrom,
+      startedTo,
     };
     const after = CursorMapper.toInstancePosition(query.cursor);
     const page = await this.instances.list(filter, after, query.limit);
@@ -118,8 +136,7 @@ export class InstancesController {
   ): Promise<InstanceResponse> {
     const instance = await this.instances.get(params.id);
 
-    if (instance === null)
-      throw new NotFoundException('The workflow instance does not exist');
+    if (instance === null) throw ProblemPresenter.of(Missing.Instance);
 
     return InstancePresenter.instance(instance);
   }
@@ -136,8 +153,7 @@ export class InstancesController {
     const after = query.cursor ?? null;
     const page = await this.instances.tasks(params.id, after, query.limit);
 
-    if (page === null)
-      throw new NotFoundException('The workflow instance does not exist');
+    if (page === null) throw ProblemPresenter.of(Missing.Instance);
 
     return InstancePresenter.tasks(page);
   }
@@ -158,8 +174,7 @@ export class InstancesController {
       query.limit,
     );
 
-    if (page === null)
-      throw new NotFoundException('The workflow instance does not exist');
+    if (page === null) throw ProblemPresenter.of(Missing.Instance);
 
     const next = page.next === null ? null : String(page.next);
     return { items: page.items as ResponseJson[], next };
@@ -242,8 +257,7 @@ export class InstancesController {
   async #summaryOf(id: string): Promise<InstanceSummaryResponse> {
     const instance = await this.instances.get(id);
 
-    if (instance === null)
-      throw new NotFoundException('The workflow instance does not exist');
+    if (instance === null) throw ProblemPresenter.of(Missing.Instance);
 
     return InstancePresenter.summary(instance);
   }

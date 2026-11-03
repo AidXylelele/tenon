@@ -29,6 +29,7 @@ export class LifecycleEventMapper {
     [TaskStatus.Running, 'started'],
     [TaskStatus.Completed, 'completed'],
     [TaskStatus.Faulted, 'faulted'],
+    [TaskStatus.Cancelled, 'cancelled'],
   ]);
 
   // The event of an instance's change, or null for a change the standard has no event for.

@@ -5,6 +5,7 @@ import { Clock } from '../ports.js';
 import {
   type InstanceCommand,
   type InstanceResult,
+  TaskProgress,
   WorkflowInstanceRepository,
 } from './ports.js';
 
@@ -13,6 +14,7 @@ import {
 export class CancelInstance {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
+    private readonly progress: TaskProgress,
     private readonly clock: Clock,
   ) {}
 
@@ -28,6 +30,7 @@ export class CancelInstance {
     if (!changed.ok) return changed;
 
     await this.instances.save(instance);
+    await this.progress.cancelRunning(instance.id, now);
     const parents = [instance.id];
 
     // The children it awaits end with it, and theirs with them (US9 AS3); each tells its run.
@@ -41,6 +44,7 @@ export class CancelInstance {
       for (const child of children) {
         child.cancel(now);
         await this.instances.save(child);
+        await this.progress.cancelRunning(child.id, now);
         parents.push(child.id);
       }
     }

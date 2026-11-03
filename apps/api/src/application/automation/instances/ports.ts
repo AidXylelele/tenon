@@ -68,4 +68,6 @@ export abstract class InstanceRuns {
 export abstract class TaskProgress {
   abstract started(instanceId: string, task: TaskRecord): Promise<void>;
   abstract ended(instanceId: string, task: TaskRecord): Promise<void>;
+  // The instance ended: its tasks still running end with it, as cancelled (FR-015).
+  abstract cancelRunning(instanceId: string, at: Date): Promise<void>;
 }

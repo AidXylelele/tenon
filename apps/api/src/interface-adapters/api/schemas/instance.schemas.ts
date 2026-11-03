@@ -11,9 +11,12 @@ export const ResponseJson = z.json();
 
 export type ResponseJson = z.infer<typeof ResponseJson>;
 
+// The version named, or `latest` for the current one (as `run.workflow.version` of DSL 1.0.3).
+export const LATEST = 'latest';
+
 export const StartInstanceBody = z.strictObject({
   input: z.json().default({}),
-  version: z.string().optional(),
+  version: z.string().min(1).default(LATEST),
 });
 
 export type StartInstanceBody = z.infer<typeof StartInstanceBody>;
@@ -33,7 +36,10 @@ const InstanceCursor = z.string().refine((cursor) => {
 export const ListInstancesQuery = z.strictObject({
   namespace: z.string().optional(),
   name: z.string().optional(),
+  version: z.string().min(1).optional(),
   phase: z.enum(Phase).optional(),
+  startedFrom: z.iso.datetime({ offset: true }).optional(),
+  startedTo: z.iso.datetime({ offset: true }).optional(),
   cursor: InstanceCursor.optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });

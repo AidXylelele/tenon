@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
-import { sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
+import { TaskStatus } from '../../../application/automation/instances/enums.js';
 import type {
   TaskProgress,
   TaskRecord,
@@ -66,6 +67,32 @@ export class DrizzleTaskProgressStore implements TaskProgress {
         },
       });
     await this.#told(instanceId, task);
+  }
+
+  async cancelRunning(instanceId: string, at: Date): Promise<void> {
+    const running = and(
+      eq(progress.instanceId, instanceId),
+      eq(progress.status, TaskStatus.Running),
+    );
+    const cancelled = await this.txHost.tx
+      .update(progress)
+      .set({ status: TaskStatus.Cancelled, endedAt: at })
+      .where(running)
+      .returning();
+
+    for (const row of cancelled) {
+      const task: TaskRecord = {
+        execution: row.execution,
+        reference: row.reference,
+        name: row.name,
+        status: TaskStatus.Cancelled,
+        input: row.input,
+        output: null,
+        error: null,
+        at,
+      };
+      await this.#told(instanceId, task);
+    }
   }
 
   // The task's lifecycle event, accepted as any other event.

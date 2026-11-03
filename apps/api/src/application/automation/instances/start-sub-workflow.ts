@@ -17,7 +17,8 @@ import { WorkflowInstanceRepository } from './ports.js';
 export interface StartSubWorkflowCommand {
   readonly parentId: string;
   readonly name: WorkflowName;
-  readonly version: string;
+  // The version named, or null for the current one.
+  readonly version: string | null;
   readonly input: JsonValue;
   // Parent when the task awaits the child, Detached when it does not.
   readonly trigger: TriggerKind;
@@ -43,7 +44,10 @@ export class StartSubWorkflow {
 
     if (workflow === null) return { ok: false, failure: Missing.Workflow };
 
-    const version = await this.versions.find(command.name, command.version);
+    const version = await this.versions.findToRun(
+      command.name,
+      command.version,
+    );
 
     if (version === null) return { ok: false, failure: Missing.Version };
 

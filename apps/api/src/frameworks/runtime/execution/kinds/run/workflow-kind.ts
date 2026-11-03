@@ -19,6 +19,8 @@ import type { Scope } from '../../scope.js';
 // Awaited, its output is the task's and its fault the task's; detached (`await: false`), it runs
 // on its own and the task goes on with its input.
 export class WorkflowKind implements CompositeKind {
+  static readonly #LATEST = 'latest';
+
   constructor(private readonly evaluator: Evaluator) {}
 
   async run(
@@ -31,6 +33,7 @@ export class WorkflowKind implements CompositeKind {
     const declared = ((task as Specification.RunTask).run ?? {}) as JsonObject;
     const target = (declared.workflow ?? {}) as JsonObject;
     const detached = declared.await === false;
+    const version = WorkflowKind.#versionOf(target.version);
     const started = await Journal.value(scope, 'child', async () => {
       const childInput = await this.evaluator.template(
         target.input ?? {},
@@ -41,7 +44,7 @@ export class WorkflowKind implements CompositeKind {
       const start = await run.observer.startChild(run.plan.instanceId, {
         namespace: ProcessCommands.textOf(target.namespace),
         name: ProcessCommands.textOf(target.name),
-        version: ProcessCommands.textOf(target.version),
+        version,
         input: childInput,
         detached,
       });
@@ -84,5 +87,14 @@ export class WorkflowKind implements CompositeKind {
     if (!ended.ok) return { kind: EndingKind.Faulted, error: ended.error };
 
     return { kind: EndingKind.Completed, output: ended.value, ended: false };
+  }
+
+  // The version named, or null for the current one: `version` "Defaults to `latest`".
+  static #versionOf(version: JsonValue | undefined): string | null {
+    const named = ProcessCommands.textOf(version);
+
+    if (named === '' || named === WorkflowKind.#LATEST) return null;
+
+    return named;
   }
 }

@@ -246,9 +246,15 @@ export interface RecordedTask {
 }
 
 // Like the Drizzle store, a record of an instance that is not stored violates its foreign key.
+export interface CancelledTasks {
+  readonly instanceId: string;
+  readonly at: Date;
+}
+
 export class RecordingTaskProgress implements TaskProgress {
   readonly starts: RecordedTask[] = [];
   readonly ends: RecordedTask[] = [];
+  readonly cancellations: CancelledTasks[] = [];
 
   constructor(private readonly instances: StoredWorkflowInstanceRepository) {}
 
@@ -260,6 +266,11 @@ export class RecordingTaskProgress implements TaskProgress {
   async ended(instanceId: string, task: TaskRecord): Promise<void> {
     this.#ensureStored(instanceId);
     this.ends.push({ instanceId, task });
+  }
+
+  async cancelRunning(instanceId: string, at: Date): Promise<void> {
+    this.#ensureStored(instanceId);
+    this.cancellations.push({ instanceId, at });
   }
 
   #ensureStored(instanceId: string): void {

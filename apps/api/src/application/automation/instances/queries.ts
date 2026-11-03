@@ -28,7 +28,11 @@ export interface InstanceDetail extends InstanceSummary {
 export interface InstanceFilter {
   readonly namespace: string | null;
   readonly name: string | null;
+  readonly version: string | null;
   readonly phase: Phase | null;
+  // Instances started at or after, and at or before, these times.
+  readonly startedFrom: Date | null;
+  readonly startedTo: Date | null;
 }
 
 // The last instance of a page, newest first.
