@@ -81,9 +81,4 @@ export class Subscription {
   get createdAt(): Date {
     return this.#createdAt;
   }
-
-  // Only the events accepted once it exists reach it.
-  takesEventsOf(acceptedAt: Date): boolean {
-    return acceptedAt.getTime() >= this.#createdAt.getTime();
-  }
 }

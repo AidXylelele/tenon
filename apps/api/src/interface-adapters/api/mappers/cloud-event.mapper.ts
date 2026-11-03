@@ -6,15 +6,9 @@ import type { JsonValue } from '../../../domain/automation/json.js';
 // in `ce-` headers, its data the body, its `datacontenttype` the body's media type.
 export class CloudEventMapper {
   static readonly #PREFIX = 'ce-';
-  static readonly #STRUCTURED = 'application/cloudevents+json';
 
   static isBinary(headers: IncomingHttpHeaders): boolean {
     return headers['ce-specversion'] !== undefined;
-  }
-
-  static isStructured(headers: IncomingHttpHeaders): boolean {
-    const type = headers['content-type'] ?? '';
-    return type.startsWith(CloudEventMapper.#STRUCTURED);
   }
 
   static fromBinary(headers: IncomingHttpHeaders, body: unknown): CloudEvent {

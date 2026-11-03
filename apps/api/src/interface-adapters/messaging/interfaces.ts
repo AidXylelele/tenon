@@ -1,4 +1,5 @@
 import type { JsonObject } from '../../domain/automation/json.js';
+import type { DeliveryScheme } from '../../domain/automation/subscriptions/enums.js';
 
 // What an accepted event's outbox message carries.
 export interface AcceptedEventMessage {
@@ -9,8 +10,6 @@ export interface AcceptedEventMessage {
 export interface ScheduleChangedMessage {
   readonly workflowId: string;
 }
-
-export type DeliveryScheme = 'basic' | 'bearer';
 
 // Posts an event in CloudEvents' HTTP structured mode, authenticated with a secret's value (a
 // basic one holds `username` and `password`, a bearer one the token or `token`); null when a

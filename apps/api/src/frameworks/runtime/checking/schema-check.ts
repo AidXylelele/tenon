@@ -6,6 +6,7 @@ import type { Specification } from '@openworkflowspec/sdk';
 import type { JsonObject, JsonValue } from '../../../domain/automation/json.js';
 import type { CheckProblem } from '../../../interface-adapters/workflows/interfaces.js';
 import { TaskKind } from '../enums.js';
+import { JsonPointer } from '../document/json-pointer.js';
 import { TaskKinds } from '../document/task-kind.js';
 import { UriTemplate } from './uri-template.js';
 
@@ -163,7 +164,7 @@ export class SchemaCheck {
       params.unevaluatedProperty ?? params.additionalProperty;
 
     if (typeof unknownProperty === 'string') {
-      const escaped = SchemaCheck.#escaped(unknownProperty);
+      const escaped = JsonPointer.escaped(unknownProperty);
       const pointer = `${at}/${escaped}`;
       return { pointer, detail: `'${unknownProperty}' is not a property here` };
     }
@@ -211,7 +212,7 @@ export class SchemaCheck {
     let value: JsonValue = document;
 
     for (const token of tokens) {
-      const key = token.replaceAll('~1', '/').replaceAll('~0', '~');
+      const key = JsonPointer.unescaped(token);
 
       if (value === null || typeof value !== 'object') return null;
 
@@ -222,9 +223,5 @@ export class SchemaCheck {
     }
 
     return value;
-  }
-
-  static #escaped(token: string): string {
-    return token.replaceAll('~', '~0').replaceAll('/', '~1');
   }
 }

@@ -32,11 +32,12 @@ export class MatchSubscriptions {
 
     if (event === null) return;
 
-    const candidates = await this.subscriptions.ofType(event.type);
+    const candidates = await this.subscriptions.ofType(
+      event.type,
+      event.acceptedAt,
+    );
 
     for (const subscription of candidates) {
-      if (!subscription.takesEventsOf(event.acceptedAt)) continue;
-
       const accepts = await this.filters.accepts(subscription.filter, event);
 
       if (!accepts) continue;

@@ -144,10 +144,6 @@ export class InMemoryDurability implements Durability {
     return this.calls.filter((call) => call.kind === 'wait' && !call.replayed);
   }
 
-  attemptsOf(name: string): number {
-    return this.executed.filter((executed) => executed === name).length;
-  }
-
   // Unjournaled, as the engine's clock: a step's result keeps what its effect read.
   stepTime(): number {
     return this.clock;

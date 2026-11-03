@@ -6,7 +6,6 @@ import type {
   EndpointOutcomeKind,
   JqOutcomeKind,
   JsonSchemaOutcomeKind,
-  RequestPreparationKind,
   SandboxOutcomeKind,
 } from './enums.js';
 
@@ -185,18 +184,6 @@ export type ExchangeOutcome = EndpointResponded | EndpointFailure;
 
 export type DocumentOutcome =
   EndpointDocumentRead | EndpointUnreadable | EndpointFailure;
-
-export interface PreparedRequest {
-  readonly kind: RequestPreparationKind.Prepared;
-  readonly request: HttpRequest;
-}
-
-export interface MisconfiguredRequest {
-  readonly kind: RequestPreparationKind.Misconfigured;
-  readonly reason: string;
-}
-
-export type RequestPreparation = PreparedRequest | MisconfiguredRequest;
 
 export abstract class EndpointClient {
   abstract exchange(exchange: Exchange): Promise<ExchangeOutcome>;

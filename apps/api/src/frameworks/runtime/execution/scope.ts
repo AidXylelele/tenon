@@ -183,7 +183,7 @@ export class Scope {
 
   child(token: string | number): Scope {
     const pointer = this.#place.pointer.child(token);
-    const escaped = Scope.#escaped(token);
+    const escaped = JsonPointer.escaped(token);
     const path = `${this.#place.path}/${escaped}`;
     return this.#moved({ pointer, path, startedAt: null });
   }
@@ -197,7 +197,7 @@ export class Scope {
   // Somewhere else in the document (a declared function's body), journaled under this scope
   // apart from this scope's own steps (`@<suffix>`).
   elsewhere(pointer: JsonPointer, marker: string): Scope {
-    const escaped = Scope.#escaped(marker);
+    const escaped = JsonPointer.escaped(marker);
     const path = `${this.#place.path}:${escaped}`;
     return this.#moved({ pointer, path, startedAt: null });
   }
@@ -246,9 +246,5 @@ export class Scope {
   #moved(changes: Partial<Place>): Scope {
     const place: Place = Object.assign({}, this.#place, changes);
     return new Scope(this.#run, place);
-  }
-
-  static #escaped(token: string | number): string {
-    return String(token).replaceAll('~', '~0').replaceAll('/', '~1');
   }
 }

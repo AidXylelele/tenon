@@ -30,11 +30,6 @@ export enum EndpointOutcomeKind {
   Invalid = 'invalid',
 }
 
-export enum RequestPreparationKind {
-  Prepared = 'prepared',
-  Misconfigured = 'misconfigured',
-}
-
 export enum GoJudgeStatus {
   Accepted = 'Accepted',
   NonzeroExitStatus = 'Nonzero Exit Status',

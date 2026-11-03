@@ -51,7 +51,8 @@ export class PiscinaJqClient implements JqClient, OnApplicationShutdown {
       moduleUrl: import.meta.url,
       worker: 'jq.worker',
       maxThreads: ENGINE_CONCURRENCY + 1,
-      heapMb: null,
+      // A program that builds a huge value (`[range(1e9)]`) ends its worker, not the process.
+      heapMb: 128,
     });
   }
 

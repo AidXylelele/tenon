@@ -2,10 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { type ResiliencePolicy, ResilienceService } from '@nestjs/resilience';
 import { request as send } from 'undici';
 import type { JsonObject } from '../../domain/automation/json.js';
-import type {
-  DeliveryClient,
-  DeliveryScheme,
-} from '../../interface-adapters/messaging/interfaces.js';
+import { DeliveryScheme } from '../../domain/automation/subscriptions/enums.js';
+import type { DeliveryClient } from '../../interface-adapters/messaging/interfaces.js';
 import { EndpointDispatcher } from './endpoint-dispatcher.js';
 
 // A delivery in CloudEvents' HTTP structured mode, through the dispatcher whose address
@@ -83,7 +81,7 @@ export class UndiciDeliveryClient implements DeliveryClient {
 
     const parsed = UndiciDeliveryClient.parsed(credential);
 
-    if (scheme === 'basic') {
+    if (scheme === DeliveryScheme.Basic) {
       const username = UndiciDeliveryClient.textOf(parsed.username);
       const password = UndiciDeliveryClient.textOf(parsed.password);
       const pair = Buffer.from(`${username}:${password}`, 'utf8');

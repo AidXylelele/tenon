@@ -9,9 +9,17 @@ export class JsonPointer {
   }
 
   child(token: string | number): JsonPointer {
-    const text = String(token);
-    const escaped = text.replaceAll('~', '~0').replaceAll('/', '~1');
+    const escaped = JsonPointer.escaped(token);
     return new JsonPointer(`${this.#text}/${escaped}`);
+  }
+
+  // A reference token as RFC 6901 writes it (`~` as `~0`, `/` as `~1`), and back.
+  static escaped(token: string | number): string {
+    return String(token).replaceAll('~', '~0').replaceAll('/', '~1');
+  }
+
+  static unescaped(token: string): string {
+    return token.replaceAll('~1', '/').replaceAll('~0', '~');
   }
 
   toString(): string {

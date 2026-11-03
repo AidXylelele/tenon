@@ -17,7 +17,6 @@ import { ResilienceModule as NestResilienceModule } from '@nestjs/resilience';
         // The bound of a runaway program or schema, not of an ordinary one: it counts the wait
         // for a worker and the main thread's delays too, which a loaded process stretches.
         jq: { timeout: '5s' },
-        documents: { timeout: '2s' },
         schemas: { timeout: '5s' },
       },
     }),

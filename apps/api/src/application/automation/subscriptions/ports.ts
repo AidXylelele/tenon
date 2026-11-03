@@ -38,8 +38,9 @@ export type AttemptResult = Result<boolean, string>;
 export abstract class SubscriptionRepository {
   abstract findById(id: string): Promise<Subscription | null>;
   abstract findOwned(ownerId: string, id: string): Promise<Subscription | null>;
-  // The subscriptions that may take events of this type.
-  abstract ofType(type: string): Promise<Subscription[]>;
+  // The subscriptions that may take events of this type, created before it was accepted (only
+  // the events accepted once a subscription exists reach it), as listeners are found.
+  abstract ofType(type: string, acceptedAt: Date): Promise<Subscription[]>;
   abstract add(subscription: Subscription): Promise<void>;
   abstract remove(subscription: Subscription): Promise<void>;
 }

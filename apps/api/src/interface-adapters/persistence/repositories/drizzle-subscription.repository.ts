@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionHost } from '@nestjs-cls/transactional';
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import type { SubscriptionRepository } from '../../../application/automation/subscriptions/ports.js';
 import type { Subscription } from '../../../domain/automation/subscriptions/subscription.js';
 import type { DrizzleTx } from '../interfaces.js';
@@ -34,12 +34,16 @@ export class DrizzleSubscriptionRepository implements SubscriptionRepository {
     return SubscriptionMapper.toEntity(row);
   }
 
-  async ofType(type: string): Promise<Subscription[]> {
+  async ofType(type: string, acceptedAt: Date): Promise<Subscription[]> {
     const takes = or(
       isNull(subscriptions.types),
       sql`${type} = any(${subscriptions.types})`,
     );
-    const rows = await this.txHost.tx.select().from(subscriptions).where(takes);
+    const existed = lte(subscriptions.createdAt, acceptedAt);
+    const rows = await this.txHost.tx
+      .select()
+      .from(subscriptions)
+      .where(and(takes, existed));
     return rows.map((row) => SubscriptionMapper.toEntity(row));
   }
 
