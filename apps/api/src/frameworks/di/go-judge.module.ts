@@ -1,9 +1,6 @@
 import { Module, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  SandboxClient,
-  SandboxLimits,
-} from '../../interface-adapters/sandbox/interfaces.js';
+import { SandboxClient, SandboxLimits } from '../runtime/interfaces.js';
 import { GoJudgeSandboxClient } from '../go-judge/go-judge-sandbox.client.js';
 import { createSandboxPool, SandboxPool } from '../go-judge/sandbox-pool.js';
 import type { Env } from './config.module.js';

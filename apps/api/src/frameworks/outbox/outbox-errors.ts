@@ -17,8 +17,6 @@ export class OutboxErrors {
     } catch (error) {
       const kind = this.classifier.classify(error);
 
-      if (kind === ErrorClass.Settled) return;
-
       // The outbox stores what it retries: a short text, not a query with its values.
       if (kind === ErrorClass.Transient) {
         OutboxErrors.LOGGER.warn(error);

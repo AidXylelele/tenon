@@ -1,6 +1,6 @@
 import { Dispatcher, Pool } from 'undici';
-import { GoJudgeOutput } from '../../interface-adapters/sandbox/enums.js';
-import type { SandboxLimits } from '../../interface-adapters/sandbox/interfaces.js';
+import { GoJudgeOutput } from '../runtime/enums.js';
+import type { SandboxLimits } from '../runtime/interfaces.js';
 
 export abstract class SandboxPool extends Dispatcher {}
 

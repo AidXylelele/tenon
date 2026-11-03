@@ -19,25 +19,12 @@ describe('the OpenAPI document', () => {
     expect(paths).toEqual(
       expect.arrayContaining([
         '/api/v1/workflows',
-        '/api/v1/workflows/{namespace}/{name}/instances',
-        '/api/v1/instances',
-        '/api/v1/instances/{id}',
-        '/api/v1/instances/{id}/tasks',
-        '/api/v1/instances/{id}/events',
+        '/api/v1/workflows/check',
+        '/api/v1/workflows/{namespace}/{name}',
+        '/api/v1/workflows/{namespace}/{name}/archive',
+        '/api/v1/workflows/{namespace}/{name}/versions',
+        '/api/v1/workflows/{namespace}/{name}/versions/{version}',
       ]),
     );
-  });
-
-  it('describes_the_start_time_filters_as_date_times', () => {
-    const document = createOpenApiDocument(t.app);
-
-    const parameters = document.paths['/api/v1/instances']?.get?.parameters;
-    const startedFrom = parameters?.find(
-      (parameter) => 'name' in parameter && parameter.name === 'startedFrom',
-    );
-    expect(startedFrom).toMatchObject({
-      in: 'query',
-      schema: { type: 'string', format: 'date-time' },
-    });
   });
 });

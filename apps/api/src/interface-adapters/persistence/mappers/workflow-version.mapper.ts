@@ -1,4 +1,3 @@
-import { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
 import { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 import type { WorkflowVersionRow } from '../interfaces.js';
 
@@ -8,26 +7,22 @@ export class WorkflowVersionMapper {
       id: version.id,
       workflowId: version.workflowId,
       semver: version.semver,
-      dslVersion: version.dslVersion,
-      sourceFormat: version.source.format,
-      sourceText: version.source.text,
-      fingerprint: version.source.fingerprint,
+      dsl: version.dsl,
+      document: version.document,
+      fingerprint: version.fingerprint,
       publisherId: version.publisherId,
       publishedAt: version.publishedAt,
     };
   }
 
   static toEntity(row: WorkflowVersionRow): WorkflowVersion {
-    const source = new SourceDocument({
-      format: row.sourceFormat,
-      text: row.sourceText,
-    });
     return new WorkflowVersion({
       id: row.id,
       workflowId: row.workflowId,
       semver: row.semver,
-      dslVersion: row.dslVersion,
-      source,
+      dsl: row.dsl,
+      document: row.document,
+      fingerprint: row.fingerprint,
       publisherId: row.publisherId,
       publishedAt: row.publishedAt,
     });

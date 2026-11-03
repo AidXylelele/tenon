@@ -8,14 +8,8 @@ import {
   ResilienceTimeoutError,
 } from '@nestjs/resilience';
 import { request as send } from 'undici';
-import type {
-  JsonObject,
-  JsonValue,
-} from '../../domain/automation/language/interfaces.js';
-import {
-  AuthorizationKind,
-  EndpointOutcomeKind,
-} from '../../interface-adapters/workflows/services/enums.js';
+import type { JsonObject, JsonValue } from '../../domain/automation/json.js';
+import { AuthorizationKind, EndpointOutcomeKind } from '../runtime/enums.js';
 import {
   type Authorization,
   type ClientCredentials,
@@ -27,7 +21,7 @@ import {
   type ExchangeOutcome,
   type HttpRequest,
   type SentAuthorization,
-} from '../../interface-adapters/workflows/services/interfaces.js';
+} from '../runtime/interfaces.js';
 import { EndpointDispatcher } from './endpoint-dispatcher.js';
 import { ResponseTooLargeError, TokenRefusedError } from './endpoint.errors.js';
 

@@ -1,1 +1,0 @@
-ALTER TABLE "workflow_version" DROP COLUMN "definition";

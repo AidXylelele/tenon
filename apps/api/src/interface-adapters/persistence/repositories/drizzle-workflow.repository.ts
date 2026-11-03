@@ -6,7 +6,7 @@ import {
 } from '@nestjs-cls/transactional';
 import { and, eq, sql } from 'drizzle-orm';
 import type { WorkflowRepository } from '../../../application/automation/workflows/ports.js';
-import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
+import type { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 import type { Workflow } from '../../../domain/automation/workflows/workflow.js';
 import { StaleWriteError } from '../../../domain/errors.js';
 import type { DrizzleTx } from '../interfaces.js';
@@ -44,8 +44,9 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
       .onConflictDoUpdate({
         target: workflows.id,
         set: {
-          isOn: sql`excluded.is_on`,
+          status: sql`excluded.status`,
           currentVersionId: sql`excluded.current_version_id`,
+          archivedAt: sql`excluded.archived_at`,
           version: sql`excluded.version`,
         },
         setWhere: eq(workflows.version, workflow.version),

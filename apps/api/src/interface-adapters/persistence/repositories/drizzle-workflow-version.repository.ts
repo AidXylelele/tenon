@@ -4,10 +4,9 @@ import {
   Transactional,
   TransactionHost,
 } from '@nestjs-cls/transactional';
-import { and, eq, type SQL } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { WorkflowVersionRepository } from '../../../application/automation/workflows/ports.js';
-import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import type { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
+import type { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
 import { StaleWriteError } from '../../../domain/errors.js';
 import type { DrizzleTx } from '../interfaces.js';
@@ -43,39 +42,26 @@ export class DrizzleWorkflowVersionRepository implements WorkflowVersionReposito
     return WorkflowVersionMapper.toEntity(found.version);
   }
 
-  async findBy(reference: VersionReference): Promise<WorkflowVersion | null> {
-    const versionId = reference.versionId;
+  async findById(id: string): Promise<WorkflowVersion | null> {
+    const [row] = await this.txHost.tx
+      .select()
+      .from(versions)
+      .where(eq(versions.id, id));
 
-    if (versionId !== null) return this.#first(eq(versions.id, versionId));
+    if (!row) return null;
 
-    const workflowId = reference.workflowId;
-    const semver = reference.semver;
-
-    if (workflowId === null || semver === null) return null;
-
-    const pinned = and(
-      eq(versions.workflowId, workflowId),
-      eq(versions.semver, semver),
-    );
-    return this.#first(pinned);
+    return WorkflowVersionMapper.toEntity(row);
   }
 
+  // A version is written once: the same version again finds its row and writes nothing, while
+  // a concurrent publish of other content under its identity is a stale write.
   @Transactional(Propagation.Mandatory)
   async add(version: WorkflowVersion): Promise<void> {
     const row = WorkflowVersionMapper.toRow(version);
-
-    const insert = this.txHost.tx.insert(versions).values(row);
+    const insert = this.txHost.tx
+      .insert(versions)
+      .values(row)
+      .onConflictDoNothing({ target: versions.id });
     await UniqueViolation.translated(insert, () => new StaleWriteError());
-  }
-
-  async #first(condition: SQL | undefined): Promise<WorkflowVersion | null> {
-    const [found] = await this.txHost.tx
-      .select()
-      .from(versions)
-      .where(condition);
-
-    if (!found) return null;
-
-    return WorkflowVersionMapper.toEntity(found);
   }
 }

@@ -1,10 +1,11 @@
-import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
+import type { JsonObject } from '../../../domain/automation/json.js';
+import type { WorkflowStatus } from '../../../domain/automation/workflows/enums.js';
+import type { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 
 export interface WorkflowSummary {
   readonly namespace: string;
   readonly name: string;
-  readonly isOn: boolean;
+  readonly status: WorkflowStatus;
   readonly currentVersion: string | null;
 }
 
@@ -21,6 +22,7 @@ export interface WorkflowPage {
 
 export interface WorkflowPageRequest {
   readonly after: WorkflowPosition | null;
+  readonly status: WorkflowStatus | null;
   readonly limit: number;
 }
 
@@ -34,22 +36,14 @@ export interface VersionSummary {
   readonly publishedAt: Date;
 }
 
-export interface VersionDocument {
-  readonly format: DocumentFormat;
-  readonly text: string;
-}
-
 export abstract class WorkflowQueries {
   abstract list(page: WorkflowPageRequest): Promise<WorkflowPage>;
   abstract get(name: WorkflowName): Promise<WorkflowSummary | null>;
-  abstract versions(name: WorkflowName): Promise<readonly VersionSummary[]>;
+  abstract versions(
+    name: WorkflowName,
+  ): Promise<readonly VersionSummary[] | null>;
   abstract document(
     name: WorkflowName,
     version: string,
-  ): Promise<VersionDocument | null>;
-}
-
-// The document of a version a run executes.
-export abstract class VersionDocuments {
-  abstract documentOf(versionId: string): Promise<VersionDocument | null>;
+  ): Promise<JsonObject | null>;
 }

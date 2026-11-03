@@ -1,10 +1,12 @@
 import { CurrentUser } from '@nestjs/authentication';
 import { Can } from '@nestjs/authorization';
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -22,19 +24,19 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { z } from 'zod';
-import { CheckDocument } from '../../../application/automation/workflows/check-document.js';
+import { ArchiveWorkflow } from '../../../application/automation/workflows/archive-workflow.js';
+import { CheckDefinition } from '../../../application/automation/workflows/check-definition.js';
 import { PublishVersion } from '../../../application/automation/workflows/publish-version.js';
 import { WorkflowQueries } from '../../../application/automation/workflows/queries.js';
 import { WorkflowPolicy } from '../../../application/automation/workflows/workflow.policy.js';
-import { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import {
-  VersionNotFoundError,
-  WorkflowNotFoundError,
-} from '../../../domain/errors.js';
+import type { JsonObject } from '../../../domain/automation/json.js';
+import { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 import type { User } from '../../../domain/identity/user.js';
-import { DocumentBody } from '../parsers/document-body.parser.js';
+import { CursorMapper } from '../mappers/cursor.mapper.js';
+import { ProblemPresenter } from '../presenters/problem.presenter.js';
 import { WorkflowPresenter } from '../presenters/workflow.presenter.js';
 import {
+  DefinitionBody,
   ListWorkflowsQuery,
   VersionParams,
   VersionResponse,
@@ -42,15 +44,15 @@ import {
   WorkflowParams,
   WorkflowResponse,
 } from '../schemas/workflow.schemas.js';
-import { CursorMapper } from '../mappers/cursor.mapper.js';
 
 @ApiTags('workflows')
 @ApiCookieAuth('sessionCookie')
 @Controller('workflows')
 export class WorkflowsController {
   constructor(
-    private readonly checkDocument: CheckDocument,
+    private readonly checkDefinition: CheckDefinition,
     private readonly publishVersion: PublishVersion,
+    private readonly archiveWorkflow: ArchiveWorkflow,
     private readonly workflows: WorkflowQueries,
   ) {}
 
@@ -58,9 +60,18 @@ export class WorkflowsController {
   @Can(WorkflowPolicy, 'author')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNoContentResponse()
+  @ApiConflictResponse()
   @ApiUnprocessableEntityResponse()
-  async check(@DocumentBody() document: DocumentBody): Promise<void> {
-    await this.checkDocument.execute(document);
+  async check(
+    @Body({ schema: DefinitionBody }) document: DefinitionBody,
+    @CurrentUser() user: User,
+  ): Promise<void> {
+    const checked = await this.checkDefinition.execute({
+      document,
+      publisherId: user.id,
+    });
+
+    if (!checked.ok) throw ProblemPresenter.of(checked.failure);
   }
 
   @Post()
@@ -70,18 +81,21 @@ export class WorkflowsController {
   @ApiConflictResponse()
   @ApiUnprocessableEntityResponse()
   async publish(
-    @DocumentBody() document: DocumentBody,
+    @Body({ schema: DefinitionBody }) document: DefinitionBody,
     @CurrentUser() user: User,
     @Res({ passthrough: true }) response: Response,
   ): Promise<VersionResponse> {
     const published = await this.publishVersion.execute({
-      format: document.format,
-      text: document.text,
+      document,
       publisherId: user.id,
     });
-    const status = published.created ? HttpStatus.CREATED : HttpStatus.OK;
-    response.status(status);
-    return WorkflowPresenter.published(published);
+
+    if (!published.ok) throw ProblemPresenter.of(published.failure);
+
+    const status = WorkflowPresenter.statusOf(published.value);
+    const location = WorkflowPresenter.locationOf(published.value);
+    response.status(status).location(location);
+    return WorkflowPresenter.published(published.value);
   }
 
   @Get()
@@ -91,7 +105,12 @@ export class WorkflowsController {
     @Query({ schema: ListWorkflowsQuery }) query: ListWorkflowsQuery,
   ): Promise<WorkflowPageResponse> {
     const after = CursorMapper.toWorkflowPosition(query.cursor);
-    const page = await this.workflows.list({ after, limit: query.limit });
+    const status = query.status ?? null;
+    const page = await this.workflows.list({
+      after,
+      status,
+      limit: query.limit,
+    });
     return WorkflowPresenter.page(page);
   }
 
@@ -105,40 +124,58 @@ export class WorkflowsController {
     const workflowName = new WorkflowName(params.namespace, params.name);
     const workflow = await this.workflows.get(workflowName);
 
-    if (workflow === null) throw new WorkflowNotFoundError();
+    if (workflow === null)
+      throw new NotFoundException('The workflow does not exist');
 
     return WorkflowPresenter.workflow(workflow);
+  }
+
+  @Post(':namespace/:name/archive')
+  @Can(WorkflowPolicy, 'author')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  async archive(
+    @Param({ schema: WorkflowParams }) params: WorkflowParams,
+  ): Promise<void> {
+    const name = new WorkflowName(params.namespace, params.name);
+    const archived = await this.archiveWorkflow.execute({ name });
+
+    if (!archived.ok) throw ProblemPresenter.of(archived.failure);
   }
 
   @Get(':namespace/:name/versions')
   @Can.Anyone()
   @ApiOkResponse({ standardSchema: z.array(VersionResponse) })
+  @ApiNotFoundResponse()
   async versions(
     @Param({ schema: WorkflowParams }) params: WorkflowParams,
   ): Promise<VersionResponse[]> {
     const workflowName = new WorkflowName(params.namespace, params.name);
     const versions = await this.workflows.versions(workflowName);
+
+    if (versions === null)
+      throw new NotFoundException('The workflow does not exist');
+
     return versions.map((version) => WorkflowPresenter.version(version));
   }
 
   @Get(':namespace/:name/versions/:version')
   @Can.Anyone()
-  @ApiOkResponse({ description: 'The document exactly as submitted' })
+  @ApiOkResponse({ description: 'The published document, as JSON' })
   @ApiNotFoundResponse()
   async document(
     @Param({ schema: VersionParams }) params: VersionParams,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<string> {
+  ): Promise<JsonObject> {
     const workflowName = new WorkflowName(params.namespace, params.name);
     const document = await this.workflows.document(
       workflowName,
       params.version,
     );
 
-    if (document === null) throw new VersionNotFoundError();
+    if (document === null)
+      throw new NotFoundException('The workflow version does not exist');
 
-    const mediaType = WorkflowPresenter.mediaType(document.format);
-    response.type(mediaType);
-    return document.text;
+    return document;
   }
 }

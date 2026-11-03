@@ -1,151 +1,72 @@
 import { randomUUID } from 'node:crypto';
-import type { Event } from '../events/event.js';
-import { ErrorType } from '../language/error-type.js';
-import type { SubWorkflowAnswer } from '../language/answers/sub-workflow-answer.js';
-import { SubWorkflowDetached } from '../language/answers/sub-workflow-detached.js';
-import { SubWorkflowEnded } from '../language/answers/sub-workflow-ended.js';
-import { SubWorkflowRefused } from '../language/answers/sub-workflow-refused.js';
-import type {
-  JsonObject,
-  JsonValue,
-  SubWorkflowEnding,
-  TaskScopeProps,
-  TaskStart,
-} from '../language/interfaces.js';
-import { JsonPointer } from '../language/json-pointer.js';
-import type { Outcome } from '../language/outcome.js';
-import { Phase } from '../language/phase.js';
-import { RoundResults } from '../language/round-results.js';
-import { RoundWork } from '../language/round-work.js';
-import { TaskScope } from '../language/scopes/task-scope.js';
-import { WorkflowScope } from '../language/scopes/workflow-scope.js';
-import type { TaskEnding } from '../language/endings/task-ending.js';
-import type { Task } from '../language/tasks/task.js';
-import type { WorkflowError } from '../language/workflow-error.js';
-import type { WorkflowName } from '../language/workflow-name.js';
-import type { RunnableVersion } from '../workflows/runnable-version.js';
-import { StaleRoundError } from '../../errors.js';
-import { DerivedId } from './derived-id.js';
-import { ProcessDetached } from './domain-events/process-detached.js';
-import { WorkflowDetached } from './domain-events/workflow-detached.js';
-import { InstanceProgressKind } from './enums.js';
-import type {
-  InstanceEvent,
-  InstanceIdentity,
-  InstanceProgress,
-  NewSubWorkflowInstance,
-  NewWorkflowInstance,
-  Origin,
-  RequestedSubWorkflow,
-  RoundAnswer,
-  TaskChange,
-  TaskFollowUp,
-  WorkflowInstanceProps,
-} from './interfaces.js';
-import { ParentOrigin } from './origins/parent-origin.js';
-import { ProducedEvents } from './produced-events.js';
-import type { RoundContext } from './round-context.js';
-import type { TaskInstance } from './task-instance.js';
-import { TaskTree } from './task-tree.js';
+import type { Result } from '../../result.js';
+import type { JsonObject, JsonValue } from '../json.js';
+import type { NewInstance } from '../workflows/interfaces.js';
+import {
+  InstanceEventKind,
+  InstanceRefusal,
+  Phase,
+  RunDirective,
+  type TriggerKind,
+} from './enums.js';
+import type { InstanceEvent, WorkflowInstanceProps } from './interfaces.js';
 
+// An execution of a workflow version. The runtime executes its tasks; the instance keeps the
+// standard's phases and decides what users may do with it.
 export class WorkflowInstance {
-  static readonly #RUN_FAILED = 'The run of the instance failed';
-  static readonly #LIMIT_REACHED =
-    'The instance reached its limit of 10,000 task executions';
-  static readonly #NOT_NAMED = 'The workflow is not the one the run task names';
+  static readonly #ENDED = [Phase.Completed, Phase.Faulted, Phase.Cancelled];
+  static readonly #SUSPENDABLE = [Phase.Running, Phase.Waiting];
 
   readonly #id: string;
   readonly #workflowId: string;
   readonly #versionId: string;
-  readonly #workflow: WorkflowName;
-  readonly #semver: string;
+  readonly #trigger: TriggerKind;
+  readonly #starterId: string | null;
+  readonly #originId: string | null;
   readonly #input: JsonValue;
-  readonly #origin: Origin;
-  readonly #startedAt: Date;
+  readonly #createdAt: Date;
   readonly #version: number;
-  readonly #tasks: TaskTree;
-  readonly #produced: ProducedEvents;
-  readonly #events: InstanceEvent[];
   #phase: Phase;
-  #output: JsonValue;
-  #error: WorkflowError | null;
-  #context: JsonValue;
+  #output: JsonValue | null;
+  #error: JsonObject | null;
+  #startedAt: Date | null;
   #endedAt: Date | null;
-  #rounds: number;
-  #changed: boolean;
+  #events: InstanceEvent[] = [];
 
   constructor(props: WorkflowInstanceProps) {
     this.#id = props.id;
     this.#workflowId = props.workflowId;
     this.#versionId = props.versionId;
-    this.#workflow = props.workflow;
-    this.#semver = props.semver;
-    this.#phase = props.phase;
+    this.#trigger = props.trigger;
+    this.#starterId = props.starterId;
+    this.#originId = props.originId;
     this.#input = props.input;
+    this.#phase = props.phase;
     this.#output = props.output;
     this.#error = props.error;
-    this.#context = props.context;
-    this.#origin = props.origin;
+    this.#createdAt = props.createdAt;
     this.#startedAt = props.startedAt;
     this.#endedAt = props.endedAt;
-    this.#rounds = props.rounds;
-    this.#tasks = new TaskTree(props.id, props.tasks, props.executions);
     this.#version = props.version;
-    this.#events = [];
-    this.#changed = false;
-    this.#produced = new ProducedEvents(
-      {
-        instanceId: props.id,
-        workflowId: props.workflowId,
-        workflow: props.workflow,
-        semver: props.semver,
-      },
-      props.sequence,
-    );
   }
 
-  static idFor(identity: InstanceIdentity): string {
-    if (identity.key === null) return randomUUID();
-
-    const parts = [identity.userId, identity.workflowId, identity.key];
-    return DerivedId.of(parts);
-  }
-
-  static start(input: NewWorkflowInstance): WorkflowInstance {
-    const workflow = input.runnable.workflow;
-    const version = input.runnable.version;
-    const instance = new WorkflowInstance({
-      id: input.id,
-      workflowId: workflow.id,
-      versionId: version.id,
-      workflow: workflow.name,
-      semver: version.semver,
+  static start(workflowId: string, input: NewInstance): WorkflowInstance {
+    const id = randomUUID();
+    return new WorkflowInstance({
+      id,
+      workflowId,
+      versionId: input.version.id,
+      trigger: input.trigger,
+      starterId: input.starterId,
+      originId: input.originId,
+      input: input.input,
       phase: Phase.Pending,
-      input: input.input ?? {},
       output: null,
       error: null,
-      context: {},
-      origin: input.origin,
-      startedAt: input.now,
+      createdAt: input.now,
+      startedAt: null,
       endedAt: null,
-      sequence: 0,
-      executions: 0,
-      rounds: 0,
-      tasks: [],
       version: 0,
-    });
-    instance.#changed = true;
-    return instance;
-  }
-
-  static startSubWorkflow(input: NewSubWorkflowInstance): WorkflowInstance {
-    const origin = new ParentOrigin(input.parentId, input.taskId);
-    return WorkflowInstance.start({
-      id: input.id,
-      runnable: input.runnable,
-      input: input.input,
-      origin,
-      now: input.now,
     });
   }
 
@@ -161,39 +82,39 @@ export class WorkflowInstance {
     return this.#versionId;
   }
 
-  get workflow(): WorkflowName {
-    return this.#workflow;
+  get trigger(): TriggerKind {
+    return this.#trigger;
   }
 
-  get semver(): string {
-    return this.#semver;
+  get starterId(): string | null {
+    return this.#starterId;
   }
 
-  get phase(): Phase {
-    return this.#phase;
+  get originId(): string | null {
+    return this.#originId;
   }
 
   get input(): JsonValue {
     return this.#input;
   }
 
-  get output(): JsonValue {
+  get phase(): Phase {
+    return this.#phase;
+  }
+
+  get output(): JsonValue | null {
     return this.#output;
   }
 
-  get error(): WorkflowError | null {
+  get error(): JsonObject | null {
     return this.#error;
   }
 
-  get context(): JsonValue {
-    return this.#context;
+  get createdAt(): Date {
+    return this.#createdAt;
   }
 
-  get origin(): Origin {
-    return this.#origin;
-  }
-
-  get startedAt(): Date {
+  get startedAt(): Date | null {
     return this.#startedAt;
   }
 
@@ -201,521 +122,108 @@ export class WorkflowInstance {
     return this.#endedAt;
   }
 
-  get sequence(): number {
-    return this.#produced.sequence;
-  }
-
-  get executions(): number {
-    return this.#tasks.executions;
-  }
-
-  get rounds(): number {
-    return this.#rounds;
-  }
-
-  get tasks(): readonly TaskInstance[] {
-    return this.#tasks.tasks;
-  }
-
   get version(): number {
     return this.#version;
   }
 
-  get changed(): boolean {
-    return this.#changed;
+  get ended(): boolean {
+    return WorkflowInstance.#ENDED.includes(this.#phase);
   }
 
-  // Every round is counted, so results of an earlier round can be told apart (fencing).
-  beginRound(round: RoundContext): void {
-    if (this.#phase.isTerminal()) return;
-
-    this.#confirmOwn(round);
-    this.#rounds += 1;
-    this.#changed = true;
-
-    if (this.#phase === Phase.Pending) this.#run(round);
-
-    for (const task of this.#tasks.active()) this.#fire(task, round);
-
-    this.#settle(round);
+  get events(): readonly InstanceEvent[] {
+    return this.#events;
   }
 
-  pendingWork(round: RoundContext): RoundWork {
-    if (this.#phase.isTerminal()) return RoundWork.none();
-
-    this.#confirmOwn(round);
-    const works: RoundWork[] = [];
-    const active = this.#tasks.active();
-    let exporting = active.some((task) => task.holdsExport());
-
-    // One export at a time, from `export.as` until its task ends, so each sees the context the
-    // one before it left (fork branches would otherwise overwrite one another's exports).
-    for (const task of active) {
-      const exports = task.evaluatesExport();
-
-      if (exports && exporting) continue;
-
-      if (exports) exporting = true;
-
-      const scope = this.#scopeOf(task, round);
-      const work = task.work(scope);
-      works.push(work);
-    }
-
-    return RoundWork.combined(works);
+  clearEvents(): void {
+    this.#events = [];
   }
 
-  record(results: RoundResults, round: RoundContext): void {
-    if (this.#phase.isTerminal()) return;
+  // What the runtime does after a task: nothing more once the instance ended, and nothing
+  // until a resume while it is suspended.
+  directive(): RunDirective {
+    if (this.ended) return RunDirective.Stop;
 
-    this.#confirmOwn(round);
+    if (this.#phase === Phase.Suspended) return RunDirective.Suspend;
 
-    // The results arrived at `now`: a task whose time ran out by then, or around whose work the
-    // workflow's did, is interrupted first, so an answer that came too late is a time-out.
-    for (const task of this.#tasks.active()) this.#expire(task, round);
-
-    for (const task of this.#tasks.active()) {
-      const scope = this.#scopeOf(task, round);
-      const change = task.record(results, scope);
-      this.#follow(task, change, round);
-    }
-
-    this.#settle(round);
+    return RunDirective.Continue;
   }
 
-  // The results of round `round`, each at the time it arrived, recorded only while no later
-  // round began: a worker that lost the instance records nothing over its successor.
-  recordRound(
-    round: number,
-    answers: readonly RoundAnswer[],
-    context: RoundContext,
-  ): void {
-    if (round !== this.#rounds) throw new StaleRoundError();
+  // The runtime picked the instance up.
+  begin(now: Date): void {
+    if (this.#phase !== Phase.Pending) return;
 
-    for (const answer of answers) {
-      const arrived = context.at(answer.at);
-      this.record(answer.results, arrived);
-    }
-  }
-
-  fault(now: Date): void {
-    if (this.#phase.isTerminal()) return;
-
-    const root = JsonPointer.root();
-    const error = ErrorType.Runtime.errorAt(root, WorkflowInstance.#RUN_FAILED);
-    this.#faultWith(error, now);
-  }
-
-  #faultWith(error: WorkflowError, now: Date): void {
-    for (const task of this.#tasks.active()) this.#abandon(task, now);
-
-    this.#end(Phase.Faulted, now);
-    this.#error = error;
-    this.#produced.workflowFaulted(error, now);
-  }
-
-  requestedSubWorkflows(): readonly RequestedSubWorkflow[] {
-    return this.#tasks.requests();
-  }
-
-  requestedSubWorkflow(subWorkflowId: string): RequestedSubWorkflow | null {
-    const requested = this.requestedSubWorkflows();
-    const request = requested.find(
-      (candidate) => candidate.instanceId === subWorkflowId,
-    );
-    return request ?? null;
-  }
-
-  // `runnable`: the version the task's target names, none when it is not published.
-  answerSubWorkflow(
-    subWorkflowId: string,
-    runnable: RunnableVersion | null,
-    round: RoundContext,
-  ): WorkflowInstance | null {
-    const request = this.requestedSubWorkflow(subWorkflowId);
-    const task = this.#tasks.requesting(subWorkflowId);
-
-    if (this.#phase.isTerminal() || request === null || task === null)
-      return null;
-
-    this.#confirmOwn(round);
-
-    if (runnable === null) {
-      const refused = new SubWorkflowRefused();
-      this.#answer(task, refused, round);
-      return null;
-    }
-
-    if (!runnable.isNamedBy(request.target))
-      throw new TypeError(WorkflowInstance.#NOT_NAMED);
-
-    if (!request.awaited) {
-      const detached = new SubWorkflowDetached({
-        workflow: runnable.workflow.name,
-        versionId: runnable.version.id,
-        input: request.input,
-      });
-      this.#answer(task, detached, round);
-      return null;
-    }
-
-    return WorkflowInstance.startSubWorkflow({
-      id: request.instanceId,
-      parentId: this.#id,
-      taskId: request.taskId,
-      runnable,
-      input: request.input,
-      now: round.now,
-    });
-  }
-
-  completeSubWorkflow(
-    subWorkflowId: string,
-    ending: SubWorkflowEnding | null,
-    round: RoundContext,
-  ): void {
-    const task = this.#tasks.requesting(subWorkflowId);
-
-    if (this.#phase.isTerminal() || task === null) return;
-
-    this.#confirmOwn(round);
-    const ended = new SubWorkflowEnded(ending);
-    this.#answer(task, ended, round);
-  }
-
-  progress(now: Date): InstanceProgress {
-    const none: readonly string[] = [];
-
-    if (this.#phase.isTerminal())
-      return {
-        kind: InstanceProgressKind.Ended,
-        wakeAt: null,
-        subWorkflows: none,
-      };
-
-    const requested = this.requestedSubWorkflows();
-    const subWorkflows = requested.map((request) => request.instanceId);
-    const next = this.#tasks.nextDue();
-    const due = next.isDue(now);
-    const wakeAt = next.time;
-
-    if (this.#phase === Phase.Waiting && !due)
-      return { kind: InstanceProgressKind.Park, wakeAt, subWorkflows };
-
-    return { kind: InstanceProgressKind.Run, wakeAt, subWorkflows };
-  }
-
-  takeProducedEvents(): readonly Event[] {
-    return this.#produced.take();
-  }
-
-  takeDomainEvents(): readonly InstanceEvent[] {
-    return this.#events.splice(0);
-  }
-
-  #confirmOwn(round: RoundContext): void {
-    const definition = round.definition;
-    const own =
-      definition.workflow.equals(this.#workflow) &&
-      definition.version === this.#semver;
-
-    if (!own)
-      throw new TypeError(
-        'The definition is not the version the instance runs',
-      );
-  }
-
-  #run(round: RoundContext): void {
     this.#phase = Phase.Running;
-    this.#changed = true;
-    this.#produced.workflowStarted(this.#startedAt, round.now);
-    const variables: JsonObject = {};
-    const start: TaskStart = {
-      reference: round.definition.root.reference,
-      input: this.#input,
-      variables,
-    };
-    const root = this.#created(null, start, round);
-    const scope = this.#scopeOf(root, round);
-    const change = root.begin(scope);
-    this.#follow(root, change, round);
+    this.#startedAt = now;
   }
 
-  #fire(task: TaskInstance, round: RoundContext): void {
-    const expired = this.#expire(task, round);
+  // A wait or a listen began; the runtime reports it, and only a running instance waits.
+  beginWaiting(): void {
+    if (this.#phase !== Phase.Running) return;
 
-    if (expired || !task.isDue(round.now)) return;
-
-    const scope = this.#scopeOf(task, round);
-    const none = RoundResults.none();
-    const resumed = task.record(none, scope);
-    this.#follow(task, resumed, round);
+    this.#phase = Phase.Waiting;
   }
 
-  #expire(task: TaskInstance, round: RoundContext): boolean {
-    if (task.isTerminal() || !task.hasElapsed(round.now)) return false;
+  endWaiting(): void {
+    if (this.#phase !== Phase.Waiting) return;
 
-    const scope = this.#scopeOf(task, round);
-    const timedOut = task.timeOut(scope);
-    this.#follow(task, timedOut, round);
-    return true;
+    this.#phase = Phase.Running;
   }
 
-  #answer(
-    task: TaskInstance,
-    answer: SubWorkflowAnswer,
-    round: RoundContext,
-  ): void {
-    const scope = this.#scopeOf(task, round);
-    const change = task.subWorkflowAnswered(answer, scope);
-    this.#follow(task, change, round);
-    this.#settle(round);
-  }
+  // Outcomes are facts the runtime reports: never refused, ignored once the instance ended.
+  complete(output: JsonValue, now: Date): void {
+    if (this.ended) return;
 
-  #follow(
-    task: TaskInstance,
-    change: TaskChange | null,
-    round: RoundContext,
-  ): void {
-    if (change === null) return;
-
-    this.#changed = true;
-    const queue: TaskFollowUp[] = [];
-    this.#accept(task, change, queue, round.now);
-
-    // Nothing follows the end: the tasks left in the queue were withdrawn or abandoned.
-    for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
-      if (this.#phase.isTerminal()) return;
-
-      this.#followUp(next, queue, round);
-    }
-  }
-
-  #accept(
-    task: TaskInstance,
-    change: TaskChange,
-    queue: TaskFollowUp[],
-    now: Date,
-  ): void {
-    if (change.entered) this.#produced.taskEntered(task, now);
-
-    if (change.retried) this.#produced.taskRetried(task, now);
-
-    queue.push({ task, change });
-  }
-
-  #followUp(
-    followUp: TaskFollowUp,
-    queue: TaskFollowUp[],
-    round: RoundContext,
-  ): void {
-    const task = followUp.task;
-    const change = followUp.change;
-
-    if (task.isCancelled()) return;
-
-    for (const start of change.starts) {
-      if (this.#tasks.isFull()) {
-        const error = ErrorType.Runtime.errorAt(
-          task.reference,
-          WorkflowInstance.#LIMIT_REACHED,
-        );
-        this.#withdrawAll(queue, round.now);
-        this.#faultWith(error, round.now);
-        return;
-      }
-
-      const child = this.#created(task.id, start, round);
-      const scope = this.#scopeOf(child, round);
-      const begun = child.begin(scope);
-      this.#accept(child, begun, queue, round.now);
-    }
-
-    if (!task.runsBody()) this.#abandonChildrenOf(task, queue, round.now);
-
-    const ending = change.ending;
-
-    if (ending === null) return;
-
-    this.#ended(task, ending, round.now);
-
-    if (task.isRoot()) {
-      this.#conclude(ending, round.now);
-      return;
-    }
-
-    const parent = this.#tasks.parentOf(task);
-    const scope = this.#scopeOf(parent, round);
-    const parentChange = parent.childEnded(task.reference, ending, scope);
-
-    if (parentChange !== null)
-      this.#accept(parent, parentChange, queue, round.now);
-  }
-
-  #ended(task: TaskInstance, ending: TaskEnding, now: Date): void {
-    if (ending.isSkipped()) return;
-
-    const body = ending.body;
-
-    if (body !== null) this.#act(task, body, now);
-
-    this.#context = ending.contextOr(this.#context);
-
-    this.#produced.taskEnded(task, ending, now);
-  }
-
-  #act(task: TaskInstance, body: Outcome, now: Date): void {
-    const emitted = body.emitted;
-    const run = body.detachedProcess;
-    const detachedWorkflow = body.detachedWorkflow;
-
-    if (emitted !== null) this.#produced.emit(emitted, now);
-
-    if (run !== null) {
-      const detached = new ProcessDetached({
-        instanceId: this.#id,
-        taskInstanceId: task.id,
-        run,
-      });
-      this.#events.push(detached);
-    }
-
-    if (detachedWorkflow !== null) {
-      const subWorkflowId = this.#tasks.subWorkflowIdOf(task);
-      const detached = new WorkflowDetached({
-        instanceId: this.#id,
-        taskInstanceId: task.id,
-        subWorkflowId,
-        detached: detachedWorkflow,
-      });
-      this.#events.push(detached);
-    }
-  }
-
-  #conclude(ending: TaskEnding, now: Date): void {
-    const failure = ending.failure;
-
-    if (failure !== null) {
-      this.#faultWith(failure, now);
-      return;
-    }
-
-    this.#end(Phase.Completed, now);
-    this.#output = ending.output;
-    this.#produced.workflowCompleted(ending.output, now);
-  }
-
-  #end(phase: Phase, now: Date): void {
-    this.#phase = phase;
+    this.#phase = Phase.Completed;
+    this.#output = output;
     this.#endedAt = now;
-    this.#changed = true;
   }
 
-  #settle(round: RoundContext): void {
-    if (this.#phase.isTerminal()) return;
+  fault(error: JsonObject, now: Date): void {
+    if (this.ended) return;
 
-    const work = this.pendingWork(round);
-
-    if (work.isEmpty()) {
-      this.#become(Phase.Waiting);
-      return;
-    }
-
-    this.#become(Phase.Running);
+    this.#phase = Phase.Faulted;
+    this.#error = error;
+    this.#endedAt = now;
   }
 
-  #become(phase: Phase): void {
-    if (phase === this.#phase) return;
+  // A user's requests (US9): each is refused unless the instance is in a phase that allows it.
+  suspend(): Result<void, InstanceRefusal> {
+    const suspendable = WorkflowInstance.#SUSPENDABLE.includes(this.#phase);
 
-    this.#phase = phase;
-    this.#changed = true;
+    if (!suspendable) return { ok: false, failure: InstanceRefusal.NotRunning };
+
+    this.#phase = Phase.Suspended;
+    return { ok: true, value: undefined };
   }
 
-  // The tasks of a subtree whose body no longer runs end with it: those still running are
-  // abandoned, and those that ended in this pass but are not followed up yet are withdrawn.
-  #abandonChildrenOf(
-    parent: TaskInstance,
-    queue: readonly TaskFollowUp[],
-    now: Date,
-  ): void {
-    const descendants = this.#tasks.activeDescendantsOf(parent);
+  resume(): Result<void, InstanceRefusal> {
+    if (this.#phase !== Phase.Suspended)
+      return { ok: false, failure: InstanceRefusal.NotSuspended };
 
-    for (const descendant of descendants) this.#abandon(descendant, now);
-
-    for (const followUp of queue) {
-      const within = this.#tasks.isWithin(followUp.task, parent);
-
-      if (within) this.#withdraw(followUp, now);
-    }
+    this.#phase = Phase.Running;
+    this.#raise(InstanceEventKind.Resumed);
+    return { ok: true, value: undefined };
   }
 
-  // The instance ends in mid-pass: no follow-up left in the queue acts.
-  #withdrawAll(queue: readonly TaskFollowUp[], now: Date): void {
-    for (const followUp of queue) this.#withdraw(followUp, now);
+  cancel(now: Date): Result<void, InstanceRefusal> {
+    if (this.ended) return { ok: false, failure: InstanceRefusal.Ended };
+
+    this.#phase = Phase.Cancelled;
+    this.#endedAt = now;
+    this.#raise(InstanceEventKind.Cancelled);
+    return { ok: true, value: undefined };
   }
 
-  // An ending not acted on never takes effect: the task is cancelled, and announced as such.
-  #withdraw(followUp: TaskFollowUp, now: Date): void {
-    const ending = followUp.change.ending;
+  // Only an ended instance's history may go.
+  delete(): Result<void, InstanceRefusal> {
+    if (!this.ended) return { ok: false, failure: InstanceRefusal.NotEnded };
 
-    if (ending === null || ending.isSkipped()) return;
-
-    const task = followUp.task;
-
-    if (!task.hasEnded()) return;
-
-    task.withdraw(now);
-    this.#produced.taskCancelled(task, now);
+    this.#raise(InstanceEventKind.Deleted);
+    return { ok: true, value: undefined };
   }
 
-  #abandon(task: TaskInstance, now: Date): void {
-    const announced = task.isUnderway();
-    task.abandon(now);
-
-    if (announced) this.#produced.taskCancelled(task, now);
-  }
-
-  #created(
-    parentId: string | null,
-    start: TaskStart,
-    round: RoundContext,
-  ): TaskInstance {
-    const declared = round.definition.taskAt(start.reference);
-    return this.#tasks.create(parentId, declared.name, start, round.now);
-  }
-
-  #scopeOf(task: TaskInstance, round: RoundContext): TaskScope {
-    const definition = round.definition;
-
-    if (task.isRoot()) {
-      const rootProps = this.#scopePropsOf(definition.root, task, round);
-      return new WorkflowScope(rootProps);
-    }
-
-    const declared = definition.taskAt(task.reference);
-    const props = this.#scopePropsOf(declared, task, round);
-    return new TaskScope(props);
-  }
-
-  #scopePropsOf<T extends Task>(
-    declared: T,
-    task: TaskInstance,
-    round: RoundContext,
-  ): TaskScopeProps<T> {
-    return {
-      id: task.id,
-      task: declared,
-      definition: round.definition,
-      rawInput: task.rawInput,
-      context: this.#context,
-      instanceId: this.#id,
-      workflowInput: this.#input,
-      workflowStartedAt: this.#startedAt,
-      runtime: round.runtime,
-      variables: task.variables,
-      startedAt: task.startedAt,
-      deadline: this.#tasks.deadlineOf(task),
-      now: round.now,
-    };
+  #raise(kind: InstanceEventKind): void {
+    const event = { kind, instanceId: this.#id };
+    this.#events.push(event);
   }
 }

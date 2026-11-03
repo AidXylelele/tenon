@@ -1,21 +1,13 @@
 import request from 'supertest';
 import { Role } from '../../../src/domain/identity/enums.js';
 import { authHeaders, createUser, signIn } from '../../support/auth-helpers.js';
+import { aDocument } from '../../support/builders.js';
 import { createTestApp, type TestApp } from '../../support/create-test-app.js';
 import { truncateAll } from '../../support/db.js';
-import { DEFECTIVE_DOCUMENTS, yamlOf } from './fixtures/defective-documents.js';
 
-const YAML = 'application/yaml';
+const PROBLEM = 'application/problem+json';
 
-function named(name: string): string {
-  return `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: ${name}\n  version: '1.0.0'\ndo:\n  - hello:\n      set:\n        greeting: hi\n`;
-}
-
-function greeting(version: string, text: string): string {
-  return `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: greet\n  version: '${version}'\ndo:\n  - hello:\n      set:\n        greeting: ${text}\n`;
-}
-
-describe('publishing workflows', () => {
+describe('publishing workflow definitions over HTTP', () => {
   let t: TestApp;
   let editor: Record<string, string>;
   let viewer: Record<string, string>;
@@ -36,350 +28,266 @@ describe('publishing workflows', () => {
     viewer = authHeaders(await signIn(t.server, 'viewer@example.com'));
   });
 
-  it('a_valid_document_becomes_the_current_version_and_reads_back_as_submitted', async () => {
-    const text = greeting('1.0.0', 'hello');
+  it('a_valid_document_becomes_the_current_version_and_reads_back_as_the_same_json', async () => {
+    const document = aDocument();
 
     const published = await request(t.server)
       .post('/api/v1/workflows')
       .set(editor)
-      .type(YAML)
-      .send(text)
+      .send(document)
       .expect(201);
     const workflow = await request(t.server)
-      .get('/api/v1/workflows/default/greet')
+      .get('/api/v1/workflows/sales/route-lead')
       .set(viewer)
       .expect(200);
-    const document = await request(t.server)
-      .get('/api/v1/workflows/default/greet/versions/1.0.0')
+    const stored = await request(t.server)
+      .get('/api/v1/workflows/sales/route-lead/versions/1.0.0')
       .set(viewer)
       .expect(200);
 
+    expect(published.headers.location).toBe(
+      '/api/v1/workflows/sales/route-lead/versions/1.0.0',
+    );
     expect(published.body).toMatchObject({
-      namespace: 'default',
-      name: 'greet',
+      namespace: 'sales',
+      name: 'route-lead',
       version: '1.0.0',
       dsl: '1.0.3',
       current: true,
     });
     expect(workflow.body).toEqual({
-      namespace: 'default',
-      name: 'greet',
-      on: false,
+      namespace: 'sales',
+      name: 'route-lead',
+      status: 'active',
       currentVersion: '1.0.0',
     });
-    expect(document.text).toBe(text);
-    expect(document.headers['content-type']).toMatch(/^application\/yaml/);
+    expect(stored.body).toEqual(document);
   });
 
-  it('a_document_in_json_is_accepted_and_kept_as_json', async () => {
-    const json = JSON.stringify({
-      document: {
-        dsl: '1.0.3',
-        namespace: 'default',
-        name: 'greet',
-        version: '1.0.0',
-      },
-      do: [{ hello: { set: { greeting: 'hi' } } }],
-    });
-
-    await request(t.server)
+  it('the_same_document_again_answers_200_with_the_published_version', async () => {
+    const first = await request(t.server)
       .post('/api/v1/workflows')
       .set(editor)
-      .type('application/json')
-      .send(json)
+      .send(aDocument())
       .expect(201);
-    const document = await request(t.server)
-      .get('/api/v1/workflows/default/greet/versions/1.0.0')
-      .set(viewer)
-      .expect(200);
-
-    expect(document.text).toBe(json);
-  });
-
-  it('the_identical_document_again_returns_the_existing_version', async () => {
-    const text = greeting('1.0.0', 'hello');
-    await request(t.server)
-      .post('/api/v1/workflows')
-      .set(editor)
-      .type(YAML)
-      .send(text)
-      .expect(201);
+    const reordered = { do: aDocument().do, document: aDocument().document };
 
     const again = await request(t.server)
       .post('/api/v1/workflows')
       .set(editor)
-      .type(YAML)
-      .send(text)
-      .expect(200);
-    const versions = await request(t.server)
-      .get('/api/v1/workflows/default/greet/versions')
-      .set(viewer)
+      .send(reordered)
       .expect(200);
 
-    expect(again.body).toMatchObject({ version: '1.0.0' });
-    expect(versions.body).toHaveLength(1);
+    expect(again.body).toEqual(first.body);
   });
 
-  it('other_content_under_a_published_version_is_a_conflict', async () => {
+  it('other_content_under_a_published_identity_is_a_conflict', async () => {
     await request(t.server)
       .post('/api/v1/workflows')
       .set(editor)
-      .type(YAML)
-      .send(greeting('1.0.0', 'hello'))
+      .send(aDocument())
       .expect(201);
+    const changed = aDocument({}, [{ other: { set: { x: 1 } } }]);
 
-    await request(t.server)
+    const conflict = await request(t.server)
       .post('/api/v1/workflows')
       .set(editor)
-      .type(YAML)
-      .send(greeting('1.0.0', 'goodbye'))
+      .send(changed)
       .expect(409);
-    await request(t.server)
-      .post('/api/v1/workflows/check')
-      .set(editor)
-      .type(YAML)
-      .send(greeting('1.0.0', 'goodbye'))
-      .expect(409);
-    await request(t.server)
-      .post('/api/v1/workflows/check')
-      .set(editor)
-      .type(YAML)
-      .send(greeting('1.0.0', 'hello'))
-      .expect(204);
-  });
 
-  it('a_later_version_becomes_current', async () => {
-    await request(t.server)
-      .post('/api/v1/workflows')
-      .set(editor)
-      .type(YAML)
-      .send(greeting('1.0.0', 'hello'))
-      .expect(201);
-    await request(t.server)
-      .post('/api/v1/workflows')
-      .set(editor)
-      .type(YAML)
-      .send(greeting('1.1.0', 'hi'))
-      .expect(201);
-
-    const workflow = await request(t.server)
-      .get('/api/v1/workflows/default/greet')
-      .set(viewer)
-      .expect(200);
-    const versions = await request(t.server)
-      .get('/api/v1/workflows/default/greet/versions')
-      .set(viewer)
-      .expect(200);
-
-    expect(workflow.body).toMatchObject({ currentVersion: '1.1.0' });
-    const listed = versions.body as { version: string; current: boolean }[];
-    const currency = listed.map((version) => [
-      version.version,
-      version.current,
-    ]);
-
-    expect(currency).toEqual([
-      ['1.0.0', false],
-      ['1.1.0', true],
-    ]);
-  });
-
-  it('a_document_is_refused_at_its_first_defect_and_nothing_is_stored', async () => {
-    const text = `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: broken\n  version: '1.0.0'\ndo:\n  - pause:\n      wait: PT1S\n  - compute:\n      set:\n        value: '\${ .a + }'\n      then: nowhere\n`;
-
-    const refused = await request(t.server)
-      .post('/api/v1/workflows')
-      .set(editor)
-      .type(YAML)
-      .send(text)
-      .expect(422);
-    const listed = await request(t.server)
-      .get('/api/v1/workflows')
-      .set(viewer)
-      .expect(200);
-
-    expect(refused.body).toEqual({
-      statusCode: 422,
-      error: 'Unprocessable Entity',
-      message: 'the wait task is outside the supported subset',
-      pointer: '/do/0/pause/wait',
+    expect(conflict.headers['content-type']).toContain(PROBLEM);
+    expect(conflict.body).toMatchObject({
+      type: 'urn:problem:workflow.version-taken',
+      status: 409,
     });
-    expect(listed.body.items).toEqual([]);
   });
 
-  it('checking_accepts_what_publishing_would_publish_and_stores_nothing', async () => {
-    await request(t.server)
-      .post('/api/v1/workflows/check')
-      .set(editor)
-      .type(YAML)
-      .send(greeting('1.0.0', 'hello'))
-      .expect(204);
-    const listed = await request(t.server)
-      .get('/api/v1/workflows')
-      .set(viewer)
-      .expect(200);
+  it('an_invalid_document_answers_a_located_problem_and_stores_nothing', async () => {
+    const document = aDocument({}, [{ greet: { set: { x: 1 }, thn: 'end' } }]);
 
-    expect(listed.body.items).toEqual([]);
-  });
-
-  it('checking_refuses_what_publishing_would_refuse', async () => {
-    const text = `document:\n  dsl: '1.0.3'\n  namespace: default\n  name: broken\n  version: '1.0.0'\ndo:\n  - compute:\n      set:\n        value: '\${ .a + }'\n`;
-
-    const checked = await request(t.server)
-      .post('/api/v1/workflows/check')
-      .set(editor)
-      .type(YAML)
-      .send(text)
-      .expect(422);
     const refused = await request(t.server)
       .post('/api/v1/workflows')
       .set(editor)
-      .type(YAML)
-      .send(text)
+      .send(document)
       .expect(422);
+    await request(t.server)
+      .get('/api/v1/workflows/sales/route-lead')
+      .set(viewer)
+      .expect(404);
 
-    expect(checked.body).toEqual(refused.body);
-    expect(checked.body).toMatchObject({ pointer: '/do/0/compute/set/value' });
+    expect(refused.headers['content-type']).toContain(PROBLEM);
+    expect(refused.body).toEqual({
+      type: 'urn:problem:definition.invalid',
+      title: 'The workflow definition is invalid',
+      status: 422,
+      detail: "'thn' is not a property here",
+      errors: [
+        { pointer: '/do/0/greet/thn', detail: "'thn' is not a property here" },
+      ],
+    });
   });
 
-  it('a_workflow_cursor_the_api_did_not_give_out_is_refused', async () => {
-    const foreign = Buffer.from('default\ngreet\nextra').toString('base64url');
+  it('checking_answers_as_publishing_would_and_stores_nothing', async () => {
+    await request(t.server)
+      .post('/api/v1/workflows/check')
+      .set(editor)
+      .send(aDocument())
+      .expect(204);
+    await request(t.server)
+      .get('/api/v1/workflows/sales/route-lead')
+      .set(viewer)
+      .expect(404);
+    const invalid = aDocument({ dsl: '0.9.0' });
 
     await request(t.server)
-      .get(`/api/v1/workflows?cursor=${foreign}`)
-      .set(viewer)
-      .expect(400);
+      .post('/api/v1/workflows/check')
+      .set(editor)
+      .send(invalid)
+      .expect(422);
+  });
+
+  it('a_body_that_is_not_json_is_refused_as_an_unsupported_media_type', async () => {
     await request(t.server)
-      .get('/api/v1/workflows?cursor=not%20a%20cursor')
-      .set(viewer)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .type('application/yaml')
+      .send('document:\n  dsl: 1.0.3\n')
+      .expect(415);
+  });
+
+  it('a_body_that_is_not_a_json_object_is_a_bad_request', async () => {
+    await request(t.server)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .send([1, 2, 3])
       .expect(400);
   });
 
-  it('the_workflow_list_pages_by_its_cursor', async () => {
-    for (const name of ['page-a', 'page-b', 'page-c'])
+  it('an_archived_workflow_takes_no_new_version_and_lists_as_archived', async () => {
+    await request(t.server)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .send(aDocument())
+      .expect(201);
+
+    await request(t.server)
+      .post('/api/v1/workflows/sales/route-lead/archive')
+      .set(editor)
+      .expect(204);
+    await request(t.server)
+      .post('/api/v1/workflows/sales/route-lead/archive')
+      .set(editor)
+      .expect(204);
+    const refused = await request(t.server)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .send(aDocument({ version: '2.0.0' }))
+      .expect(409);
+    const archived = await request(t.server)
+      .get('/api/v1/workflows?status=archived')
+      .set(viewer)
+      .expect(200);
+    const active = await request(t.server)
+      .get('/api/v1/workflows?status=active')
+      .set(viewer)
+      .expect(200);
+
+    expect(refused.body).toMatchObject({
+      type: 'urn:problem:workflow.archived',
+    });
+    expect(archived.body.items).toEqual([
+      {
+        namespace: 'sales',
+        name: 'route-lead',
+        status: 'archived',
+        currentVersion: '1.0.0',
+      },
+    ]);
+    expect(active.body.items).toEqual([]);
+  });
+
+  it('archiving_an_unknown_workflow_is_not_found', async () => {
+    const missing = await request(t.server)
+      .post('/api/v1/workflows/sales/missing/archive')
+      .set(editor)
+      .expect(404);
+
+    expect(missing.body).toMatchObject({
+      type: 'urn:problem:workflow.not-found',
+    });
+  });
+
+  it('versions_list_in_publishing_order_and_an_unknown_workflow_has_none', async () => {
+    await request(t.server)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .send(aDocument())
+      .expect(201);
+    await request(t.server)
+      .post('/api/v1/workflows')
+      .set(editor)
+      .send(aDocument({ version: '1.1.0' }))
+      .expect(201);
+
+    const versions = await request(t.server)
+      .get('/api/v1/workflows/sales/route-lead/versions')
+      .set(viewer)
+      .expect(200);
+    await request(t.server)
+      .get('/api/v1/workflows/sales/missing/versions')
+      .set(viewer)
+      .expect(404);
+
+    expect(versions.body).toMatchObject([
+      { version: '1.0.0', current: false },
+      { version: '1.1.0', current: true },
+    ]);
+  });
+
+  it('the_workflow_list_pages_by_namespace_and_name', async () => {
+    for (const name of ['alpha', 'beta', 'gamma']) {
+      const document = aDocument({ name });
       await request(t.server)
         .post('/api/v1/workflows')
         .set(editor)
-        .type(YAML)
-        .send(named(name))
+        .send(document)
         .expect(201);
+    }
 
     const first = await request(t.server)
       .get('/api/v1/workflows?limit=2')
       .set(viewer)
       .expect(200);
     const second = await request(t.server)
-      .get(`/api/v1/workflows?limit=2&cursor=${String(first.body.next)}`)
+      .get(`/api/v1/workflows?limit=2&cursor=${first.body.next as string}`)
       .set(viewer)
       .expect(200);
 
-    const names = [...first.body.items, ...second.body.items].map(
-      (item: { name: string }) => item.name,
-    );
-    expect(new Set(names).size).toBe(names.length);
-    expect(names).toEqual(
-      expect.arrayContaining(['page-a', 'page-b', 'page-c']),
-    );
+    const names = (body: { items: { name: string }[] }) =>
+      body.items.map((item) => item.name);
+    expect(names(first.body)).toEqual(['alpha', 'beta']);
+    expect(names(second.body)).toEqual(['gamma']);
+    expect(second.body.next).toBeNull();
   });
 
-  it('a_malformed_json_document_is_refused_at_its_root', async () => {
-    const checked = await request(t.server)
-      .post('/api/v1/workflows/check')
-      .set(editor)
-      .type('application/json')
-      .send('{ "document": ')
-      .expect(422);
-
-    expect(checked.body).toMatchObject({ statusCode: 422, pointer: '' });
-  });
-
-  it('a_namespace_in_upper_case_that_the_standard_allows_reads_back', async () => {
-    const text = `document:\n  dsl: '1.0.3'\n  namespace: Team\n  name: Greet\n  version: '1.0.0'\ndo:\n  - hello:\n      set:\n        greeting: hello\n`;
-
-    await request(t.server)
-      .post('/api/v1/workflows')
-      .set(editor)
-      .type(YAML)
-      .send(text)
-      .expect(201);
-    const workflow = await request(t.server)
-      .get('/api/v1/workflows/Team/Greet')
-      .set(viewer)
-      .expect(200);
-
-    expect(workflow.body).toMatchObject({ namespace: 'Team', name: 'Greet' });
-  });
-
-  it('a_path_that_is_not_a_workflow_name_is_refused', async () => {
-    await request(t.server)
-      .get('/api/v1/workflows/Bad_Namespace/greet')
-      .set(viewer)
-      .expect(400);
-  });
-
-  it('a_viewer_cannot_publish_or_check', async () => {
-    const text = greeting('1.0.0', 'hello');
-
+  it('a_viewer_reads_but_neither_publishes_nor_archives', async () => {
     await request(t.server)
       .post('/api/v1/workflows')
       .set(viewer)
-      .type(YAML)
-      .send(text)
+      .send(aDocument())
       .expect(403);
     await request(t.server)
-      .post('/api/v1/workflows/check')
+      .post('/api/v1/workflows/sales/route-lead/archive')
       .set(viewer)
-      .type(YAML)
-      .send(text)
       .expect(403);
+    await request(t.server).get('/api/v1/workflows').set(viewer).expect(200);
   });
 
-  it('an_unsupported_media_type_is_refused', async () => {
+  it('without_a_session_nothing_is_answered', async () => {
+    await request(t.server).get('/api/v1/workflows').expect(401);
     await request(t.server)
       .post('/api/v1/workflows')
-      .set(editor)
-      .type('text/plain')
-      .send('do: []')
-      .expect(415);
+      .send(aDocument())
+      .expect(401);
   });
-
-  it('a_document_above_one_mebibyte_is_refused', async () => {
-    const padding = '#'.repeat(1_100_000);
-    const text = `${greeting('1.0.0', 'hello')}${padding}\n`;
-
-    await request(t.server)
-      .post('/api/v1/workflows')
-      .set(editor)
-      .type(YAML)
-      .send(text)
-      .expect(413);
-  });
-
-  it('the_conformance_statement_names_the_subset_and_the_recorded_contradictions', async () => {
-    const statement = await request(t.server)
-      .get('/api/v1/conformance')
-      .set(viewer)
-      .expect(200);
-
-    expect(statement.body.dsl).toEqual(['1.0.0', '1.0.1', '1.0.2', '1.0.3']);
-    expect(statement.body.runs).toEqual(['workflow', 'script', 'shell']);
-    expect(statement.body.excluded).toContain('the wait task');
-    expect(statement.body.contradictions).toHaveLength(3);
-  });
-
-  it.each(DEFECTIVE_DOCUMENTS.map((document) => [document.defect, document]))(
-    'a_document_with_%s_is_refused_where_the_defect_is',
-    async (_, document) => {
-      const text = yamlOf(document);
-
-      const refused = await request(t.server)
-        .post('/api/v1/workflows')
-        .set(editor)
-        .type(YAML)
-        .send(text)
-        .expect(422);
-
-      expect(refused.body).toMatchObject({ pointer: document.pointer });
-    },
-  );
 });

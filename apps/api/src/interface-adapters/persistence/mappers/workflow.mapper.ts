@@ -1,5 +1,5 @@
-import { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
 import { Workflow } from '../../../domain/automation/workflows/workflow.js';
+import { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 import type { WorkflowRow } from '../interfaces.js';
 
 export class WorkflowMapper {
@@ -8,8 +8,9 @@ export class WorkflowMapper {
       id: workflow.id,
       namespace: workflow.name.namespace,
       name: workflow.name.name,
-      isOn: workflow.isOn,
+      status: workflow.status,
       currentVersionId: workflow.currentVersionId,
+      archivedAt: workflow.archivedAt,
       version: workflow.version,
     };
   }
@@ -19,8 +20,9 @@ export class WorkflowMapper {
     return new Workflow({
       id: row.id,
       name,
-      isOn: row.isOn,
+      status: row.status,
       currentVersionId: row.currentVersionId,
+      archivedAt: row.archivedAt,
       version: row.version,
     });
   }

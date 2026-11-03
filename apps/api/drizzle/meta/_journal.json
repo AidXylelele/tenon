@@ -33,36 +33,8 @@
     {
       "idx": 4,
       "version": "7",
-      "when": 1793232621071,
+      "when": 1793665595723,
       "tag": "0004_workflow",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1793347637473,
-      "tag": "0005_workflow_version_without_definition",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1793575542372,
-      "tag": "0006_workflow_instance",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1793608259624,
-      "tag": "0007_instance_list_indexes",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1793610502456,
-      "tag": "0008_instance_rounds",
       "breakpoints": true
     }
   ]

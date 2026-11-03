@@ -1,13 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { WorkDeferredError } from '../../application/errors.js';
-import {
-  InstanceNotFoundError,
-  StaleRoundError,
-  StaleWriteError,
-} from '../../domain/errors.js';
+import { StaleWriteError } from '../../domain/errors.js';
 import { PostgresTransientFailures } from '../drizzle/postgres-transient-failures.js';
 import { ErrorClass } from './enums.js';
 
+// A failure that repeating the work may cure (a lost race, an outage of the database or a
+// socket) or one it never will.
 @Injectable()
 export class ErrorClassifier {
   private static readonly SOCKET_ERRORS: readonly string[] = [
@@ -20,19 +17,9 @@ export class ErrorClassifier {
 
   constructor(private readonly transientFailures: PostgresTransientFailures) {}
 
-  // A run or message whose instance is gone has nothing left to do; any other record missing
-  // from a run is corrupt state, which faults the instance or dead-letters the message.
   classify(error: unknown): ErrorClass {
-    // A stale round belongs to a worker that lost the instance: its successor goes on.
-    const settled =
-      error instanceof InstanceNotFoundError ||
-      error instanceof StaleRoundError;
-
-    if (settled) return ErrorClass.Settled;
-
     const transient =
       error instanceof StaleWriteError ||
-      error instanceof WorkDeferredError ||
       this.transientFailures.includes(error) ||
       this.#socketError(error);
 

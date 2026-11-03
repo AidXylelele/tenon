@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { JsonSchemaClient } from '../../interface-adapters/workflows/schemas/interfaces.js';
+import { JsonSchemaClient } from '../runtime/interfaces.js';
 import { AjvJsonSchemaClient } from '../ajv/ajv-json-schema.client.js';
 
 @Module({

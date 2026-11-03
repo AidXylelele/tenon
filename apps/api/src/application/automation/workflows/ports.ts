@@ -1,45 +1,45 @@
-import type { Definition } from '../../../domain/automation/language/definition.js';
-import type { WorkflowName } from '../../../domain/automation/language/workflow-name.js';
-import type { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
-import type { SourceDocument } from '../../../domain/automation/workflows/source-document.js';
-import type { VersionReference } from '../../../domain/automation/workflows/version-reference.js';
+import type { JsonObject } from '../../../domain/automation/json.js';
+import type { CheckedDefinition } from '../../../domain/automation/workflows/checked-definition.js';
+import type { WorkflowRefusal } from '../../../domain/automation/workflows/enums.js';
+import type { Publication } from '../../../domain/automation/workflows/interfaces.js';
 import type { Workflow } from '../../../domain/automation/workflows/workflow.js';
+import type { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
 import type { WorkflowVersion } from '../../../domain/automation/workflows/workflow-version.js';
+import type { Result } from '../../../domain/result.js';
+import type { Missing } from '../enums.js';
 
-export interface CheckDocumentQuery {
-  readonly format: DocumentFormat;
-  readonly text: string;
+// The first problem of a document the runtime refuses: where it is and what is wrong.
+export interface DefinitionProblem {
+  readonly pointer: string;
+  readonly detail: string;
 }
 
-// What publishing would publish, and the version already published under its identity.
-export interface CheckedDocument {
-  readonly source: SourceDocument;
-  readonly definition: Definition;
-  readonly existing: WorkflowVersion | null;
-}
+export type PublishFailure = DefinitionProblem | WorkflowRefusal;
 
 export interface PublishVersionCommand {
-  readonly format: DocumentFormat;
-  readonly text: string;
+  readonly document: JsonObject;
   readonly publisherId: string;
 }
 
-export interface PublishedVersionResult {
+// What publishing would do: the workflow, new or found, and the version it would publish.
+export interface PreparedPublication {
   readonly workflow: Workflow;
-  readonly version: WorkflowVersion;
-  readonly created: boolean;
-  readonly current: boolean;
+  readonly publication: Publication;
 }
 
-export interface ConformanceStatement {
-  readonly dsl: readonly string[];
-  readonly tasks: readonly string[];
-  readonly calls: readonly string[];
-  readonly runs: readonly string[];
-  readonly scriptLanguages: readonly string[];
-  readonly authentications: readonly string[];
-  readonly excluded: readonly string[];
-  readonly contradictions: readonly string[];
+export type PublishResult = Result<PreparedPublication, PublishFailure>;
+
+export interface ArchiveWorkflowCommand {
+  readonly name: WorkflowName;
+}
+
+export type ArchiveResult = Result<void, Missing>;
+
+export abstract class DefinitionChecker {
+  // The definition the runtime can run, or the document's first problem (FR-002).
+  abstract check(
+    document: JsonObject,
+  ): Promise<Result<CheckedDefinition, DefinitionProblem>>;
 }
 
 export abstract class WorkflowRepository {
@@ -52,6 +52,7 @@ export abstract class WorkflowVersionRepository {
     name: WorkflowName,
     semver: string,
   ): Promise<WorkflowVersion | null>;
-  abstract findBy(reference: VersionReference): Promise<WorkflowVersion | null>;
+  abstract findById(id: string): Promise<WorkflowVersion | null>;
+  // Inserts a version once: the same version again is a no-op.
   abstract add(version: WorkflowVersion): Promise<void>;
 }

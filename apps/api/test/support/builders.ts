@@ -1,3 +1,6 @@
+import type { JsonObject } from '../../src/domain/automation/json.js';
+import { CheckedDefinition } from '../../src/domain/automation/workflows/checked-definition.js';
+import { WorkflowName } from '../../src/domain/automation/workflows/workflow-name.js';
 import { Account } from '../../src/domain/identity/account.js';
 import { Role, UserStatus } from '../../src/domain/identity/enums.js';
 import type { UserProps } from '../../src/domain/identity/interfaces.js';
@@ -46,3 +49,40 @@ export const anInvitation = (
 };
 
 export const passwords = new FakePasswordHasher();
+
+export interface DocumentHeader {
+  readonly namespace?: string;
+  readonly name?: string;
+  readonly version?: string;
+  readonly dsl?: string;
+}
+
+// A minimal DSL 1.0.3 document: one `set` task, with the header given.
+export const aDocument = (
+  header: DocumentHeader = {},
+  tasks: JsonObject[] = [{ greet: { set: { greeting: 'hello' } } }],
+): JsonObject => ({
+  document: {
+    dsl: header.dsl ?? '1.0.3',
+    namespace: header.namespace ?? 'sales',
+    name: header.name ?? 'route-lead',
+    version: header.version ?? '1.0.0',
+  },
+  do: tasks,
+});
+
+export const aDefinition = (
+  header: DocumentHeader = {},
+  fingerprint = 'fingerprint-1',
+): CheckedDefinition => {
+  const document = aDocument(header);
+  const declared = document.document as Record<string, string>;
+  const name = new WorkflowName(declared.namespace!, declared.name!);
+  return new CheckedDefinition({
+    name,
+    version: declared.version!,
+    dsl: declared.dsl!,
+    fingerprint,
+    document,
+  });
+};

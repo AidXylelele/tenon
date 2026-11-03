@@ -1,35 +1,46 @@
-import type {
-  ConformanceStatement,
-  PublishedVersionResult,
-} from '../../../application/automation/workflows/ports.js';
+import { HttpStatus } from '@nestjs/common';
+import type { PreparedPublication } from '../../../application/automation/workflows/ports.js';
 import type {
   VersionSummary,
   WorkflowPage,
   WorkflowSummary,
 } from '../../../application/automation/workflows/queries.js';
-import { DocumentFormat } from '../../../domain/automation/workflows/enums.js';
-import { DocumentMediaType } from '../enums.js';
+import { CursorMapper } from '../mappers/cursor.mapper.js';
 import type {
-  ConformanceResponse,
   VersionResponse,
   WorkflowPageResponse,
   WorkflowResponse,
 } from '../schemas/workflow.schemas.js';
-import { CursorMapper } from '../mappers/cursor.mapper.js';
 
 export class WorkflowPresenter {
-  static published(result: PublishedVersionResult): VersionResponse {
-    const version = result.version;
-    const workflow = result.workflow;
+  private static readonly PREFIX = '/api/v1/workflows';
+
+  static published(prepared: PreparedPublication): VersionResponse {
+    const workflow = prepared.workflow;
+    const version = prepared.publication.version;
+    const current = workflow.currentVersionId === version.id;
     return {
       namespace: workflow.name.namespace,
       name: workflow.name.name,
       version: version.semver,
-      dsl: version.dslVersion,
-      current: result.current,
+      dsl: version.dsl,
+      current,
       publishedBy: version.publisherId,
       publishedAt: version.publishedAt.toISOString(),
     };
+  }
+
+  // 201 for a version published now, 200 for the same document again (FR-004).
+  static statusOf(prepared: PreparedPublication): HttpStatus {
+    if (prepared.publication.created) return HttpStatus.CREATED;
+
+    return HttpStatus.OK;
+  }
+
+  static locationOf(prepared: PreparedPublication): string {
+    const name = prepared.workflow.name;
+    const version = prepared.publication.version.semver;
+    return `${WorkflowPresenter.PREFIX}/${name.namespace}/${name.name}/versions/${version}`;
   }
 
   static version(version: VersionSummary): VersionResponse {
@@ -48,7 +59,7 @@ export class WorkflowPresenter {
     return {
       namespace: workflow.namespace,
       name: workflow.name,
-      on: workflow.isOn,
+      status: workflow.status,
       currentVersion: workflow.currentVersion,
     };
   }
@@ -59,24 +70,5 @@ export class WorkflowPresenter {
     );
     const next = CursorMapper.fromWorkflowPosition(page.next);
     return { items, next };
-  }
-
-  static conformance(statement: ConformanceStatement): ConformanceResponse {
-    return {
-      dsl: statement.dsl.slice(),
-      tasks: statement.tasks.slice(),
-      calls: statement.calls.slice(),
-      runs: statement.runs.slice(),
-      scriptLanguages: statement.scriptLanguages.slice(),
-      authentications: statement.authentications.slice(),
-      excluded: statement.excluded.slice(),
-      contradictions: statement.contradictions.slice(),
-    };
-  }
-
-  static mediaType(format: DocumentFormat): DocumentMediaType {
-    if (format === DocumentFormat.Json) return DocumentMediaType.Json;
-
-    return DocumentMediaType.Yaml;
   }
 }

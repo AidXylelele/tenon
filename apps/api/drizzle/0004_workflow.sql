@@ -2,8 +2,9 @@ CREATE TABLE "workflow" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"namespace" text NOT NULL,
 	"name" text NOT NULL,
-	"is_on" boolean DEFAULT false NOT NULL,
+	"status" text NOT NULL,
 	"current_version_id" uuid,
+	"archived_at" timestamp with time zone,
 	"version" integer DEFAULT 1 NOT NULL
 );
 --> statement-breakpoint
@@ -11,11 +12,9 @@ CREATE TABLE "workflow_version" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"workflow_id" uuid NOT NULL,
 	"semver" text NOT NULL,
-	"dsl_version" text NOT NULL,
-	"source_format" text NOT NULL,
-	"source_text" text NOT NULL,
+	"dsl" text NOT NULL,
+	"document" jsonb NOT NULL,
 	"fingerprint" text NOT NULL,
-	"definition" jsonb NOT NULL,
 	"publisher_id" uuid NOT NULL,
 	"published_at" timestamp with time zone NOT NULL
 );

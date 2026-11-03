@@ -1,17 +1,14 @@
 import { Injectable, type OnApplicationShutdown } from '@nestjs/common';
 import { ResilienceService } from '@nestjs/resilience';
-import type {
-  JsonObject,
-  JsonValue,
-} from '../../domain/automation/language/interfaces.js';
-import { JqOutcomeKind } from '../../interface-adapters/workflows/expressions/enums.js';
+import type { JsonObject, JsonValue } from '../../domain/automation/json.js';
+import { JqOutcomeKind } from '../runtime/enums.js';
 import {
   type JqAborted,
   JqClient,
   type JqCompilation,
   type JqEvaluation,
   type JqTimedOut,
-} from '../../interface-adapters/workflows/expressions/interfaces.js';
+} from '../runtime/interfaces.js';
 import { WorkerRunKind } from '../piscina/enums.js';
 import type { WorkerExhausted, WorkerTimedOut } from '../piscina/interfaces.js';
 import { WorkerPool } from '../piscina/worker-pool.js';

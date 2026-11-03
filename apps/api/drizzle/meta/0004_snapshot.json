@@ -1,5 +1,5 @@
 {
-  "id": "d3e09b81-2ee4-4e16-b179-ddf00aea998c",
+  "id": "7f98cfe6-517c-460c-8bc5-437b2bb35ed8",
   "prevId": "be31ebff-d8dd-44e4-b1e5-15d70c18d45d",
   "version": "7",
   "dialect": "postgresql",
@@ -528,16 +528,21 @@
           "primaryKey": false,
           "notNull": true
         },
-        "is_on": {
-          "name": "is_on",
-          "type": "boolean",
+        "status": {
+          "name": "status",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": false
+          "notNull": true
         },
         "current_version_id": {
           "name": "current_version_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archived_at": {
+          "name": "archived_at",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -601,33 +606,21 @@
           "primaryKey": false,
           "notNull": true
         },
-        "dsl_version": {
-          "name": "dsl_version",
+        "dsl": {
+          "name": "dsl",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "source_format": {
-          "name": "source_format",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_text": {
-          "name": "source_text",
-          "type": "text",
+        "document": {
+          "name": "document",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },
         "fingerprint": {
           "name": "fingerprint",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "definition": {
-          "name": "definition",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": true
         },

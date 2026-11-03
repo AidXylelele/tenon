@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { InstanceQueries } from '../../src/application/automation/instances/queries.js';
+import { WorkflowQueries } from '../../src/application/automation/workflows/queries.js';
 import { Role } from '../../src/domain/identity/enums.js';
 import { authHeaders, createUser, signIn } from '../support/auth-helpers.js';
 import { createTestApp, type TestApp } from '../support/create-test-app.js';
@@ -21,7 +21,7 @@ describe('a database outage over HTTP', () => {
       list: () => Promise.reject(failure()),
     };
     t = await createTestApp((builder) =>
-      builder.overrideProvider(InstanceQueries).useValue(queries),
+      builder.overrideProvider(WorkflowQueries).useValue(queries),
     );
   });
 
@@ -39,7 +39,7 @@ describe('a database outage over HTTP', () => {
     const viewer = authHeaders(await signIn(t.server, 'viewer@example.com'));
 
     const response = await request(t.server)
-      .get('/api/v1/instances')
+      .get('/api/v1/workflows')
       .set(viewer)
       .expect(503);
 
@@ -50,6 +50,6 @@ describe('a database outage over HTTP', () => {
     failure = () => new Error('a defect');
     const viewer = authHeaders(await signIn(t.server, 'viewer@example.com'));
 
-    await request(t.server).get('/api/v1/instances').set(viewer).expect(500);
+    await request(t.server).get('/api/v1/workflows').set(viewer).expect(500);
   });
 });

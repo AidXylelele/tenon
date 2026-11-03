@@ -1,5 +1,11 @@
 import { z } from 'zod';
+import { WorkflowStatus } from '../../../domain/automation/workflows/enums.js';
 import { CursorMapper } from '../mappers/cursor.mapper.js';
+
+// The DSL document itself; the runtime validates it against the standard's schema.
+export const DefinitionBody = z.record(z.string(), z.json());
+
+export type DefinitionBody = z.infer<typeof DefinitionBody>;
 
 export const VersionResponse = z.object({
   namespace: z.string(),
@@ -16,7 +22,7 @@ export type VersionResponse = z.infer<typeof VersionResponse>;
 export const WorkflowResponse = z.object({
   namespace: z.string(),
   name: z.string(),
-  on: z.boolean(),
+  status: z.enum(WorkflowStatus),
   currentVersion: z.string().nullable(),
 });
 
@@ -42,23 +48,11 @@ export type WorkflowPageResponse = z.infer<typeof WorkflowPageResponse>;
 
 export const ListWorkflowsQuery = z.strictObject({
   cursor: WorkflowCursor.optional(),
+  status: z.enum(WorkflowStatus).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 });
 
 export type ListWorkflowsQuery = z.infer<typeof ListWorkflowsQuery>;
-
-export const ConformanceResponse = z.object({
-  dsl: z.array(z.string()),
-  tasks: z.array(z.string()),
-  calls: z.array(z.string()),
-  runs: z.array(z.string()),
-  scriptLanguages: z.array(z.string()),
-  authentications: z.array(z.string()),
-  excluded: z.array(z.string()),
-  contradictions: z.array(z.string()),
-});
-
-export type ConformanceResponse = z.infer<typeof ConformanceResponse>;
 
 const SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$/;

@@ -6,13 +6,13 @@ import {
   ResilienceTimeoutError,
 } from '@nestjs/resilience';
 import { errors } from 'undici';
-import { SandboxOutcomeKind } from '../../interface-adapters/sandbox/enums.js';
+import { SandboxOutcomeKind } from '../runtime/enums.js';
 import {
   type GoJudgeCommand,
   type GoJudgeResult,
   SandboxClient,
   type SandboxOutcome,
-} from '../../interface-adapters/sandbox/interfaces.js';
+} from '../runtime/interfaces.js';
 import { SandboxPool } from './sandbox-pool.js';
 
 @Injectable()

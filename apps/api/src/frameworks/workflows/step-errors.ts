@@ -11,13 +11,11 @@ export class StepErrors {
 
   constructor(private readonly classifier: ErrorClassifier) {}
 
-  async classified<T>(work: () => Promise<T>): Promise<T | null> {
+  async classified<T>(work: () => Promise<T>): Promise<T> {
     try {
       return await work();
     } catch (error) {
       const kind = this.classifier.classify(error);
-
-      if (kind === ErrorClass.Settled) return null;
 
       // The engine journals what it retries: a short text, not a query with its values.
       if (kind === ErrorClass.Transient) {

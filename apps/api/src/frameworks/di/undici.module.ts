@@ -1,6 +1,6 @@
 import { Module, type OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EndpointClient } from '../../interface-adapters/workflows/services/interfaces.js';
+import { EndpointClient } from '../runtime/interfaces.js';
 import {
   createEndpointDispatcher,
   EndpointDispatcher,

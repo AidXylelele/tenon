@@ -1,1 +1,0 @@
-ALTER TABLE "workflow_instance" ADD COLUMN "rounds" integer DEFAULT 0 NOT NULL;

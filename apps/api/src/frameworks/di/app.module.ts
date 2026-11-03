@@ -9,6 +9,7 @@ import { AuthorizationModule } from '@nestjs/authorization';
 import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from '../../interface-adapters/api/controllers/health.controller.js';
 import { DomainErrorFilter } from '../../interface-adapters/api/filters/domain-error.filter.js';
+import { ProblemFilter } from '../../interface-adapters/api/filters/problem.filter.js';
 import { SecurityHeadersMiddleware } from '../../interface-adapters/api/middleware/security-headers.middleware.js';
 import { AutomationModule } from './automation.module.js';
 import { ConfigModule } from './config.module.js';
@@ -45,6 +46,7 @@ import { TerminusHealthClient } from '../terminus/terminus-health.client.js';
     // Nest asks the global filters last to first: domain errors first, the database's outages next.
     { provide: APP_FILTER, useClass: DatabaseUnavailableFilter },
     { provide: APP_FILTER, useClass: DomainErrorFilter },
+    { provide: APP_FILTER, useClass: ProblemFilter },
   ],
 })
 export class AppModule implements NestModule {

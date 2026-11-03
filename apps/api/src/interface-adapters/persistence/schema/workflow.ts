@@ -1,11 +1,12 @@
 import {
-  boolean,
   integer,
   pgTable,
   text,
+  timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import type { WorkflowStatus } from '../../../domain/automation/workflows/enums.js';
 
 export const workflow = pgTable(
   'workflow',
@@ -13,8 +14,9 @@ export const workflow = pgTable(
     id: uuid('id').primaryKey(),
     namespace: text('namespace').notNull(),
     name: text('name').notNull(),
-    isOn: boolean('is_on').notNull().default(false),
+    status: text('status').$type<WorkflowStatus>().notNull(),
     currentVersionId: uuid('current_version_id'),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
     version: integer('version').notNull().default(1),
   },
   (table) => [

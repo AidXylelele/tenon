@@ -1,4 +1,3 @@
-import { STATUS_CODES } from 'node:http';
 import {
   type ArgumentsHost,
   Catch,
@@ -6,7 +5,6 @@ import {
   ForbiddenException,
   GoneException,
   type HttpException,
-  HttpStatus,
   NotFoundException,
   UnauthorizedException,
   UnprocessableEntityException,
@@ -15,7 +13,6 @@ import { BaseExceptionFilter } from '@nestjs/core';
 import {
   AuthenticationError,
   ConflictError,
-  DefinitionRejectedError,
   DomainError,
   ExpiredError,
   ForbiddenError,
@@ -37,17 +34,6 @@ export class DomainErrorFilter extends BaseExceptionFilter {
 
     if (error instanceof ConflictError) {
       return new ConflictException(error.message);
-    }
-
-    if (error instanceof DefinitionRejectedError) {
-      const statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
-      const reason = STATUS_CODES[statusCode];
-      return new UnprocessableEntityException({
-        statusCode,
-        error: reason,
-        message: error.message,
-        pointer: error.pointer,
-      });
     }
 
     if (error instanceof RuleViolationError) {
