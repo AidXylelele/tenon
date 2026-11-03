@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import type { INestApplicationContext } from '@nestjs/common';
 import type { JsonObject } from '../../../src/domain/automation/json.js';
+import { ConfigModule } from '../../../src/frameworks/di/config.module.js';
 import { ResilienceModule } from '../../../src/frameworks/di/resilience.module.js';
 import { RuntimeModule } from '../../../src/frameworks/di/runtime.module.js';
 import { VerdictKind } from '../../../src/interface-adapters/workflows/enums.js';
@@ -15,7 +16,7 @@ let checks: RuntimeChecks;
 
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({
-    imports: [ResilienceModule, RuntimeModule],
+    imports: [ConfigModule, ResilienceModule, RuntimeModule],
   }).compile();
   context = await moduleRef.init();
   checks = context.get(RuntimeChecks);

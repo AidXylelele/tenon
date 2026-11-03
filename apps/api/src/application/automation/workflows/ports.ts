@@ -44,6 +44,7 @@ export abstract class DefinitionChecker {
 
 export abstract class WorkflowRepository {
   abstract findByName(name: WorkflowName): Promise<Workflow | null>;
+  abstract findById(id: string): Promise<Workflow | null>;
   abstract save(workflow: Workflow): Promise<void>;
 }
 
@@ -53,6 +54,11 @@ export abstract class WorkflowVersionRepository {
     semver: string,
   ): Promise<WorkflowVersion | null>;
   abstract findById(id: string): Promise<WorkflowVersion | null>;
+  // The version named, or the workflow's current version when none is named.
+  abstract findToRun(
+    name: WorkflowName,
+    semver: string | null,
+  ): Promise<WorkflowVersion | null>;
   // Inserts a version once: the same version again is a no-op.
   abstract add(version: WorkflowVersion): Promise<void>;
 }

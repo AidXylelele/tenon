@@ -34,6 +34,17 @@ export class DrizzleWorkflowRepository implements WorkflowRepository {
     return WorkflowMapper.toEntity(row);
   }
 
+  async findById(id: string): Promise<Workflow | null> {
+    const [row] = await this.txHost.tx
+      .select()
+      .from(workflows)
+      .where(eq(workflows.id, id));
+
+    if (!row) return null;
+
+    return WorkflowMapper.toEntity(row);
+  }
+
   @Transactional(Propagation.Mandatory)
   async save(workflow: Workflow): Promise<void> {
     const row = WorkflowMapper.toRow(workflow);

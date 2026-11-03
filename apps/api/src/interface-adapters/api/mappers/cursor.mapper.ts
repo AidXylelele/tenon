@@ -1,8 +1,11 @@
+import type { InstancePosition } from '../../../application/automation/instances/queries.js';
 import type { WorkflowPosition } from '../../../application/automation/workflows/queries.js';
 
-// The API's opaque page tokens: the last workflow's namespace and name in base64url.
+// The API's opaque page tokens: the last workflow's namespace and name in base64url, or the
+// last instance's creation time in milliseconds and its id.
 export class CursorMapper {
   static readonly #NAME_SEPARATOR = '\n';
+  static readonly #SEPARATOR = '_';
   static readonly #ENCODING = 'base64url';
 
   static toWorkflowPosition(cursor: string): WorkflowPosition;
@@ -30,5 +33,31 @@ export class CursorMapper {
 
     const named = `${position.namespace}${CursorMapper.#NAME_SEPARATOR}${position.name}`;
     return Buffer.from(named).toString(CursorMapper.#ENCODING);
+  }
+
+  static toInstancePosition(cursor: string): InstancePosition;
+  static toInstancePosition(
+    cursor: string | undefined,
+  ): InstancePosition | null;
+  static toInstancePosition(
+    cursor: string | undefined,
+  ): InstancePosition | null {
+    if (cursor === undefined) return null;
+
+    const [epoch = '', id = ''] = cursor.split(CursorMapper.#SEPARATOR);
+    const milliseconds = Number(epoch);
+    const createdAt = new Date(milliseconds);
+    return { createdAt, id };
+  }
+
+  static fromInstancePosition(position: InstancePosition): string;
+  static fromInstancePosition(position: InstancePosition | null): string | null;
+  static fromInstancePosition(
+    position: InstancePosition | null,
+  ): string | null {
+    if (position === null) return null;
+
+    const milliseconds = String(position.createdAt.getTime());
+    return `${milliseconds}${CursorMapper.#SEPARATOR}${position.id}`;
   }
 }

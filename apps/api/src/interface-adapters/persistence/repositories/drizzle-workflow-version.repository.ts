@@ -53,6 +53,28 @@ export class DrizzleWorkflowVersionRepository implements WorkflowVersionReposito
     return WorkflowVersionMapper.toEntity(row);
   }
 
+  async findToRun(
+    name: WorkflowName,
+    semver: string | null,
+  ): Promise<WorkflowVersion | null> {
+    if (semver !== null) return this.find(name, semver);
+
+    const [found] = await this.txHost.tx
+      .select({ version: versions })
+      .from(versions)
+      .innerJoin(workflows, eq(workflows.currentVersionId, versions.id))
+      .where(
+        and(
+          eq(workflows.namespace, name.namespace),
+          eq(workflows.name, name.name),
+        ),
+      );
+
+    if (!found) return null;
+
+    return WorkflowVersionMapper.toEntity(found.version);
+  }
+
   // A version is written once: the same version again finds its row and writes nothing, while
   // a concurrent publish of other content under its identity is a stale write.
   @Transactional(Propagation.Mandatory)

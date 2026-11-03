@@ -187,11 +187,14 @@ Given('given the workflow input is:', (world, input: string) => {
 When('the workflow is executed', async (world) => {
   const t = await started();
   const definition = String(world.data.definition);
+  // The kit writes YAML; the API reads JSON, so the SDK reads the YAML as the editor would.
+  const document: unknown = Classes.Workflow.deserialize(definition, {
+    validate: false,
+  }).asPlainObject();
   const published = await request(t.server)
     .post('/api/v1/workflows')
     .set(editor)
-    .type('application/yaml')
-    .send(definition)
+    .send(document as object)
     .expect(201);
   const namespace = String(published.body.namespace);
   const name = String(published.body.name);

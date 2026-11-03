@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { StaleWriteError } from '../../domain/errors.js';
 import { PostgresTransientFailures } from '../drizzle/postgres-transient-failures.js';
+import { CapacityExhaustedError } from '../runtime/execution/faults.js';
 import { ErrorClass } from './enums.js';
 
 // A failure that repeating the work may cure (a lost race, an outage of the database or a
@@ -20,6 +21,7 @@ export class ErrorClassifier {
   classify(error: unknown): ErrorClass {
     const transient =
       error instanceof StaleWriteError ||
+      error instanceof CapacityExhaustedError ||
       this.transientFailures.includes(error) ||
       this.#socketError(error);
 

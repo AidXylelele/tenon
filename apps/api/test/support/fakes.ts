@@ -228,6 +228,10 @@ export class InMemoryWorkflowRepository implements WorkflowRepository {
     return found ?? null;
   }
 
+  async findById(id: string): Promise<Workflow | null> {
+    return this.workflows.get(id) ?? null;
+  }
+
   async save(workflow: Workflow): Promise<void> {
     this.workflows.set(workflow.id, workflow);
   }
@@ -252,6 +256,17 @@ export class InMemoryWorkflowVersionRepository implements WorkflowVersionReposit
 
   async findById(id: string): Promise<WorkflowVersion | null> {
     return this.versions.get(id) ?? null;
+  }
+
+  async findToRun(
+    name: WorkflowName,
+    semver: string | null,
+  ): Promise<WorkflowVersion | null> {
+    if (semver !== null) return this.find(name, semver);
+
+    const workflow = await this.workflows.findByName(name);
+    const current = workflow?.currentVersionId ?? '';
+    return this.versions.get(current) ?? null;
   }
 
   async add(version: WorkflowVersion): Promise<void> {

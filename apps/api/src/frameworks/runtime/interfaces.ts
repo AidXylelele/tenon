@@ -278,3 +278,36 @@ export abstract class SandboxClient {
 export interface DefinitionCheck {
   firstProblem(workflow: Specification.Workflow): Promise<CheckProblem | null>;
 }
+
+// How an engine step repeats: the engine waits `backoff(attempt)` milliseconds between attempts
+// and repeats only an error `retries` accepts.
+export interface StepRetry {
+  readonly attempts: number;
+  backoff(attempt: number): number;
+  retries(error: unknown): boolean;
+}
+
+export interface StepOptions {
+  readonly timeoutMs: number | null;
+  readonly retry: StepRetry | null;
+}
+
+// What a durable engine gives the runtime: each effect runs once and its result is journaled;
+// a sleep or a wait parks the run without holding a worker.
+export interface Durability {
+  now(): number;
+  step<T>(
+    name: string,
+    effect: (attempt: number) => Promise<T>,
+    options: StepOptions,
+  ): Promise<T>;
+  sleep(name: string, milliseconds: number): Promise<void>;
+  // Until a resume signal, or `milliseconds` at most.
+  waitForResume(name: string, milliseconds: number): Promise<void>;
+}
+
+// The runtime's own descriptor, `$runtime` in expressions.
+export interface RuntimeDescriptor {
+  readonly name: string;
+  readonly version: string;
+}
