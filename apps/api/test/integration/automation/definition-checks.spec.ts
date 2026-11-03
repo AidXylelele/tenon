@@ -428,4 +428,35 @@ describe('the checks a document passes before it is published', () => {
       pointer: '/schedule/on/all',
     });
   });
+
+  it.each([
+    ['if', { set: { x: 1 }, if: '.x ==' }, '/do/0/task/if'],
+    [
+      'input.from',
+      { set: { x: 1 }, input: { from: '.[' } },
+      '/do/0/task/input/from',
+    ],
+    ['for.in', { for: { in: '.items[' }, do: [] }, '/do/0/task/for/in'],
+  ])(
+    'a_bare_%s_that_does_not_compile_is_refused_where_it_is',
+    async (_, task, pointer) => {
+      const document = documentWith([{ task: task }]);
+
+      expect(await problemOf(document)).toMatchObject({ pointer });
+    },
+  );
+
+  it('a_bare_expression_that_compiles_is_accepted', async () => {
+    const document = documentWith([
+      { task: { set: { x: 1 }, if: '.ready == true' } },
+    ]);
+
+    expect(await problemOf(document)).toBeNull();
+  });
+
+  it('a_text_in_set_data_is_data_even_under_an_expression_key', async () => {
+    const document = documentWith([{ task: { set: { if: 'not jq (' } } }]);
+
+    expect(await problemOf(document)).toBeNull();
+  });
 });
