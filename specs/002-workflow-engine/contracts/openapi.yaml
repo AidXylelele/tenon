@@ -3,10 +3,35 @@ info:
   title: Workflow Engine API
   version: 1.0.0
   description: >
-    Automation context of the platform API. Errors are standard Nest HttpException bodies
-    ({ statusCode, message, error }); a refusal adds the `pointer` of its first problem. Starting an instance and calling a
-    webhook accept the `Idempotency-Key` header (replay, 409 in flight, 422 on reuse with
-    another body).
+    The automation routes of the platform API (feature 002).
+
+
+    Authority: the API serves its own OpenAPI document, generated at run time from the
+    controllers and their zod schemas (`/api/v1/docs-json`, UI at `/api/v1/docs`). That
+    document is authoritative for what the API does; this file is the design contract and is
+    kept equal to it.
+
+
+    Errors: every refusal of these routes is an RFC 9457 problem in
+    `application/problem+json` (`Problem`). A refusal the platform names has the type
+    `urn:problem:<code>` (for example `urn:problem:workflow.not-found`); any other refusal
+    (validation, authentication, authorization, a reused `Idempotency-Key`) is an
+    `about:blank` problem titled by its status, with the library's `code` when it gave one. A
+    refusal located in the request lists `errors[{ pointer, detail }]`. Three answers are given
+    before or outside the routes and keep the framework's body: 413 (body above 1 MiB) and 415
+    (a body that is not JSON) from the body parser, and 503 with `Retry-After: 5` while the
+    database is unavailable.
+
+
+    Bodies: JSON only, up to 1 MiB, except `POST /events` and `POST /hooks/{token}`, which
+    read any media type (a non-JSON body as text).
+
+
+    Idempotency: `POST /workflows/{namespace}/{name}/instances` takes an `Idempotency-Key`
+    (`@nestjs/idempotency`, kept 24 hours, per user): the same key and request replay the first
+    answer (any status below 500), a request still in flight is a 409, and the same key with
+    another version or input is a 422. A webhook call's `Idempotency-Key` is the id of the
+    event it becomes (see `/hooks/{token}`).
 servers:
   - url: /api/v1
 security:
@@ -25,150 +50,160 @@ paths:
     post:
       tags: [workflows]
       summary: Check a document without publishing it (FR-003)
-      requestBody: { $ref: '#/components/requestBodies/Document' }
+      description: Answers what publishing would answer, and stores nothing.
+      requestBody: { $ref: '#/components/requestBodies/Definition' }
       responses:
         '204': { description: The document would be published }
-        '422': { $ref: '#/components/responses/Rejected' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+
   /workflows:
     get:
       tags: [workflows]
-      summary: List workflows
+      summary: List workflows by namespace and name
       parameters:
-        [
-          { $ref: '#/components/parameters/Cursor' },
-          { $ref: '#/components/parameters/Limit' },
-        ]
+        - { $ref: '#/components/parameters/WorkflowCursor' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/WorkflowStatus' }
+        - { $ref: '#/components/parameters/Limit' }
       responses:
         '200':
-          {
-            description: Page of workflows,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/WorkflowPage' } },
-              },
-          }
+          description: A page of workflows
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowPage' }
+        '400': { $ref: '#/components/responses/Problem' }
     post:
       tags: [workflows]
       summary: Publish a version (FR-002, FR-004)
-      requestBody: { $ref: '#/components/requestBodies/Document' }
+      requestBody: { $ref: '#/components/requestBodies/Definition' }
       responses:
         '201':
-          {
-            description: Published,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/Version' } },
-              },
-          }
+          description: Published; `Location` names the version
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Version' }
         '200':
-          {
-            description: Identical document already published,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/Version' } },
-              },
-          }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Rejected' }
+          description: The identical document is already published
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Version' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:workflow.version-taken or urn:problem:workflow.archived'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: 'urn:problem:definition.invalid, located at the first problem'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /workflows/{namespace}/{name}:
     parameters:
-      [
-        { $ref: '#/components/parameters/Namespace' },
-        { $ref: '#/components/parameters/Name' },
-      ]
+      - { $ref: '#/components/parameters/Namespace' }
+      - { $ref: '#/components/parameters/Name' }
     get:
       tags: [workflows]
-      summary: Get a workflow
+      summary: Read a workflow
       responses:
         '200':
-          {
-            description: Workflow,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/Workflow' } },
-              },
-          }
-        '404': { $ref: '#/components/responses/NotFound' }
+          description: The workflow
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Workflow' }
+        '404': { $ref: '#/components/responses/Problem' }
+
+  /workflows/{namespace}/{name}/archive:
+    parameters:
+      - { $ref: '#/components/parameters/Namespace' }
+      - { $ref: '#/components/parameters/Name' }
+    post:
+      tags: [workflows]
+      summary: Archive a workflow; it is turned off, takes no new version and starts no instance
+      responses:
+        '204': { description: Archived, or already archived }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /workflows/{namespace}/{name}/turn-on:
     parameters:
-      [
-        { $ref: '#/components/parameters/Namespace' },
-        { $ref: '#/components/parameters/Name' },
-      ]
+      - { $ref: '#/components/parameters/Namespace' }
+      - { $ref: '#/components/parameters/Name' }
     post:
       tags: [workflows]
       summary: Turn automatic starts on (FR-006); a no-op when already on
       responses:
         '204': { description: On }
-        '404': { $ref: '#/components/responses/NotFound' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:workflow.archived'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /workflows/{namespace}/{name}/turn-off:
     parameters:
-      [
-        { $ref: '#/components/parameters/Namespace' },
-        { $ref: '#/components/parameters/Name' },
-      ]
+      - { $ref: '#/components/parameters/Namespace' }
+      - { $ref: '#/components/parameters/Name' }
     post:
       tags: [workflows]
       summary: Turn automatic starts off (FR-006); a no-op when already off
       responses:
         '204': { description: Off }
-        '404': { $ref: '#/components/responses/NotFound' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /workflows/{namespace}/{name}/versions:
     parameters:
-      [
-        { $ref: '#/components/parameters/Namespace' },
-        { $ref: '#/components/parameters/Name' },
-      ]
+      - { $ref: '#/components/parameters/Namespace' }
+      - { $ref: '#/components/parameters/Name' }
     get:
       tags: [workflows]
-      summary: List versions
+      summary: List a workflow's versions in publishing order
       responses:
         '200':
-          {
-            description: Versions,
-            content:
-              {
-                application/json:
-                  {
-                    schema:
-                      {
-                        type: array,
-                        items: { $ref: '#/components/schemas/Version' },
-                      },
-                  },
-              },
-          }
+          description: The versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Version' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /workflows/{namespace}/{name}/versions/{version}:
     parameters:
-      [
-        { $ref: '#/components/parameters/Namespace' },
-        { $ref: '#/components/parameters/Name' },
-        { $ref: '#/components/parameters/SemVer' },
-      ]
+      - { $ref: '#/components/parameters/Namespace' }
+      - { $ref: '#/components/parameters/Name' }
+      - { $ref: '#/components/parameters/SemVer' }
     get:
       tags: [workflows]
-      summary: Read a version's document exactly as submitted (FR-005)
+      summary: Read a version's document as published (FR-005)
       responses:
         '200':
-          description: The submitted document
+          description: The published document, as JSON
           content:
-            application/yaml: { schema: { type: string } }
-            application/json: { schema: { type: object } }
-        '404': { $ref: '#/components/responses/NotFound' }
+            application/json:
+              schema: { type: object }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /workflows/{namespace}/{name}/instances:
     parameters:
-      [
-        { $ref: '#/components/parameters/Namespace' },
-        { $ref: '#/components/parameters/Name' },
-      ]
+      - { $ref: '#/components/parameters/Namespace' }
+      - { $ref: '#/components/parameters/Name' }
     post:
       tags: [instances]
       summary: Start an instance (FR-008, FR-009)
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody:
         required: true
         content:
@@ -178,219 +213,242 @@ paths:
               additionalProperties: false
               properties:
                 version:
-                  {
-                    type: string,
-                    minLength: 1,
-                    description: 'A published semantic version, or `latest`; the current version when omitted',
-                  }
+                  type: string
+                  minLength: 1
+                  default: latest
+                  description: 'A published version, or `latest` for the current one'
                 input:
-                  {
-                    description: 'Any JSON value; an empty object when omitted',
-                  }
+                  description: 'Any JSON value'
+                  default: {}
       responses:
         '201':
-          {
-            description: Started,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/InstanceSummary' } },
-              },
-          }
-        '400':
-          {
-            description: 'The body, the path or the idempotency key is malformed',
-          }
-        '403': { description: The user may not start instances }
-        '404': { $ref: '#/components/responses/NotFound' }
+          description: Started
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceSummary' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404':
+          description: 'urn:problem:workflow.not-found or urn:problem:version.not-found'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '409':
-          { description: A request with the same idempotency key is in flight }
+          description: 'urn:problem:workflow.archived, or a request with the same key in flight'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '422':
-          {
-            description: 'The idempotency key was used with another version or input within 24 hours',
-          }
+          description: 'The same key with another version or input within 24 hours'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /instances:
     get:
       tags: [instances]
-      summary: List instances (FR-016)
+      summary: List instances, newest first (FR-016)
       parameters:
         - { name: namespace, in: query, schema: { type: string } }
         - { name: name, in: query, schema: { type: string } }
-        - { name: version, in: query, schema: { type: string } }
-        - {
-            name: phase,
-            in: query,
-            schema: { $ref: '#/components/schemas/Phase' },
-          }
-        - {
-            name: startedFrom,
-            in: query,
-            schema: { type: string, format: date-time },
-          }
-        - {
-            name: startedTo,
-            in: query,
-            schema: { type: string, format: date-time },
-          }
-        - { $ref: '#/components/parameters/Cursor' }
+        - name: version
+          in: query
+          schema: { type: string, minLength: 1 }
+        - name: phase
+          in: query
+          schema: { $ref: '#/components/schemas/Phase' }
+        - name: startedFrom
+          in: query
+          description: Instances started at or after this time
+          schema: { type: string, format: date-time }
+        - name: startedTo
+          in: query
+          description: Instances started at or before this time
+          schema: { type: string, format: date-time }
+        - { $ref: '#/components/parameters/InstanceCursor' }
         - { $ref: '#/components/parameters/Limit' }
       responses:
-        '400': { description: A filter or the cursor is malformed }
         '200':
-          {
-            description: Page of instances,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/InstancePage' } },
-              },
-          }
+          description: A page of instances
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstancePage' }
+        '400': { $ref: '#/components/responses/Problem' }
+
   /instances/{id}:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
     get:
       tags: [instances]
-      summary: Read an instance; its task records and lifecycle events are paged at /tasks and /events
+      summary: Read an instance; its task records and events are paged at /tasks and /events
       responses:
-        '400': { description: The id is not a UUID }
         '200':
-          {
-            description: Instance,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/Instance' } },
-              },
-          }
-        '404': { $ref: '#/components/responses/NotFound' }
+          description: The instance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Instance' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+    delete:
+      tags: [instances]
+      summary: Delete an ended instance with its task records; the engine forgets its run
+      responses:
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:instance.not-ended'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /instances/{id}/tasks:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
     get:
       tags: [instances]
-      summary: Task records, in start order
+      summary: Task records, one per execution, in start order (FR-016)
       parameters:
-        [
-          { $ref: '#/components/parameters/Cursor' },
-          { $ref: '#/components/parameters/PageLimit' },
-        ]
+        - { $ref: '#/components/parameters/SequenceCursor' }
+        - { $ref: '#/components/parameters/PageLimit' }
       responses:
-        '400': { description: The cursor or the limit is malformed }
         '200':
-          {
-            description: Page of task records,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/TaskRecordPage' } },
-              },
-          }
-        '404': { $ref: '#/components/responses/NotFound' }
+          description: A page of task records
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskRecordPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /instances/{id}/events:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
     get:
       tags: [instances]
-      summary: Lifecycle events of the instance, by sequence (FR-030)
+      summary: The instance's lifecycle events and the events it emitted, in the order accepted
       parameters:
-        [
-          { $ref: '#/components/parameters/Cursor' },
-          { $ref: '#/components/parameters/PageLimit' },
-        ]
+        - { $ref: '#/components/parameters/SequenceCursor' }
+        - { $ref: '#/components/parameters/PageLimit' }
       responses:
-        '400': { description: The cursor or the limit is malformed }
         '200':
-          {
-            description: Page of CloudEvents,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/CloudEventPage' } },
-              },
-          }
-        '404': { $ref: '#/components/responses/NotFound' }
+          description: A page of CloudEvents
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CloudEventPage' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /instances/{id}/suspend:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
     post:
-      {
-        tags: [instances],
-        summary: Suspend (FR-017),
-        responses:
-          {
-            '204': { description: Suspended },
-            '404': { $ref: '#/components/responses/NotFound' },
-            '409': { $ref: '#/components/responses/Conflict' },
-          },
-      }
+      tags: [instances]
+      summary: Suspend a running or waiting instance (FR-017)
+      responses:
+        '204': { description: Suspended }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:instance.not-running'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /instances/{id}/resume:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
     post:
-      {
-        tags: [instances],
-        summary: Resume (FR-017),
-        responses:
-          {
-            '204': { description: Resumed },
-            '404': { $ref: '#/components/responses/NotFound' },
-            '409': { $ref: '#/components/responses/Conflict' },
-          },
-      }
+      tags: [instances]
+      summary: Resume a suspended instance (FR-017)
+      responses:
+        '204': { description: Resumed }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:instance.not-suspended'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
   /instances/{id}/cancel:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
     post:
-      {
-        tags: [instances],
-        summary: Cancel (FR-017),
-        responses:
-          {
-            '204': { description: Cancelled },
-            '404': { $ref: '#/components/responses/NotFound' },
-            '409': { $ref: '#/components/responses/Conflict' },
-          },
-      }
+      tags: [instances]
+      summary: Cancel an instance that has not ended, and the children it awaits (FR-017)
+      responses:
+        '204': { description: Cancelled }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:instance.ended'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /instances/{id}/restart:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    post:
+      tags: [instances]
+      summary: Start a new instance of an ended one, on its version and with its input
+      responses:
+        '201':
+          description: The new instance; its `originId` is the restarted one
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InstanceSummary' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:instance.not-ended or urn:problem:workflow.archived'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /events:
     post:
       tags: [events]
-      summary: Publish a CloudEvent, structured or binary HTTP mode (FR-023)
+      summary: Publish a CloudEvent in HTTP structured or binary mode (FR-023)
+      description: >
+        Structured mode: the event as JSON. Binary mode: the context attributes in `ce-*`
+        headers and the data in the body. The answer does not wait for any workflow; an event
+        whose source and id were accepted before is acknowledged alike and has no effect.
       requestBody:
         required: true
         content:
           application/cloudevents+json:
-            { schema: { $ref: '#/components/schemas/CloudEvent' } }
+            schema: { $ref: '#/components/schemas/CloudEvent' }
+          application/json:
+            schema: { $ref: '#/components/schemas/CloudEvent' }
           '*/*':
-            {
-              schema:
-                {
-                  description: 'Binary mode: attributes in ce-* headers, data in the body',
-                },
-            }
+            schema:
+              description: 'Binary mode: attributes in ce-* headers, data in the body'
       responses:
         '202': { description: 'Accepted, or a duplicate acknowledged' }
-        '413': { description: Above the event size limit }
-        '422': { description: Not a valid CloudEvent }
+        '400':
+          description: Not a CloudEvent 1.0
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
 
   /webhooks:
     get:
       tags: [webhooks]
-      summary: List webhooks (URLs are not shown again)
+      summary: List webhooks; their URLs are not shown again
       responses:
         '200':
-          {
-            description: Webhooks,
-            content:
-              {
-                application/json:
-                  {
-                    schema:
-                      {
-                        type: array,
-                        items: { $ref: '#/components/schemas/Webhook' },
-                      },
-                  },
-              },
-          }
+          description: The webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Webhook' }
+        '403': { $ref: '#/components/responses/Problem' }
     post:
       tags: [webhooks]
-      summary: Create a webhook (FR-024); the URL is returned only here
+      summary: Create a webhook (FR-024); its URL is returned only here
       requestBody:
         required: true
         content:
@@ -407,37 +465,53 @@ paths:
           description: Created
           content:
             application/json:
-              schema:
-                allOf:
-                  - { $ref: '#/components/schemas/Webhook' }
-                  - {
-                      type: object,
-                      required: [url],
-                      properties: { url: { type: string, format: uri } },
-                    }
+              schema: { $ref: '#/components/schemas/CreatedWebhook' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+
   /webhooks/{id}:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
     delete:
       tags: [webhooks]
       summary: Delete a webhook; its URL stops working
       responses:
-        {
-          '204': { description: Deleted },
-          '404': { $ref: '#/components/responses/NotFound' },
-        }
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
+
   /hooks/{token}:
     parameters:
-      [{ name: token, in: path, required: true, schema: { type: string } }]
+      - name: token
+        in: path
+        required: true
+        schema: { type: string, minLength: 1, maxLength: 128 }
     post:
       tags: [webhooks]
-      summary: Webhook URL called by other applications; no sign-in; idempotent by header
+      summary: A webhook's URL, called by other applications without signing in (FR-024)
+      description: >
+        The call becomes one CloudEvent of the webhook's type, with source
+        `/webhooks/{webhook id}` and data `{ body, query, headers }` (a body that is not JSON
+        as text; `Authorization` and `Cookie` left out). Its id is the caller's
+        `Idempotency-Key`, or a new one without it, so calls with the same key are one event,
+        accepted once whenever they come.
       security: []
-      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
-      requestBody: { content: { '*/*': { schema: {} } } }
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        content:
+          '*/*': { schema: {} }
       responses:
-        '202': { description: Accepted as one event }
-        '404': { description: Unknown or deleted webhook (identical answer) }
-        '413': { description: Above the event size limit }
+        '202': { description: Accepted as one event, or the same event again }
+        '400': { $ref: '#/components/responses/Problem' }
+        '404':
+          description: 'urn:problem:webhook.not-found, alike for an unknown and a deleted webhook'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '413': { description: The body is larger than 1 MiB }
 
   /subscriptions:
     get:
@@ -445,23 +519,16 @@ paths:
       summary: List the caller's subscriptions
       responses:
         '200':
-          {
-            description: Subscriptions,
-            content:
-              {
-                application/json:
-                  {
-                    schema:
-                      {
-                        type: array,
-                        items: { $ref: '#/components/schemas/Subscription' },
-                      },
-                  },
-              },
-          }
+          description: The subscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Subscription' }
+        '403': { $ref: '#/components/responses/Problem' }
     post:
       tags: [subscriptions]
-      summary: Create a subscription (FR-025)
+      summary: Subscribe an endpoint to the events a filter takes (FR-025)
       requestBody:
         required: true
         content:
@@ -476,263 +543,255 @@ paths:
                 filter: { $ref: '#/components/schemas/EventFilter' }
       responses:
         '201':
-          {
-            description: Created,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/Subscription' } },
-              },
-          }
-        '422': { $ref: '#/components/responses/Rejected' }
-  /subscriptions/{id}:
-    parameters: [{ $ref: '#/components/parameters/Id' }]
-    get:
-      tags: [subscriptions]
-      summary: Read a subscription with its recent deliveries
-      responses:
-        '200':
-          description: Subscription
+          description: Created
           content:
             application/json:
-              schema:
-                allOf:
-                  - { $ref: '#/components/schemas/Subscription' }
-                  - {
-                      type: object,
-                      properties:
-                        {
-                          deliveries:
-                            {
-                              type: array,
-                              items: { $ref: '#/components/schemas/Delivery' },
-                            },
-                        },
-                    }
-        '404': { $ref: '#/components/responses/NotFound' }
+              schema: { $ref: '#/components/schemas/Subscription' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '422':
+          description: >
+            `urn:problem:subscription.invalid` (a pattern or an expression of the filter that
+            does not compile, located under `/filter`) or `urn:problem:subscription.foreign-secret`
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /subscriptions/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/Id' }
+    get:
+      tags: [subscriptions]
+      summary: Read one of the caller's subscriptions with its 50 most recent deliveries
+      responses:
+        '200':
+          description: The subscription
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionDetail' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [subscriptions]
-      summary: Delete a subscription; pending deliveries stop
+      summary: Delete one of the caller's subscriptions; its pending deliveries stop
       responses:
-        {
-          '204': { description: Deleted },
-          '404': { $ref: '#/components/responses/NotFound' },
-        }
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /secrets:
     get:
       tags: [secrets]
-      summary: List the caller's secret names
+      summary: List the caller's secrets by name
       responses:
         '200':
-          {
-            description: Secrets,
-            content:
-              {
-                application/json:
-                  {
-                    schema:
-                      {
-                        type: array,
-                        items: { $ref: '#/components/schemas/Secret' },
-                      },
-                  },
-              },
-          }
+          description: The secrets, never their values
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Secret' }
+        '403': { $ref: '#/components/responses/Problem' }
     post:
       tags: [secrets]
-      summary: Create a secret (FR-007); the value is never returned
-      requestBody: { $ref: '#/components/requestBodies/SecretValue' }
-      responses:
-        '201':
-          {
-            description: Created,
-            content:
-              {
-                application/json:
-                  { schema: { $ref: '#/components/schemas/Secret' } },
-              },
-          }
-        '409': { $ref: '#/components/responses/Conflict' }
-  /secrets/{name}:
-    parameters: [{ $ref: '#/components/parameters/SecretName' }]
-    put:
-      tags: [secrets]
-      summary: Replace a secret's value
+      summary: Create a secret (FR-007); its value is never returned
       requestBody:
         required: true
         content:
-          {
-            application/json:
-              {
-                schema:
-                  {
-                    type: object,
-                    additionalProperties: false,
-                    required: [value],
-                    properties:
-                      {
-                        value: { type: string, minLength: 1, maxLength: 16384 },
-                      },
-                  },
-              },
-          }
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, value]
+              properties:
+                name: { $ref: '#/components/schemas/SecretName' }
+                value: { $ref: '#/components/schemas/SecretValue' }
       responses:
-        {
-          '204': { description: Replaced },
-          '404': { $ref: '#/components/responses/NotFound' },
-        }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Secret' }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '409':
+          description: 'urn:problem:secret.name-taken'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /secrets/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        schema: { $ref: '#/components/schemas/SecretName' }
+    put:
+      tags: [secrets]
+      summary: Replace a secret's value; later resolutions read the new one
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [value]
+              properties:
+                value: { $ref: '#/components/schemas/SecretValue' }
+      responses:
+        '204': { description: Replaced }
+        '400': { $ref: '#/components/responses/Problem' }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
     delete:
       tags: [secrets]
       summary: Delete a secret
       responses:
-        {
-          '204': { description: Deleted },
-          '404': { $ref: '#/components/responses/NotFound' },
-        }
+        '204': { description: Deleted }
+        '403': { $ref: '#/components/responses/Problem' }
+        '404': { $ref: '#/components/responses/Problem' }
 
   /conformance:
     get:
       tags: [conformance]
-      summary: The supported subset as a statement of partial conformance (ER-001)
+      summary: The supported subset of DSL 1.0.3 as a statement of partial conformance (ER-001)
       responses:
         '200':
-          {
-            description: Statement,
-            content:
-              {
-                application/json:
-                  {
-                    schema:
-                      { $ref: '#/components/schemas/ConformanceStatement' },
-                  },
-              },
-          }
+          description: The statement that publishing holds documents to
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConformanceStatement' }
 
 components:
   securitySchemes:
     sessionCookie: { type: apiKey, in: cookie, name: sid }
+
   parameters:
     Namespace:
-      {
-        name: namespace,
-        in: path,
-        required: true,
-        schema:
-          {
-            type: string,
-            pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$',
-          },
-      }
+      name: namespace
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/DslName' }
     Name:
-      {
-        name: name,
-        in: path,
-        required: true,
-        schema:
-          {
-            type: string,
-            pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$',
-          },
-      }
+      name: name
+      in: path
+      required: true
+      schema: { $ref: '#/components/schemas/DslName' }
     SemVer:
-      { name: version, in: path, required: true, schema: { type: string } }
+      name: version
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-.]+)?(?:\+[0-9A-Za-z-.]+)?$'
     Id:
-      {
-        name: id,
-        in: path,
-        required: true,
-        schema: { type: string, format: uuid },
-      }
-    Cursor: { name: cursor, in: query, schema: { type: string } }
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkflowCursor:
+      name: cursor
+      in: query
+      description: The `next` of the previous page (base64url)
+      schema: { type: string }
+    InstanceCursor:
+      name: cursor
+      in: query
+      description: The `next` of the previous page
+      schema: { type: string }
+    SequenceCursor:
+      name: cursor
+      in: query
+      description: The `next` of the previous page
+      schema: { type: integer, minimum: 0 }
     Limit:
-      {
-        name: limit,
-        in: query,
-        schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
-      }
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
     PageLimit:
-      {
-        name: limit,
-        in: query,
-        schema: { type: integer, minimum: 1, maximum: 500, default: 100 },
-      }
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
     IdempotencyKey:
-      {
-        name: Idempotency-Key,
-        in: header,
-        schema: { type: string, minLength: 1, maxLength: 255 },
-      }
-    SecretName:
-      {
-        name: name,
-        in: path,
-        required: true,
-        schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,120}$' },
-      }
+      name: Idempotency-Key
+      in: header
+      schema: { type: string, minLength: 1, maxLength: 255 }
+
   requestBodies:
-    Document:
+    Definition:
       required: true
-      description: A DSL document (≤ 1 MiB) as YAML or JSON
-      content:
-        application/yaml: { schema: { type: string } }
-        application/json: { schema: { type: object } }
-    SecretValue:
-      required: true
+      description: A DSL 1.0.x document as a JSON object (up to 1 MiB)
       content:
         application/json:
-          schema:
-            type: object
-            additionalProperties: false
-            required: [name, value]
-            properties:
-              name: { type: string, pattern: '^[A-Za-z0-9_-]{1,120}$' }
-              value: { type: string, minLength: 1, maxLength: 16384 }
+          schema: { type: object }
+
   responses:
-    NotFound: { description: Not found }
-    Conflict: { description: Conflict }
-    Rejected:
-      description: Refused at the first problem, located
+    Problem:
+      description: An RFC 9457 problem
       content:
-        application/json:
-          schema:
-            type: object
-            required: [statusCode, error, message, pointer]
-            properties:
-              statusCode: { const: 422 }
-              error: { const: Unprocessable Entity }
-              message: { type: string, description: The reason }
-              pointer:
-                {
-                  type: string,
-                  description: RFC 6901 JSON Pointer into the document,
-                }
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
   schemas:
-    Phase:
-      {
-        type: string,
-        enum:
-          [pending, running, waiting, suspended, cancelled, faulted, completed],
-      }
+    Problem:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type:
+          type: string
+          description: '`urn:problem:<code>` for a refusal the platform names, else `about:blank`'
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        errors:
+          type: array
+          description: Where the request is refused, for a located refusal
+          items:
+            type: object
+            required: [pointer, detail]
+            properties:
+              pointer:
+                type: string
+                description: RFC 6901 JSON Pointer into the document or the request body
+              detail: { type: string }
+        code:
+          type: string
+          description: The code a library refused with (an extension member)
+
+    DslName:
+      type: string
+      pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$'
+
+    WorkflowStatus:
+      type: string
+      enum: [active, archived]
+
     Workflow:
       type: object
-      required: [namespace, name, on, currentVersion]
+      required: [namespace, name, status, on, currentVersion]
       properties:
         namespace: { type: string }
         name: { type: string }
-        on: { type: boolean }
-        currentVersion: { type: string }
+        status: { $ref: '#/components/schemas/WorkflowStatus' }
+        on:
+          type: boolean
+          description: Whether the current version's schedule starts instances (FR-006)
+        currentVersion: { type: [string, 'null'] }
+
     WorkflowPage:
       type: object
+      required: [items, next]
       properties:
-        {
-          items:
-            { type: array, items: { $ref: '#/components/schemas/Workflow' } },
-          next: { type: [string, 'null'] },
-        }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Workflow' }
+        next: { type: [string, 'null'] }
+
     Version:
       type: object
-      required: [namespace, name, version, dsl, publishedBy, publishedAt]
+      required:
+        [namespace, name, version, dsl, current, publishedBy, publishedAt]
       properties:
         namespace: { type: string }
         name: { type: string }
@@ -741,118 +800,161 @@ components:
         current: { type: boolean }
         publishedBy: { type: string, format: uuid }
         publishedAt: { type: string, format: date-time }
-    WorkflowError:
-      type: object
-      required: [type, status, instance]
-      properties:
-        type: { type: string, format: uri }
-        status: { type: integer }
-        instance: { type: string }
-        title: { type: string }
-        detail: { type: string }
+
+    Phase:
+      type: string
+      enum:
+        [pending, running, waiting, suspended, cancelled, faulted, completed]
+
+    Trigger:
+      type: string
+      description: What started the instance
+      enum: [manual, schedule, event, parent, detached, restart]
+
     InstanceSummary:
       type: object
-      required: [id, namespace, name, version, phase, startedAt]
+      required:
+        [
+          id,
+          namespace,
+          name,
+          version,
+          phase,
+          trigger,
+          createdAt,
+          startedAt,
+          endedAt,
+        ]
       properties:
         id: { type: string, format: uuid }
         namespace: { type: string }
         name: { type: string }
         version: { type: string }
         phase: { $ref: '#/components/schemas/Phase' }
-        startedAt: { type: string, format: date-time }
+        trigger: { $ref: '#/components/schemas/Trigger' }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
         endedAt: { type: [string, 'null'], format: date-time }
+
     Instance:
       allOf:
         - { $ref: '#/components/schemas/InstanceSummary' }
         - type: object
+          required: [input, output, error, originId, starterId]
           properties:
-            input: {}
-            output: {}
+            input: { description: Any JSON value }
+            output: { description: Any JSON value, or null }
             error:
-              {
-                oneOf:
-                  [
-                    { $ref: '#/components/schemas/WorkflowError' },
-                    { type: 'null' },
-                  ],
-              }
-            parentId: { type: [string, 'null'], format: uuid }
+              oneOf:
+                - { $ref: '#/components/schemas/WorkflowError' }
+                - { type: 'null' }
+            originId:
+              type: [string, 'null']
+              format: uuid
+              description: The parent of a child, or the instance a restart comes from
+            starterId: { type: [string, 'null'], format: uuid }
+
     InstancePage:
       type: object
+      required: [items, next]
       properties:
-        {
-          items:
-            {
-              type: array,
-              items: { $ref: '#/components/schemas/InstanceSummary' },
-            },
-          next: { type: [string, 'null'] },
-        }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/InstanceSummary' }
+        next: { type: [string, 'null'] }
+
+    WorkflowError:
+      type: object
+      description: The standard's error (DSL 1.0.3)
+      required: [type, status, instance]
+      properties:
+        type: { type: string, format: uri }
+        status: { type: integer }
+        instance:
+          { type: string, description: JSON Pointer of the faulting task }
+        title: { type: string }
+        detail: { type: string }
+
+    TaskStatus:
+      type: string
+      description: >
+        A task's execution: `skipped` when its `if` was false (it entered no phase);
+        `cancelled` when it was still running as its instance ended (FR-015)
+      enum: [running, completed, faulted, cancelled, skipped]
+
     TaskRecord:
       type: object
-      required: [id, reference, name, status, retries, startedAt]
+      required:
+        [
+          execution,
+          reference,
+          name,
+          status,
+          input,
+          output,
+          error,
+          startedAt,
+          endedAt,
+        ]
       properties:
-        id: { type: string, format: uuid }
-        reference: { type: string, description: JSON Pointer of the task }
+        execution:
+          type: string
+          description: >
+            The execution's key: the task's pointer, with the iteration, retry attempt or
+            later visit when it runs again; each is its own record
+        reference:
+          {
+            type: string,
+            description: JSON Pointer of the task in the document,
+          }
         name: { type: string }
-        status:
-          {
-            oneOf: [{ $ref: '#/components/schemas/Phase' }, { const: skipped }],
-          }
-        parentId:
-          {
-            type: [string, 'null'],
-            format: uuid,
-            description: The enclosing task's record; null for a top-level task,
-          }
+        status: { $ref: '#/components/schemas/TaskStatus' }
         input: { description: 'The raw input, as `$task.input`' }
         output: { description: The transformed output }
         error:
-          {
-            oneOf:
-              [
-                { $ref: '#/components/schemas/WorkflowError' },
-                { type: 'null' },
-              ],
-          }
-        retries:
-          {
-            type: integer,
-            description: 'Retries of a `try` task; every attempt is its own record and a `task.retried` event',
-          }
+          oneOf:
+            - { $ref: '#/components/schemas/WorkflowError' }
+            - { type: 'null' }
         startedAt: { type: string, format: date-time }
         endedAt: { type: [string, 'null'], format: date-time }
+
     TaskRecordPage:
       type: object
+      required: [items, next]
       properties:
-        {
-          items:
-            { type: array, items: { $ref: '#/components/schemas/TaskRecord' } },
-          next: { type: [string, 'null'] },
-        }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TaskRecord' }
+        next: { type: [string, 'null'] }
+
     CloudEvent:
       type: object
       required: [specversion, id, source, type]
+      additionalProperties: true
+      description: >
+        A CloudEvent 1.0 in structured form; extension attribute names hold only lower-case
+        letters and digits. A lifecycle event has the source
+        `/workflows/{namespace}/{name}/instances/{id}` and a type in `io.serverlessworkflow.*.v1`.
       properties:
         specversion: { const: '1.0' }
-        id: { type: string }
-        source: { type: string }
-        type: { type: string }
+        id: { type: string, minLength: 1 }
+        source: { type: string, minLength: 1 }
+        type: { type: string, minLength: 1 }
+        subject: { type: string, minLength: 1 }
         time: { type: string, format: date-time }
-        subject: { type: string }
-        datacontenttype: { type: string }
-        dataschema: { type: string }
+        datacontenttype: { type: string, minLength: 1 }
+        dataschema: { type: string, minLength: 1 }
         data: {}
-      additionalProperties: true
-      description: 'A CloudEvent. A lifecycle event of an instance has its sequence as `id`, and leaves `output` out when that would make it larger than 64 KiB'
+
     CloudEventPage:
       type: object
+      required: [items, next]
       properties:
-        {
-          items:
-            { type: array, items: { $ref: '#/components/schemas/CloudEvent' } },
-          next: { type: [string, 'null'] },
-        }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CloudEvent' }
+        next: { type: [string, 'null'] }
+
     Webhook:
       type: object
       required: [id, name, eventType, createdAt]
@@ -861,12 +963,24 @@ components:
         name: { type: string }
         eventType: { type: string }
         createdAt: { type: string, format: date-time }
+
+    CreatedWebhook:
+      allOf:
+        - { $ref: '#/components/schemas/Webhook' }
+        - type: object
+          required: [url]
+          properties:
+            url:
+              type: string
+              format: uri
+              description: '`{origin}/api/v1/hooks/{token}`; the token is kept only as its SHA-256'
+
     Endpoint:
       type: object
       additionalProperties: false
       required: [uri]
       properties:
-        uri: { type: string, format: uri }
+        uri: { type: string, format: uri, description: An http or https URL }
         authentication:
           type: object
           additionalProperties: false
@@ -874,18 +988,23 @@ components:
           properties:
             scheme: { type: string, enum: [basic, bearer] }
             secret:
-              { type: string, description: Name of one of the owner's secrets }
+              type: string
+              minLength: 1
+              description: The name of one of the owner's secrets
+
     EventFilter:
       type: object
       additionalProperties: false
       required: [with]
       properties:
         with:
-          {
-            type: object,
-            minProperties: 1,
-            description: 'CloudEvent attributes; values are literals or regular expressions, as in the DSL event filter',
-          }
+          type: object
+          minProperties: 1
+          description: >
+            The standard's event filter: each CloudEvent attribute as a regular expression the
+            value matches whole, a runtime expression over the value (`${ .temperature > 38 }`),
+            or an object the data must contain
+
     Subscription:
       type: object
       required: [id, name, endpoint, filter, createdAt]
@@ -895,47 +1014,88 @@ components:
         endpoint: { $ref: '#/components/schemas/Endpoint' }
         filter: { $ref: '#/components/schemas/EventFilter' }
         createdAt: { type: string, format: date-time }
+
+    SubscriptionDetail:
+      allOf:
+        - { $ref: '#/components/schemas/Subscription' }
+        - type: object
+          required: [deliveries]
+          properties:
+            deliveries:
+              type: array
+              items: { $ref: '#/components/schemas/Delivery' }
+
     Delivery:
       type: object
-      required: [eventId, type, status, attempts]
+      required:
+        [
+          eventId,
+          type,
+          status,
+          attempts,
+          lastError,
+          firstAttemptAt,
+          lastAttemptAt,
+        ]
       properties:
         eventId: { type: string }
         type: { type: string }
         status: { type: string, enum: [pending, delivered, failed] }
         attempts: { type: integer }
         lastError:
-          {
-            type: [string, 'null'],
-            description: Masked; never contains a secret value,
-          }
+          type: [string, 'null']
+          description: The last attempt's error; never a secret value
         firstAttemptAt: { type: [string, 'null'], format: date-time }
         lastAttemptAt: { type: [string, 'null'], format: date-time }
+
+    SecretName:
+      type: string
+      pattern: '^[A-Za-z0-9_-]{1,120}$'
+
+    SecretValue:
+      type: string
+      minLength: 1
+      maxLength: 16384
+
     Secret:
       type: object
-      required: [name, createdAt]
+      required: [name, createdAt, updatedAt]
       properties:
         name: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
     ConformanceStatement:
       type: object
-      required: [dsl, tasks, calls, runs, excluded]
+      required:
+        [
+          dsl,
+          tasks,
+          calls,
+          runs,
+          scriptLanguages,
+          authentications,
+          excluded,
+          contradictions,
+        ]
       properties:
         dsl:
-          {
-            type: array,
-            items: { type: string },
-            examples: [['1.0.0', '1.0.1', '1.0.2', '1.0.3']],
-          }
+          type: array
+          items: { type: string }
+          examples: [['1.0.0', '1.0.1', '1.0.2', '1.0.3']]
         tasks: { type: array, items: { type: string } }
         calls: { type: array, items: { type: string } }
         runs:
-          {
-            type: array,
-            items: { type: string },
-            examples: [[workflow, script, shell]],
-          }
+          type: array
+          items: { type: string }
+          examples: [[workflow, script, shell]]
         scriptLanguages: { type: array, items: { type: string } }
         authentications: { type: array, items: { type: string } }
-        excluded: { type: array, items: { type: string } }
-        contradictions: { type: array, items: { type: string } }
+        excluded:
+          type: array
+          description: What publishing refuses
+          items: { type: string }
+        contradictions:
+          type: array
+          description: Where the standard contradicts itself or its kit, and the reading taken
+          items: { type: string }

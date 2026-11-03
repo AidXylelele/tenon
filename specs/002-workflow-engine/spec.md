@@ -28,11 +28,11 @@
 ### Session 2026-10-29
 
 - Q: Must a refused document report every problem at once? → A: No. The standard requires no such report, and its SDK stops at the first schema error. Publishing works like request validation: the first problem refuses the document, with its location and reason. The standard's SDK checks the schema, the DSL range and duplicate task names. The platform checks only what the schema accepts and the platform cannot run.
-- Q: Should publishing check other workflows, secrets, or which variables an expression can use? → A: No. Publishing checks the document as a compiler would: the schema, the subset, the references inside the document and the syntax of expressions. Like AWS Step Functions and Camunda, the platform resolves other workflows, secrets and variable values when a run needs them.
+- Q: Should publishing check other workflows, secrets, or which variables an expression can use? → A: No. Publishing checks the document as a compiler would: the schema, the subset, the references inside the document and the syntax of expressions. Like AWS Step Functions and Camunda, the platform resolves other workflows, secrets and variable values when a run needs them. (Changed on 2026-11-03 with User Story 8: publishing refuses a `use.secrets` name its publisher does not own, as its scenario 4 requires. The values are still resolved only when a run needs them.)
 
 ### Session 2026-10-30
 
-- Q: Which evaluation modes must runs support? → A: jq's strict mode only. DSL 1.0.3 defines `evaluate` (`mode`, `language`); a document that asks for the `loose` mode or another language is refused at publish, and the conformance statement lists it. (Corrected on 2026-11-01: the first answer said that 1.0.3 had no `evaluate`.)
+- Q: Which evaluation modes must runs support? → A: jq's strict mode only. DSL 1.0.3 defines `evaluate` (`mode`, `language`); a document that asks for the `loose` mode or another language is refused at publish, and the conformance statement lists it. (Corrected on 2026-11-01: the first answer said that 1.0.3 had no `evaluate`. Corrected again on 2026-11-03: `evaluate` belongs to DSL 1.0.4, not to the 1.0.3 root, so a document that declares it is refused as a property outside 1.0.3. Every expression is jq in strict mode.)
 
 ### Session 2026-11-01
 
@@ -302,7 +302,7 @@ A workflow can pause for a duration (`wait`) or until events arrive (`listen`). 
 2. **Given** a `listen` task with filters and correlation keys, **When** matching events are accepted, **Then** the instance consumes them according to the task's strategy (`one`, `any`, `all`, `until`). It continues with the consumed events as the task output, in the task's read mode (`data`, `envelope`, `raw`).
 3. **Given** an event with the same source and id as an event already accepted, **When** it is published again, **Then** it is acknowledged and has no effect.
 4. **Given** an `emit` task, **When** it runs, **Then** its event reaches the matching listeners, schedules and subscriptions exactly as any other event does.
-5. **Given** a `listen` task with `foreach`, **When** several events match, **Then** they are processed one at a time, in the order the platform accepted them.
+5. **Given** a `listen` task with `foreach`, **When** several events match, **Then** they are processed one at a time, in the order the platform accepted them. (Not yet supported: publishing refuses `listen.foreach`, and the conformance statement lists it; see FR-027.)
 6. **Given** an event accepted before a `listen` task started, **When** the task starts, **Then** the task does not consume that event.
 
 ---
@@ -417,31 +417,32 @@ An author can pause an instance, resume it later, or cancel it.
   - (c) references:
     - every flow directive targets a task in its own scope;
     - every reusable component a task names (function, retry policy, error, timeout, authentication policy) is declared in the document's `use`;
-  - (d) the syntax of every runtime expression in the evaluation language.
+  - (d) the syntax of every runtime expression in the evaluation language, including a bare text in a field that takes only an expression (such as `if` or `input.from`), which the runtime evaluates as an expression;
+  - (e) the names in `use.secrets`, which MUST be secrets of the publisher (FR-007).
 
   The platform MUST refuse a document at its first problem, with the problem's location as a JSON Pointer into the document and a reason. It MUST store nothing for a refused document.
 
-  What depends on the platform's state is resolved when a run needs it, not at publish: the workflows that `run` tasks name (FR-011), the publisher's secrets (FR-007), and which runtime arguments and variables an expression can use at its place (FR-010).
+  What depends on the platform's state is resolved when a run needs it, not at publish: the workflows that `run` tasks name (FR-011), the values of the publisher's secrets (FR-007), and which runtime arguments and variables an expression can use at its place (FR-010).
 
 - **FR-003**: Authors MUST be able to check a document without publishing it. The check MUST give the same outcome as publishing would and MUST store nothing.
 - **FR-004**: A version MUST be identified by the document's namespace, name and version, and a published version MUST never change. Publishing an identical document again MUST return the existing version. Publishing different content under an existing identity MUST be refused as a conflict. A newly published version MUST become the workflow's current version.
 - **FR-005**: Signed-in users MUST be able to list workflows and their versions and to read a version's document exactly as submitted.
-- **FR-006**: An author MUST be able to turn a workflow on and off. Only while a workflow is on MUST the schedule of its current version start instances. Turning a workflow off MUST NOT affect running instances or manual starts.
+- **FR-006**: An author MUST be able to turn a workflow on and off. Only while a workflow is on MUST the schedule of its current version start instances. Turning a workflow off MUST NOT affect running instances or manual starts. An author MUST also be able to archive a workflow. An archived workflow is off, takes no new version, cannot be turned on, and starts no instance, whether manual, restarted or a sub-workflow. Its versions and instances stay readable, and the workflow list can be filtered by status (active or archived).
 
 **Credentials**
 
 - **FR-007**: Users MUST be able to create, replace and delete their own secrets and to list their names.
   - Values MUST be encrypted at rest and MUST never be returned.
-  - A version MUST resolve the names in its `use.secrets` against the secrets of its publisher, only while its instances run. A subscription resolves its secret only while it delivers.
+  - Publishing MUST refuse a `use.secrets` name that is not one of the publisher's secrets. A version MUST resolve the values of those names against the secrets of its publisher only while its instances run, on every execution, so a replaced value counts from the next one. A subscription resolves its secret only while it delivers.
   - A secret missing at run time MUST raise an authorization error.
   - The platform MUST never return, show or deliver a secret value. Wherever a resolved value appears in instance records, task records, events, deliveries, logs or error messages, it MUST be masked. The standard warns that `$secrets` lets an author pass a value into data, so masking covers data as well.
 
 **Execution**
 
-- **FR-008**: An author or an application MUST be able to start an instance with a JSON input, either of a named version or, when no version is named, of the workflow's current version.
+- **FR-008**: An author or an application MUST be able to start an instance with a JSON input (an empty object when omitted), either of a named version or, when the version is `latest` or not named, of the workflow's current version.
   - If the version declares an input schema, the instance MUST validate the input as its first stage and MUST fault with a validation error when the input does not match.
   - An instance MUST run on the version it was started with until it ends.
-- **FR-009**: A start request MUST accept an idempotency key. Within 24 hours, a repeated request with the same key and the same version and input MUST return the original instance, and a request with the same key and a different version or input MUST be refused. After 24 hours the same request still returns the original instance, and a different request with the same key starts a new one.
+- **FR-009**: A start request MUST accept an idempotency key. Within 24 hours, a repeated request with the same key and the same version and input MUST return the original answer, and a request with the same key and a different version or input MUST be refused. An omitted input and `{}` are the same input, and an omitted version and `latest` the same version. A refusal is the key's answer too, so a repeat of a refused start is refused again. After 24 hours the key is forgotten, and a request with it starts a new instance.
 - **FR-010**: The platform MUST execute instances with the standard's semantics:
   - flow directives (`continue`, `exit`, `end`, a task name) and the `if` condition;
   - the data-flow stages in the standard's order: input schema, `input.from`, execution, `output.as`, output schema, `export.as`, export schema;
@@ -453,10 +454,20 @@ An author can pause an instance, resume it later, or cancel it.
 - **FR-011**: The supported subset MUST be the following:
   - the tasks `do`, `set`, `switch`, `for`, `fork`, `try`, `raise`, `wait`, `listen` and `emit`;
   - `call` with the `http` and `openapi` types, used directly or through a function declared in the document's `use.functions`;
-  - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error. A target that does not exist, or an explicit version that is not published, faults the task with a configuration error when it starts. When `await` is false, the task completes with its transformed input once the target is resolved, and the sub-workflow starts on the version resolved then.
+  - `run` with the `workflow` type, which starts a sub-workflow instance of the version it names or, for `latest`, of the sub-workflow's current version when the task starts. When `await` is true, the `run` task completes with the sub-workflow's output or faults with its error. A target that does not exist or is archived, or an explicit version that is not published, faults the task with a configuration error when it starts. When `await` is false, the task completes with its transformed input once the sub-workflow has started, and the sub-workflow runs on its own. `return` on a `run: workflow` task is outside the subset.
   - `run` with the `script` type (JavaScript or Python, with inline `code`) and the `shell` type, executed as FR-012 defines. A script `source` (an external resource) is outside the subset.
+  - `schedule`, `use.secrets`, and the `$secrets` argument in the workflow's `input.from`.
 
-  These are outside the subset: `run` with `container`; `call` with `grpc`, `asyncapi`, `a2a` or `mcp`; catalogs, the default catalog included; `use.extensions`; digest authentication, OAuth2 or OIDC grants other than `client_credentials`, and the OAuth2 or OIDC settings that grant does not use (a client assertion or JWT authentication, `issuers`, a JSON token request, the revocation and introspection endpoints); a runtime expression as a retry delay, jitter or limit; and a fraction in a duration other than in the smallest of its hours, minutes or seconds (`P1.5D`, `PT1.5H30M`), which the platform cannot compute. The tasks `wait` and `listen`, `schedule`, `use.secrets` and the `$secrets` argument join the subset with the stories that run them; a version published before then is never checked again, so the platform refuses them until it runs them.
+  These are outside the subset:
+  - `run` with `container`, and `call` with `grpc`, `asyncapi`, `a2a` or `mcp`;
+  - catalogs, the default catalog included, and `use.extensions`;
+  - digest and certificate authentication, OAuth2 or OIDC grants other than `client_credentials`, and the OAuth2 or OIDC settings that grant does not use (a client authentication method other than a client secret, a token request not sent as a form);
+  - a runtime expression as a retry delay, jitter or limit, `limit.attempt.duration`, and a backoff with parameters;
+  - a fraction in a duration other than in the smallest of its hours, minutes or seconds (`P1.5D`, `PT1.5H30M`), which the platform cannot compute;
+  - a schema from an external resource or in a format other than JSON;
+  - `listen` with `foreach`, and a `listen` `until` given as events rather than an expression;
+  - `schedule.on` with `all`, and `schedule.on` with `until`, which would hold state between events outside any instance;
+  - any property beyond the DSL 1.0.3 root, such as the 1.0.4 `evaluate`.
 
   The platform MUST refuse any construct outside the subset at publish and MUST never ignore a construct silently.
 
@@ -473,11 +484,11 @@ An author can pause an instance, resume it later, or cancel it.
   - Retry policies MUST support `when`, `exceptWhen`, `delay`, constant, linear and exponential back-off, attempt-count and total-duration limits, and jitter. `limit.attempt.duration` MUST be refused at publish, because the specification text and its schema disagree on it.
   - `raise` MUST raise the declared error.
 - **FR-014**: Task-level and workflow-level timeouts MUST fault the task or the instance with a timeout error when they elapse.
-- **FR-015**: Instances and tasks MUST use the standard's phases: pending, running, waiting, suspended, cancelled, faulted, completed. Completed, faulted and cancelled are terminal: a terminal instance or task MUST never change again. A task whose `if` evaluates to false is recorded as skipped, the standard's term for it: it enters no phase, produces no lifecycle event, and its raw input becomes its output.
+- **FR-015**: Instances MUST use the standard's phases: pending, running, waiting, suspended, cancelled, faulted, completed. A task record's status MUST be running, completed, faulted, cancelled or skipped. Completed, faulted and cancelled are terminal: a terminal instance or task MUST never change again. A task whose `if` evaluates to false is recorded as skipped, the standard's term for it: it enters no phase, produces no lifecycle event, and its raw input becomes its output. A task still running when its instance ends (cancelled, faulted or completed) MUST be recorded as cancelled with it.
 - **FR-016**: Signed-in users MUST be able to read an instance's execution history: its phase, version, input, output or error, start and end times, lifecycle events, and task records.
-  - A task record MUST hold the task's location in the document, its status, timing, input, output, error, retry attempts and parent task.
-  - Users MUST be able to list instances, filtered by workflow, version, phase and start-time range, with pagination.
-- **FR-017**: An author MUST be able to suspend a running or waiting instance, resume a suspended one, and cancel an instance that has not ended, with the effects described in User Story 9. Every other control request MUST be refused without effect.
+  - A task record MUST hold the task's location in the document as a JSON Pointer, which also places it inside its parent task, and its status, timing, input, output and error. Every execution is its own record: each loop iteration, each retry attempt, and each later visit through `then`.
+  - Users MUST be able to list instances newest first, filtered by namespace, name, version, phase and start-time range (`startedFrom`, `startedTo`), with pagination.
+- **FR-017**: An author MUST be able to suspend a running or waiting instance, resume a suspended one, and cancel an instance that has not ended, with the effects described in User Story 9. Every other control request MUST be refused without effect. An author MUST also be able to restart an ended instance, which starts a new instance on the same version with the same input and records the one it comes from, and to delete an ended instance with its task records. Both are refused for an instance that has not ended.
 - **FR-018**: An instance MUST survive the crash or restart of any process.
   - A task whose completion was recorded MUST never execute again.
   - A task interrupted before its completion was recorded MUST execute again from its recorded input. Calls to external systems are therefore at-least-once.
@@ -502,7 +513,7 @@ An author can pause an instance, resume it later, or cancel it.
 - **FR-024**: Editors MUST be able to create, list and delete webhooks.
   - A webhook MUST have a name and a CloudEvent type, and an unguessable URL that is returned only at creation and stored only as a fingerprint.
   - Each request to the URL MUST be acknowledged without waiting for any workflow, and MUST be accepted as one event with the webhook's type, the webhook as its source, and the request body, query parameters and headers as its data. `Authorization` and `Cookie` headers MUST be dropped, and a body that is not JSON MUST be carried as text.
-  - Requests with the same idempotency key MUST be accepted once within 24 hours.
+  - The request's idempotency key MUST be the event's id, so requests with the same key to the same webhook are one event, accepted once however much later the repeat arrives (FR-023). A request without a key is a new event.
   - Requests to a deleted webhook, to an unknown URL, or above the event size limit MUST be refused without accepting an event. Deleted and unknown URLs MUST answer in the same way.
 - **FR-025**: Editors MUST be able to create, list, read and delete event subscriptions.
   - A subscription MUST have a name, a destination endpoint in the standard's endpoint form (a URI and, optionally, a basic or bearer authentication that takes its values from one of the owner's secrets), and an event filter in the standard's event-filter form (`with` attributes, matched as `listen` matches them).
@@ -514,12 +525,11 @@ An author can pause an instance, resume it later, or cancel it.
   - Delivery MUST happen only after the event is recorded, MUST survive the crash of any process, and MUST keep the event's id on every attempt.
   - The delivery order across retries is not guaranteed. Lifecycle events carry their sequence number within the instance, so receivers can order them.
 - **FR-027**: `listen` MUST support:
-  - the `one`, `any` and `all` strategies, and `until`;
+  - the `one`, `any` and `all` strategies, and `until` given as a runtime expression;
   - the `with` filters and `correlate` keys;
-  - the `data`, `envelope` and `raw` read modes;
-  - `foreach`, in acceptance order.
+  - the `data`, `envelope` and `raw` read modes.
 
-  A `listen` task MUST consider only events accepted after it started.
+  A `listen` task MUST consider only events accepted after it started. `foreach`, and an `until` given as events, are outside the subset for now and refused at publish (FR-011), so User Story 7 scenario 5 waits for them.
 
 - **FR-028**: `emit` MUST publish the event its task declares; the DSL 1.0.3 schema requires only `source` and `type`, inside `with`. A document whose event has no source and type is refused, and an event whose source or type does not evaluate to text faults the task with a runtime error.
   - The platform MUST generate the `id`, `time` and `specversion` attributes the task leaves out.
@@ -528,7 +538,7 @@ An author can pause an instance, resume it later, or cancel it.
 - **FR-029**: `schedule` MUST support `cron` (in UTC), `every`, `after` and `on`, for workflows that are on (FR-006).
   - Each occurrence MUST start exactly one instance across all workers.
   - After downtime, at most one missed occurrence MUST start.
-  - `on` MUST start one instance per satisfied strategy, with the consumed events as its input.
+  - `on` MUST start one instance per satisfied strategy, with the consumed events as its input. The `one` and `any` strategies are supported; `all` and `until` are refused at publish (FR-011).
   - `after` MUST start the next instance the given delay after an instance it started completes, and the first one when the workflow is turned on.
   - The platform MUST keep no workflow data between the instances a schedule starts.
 - **FR-030**: The platform MUST produce the standard's required lifecycle events, with the data the standard defines for each:
@@ -555,12 +565,13 @@ An author can pause an instance, resume it later, or cancel it.
 - **FR-032**: Every scenario of the standard's Conformance Test Kit for DSL 1.0.3 that uses only supported constructs MUST pass unmodified through the platform's public interface. Every scenario that uses an unsupported construct MUST be refused at publish.
   - A scenario that contradicts the specification's own text MUST follow the specification. It is listed as a recorded contradiction.
   - The one known case is `try.feature`, scenario "Try Handle Caught Error", which filters on an error type URI that the specification does not define.
+- **FR-033**: Every refusal of the automation API MUST be an RFC 9457 problem (`application/problem+json`). A refusal the platform names MUST carry a stable type (`urn:problem:<code>`); any other MUST be an `about:blank` problem titled by its status. A refusal located in a document or a request body MUST list each location as a JSON Pointer with its reason.
 
 ### Evolution Requirements
 
 These requirements keep the core open to the iterations listed in "Foundation for Later Iterations".
 
-- **ER-001**: The supported subset MUST be declared in one place, and the platform MUST publish it through its interface as its statement of partial conformance. Publishing MUST check documents against that statement. Adding a construct in a later iteration MUST make documents that use it publishable, and MUST NOT change versions, instances or history that already exist.
+- **ER-001**: The supported subset MUST be declared in one place, and the platform MUST publish it through its interface as its statement of partial conformance: the DSL versions, tasks, calls, runs, script languages and authentications it runs, what it excludes, and the recorded contradictions of the standard. Publishing MUST check documents against that statement. Adding a construct in a later iteration MUST make documents that use it publishable, and MUST NOT change versions, instances or history that already exist.
 - **ER-002**: Each version MUST keep the DSL version it declares, and its instances MUST run under that version's rules, so that a later DSL release (for example 1.0.4) can be supported next to the earlier ones.
 - **ER-003**: Every interaction with an external system MUST pass through the same safeguards: secret resolution and masking (FR-007), limits (FR-021), address restrictions (FR-022) and at-least-once semantics (FR-018). This applies to calls of the supported types now and to agent, tool and file interactions added later.
 - **ER-004**: Instance data MUST be JSON values. Binary content MUST travel only as base64 text within the data size limit, or as a URI that names an external resource. File support can then add a store and URIs without changing the data model.
@@ -581,10 +592,10 @@ These constraints come from the request. They shape the plan, not the user-visib
   - The events are stored in the same transaction as the change, then dispatched after commit through the outbox to idempotent handlers.
   - Accepted, emitted and lifecycle events are such effects, and the outbox is what gives FR-026 its guarantee.
 - **AR-004**: The platform MUST use the framework's first-party reliability modules wherever they fit, each as its documentation describes:
-  - **Durable execution:** `@nestjs/workflows`, whose per-instance journal limit is accepted.
-  - **Idempotent commands and webhook requests:** `@nestjs/idempotency`.
-  - **Event delivery and every other effect that leaves the process:** `@nestjs/outbox`.
-  - **Timeouts and bulkheads on outbound interactions, and circuit breakers on deliveries:** `@nestjs/resilience`.
+  - **Durable execution:** `@nestjs/workflows`, whose per-instance journal limit is accepted. Subscription deliveries are engine runs too, whose concurrency limits (one at a time per subscription) keep a failing destination from delaying anything else.
+  - **Idempotent commands:** `@nestjs/idempotency`, on starting an instance. Webhook requests are deduplicated by their event id (FR-024).
+  - **Event dispatch and every other effect that leaves the transaction:** `@nestjs/outbox`.
+  - **Timeouts and bulkheads on outbound interactions:** `@nestjs/resilience`.
 
   `@nestjs/schedule` and `@nestjs/locks` fit periodic housekeeping, such as purging finished runs and pruning library tables. They arrive with the retention feature, because this feature has no periodic job.
 
@@ -594,10 +605,10 @@ These constraints come from the request. They shape the plan, not the user-visib
 
 ### Key Entities
 
-- **Workflow**: a named automation within a namespace. It groups its versions, points to its current version, and is on or off.
+- **Workflow**: a named automation within a namespace. It groups its versions, points to its current version, is on or off, and is active or archived.
 - **Workflow version**: one immutable DSL document, identified by namespace, name and version. It records who published it and the DSL version it declares.
 - **Workflow instance**: one execution of a version. It has a phase, an input, an output or error, start and end times, and the event subscriptions it holds.
-- **Task instance**: one execution of a task inside an instance. It has its location in the document, a status, an input, an output, an error, retry attempts and a parent task.
+- **Task instance**: one execution of a task inside an instance (an iteration, a retry attempt or a later visit is its own execution). It has its location in the document, a status, an input, an output, an error, and start and end times.
 - **Event**: a CloudEvent accepted or produced by the platform. It comes from the intake, a webhook, an `emit` task or a lifecycle change, and is unique by source and id.
 - **Webhook**: a named inbound URL that turns each request into an event of its declared type. It keeps only the fingerprint of its secret.
 - **Subscription**: an owner's standing request to receive the events that match a filter at a destination endpoint.
@@ -664,9 +675,9 @@ These constraints come from the request. They shape the plan, not the user-visib
 - **Default limits.** These defaults apply unless the operator changes them within the engine's bounds:
   - 10,000 task executions per instance;
   - 1 MiB for each task's input, output and exported context;
-  - 256 KiB per accepted event or webhook request;
+  - 1 MiB per request body, accepted events and webhook requests included;
   - for an outbound call, a 30-second timeout when the document sets no shorter one, and a 1 MiB response;
-  - for a subscription delivery, a 10-second timeout, with retries for 24 hours;
+  - for a subscription delivery, a 30-second timeout per attempt, with retries for about 24 hours;
   - for a script or shell command, 30 seconds when the document sets no shorter timeout, 256 MiB of memory, 50 processes and 1 MiB of output per stream.
 
   Idempotency keys are kept for 24 hours. Request rates on webhook URLs are limited by the API gateway, as on every public route.

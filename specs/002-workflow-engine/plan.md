@@ -1,63 +1,67 @@
 # Implementation Plan: Workflow Engine
 
-**Branch**: `002-workflow-builder` | **Date**: 2026-10-28 | **Spec**: [spec.md](spec.md)
+**Branch**: `002-workflow-builder` | **Date**: 2026-10-28, updated 2026-11-03 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from `specs/002-workflow-engine/spec.md`
 
 ## Summary
 
-This is the core of the automation platform: a durable, horizontally scalable runtime for the Open Workflow Specification DSL 1.0.3, for the subset of FR-011.
+This feature is the core of the automation platform: a durable, horizontally scalable runtime for the Open Workflow Specification DSL 1.0.3, for the subset of FR-011.
 
-- **Domain.** The domain owns the standard's semantics: stages, flow, composites, catch and retry, phases, correlation and publication rules. It hands out the four computations it cannot do: expressions, schemas, service calls, and script or shell processes. Processes run in the go-judge sandbox. This is the split Synapse's executors already have, moved into Clean Architecture layers (research R1).
-- **Use cases** only orchestrate.
+- **Runtime (frameworks).** The DSL is the standard's language. A runtime in `frameworks/runtime` checks documents as a compiler would and executes them with the standard's semantics on `@nestjs/workflows`: one durable step per task (research R1, R2).
+- **Domain.** The domain keeps what the platform decides: publishing and archiving, the instance lifecycle, webhooks, secrets and subscriptions.
+- **Use cases.** They orchestrate.
+- **Adapters.** They only map.
 - **Libraries.**
-  - `@nestjs/workflows` drives one run per instance in rounds.
-  - `@nestjs/outbox` carries every reaction that leaves a transaction, including deliveries to subscribers.
-  - `@nestjs/idempotency` makes starts and webhook calls idempotent.
-  - `@nestjs/resilience` bounds outbound work.
+  - `@nestjs/workflows` runs instances, schedules and deliveries.
+  - `@nestjs/outbox` dispatches every accepted event after the commit.
+  - `@nestjs/idempotency` makes starts idempotent.
+  - `@nestjs/resilience` bounds outbound work and the jq and Ajv workers.
 
-Structure and behaviour: [architecture.md](architecture.md). Model: [data-model.md](data-model.md). Decisions: [research.md](research.md).
+Structure and behaviour: [architecture.md](architecture.md). Model: [data-model.md](data-model.md). Decisions and their sources: [research.md](research.md).
 
 ## Technical Context
 
-|                          |                                                                                                                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language/Version**     | TypeScript 6.0.3, Node 26.13.0 LTS (ESM, SWC)                                                                                                                                   |
-| **Primary Dependencies** | NestJS 12 with `@nestjs/workflows`, `@nestjs/outbox`, `@nestjs/idempotency`, `@nestjs/resilience`; DSL and HTTP tooling as listed in research R21; the go-judge sandbox service |
-| **Storage**              | PostgreSQL through Drizzle 0.45, plus the `nest_workflows` and `nest_outbox` schemas                                                                                            |
-| **Testing**              | Vitest 5, supertest, Testcontainers, `quickpickle` (CTK), undici `MockAgent`, `ManualWorkflowClock` with `drain`, `OutboxRelay.runOnce`                                         |
-| **Target Platform**      | Linux containers (existing Dockerfile and Compose)                                                                                                                              |
-| **Project Type**         | Web service: `apps/api` only                                                                                                                                                    |
-| **Performance Goals**    | SC-004 to SC-010                                                                                                                                                                |
-| **Constraints**          | Journal limit of 10,000 entries per instance (accepted); 10,000 task executions; the data limits of FR-021; external calls at least once                                        |
-| **Scale/Scope**          | Identical processes in any number; 10,000 waiting instances; 9 user stories                                                                                                     |
+|                          |                                                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Language/Version**     | TypeScript 6.0.3, Node 26.13.0 LTS (ESM, SWC)                                                                                                                    |
+| **Primary Dependencies** | NestJS 12 with `@nestjs/workflows`, `@nestjs/outbox`, `@nestjs/idempotency`, `@nestjs/resilience`; the DSL tooling of research R18; the go-judge sandbox service |
+| **Storage**              | PostgreSQL through Drizzle 0.45, plus the `nest_workflows` and `nest_outbox` schemas                                                                             |
+| **Testing**              | Vitest 5, supertest, Testcontainers, `quickpickle` (CTK), undici `MockAgent`, `ManualWorkflowClock`, `OutboxRelay.runOnce`, k6 for load                          |
+| **Target Platform**      | Linux containers (the existing Dockerfile and Compose)                                                                                                           |
+| **Project Type**         | Web service: `apps/api` only                                                                                                                                     |
+| **Performance Goals**    | SC-004 to SC-010                                                                                                                                                 |
+| **Constraints**          | The engine's per-instance journal limit (accepted); the limits of FR-021; external calls at least once                                                           |
+| **Scale/Scope**          | Identical processes in any number; 10,000 waiting instances; 9 user stories                                                                                      |
 
 No NEEDS CLARIFICATION remains.
 
 ## Constitution Check (3.0.1)
 
-| Gate                                         | Result                                                                                                                                                                                                  |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| I. Web/API separation                        | Pass: API only                                                                                                                                                                                          |
-| II. Documentation first, first-party modules | Pass. Each mechanism cites its docs. Custom code fills only the gaps: the idempotency Drizzle store (the module ships none), the SSRF lookup, encryption at rest with `node:crypto`, and the CTK steps. |
-| III. Clean Architecture                      | Pass with the drift recorded in Complexity 1. Dependencies point inward; adapters are grouped by agency and import no other adapter folder.                                                             |
-| IV. DDD, simply                              | Pass. Nine aggregates, each with a "Protects" line, one owner per rule, and interfaces instead of base classes.                                                                                         |
-| V. CQS                                       | Pass: every operation is classified (data-model §4)                                                                                                                                                     |
-| VI. Tests                                    | Pass: see the table below                                                                                                                                                                               |
-| VII. Security                                | Pass: architecture.md §10                                                                                                                                                                               |
-| VIII. OpenTelemetry                          | Pass: auto-instrumentation only                                                                                                                                                                         |
-| IX. Simplicity                               | Pass: research R20 removes everything not required                                                                                                                                                      |
+| Gate                                         | Result                                                                                                                                                                               |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| I. Web/API separation                        | Pass: API only                                                                                                                                                                       |
+| II. Documentation first, first-party modules | Pass. Each mechanism cites its docs (research). Custom code fills only the gaps: the idempotency Drizzle store, the address policy, the cipher and the CTK steps                     |
+| III. Clean Architecture                      | Pass. Dependencies point inward, no adapter group imports another, and the DSL runtime sits in frameworks behind the adapters' contracts (R1)                                        |
+| IV. DDD, simply                              | Pass with the open tensions of research R19. Six aggregates (Workflow, WorkflowVersion, WorkflowInstance, Webhook, Secret, Subscription), each with what it protects (data-model §3) |
+| V. CQS                                       | Pass: commands are use cases; reads go through query ports into read models                                                                                                          |
+| VI. Tests                                    | Pass so far: the table below. The US3 journeys are open (tasks.md)                                                                                                                   |
+| VII. Security                                | Pass: architecture.md §11                                                                                                                                                            |
+| VIII. OpenTelemetry                          | Pass: auto-instrumentation only; undici is not instrumented, because authors' URLs and headers would leak                                                                            |
+| IX. Simplicity                               | Pass: every dependency is justified (research R18)                                                                                                                                   |
 
 **Test plan:**
 
-| Layer                                                                                         | Test type                               | Location                           |
-| --------------------------------------------------------------------------------------------- | --------------------------------------- | ---------------------------------- |
-| Domain                                                                                        | Sociable unit tests                     | `test/unit/domain/automation`      |
-| Use cases                                                                                     | Solitary unit tests with fakes          | `test/unit/application/automation` |
-| Repositories, queries, the store, engine rounds, outbox handlers, gateways (with `MockAgent`) | Integration on PostgreSQL               | `test/integration/automation`      |
-| HTTP                                                                                          | Component tests with the engine drained | `test/component/automation`        |
-| CTK                                                                                           | —                                       | `test/conformance`                 |
-| Fault injection and scale-out                                                                 | e2e                                     | `test/e2e`                         |
+| What                                                           | Test type                              | Location                                                   |
+| -------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------- |
+| Domain                                                         | Unit                                   | `test/unit/domain/automation`                              |
+| Use cases                                                      | Unit with fakes                        | `test/unit/application/automation`                         |
+| The runtime's checks and execution, on an in-memory durability | Integration                            | `test/integration/automation`, `test/integration/runtime`  |
+| Repositories, the delivery client                              | Integration on PostgreSQL, `MockAgent` | `test/integration/automation`, `test/integration/delivery` |
+| HTTP, with the engine and the relay drained                    | Component                              | `test/component/automation`                                |
+| CTK                                                            | Gherkin over HTTP                      | `test/conformance`                                         |
+| Load                                                           | k6                                     | `test/load`                                                |
+| Fault injection and scale-out                                  | e2e (open)                             | `test/e2e`                                                 |
 
 ## Project Structure
 
@@ -65,57 +69,45 @@ No NEEDS CLARIFICATION remains.
 
 ```text
 specs/002-workflow-engine/
-├── spec.md  plan.md  research.md  data-model.md  architecture.md  quickstart.md
+├── spec.md  plan.md  research.md  data-model.md  architecture.md  quickstart.md  tasks.md
 ├── contracts/openapi.yaml
-├── checklists/requirements.md
-└── tasks.md   (/speckit-tasks)
+└── checklists/requirements.md
 ```
 
-### Source Code (repository root)
+### Source Code
 
 The layers and folders are in [architecture.md §1](architecture.md#1-layers-and-grouping):
 
-- `apps/api/src/{domain,application}/automation/<module>/`
-- `apps/api/src/interface-adapters/{api,persistence,messaging,mailing,sandbox,workflows/{definitions,expressions,schemas,services,runs}}/`, with `interfaces.ts` and `enums.ts` for the outbox payloads: adapters only map
-- `apps/api/src/frameworks/{di,http,drizzle,pino,errors,workflows,outbox,mail,openworkflowspec,jq,ajv,undici}/`: library instances, clients, presets and error handling
+- `apps/api/src/domain/automation/{workflows, instances, webhooks, secrets, subscriptions}/`
+- `apps/api/src/application/automation/{workflows, instances, events, schedules, webhooks, secrets, subscriptions}/`
+- `apps/api/src/interface-adapters/{api, persistence, messaging, workflows, mailing}/`
+- `apps/api/src/frameworks/{runtime, workflows, outbox, undici, jq, ajv, piscina, go-judge, crypto, di, …}/`
+- `apps/api/drizzle/0004`–`0013` (data-model §8)
 
-Tests go under `apps/api/test/`.
-
-**Structure Decision**: Extend the existing API in place, in the identity code's style. There is one new bounded context, `automation`.
+**Structure Decision**: The existing API is extended in place, in the identity code's style. There is one new bounded context, `automation`.
 
 ## Slices
 
-Each slice goes in this order:
+Each slice ran in this order: domain, application, adapters and frameworks, with tests; then the critics on the diff (research R19). Tasks and their status: [tasks.md](tasks.md).
 
-1. Domain with unit tests.
-2. Both critics on the intended code.
-3. Application.
-4. Adapters.
-5. The Clean Architecture critic on the diff.
-
-Each slice moves the constructs it makes runnable out of `UnsupportedConstruct`, so the conformance statement stays exact (ER-001). Secrets come before subscriptions because a subscription authenticates with its owner's secrets. Tasks: [tasks.md](tasks.md).
-
-| #   | Slice             | Delivers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| --- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| S0  | Foundation        | Constitution 3.1.0 (separate PR); packages (the user installs them); the go-judge service in Compose from a custom image pinned by digest, with Node.js and Python 3 and no network; outbox 0.1.3; the `engine:migrate` script (`nest-workflows migrate`); `Database`/`DrizzleTx` in `interface-adapters/persistence/interfaces.ts`; env schema (`SECRETS_KEY`, `OUTBOUND_ALLOW_LIST`, `SANDBOX_URL`, role flags); idempotency store and its contract test; resilience presets with rejecting bulkheads; engine module with tests of `start`/`signal` inside a nestjs-cls transaction, of lease renewal by the heartbeat during a long step, and of a signal sent during `advance-N` being consumed by `park-N`; SSRF dispatcher tests; quickpickle trial; error classifiers |
-| S1  | US1 Publish       | Definition model, Workflow, WorkflowVersion, `OpenWorkflowDefinitionReader` with its mappers and `SdkOpenWorkflowClient`, expression syntax check, check and publish endpoints, conformance statement                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| S2  | US2 Run           | WorkflowInstance with stages and progress objects; `emit` and lifecycle events stored as produced Events; the four ports and their adapters, including `run: script` and `run: shell` through go-judge; the engine loop; start; history queries; CTK passing except the recorded contradiction                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| S3  | US3 Durability    | Fault-injection and scale-out journeys; limits                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| S4  | US7 Events        | Event intake, Correlation, wait/listen, routing of every Event                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| S5  | US5 Webhooks      | Webhook, token, receiver route                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| S6  | US4 Schedules     | On/off, epoch, engine schedules, `after`, triggers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| S7  | US8 Secrets       | Secret, encryption at rest, masking, auth policies from secrets                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| S8  | US6 Subscriptions | Subscription (authentication from the owner's secrets), Delivery, routing to subscribers, `CloudEventSubscriberGateway` in `workflows/services/`, its client in `frameworks/undici` with circuit breakers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| S9  | US9 Control       | Suspend, resume, cancel, cascading to children                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| S10 | Wrap-up           | README, `.env.example`, and the thesis text corrections                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Slice             | Delivered                                                                                  | Commits                                              |
+| ----------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| Rework            | The runtime owns the DSL; publish, archive, conformance                                    | 2a75b67                                              |
+| US2 Run           | Instances on the runtime; processes and sub-workflows; lifecycle events; problem responses | 91bef79, d4bb301, 0aecef6, d04c4b4                   |
+| US7 Events        | The event store, the intake, listeners and signals                                         | 0aecef6, 2e52a8a                                     |
+| Load and QA       | k6 scenarios and their fixes; DSL 1.0.3 fixes                                              | 1b1d8d8, a4ae5dd, 16d746c                            |
+| US5 Webhooks      | Webhooks and the hook route                                                                | 5b4da39                                              |
+| US4 Schedules     | On/off, cron, every, after, `schedule.on`                                                  | b4ddb40                                              |
+| US8 Secrets       | Sealed secrets, publish-time ownership, masking                                            | 29405ec                                              |
+| US6 Subscriptions | Deliveries as engine runs                                                                  | 1794679                                              |
+| Critics           | Round 19 fixes; bare expressions; conformance in one place                                 | c6bda66, 2fd7d61, 2e13a75, a9f9990, 30c817b, dc19774 |
+| US3 Durability    | Limits and journeys                                                                        | open                                                 |
 
 ## Complexity Tracking
 
-| Violation                                        | Why Needed                                                                                                                            | Simpler Alternative Rejected Because                                                                                               |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Constitution drift (R19)                      | The identity code already follows the user's later rules, and a round cannot hold a transaction across a call                         | Rewriting identity, or holding connections during calls                                                                            |
-| 2. Nine aggregates                               | Each protects a distinct transaction; the critics confirmed the boundaries                                                            | Merging Correlation into the instance would lock it on every event; without Delivery, the 24-hour rule would live in configuration |
-| 3. Rounds with four kinds of work                | A pure domain that owns every decision; recorded results are never recomputed; one round is bounded below the lease (architecture §4) | Executing SDK objects, or an interpreter in adapters, scatters the rules (R1)                                                      |
-| 4. Two records of execution (journal and tables) | `@nestjs/workflows` is required; the journal holds only Progress                                                                      | —                                                                                                                                  |
-| 5. A jq worker pool (US2)                        | A runaway expression must be stopped (constitution VII)                                                                               | Synchronous WASM cannot be interrupted on the main thread                                                                          |
-| 6. The go-judge service                          | Scripts and shell commands must run isolated, with no network (FR-012, constitution VII)                                              | `node:vm` and `isolated-vm` run in-process and support JavaScript only; containers need a runtime                                  |
+| Complexity                                       | Why needed                                                             | Simpler alternative rejected because                                                 |
+| ------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1. A DSL runtime in the frameworks layer         | The standard's semantics must run durably, step by step                | A domain interpreter put the standard's rules in the platform's domain (research R1) |
+| 2. Two records of execution (journal and tables) | `@nestjs/workflows` is required; the tables are what users read        | Reading the journal would tie the API to the engine's storage                        |
+| 3. Worker pools for jq and Ajv                   | A runaway expression or schema must be stopped (constitution VII)      | Synchronous WASM and Ajv cannot be interrupted on the main thread                    |
+| 4. The go-judge service                          | Scripts and shell commands must run isolated, with no network (FR-012) | `node:vm` and `isolated-vm` run in process and support JavaScript only               |

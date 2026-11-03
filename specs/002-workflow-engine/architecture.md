@@ -1,317 +1,185 @@
 # Architecture: Workflow Engine
 
-This document covers structure and behaviour. The model is in [data-model.md](data-model.md) and the decisions in [research.md](research.md).
+This document covers structure and behaviour. The model is in [data-model.md](data-model.md) and the decisions, with their sources, in [research.md](research.md).
 
 ## 1. Layers and grouping
 
-The dependency rule: frameworks → interface adapters → application → domain (Martin, 2012). One grouping criterion per layer:
+The dependency rule holds: frameworks → interface adapters → application → domain (Martin, 2012). The domain and the application import nothing from the outer rings, and no adapter group imports another. Each layer has one grouping criterion:
 
-| Layer              | Grouped by                                                        | Folders                                                                                                                   |
-| ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Domain             | Bounded context, then module                                      | `domain/automation/{language, workflows, instances, events, secrets}`                                                     |
-| Application        | The same modules, plus `language` for the ports every module uses | `application/automation/{language, workflows, instances, events, secrets}`: use cases, `ports.ts`, `queries.ts`, policies |
-| Interface adapters | Purpose                                                           | see below                                                                                                                 |
-| Frameworks         | The tool the code drives (a library or an external service)       | see below                                                                                                                 |
+| Layer              | Grouped by                   | Folders                                                                                                                                                    |
+| ------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain             | Bounded context, then module | `domain/automation/{workflows, instances, webhooks, secrets, subscriptions}`, plus `json.ts` and `domain/result.ts`                                        |
+| Application        | Subcontext                   | `application/automation/{workflows, instances, events, schedules, webhooks, secrets, subscriptions}`, plus `ports.ts` (`Clock`) and `enums.ts` (`Missing`) |
+| Interface adapters | The agency they talk to      | `interface-adapters/{api, persistence, messaging, workflows, mailing}`                                                                                     |
+| Frameworks         | The tool the code drives     | `frameworks/{runtime, workflows, outbox, undici, jq, ajv, piscina, go-judge, crypto, di, …}`                                                               |
 
-**The split between adapters and frameworks** (Martin, 2012: "the interface adapters convert data from the format most convenient for the use cases and entities to the format most convenient for some external agency"; the frameworks are "glue code"):
+**The DSL lives in the frameworks layer.** The Open Workflow DSL is the standard's language, not the platform's business. The runtime in `frameworks/runtime` checks and executes it. The domain keeps what the platform decides: publication and archiving, the instance lifecycle, webhooks, secrets and subscriptions (research R1).
 
-- **Adapters map.** An adapter turns domain values and use-case results into the shapes of an external agency and back. It never creates a library object, applies a resilience preset, classifies an error or decides a retry. Its IO goes through a client from `frameworks/`; the persistence group is the one gateway that speaks its agency's language itself (Martin: "all the SQL should be restricted to this layer"): repositories and queries build their statements on the transaction host's client (`txHost.tx`), so a read inside a use case's transaction shares its connection instead of taking a second one from the pool, and repositories translate their own constraint conflicts (a unique violation into `StaleWriteError`), while the driver, the pool and the classification of transient failures stay in `frameworks/`.
-- **Frameworks hold the libraries.** Library instances, client implementations, resilience presets, error parsing and classification, the engine's run loop and the outbox's error policy live in `frameworks/`. A client implements a contract its adapter group declares in `interfaces.ts` and answers with simple outcomes discriminated by `kind`, so the adapter maps an outcome instead of catching an error.
-- **Inbound glue calls controllers.** An HTTP route, an engine step and an outbox message reach the application through a controller in the adapters, which maps the input to a command and the result to the glue's shape. The glue around it (the `@Workflow` loop, the `@OnOutboxMessage` handlers) is in `frameworks/`.
+### Domain
 
-**Adapters.** Grouped by purpose:
+| Module          | Content                                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workflows`     | `Workflow` (publish, archive, on/off, which version its schedule starts, start, restart), `WorkflowVersion` (write-once), `CheckedDefinition`, `WorkflowName` |
+| `instances`     | `WorkflowInstance`: the standard's phases, suspend, resume, cancel, delete, and the directive the runtime follows after each task                             |
+| `webhooks`      | `Webhook` (a call becomes one event), `WebhookToken` (generated once, kept as its fingerprint)                                                                |
+| `secrets`       | `Secret` (owner, name, value, version)                                                                                                                        |
+| `subscriptions` | `Subscription` (refuses a secret its owner does not keep)                                                                                                     |
 
-| Folder                   | Purpose                                     | Contents                                                                                                                                                              |
-| ------------------------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `api/`                   | The REST API                                | Controllers, parsers (DSL body), zod schemas, presenters (the CloudEvent JSON format of lifecycle events, its 64 KiB rule), filters, middleware, `auth/`              |
-| `persistence/`           | PostgreSQL                                  | Repositories (they write domain events to the outbox), queries, stores, mappers, schema, `Database` and `DrizzleTx`                                                   |
-| `messaging/`             | Domain events delivered by the outbox relay | One `*.controller.ts` per domain event: the payload → a command → one use case                                                                                        |
-| `mailing/`               | Mail                                        | `MailGateway` and the templates                                                                                                                                       |
-| `sandbox/`               | The go-judge sandbox                        | `SandboxGateway` (`ProcessRunner`): a `ProcessRun` → a go-judge command → a `ProcessResult`, through `SandboxClient`                                                  |
-| `workflows/definitions/` | DSL documents                               | `OpenWorkflowDefinitionReader`: the client's outcome → the Definition through pure mappers, or a refusal                                                              |
-| `workflows/expressions/` | jq                                          | `JqExpressionEvaluator`: compilations and evaluations through `JqClient`; a program's outputs → one value or an expression failure                                    |
-| `workflows/schemas/`     | JSON Schema                                 | `JsonSchemaValidator`: a `Validation` → `JsonSchemaClient` → `Validated` or `ValidationFailed`                                                                        |
-| `workflows/services/`    | HTTP endpoints chosen by authors            | `ServiceCallGateway` (`ServiceCaller`): `call: http` and `openapi` → requests and authorizations for `EndpointClient` → `ServiceResult`; later the subscriber gateway |
-| `workflows/runs/`        | The durable engine                          | `InstanceRunController` (an engine step → a use case → `RoundProgress`), `InstanceRunsGateway` (`InstanceRuns` → `RunClient`), `EngineClock`                          |
+Expected refusals are `Result` values with a code, for example `WorkflowRefusal.Archived`; the API turns a code into a problem (§9).
 
-**Frameworks.** Grouped by the tool the code drives. A tool is a library or an external service: two tools never share a folder, even when one uses the other (the go-judge client sends its requests with undici, yet go-judge is not the endpoints authors call).
+### Application
 
-| Folder              | Tool                                     | Contents                                                                                                                                                                                                                           |
-| ------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `di/`               | Nest's container                         | Nest modules; `automation.module.ts` assembles the context, one module per library (`engine`, `outbox`, `idempotency`, `resilience` presets, `undici`, `go-judge`, `jq`, `ajv`, `open-workflow-spec`), each closing what it opened |
-| `express/`          | The HTTP server                          | `configureHttpApp` (prefix, CSRF, trusted proxies, the document body parser)                                                                                                                                                       |
-| `pino/`             | The logger                               | The HTTP logger options                                                                                                                                                                                                            |
-| `swagger/`          | The OpenAPI document                     | `createOpenApiDocument` and `serveOpenApi`, which `main.ts` calls and a test builds                                                                                                                                                |
-| `drizzle/`          | PostgreSQL through Drizzle               | `createDatabase` (`database.ts`); `PostgresTransientFailures` (SQLSTATE classes 08, 40, 53, 57 and pool timeouts, found through `cause`)                                                                                           |
-| `resilience/`       | Transient-fault handling                 | `ErrorClassifier` (§8): settled, transient or permanent, shared by the engine's steps and the outbox handlers                                                                                                                      |
-| `workflows/`        | The durable engine (`@nestjs/workflows`) | `InstanceWorkflow` (the `@Workflow` loop of §4, its retry options and the classification of step errors), `EngineRunClient` (`RunClient`, in the caller's transaction)                                                             |
-| `outbox/`           | The outbox (`@nestjs/outbox`)            | The `@OnOutboxMessage` handlers, each calling one `messaging/` controller, and `OutboxErrors` (settled → acknowledge, transient → retry, else `NonRetryableMessageError`); `MailOutboxHandler` (the SMTP send)                     |
-| `mail/`             | Mail (`@nestjs/mail`)                    | `OutboxMailTransport` (a rendered mail → the outbox) and the stored mail shape                                                                                                                                                     |
-| `openworkflowspec/` | The Open Workflow SDK                    | `SdkOpenWorkflowClient` (`OpenWorkflowClient`): `sdk.worker.ts` reads documents on a `WorkerPool` (the 2 s `documents` preset, a 256 MB heap)                                                                                      |
-| `jq/`               | jq (jq-wasm)                             | `PiscinaJqClient` (`JqClient`): the sandbox prelude, the program wrapper and jq's answers, on a `WorkerPool` of a worker per engine slot plus one (the 1 s `jq` preset); `jq.worker.ts` runs jq-wasm and reloads it after an abort |
-| `ajv/`              | JSON Schema (Ajv)                        | `AjvJsonSchemaClient` (`JsonSchemaClient`) on a `WorkerPool` (the 1 s `schemas` preset); `ajv.worker.ts` holds one Ajv per draft (`addUsedSchema: false`, no `allErrors`) and a bounded cache of compiled schemas                  |
-| `undici/`           | The endpoints authors call (undici)      | `EndpointDispatcher` and `AddressPolicy` (SSRF-safe), `UndiciEndpointClient` (`EndpointClient`: requests, OAuth2/OIDC tokens, OpenAPI documents, limits, the `service-calls` preset)                                               |
-| `go-judge/`         | The go-judge sandbox                     | `GoJudgeSandboxClient` (`SandboxClient`: `POST /run`, the `processes` preset, its outcomes), `SandboxPool` (the sandbox's own connection pool with the bearer token)                                                               |
-| `piscina/`          | Worker threads (Piscina)                 | `WorkerPool`: a pool whose runs a resilience preset bounds; a time-out terminates the worker and a worker past its heap ends, answered as `done`, `timed-out` or `exhausted`                                                       |
+| Subcontext      | Use cases                                                                                                                                                                                                                                                   | Ports and queries                                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `workflows`     | CheckDefinition, PublishVersion, ArchiveWorkflow, TurnWorkflowOn, TurnWorkflowOff                                                                                                                                                                           | DefinitionChecker, WorkflowRepository, WorkflowVersionRepository; WorkflowQueries; WorkflowPolicy                          |
+| `instances`     | StartInstance, RestartInstance, SuspendInstance, ResumeInstance, CancelInstance, DeleteInstance; for the run: BeginInstance, RecordTaskStart, RecordTaskEnd, BeginWaiting, EndWaiting, InstanceDirective, StartSubWorkflow, CompleteInstance, FaultInstance | WorkflowInstanceRepository, InstanceRuns, TaskProgress; InstanceQueries; InstancePolicy                                    |
+| `events`        | AcceptEvent, DispatchEvent, Listen, Unlisten                                                                                                                                                                                                                | EventStore, ListenerStore, EventDeliveries; EventQueries                                                                   |
+| `schedules`     | SyncSchedule, StartScheduledInstance, StartOnEvent                                                                                                                                                                                                          | WorkflowSchedules, EventTriggers                                                                                           |
+| `webhooks`      | CreateWebhook, DeleteWebhook, ReceiveWebhookCall                                                                                                                                                                                                            | WebhookRepository; WebhookQueries; WebhookPolicy                                                                           |
+| `secrets`       | CreateSecret, ReplaceSecret, DeleteSecret                                                                                                                                                                                                                   | SecretRepository; SecretQueries; SecretPolicy                                                                              |
+| `subscriptions` | CreateSubscription, DeleteSubscription, MatchSubscriptions, DeliverEvent, FailDelivery                                                                                                                                                                      | SubscriptionRepository, SubscriptionFilters, Deliveries, EventSender, DeliveryLog; SubscriptionQueries; SubscriptionPolicy |
 
-Rules:
+Use cases read the time once through the `Clock` port, which `EngineClock` implements over the engine's time source, so `ManualWorkflowClock` drives HTTP requests and engine runs alike in tests.
 
-- **Shared types.** An adapter folder declares in its `interfaces.ts` and `enums.ts` the client the frameworks provide for it, its simple outcomes and its data shapes. The `interface-adapters/` root keeps only what `persistence/` writes and `messaging/` reads: the outbox topics and payload shapes of the domain events.
-- **Contracts.** Outbox topics and payloads are the domain events in `domain/automation/*/domain-events/`.
-- **Isolation.** No adapter folder imports another, and no adapter imports `frameworks/`.
+### Interface adapters
 
-**Naming.** One convention per kind:
+Adapters only map. An adapter turns domain values and use-case results into an agency's shapes and back. Its IO goes through a client that `frameworks/` implements, behind a contract the adapter group declares in its `interfaces.ts`. Persistence is the one group that speaks its agency's language itself (Martin: "all the SQL should be restricted to this layer").
 
-| Kind                          | Pattern                                                                                                                                                                                                                                                                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Controllers (inbound)         | `*.controller.ts`: HTTP routes, engine steps, outbox messages                                                                                                                                                                                                                                                                       |
-| Presenters                    | `*.presenter.ts`                                                                                                                                                                                                                                                                                                                    |
-| Gateways (outbound services)  | `*.gateway.ts`: the engine, the sandbox, service endpoints, mail, sessions                                                                                                                                                                                                                                                          |
-| Repositories                  | `drizzle-*.repository.ts`                                                                                                                                                                                                                                                                                                           |
-| Queries                       | `drizzle-*.queries.ts`                                                                                                                                                                                                                                                                                                              |
-| Stores                        | `drizzle-*.store.ts`                                                                                                                                                                                                                                                                                                                |
-| Computations (in process)     | `*.reader.ts`, `*.evaluator.ts`, `*.validator.ts`                                                                                                                                                                                                                                                                                   |
-| Clocks                        | `*.clock.ts` (`EngineClock` implements the `Clock` port over the engine's time source)                                                                                                                                                                                                                                              |
-| Mappers                       | `mappers/*.mapper.ts`, static and pure. Document mappers use `toDomain`, one-way into value objects; `KnownPropertiesMapper.confirm` refuses what a mapper does not read. Persistence mappers use `toEntity`/`toRow` for aggregates and `toState`/`toDomain` for the value graphs stored as jsonb (`persistence/mappers/progress/`) |
-| Engine workflows (frameworks) | `*.workflow.ts`                                                                                                                                                                                                                                                                                                                     |
-| Outbox handlers (frameworks)  | `*-outbox.handler.ts`                                                                                                                                                                                                                                                                                                               |
-| Library clients (frameworks)  | `<mechanism>-<agency>.client.ts` (`sdk-open-workflow`, `piscina-jq`, `ajv-json-schema`, `undici-endpoint`, `go-judge-sandbox`, `engine-run`), behind a client declared in its adapter's `interfaces.ts`                                                                                                                             |
+| Group          | Contents                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api/`         | Controllers, zod schemas, presenters (`ProblemPresenter` turns refusal codes into RFC 9457 problems), mappers (CloudEvent binary mode, cursors, webhook calls, subscription endpoints), `ProblemFilter`, middleware, `auth/`; `HealthClient` contract                                                                                                                       |
+| `persistence/` | Repositories, queries, stores (task progress, events, listeners, deliveries, idempotency), mappers (including `LifecycleEventMapper`), schema; `Database`, `DrizzleTx` and the `Cipher` contract                                                                                                                                                                            |
+| `messaging/`   | Controllers for the outbox messages (`EventDispatchController`, `ScheduleController`, `SubscriptionController`) and `EventSenderGateway`; the message shapes and the `DeliveryClient` contract                                                                                                                                                                              |
+| `workflows/`   | `definitions/` (`RuntimeDefinitionChecker`), `runs/` (`InstanceRunController`, `InstanceRunsGateway`, `EventDeliveriesGateway`, `EngineClock`), `schedules/` (`WorkflowSchedulesGateway`, `EventTriggersGateway`, `ScheduleRunController`), `subscriptions/` (`SubscriptionFiltersGateway`, `DeliveriesGateway`, `DeliveryRunController`); the runtime and engine contracts |
+| `mailing/`     | `MailGateway` and the templates (feature 001)                                                                                                                                                                                                                                                                                                                               |
 
-**Ports.** Abstract classes in `application/automation/*/ports.ts` and `queries.ts`:
+There is no `sandbox/` adapter group at HEAD. Only the runtime runs processes, so the go-judge contract (`SandboxClient`) is one of the runtime's own tool contracts in `frameworks/runtime/interfaces.ts`.
 
-| Module    | Ports                                                                                                                                                          | Queries                                                                                                             |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| workflows | WorkflowRepository, WorkflowVersionRepository, RecurringStarts                                                                                                 | WorkflowQueries (the API's lists and documents, trigger candidates), VersionDocuments (the document a run executes) |
-| language  | DefinitionReader (document text in, Definition out), ExpressionEvaluator, SchemaValidator (every module uses them, as every module uses the `language` domain) | —                                                                                                                   |
-| instances | WorkflowInstanceRepository, InstanceRuns, ServiceCaller, ProcessRunner                                                                                         | InstanceQueries (the API's lists, history, progress), SubWorkflowQueries (what a run reads about another instance)  |
-| events    | CorrelationRepository, WebhookRepository, SubscriptionRepository, DeliveryRepository, EventOffers, SubscriberGateway                                           | EventQueries (candidates, catch-up), ConnectionQueries                                                              |
-| secrets   | SecretRepository                                                                                                                                               | SecretQueries (`valuesFor`, `namesOwnedBy`)                                                                         |
+### Frameworks
 
-**Time.** A use case reads the clock once per operation through the `Clock` port, except `AdvanceInstance`, which reads it as each answer arrives, so results, deadlines and lifecycle times carry the time they happened (`application/automation/language/ports.ts`), which `EngineClock` implements over the engine's time source, so `ManualWorkflowClock` drives HTTP starts and engine runs alike in tests; the time is then passed as a value. A retry's jitter sample derives from its work id, which is pure and stable on replay. The domain reads no clock.
+Frameworks hold the libraries: library instances, client implementations, resilience presets, error classification and the engine's workflows. Two tools never share a folder.
 
-**Runtime topology.** Every API process runs the same image, and the flags `HTTP`, `ENGINE_WORKER` and `OUTBOX_RELAY` switch its roles. Work is shared through PostgreSQL:
+| Folder       | Tool                                     | Contents                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------ | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime/`   | The Open Workflow DSL 1.0.3              | `checking/` (schema, DSL version, subset, task names, references, durations, cron, expressions, author schemas, secrets, fingerprint), `document/` (walks, pointers, task kinds, event types, durations), `execution/` (the task runner, data flow, one kind per task, retry policy, event filters, secret masking), `conformance.ts`, `runtime.ts`, and the clients the adapters' contracts name (`RuntimeTimingClient`, `RuntimeTriggerClient`, `RuntimeFilterClient`); `interfaces.ts` declares its own tools |
+| `workflows/` | The durable engine (`@nestjs/workflows`) | The engine workflows `instance`, `process`, `schedule` and `delivery`; `EngineDurability` (the runtime's `Durability`); the clients `EngineRunClient`, `EngineScheduleClient`, `EngineDeliveryClient`, `EngineCronClient`; `StepErrors`                                                                                                                                                                                                                                                                          |
+| `outbox/`    | The outbox (`@nestjs/outbox`)            | The `@OnOutboxMessage` handlers (event dispatch, schedules, subscriptions, instance events, mail), `OutboxErrors`                                                                                                                                                                                                                                                                                                                                                                                                |
+| `undici/`    | Outbound HTTP (undici)                   | `EndpointDispatcher` and `AddressPolicy` (FR-022), `UndiciEndpointClient` (service calls, OAuth2/OIDC tokens, OpenAPI documents), `UndiciDeliveryClient`                                                                                                                                                                                                                                                                                                                                                         |
+| `jq/`        | jq (jq-wasm)                             | `PiscinaJqClient` (the sandbox prelude, the `jq` preset) and `jq.worker.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `ajv/`       | JSON Schema (Ajv)                        | `AjvJsonSchemaClient` (the `schemas` preset) and `ajv.worker.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `piscina/`   | Worker threads (Piscina)                 | `WorkerPool`: runs bounded by a resilience preset; a timed-out or out-of-memory worker ends                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `go-judge/`  | The go-judge sandbox                     | `GoJudgeSandboxClient` (the `processes` preset), `SandboxPool` (its own connection pool with the bearer token)                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `crypto/`    | `node:crypto`                            | `AesGcmCipher` (`Cipher`)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `di/`        | Nest's container                         | One module per tool (engine, outbox, idempotency, resilience, runtime, undici, go-judge, jq, ajv, crypto, …), each closing what it opened; `automation.module.ts` assembles the context                                                                                                                                                                                                                                                                                                                          |
 
-- engine instances: `SKIP LOCKED` with leases;
-- outbox messages: fenced leases;
-- schedule occurrences: occurrence ids.
+The remaining folders serve both features: `drizzle/` (`createDatabase`, `PostgresTransientFailures`), `express/` (`configureHttpApp`, `DatabaseUnavailableFilter`), `resilience/` (`ErrorClassifier`), `swagger/`, `pino/`, `terminus/` and `mail/`.
 
-go-judge is a separate, stateless service. Both scale by adding processes. The deployment is Compose; a Helm chart comes with the deployment feature.
+**Naming.** Controllers (inbound: HTTP routes, engine steps, outbox messages) are `*.controller.ts`; outbound adapters `*.gateway.ts`; `drizzle-*.repository.ts`, `drizzle-*.queries.ts`, `drizzle-*.store.ts`; mappers `mappers/*.mapper.ts`; engine workflows `*.workflow.ts`; outbox handlers `*.outbox.handler.ts`; library clients `<mechanism>-<agency>.client.ts`.
 
-## 2. Where Synapse's DSL processing lands
+**Runtime topology.** Every API process runs the same image. The flags `HTTP`, `ENGINE_WORKER` and `OUTBOX_RELAY` switch its roles. Work is shared only through PostgreSQL: engine runs by leases, outbox messages by fenced leases, schedule occurrences by the engine's schedules. go-judge is a separate, stateless service. Both scale by adding processes.
 
-| Synapse                                                               | Here                                                                         | Layer                    |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------ |
-| SDK `WorkflowDefinition` executed directly                            | SDK validation, then `DefinitionMapper` → value objects                      | Adapter; domain          |
-| `TaskExecutor` lifecycle, stages, `GetTaskAfter`, composite executors | `WorkflowInstance`, task kinds, progress objects, `TaskList`                 | Domain                   |
-| `IExpressionEvaluator` (a jq process per evaluation), recursive `${}` | `ExpressionEvaluator` → `JqExpressionEvaluator` → `PiscinaJqClient`          | Port; adapter; framework |
-| `ISchemaHandler`                                                      | `SchemaValidator` → `JsonSchemaValidator` → `AjvJsonSchemaClient`            | Port; adapter; framework |
-| `HttpCallExecutor`, `OpenApiCallExecutor`, `AuthorizationInfo`        | `ServiceCaller` → `ServiceCallGateway` → `UndiciEndpointClient`              | Port; adapter; framework |
-| Script and shell executors on the runner host                         | `ProcessRunner` → `SandboxGateway` → `GoJudgeSandboxClient`, with no network | Port; adapter; framework |
-| `SecretsManager` (files)                                              | `Secret`, encrypted by its repository                                        | Domain; adapter          |
-| Correlator (regex / `${}`, keys)                                      | `EventFilter` and `Correlation` decide; matching is work                     | Domain                   |
-| Runner process per instance; Operator timers                          | One engine run per instance; engine schedules                                | Framework; adapter       |
+## 2. The runtime
 
-Gaps this closes:
+`Runtime.run(plan, durability, observer)` executes one instance's document with the standard's semantics. It reaches the engine only through `Durability` and the platform only through `RunObserver`, which `InstanceRunController` implements.
 
-- validation before a run;
-- durable timers and correlations;
-- optimistic locking;
-- retry delay and backoff;
-- output and export schemas;
-- workflow `input.from`, `output.as` and timeout;
-- `evaluate.mode`, `for.while` and `until`;
-- the fork output array;
-- `$secrets` and `$authorization`;
-- sandboxed scripts;
-- the standard's error types.
+- **Durability.** Each effect is one durable step whose result is journaled, so a replay never repeats a recorded effect. A leaf task (`set`, `switch`, `raise`, `emit`, `call`, an awaited `run: script` or `run: shell`) is one step with its `if`, input, body, output and export. A composite (`do`, `for`, `fork`, `try`, a declared function, `wait`, `listen`) runs its children between steps. `wait` and retry delays are durable sleeps. A single task in a `try` is retried by the engine's own step retries; several tasks run again after a durable sleep.
+- **Observer.** After each task the runtime reports the task record (`RecordTaskStart`, `RecordTaskEnd`) and asks for the instance's directive (`continue`, `suspend` or `stop`). A suspended run waits for the `resume` signal, rechecking at intervals. A stopped run starts no further task.
+- **Expressions and schemas.** Run in Piscina workers (`jq/`, `ajv/`), each bounded at 5 s (research R4, R5).
+- **Service calls.** Go through `UndiciEndpointClient` on the `EndpointDispatcher`: the `service-calls` preset (30 s, a bulkhead of 64) and a 1 MiB response limit.
+- **Processes.** Awaited processes run in go-judge as a step. A process with `await: false` becomes an engine child (`process`) that nobody awaits.
+- **Sub-workflows.** `run: workflow` starts the child instance through the platform (`StartSubWorkflow`), then runs it as an engine child (`executeChild` when awaited; `startChild` with `parentClose: 'abandon'` when not).
+- **Listening.** `listen` registers a listener (`Listen`: a key, the event types and `since`), marks the instance waiting, and waits for `event` signals sent to its key. It decides by its own filters whether it consumes an event. When it ends it removes the listener (`Unlisten`).
+- **Emitted events.** Go to `AcceptEvent` like any other event.
+- **Secrets.** Read once per execution through the observer, never journaled, and masked in records, outputs, errors and emitted events (research R11).
 
-## 3. A round
+## 3. Engine workflows
 
-`AdvanceInstance` composes two transactional use cases around the computation, the way `PublishVersion` composes `CheckDocument`. It is not transactional itself, so no transaction stays open across a call:
+| Workflow               | Run per                             | Steps                                                                                                                                                                                                                                                       |
+| ---------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `instance` (version 2) | instance (id = instance id)         | `begin` (pending → running; a stopped instance ends the run), `plan` (the version's document and the input), the runtime's steps, `end` (`CompleteInstance` or `FaultInstance`). A defect of the platform faults the instance instead of leaving it running |
+| `process` (version 1)  | detached process                    | `run` in go-judge; an outage of the sandbox repeats the step                                                                                                                                                                                                |
+| `schedule`             | schedule occurrence or `after` link | an optional `after` sleep, then `start` (`StartScheduledInstance`), with the instance id from `ctx.uuid()` so a retried step finds the instance it started                                                                                                  |
+| `delivery`             | subscription and event              | `deliver` (`DeliverEvent`), retried 36 times from 1 s doubling to 1 h (about 24 h), then `failed` (`FailDelivery`); concurrency 4 overall and 1 per subscription                                                                                            |
 
-```text
-AdvanceInstance({ instanceId, runtime }):
-  now = clock.now()
-  { context, instance } = BeginRound({ instanceId, now, runtime })        // @Transactional
-      instance = instances.get(id);  definition = definitions.read(documents.documentOf(instance.versionId))
-      context = RoundContext(definition, runtime, now)
-      instance.beginRound(context);  instances.save(instance)                  // save writes nothing when unchanged
-      events.addAll(instance.takeProducedEvents())                               // save writes the domain events to the outbox
-  recorded = []
-  repeat:                                                    // pure work is never saved on its own
-    work = instance.pendingWork(context)                      // one context export at a time
-    if work is empty: stop
-    for each answer of WorkAnswers.inArrivalOrder(work):     // expressions and schemas together, then each
-      context = context.at(clock.now())                      // call and process as it ends
-      instance.record(answer.results, context);  recorded.push({ answer.results, at: context.now })
-    if work.endsRound(): stop                                 // it had calls or processes
-  if recorded is not empty: RecordRound({ instanceId, round, context, recorded })   // @Transactional
-      current = instances.get(id);  current.recordRound(round, recorded, context)   // StaleRoundError when superseded
-      instances.save(current);  events.addAll(current.takeProducedEvents())
-  return { progress: current.progress(context.now), deferred: work the outside did not start }
-```
+Engine settings: 10 runs per worker, a 100 ms poll, a 120 s lease renewed by the heartbeat, a 90 s shutdown, and payloads encrypted with `AesGcmPayloadCodec` under `SECRETS_KEY` (research R2). A step's transient failure (a PostgreSQL outage) is retried 10 times, from 1 s doubling to 1 min, on top of a retry policy's own attempts.
 
-`runtime` (`$runtime`: name, version) is configuration, passed as a value like the time.
+## 4. Publishing
 
-- A round saves at the boundaries of side effects: a call, a process, a sub-workflow, parking, the end. Expressions and schemas are pure and run in process, so a crash only computes them again; one HTTP task costs one round instead of one per stage. `RecordRound` replays the recorded results on the instance it reloads. Work ids are positional (a task's id derives from the instance id and its execution number), so nothing outside the run changes task state between the two transactions: other writers (a listen's event in US7, a sub-workflow's start) only signal the run, which records the change in its own step, as `StartSubWorkflow` and `CompleteSubWorkflow` do. A cancel is the one exception, and it discards the round.
-- **Fencing.** `beginRound` counts the round, and `RecordRound` records only into the round that produced the results (`recordRound(round, answers, context)` refuses a superseded round): a worker that resumes after it lost its lease meets `StaleRoundError`, which ends its step, and the worker that took over decides.
-- **Arrival order.** `WorkAnswers` (an application service over the four computation ports) yields a pass's answers as they arrive: expressions and schemas together, then each call and process. The instance records each at its time, so the first `compete` branch to finish wins; the round still waits for the losers' calls, which the platform cannot interrupt, before it saves.
-- **Deadlines in flight.** A call or process carries the earliest deadline of its task and the tasks around it (the workflow's included). The gateways turn it into a budget (`Clock.remainingUntil`): undici gets an abort signal, go-judge a smaller `clockLimit`, and work whose deadline already passed is not sent. Before each answer is recorded the instance fires every deadline elapsed by its time (`#expire`), so an answer that came too late is a time-out and a workflow timeout interrupts a call in progress.
-- **Limits.** An instance faults with a runtime error at the task that would start its 10,001st task execution (the default of the spec's Assumptions). Task and event rows are written in batches of 1,000, under PostgreSQL's 65,535 parameters per statement.
-- **Capacity is data.** `ServiceCaller.call` and `ProcessRunner.run` take one bulkhead slot per call or run and return no result when the full bulkhead rejected it, so the accepted results are kept, the rejected work stays pending in the domain, and `AdvanceInstance` reports how much it deferred.
-- The engine run follows the returned progress; no separate query is needed.
-- Secrets join the round with US8: their values are read once per round and passed as a value to `beginRound`, `record` and the computations that need them.
-- Adapters log work ids, never payloads. Handlers and gateways throw fixed texts, never response bodies.
+`PublishVersion` composes `CheckDefinition` and writes only at the end:
 
-## 4. The engine loop
+1. `CheckDefinition` (no transaction) reads the publisher's secret names, asks `DefinitionChecker` (the runtime's checks, first problem refuses), loads or registers the `Workflow`, finds an existing version under the same identity, and lets `Workflow.publish` decide: the same content is the existing version (200); other content is `workflow.version-taken` (409); an archived workflow is `workflow.archived` (409).
+2. `PublishVersion` opens a transaction only for the writes (`TransactionHost.withTransaction`): the workflow and the new version. The workflow's version fence and the unique (workflow, semver) index keep a concurrent publish out.
 
-The loop is framework glue (`frameworks/workflows/instance.workflow.ts`); every step calls `InstanceRunController` (`workflows/runs/`), which maps the run's ids to a command and the use case's result to a JSON value the journal keeps.
-
-```text
-@Workflow('instance', { version: 1 })
-run(ctx, { instanceId }):
-  run = RunState(instanceId)            // attempted ids, awaited children, the busy pause; rebuilt on every replay
-  for round = 1, 2, …:
-    try
-      progress = step("advance-" + round, untilParked(run), round = 1: compensate: controller.fault(instanceId))
-      if progress is settled or progress.kind = ended: return
-      requested = run.unattempted(progress.subWorkflows)
-      if requested: for each id: run.attempt(id)                                   // #startAll
-                      started = step("start-" + id, controller.startSubWorkflow(instanceId, id))
-                      if started is settled: return
-                      if started = started: run.await(id, ctx.startChild(InstanceWorkflow, { instanceId: id }, { id, parentClose: 'abandon' }))
-                    continue
-      if progress.kind = busy: ctx.sleep("busy-" + round, run.busy()); continue     // 1 s doubling to 30 s
-      run.rested()
-      if progress.kind = run: continue
-      winner = ctx.waitForAny("park-" + round, run.conditions(progress.wakeAt))     // the timer and each awaited child
-      if run.ended(winner.key): step("ended-" + round, controller.completeSubWorkflow(instanceId, winner.key))
-    catch (error)
-      if isWorkflowInterrupt(error): throw error
-      step("fault-" + round, controller.fault(instanceId)); return
-
-step(name, work): ctx.step(name, classified(work), { retry: 10 attempts, 1 s doubling to 1 min })   // the one owner
-
-untilParked(run):                                            // inside one step, within a 10 s budget
-  repeat: progress = controller.advance(instanceId)
-          stop unless progress.kind = run, it lists no unattempted id, the budget lasts and the step's signal holds
-```
-
-**Constraints:**
-
-- **Explicit flow, with the engine's children.** Sub-workflows are steps of the parent's run, not domain events (Khorikov, "Domain events: simple and reliable solution": events only for what leaves the application). The run follows the engine's own pattern: a step creates the child instance (`StartSubWorkflow`) and answers what happened, and `run()` starts the child with `ctx.startChild` ("Start the child from run(), and pass it what the step returned"). The engine journals every start, so a replay gets the same child back. A child's end needs no step of the child: the engine writes the end and a signal to the parent in one transaction ("a parent never misses its child's end"), and the parent's `waitForAny` takes the child's handle.
-- **Which sub-workflows.** `progress.subWorkflows` lists, from persisted state, the derived ids of the sub-workflows the `run: workflow` tasks have requested, awaited or not. One step per id runs `StartSubWorkflow`, which saves one aggregate and answers with a named outcome: `started` (the awaited child exists, whether this attempt created it or an earlier one did) or `answered` (the parent's task took the answer itself: it faulted on a missing target, or, not awaited, it completed and raised `WorkflowDetached` with the resolved version; or an earlier attempt answered it). The step asks the parent's request first and the child's existence second, so a repeated step for a detached request whose child the outbox already started still answers `answered`. `parent.answerSubWorkflow(…)` decides, and returns the child to save when there is one. An id is stepped once per run (`attempted`), so a step name is never used twice, whatever the child's end. `untilParked` stops after a round that lists an id the run has not stepped, so a sub-workflow never waits for other branches.
-- **The step's result.** `ctx.step` journals its value as JSON, so the controller maps the use case's result to `RoundProgress` (`workflows/runs/interfaces.ts`): `kind` (run, park, busy or ended; ended wins over busy), `wakeAt` as epoch milliseconds, and the sub-workflow ids. `busy` is the engine's word for deferred work and stays out of the domain.
-- **`parentClose: 'abandon'`.** The engine never cancels a child behind the domain's back. Until US9, a child whose task ended early runs to its end and `CompleteSubWorkflow` ignores it; US9 cancels it through `CancelInstance`.
-- **A child run that fails.** A faulted child instance ends its run normally. Only a run that fails in the engine (its own fault step failed) throws `ChildWorkflowFailedError` from `waitForAny`, and the parent faults as after any failed step.
-- **A park with nothing to wait for** is a broken invariant: the engine refuses an empty `waitForAny`, and the parent faults. Waits for listens and controls arrive with US7 and US9.
-- **A run the engine fails.** The journal limit, the run timeout or a failed fault step end the run as `failed` before it can record a new step, so the first step registers the fault as its compensation ("Compensations may still record theirs"). `FaultInstance` does nothing to a terminal instance. The `catch` rethrows `WorkflowInterrupt` ("must rethrow").
-- **Errors inside a step.** A failed step comes back from the journal as `StepFailedError`, without its class. So every step, the fault and the compensation included, runs its controller call through `StepErrors` (`frameworks/workflows`), which asks `ErrorClassifier`: a settled error becomes the value `null` and ends the run, a transient one is rethrown for the step's retry, and the rest become `NonRetryableStepError`.
-- **Retries (`STEPS`).** 10 attempts, 1 s doubling to 1 min with equal jitter, for every step the fault step included, so a PostgreSQL failover of several minutes delays an instance instead of faulting it or leaving it without a run.
-- **Round budget.** `untilParked` repeats rounds within a budget of 10 s. One round's caps add up to about 66 s:
-  - evaluations 1 s;
-  - calls 30 s;
-  - processes 30 s + 5 s.
-- **Lease.** `leaseDuration` is 120 s, and the worker heartbeat (every 40 s) renews it during a step. S0 proves both the renewal and that a `signal` sent during `advance-N` is consumed by `park-N`.
-- **Bulkheads** reject when full, so they never queue past the lease. A full bulkhead never faults an instance: the rejected work gets no result and stays pending (§3), the controller returns `busy` when a round deferred work, and the run sleeps 1 s doubling to 30 s, so capacity delays a `fork` of 65 calls instead of failing it.
-- **Journal.** Each park costs two entries (the round and the wait), and each awaited child three more (its start step, `$child:` and the step that records its end). The accepted default of 10,000 entries therefore allows about 5,000 parks.
-
-**Gateways and wakes:**
-
-- `InstanceRuns.start` runs inside the caller's transaction (`EngineRunClient` passes `TransactionHost.tx` as the engine's `transaction` option) and is idempotent by id.
-- `RecurringStarts.register` and `remove` call `WorkflowSchedules.upsert` and `remove`.
-- Wakes, and the signal condition in the parent's wait, arrive with their senders: `CompleteListen`, `ConsumeListenEvent` (US7), `SuspendInstance`, `ResumeInstance` and `CancelInstance` (US9). A child's end needs no wake.
+The checks run in this order: the standard's JSON Schema (Ajv 2020 over the SDK's schema, a task re-validated against its own kind for a precise pointer), the DSL version, the subset, unique task names, references, durations, cron syntax (the engine's own reading), expression syntax (bare expressions in expression-only fields included), author schemas, and `use.secrets` against the publisher's names.
 
 ## 5. Starts
 
-Every non-HTTP start derives its id, so a repeated message finds the instance and returns at a guard:
+| Use case                 | Trigger              | Steps                                                                                                                                                                                                                     |
+| ------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `StartInstance` (HTTP)   | `manual`             | `@Idempotent` on the route. Find the workflow, then the version named or the current one (`latest`), then `Workflow.startInstance` (refuses an archived workflow), save, and `InstanceRuns.start` in the same transaction |
+| `RestartInstance` (HTTP) | `restart`            | An ended instance's version and input; `originId` names the restarted instance                                                                                                                                            |
+| `StartSubWorkflow` (run) | `parent`, `detached` | The version named or the current one, of a workflow that is not archived; `originId` names the parent; the parent's run starts the child's run                                                                            |
+| `StartScheduledInstance` | `schedule`           | `Workflow.startScheduledInstance`: only the current version of a workflow that is on (else `workflow.off`); a link of an `after` chain starts none while an instance the schedule started runs                            |
+| `StartOnEvent` (outbox)  | `event`              | For each current version of a workflow that is on whose `schedule.on` takes the event: one instance with `[event]` as input                                                                                               |
 
-| Use case                                                                  | Id                                                                                                                                                                                                                                                                                                              | Steps                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `StartInstance` (HTTP, `@Transactional`; `@Idempotent` on the controller) | UUIDv5 of the user, the workflow and the start key, when an `Idempotency-Key` is given; otherwise new. The API derives the start key from the `Idempotency-Key` and a fingerprint of the requested version and input, so a key repeated after the interceptor's 24 h with another request starts a new instance | `workflows.findByName` → `versions.findBy(VersionReference.forTarget(workflow, target))` → id → guard (exists: return it, so a repeat after a crash gets the instance, not a 409) → `WorkflowInstance.start` → save → `InstanceRuns.start`                                                                                                                                                                                                                                                                                                                                                                                              |
-| `StartScheduledInstance(workflowId, epoch, occurrence)`                   | `workflowId` + occurrence (or previous instance id)                                                                                                                                                                                                                                                             | guard (exists) → `workflows.getForStart` (`FOR SHARE`) → `assertStartable(epoch)` → the same steps                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `StartTriggeredInstance`                                                  | correlation context id                                                                                                                                                                                                                                                                                          | the same steps, with the consumed events as input                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `StartSubWorkflow({ instanceId, subWorkflowId })`                         | parent id + task instance id (derived in the domain)                                                                                                                                                                                                                                                            | the parent's request for that id (none: `answered`) → guard (the child exists: `started`) → `workflows.findByName` → `versions.findBy(VersionReference.forTarget(workflow, target))` (the domain decides that `latest` is the loaded workflow's current version, so both reads agree) → `parent.answerSubWorkflow(…)`: a missing target faults the task; a task with `await: false` completes and raises `WorkflowDetached` with the resolved version id; an awaited one gets the new child. A child: save it, `started`; otherwise save the parent, `answered`. It runs in the parent's own run, so it never races the parent's rounds |
-| `StartDetachedWorkflow` (outbox)                                          | the id `WorkflowDetached` carries                                                                                                                                                                                                                                                                               | guard (exists) → the workflow by name and the version by the id resolved when the task started (versions are write-once) → `WorkflowInstance.startSubWorkflow` with a `ParentOrigin` → save → `InstanceRuns.start`                                                                                                                                                                                                                                                                                                                                                                                                                      |
+`EngineRunClient.start` requires its caller's transaction (`Propagation.Mandatory`), so a run starts only with the instance it runs.
 
 ## 6. Events
 
-1. **Produced events** (lifecycle, emit) are added in the round's transaction (§3). Each Event raises `EventAccepted`.
-2. **Intake.**
-   - `POST /api/v1/events` (zod schemas of the CloudEvents 1.0 HTTP binding; structured or binary; batch refused) → `AcceptEvent`.
-   - `POST /api/v1/hooks/{token}` → `ReceiveWebhookCall`: `webhook.receive(call, now)` → `Event.accept` → `events.add`. A duplicate is acknowledged.
-3. **Routing.** `EventAccepted` → `RouteEvent`. It finds the candidates whose `filter_types` hold the event's type or `*`, across correlations, trigger workflows and subscriptions. `EventOffers` then writes one outbox message per candidate.
-4. **Offers.** Each loads, evaluates its filter through `expressions.evaluateAll(filter.evaluationsFor(event))`, decides and saves:
-   - `OfferEvent` → `correlation.offer`;
-   - `OfferTrigger` → `assertStartable(epoch)` → `Correlation.forTrigger` → `offer`;
-   - `OfferDelivery` → `Delivery.plan`, with a guard for null → `deliveries.add`.
-5. **Correlation start.** `ListenStarted` → `StartCorrelation`, which saves the correlation and raises `CorrelationStarted`. After commit, `CatchUpCorrelation` offers every committed event with `accepted_at ≥ since`. Overlap with routing is harmless, because `offer` ignores events already consumed.
-6. **Listen.** `EventConsumed` → `ConsumeListenEvent`; `CorrelationCompleted` → `CompleteListen`; `ListenEnded` → `EndCorrelation`.
-7. **Delivery.** `DeliveryScheduled` → `DeliverEvent`:
-   1. guard if the subscription is gone;
-   2. `secretQueries.valuesFor`;
-   3. `SubscriberGateway.deliver`;
-   4. `delivery.record(attempt, secrets, now)` and save.
+1. **Acceptance.** `EventStore.accept` inserts the CloudEvent once per (source, id) (`ON CONFLICT DO NOTHING`) and, in the same transaction, adds one outbox message `event.accepted` under the single key `events`, so consumers see events in acceptance order. Sources:
+   - the intake `POST /events` (structured or binary mode);
+   - webhook calls;
+   - `emit` tasks;
+   - lifecycle events, written by the instance repository's `save` from the instance's changes, and by the task progress store from task records.
+2. **Consumers** of `event.accepted`:
+   - `dispatch` → `DispatchEvent`: every listener of a running instance that takes the event's type and began before the event was accepted gets an engine signal with id `{sequence}:{listener key}`, so a repeated dispatch delivers once per listener.
+   - `schedule-on` → `StartOnEvent`, in one transaction with the consumer's inbox (`processInTransaction`), so a redelivered message starts nothing again.
+   - `subscriptions` → `MatchSubscriptions`, in one transaction with the consumer's inbox: one pending delivery row and one `delivery` run for each subscription that existed when the event was accepted and whose filter takes it.
+3. **Filters** are the standard's event filter, matched by `EventFilters` for listens, `schedule.on` and subscriptions alike (research R8).
 
-   The handler throws while the delivery is pending, so the outbox retries (backoff capped at 60 s).
+## 7. Schedules and control
 
-8. **Detached processes.** `ProcessDetached` carries the evaluated `ProcessRun` → `RunDetachedProcess`, which calls `processRunner.run` and ignores the result; a run the full bulkhead rejected throws `WorkDeferredError`, so the outbox retries it. With US8 the payload must not carry secret values in plain text.
+- **Schedule changes.** `Workflow` raises `workflow.schedule-changed` when a publish while on, an archive, or a turn on or off changes which version's schedule runs. Its outbox consumer `schedules` runs `SyncSchedule`, which applies the current version's timing through `WorkflowSchedules`. The runtime reads the timing from the document (`TimingClient`); the engine's schedule client gets only that timing (research R10).
+- **Suspend.** `WorkflowInstance.suspend` refuses anything but running or waiting. The run sees `suspend` at its next task boundary and holds there. A call in flight finishes and is recorded.
+- **Resume.** The outbox consumer `engine` sends the `resume` signal to the held run.
+- **Cancel.** `CancelInstance` cancels the instance, marks its running task records cancelled, and does the same for every awaited child, recursively, in one transaction (US9 AS3). The consumer `engine` cancels each run (`WorkflowClient.cancel`). A task result that arrives after the end is ignored.
+- **Delete.** Only an ended instance. The row goes with its task records and listeners (cascade). The consumer `engine` deletes the run's journal.
 
-## 7. Schedules, control, sub-workflows
+## 8. Subscriptions and deliveries
 
-- **Schedules.** `RecurringScheduleSet` → `RegisterRecurringStarts`, which calls `WorkflowSchedules.upsert(workflowId, { workflow: 'scheduled-start', input: { workflowId, epoch }, …, tz: 'UTC', missed: 'once', overlap: 'allow' })`. `RecurringScheduleCleared` → `RemoveRecurringStarts`. `NextStartDue(delay)` is written with the outbox `delay` → `StartScheduledInstance`.
-- **Suspend.** No new work. Results in flight are recorded.
-- **Resume.** Passed deadlines apply on the next round.
-- **Cancel.** Results in flight are discarded. Every abandoned task closes its correlation (`ListenEnded`) or its child (`CancelRequested`). The same happens for timeouts, `compete` losers and caught branches.
-- **Sub-workflow.** A step of the parent's run resolves the target and creates the awaited child (`StartSubWorkflow`), and the run starts it with `ctx.startChild`. The engine tells the parent's run when a child ends, and its next step records the end (`CompleteSubWorkflow`); a child that ended without a result (no row, or cancelled in US9) faults the parent's task. A child whose input breaks its schema faults in its first round, so the parent learns through the same path. A task with `await: false` resolves its target in the same step and completes; the outbox starts the child (`StartDetachedWorkflow`).
+`DeliverEvent` reads the subscription (gone: nothing more to do), the event, and the owner's secret value when the endpoint names one (missing: the attempt fails with that reason). `EventSender` then posts the event in structured mode (`application/cloudevents+json`) through `UndiciDeliveryClient`: the `EndpointDispatcher`'s address policy, the `service-calls` preset, and the secret masked in any error. A 2xx answer is delivered. Anything else is recorded on the delivery row (`refused`: attempts, last error) and retried by the `delivery` run's step retries with the same event, so the same id. When the attempts are spent, the run's `failed` step marks the delivery failed.
 
-## 8. Errors at the engine and the outbox
+## 9. Errors
 
-| Error                                                                        | Outbox handler | `InstanceWorkflow` step                                   | `ScheduledStartWorkflow` |
-| ---------------------------------------------------------------------------- | -------------- | --------------------------------------------------------- | ------------------------ |
-| InstanceNotFoundError, StaleRoundError, StaleStartError, InvalidControlError | Acknowledge    | End the run (a stale round's successor goes on)           | End the run              |
-| StaleWriteError, a transient PostgreSQL failure, a network error             | Retry          | Transient: retry (a full bulkhead is data, §3)            | Retry                    |
-| Anything else                                                                | Dead-letter    | `NonRetryableStepError` → `FaultInstance({ instanceId })` | Fail the run             |
+- **HTTP.** Every automation controller uses `ProblemFilter`, so every refusal is `application/problem+json` (RFC 9457). A refusal a use case or the domain names has the type `urn:problem:<code>`, its title from `ProblemPresenter` and its status (404 not found, 409 conflict, 422 invalid). A located refusal (`definition.invalid`, `subscription.invalid`) lists `errors[{ pointer, detail }]`. Validation, authorization and idempotency refusals are `about:blank` problems titled by their status (RFC 9457 §4.2.1), with the library's `code` when it gave one. A transient PostgreSQL failure answers 503 with `Retry-After: 5` (`DatabaseUnavailableFilter`).
+- **Engine and outbox.** Use cases never catch. `ErrorClassifier` (`frameworks/resilience`) tells settled, transient and permanent errors apart, using `PostgresTransientFailures` for the database. `StepErrors` makes the engine retry transient errors and stop on permanent ones. `OutboxErrors` acknowledges settled errors, retries transient ones and dead-letters the rest.
+- **Outbound clients** answer with outcomes (responded, rejected, timed out, unreachable, unauthorized) rather than throwing, and the runtime maps them to the standard's errors.
 
-Error handling is framework work: use cases never catch, and an adapter catches only to translate a storage conflict into a domain error (a unique violation into `StaleWriteError`). Some transient PostgreSQL failures surface outside repository code (a pool connection, `BEGIN` and `COMMIT` in `@Transactional`, the engine's insert in the caller's transaction), so translating them in the repositories would leave holes. Instead one owner recognizes them wherever they surface: `PostgresTransientFailures` (`frameworks/drizzle`: SQLSTATE classes 08, 40, 53 and 57 and pool timeouts, found through `cause`). `ErrorClassifier` (`frameworks/resilience`) asks it, checks socket error codes and classifies the domain and application error classes into settled, transient or permanent; `StepErrors` (`frameworks/workflows`) and `OutboxErrors` (`frameworks/outbox`) turn that into their library's answer. The classification runs inside each step, because the engine's journal keeps no error class. Failures of the outbound clients are not errors at all: the clients in `frameworks/` answer with outcomes (rejected, timed out, unreachable, unauthorized, refused), which the gateways map to results.
+## 10. Guarantees
 
-## 9. Guarantees
+| Operation                   | Transaction                                        | Guarantee                                                                                  |
+| --------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| HTTP command                | `@Transactional`; publish writes after its checks  | Atomic; a stale write is a conflict                                                        |
+| Start                       | Instance row + engine run in one transaction       | One run per instance; a repeated start with the same `Idempotency-Key` within 24 h replays |
+| Task effect                 | One engine step, journaled                         | A recorded effect is never repeated; an interrupted one runs again (at least once)         |
+| Event acceptance            | Event row + outbox message                         | Once per source and id; dispatched after commit, in acceptance order                       |
+| Event start, delivery match | Outbox consumer's inbox in the same transaction    | Exactly once per event and consumer                                                        |
+| Listen                      | Engine signal with id `{sequence}:{key}`           | Once per event and listener                                                                |
+| Delivery                    | Engine run per (subscription, event), step retries | At least once, with the same event id, for about 24 hours                                  |
+| Schedule occurrence         | Engine schedule (`missed: once`)                   | Once across all workers; at most one missed occurrence after downtime                      |
 
-| Operation           | Transaction                                                                                          | Guarantee                                                                                     |
-| ------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| HTTP command        | `@Transactional`                                                                                     | Atomic; a stale write is a 409, a transient PostgreSQL failure a 503 with `Retry-After`       |
-| Start               | Insert + run start; derived ids                                                                      | One instance and one run, however often the start is repeated                                 |
-| Round               | Begin and save; compute with no transaction; then record, save and add the Events in one transaction | No event without its change; recorded results are never recomputed; work in flight may repeat |
-| Wake                | In the change's transaction                                                                          | No lost wakes (proven in S0)                                                                  |
-| Reactions           | Outbox + inbox                                                                                       | At least once, with idempotent handlers                                                       |
-| Delivery            | Delivery + outbox retries                                                                            | At least once, with a stable id, for 24 hours                                                 |
-| Schedule occurrence | Engine lease + occurrence id + epoch + `FOR SHARE`                                                   | Exactly once; at most one missed occurrence                                                   |
+## 11. Security
 
-## 10. Security
+- **Outbound HTTP.** `EndpointDispatcher` (undici) refuses private, loopback and link-local addresses at every connect, redirects included, unless they are allow-listed (`OUTBOUND_ALLOW_LIST`). Service calls and deliveries use it.
+- **Scripts and shell commands** run only in go-judge, with no network, read-only system directories with `node` and `python3` from a custom image, temporary work directories, and 30 s, 256 MiB, 50 processes and 1 MiB per output stream. go-judge sits on its own Compose network and requires a bearer token.
+- **jq.** A prelude turns `env`, `input`, `inputs`, `input_filename`, `halt`, `halt_error` and local time into errors, and makes `debug` and `stderr` pass their input through. Each run is bounded at 5 s and a 128 MB worker heap. Expressions in data are never evaluated.
+- **Author schemas.** Compiled at publish, validated in workers with a 5 s bound, because a `pattern` can backtrack without end.
+- **Secrets.** Sealed at rest with AES-256-GCM (`SECRETS_KEY`). The engine's journal is encrypted with the same key. Values are read per execution and masked wherever the platform records, shows or delivers them.
+- **Webhooks.** Unguessable tokens kept as SHA-256 fingerprints; unknown and deleted tokens answer the same 404.
+- **Input.** zod on every body, query and path, unknown fields refused. JSON only, except the event and webhook routes. 1 MiB per body.
 
-- **Outbound HTTP.** `EndpointDispatcher` (undici, built in `frameworks/undici`) refuses private, loopback and link-local addresses at every connect, redirects included, unless they are allow-listed. It is used for service calls and deliveries.
-- **Scripts and shell commands** run only in go-judge:
-  - namespaces, cgroups and seccomp;
-  - no network;
-  - a read-only rootfs with `node` and `python3`, from a pinned custom image;
-  - the limits of FR-021, in a temporary directory.
+## 12. Conformance harness
 
-  They receive only the evaluated code, arguments, environment and stdin.
-
-- **jq.** Publishing only compiles expressions. Compilations and evaluations run in Piscina workers (`frameworks/jq`), with the client's prelude: `env`, `input`, `inputs`, `input_filename`, `halt`, `halt_error` and local time raise errors, `$ENV` is `null`, and `debug` and `stderr` pass their input through. Publishing compiles the same wrapped program that runs. Each run times out after 1 s and terminates its worker, and a run that exhausts jq's memory aborts its WebAssembly instance, which the worker reloads; both are expression errors (`The expression ran out of time`, `… of memory`). The pool has a worker per engine slot plus one, so a program waits for a worker only behind more programs than a process runs instances. Expressions in data are never evaluated.
-- **Author schemas.** Publishing compiles every `input`, `output` and `export` schema of the workflow, its tasks and its declared functions (`Definition.schemas`, `SchemaValidator.check`), so a schema Ajv cannot use is refused at its pointer before any run. Ajv runs in Piscina workers (`frameworks/ajv`) with the 1 s `schemas` preset and without `allErrors`, because Ajv trusts its schemas and a `pattern` can backtrack without end; a validation out of time is a configuration error.
-- **Documents.** The SDK reads a document in a Piscina worker (`frameworks/openworkflowspec`) with the 2 s `documents` preset and a 256 MB heap, since YAML aliases expand without bound; a reading out of time or memory is refused at the root. The reader keeps the 64 Definitions read most recently, by the text's SHA-256, so the rounds of published versions read them from memory and drafts under check do not push them out (a hand-made LRU: R20 dropped `@nestjs/cache-manager`, and 64 immutable Definitions need no store, expiry or invalidation).
-- **NUL.** PostgreSQL keeps no U+0000 in jsonb. A start input holding one is refused (400); a jq result, a response's content or a process's output holding one fails its task with a catchable expression, communication or runtime error.
-- **Secrets.**
-  - At rest: AES-256-GCM in the repository (`SECRETS_KEY`).
-  - Only the definition's declared names are decrypted, and only for its rounds and deliveries.
-  - Values are masked in records, faults, delivery errors and logs.
-- **Webhooks.** SHA-256 fingerprints; unknown and deleted tokens give the same 404; rates limited at the gateway.
-- **Input.** zod on every body, query and path, unknown fields rejected. Documents up to 1 MiB, read as text only on the two document routes; events and webhook calls up to 256 KiB; the default limit everywhere else.
-
-## 11. Conformance harness
-
-- **Runner.** CTK 1.0.3 feature files, copied unchanged into `apps/api/test/conformance/features/`, run by `quickpickle` as a separate Vitest project over HTTP.
-- **Stand-ins.** undici `MockAgent` replaces `EndpointDispatcher` and stands in for petstore and httpbin; the address policy has its own integration tests.
-- **Isolation.** The database is cleaned per scenario.
-- **Contradictions** are recorded (research R16).
+- **Runner.** The CTK 1.0.3 feature files, copied unchanged into `apps/api/test/conformance/features/`, run through the public HTTP API by `quickpickle` as a separate Vitest project (`test:ctk`).
+- **Stand-ins.** undici `MockAgent` stands in for petstore and httpbin; the address policy has its own tests.
+- **Contradiction.** The one recorded contradiction (FR-032) is asserted as the specification prescribes.
