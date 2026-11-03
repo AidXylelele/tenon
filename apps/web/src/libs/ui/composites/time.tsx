@@ -89,6 +89,25 @@ export function Duration({ from, to }: DurationProps) {
   );
 }
 
+interface CountdownProps {
+  readonly to: string;
+}
+
+// How soon something is due, counted down each second: "in 4 s", "in 3 min 5 s".
+export function Countdown({ to }: CountdownProps) {
+  const now = useSecondTicks(true);
+
+  if (now === null) return <span className="text-muted-foreground">…</span>;
+
+  const left = new Date(to).getTime() - now;
+
+  if (left <= 0) return <span className="whitespace-nowrap">now</span>;
+
+  const seconds = Math.ceil(left / 1000);
+  const text = seconds < 60 ? `${String(seconds)} s` : durationText(left);
+  return <span className="whitespace-nowrap tabular-nums">in {text}</span>;
+}
+
 // The current time each second while `running`; null on the server and before hydration.
 function useSecondTicks(running: boolean): number | null {
   const [now, setNow] = useState<number | null>(null);

@@ -21,11 +21,17 @@ interface WorkflowEditorProps {
   // Present when editing an existing workflow; absent for a new one.
   readonly namespace?: string;
   readonly name?: string;
+  // The step to open, as a run's fault links to it.
+  readonly step?: string | null;
 }
 
 // Loads what the builder needs: the draft (a new document, or the current version with the
 // next version proposed), the author's secrets and the platform's supported subset.
-export async function WorkflowEditor({ namespace, name }: WorkflowEditorProps) {
+export async function WorkflowEditor({
+  namespace,
+  name,
+  step = null,
+}: WorkflowEditorProps) {
   const user = await currentUser();
 
   if (!canAuthor(user))
@@ -54,6 +60,7 @@ export async function WorkflowEditor({ namespace, name }: WorkflowEditorProps) {
   return (
     <Editor
       initial={initial}
+      initialStep={step}
       existing={existing}
       secretNames={owned.map((secret) => secret.name)}
       conformance={statement}

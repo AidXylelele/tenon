@@ -87,6 +87,11 @@ export function isUnended(phase: Phase): boolean {
   );
 }
 
+// A run that moves on its own: it has not ended and is not held, so its waits count down.
+export function isAdvancing(phase: Phase): boolean {
+  return isUnended(phase) && phase !== 'suspended';
+}
+
 const TASK_STATUS: Record<
   TaskStatus,
   { readonly label: string; readonly tone: Tone }
@@ -112,7 +117,7 @@ const TRIGGER: Record<Trigger, string> = {
   event: 'Event',
   parent: 'Parent run',
   detached: 'Detached from a run',
-  restart: 'Restart',
+  restart: 'Run again',
 };
 
 export function triggerLabel(trigger: Trigger): string {
@@ -125,7 +130,7 @@ const STARTED: Record<Trigger, string> = {
   event: 'Started by an event',
   parent: 'Started by a parent run',
   detached: 'Started detached from a run',
-  restart: 'Restarted',
+  restart: 'Run again by hand',
 };
 
 // How a run began, as a phrase: "Started by its schedule".

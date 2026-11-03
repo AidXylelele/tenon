@@ -118,6 +118,10 @@ export interface TaskRecord {
   readonly error: WorkflowError | null;
   readonly startedAt: string;
   readonly endedAt: string | null;
+  // Which attempt of the step the execution is: above 1 when a retry or an outage repeated it.
+  readonly attempt: number;
+  // When the next attempt begins, for a faulted attempt that is retried.
+  readonly retryAt: string | null;
 }
 
 export interface CloudEvent {

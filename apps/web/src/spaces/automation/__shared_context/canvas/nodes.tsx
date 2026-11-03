@@ -17,13 +17,14 @@ import {
   ShieldAlertIcon,
   SkipForwardIcon,
 } from 'lucide-react';
+import { Countdown } from '@/libs/ui/composites/time';
 import { infoOf } from '../document/kinds';
 import { summaryOf } from '../document/summary';
 import type { TaskEntry } from '../document/tasks';
-import type { TaskProgress } from '../outline/progress';
+import { isRetrying, type TaskProgress } from '../outline/progress';
 import { accentOf, tileOf } from '../outline/families';
 import { TaskIcon } from '../outline/task-icon';
-import { taskStatusLabel } from '../vocabulary';
+import { isAdvancing, taskStatusLabel } from '../vocabulary';
 import { type CanvasState, useCanvas } from './canvas-context';
 import { CASE, type CanvasNode, FAILURE, OUT } from './graph';
 import { IN, type Point } from './layout';
@@ -42,6 +43,7 @@ const STATUS_RING: Record<string, string> = {
   running: 'ring-2 ring-sky-500/70 shadow-[0_0_0_6px] shadow-sky-500/10',
   completed: 'ring-2 ring-emerald-500/60',
   faulted: 'ring-2 ring-red-500/70 shadow-[0_0_0_6px] shadow-red-500/10',
+  retrying: 'ring-2 ring-amber-500/70 shadow-[0_0_0_6px] shadow-amber-500/10',
   cancelled: 'ring-2 ring-zinc-400/60',
   skipped: 'opacity-60',
 };
@@ -154,7 +156,7 @@ export function TaskNode({ data }: Props) {
       aria-label={`${shown.name}, ${infoOf(shown.kind).label}`}
       className={cn(
         'group relative flex size-full cursor-pointer flex-col justify-center gap-1 rounded-2xl border bg-card px-3 py-2.5 shadow-xs transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50',
-        status !== undefined && STATUS_RING[status],
+        ringOf(canvas, status, seen),
         selected && 'border-primary/60 ring-3 ring-primary/30',
         flagged && 'border-red-500/70 ring-3 ring-red-500/25',
       )}
@@ -211,7 +213,7 @@ export function GroupNode({ data }: Props) {
         'relative size-full rounded-3xl border border-t-4 shadow-xs',
         node.collapsed ? 'bg-card' : 'bg-muted/35',
         accentOf(entry.kind),
-        node.collapsed && status !== undefined && STATUS_RING[status],
+        node.collapsed && ringOf(canvas, status, seen),
         selected && 'ring-3 ring-primary/30',
         flagged && 'ring-3 ring-red-500/25',
       )}
@@ -358,9 +360,7 @@ function Heading({
               aria-label="Has a problem"
             />
           )}
-          {status !== undefined && (
-            <StatusChip status={status} runs={seen?.runs ?? 1} />
-          )}
+          {status !== undefined && <StatusChip status={status} seen={seen} />}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
           {steps === null
@@ -372,21 +372,35 @@ function Heading({
   );
 }
 
+// A step's status on a run: its latest attempt, the try it is on, and, while it waits to be
+// tried again, when that is (FR-033).
 function StatusChip({
   status,
-  runs,
+  seen,
 }: {
   readonly status: string;
-  readonly runs: number;
+  readonly seen: TaskProgress | undefined;
 }) {
-  const tone =
+  const canvas = useCanvas();
+  const retryAt = isWaiting(canvas, status, seen)
+    ? (seen?.retryAt ?? null)
+    : null;
+  const attempt = seen?.status === status ? seen.attempt : 1;
+  const tries =
     status === 'running'
-      ? 'bg-sky-500 text-white'
-      : status === 'completed'
-        ? 'bg-emerald-500 text-white'
-        : status === 'faulted'
-          ? 'bg-red-500 text-white'
-          : 'bg-zinc-400 text-white';
+      ? `try ${String(attempt)}`
+      : `${String(attempt)} tries`;
+  const runs = seen?.runs ?? 1;
+  const tone =
+    retryAt !== null
+      ? 'bg-amber-500 text-white'
+      : status === 'running'
+        ? 'bg-sky-500 text-white'
+        : status === 'completed'
+          ? 'bg-emerald-500 text-white'
+          : status === 'faulted'
+            ? 'bg-red-500 text-white'
+            : 'bg-zinc-400 text-white';
   const label = taskStatusLabel(
     status as Parameters<typeof taskStatusLabel>[0],
   );
@@ -398,10 +412,19 @@ function StatusChip({
         tone,
       )}
     >
-      {status === 'running' && (
+      {(status === 'running' || retryAt !== null) && (
         <span className="size-1.5 animate-pulse rounded-full bg-white" />
       )}
-      {label}
+      {retryAt === null ? (
+        label
+      ) : (
+        <>
+          Tries again <Countdown to={retryAt} />
+        </>
+      )}
+      {retryAt === null && attempt > 1 && (
+        <span className="opacity-80">{tries}</span>
+      )}
       {runs > 1 && <span className="opacity-80">×{runs}</span>}
     </span>
   );
@@ -525,6 +548,28 @@ function progressOf(
   id: string,
 ): TaskProgress | undefined {
   return canvas.progress?.get(shown.pointer) ?? canvas.progress?.get(id);
+}
+
+// Whether a step waits for its next attempt: its latest attempt faulted, and the run goes on.
+function isWaiting(
+  canvas: CanvasState,
+  status: string | undefined,
+  seen: TaskProgress | undefined,
+): boolean {
+  const advancing = canvas.phase !== null && isAdvancing(canvas.phase);
+  return seen?.status === status && isRetrying(seen, advancing);
+}
+
+// A step's ring on a run: its status, or amber while it waits to be tried again.
+function ringOf(
+  canvas: CanvasState,
+  status: string | undefined,
+  seen: TaskProgress | undefined,
+): string | undefined {
+  if (status === undefined) return undefined;
+
+  const ring = isWaiting(canvas, status, seen) ? 'retrying' : status;
+  return STATUS_RING[ring];
 }
 
 function faultedAt(canvas: CanvasState, id: string): boolean {

@@ -82,14 +82,12 @@ apps/web/src/
 │   │   ├── reset-password/          → spaces/identity/modules/password-reset   (API link: /reset-password?token=)
 │   │   └── invitations/accept/      → spaces/identity/modules/invitation-acceptance (API link)
 │   └── (console)/layout.tsx         → spaces/shell/modules/console-frame
-│       ├── page.tsx                 → redirect to /workflows
-│       ├── workflows/ … new/, [namespace]/[name]/, …/edit/, …/versions/[version]/
-│       ├── instances/, instances/[id]/
-│       ├── webhooks/, secrets/, events/, subscriptions/, subscriptions/new/, subscriptions/[id]/
-│       ├── conformance/
-│       └── account/, team/
+│       ├── (canvas)/                full-height pages: workflows/new/, …/[name]/edit/, instances/[id]/
+│       └── (column)/                page column: / (overview), workflows/, …/[name]/, …/versions/[version]/,
+│                                    instances/, connections/{webhooks, notifications, test-event}/, credentials/,
+│                                    settings/{account, team, standard}/ (old addresses redirect, R15)
 ├── spaces/
-│   ├── shell/modules/{console-frame, auth-frame}
+│   ├── shell/modules/{root-frame, console-frame, auth-frame}
 │   ├── identity/modules/{sign-in, password-recovery, password-reset, invitation-acceptance, account, invitations}
 │   └── automation/
 │       ├── modules/{overview, …}{workflow-list, workflow-detail, workflow-editor, version-document, instance-list,
@@ -104,7 +102,7 @@ apps/web/src/
     └── routing/                     route segments (a malformed escape is a 404) and search parameters
 ```
 
-**Structure decision**: Two bounded contexts of the API give two spaces, `identity` (001) and `automation` (002). The frames that every page shares are the `shell` space. Code that one space needs stays in its `__shared_context`; no feature or operation is created until a second space needs it (R2).
+**Structure decision**: Two bounded contexts of the API give two spaces, `identity` (001) and `automation` (002). The frames that every page shares are the `shell` space. Code that one space needs stays in its `__shared_context`; no feature or operation is created until a second space needs it (R2). This cut follows the API, not the RFC's domains, and is replaced in iteration 4 (R19).
 
 ## Complexity Tracking
 

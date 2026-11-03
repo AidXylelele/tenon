@@ -4,7 +4,7 @@ import { indentWithTab } from '@codemirror/commands';
 import { lintGutter } from '@codemirror/lint';
 import CodeMirror, { keymap } from '@uiw/react-codemirror';
 import { useMemo } from 'react';
-import { usePrefersDark } from './color-scheme';
+import { usePrefersDark } from '@/libs/ui/hooks/use-prefers-dark';
 import { type CodeLanguage, languageSupport } from './languages';
 import { syntaxErrors } from './syntax-errors';
 

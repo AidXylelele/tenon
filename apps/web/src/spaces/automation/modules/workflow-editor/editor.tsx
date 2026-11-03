@@ -100,6 +100,8 @@ const CodeView = dynamic(() => import('./code-view'), {
 
 interface EditorProps {
   readonly initial: JsonObject;
+  // A step to open at once, when it is in the draft.
+  readonly initialStep: string | null;
   // An existing workflow: its namespace and name stay, and leaving returns to it.
   readonly existing: {
     readonly namespace: string;
@@ -129,6 +131,7 @@ const CASE = 'case-';
 // "what happens next?" on every `+`, and the same document as YAML or JSON in the code view.
 export function Editor({
   initial,
+  initialStep,
   existing,
   secretNames,
   conformance,
@@ -140,7 +143,12 @@ export function Editor({
   const [text, setText] = useState('');
   const [format, setFormat] = useState<TextFormat>('yaml');
   const [textError, setTextError] = useState<TextError | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  // The step the editor opened at: picked, and brought into view once.
+  const [opened] = useState(() => {
+    const id = openedOf(initial, initialStep);
+    return id === null ? null : { id };
+  });
+  const [selected, setSelected] = useState(opened?.id ?? null);
   const [creating, setCreating] = useState<Place | null>(null);
   const [focus, setFocus] = useState<{ from: number; to: number } | null>(null);
   const [publishProblem, setPublishProblem] = useState<Problem | null>(null);
@@ -464,6 +472,7 @@ export function Editor({
         onInsert={openCreator}
         onConnect={connect}
         onDisconnect={disconnect}
+        reveal={opened}
       />
       {!panelOpen && (
         <div className="pointer-events-none absolute top-3 left-1/2 hidden -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-xs backdrop-blur lg:block">
@@ -618,7 +627,7 @@ export function Editor({
                 >
                   <SheetContent
                     side="bottom"
-                    className="flex h-[85svh] flex-col p-0 [&>button]:hidden"
+                    className="flex flex-col p-0 data-[side=bottom]:h-[85svh] [&>button]:hidden"
                   >
                     <SheetHeader className="sr-only">
                       <SheetTitle>Panel</SheetTitle>
@@ -710,4 +719,11 @@ function caseThen(draft: JsonObject, pointer: string, index: number): string {
   const item = valueAt(draft, pointerOf(tokens));
   const name = isObject(item) ? (Object.keys(item)[0] ?? '') : '';
   return pointerOf([...tokens, name, 'then']);
+}
+
+// The step the editor opens with, as drawn on the canvas, or none when the draft lacks it.
+function openedOf(draft: JsonObject, pointer: string | null): string | null {
+  if (pointer === null || entryAt(draft, pointer) === null) return null;
+
+  return protectorOf(draft, pointer);
 }

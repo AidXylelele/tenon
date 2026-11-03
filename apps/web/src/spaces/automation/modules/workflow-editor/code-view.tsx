@@ -4,7 +4,7 @@ import { yaml } from '@codemirror/lang-yaml';
 import { type Diagnostic, lintGutter, setDiagnostics } from '@codemirror/lint';
 import CodeMirror, { EditorView } from '@uiw/react-codemirror';
 import { useEffect, useState } from 'react';
-import { usePrefersDark } from '@/libs/code-editor/color-scheme';
+import { usePrefersDark } from '@/libs/ui/hooks/use-prefers-dark';
 
 interface CodeViewProps {
   readonly text: string;

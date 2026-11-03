@@ -16,6 +16,7 @@ import {
 } from '@xyflow/react';
 import { cn } from 'cn';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { usePrefersDark } from '@/libs/ui/hooks/use-prefers-dark';
 import type { JsonObject, Phase } from '@/libs/data-access/types';
 import { Spinner } from '@/libs/ui/components/spinner';
 import { isObject } from '../document/json';
@@ -81,7 +82,14 @@ export interface WorkflowCanvasProps {
   ) => void;
   // A jump or a case removed with the Delete key.
   readonly onDisconnect?: (edge: CanvasEdge) => void;
+  // A node to bring into view, as when a fault or a link points at a step; a new request each
+  // time, so the same node can be shown again.
+  readonly reveal?: Reveal | null;
   readonly className?: string;
+}
+
+export interface Reveal {
+  readonly id: string;
 }
 
 interface LaidOut {
@@ -95,6 +103,8 @@ const NOTHING = () => undefined;
 const PAD = 48;
 const READABLE_ZOOM = 0.9;
 const MAX_ZOOM = 1;
+const REVEAL_MS = 300;
+const REVEAL_PADDING = 0.6;
 
 // The workflow as a graph (FR-022, FR-028): the builder edits on it, a run's page colours it.
 export function WorkflowCanvas(props: WorkflowCanvasProps) {
@@ -117,6 +127,7 @@ function Canvas({
   onInsert = NOTHING,
   onConnect,
   onDisconnect,
+  reveal = null,
   className,
 }: WorkflowCanvasProps) {
   // A live refresh brings an equal document as a new object; the graph is redone only when
@@ -136,7 +147,9 @@ function Canvas({
   const groups = useMemo(() => groupsOf(stable, editable), [stable, editable]);
   const { laid, failed } = useLaidOut(graph, direction, editable);
   const trigger = describeTrigger(triggerOf(stable));
-  const { setViewport } = useReactFlow();
+  const { fitView, setViewport } = useReactFlow();
+  // The system's scheme once the page is live; the server and the first render draw light.
+  const dark = usePrefersDark();
   const frame = useRef<HTMLDivElement>(null);
   const shownFor = useRef<Direction | null>(null);
 
@@ -170,6 +183,24 @@ function Canvas({
     observer.observe(element);
     return () => observer.disconnect();
   }, [laid, setViewport]);
+
+  // The asked-for node, once its graph is laid out; each request once, so later layouts (an
+  // edit, a block opened) keep the view where the person left it.
+  const revealed = useRef<Reveal | null>(null);
+  useEffect(() => {
+    if (reveal === null || reveal === revealed.current || laid === null) return;
+
+    if (!laid.placement.nodes.has(reveal.id)) return;
+
+    revealed.current = reveal;
+    const target = [{ id: reveal.id }];
+    void fitView({
+      nodes: target,
+      duration: REVEAL_MS,
+      maxZoom: MAX_ZOOM,
+      padding: REVEAL_PADDING,
+    });
+  }, [reveal, laid, fitView]);
 
   const nodes = useMemo<Node<CanvasNodeData>[]>(
     () =>
@@ -316,7 +347,7 @@ function Canvas({
           edges={edges}
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
-          colorMode="system"
+          colorMode={dark ? 'dark' : 'light'}
           minZoom={0.2}
           maxZoom={1.6}
           nodesDraggable={false}

@@ -11,7 +11,20 @@ export async function generateMetadata({
 
 export default async function EditWorkflowPage({
   params,
+  searchParams,
 }: PageProps<'/workflows/[namespace]/[name]/edit'>) {
   const { namespace, name } = await params;
-  return <WorkflowEditor namespace={segment(namespace)} name={segment(name)} />;
+  const { step } = await searchParams;
+  const opened = stepOf(step);
+  return (
+    <WorkflowEditor
+      namespace={segment(namespace)}
+      name={segment(name)}
+      step={opened}
+    />
+  );
+}
+
+function stepOf(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' ? value : null;
 }

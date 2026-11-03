@@ -303,7 +303,73 @@ An independent review of the tiers, the BFF rules and security found no import t
   The runtime's side is in 002 (research there); runs survive a restart of the API.
 
 - **Console.**
-  - A step being retried shows "Attempt n · next try in s s", and the last failure in its panel. The task record's `attempt`, `retryAt` and `previousError` come from 002.
-  - A faulted run's strip says what failed (title, detail), at which step (a click selects it), and what to do: Open in editor (authors) and Run again.
+  - Every attempt is its own task record (002 FR-016) with its `attempt` and, when it is retried, its `retryAt`. A step waiting for its next attempt is amber on the canvas with "Tries again in n s"; a later attempt says which try it is; the timeline marks "Attempt n" and counts down to the next. The attempts of one run count once in the step's run count.
+  - A faulted run's strip says what failed (title, detail) and at which step, with Show the step (picks it and brings it into view) and, for authors, Open in the editor (`/edit?step=`, the step open when the draft has it). Run again stays in the header with the other controls, so the screen has one button for it.
   - Restart is named "Run again": it starts a new run of the same version with the same input.
+  - A step a `try` protects on its own is shown as that step in the picked-step panel, with only its attempts.
 - **Not yet.** Continuing a faulted run from its failed step, as AWS Step Functions' redrive does. `@nestjs/workflows` can retry a failed instance from its journal (`WorkflowClient.retry`). The runtime, though, ends a DSL fault as a completed engine run, so the change is the runtime's and the domain's, to be designed with the owner first.
+
+## R19. The module system as the owner's RFC defines it (iteration 4)
+
+The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules) is the standard. An audit of `apps/web/src` on 2026-11-03 found:
+
+- **Conforms.** No import goes up a tier or across one; every page renders one module through its `index.ts`; only `data-access` reaches the API; libs import no space.
+- **Spaces are cut by the API's bounded contexts, not by domains.** The RFC's domain level is "the current user experience, a page or a set of related pages". `automation` holds 14 modules of seven experiences, and its `__shared_context` carries code that three of them reuse. That code is features and operations kept out of their tier: the canvas, the workflow document model, the run vocabulary and the run table.
+- **One rule in several places.** The author rule (`canAuthor`) is repeated in shell, identity and an entry. Route addresses are rebuilt by hand in 66 places.
+- **Entries with logic.** Seven pages parse search parameters. Three layouts build tabs or check a role instead of referencing a module.
+- **Libs.**
+  - `data-access` knows the sign-in route.
+  - `data-access` has one query shaped for one view.
+  - JSON reads and writes live in a space.
+- **Governance the RFC requires is missing.** There is no `CODEOWNERS`, no playground, no Cypress, no coverage threshold per tier, and no dependency check, although the constitution says one enforces the graph.
+
+### Decision: the target
+
+- **Spaces by experience.** Each one matches a destination:
+  - `shell`: the frames, not-found, error, the canvas and column bodies
+  - `identity`: sign in, recover, reset, accept an invitation
+  - `home`: overview
+  - `workflows`: list, detail, editor, version
+  - `runs`: list, detail
+  - `connections`: its frame with tabs, webhooks, notifications, test event
+  - `credentials`: secrets
+  - `settings`: its frame with tabs, account, team, standard
+
+  A space's `__shared_context` keeps only what two of its own modules share. What one module uses moves into it.
+
+- **Operations** (no JSX, at least 75 % coverage, playground):
+  - `workflow-document`: header, tasks, kinds, protection, summary, trigger
+  - `run-progress`: phases and task statuses, the controls a phase allows, a run's progress by step, retries
+  - `access-policy`: authors, administrators
+  - `app-routes`: every page's address
+
+  No operation imports another.
+
+- **Features** (UI and logic, playground, Cypress smoke test, coverage):
+  - `workflow-canvas`, for workflows and runs
+  - `run-table`, for runs, a workflow's runs and home
+  - `workflow-search`: the ⌘K source of workflows, which the console frame injects into the palette
+
+  Features don't import features. A module combines them through props and slots, as in the RFC's header example.
+
+- **Libs.**
+  - `document-text` takes the JSON reads and writes.
+  - `ui` takes the generic `Status` and a confirm-then-act composite.
+  - A `forms` lib takes the form-state helpers.
+  - `data-access` names no route and has no view-shaped query.
+  - Every lib gets tests. shadcn's generated components count as vendor code; the composites and hooks built on them are tested.
+- **Entries.**
+  - A page holds metadata and its module, with `params` and `searchParams` passed through; the module parses them with `libs/routing`.
+  - A layout references a layout module.
+  - Redirect-only pages become `next.config` redirects.
+  - `not-found`, `loading` and `error` render shell modules.
+- **Governance.**
+  - `CODEOWNERS` lists every element.
+  - A development-only `(playground)` route group renders each feature and operation with fixtures, and answers 404 in production.
+  - Cypress runs each space's `e2e/` and each feature's smoke test.
+  - Vitest coverage thresholds are set per tier.
+  - The dependency graph is checked in CI with no allowed exceptions. The tool, `dependency-cruiser` or an ESLint rule, is the owner's choice: the 2026-10-28 decision kept lint to strict TypeScript.
+
+### Order
+
+Bottom up, one slice per tier: libs, then operations, then features, then spaces, then entries, then governance. In each slice, modules change in place: suites, a browser check of every route, and the critic round run before its commit.

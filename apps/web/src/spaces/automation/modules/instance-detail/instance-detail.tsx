@@ -1,4 +1,3 @@
-import { CircleAlertIcon } from 'lucide-react';
 import { Link } from '@/libs/routing/link';
 import { notFound } from 'next/navigation';
 import {
@@ -13,7 +12,6 @@ import { RefreshControl } from '@/libs/live/refresh-control';
 import { Crumbs } from '@/libs/ui/composites/crumbs';
 import { Duration, Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
-import { allEntries } from '../../__shared_context/document/tasks';
 import {
   instanceHref,
   versionHref,
@@ -52,16 +50,12 @@ export async function InstanceDetail({ id, view }: InstanceDetailProps) {
     instance.name,
     instance.version,
   );
-  const pointers =
-    document === null
-      ? []
-      : allEntries(document).map(({ entry }) => entry.pointer);
   const live = isUnended(instance.phase);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 border-b px-4 py-3 md:px-6">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-60 flex-1">
           <Crumbs
             trail={[
               { label: 'Runs', href: '/instances' },
@@ -78,7 +72,7 @@ export async function InstanceDetail({ id, view }: InstanceDetailProps) {
           </h1>
           <Facts instance={instance} />
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-start gap-2 sm:items-end">
           {canAuthor(user) && (
             <Controls id={instance.id} phase={instance.phase} />
           )}
@@ -88,9 +82,6 @@ export async function InstanceDetail({ id, view }: InstanceDetailProps) {
           />
         </div>
       </div>
-      {instance.phase === 'faulted' && instance.error !== null && (
-        <FaultStrip instance={instance} pointers={pointers} />
-      )}
       <RunView
         instance={instance}
         document={document}
@@ -98,6 +89,7 @@ export async function InstanceDetail({ id, view }: InstanceDetailProps) {
         more={records.next !== null}
         panel={panel}
         events={events?.items ?? null}
+        canEdit={canAuthor(user)}
       />
     </div>
   );
@@ -137,47 +129,10 @@ function Facts({ instance }: { readonly instance: Instance }) {
           className="underline-offset-4 hover:underline"
         >
           {instance.trigger === 'restart'
-            ? 'Restarted from another run'
+            ? 'Run again from an earlier run'
             : 'Started by its parent run'}
         </Link>
       )}
     </p>
-  );
-}
-
-function FaultStrip({
-  instance,
-  pointers,
-}: {
-  readonly instance: Instance;
-  readonly pointers: readonly string[];
-}) {
-  const error = instance.error;
-
-  if (error === null) return null;
-
-  const step = pointers.find((pointer) => pointer === error.instance);
-  const name = step?.split('/').at(-1);
-  const kind = error.type.split('/').at(-1);
-
-  return (
-    <div
-      className="flex items-start gap-3 border-b bg-red-500/[0.06] px-4 py-2.5 text-sm md:px-6"
-      role="alert"
-    >
-      <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-400" />
-      <div className="min-w-0">
-        <span className="font-medium text-red-700 dark:text-red-300">
-          {error.title ?? 'The run faulted'}
-          {name !== undefined && ` at ${name}`}
-        </span>
-        <span className="text-muted-foreground">
-          {' '}
-          {error.detail ??
-            'The step raised an error the workflow did not handle.'}{' '}
-          ({kind}, status {error.status})
-        </span>
-      </div>
-    </div>
   );
 }

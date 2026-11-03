@@ -5,11 +5,16 @@ const PARSE_BUDGET_MS = 200;
 const MOST = 20;
 
 // The language's own parse tree marks where the code stops making sense; each mark becomes a
-// diagnostic at its line (research R17). No linter runs the code or knows its libraries.
+// diagnostic at its line (research R17). No linter runs the code or knows its libraries. An
+// empty field is left alone: it is not yet code, and optional fields start empty.
 export const syntaxErrors = linter(
   (view) => {
     const state = view.state;
     const length = state.doc.length;
+    const text = state.doc.toString();
+
+    if (text.trim() === '') return [];
+
     const tree =
       ensureSyntaxTree(state, length, PARSE_BUDGET_MS) ?? syntaxTree(state);
     const found: Diagnostic[] = [];

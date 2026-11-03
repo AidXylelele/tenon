@@ -49,7 +49,7 @@ export function Controls({
     });
   }
 
-  function restart() {
+  function runAgain() {
     start(async () => {
       const outcome = await restartAction(id);
 
@@ -58,7 +58,7 @@ export function Controls({
         return;
       }
 
-      toast.success('Restarted with the same version and input');
+      toast.success('Started again with the same version and input');
       router.push(instanceHref(outcome.value.id));
     });
   }
@@ -116,9 +116,9 @@ export function Controls({
         </Confirm>
       )}
       {allowed.restart && (
-        <Button variant="outline" disabled={pending} onClick={restart}>
+        <Button variant="outline" disabled={pending} onClick={runAgain}>
           <RotateCcwIcon data-icon="inline-start" />
-          Restart
+          Run again
         </Button>
       )}
       {allowed.remove && (
