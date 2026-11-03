@@ -36,10 +36,12 @@ export class RestartInstance {
     if (previous === null) return { ok: false, failure: Missing.Instance };
 
     const workflow = await this.workflows.findById(previous.workflowId);
+
+    if (workflow === null) return { ok: false, failure: Missing.Workflow };
+
     const version = await this.versions.findById(previous.versionId);
 
-    if (workflow === null || version === null)
-      return { ok: false, failure: Missing.Version };
+    if (version === null) return { ok: false, failure: Missing.Version };
 
     const restarted = workflow.restartInstance({
       previous,

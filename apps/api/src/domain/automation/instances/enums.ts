@@ -34,8 +34,14 @@ export enum InstanceRefusal {
   NotSuspended = 'instance.not-suspended',
 }
 
+// The changes of an instance that leave its transaction: the engine running it learns of a
+// cancel, a resume or a delete, and every change but a delete is the standard's lifecycle event.
 export enum InstanceEventKind {
-  Cancelled = 'instance.cancelled',
+  Started = 'instance.started',
+  Suspended = 'instance.suspended',
   Resumed = 'instance.resumed',
+  Cancelled = 'instance.cancelled',
+  Faulted = 'instance.faulted',
+  Completed = 'instance.completed',
   Deleted = 'instance.deleted',
 }

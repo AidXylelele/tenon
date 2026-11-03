@@ -13,6 +13,7 @@ import type { Scope } from '../scope.js';
 // author leaves out are given. A source or type that is not text faults the task (FR-028).
 export class EmitKind implements LeafKind {
   static readonly #SPEC_VERSION = '1.0';
+  static readonly #LIFECYCLE = '/workflows/';
 
   constructor(private readonly evaluator: Evaluator) {}
 
@@ -42,9 +43,18 @@ export class EmitKind implements LeafKind {
 
     const event: Record<string, JsonValue> = {};
     Object.assign(event, filled);
+    if (source.startsWith(EmitKind.#LIFECYCLE))
+      throw TaskFault.of(
+        ErrorKind.Runtime,
+        scope.pointer,
+        "The /workflows/ source is the platform's lifecycle events'",
+      );
+
     event.specversion = EmitKind.#SPEC_VERSION;
     event.id ??= randomUUID();
     event.time ??= new Date().toISOString();
+    const run = scope.run;
+    await run.observer.emitted(run.plan.instanceId, event);
     return { output: event, then: null };
   }
 }

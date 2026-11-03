@@ -22,7 +22,12 @@ export class RecordTaskEnd {
 
     if (instance === null) return RunDirective.Stop;
 
+    const directive = instance.directive();
+
+    // A result that arrives after the instance ended is discarded (US9).
+    if (directive === RunDirective.Stop) return directive;
+
     await this.progress.ended(command.instanceId, command.task);
-    return instance.directive();
+    return directive;
   }
 }

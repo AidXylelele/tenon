@@ -1,5 +1,12 @@
 import { Module } from '@nestjs/common';
+import { AcceptEvent } from '../../application/automation/events/accept-event.js';
+import { EventStore } from '../../application/automation/events/ports.js';
+import { EventQueries } from '../../application/automation/events/queries.js';
 import { BeginInstance } from '../../application/automation/instances/begin-instance.js';
+import { EventsController } from '../../interface-adapters/api/controllers/events.controller.js';
+import { DrizzleEventQueries } from '../../interface-adapters/persistence/queries/drizzle-event.queries.js';
+import { DrizzleInstanceNames } from '../../interface-adapters/persistence/queries/drizzle-instance-names.query.js';
+import { DrizzleEventStore } from '../../interface-adapters/persistence/stores/drizzle-event.store.js';
 import { BeginWaiting } from '../../application/automation/instances/begin-waiting.js';
 import { CancelInstance } from '../../application/automation/instances/cancel-instance.js';
 import { CompleteInstance } from '../../application/automation/instances/complete-instance.js';
@@ -57,7 +64,7 @@ import { RuntimeModule } from './runtime.module.js';
 
 @Module({
   imports: [EngineModule, RuntimeModule],
-  controllers: [WorkflowsController, InstancesController],
+  controllers: [WorkflowsController, InstancesController, EventsController],
   providers: [
     WorkflowPolicy,
     InstancePolicy,
@@ -78,6 +85,12 @@ import { RuntimeModule } from './runtime.module.js';
       provide: WorkflowInstanceRepository,
       useExisting: DrizzleWorkflowInstanceRepository,
     },
+    DrizzleEventStore,
+    { provide: EventStore, useExisting: DrizzleEventStore },
+    DrizzleEventQueries,
+    { provide: EventQueries, useExisting: DrizzleEventQueries },
+    DrizzleInstanceNames,
+    AcceptEvent,
     DrizzleTaskProgressStore,
     { provide: TaskProgress, useExisting: DrizzleTaskProgressStore },
     DrizzleInstanceQueries,

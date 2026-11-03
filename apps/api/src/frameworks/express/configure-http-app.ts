@@ -1,5 +1,5 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import type { NextFunction, Request, Response } from 'express';
+import { type NextFunction, type Request, type Response, text } from 'express';
 
 const PREFIX = 'api/v1';
 
@@ -7,6 +7,10 @@ const PREFIX = 'api/v1';
 const JSON_LIMIT = '1mb';
 
 const JSON_TYPES = ['application/json', 'application/*+json'];
+
+// The routes that take events: a CloudEvent in binary mode, or a webhook call, may carry any
+// media type, read as text.
+const EVENT_ROUTES = [`/${PREFIX}/events`, `/${PREFIX}/hooks/`];
 
 export interface HttpSettings {
   readonly trustedProxies: readonly string[];
@@ -21,8 +25,25 @@ export function configureHttpApp(
   app.disable('x-powered-by');
   app.enableCsrfProtection({ trustedOrigins: settings.trustedOrigins.slice() });
   app.setGlobalPrefix(PREFIX);
-  app.use(refuseOtherMediaTypes);
-  app.useBodyParser('json', { limit: JSON_LIMIT });
+  const events = text({ type: () => true, limit: JSON_LIMIT });
+  app.useBodyParser('json', { limit: JSON_LIMIT, type: JSON_TYPES });
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    if (!takesEvents(request)) {
+      refuseOtherMediaTypes(request, response, next);
+      return;
+    }
+
+    if (typeof request.body === 'object' && request.body !== null) {
+      next();
+      return;
+    }
+
+    events(request, response, next);
+  });
+}
+
+function takesEvents(request: Request): boolean {
+  return EVENT_ROUTES.some((route) => request.path.startsWith(route));
 }
 
 // The API reads JSON only: a body of another media type is refused before any route reads it.

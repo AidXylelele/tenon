@@ -26,6 +26,7 @@ function anInstance(phase: Phase = Phase.Pending): WorkflowInstance {
     createdAt: now,
     startedAt: null,
     endedAt: null,
+    waiting: false,
     version: 3,
   };
   return new WorkflowInstance(props);

@@ -6,7 +6,14 @@ import {
 } from '@nestjs-cls/transactional';
 import { Outbox } from '@nestjs/outbox';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { TriggerKind } from '../../../domain/automation/instances/enums.js';
+import { EventOrigin } from '../../../application/automation/events/enums.js';
+import {
+  InstanceEventKind,
+  TriggerKind,
+} from '../../../domain/automation/instances/enums.js';
+import { LifecycleEventMapper } from '../mappers/lifecycle-event.mapper.js';
+import { DrizzleInstanceNames } from '../queries/drizzle-instance-names.query.js';
+import { DrizzleEventStore } from '../stores/drizzle-event.store.js';
 import type { WorkflowInstanceRepository } from '../../../application/automation/instances/ports.js';
 import type { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
 import { StaleWriteError } from '../../../domain/errors.js';
@@ -16,9 +23,17 @@ import { workflowInstance as instances } from '../schema/index.js';
 
 @Injectable()
 export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceRepository {
+  private static readonly ENGINE = new Set<InstanceEventKind>([
+    InstanceEventKind.Cancelled,
+    InstanceEventKind.Resumed,
+    InstanceEventKind.Deleted,
+  ]);
+
   constructor(
     private readonly txHost: TransactionHost<DrizzleTx>,
     private readonly outbox: Outbox,
+    private readonly events: DrizzleEventStore,
+    private readonly names: DrizzleInstanceNames,
   ) {}
 
   async find(id: string): Promise<WorkflowInstance | null> {
@@ -63,6 +78,7 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
           error: sql`excluded.error`,
           startedAt: sql`excluded.started_at`,
           endedAt: sql`excluded.ended_at`,
+          waiting: sql`excluded.waiting`,
           version: sql`excluded.version`,
         },
         setWhere: eq(instances.version, instance.version),
@@ -80,14 +96,38 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
     await this.#told(instance);
   }
 
+  // The engine learns of a cancel, a resume or a delete; every change but a delete is also the
+  // standard's lifecycle event, accepted as any other event.
   async #told(instance: WorkflowInstance): Promise<void> {
-    const entries = instance.events.map((event) => ({
-      topic: event.kind,
-      key: event.instanceId,
-      payload: { instanceId: event.instanceId },
-    }));
+    const changes = instance.events;
+    const entries = changes
+      .filter((change) =>
+        DrizzleWorkflowInstanceRepository.ENGINE.has(change.kind),
+      )
+      .map((change) => ({
+        topic: change.kind,
+        key: change.instanceId,
+        payload: { instanceId: change.instanceId },
+      }));
 
     if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
+
+    const names = changes.length > 0 ? await this.names.of(instance.id) : null;
+    const at = new Date();
+
+    for (const change of changes) {
+      if (names === null) break;
+
+      const lifecycle = LifecycleEventMapper.ofInstance(
+        change.kind,
+        instance,
+        names,
+        at,
+      );
+
+      if (lifecycle !== null)
+        await this.events.accept(lifecycle, EventOrigin.Lifecycle, instance.id);
+    }
 
     instance.clearEvents();
   }

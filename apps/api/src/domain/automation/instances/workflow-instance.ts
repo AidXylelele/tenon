@@ -31,6 +31,7 @@ export class WorkflowInstance {
   #error: JsonObject | null;
   #startedAt: Date | null;
   #endedAt: Date | null;
+  #waiting: boolean;
   #events: InstanceEvent[] = [];
 
   constructor(props: WorkflowInstanceProps) {
@@ -47,6 +48,7 @@ export class WorkflowInstance {
     this.#createdAt = props.createdAt;
     this.#startedAt = props.startedAt;
     this.#endedAt = props.endedAt;
+    this.#waiting = props.waiting;
     this.#version = props.version;
   }
 
@@ -66,6 +68,7 @@ export class WorkflowInstance {
       createdAt: input.now,
       startedAt: null,
       endedAt: null,
+      waiting: false,
       version: 0,
     });
   }
@@ -126,6 +129,11 @@ export class WorkflowInstance {
     return this.#version;
   }
 
+  // Whether the run is in a wait or a listen, which a suspension does not end.
+  get waiting(): boolean {
+    return this.#waiting;
+  }
+
   get ended(): boolean {
     return WorkflowInstance.#ENDED.includes(this.#phase);
   }
@@ -154,19 +162,24 @@ export class WorkflowInstance {
 
     this.#phase = Phase.Running;
     this.#startedAt = now;
+    this.#raise(InstanceEventKind.Started);
   }
 
   // A wait or a listen began; the runtime reports it, and only a running instance waits.
   beginWaiting(): void {
-    if (this.#phase !== Phase.Running) return;
+    if (this.ended) return;
 
-    this.#phase = Phase.Waiting;
+    this.#waiting = true;
+
+    if (this.#phase === Phase.Running) this.#phase = Phase.Waiting;
   }
 
   endWaiting(): void {
-    if (this.#phase !== Phase.Waiting) return;
+    if (this.ended) return;
 
-    this.#phase = Phase.Running;
+    this.#waiting = false;
+
+    if (this.#phase === Phase.Waiting) this.#phase = Phase.Running;
   }
 
   // Outcomes are facts the runtime reports: never refused, ignored once the instance ended.
@@ -176,6 +189,7 @@ export class WorkflowInstance {
     this.#phase = Phase.Completed;
     this.#output = output;
     this.#endedAt = now;
+    this.#raise(InstanceEventKind.Completed);
   }
 
   fault(error: JsonObject, now: Date): void {
@@ -184,6 +198,7 @@ export class WorkflowInstance {
     this.#phase = Phase.Faulted;
     this.#error = error;
     this.#endedAt = now;
+    this.#raise(InstanceEventKind.Faulted);
   }
 
   // A user's requests (US9): each is refused unless the instance is in a phase that allows it.
@@ -193,6 +208,7 @@ export class WorkflowInstance {
     if (!suspendable) return { ok: false, failure: InstanceRefusal.NotRunning };
 
     this.#phase = Phase.Suspended;
+    this.#raise(InstanceEventKind.Suspended);
     return { ok: true, value: undefined };
   }
 
@@ -200,7 +216,7 @@ export class WorkflowInstance {
     if (this.#phase !== Phase.Suspended)
       return { ok: false, failure: InstanceRefusal.NotSuspended };
 
-    this.#phase = Phase.Running;
+    this.#phase = this.#waiting ? Phase.Waiting : Phase.Running;
     this.#raise(InstanceEventKind.Resumed);
     return { ok: true, value: undefined };
   }
@@ -218,7 +234,12 @@ export class WorkflowInstance {
   delete(): Result<void, InstanceRefusal> {
     if (!this.ended) return { ok: false, failure: InstanceRefusal.NotEnded };
 
-    this.#raise(InstanceEventKind.Deleted);
+    const told = this.#events.some(
+      (event) => event.kind === InstanceEventKind.Deleted,
+    );
+
+    if (!told) this.#raise(InstanceEventKind.Deleted);
+
     return { ok: true, value: undefined };
   }
 

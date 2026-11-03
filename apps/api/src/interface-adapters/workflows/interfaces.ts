@@ -83,6 +83,8 @@ export abstract class RunObserver {
     child: ChildRequest,
   ): Promise<ChildStart>;
   abstract outcomeOf(childId: string): Promise<ChildOutcome>;
+  // An event an `emit` task published, accepted as any other event.
+  abstract emitted(instanceId: string, event: JsonObject): Promise<void>;
 }
 
 // A sub-workflow a `run: workflow` task starts; a detached one is not awaited.

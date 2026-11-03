@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -35,6 +36,7 @@ export const workflowInstance = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     endedAt: timestamp('ended_at', { withTimezone: true }),
+    waiting: boolean('waiting').notNull().default(false),
     version: integer('version').notNull().default(1),
   },
   (table) => [

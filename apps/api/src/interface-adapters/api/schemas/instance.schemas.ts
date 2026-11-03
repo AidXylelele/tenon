@@ -96,3 +96,10 @@ export const TaskPageResponse = z.object({
 });
 
 export type TaskPageResponse = z.infer<typeof TaskPageResponse>;
+
+export const EventPageResponse = z.object({
+  items: z.array(ResponseJson),
+  next: z.string().nullable(),
+});
+
+export type EventPageResponse = z.infer<typeof EventPageResponse>;

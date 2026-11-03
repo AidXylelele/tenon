@@ -43,6 +43,20 @@
       "when": 1793667140642,
       "tag": "0005_workflow_instance",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793668252872,
+      "tag": "0006_event",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793668492821,
+      "tag": "0007_instance_waiting",
+      "breakpoints": true
     }
   ]
 }

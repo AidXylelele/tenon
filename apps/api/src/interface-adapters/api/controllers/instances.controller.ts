@@ -22,7 +22,9 @@ import {
   ApiOkResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { EventQueries } from '../../../application/automation/events/queries.js';
 import { CancelInstance } from '../../../application/automation/instances/cancel-instance.js';
+import { EventsQuery } from '../schemas/event.schemas.js';
 import { DeleteInstance } from '../../../application/automation/instances/delete-instance.js';
 import { InstancePolicy } from '../../../application/automation/instances/instance.policy.js';
 import type { InstanceResult } from '../../../application/automation/instances/ports.js';
@@ -42,6 +44,8 @@ import {
   InstanceResponse,
   InstanceSummaryResponse,
   ListInstancesQuery,
+  EventPageResponse,
+  type ResponseJson,
   StartInstanceBody,
   TaskPageResponse,
   TasksQuery,
@@ -60,6 +64,7 @@ export class InstancesController {
     private readonly resumeInstance: ResumeInstance,
     private readonly deleteInstance: DeleteInstance,
     private readonly instances: InstanceQueries,
+    private readonly eventQueries: EventQueries,
   ) {}
 
   // A repeated request with the same Idempotency-Key answers the first one's response (FR-009).
@@ -135,6 +140,29 @@ export class InstancesController {
       throw new NotFoundException('The workflow instance does not exist');
 
     return InstancePresenter.tasks(page);
+  }
+
+  // The instance's lifecycle events and the events it emitted, in the order accepted (FR-016).
+  @Get('instances/:id/events')
+  @Can.Anyone()
+  @ApiOkResponse({ standardSchema: EventPageResponse })
+  @ApiNotFoundResponse()
+  async events(
+    @Param({ schema: InstanceParams }) params: InstanceParams,
+    @Query({ schema: EventsQuery }) query: EventsQuery,
+  ): Promise<EventPageResponse> {
+    const after = query.cursor ?? null;
+    const page = await this.eventQueries.ofInstance(
+      params.id,
+      after,
+      query.limit,
+    );
+
+    if (page === null)
+      throw new NotFoundException('The workflow instance does not exist');
+
+    const next = page.next === null ? null : String(page.next);
+    return { items: page.items as ResponseJson[], next };
   }
 
   @Post('instances/:id/cancel')

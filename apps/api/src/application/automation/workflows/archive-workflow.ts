@@ -22,8 +22,10 @@ export class ArchiveWorkflow {
 
     if (workflow === null) return { ok: false, failure: Missing.Workflow };
 
-    workflow.archive(now);
-    await this.workflows.save(workflow);
+    const archived = workflow.archive(now);
+
+    if (archived) await this.workflows.save(workflow);
+
     return { ok: true, value: undefined };
   }
 }

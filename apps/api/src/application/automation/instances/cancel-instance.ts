@@ -28,12 +28,21 @@ export class CancelInstance {
     if (!changed.ok) return changed;
 
     await this.instances.save(instance);
-    const children = await this.instances.findAwaitedChildren(instance.id);
+    const parents = [instance.id];
 
-    // The children it awaits end with it (US9 AS3); each tells its own run.
-    for (const child of children) {
-      child.cancel(now);
-      await this.instances.save(child);
+    // The children it awaits end with it, and theirs with them (US9 AS3); each tells its run.
+    for (
+      let parent = parents.pop();
+      parent !== undefined;
+      parent = parents.pop()
+    ) {
+      const children = await this.instances.findAwaitedChildren(parent);
+
+      for (const child of children) {
+        child.cancel(now);
+        await this.instances.save(child);
+        parents.push(child.id);
+      }
     }
 
     return changed;

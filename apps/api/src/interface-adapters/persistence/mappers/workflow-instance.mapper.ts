@@ -17,6 +17,7 @@ export class WorkflowInstanceMapper {
       createdAt: instance.createdAt,
       startedAt: instance.startedAt,
       endedAt: instance.endedAt,
+      waiting: instance.waiting,
       version: instance.version,
     };
   }
@@ -36,6 +37,7 @@ export class WorkflowInstanceMapper {
       createdAt: row.createdAt,
       startedAt: row.startedAt,
       endedAt: row.endedAt,
+      waiting: row.waiting,
       version: row.version,
     });
   }

@@ -23,6 +23,10 @@ export class PublishVersion {
     if (!prepared.ok) return prepared;
 
     const publication = prepared.value.publication;
+
+    // The same document again: the version is published already, nothing changes.
+    if (!publication.created) return prepared;
+
     await this.workflows.save(prepared.value.workflow);
     await this.versions.add(publication.version);
     return prepared;

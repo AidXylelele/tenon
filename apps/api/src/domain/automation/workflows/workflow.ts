@@ -86,11 +86,13 @@ export class Workflow {
     return { ok: true, value: { version, created: true } };
   }
 
-  archive(now: Date): void {
-    if (this.#isArchived()) return;
+  // Whether archiving changed the workflow: an archived one stays as it was.
+  archive(now: Date): boolean {
+    if (this.#isArchived()) return false;
 
     this.#status = WorkflowStatus.Archived;
     this.#archivedAt = now;
+    return true;
   }
 
   startInstance(input: NewInstance): Result<WorkflowInstance, WorkflowRefusal> {
@@ -111,6 +113,12 @@ export class Workflow {
     restart: InstanceRestart,
   ): Result<WorkflowInstance, StartRefusal> {
     const previous = restart.previous;
+    const own =
+      previous.workflowId === this.#id &&
+      restart.version.id === previous.versionId;
+
+    if (!own)
+      throw new TypeError('The instance runs another workflow or version');
 
     if (!previous.ended)
       return { ok: false, failure: InstanceRefusal.NotEnded };

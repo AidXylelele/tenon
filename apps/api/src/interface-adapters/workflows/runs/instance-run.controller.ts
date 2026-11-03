@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { AcceptEvent } from '../../../application/automation/events/accept-event.js';
+import { EventOrigin } from '../../../application/automation/events/enums.js';
 import { BeginInstance } from '../../../application/automation/instances/begin-instance.js';
 import { BeginWaiting } from '../../../application/automation/instances/begin-waiting.js';
 import { CompleteInstance } from '../../../application/automation/instances/complete-instance.js';
@@ -41,6 +43,7 @@ export class InstanceRunController extends RunObserver {
     private readonly completeInstance: CompleteInstance,
     private readonly faultInstance: FaultInstance,
     private readonly startSubWorkflow: StartSubWorkflow,
+    private readonly acceptEvent: AcceptEvent,
   ) {
     super();
   }
@@ -138,6 +141,14 @@ export class InstanceRunController extends RunObserver {
     if (child === null) return { phase: null, output: null, error: null };
 
     return { phase: child.phase, output: child.output, error: child.error };
+  }
+
+  async emitted(instanceId: string, event: JsonObject): Promise<void> {
+    await this.acceptEvent.execute({
+      cloudEvent: event,
+      origin: EventOrigin.Emit,
+      instanceId,
+    });
   }
 
   completed(instanceId: string, output: JsonValue): Promise<void> {

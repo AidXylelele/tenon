@@ -5,14 +5,22 @@ import type {
   TaskProgress,
   TaskRecord,
 } from '../../../application/automation/instances/ports.js';
+import { EventOrigin } from '../../../application/automation/events/enums.js';
 import type { DrizzleTx } from '../interfaces.js';
+import { LifecycleEventMapper } from '../mappers/lifecycle-event.mapper.js';
+import { DrizzleInstanceNames } from '../queries/drizzle-instance-names.query.js';
+import { DrizzleEventStore } from './drizzle-event.store.js';
 import { taskProgress as progress } from '../schema/index.js';
 
 // One row per execution: a start writes it running, an end completes it (or writes it whole
 // when the task ended at once, skipped or faulted before it began).
 @Injectable()
 export class DrizzleTaskProgressStore implements TaskProgress {
-  constructor(private readonly txHost: TransactionHost<DrizzleTx>) {}
+  constructor(
+    private readonly txHost: TransactionHost<DrizzleTx>,
+    private readonly events: DrizzleEventStore,
+    private readonly names: DrizzleInstanceNames,
+  ) {}
 
   async started(instanceId: string, task: TaskRecord): Promise<void> {
     await this.txHost.tx
@@ -30,6 +38,7 @@ export class DrizzleTaskProgressStore implements TaskProgress {
         target: [progress.instanceId, progress.execution],
         set: { status: sql`excluded.status`, error: null, endedAt: null },
       });
+    await this.#told(instanceId, task);
   }
 
   async ended(instanceId: string, task: TaskRecord): Promise<void> {
@@ -56,5 +65,18 @@ export class DrizzleTaskProgressStore implements TaskProgress {
           endedAt: sql`excluded.ended_at`,
         },
       });
+    await this.#told(instanceId, task);
+  }
+
+  // The task's lifecycle event, accepted as any other event.
+  async #told(instanceId: string, task: TaskRecord): Promise<void> {
+    const names = await this.names.of(instanceId);
+
+    if (names === null) return;
+
+    const lifecycle = LifecycleEventMapper.ofTask(instanceId, names, task);
+
+    if (lifecycle !== null)
+      await this.events.accept(lifecycle, EventOrigin.Lifecycle, instanceId);
   }
 }

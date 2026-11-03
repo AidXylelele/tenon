@@ -15,6 +15,7 @@ export interface WorkflowInstanceProps {
   readonly createdAt: Date;
   readonly startedAt: Date | null;
   readonly endedAt: Date | null;
+  readonly waiting: boolean;
   readonly version: number;
 }
 
