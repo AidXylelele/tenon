@@ -5,7 +5,8 @@ import {
   TransactionHost,
 } from '@nestjs-cls/transactional';
 import { Outbox } from '@nestjs/outbox';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+import { TriggerKind } from '../../../domain/automation/instances/enums.js';
 import type { WorkflowInstanceRepository } from '../../../application/automation/instances/ports.js';
 import type { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
 import { StaleWriteError } from '../../../domain/errors.js';
@@ -29,6 +30,20 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
     if (!row) return null;
 
     return WorkflowInstanceMapper.toEntity(row);
+  }
+
+  async findAwaitedChildren(parentId: string): Promise<WorkflowInstance[]> {
+    const rows = await this.txHost.tx
+      .select()
+      .from(instances)
+      .where(
+        and(
+          eq(instances.originId, parentId),
+          eq(instances.trigger, TriggerKind.Parent),
+          isNull(instances.endedAt),
+        ),
+      );
+    return rows.map((row) => WorkflowInstanceMapper.toEntity(row));
   }
 
   // An upsert fenced by the instance's version; what the engine must learn goes to the outbox in

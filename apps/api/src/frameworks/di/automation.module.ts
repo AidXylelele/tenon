@@ -19,6 +19,7 @@ import { RecordTaskStart } from '../../application/automation/instances/record-t
 import { RestartInstance } from '../../application/automation/instances/restart-instance.js';
 import { ResumeInstance } from '../../application/automation/instances/resume-instance.js';
 import { StartInstance } from '../../application/automation/instances/start-instance.js';
+import { StartSubWorkflow } from '../../application/automation/instances/start-sub-workflow.js';
 import { SuspendInstance } from '../../application/automation/instances/suspend-instance.js';
 import { Clock } from '../../application/automation/ports.js';
 import { ArchiveWorkflow } from '../../application/automation/workflows/archive-workflow.js';
@@ -49,6 +50,7 @@ import { OutboxErrors } from '../outbox/outbox-errors.js';
 import { ErrorClassifier } from '../resilience/error-classifier.js';
 import { EngineRunClient } from '../workflows/engine-run.client.js';
 import { InstanceWorkflow } from '../workflows/instance.workflow.js';
+import { ProcessWorkflow } from '../workflows/process.workflow.js';
 import { StepErrors } from '../workflows/step-errors.js';
 import { EngineModule } from './engine.module.js';
 import { RuntimeModule } from './runtime.module.js';
@@ -101,10 +103,12 @@ import { RuntimeModule } from './runtime.module.js';
     InstanceDirective,
     CompleteInstance,
     FaultInstance,
+    StartSubWorkflow,
     InstanceRunController,
     ErrorClassifier,
     StepErrors,
     InstanceWorkflow,
+    ProcessWorkflow,
     OutboxErrors,
     InstanceEventsOutboxHandler,
   ],

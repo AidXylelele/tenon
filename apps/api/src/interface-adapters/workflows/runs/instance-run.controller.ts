@@ -9,9 +9,17 @@ import { InstanceDirective } from '../../../application/automation/instances/ins
 import { InstanceQueries } from '../../../application/automation/instances/queries.js';
 import { RecordTaskEnd } from '../../../application/automation/instances/record-task-end.js';
 import { RecordTaskStart } from '../../../application/automation/instances/record-task-start.js';
-import type { RunDirective } from '../../../domain/automation/instances/enums.js';
+import {
+  type RunDirective,
+  TriggerKind,
+} from '../../../domain/automation/instances/enums.js';
+import { WorkflowName } from '../../../domain/automation/workflows/workflow-name.js';
+import { StartSubWorkflow } from '../../../application/automation/instances/start-sub-workflow.js';
 import type { JsonObject, JsonValue } from '../../../domain/automation/json.js';
 import {
+  type ChildOutcome,
+  type ChildRequest,
+  type ChildStart,
   RunObserver,
   type RunPlan,
   type TaskEnded,
@@ -32,6 +40,7 @@ export class InstanceRunController extends RunObserver {
     private readonly instanceDirective: InstanceDirective,
     private readonly completeInstance: CompleteInstance,
     private readonly faultInstance: FaultInstance,
+    private readonly startSubWorkflow: StartSubWorkflow,
   ) {
     super();
   }
@@ -101,6 +110,34 @@ export class InstanceRunController extends RunObserver {
 
   directive(instanceId: string): Promise<RunDirective> {
     return this.instanceDirective.execute({ instanceId });
+  }
+
+  async startChild(parentId: string, child: ChildRequest): Promise<ChildStart> {
+    const name = new WorkflowName(child.namespace, child.name);
+    const trigger = child.detached ? TriggerKind.Detached : TriggerKind.Parent;
+    const started = await this.startSubWorkflow.execute({
+      parentId,
+      name,
+      version: child.version,
+      input: child.input,
+      trigger,
+    });
+
+    if (!started.ok)
+      return {
+        childId: null,
+        refusal: `The sub-workflow cannot start: ${started.failure}`,
+      };
+
+    return { childId: started.value.id, refusal: null };
+  }
+
+  async outcomeOf(childId: string): Promise<ChildOutcome> {
+    const child = await this.instances.get(childId);
+
+    if (child === null) return { phase: null, output: null, error: null };
+
+    return { phase: child.phase, output: child.output, error: child.error };
   }
 
   completed(instanceId: string, output: JsonValue): Promise<void> {

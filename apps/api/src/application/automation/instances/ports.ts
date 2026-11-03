@@ -53,6 +53,8 @@ export interface EndInstanceCommand {
 
 export abstract class WorkflowInstanceRepository {
   abstract find(id: string): Promise<WorkflowInstance | null>;
+  // The children an instance awaits (its `run: workflow` tasks') that have not ended.
+  abstract findAwaitedChildren(parentId: string): Promise<WorkflowInstance[]>;
   abstract save(instance: WorkflowInstance): Promise<void>;
   abstract remove(instance: WorkflowInstance): Promise<void>;
 }

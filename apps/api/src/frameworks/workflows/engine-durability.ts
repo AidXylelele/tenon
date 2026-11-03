@@ -7,6 +7,7 @@ import type { JsonObject } from '../../domain/automation/json.js';
 import { TaskFault } from '../runtime/execution/faults.js';
 import type {
   Durability,
+  GoJudgeCommand,
   StepOptions,
   StepRetry,
 } from '../runtime/interfaces.js';
@@ -25,6 +26,8 @@ export class EngineDurability implements Durability {
   private static readonly OUTAGE_DELAY_MS = 1_000;
   private static readonly OUTAGE_MAX_DELAY_MS = 60_000;
   private static readonly RETRYABLE = 'RetryableFault';
+  private static readonly INSTANCE = 'instance';
+  private static readonly PROCESS = 'process';
 
   constructor(
     private readonly ctx: WorkflowContext,
@@ -64,6 +67,37 @@ export class EngineDurability implements Durability {
 
   async sleep(name: string, milliseconds: number): Promise<void> {
     await this.ctx.sleep(name, milliseconds);
+  }
+
+  async awaitChild(name: string, instanceId: string): Promise<void> {
+    await this.ctx.executeChild(
+      EngineDurability.INSTANCE,
+      { instanceId },
+      { id: instanceId },
+    );
+  }
+
+  async detachChild(name: string, instanceId: string): Promise<void> {
+    await this.ctx.startChild(
+      EngineDurability.INSTANCE,
+      { instanceId },
+      {
+        id: instanceId,
+        parentClose: 'abandon',
+      },
+    );
+  }
+
+  async detachProcess(name: string, command: GoJudgeCommand): Promise<void> {
+    const id = `${this.instanceId}${name}`;
+    await this.ctx.startChild(
+      EngineDurability.PROCESS,
+      { command },
+      {
+        id,
+        parentClose: 'abandon',
+      },
+    );
   }
 
   async waitForResume(name: string, milliseconds: number): Promise<void> {

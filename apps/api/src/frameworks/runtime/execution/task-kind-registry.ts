@@ -50,6 +50,10 @@ export class TaskKindRegistry {
       const process = TaskKindRegistry.#PROCESSES.find((name) =>
         Object.hasOwn(run, name),
       );
+      const detached = run.await === false && process !== 'workflow';
+
+      if (detached) return 'run:detached';
+
       return `run:${process ?? 'unknown'}`;
     }
 

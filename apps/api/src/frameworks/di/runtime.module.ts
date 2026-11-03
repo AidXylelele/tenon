@@ -22,6 +22,9 @@ import { Authorizations } from '../runtime/execution/kinds/http/authorizations.j
 import { HttpCallKind } from '../runtime/execution/kinds/http/http-call-kind.js';
 import { OpenApiCallKind } from '../runtime/execution/kinds/http/openapi-call-kind.js';
 import { RaiseKind } from '../runtime/execution/kinds/raise-kind.js';
+import { DetachedProcessKind } from '../runtime/execution/kinds/run/detached-process-kind.js';
+import { ProcessKind } from '../runtime/execution/kinds/run/process-kind.js';
+import { WorkflowKind } from '../runtime/execution/kinds/run/workflow-kind.js';
 import { SetKind } from '../runtime/execution/kinds/set-kind.js';
 import { SwitchKind } from '../runtime/execution/kinds/switch-kind.js';
 import { TryKind } from '../runtime/execution/kinds/try-kind.js';
@@ -32,9 +35,12 @@ import {
   EndpointClient,
   JqClient,
   JsonSchemaClient,
+  SandboxClient,
+  SandboxLimits,
 } from '../runtime/interfaces.js';
 import { Runtime } from '../runtime/runtime.js';
 import { AjvModule } from './ajv.module.js';
+import { GoJudgeModule } from './go-judge.module.js';
 import { JqModule } from './jq.module.js';
 import { UndiciModule } from './undici.module.js';
 
@@ -44,7 +50,7 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
 };
 
 @Module({
-  imports: [JqModule, AjvModule, UndiciModule],
+  imports: [JqModule, AjvModule, UndiciModule, GoJudgeModule],
   providers: [
     {
       provide: RuntimeChecks,
@@ -65,11 +71,19 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
     },
     {
       provide: Runtime,
-      inject: [JqClient, JsonSchemaClient, EndpointClient],
+      inject: [
+        JqClient,
+        JsonSchemaClient,
+        EndpointClient,
+        SandboxClient,
+        SandboxLimits,
+      ],
       useFactory: (
         jq: JqClient,
         schemas: JsonSchemaClient,
         endpoints: EndpointClient,
+        sandbox: SandboxClient,
+        limits: SandboxLimits,
       ) => {
         const evaluator = new Evaluator(jq);
         const flow = new DataFlow(evaluator, schemas);
@@ -84,6 +98,8 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
             'call:openapi',
             new OpenApiCallKind(endpoints, authorizations, evaluator),
           ],
+          ['run:script', new ProcessKind(sandbox, limits, evaluator)],
+          ['run:shell', new ProcessKind(sandbox, limits, evaluator)],
         ]);
         const composites = new Map<string, CompositeKind>([
           ['do', new DoKind()],
@@ -91,6 +107,8 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
           ['fork', new ForkKind()],
           ['wait', new WaitKind(evaluator)],
           ['call:function', new FunctionCallKind(evaluator)],
+          ['run:detached', new DetachedProcessKind(limits, evaluator)],
+          ['run:workflow', new WorkflowKind(evaluator)],
         ]);
         const registry = new TaskKindRegistry(leaves, composites);
         composites.set('try', new TryKind(evaluator, registry));
@@ -103,6 +121,6 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
       },
     },
   ],
-  exports: [RuntimeChecks, Runtime],
+  exports: [RuntimeChecks, Runtime, GoJudgeModule],
 })
 export class RuntimeModule {}

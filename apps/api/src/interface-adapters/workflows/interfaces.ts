@@ -1,5 +1,8 @@
 import type { TaskStatus } from '../../application/automation/instances/enums.js';
-import type { RunDirective } from '../../domain/automation/instances/enums.js';
+import type {
+  Phase,
+  RunDirective,
+} from '../../domain/automation/instances/enums.js';
 import type { JsonObject, JsonValue } from '../../domain/automation/json.js';
 import type { RunOutcomeKind, VerdictKind } from './enums.js';
 
@@ -75,6 +78,32 @@ export abstract class RunObserver {
   abstract waiting(instanceId: string): Promise<void>;
   abstract running(instanceId: string): Promise<void>;
   abstract directive(instanceId: string): Promise<RunDirective>;
+  abstract startChild(
+    parentId: string,
+    child: ChildRequest,
+  ): Promise<ChildStart>;
+  abstract outcomeOf(childId: string): Promise<ChildOutcome>;
+}
+
+// A sub-workflow a `run: workflow` task starts; a detached one is not awaited.
+export interface ChildRequest {
+  readonly namespace: string;
+  readonly name: string;
+  readonly version: string;
+  readonly input: JsonValue;
+  readonly detached: boolean;
+}
+
+// The child instance's id, or why the platform refused to start it (null when it started).
+export interface ChildStart {
+  readonly childId: string | null;
+  readonly refusal: string | null;
+}
+
+export interface ChildOutcome {
+  readonly phase: Phase | null;
+  readonly output: JsonValue | null;
+  readonly error: JsonObject | null;
 }
 
 export interface RunCompleted {

@@ -304,6 +304,11 @@ export interface Durability {
   sleep(name: string, milliseconds: number): Promise<void>;
   // Until a resume signal, or `milliseconds` at most.
   waitForResume(name: string, milliseconds: number): Promise<void>;
+  // A platform instance run as this run's child, until it ends; or started on its own.
+  awaitChild(name: string, instanceId: string): Promise<void>;
+  detachChild(name: string, instanceId: string): Promise<void>;
+  // A process run on its own, its outcome unread.
+  detachProcess(name: string, command: GoJudgeCommand): Promise<void>;
 }
 
 // The runtime's own descriptor, `$runtime` in expressions.

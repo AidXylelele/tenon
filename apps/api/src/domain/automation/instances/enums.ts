@@ -15,6 +15,7 @@ export enum TriggerKind {
   Schedule = 'schedule',
   Event = 'event',
   Parent = 'parent',
+  Detached = 'detached',
   Restart = 'restart',
 }
 
