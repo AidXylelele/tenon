@@ -1,7 +1,8 @@
 'use client';
 
 import { ChevronLeftIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useMemo, useState, useTransition } from 'react';
 import type {
   CloudEvent,
   Instance,
@@ -9,6 +10,7 @@ import type {
   TaskRecord,
 } from '@/libs/data-access/types';
 import { Button } from '@/libs/ui/components/button';
+import { Spinner } from '@/libs/ui/components/spinner';
 import {
   Tabs,
   TabsContent,
@@ -28,12 +30,16 @@ import { isUnended } from '../../__shared_context/vocabulary';
 import { EventList } from './event-list';
 import { Timeline } from './timeline';
 
+export type RunPanel = 'timeline' | 'result' | 'input' | 'events';
+
 interface RunViewProps {
   readonly instance: Instance;
   readonly document: JsonObject | null;
   readonly records: readonly TaskRecord[];
   readonly more: boolean;
-  readonly events: readonly CloudEvent[];
+  readonly panel: RunPanel;
+  // Read only while the events panel is shown.
+  readonly events: readonly CloudEvent[] | null;
 }
 
 // A run on the canvas (FR-024): each step coloured by its latest status and each connection
@@ -44,9 +50,21 @@ export function RunView({
   document,
   records,
   more,
+  panel,
   events,
 }: RunViewProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [selected, setSelected] = useState<string | null>(null);
+  const [shown, setShown] = useState<RunPanel>(panel);
+  const [, startShowing] = useTransition();
+  // The panel lives in the address, so the server reads the events only when they are shown.
+  const show = (value: string) => {
+    const chosen = value as RunPanel;
+    const address = `${pathname}?view=${chosen}`;
+    setShown(chosen);
+    startShowing(() => router.replace(address, { scroll: false }));
+  };
   // Kept across renders that bring the same run, so a live refresh redraws only what changed.
   const pointers = useMemo(
     () =>
@@ -91,26 +109,19 @@ export function RunView({
       </div>
       <aside className="flex min-h-0 flex-col border-t bg-background lg:w-[28rem] lg:shrink-0 lg:overflow-y-auto lg:border-t-0 lg:border-l">
         {step === null ? (
-          <Tabs
-            defaultValue={
-              instance.phase === 'faulted' || instance.phase === 'completed'
-                ? 'output'
-                : 'timeline'
-            }
-            className="p-4"
-          >
+          <Tabs value={shown} onValueChange={show} className="p-4">
             <TabsList className="w-full">
               <TabsTrigger value="timeline">Timeline</TabsTrigger>
-              <TabsTrigger value="output">
+              <TabsTrigger value="result">
                 {instance.phase === 'faulted' ? 'Error' : 'Output'}
               </TabsTrigger>
               <TabsTrigger value="input">Input</TabsTrigger>
-              <TabsTrigger value="events">Events {events.length}</TabsTrigger>
+              <TabsTrigger value="events">Events</TabsTrigger>
             </TabsList>
             <TabsContent value="timeline">
               <Timeline records={records} more={more} />
             </TabsContent>
-            <TabsContent value="output">
+            <TabsContent value="result">
               <JsonBlock
                 value={
                   instance.phase === 'faulted'
@@ -128,7 +139,13 @@ export function RunView({
               <JsonBlock value={instance.input} empty="No input." />
             </TabsContent>
             <TabsContent value="events">
-              <EventList events={events} />
+              {events === null ? (
+                <p className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                  <Spinner /> Reading the run&apos;s events…
+                </p>
+              ) : (
+                <EventList events={events} />
+              )}
             </TabsContent>
           </Tabs>
         ) : (

@@ -1,9 +1,9 @@
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { notFound } from 'next/navigation';
 import { subscription as subscriptionOf } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
 import type { Delivery } from '@/libs/data-access/types';
-import { LiveRefresh } from '@/libs/live/live-refresh';
+import { RefreshControl } from '@/libs/live/refresh-control';
 import {
   Card,
   CardContent,
@@ -108,10 +108,9 @@ export async function SubscriptionDetail({ id }: { readonly id: string }) {
               event id for about a day.
             </p>
           </div>
-          <LiveRefresh
-            active
+          <RefreshControl
+            activity={live ? 'in-flight' : 'open'}
             renderedAt={subscription.readAt}
-            intervalMs={live ? 2000 : 5000}
           />
         </div>
         {subscription.deliveries.length === 0 ? (

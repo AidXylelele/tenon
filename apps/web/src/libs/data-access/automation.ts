@@ -64,7 +64,7 @@ export function versionDocument(
   version: string,
 ): Promise<JsonObject | null> {
   const path = `${workflowPath(namespace, name)}/versions/${encodeURIComponent(version)}`;
-  return read(path);
+  return read(path, { immutable: true });
 }
 
 export function checkDocument(document: JsonObject): Promise<Outcome<void>> {

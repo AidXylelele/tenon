@@ -13,6 +13,7 @@
 ### Session 2026-11-03
 
 - Q: How should the builder and a run's progress look? → A: As a graph on a canvas, as in n8n and similar platforms. Steps are nodes, configured in a side panel, and the connections between them are drawn so that their meaning is clear. The design is to be cleaner, more colourful and more modern, and the console to be organised cleanly. What a connection can mean stays what the standard defines: the next step, a path of a choice (`switch`), a jump (`then`), the handling of a failure (`try`/`catch`), the steps of a loop or of a branch. The canvas offers nothing the DSL cannot express.
+- Q: What must change after the canvas iteration (iteration 3)? → A: The console sends far too many requests; it is to refresh as Grafana does. Connections overlap on the canvas, groups and `try`/`catch` say little, and large workflows are hard to read: people are to organise the view and add notes to steps, or the canvas is to draw everything so that it stays clear. A code step needs an editor with syntax highlighting and formatting, and a large code must not stretch the step's panel. Failures and retries are to be visible and understood. Navigation and the menu are to be simpler, for people who are not technical too, and the console is to work well on small screens.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -194,7 +195,7 @@ A signed-in person changes their password. Someone who forgot theirs requests a 
 **Instances**
 
 - **FR-007**: Editors MUST be able to start a version with an input, given as JSON or, for a simple input schema, as a form; a start MUST carry an idempotency key, so a retried start creates one instance.
-- **FR-008**: The instance page MUST show the phase, trigger, origin, input, output or error, the task records in start order with status and duration, the events, and the outline of the workflow with each task's latest status; while the instance has not ended, it MUST refresh by itself at least every two seconds.
+- **FR-008**: The instance page MUST show the phase, trigger, origin, input, output or error, the task records in start order with status and duration, the events, and the outline of the workflow with each task's latest status; while the instance has not ended, it MUST refresh by itself (FR-026).
 - **FR-009**: Editors MUST be able to suspend, resume, cancel, restart and delete an instance; the console MUST offer only the controls the phase allows and show the API's reason when one is refused.
 - **FR-010**: Everyone MUST be able to list instances newest first, filtered by workflow, version, phase and start period, with the filters in the address, paged, and live while any listed instance has not ended.
 
@@ -233,11 +234,46 @@ A signed-in person changes their password. Someone who forgot theirs requests a 
 
   It MUST also offer a search (⌘K) across its pages and workflows.
 
+**Iteration 3: requests, clarity, failures, navigation** (Session 2026-11-03)
+
+- **FR-026**: Every live page MUST have one refresh control:
+  - refresh now;
+  - an interval: Auto (the default), Off, 5 s, 10 s, 30 s, 1 min or 5 min, kept for the viewer;
+  - when the page was last updated.
+
+  Auto MUST refresh every 5 s while something the page shows is in flight and every minute otherwise. Nothing refreshes more often than every 5 s. A hidden page MUST NOT refresh, and MUST refresh on return when a refresh fell due meanwhile.
+
+- **FR-027**: A page MUST read only what it shows: a run's events only on its Events view, a workflow's versions only on its Versions tab. A published version's document MUST be read once per session. Links in lists MUST load their page ahead only when the person points at them.
+- **FR-028**: The canvas MUST lay itself out so that no connection crosses a step or another connection's label:
+  - top to bottom, or left to right at the viewer's choice;
+  - readable at its first view;
+  - every container collapses and expands, and a run opens the containers that hold a running or faulted step.
+- **FR-029**: A `try` MUST be drawn as its protected steps and its "If it fails" steps, joined by a failure connection, with its retry policy written on it. A step protected on its own, with only a retry or nothing to do on failure, MUST be drawn as that step with a badge.
+- **FR-030**: Authors MUST be able to add a note to any step. The note shows under the step's name on the canvas; the workflow's summary shows on its start.
+- **FR-031**: The step panel MUST keep its size whatever it holds, scroll on its own, and be resizable on desktops. It has these sections:
+  - Settings;
+  - If it fails: stop the run, continue, retry N times S seconds apart, or handle the failure with other steps;
+  - Data;
+  - Note.
+
+  A step MUST be movable up and down its list, duplicable and deletable from the panel.
+
+- **FR-032**: Code MUST be edited with:
+  - syntax highlighting for JavaScript and Python;
+  - line numbers, indentation and bracket matching;
+  - syntax errors marked where they are;
+  - a fixed height with its own scroll, and a large editor on demand.
+
+  JavaScript MUST also be formattable.
+
+- **FR-033**: A step being retried MUST show its attempt, when the next try starts and why the last one failed. A faulted run MUST say what failed, where, and what to do next: open the editor, or run it again.
+- **FR-034**: Navigation MUST offer five destinations: Home, Workflows, Runs, Connections and Credentials. Settings holds Account, Team and the supported standard. Every page MUST show where it is with breadcrumbs. On small screens a bottom bar MUST carry the destinations, and a canvas MUST open its panel as a bottom sheet.
+
 **Feedback**
 
 - **FR-017**: Every action MUST show its pending state at once, block a second submission while pending, and end in a visible outcome: success, or the API's refusal with its title and detail; a refusal located in a request MUST be shown on its field.
 - **FR-018**: Navigation MUST show the target page's frame immediately and fill it as data arrives; a failure in one part of a page MUST NOT blank the rest.
-- **FR-019**: Live views MUST say when they were last updated and pause while the page is hidden. A run's page stops once the run has ended; lists and deliveries keep refreshing, faster while anything they show is in flight, because new items can arrive at any time.
+- **FR-019**: Live views MUST say when they were last updated and pause while the page is hidden; how often they refresh is FR-026.
 
 **Quality**
 
@@ -256,16 +292,17 @@ The console keeps no data of its own beyond the session. It shows the API's reso
 
 - **SC-001**: A first-time author builds, publishes and runs a three-task workflow from forms only, without help, in under five minutes.
 - **SC-002**: Every action shows its pending state within 100 ms; a page's frame appears within 100 ms of navigation and its content within one second on a local deployment.
-- **SC-003**: A task that starts or ends appears on an open instance page within two seconds.
+- **SC-003**: A task that starts or ends appears on an open instance page within five seconds (FR-026).
 - **SC-004**: Every problem the check reports is shown at its location: on a task and field in the builder, or at a line in the code view.
 - **SC-005**: Every page is usable at 360 px wide without horizontal scrolling of the page.
 - **SC-006**: No secret value and no webhook URL is shown after the screen where it was entered or created.
+- **SC-007**: A page left open causes at most 13 requests a minute while something it shows is in flight, and at most 2 a minute otherwise (measured on the production build).
 
 ## Assumptions
 
 - **Language.** The console is in English, like the API's messages and the standard's terms.
 - **Scope of no-code forms.** Forms cover `set`, `call: http`, `wait`, `emit`, `listen` (one event), `raise`, `switch`, `for`, `fork`, `try`, `do`, `run: workflow`, `run: script` and `run: shell`. `call: openapi`, `use.functions`, `use.authentications` and other constructs of the subset are edited as code and kept unchanged by the forms.
 - **Input form.** A start offers a form only when the version's input schema is an object of string, number, integer or boolean fields; otherwise JSON.
-- **Live updates** poll the API through the console's server; the API offers no push channel.
+- **Live updates** poll the API through the console's server, as Grafana refreshes its dashboards (R14); the API offers no push channel.
 - **People.** The API lists no users; the console shows the signed-in user and invitations only.
-- **Out of scope**: machine credentials, user management beyond invitations, a canvas with free node placement, an assistant that builds workflows, localisation.
+- **Out of scope**: machine credentials, user management beyond invitations, a canvas with free node placement (R16), an assistant that builds workflows, localisation.

@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { PageBody } from '@/libs/ui/composites/page-body';
 import { Button } from '@/libs/ui/components/button';
 import {

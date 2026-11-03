@@ -74,7 +74,7 @@ Audit (2026-11-03): the production dependencies of `web` have no known vulnerabi
 - **Cost.** A nonce makes every page dynamic. Every console page is dynamic already (R1).
 - **What is never kept.** Secret values and webhook URLs pass through actions and are never stored: the URL is shown once from the action's result.
 
-## R7. Live views
+## R7. Live views (superseded by R14)
 
 - **Decision.**
   - Intervals: 1.5 s on an instance page; 2 s on lists, deliveries and recent instances.
@@ -124,7 +124,7 @@ An independent review of the tiers, the BFF rules and security found no import t
 - **Hiding the controls a phase does not allow, and the 1 MiB pre-check, are UX.** The API still refuses both: a 409 and a 413. The console only avoids offering what would fail.
 - **The tier graph is reviewed, not linted.** The owner decided on 2026-10-28: "people review architecture". The constitution's lint clause and CODEOWNERS predate that decision for the whole repository, and the gap is recorded here.
 
-## R11. The canvas: React Flow, laid out by the document's own structure
+## R11. The canvas: React Flow, laid out by the document's own structure (layout superseded by R16)
 
 - **Decision.**
   - The builder and the run view draw the workflow with `@xyflow/react` (React Flow 12): custom nodes, custom edges, pan, zoom, fit, mini-map, and connections dragged between handles.
@@ -147,7 +147,7 @@ An independent review of the tiers, the BFF rules and security found no import t
 
 ## R12. Organisation and look (Session 2026-11-03)
 
-- **Navigation.**
+- **Navigation** (superseded by R15).
   - The console opens on an **Overview**.
   - Groups: _Workspace_ (Overview, Workflows, Runs), _Connections_ (Webhooks, Subscriptions, Event tester) and _Credentials_ (Secrets); _Supported standard_ and _Team_ sit at the foot.
   - A top bar on every page carries the sidebar toggle, the search (⌘K, shadcn `command` on `cmdk`) and the main action.
@@ -185,3 +185,121 @@ An independent review of the tiers, the BFF rules and security found no import t
 
 - **A green connection means "both ends ran", not "the choice took this path".** The task records do not say which case a `switch` took or which `then` a run followed.
 - **The run canvas reads the first 500 task records**, as the timeline does.
+
+## R14. Refreshing as Grafana does (iteration 3)
+
+- **Measured** on the production build, one page left open for 30 s (`pw/requests.mjs`), per minute:
+
+  | Page          | Browser → console | Console → API |
+  | ------------- | ----------------- | ------------- |
+  | Overview      | 600               | 152           |
+  | Workflow page | 192               | 62            |
+  | Runs          | 840               | 62            |
+  | A running run | 520               | 202           |
+
+- **Why so many.**
+  - `router.refresh()` empties the router cache, so every link on the page loads its target ahead again: 2 refreshes and 54 prefetches in 10 s on Runs.
+  - Lists, the Overview and a workflow's page refreshed every 5 s forever.
+  - Each refresh read everything again: the user, the immutable version document, events behind a closed tab.
+- **Grafana's way** (grafana.com docs):
+  - "By default, Grafana does not automatically refresh the dashboard". A picker beside the refresh button sets an interval, and "Auto" derives it from what is shown.
+  - `min_refresh_interval` "prevents users from setting the dashboard refresh interval to a lower value"; "the default interval value is 5 seconds".
+  - Panels load lazily: Grafana "will not issue any data queries for panels that are not visible".
+- **Decision.**
+  - One refresh control per live page, in the page header:
+    - refresh now;
+    - Auto, Off, 5 s, 10 s, 30 s, 1 min, 5 min;
+    - "Updated n s ago".
+
+    The interval is kept for the viewer in browser storage.
+
+  - **Auto.** Every 5 s while something the page shows is in flight, every minute otherwise; Off for pages with nothing live (a finished run). A tick never stacks on a refresh in flight. A hidden page waits and refreshes on return if a tick fell due.
+  - **Lazy reads.**
+    - A run reads its events only on its Events view (`?view=events`).
+    - A workflow reads its versions only on its Versions tab.
+    - A version document, which never changes once published, is fetched with `cache: 'force-cache'`. The cache key holds the session cookie, so nothing crosses sessions.
+  - **Links in tables and lists** load ahead on hover, focus or touch only: Next's documented hover-triggered prefetch (`prefetch={active ? null : false}`).
+- **Kept from R1/R7.** Server Components and `router.refresh()` stay. A client cache (TanStack Query, SWR) would move every live view into client components for no fewer requests: the count comes from the cadence and the prefetches.
+
+## R15. Navigation and small screens (iteration 3)
+
+- **Problem.** Eight destinations in three groups, two more at the foot, and technical names (Subscriptions, Event tester, Supported standard). Nothing said where a page sits, and on a phone the menu was only a drawer.
+- **Decision.**
+  - **Destinations.** Five, without group headings: Home (`/`), Workflows, Runs, Connections, Credentials.
+  - **Connections** is one page with tabs: Webhooks (start workflows from other apps), Notifications (subscriptions: tell other apps what happened) and Test event. Routes move under `/connections/*`.
+  - **Settings** is one page with tabs: Account, Team (administrators) and Standard (the conformance statement). Routes move under `/settings/*`.
+  - Old addresses redirect permanently (`next.config.ts` `redirects`).
+  - **Breadcrumbs** (shadcn `breadcrumb`) head every page below Home: Workflows › sales › lead-pipeline › Run 3f2a.
+  - **Desktop.** The sidebar collapses to icons (shadcn `collapsible="icon"`), and canvases open with it collapsed.
+  - **Phones.** A bottom bar carries the five destinations, as native apps do. A canvas opens its panel as a bottom sheet (shadcn `drawer`, vaul).
+
+## R16. The canvas laid out by ELK (iteration 3; replaces R11's layout)
+
+- **Problem.** R11's own layout drew jumps and skipped cases as arcs, so connections crossed containers and each other. Its fit view of a long line was unreadably small, and large workflows lost their structure.
+- **Decision.** `elkjs` lays the graph out with the layered algorithm, as Microsoft's Logic Apps designer does for the same constructs (scopes, conditions, switch, for each). Its `libs/designer/src/lib/core/graphlayout/elklayout.tsx` uses:
+  - `org.eclipse.elk.layered`;
+  - direction `DOWN`;
+  - `hierarchyHandling: INCLUDE_CHILDREN`;
+  - model order kept.
+
+  Here:
+  - **Direction.** Top to bottom by default; left to right at the viewer's choice, kept in browser storage.
+  - **Containers.** `do`, `for`, `try`, `fork` and catch handlers are compound nodes. `INCLUDE_CHILDREN` lays them out with the edges that leave them, which is dagre's open issue in R11.
+  - **Edges.** Orthogonal routing with rounded corners. ELK places the labels, so cases and jumps never overlap. The document's order is kept (`considerModelOrder: NODES_AND_EDGES`).
+  - **Collapse.** Every container collapses into one node ("4 steps"), kept per viewer and workflow. A run opens the containers that hold a running or faulted step.
+  - **`try`** is its protected steps, then a rose "If it fails" container joined by a dashed failure edge. The retry policy reads on its header ("Retries 3 times, 1 s apart").
+  - **A `try` around one step**, whose `catch` only retries or does nothing, is drawn as that step with a badge ("Retries 3×", "Continues on failure"). This is n8n's node setting: "Retry On Fail: when an execution fails, the node reruns until it succeeds"; "On Error, Continue".
+  - **Readable first view.** 100 % from the start of the flow; Fit is a button.
+  - **Loading.** ELK loads with the canvas only, as a split chunk, and lays out off the render.
+
+- **Notes.** A step's note is `metadata.note`. The DSL's task `metadata` is free-form, so the note travels with the document and its versions. It shows under the step's name, as n8n's "Display note in flow" shows a node's note "as a subtitle". The workflow's `document.summary` shows on Start.
+- **Not free placement.**
+  - Positions would live in the document, and every insertion would need a person to re-place the steps.
+  - A list's order is its execution order, so a picture placed by hand could contradict it.
+  - Logic Apps and Power Automate lay out the same constructs automatically.
+
+  The viewer organises the picture with direction, collapse and notes; an author organises the workflow with sections (`do`) and by moving steps up and down.
+
+## R17. The step panel and the code editor (iteration 3)
+
+- **Problem.**
+  - A long code or JSON field stretched the panel past the screen.
+  - The panel was one long form.
+  - Code had no highlighting.
+- **Panel.**
+  - A fixed column: a header (icon, name, kind, actions) over a body that scrolls.
+  - On desktops it is resizable with shadcn `resizable` (react-resizable-panels), and the width is kept.
+  - Sections as tabs, after n8n's node Parameters and Settings:
+    - **Settings.**
+    - **If it fails.** Stop the run, continue, retry N times S seconds apart, or handle with other steps. Each choice writes a `try` around the step:
+      - stop: no `try`;
+      - continue: `catch: {}`;
+      - retry: `catch.retry` with a constant delay and an attempt limit;
+      - other steps: `catch.do`, which turns into a full `try` container.
+
+      The step keeps its name inside the `try`, and `then` moves to the `try`.
+
+    - **Data.** Input, output, export, `if`, timeout.
+    - **Note.**
+  - Actions: move up and move down within the list, duplicate, delete.
+- **Code.**
+  - CodeMirror 6, already the code view's editor, with `@codemirror/lang-javascript` and `@codemirror/lang-python`.
+  - Line numbers, auto-indent, Tab to indent, bracket matching and closing, search.
+  - Syntax errors are taken from the language's parse tree and marked as lint diagnostics.
+  - A fixed height with its own scroll; "Expand" opens the same editor in a large dialog.
+  - "Format" for JavaScript only, with Prettier (`prettier/standalone` with its Babel and ESTree plugins), loaded on first use. Python has no formatter of note that runs in a browser.
+
+## R18. Failures a person can act on (iteration 3)
+
+- **Found on the running stack** (`failure-probe/probe.mjs`):
+  - a script that throws completed with an empty output;
+  - a call refused by the outbound address policy said only "The service could not be reached";
+  - retries happened but the record showed one row, running and then faulted.
+
+  The runtime's side is in 002 (research there); runs survive a restart of the API.
+
+- **Console.**
+  - A step being retried shows "Attempt n · next try in s s", and the last failure in its panel. The task record's `attempt`, `retryAt` and `previousError` come from 002.
+  - A faulted run's strip says what failed (title, detail), at which step (a click selects it), and what to do: Open in editor (authors) and Run again.
+  - Restart is named "Run again": it starts a new run of the same version with the same input.
+- **Not yet.** Continuing a faulted run from its failed step, as AWS Step Functions' redrive does. `@nestjs/workflows` can retry a failed instance from its journal (`WorkflowClient.retry`). The runtime, though, ends a DSL fault as a completed engine run, so the change is the runtime's and the domain's, to be designed with the owner first.

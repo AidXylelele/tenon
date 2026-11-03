@@ -1,5 +1,5 @@
 import { PlusIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { Suspense } from 'react';
 import { currentUser } from '@/libs/data-access/identity';
 import { Button } from '@/libs/ui/components/button';

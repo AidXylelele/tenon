@@ -7,7 +7,7 @@ import {
   WaypointsIcon,
   WebhookIcon,
 } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import {
   instances,
   recentInstances,
@@ -15,7 +15,7 @@ import {
 } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
 import type { InstanceSummary, Phase } from '@/libs/data-access/types';
-import { LiveRefresh } from '@/libs/live/live-refresh';
+import { RefreshControl } from '@/libs/live/refresh-control';
 import { Button } from '@/libs/ui/components/button';
 import {
   Card,
@@ -63,10 +63,9 @@ export async function Overview() {
         title={firstName === undefined ? 'Overview' : `Hello, ${firstName}`}
         description="What your automations are doing, live."
         actions={
-          <LiveRefresh
-            active
+          <RefreshControl
+            activity={inFlight.length > 0 ? 'in-flight' : 'open'}
             renderedAt={day.readAt}
-            intervalMs={inFlight.length > 0 ? 2000 : 5000}
           />
         }
       />

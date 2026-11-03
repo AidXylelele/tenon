@@ -1,7 +1,7 @@
 'use client';
 
 import { RefreshCwIcon, SendIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import type { Problem } from '@/libs/data-access/problem';

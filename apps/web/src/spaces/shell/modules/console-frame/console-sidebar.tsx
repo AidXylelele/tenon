@@ -15,7 +15,8 @@ import {
   WaypointsIcon,
   WebhookIcon,
 } from 'lucide-react';
-import Link, { useLinkStatus } from 'next/link';
+import { useLinkStatus } from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { usePathname } from 'next/navigation';
 import type { Role, User } from '@/libs/data-access/types';
 import {

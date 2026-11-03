@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import type { InstanceSummary } from '@/libs/data-access/types';
 import {
   Table,

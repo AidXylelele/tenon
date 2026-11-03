@@ -1,5 +1,5 @@
 import { DownloadIcon, PencilIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { notFound } from 'next/navigation';
 import { versionDocument } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';

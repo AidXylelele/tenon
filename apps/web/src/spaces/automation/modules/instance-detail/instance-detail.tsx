@@ -1,5 +1,5 @@
 import { CircleAlertIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { notFound } from 'next/navigation';
 import {
   instance as instanceOf,
@@ -9,7 +9,7 @@ import {
 } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
 import type { Instance } from '@/libs/data-access/types';
-import { LiveRefresh } from '@/libs/live/live-refresh';
+import { RefreshControl } from '@/libs/live/refresh-control';
 import { Duration, Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
 import { allEntries } from '../../__shared_context/document/tasks';
@@ -24,19 +24,27 @@ import {
   startedBy,
 } from '../../__shared_context/vocabulary';
 import { Controls } from './controls';
-import { RunView } from './run-view';
+import { type RunPanel, RunView } from './run-view';
+
+interface InstanceDetailProps {
+  readonly id: string;
+  // The panel in the address, or null for the one that fits the run's phase.
+  readonly view: RunPanel | null;
+}
 
 // A run, live until it ends (FR-008, FR-024): what it is, what it may still do, and its graph
-// with every step's status.
-export async function InstanceDetail({ id }: { readonly id: string }) {
-  const [user, instance, records, events] = await Promise.all([
+// with every step's status. Its events are read only while their panel is shown (FR-027).
+export async function InstanceDetail({ id, view }: InstanceDetailProps) {
+  const [user, instance, records] = await Promise.all([
     currentUser(),
     instanceOf(id),
     taskRecords(id),
-    instanceEvents(id),
   ]);
 
   if (instance === null) notFound();
+
+  const panel = view ?? defaultPanelOf(instance);
+  const events = panel === 'events' ? await instanceEvents(id) : null;
 
   const document = await versionDocument(
     instance.namespace,
@@ -69,10 +77,9 @@ export async function InstanceDetail({ id }: { readonly id: string }) {
           {canAuthor(user) && (
             <Controls id={instance.id} phase={instance.phase} />
           )}
-          <LiveRefresh
-            active={live}
+          <RefreshControl
+            activity={live ? 'in-flight' : 'ended'}
             renderedAt={records.readAt}
-            intervalMs={1500}
           />
         </div>
       </div>
@@ -84,10 +91,15 @@ export async function InstanceDetail({ id }: { readonly id: string }) {
         document={document}
         records={records.items}
         more={records.next !== null}
-        events={events.items}
+        panel={panel}
+        events={events?.items ?? null}
       />
     </div>
   );
+}
+
+function defaultPanelOf(instance: Instance): RunPanel {
+  return isUnended(instance.phase) ? 'timeline' : 'result';
 }
 
 function Facts({ instance }: { readonly instance: Instance }) {

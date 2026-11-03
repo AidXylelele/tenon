@@ -1,7 +1,7 @@
 'use client';
 
 import { PlusIcon, XIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';

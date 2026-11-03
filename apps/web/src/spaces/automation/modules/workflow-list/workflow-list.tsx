@@ -1,5 +1,5 @@
 import { PlusIcon, WaypointsIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { workflows } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
 import type { WorkflowStatus } from '@/libs/data-access/types';

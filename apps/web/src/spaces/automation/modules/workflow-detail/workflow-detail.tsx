@@ -1,5 +1,5 @@
 import { ArchiveIcon, PencilIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { notFound } from 'next/navigation';
 import {
   instances,
@@ -9,7 +9,7 @@ import {
 } from '@/libs/data-access/automation';
 import { currentUser } from '@/libs/data-access/identity';
 import type { Version } from '@/libs/data-access/types';
-import { LiveRefresh } from '@/libs/live/live-refresh';
+import { RefreshControl } from '@/libs/live/refresh-control';
 import {
   Alert,
   AlertDescription,
@@ -198,10 +198,9 @@ function Runs({
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold">{title}</h2>
         <div className="flex items-center gap-3">
-          <LiveRefresh
-            active
+          <RefreshControl
+            activity={live ? 'in-flight' : 'open'}
             renderedAt={runs.readAt}
-            intervalMs={live ? 2000 : 5000}
           />
           <Button variant="link" size="sm" asChild>
             <Link href={more}>See all</Link>

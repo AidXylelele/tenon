@@ -22,6 +22,9 @@ export interface RequestOptions {
   // Anonymous calls (sign-in, recovery, invitations) send no session, and their 401 is an
   // answer, not an ended session.
   readonly anonymous?: boolean;
+  // A read whose answer never changes (a published version's document): kept in Next's data
+  // cache, whose key holds the session cookie, so a refresh does not ask again (research R14).
+  readonly immutable?: boolean;
 }
 
 // The API answered with a status the caller did not expect to handle (a 403 on a read, for
@@ -52,7 +55,7 @@ export async function send(
       method: options.method ?? 'GET',
       headers: requestHeaders,
       body,
-      cache: 'no-store',
+      cache: options.immutable === true ? 'force-cache' : 'no-store',
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });

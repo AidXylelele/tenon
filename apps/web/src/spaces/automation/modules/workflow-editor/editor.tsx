@@ -10,7 +10,7 @@ import {
   XIcon,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';

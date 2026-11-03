@@ -1,9 +1,9 @@
 import { ActivityIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/libs/routing/link';
 import { instances } from '@/libs/data-access/automation';
 import type { InstanceFilter } from '@/libs/data-access/types';
 import { type Query, single } from '@/libs/routing/segment';
-import { LiveRefresh } from '@/libs/live/live-refresh';
+import { RefreshControl } from '@/libs/live/refresh-control';
 import { Button } from '@/libs/ui/components/button';
 import {
   Empty,
@@ -37,10 +37,9 @@ export async function InstanceList({ query }: { readonly query: Query }) {
         title="Runs"
         description="Every run of every workflow, newest first. Open one to follow it step by step."
         actions={
-          <LiveRefresh
-            active
+          <RefreshControl
+            activity={live ? 'in-flight' : 'open'}
             renderedAt={page.readAt}
-            intervalMs={live ? 2000 : 5000}
           />
         }
       />
