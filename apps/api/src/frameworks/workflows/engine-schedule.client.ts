@@ -5,17 +5,18 @@ import {
   TransactionHost,
 } from '@nestjs-cls/transactional';
 import { WorkflowClient, WorkflowSchedules } from '@nestjs/workflows';
-import type { Specification } from '@openworkflowspec/sdk';
-import type { JsonObject } from '../../domain/automation/json.js';
+import { TimingKind } from '../../interface-adapters/workflows/enums.js';
 import type { DrizzleTx } from '../../interface-adapters/persistence/interfaces.js';
-import type { ScheduleClient } from '../../interface-adapters/workflows/interfaces.js';
-import { Durations } from '../runtime/document/durations.js';
+import type {
+  ScheduleClient,
+  ScheduleTiming,
+} from '../../interface-adapters/workflows/interfaces.js';
 import {
   type ScheduleRunInput,
   ScheduleWorkflow,
 } from './schedule.workflow.js';
 
-// A document's `schedule` as the engine runs it: `cron` (in UTC) and `every` are engine
+// A schedule's timing as the engine runs it: a cron (in UTC) and an interval are engine
 // schedules, which start each occurrence once across all workers and, after downtime, at most
 // one missed occurrence (FR-029); `after` is a chain of delayed links.
 @Injectable()
@@ -30,10 +31,9 @@ export class EngineScheduleClient implements ScheduleClient {
 
   async apply(
     workflowId: string,
-    turnedOn: number,
-    document: JsonObject,
+    revision: number,
+    timing: ScheduleTiming | null,
   ): Promise<void> {
-    const schedule = EngineScheduleClient.scheduleOf(document);
     const id = EngineScheduleClient.idOf(workflowId);
     const input: ScheduleRunInput = { workflowId, delayMs: 0, chained: false };
     // `every` repeats from the epoch whatever the time zone, so only a cron takes one.
@@ -44,26 +44,24 @@ export class EngineScheduleClient implements ScheduleClient {
       input,
     };
 
-    if (schedule.cron !== undefined) {
-      const cron = schedule.cron;
+    if (timing?.kind === TimingKind.Cron) {
       const tz = EngineScheduleClient.UTC;
-      await this.schedules.upsert(id, { ...shared, cron, tz });
+      await this.schedules.upsert(id, { ...shared, cron: timing.cron, tz });
       return;
     }
 
-    if (schedule.every !== undefined) {
-      const every = Durations.millisecondsOf(schedule.every);
-      await this.schedules.upsert(id, { ...shared, every });
+    if (timing?.kind === TimingKind.Every) {
+      await this.schedules.upsert(id, { ...shared, every: timing.everyMs });
       return;
     }
 
     await this.schedules.remove(id);
 
-    if (schedule.after === undefined) return;
+    if (timing?.kind !== TimingKind.After) return;
 
     // The first link starts at once; each turn-on starts its own chain.
     const first: ScheduleRunInput = { workflowId, delayMs: 0, chained: true };
-    const firstId = `after-${workflowId}-${String(turnedOn)}`;
+    const firstId = `after-${workflowId}-${String(revision)}`;
     await this.client.start(ScheduleWorkflow, first, { id: firstId });
   }
 
@@ -76,23 +74,19 @@ export class EngineScheduleClient implements ScheduleClient {
   async continueAfter(
     workflowId: string,
     previousId: string,
-    document: JsonObject,
+    timing: ScheduleTiming | null,
   ): Promise<void> {
-    const after = EngineScheduleClient.scheduleOf(document).after;
+    if (timing?.kind !== TimingKind.After) return;
 
-    if (after === undefined) return;
-
-    const delayMs = Durations.millisecondsOf(after);
-    const next: ScheduleRunInput = { workflowId, delayMs, chained: true };
+    const next: ScheduleRunInput = {
+      workflowId,
+      delayMs: timing.afterMs,
+      chained: true,
+    };
     await this.client.start(ScheduleWorkflow, next, {
       id: `after-${previousId}`,
       transaction: this.txHost.tx,
     });
-  }
-
-  private static scheduleOf(document: JsonObject): Specification.Schedule {
-    const workflow = document as unknown as Specification.Workflow;
-    return workflow.schedule ?? {};
   }
 
   private static idOf(workflowId: string): string {

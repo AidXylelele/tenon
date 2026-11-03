@@ -8,3 +8,10 @@ export enum RunOutcomeKind {
   Faulted = 'faulted',
   Stopped = 'stopped',
 }
+
+// How a schedule's occurrences come: on a cron, at an interval, or after the previous ends.
+export enum TimingKind {
+  Cron = 'cron',
+  Every = 'every',
+  After = 'after',
+}

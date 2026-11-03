@@ -11,6 +11,8 @@ import { EngineClock } from '../../interface-adapters/workflows/runs/engine.cloc
 import { Database } from '../../interface-adapters/persistence/interfaces.js';
 import { ENGINE_CONCURRENCY } from '../workflows/engine.constants.js';
 import type { Env } from './config.module.js';
+import { CronClient } from '../runtime/interfaces.js';
+import { EngineCronClient } from '../workflows/engine-cron.client.js';
 
 @Module({
   providers: [
@@ -19,6 +21,13 @@ import type { Env } from './config.module.js';
   exports: [EngineClock],
 })
 export class EngineClockModule {}
+
+// The engine's own reading of a cron, for the checks publish runs; it needs the engine module.
+@Module({
+  providers: [{ provide: CronClient, useClass: EngineCronClient }],
+  exports: [CronClient],
+})
+export class EngineCronModule {}
 
 @Module({
   imports: [

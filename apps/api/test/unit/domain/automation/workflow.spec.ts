@@ -344,11 +344,13 @@ describe('Workflow on and off', () => {
       version,
       input: {},
       trigger: TriggerKind.Schedule,
+      chained: false,
+      chainRunning: false,
       now,
     });
 
-    expect(started.ok && started.value.id).toBe('occurrence-1');
-    expect(started.ok && started.value.trigger).toBe(TriggerKind.Schedule);
+    expect(started.ok && started.value?.id).toBe('occurrence-1');
+    expect(started.ok && started.value?.trigger).toBe(TriggerKind.Schedule);
   });
 
   it('a_workflow_that_is_off_starts_nothing_by_itself', () => {
@@ -360,6 +362,8 @@ describe('Workflow on and off', () => {
       version,
       input: {},
       trigger: TriggerKind.Event,
+      chained: false,
+      chainRunning: false,
       now,
     });
 
@@ -377,9 +381,40 @@ describe('Workflow on and off', () => {
       version: earlier,
       input: {},
       trigger: TriggerKind.Schedule,
+      chained: false,
+      chainRunning: false,
       now: later,
     });
 
     expect(started).toEqual({ ok: false, failure: WorkflowRefusal.Off });
+  });
+
+  it('a_link_of_an_after_chain_starts_none_while_the_schedules_instance_runs', () => {
+    const workflow = Workflow.register(name);
+    const version = published(workflow);
+    workflow.turnOn();
+
+    const started = workflow.startScheduledInstance({
+      instanceId: null,
+      version,
+      input: {},
+      trigger: TriggerKind.Schedule,
+      chained: true,
+      chainRunning: true,
+      now,
+    });
+
+    expect(started).toEqual({ ok: true, value: null });
+  });
+
+  it('only_a_workflow_that_is_on_has_a_scheduled_version', () => {
+    const workflow = Workflow.register(name);
+    const version = published(workflow);
+
+    const off = workflow.scheduledVersionId;
+    workflow.turnOn();
+
+    expect(off).toBeNull();
+    expect(workflow.scheduledVersionId).toBe(version.id);
   });
 });

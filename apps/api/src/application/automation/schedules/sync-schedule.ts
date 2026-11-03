@@ -20,14 +20,14 @@ export class SyncSchedule {
 
     if (workflow === null) return;
 
-    const currentId = workflow.currentVersionId;
+    const scheduledId = workflow.scheduledVersionId;
 
-    if (!workflow.on || currentId === null) {
+    if (scheduledId === null) {
       await this.schedules.clear(workflow);
       return;
     }
 
-    const version = await this.versions.findById(currentId);
+    const version = await this.versions.findById(scheduledId);
 
     if (version === null) return;
 

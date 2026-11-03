@@ -31,11 +31,13 @@ import { TryKind } from '../runtime/execution/kinds/try-kind.js';
 import { WaitKind } from '../runtime/execution/kinds/wait-kind.js';
 import { CronCheck } from '../runtime/checking/cron-check.js';
 import { RuntimeTriggerClient } from '../runtime/runtime-trigger.client.js';
-import { EngineCronClient } from '../workflows/engine-cron.client.js';
 import {
   FilterClient,
+  TimingClient,
   TriggerClient,
 } from '../../interface-adapters/workflows/interfaces.js';
+import { RuntimeTimingClient } from '../runtime/runtime-timing.client.js';
+import { EngineCronModule } from './engine.module.js';
 import { RuntimeFilterClient } from '../runtime/runtime-filter.client.js';
 import { ListenKind } from '../runtime/execution/kinds/listen-kind.js';
 import { EventFilters } from '../runtime/execution/events/event-filters.js';
@@ -61,9 +63,9 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
 };
 
 @Module({
-  imports: [JqModule, AjvModule, UndiciModule, GoJudgeModule],
+  imports: [JqModule, AjvModule, UndiciModule, GoJudgeModule, EngineCronModule],
   providers: [
-    { provide: CronClient, useClass: EngineCronClient },
+    { provide: TimingClient, useClass: RuntimeTimingClient },
     {
       provide: TriggerClient,
       inject: [JqClient],
@@ -157,6 +159,13 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
       },
     },
   ],
-  exports: [RuntimeChecks, Runtime, TriggerClient, FilterClient, GoJudgeModule],
+  exports: [
+    RuntimeChecks,
+    Runtime,
+    TriggerClient,
+    TimingClient,
+    FilterClient,
+    GoJudgeModule,
+  ],
 })
 export class RuntimeModule {}

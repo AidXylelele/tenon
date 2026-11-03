@@ -152,17 +152,27 @@ export class Workflow {
     return { ok: true, value: instance };
   }
 
+  // The version whose schedule starts instances now: the current one while on, none when off.
+  get scheduledVersionId(): string | null {
+    if (!this.#on) return null;
+
+    return this.#currentVersionId;
+  }
+
   // Only while the workflow is on does its current version's schedule start instances
-  // (FR-006); an occurrence of an earlier version's schedule starts none.
+  // (FR-006); an occurrence of an earlier version's schedule starts none. A link of an `after`
+  // chain starts none while the schedule's instance runs, so one chain goes on at a time.
   startScheduledInstance(
     start: ScheduledStart,
-  ): Result<WorkflowInstance, WorkflowRefusal> {
+  ): Result<WorkflowInstance | null, WorkflowRefusal> {
     const own = start.version.workflowId === this.#id;
 
     if (!own) throw new TypeError('The version belongs to another workflow');
 
-    if (!this.#on || start.version.id !== this.#currentVersionId)
+    if (start.version.id !== this.scheduledVersionId)
       return { ok: false, failure: WorkflowRefusal.Off };
+
+    if (start.chained && start.chainRunning) return { ok: true, value: null };
 
     const id = start.instanceId ?? randomUUID();
     const instance = WorkflowInstance.start(id, this.#id, {

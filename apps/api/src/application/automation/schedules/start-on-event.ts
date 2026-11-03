@@ -54,10 +54,12 @@ export class StartOnEvent {
         version,
         input: consumed,
         trigger: TriggerKind.Event,
+        chained: false,
+        chainRunning: false,
         now,
       });
 
-      if (!started.ok) continue;
+      if (!started.ok || started.value === null) continue;
 
       await this.instances.save(started.value);
       await this.runs.start(started.value);

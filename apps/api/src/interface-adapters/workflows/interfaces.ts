@@ -4,7 +4,7 @@ import type {
   RunDirective,
 } from '../../domain/automation/instances/enums.js';
 import type { JsonObject, JsonValue } from '../../domain/automation/json.js';
-import type { RunOutcomeKind, VerdictKind } from './enums.js';
+import type { RunOutcomeKind, TimingKind, VerdictKind } from './enums.js';
 
 // The identity a document declares, and a fingerprint of its content in canonical JSON.
 export interface DefinitionIdentity {
@@ -160,22 +160,31 @@ export abstract class RunClient {
   ): Promise<void>;
 }
 
-// The engine's schedules of a workflow, read from its version's document: the occurrences of a
-// cron or an interval, and the links of an `after` chain. `turnedOn` tells apart the chains
-// that each turn-on starts.
+// A schedule's timing as the engine runs it.
+export type ScheduleTiming =
+  | { readonly kind: TimingKind.Cron; readonly cron: string }
+  | { readonly kind: TimingKind.Every; readonly everyMs: number }
+  | { readonly kind: TimingKind.After; readonly afterMs: number };
+
+// A document's `schedule` timing, read by the runtime: null without cron, every or after.
+export abstract class TimingClient {
+  abstract timingOf(document: JsonObject): ScheduleTiming | null;
+}
+
+// The engine's schedules of a workflow: the occurrences of a cron or an interval, and the
+// links of an `after` chain. `revision` tells apart the chains each turn-on starts.
 export abstract class ScheduleClient {
   abstract apply(
     workflowId: string,
-    turnedOn: number,
-    document: JsonObject,
+    revision: number,
+    timing: ScheduleTiming | null,
   ): Promise<void>;
   abstract clear(workflowId: string): Promise<void>;
-  // In the caller's transaction: the link after the completed instance, if the document has
-  // an `after`.
+  // In the caller's transaction: the link after the completed instance, for an `after`.
   abstract continueAfter(
     workflowId: string,
     previousId: string,
-    document: JsonObject,
+    timing: ScheduleTiming | null,
   ): Promise<void>;
 }
 

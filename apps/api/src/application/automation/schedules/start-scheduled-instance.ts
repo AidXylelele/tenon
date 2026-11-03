@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import { TriggerKind } from '../../../domain/automation/instances/enums.js';
 import type { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
-import type { WorkflowRefusal } from '../../../domain/automation/workflows/enums.js';
+import { WorkflowRefusal } from '../../../domain/automation/workflows/enums.js';
 import type { Result } from '../../../domain/result.js';
 import { Missing } from '../enums.js';
 import {
@@ -22,8 +22,7 @@ export type ScheduledResult = Result<
 >;
 
 // An occurrence of a cron, an interval or an `after` delay starts one instance of the current
-// version, once: a repeated occurrence finds its instance (FR-029). A chained occurrence starts
-// none while an instance its schedule started runs, so one chain goes on at a time.
+// version, once: a repeated occurrence finds its instance (FR-029).
 @Injectable()
 export class StartScheduledInstance {
   constructor(
@@ -45,29 +44,27 @@ export class StartScheduledInstance {
 
     if (workflow === null) return { ok: false, failure: Missing.Workflow };
 
-    const currentId = workflow.currentVersionId;
+    const scheduledId = workflow.scheduledVersionId;
 
-    if (currentId === null) return { ok: false, failure: Missing.Version };
+    if (scheduledId === null)
+      return { ok: false, failure: WorkflowRefusal.Off };
 
-    const version = await this.versions.findById(currentId);
+    const version = await this.versions.findById(scheduledId);
 
     if (version === null) return { ok: false, failure: Missing.Version };
 
-    if (command.chained) {
-      const running = await this.instances.hasUnendedScheduled(workflow.id);
-
-      if (running) return { ok: true, value: null };
-    }
-
+    const chainRunning = await this.instances.hasUnendedScheduled(workflow.id);
     const started = workflow.startScheduledInstance({
       instanceId: command.instanceId,
       version,
       input: {},
       trigger: TriggerKind.Schedule,
+      chained: command.chained,
+      chainRunning,
       now,
     });
 
-    if (!started.ok) return started;
+    if (!started.ok || started.value === null) return started;
 
     await this.instances.save(started.value);
     await this.runs.start(started.value);
