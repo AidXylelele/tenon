@@ -3,6 +3,7 @@
 import {
   ActivityIcon,
   ChevronsUpDownIcon,
+  LayoutDashboardIcon,
   KeyRoundIcon,
   LogOutIcon,
   type LucideIcon,
@@ -59,12 +60,13 @@ interface Section {
 const EVERYONE: readonly Role[] = ['admin', 'editor', 'viewer'];
 const AUTHORS: readonly Role[] = ['admin', 'editor'];
 
-// What each role may open (002 FR-031): viewers read automations only.
+// What each role may open (002 FR-031): viewers read automations only (research R12).
 const SECTIONS: readonly Section[] = [
   {
-    label: 'Automations',
+    label: 'Workspace',
     roles: EVERYONE,
     items: [
+      { href: '/', label: 'Overview', icon: LayoutDashboardIcon },
       { href: '/workflows', label: 'Workflows', icon: WaypointsIcon },
       { href: '/instances', label: 'Runs', icon: ActivityIcon },
     ],
@@ -74,11 +76,19 @@ const SECTIONS: readonly Section[] = [
     roles: AUTHORS,
     items: [
       { href: '/webhooks', label: 'Webhooks', icon: WebhookIcon },
-      { href: '/events', label: 'Send an event', icon: SendIcon },
       { href: '/subscriptions', label: 'Subscriptions', icon: RadioTowerIcon },
-      { href: '/secrets', label: 'Secrets', icon: KeyRoundIcon },
+      { href: '/events', label: 'Event tester', icon: SendIcon },
     ],
   },
+  {
+    label: 'Credentials',
+    roles: AUTHORS,
+    items: [{ href: '/secrets', label: 'Secrets', icon: KeyRoundIcon }],
+  },
+];
+
+// Pages of the platform itself, at the foot of the navigation.
+const FOOT: readonly Section[] = [
   {
     label: 'Platform',
     roles: EVERYONE,
@@ -107,9 +117,10 @@ const ROLE_LABEL: Record<Role, string> = {
 // user's menu. Without a user yet, it shows its shape while the session is read.
 export function ConsoleSidebar({ user }: { readonly user: User | null }) {
   const pathname = usePathname();
-  const sections = SECTIONS.filter(
-    (section) => user === null || section.roles.includes(user.role),
-  );
+  const allowed = (section: Section) =>
+    user === null || section.roles.includes(user.role);
+  const sections = SECTIONS.filter(allowed);
+  const foot = FOOT.filter(allowed).flatMap((section) => section.items);
 
   return (
     <Sidebar collapsible="icon">
@@ -117,7 +128,7 @@ export function ConsoleSidebar({ user }: { readonly user: User | null }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip={PRODUCT_NAME}>
-              <Link href="/workflows">
+              <Link href="/">
                 <BrandMark className="size-8" />
                 <span className="font-semibold">{PRODUCT_NAME}</span>
               </Link>
@@ -149,7 +160,20 @@ export function ConsoleSidebar({ user }: { readonly user: User | null }) {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter>{user !== null && <UserMenu user={user} />}</SidebarFooter>
+      <SidebarFooter>
+        {user !== null && (
+          <SidebarMenu>
+            {foot.map((item) => (
+              <NavItem
+                key={item.href}
+                item={item}
+                active={isUnder(pathname, item.href)}
+              />
+            ))}
+          </SidebarMenu>
+        )}
+        {user !== null && <UserMenu user={user} />}
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
@@ -247,6 +271,8 @@ function UserMenu({ user }: { readonly user: User }) {
 }
 
 function isUnder(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/';
+
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

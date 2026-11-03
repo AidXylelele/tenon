@@ -5,8 +5,9 @@ import {
   ArrowLeftIcon,
   Code2Icon,
   FileUpIcon,
-  LayoutListIcon,
   SendIcon,
+  WorkflowIcon,
+  XIcon,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -18,6 +19,13 @@ import type {
   ConformanceStatement,
   JsonObject,
 } from '@/libs/data-access/types';
+import {
+  formatOf,
+  parseText,
+  rangeOf,
+  stringifyText,
+  type TextFormat,
+} from '@/libs/document-text/document-text';
 import { Button } from '@/libs/ui/components/button';
 import {
   Sheet,
@@ -33,20 +41,20 @@ import {
 } from '@/libs/ui/components/toggle-group';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { useIsMobile } from '@/libs/ui/hooks/use-mobile';
-import {
-  formatOf,
-  parseText,
-  rangeOf,
-  stringifyText,
-  type TextFormat,
-} from '@/libs/document-text/document-text';
+import { type CanvasEdge, START } from '../../__shared_context/canvas/graph';
+import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
 import {
   headerOf,
   MAX_DOCUMENT_BYTES,
   nextVersion,
   sizeOf,
 } from '../../__shared_context/document/draft';
-import { isObject, withMember } from '../../__shared_context/document/json';
+import {
+  isObject,
+  valueAt,
+  withMember,
+  withValue,
+} from '../../__shared_context/document/json';
 import { infoOf, newTask } from '../../__shared_context/document/kinds';
 import { locate } from '../../__shared_context/document/problems';
 import { withDeclaredSecrets } from '../../__shared_context/document/secrets';
@@ -59,7 +67,6 @@ import {
   removeTask,
   renameTask,
   replaceTask,
-  ROOT_LIST,
   type TaskKind,
 } from '../../__shared_context/document/tasks';
 import { workflowHref } from '../../__shared_context/links';
@@ -68,11 +75,11 @@ import { CheckStatus } from './check-status';
 import { EditingProvider } from './editing-context';
 import { HeaderCard } from './header-card';
 import { Inspector } from './inspector';
-import { TaskList } from './task-list';
+import { NodeCreator } from './node-creator';
 import { TriggerCard } from './trigger-card';
 import { useCheck } from './use-check';
 
-// The code view loads only when asked for, so the no-code builder opens without CodeMirror.
+// The code view loads only when asked for, so the canvas opens without CodeMirror.
 const CodeView = dynamic(() => import('./code-view'), {
   ssr: false,
   loading: () => <Skeleton className="h-[28rem] w-full rounded-xl" />,
@@ -89,8 +96,24 @@ interface EditorProps {
   readonly conformance: ConformanceStatement;
 }
 
-type View = 'builder' | 'code';
+type View = 'canvas' | 'code';
 
+interface TextError {
+  readonly message: string;
+  readonly from: number;
+  readonly to: number;
+  readonly line: number;
+}
+
+interface Place {
+  readonly listPointer: string;
+  readonly index: number;
+}
+
+const CASE = 'case-';
+
+// The builder (FR-022, FR-023): the workflow as a graph, a side panel for the picked node,
+// "what happens next?" on every `+`, and the same document as YAML or JSON in the code view.
 export function Editor({
   initial,
   existing,
@@ -100,16 +123,12 @@ export function Editor({
   const router = useRouter();
   const isMobile = useIsMobile();
   const [draft, setDraft] = useState(initial);
-  const [view, setView] = useState<View>('builder');
+  const [view, setView] = useState<View>('canvas');
   const [text, setText] = useState('');
   const [format, setFormat] = useState<TextFormat>('yaml');
-  const [textError, setTextError] = useState<{
-    message: string;
-    from: number;
-    to: number;
-    line: number;
-  } | null>(null);
+  const [textError, setTextError] = useState<TextError | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [creating, setCreating] = useState<Place | null>(null);
   const [focus, setFocus] = useState<{ from: number; to: number } | null>(null);
   const [publishProblem, setPublishProblem] = useState<Problem | null>(null);
   const [publishing, startPublish] = useTransition();
@@ -121,16 +140,15 @@ export function Editor({
     [check, draft],
   );
   const header = headerOf(draft);
-  const entry = selected === null ? null : entryAt(draft, selected);
+  const entry =
+    selected === null || selected === START ? null : entryAt(draft, selected);
   const changed = draft !== initial;
 
   useEffect(() => {
     if (!changed) return;
 
     const warn = (event: BeforeUnloadEvent) => {
-      if (published.current) return;
-
-      event.preventDefault();
+      if (!published.current) event.preventDefault();
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
@@ -162,10 +180,31 @@ export function Editor({
     setPublishProblem(null);
   }
 
-  function insert(listPointer: string, index: number, kind: TaskKind) {
+  function select(id: string | null) {
+    setCreating(null);
+    setSelected(id);
+  }
+
+  function openCreator(listPointer: string, index: number) {
+    setSelected(null);
+    setCreating({ listPointer, index });
+  }
+
+  function insert(kind: TaskKind) {
+    if (creating === null) return;
+
     const name = freeName(draft, infoOf(kind).stem);
-    update(insertTask(draft, listPointer, index, name, newTask(kind)));
-    setSelected(`${listPointer}/${index}/${name}`);
+    update(
+      insertTask(
+        draft,
+        creating.listPointer,
+        creating.index,
+        name,
+        newTask(kind),
+      ),
+    );
+    setCreating(null);
+    setSelected(`${creating.listPointer}/${creating.index}/${name}`);
   }
 
   function changeTask(task: JsonObject) {
@@ -195,6 +234,46 @@ export function Editor({
     toast(`Removed ${entry.name}`, {
       action: { label: 'Undo', onClick: () => update(before) },
     });
+  }
+
+  // A connection dragged from a step, or from a case of a choice, to another step of the
+  // same list: the DSL says it with `then` (research R11).
+  function connect(
+    source: string,
+    sourceHandle: string | null,
+    target: string,
+  ) {
+    const from = entryAt(draft, source);
+    const to = entryAt(draft, target);
+
+    if (from === null || to === null) return;
+
+    if (sourceHandle?.startsWith(CASE) === true) {
+      const index = Number(sourceHandle.slice(CASE.length));
+      update(withValue(draft, caseThen(draft, from.pointer, index), to.name));
+      toast.success(`That path of ${from.name} now goes to ${to.name}`);
+      return;
+    }
+
+    update(withValue(draft, `${from.pointer}/then`, to.name));
+    toast.success(`${from.name} now goes on to ${to.name}`);
+  }
+
+  // A jump or a case removed: the step goes on to the next one again.
+  function disconnect(edge: CanvasEdge) {
+    const from = entryAt(draft, edge.source);
+
+    if (from === null) return;
+
+    if (edge.kind === 'case') {
+      const index = Number(edge.id.split('#').at(-1));
+      update(
+        withValue(draft, caseThen(draft, from.pointer, index), 'continue'),
+      );
+      return;
+    }
+
+    update(withMember(draft, `${from.pointer}/then`, undefined));
   }
 
   function showCode(nextFormat: TextFormat = format) {
@@ -230,13 +309,13 @@ export function Editor({
     update(parsed.value);
   }
 
-  function showBuilder() {
+  function showCanvas() {
     if (textError !== null) {
       toast.error('Fix the text first', { description: textError.message });
       return;
     }
 
-    setView('builder');
+    setView('canvas');
   }
 
   async function load(file: File) {
@@ -255,18 +334,7 @@ export function Editor({
       return;
     }
 
-    if (located.taskPointer !== null) {
-      setSelected(located.taskPointer);
-      document
-        .getElementById('steps')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-
-    const card = located.field.startsWith('schedule') ? 'start' : 'about';
-    document
-      .getElementById(card)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    select(located.taskPointer ?? START);
   }
 
   function publish() {
@@ -314,212 +382,253 @@ export function Editor({
     siblingNames: [],
     scriptLanguages: conformance.scriptLanguages,
   };
+  const flagged = located === null ? null : (located.taskPointer ?? START);
+  const panelOpen = creating !== null || selected !== null;
 
-  const inspector = (
-    <EditingProvider
-      value={{
-        ...editing,
-        taskPointer: entry?.pointer ?? null,
-        siblingNames:
-          entry === null
-            ? []
-            : siblingsOf(draft, entry.listPointer, entry.name),
-      }}
-    >
-      <Inspector
-        key={entry?.pointer ?? 'none'}
-        draft={draft}
-        entry={entry}
-        onChange={changeTask}
-        onRename={rename}
-        onMove={move}
-        onRemove={remove}
-      />
-    </EditingProvider>
-  );
+  const panel =
+    creating !== null ? (
+      <NodeCreator onPick={insert} onClose={() => setCreating(null)} />
+    ) : selected === START ? (
+      <PanelFrame
+        title="The workflow and its start"
+        onClose={() => select(null)}
+      >
+        <div className="flex flex-col gap-4 p-4">
+          <TriggerCard draft={draft} onChange={update} />
+          <HeaderCard
+            draft={draft}
+            onChange={update}
+            named={existing !== null}
+          />
+        </div>
+      </PanelFrame>
+    ) : entry !== null ? (
+      <PanelFrame title="Step" onClose={() => select(null)}>
+        <EditingProvider
+          value={{
+            ...editing,
+            taskPointer: entry.pointer,
+            siblingNames: siblingsOf(draft, entry.listPointer, entry.name),
+          }}
+        >
+          <Inspector
+            key={entry.pointer}
+            draft={draft}
+            entry={entry}
+            onChange={changeTask}
+            onRename={rename}
+            onMove={move}
+            onRemove={remove}
+          />
+        </EditingProvider>
+      </PanelFrame>
+    ) : null;
 
   return (
     <EditingProvider value={editing}>
-      <div className="sticky top-0 z-10 -mx-4 flex flex-col gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2 md:px-4">
           <Button variant="ghost" size="icon-sm" asChild>
             <Link href={back} aria-label="Back">
               <ArrowLeftIcon />
             </Link>
           </Button>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <div className="truncate text-sm font-semibold">
-              {existing === null ? 'New workflow' : `Edit ${existing.name}`}
-              <span className="ml-2 font-normal text-muted-foreground tabular-nums">
+              {existing === null ? 'New workflow' : existing.name}
+              <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] font-normal text-muted-foreground">
                 {header.version}
               </span>
             </div>
+            <div className="max-w-[60vw] md:max-w-xl">
+              <CheckStatus
+                state={check}
+                textError={textError?.message ?? null}
+                onShow={showProblem}
+              />
+            </div>
           </div>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            value={view}
-            onValueChange={(next) =>
-              next === 'code'
-                ? showCode()
-                : next === 'builder'
-                  ? showBuilder()
-                  : undefined
-            }
-          >
-            <ToggleGroupItem value="builder" aria-label="Builder">
-              <LayoutListIcon />
-              <span className="hidden sm:inline">Builder</span>
-            </ToggleGroupItem>
-            <ToggleGroupItem value="code" aria-label="Code">
-              <Code2Icon />
-              <span className="hidden sm:inline">Code</span>
-            </ToggleGroupItem>
-          </ToggleGroup>
-          <Button onClick={publish} disabled={!ready || publishing}>
-            {publishing ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <SendIcon data-icon="inline-start" />
-            )}
-            {publishing ? 'Publishing…' : 'Publish'}
-          </Button>
-        </div>
-        <CheckStatus
-          state={check}
-          textError={textError?.message ?? null}
-          onShow={showProblem}
-        />
-      </div>
-
-      {publishProblem !== null && (
-        <div className="flex flex-col gap-2">
-          <ProblemMessage problem={publishProblem} />
-          {versionTaken && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="self-start"
-              onClick={() =>
-                update(
-                  withMember(
-                    draft,
-                    '/document/version',
-                    nextVersion(header.version),
-                  ),
-                )
-              }
-            >
-              Use version {nextVersion(header.version)}
-            </Button>
-          )}
-        </div>
-      )}
-
-      {view === 'code' ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="ml-auto flex items-center gap-2">
             <ToggleGroup
               type="single"
               variant="outline"
               size="sm"
-              value={format}
+              value={view}
               onValueChange={(next) =>
-                next !== '' &&
-                textError === null &&
-                showCode(next as TextFormat)
+                next === 'code'
+                  ? showCode()
+                  : next === 'canvas'
+                    ? showCanvas()
+                    : undefined
               }
             >
-              <ToggleGroupItem value="yaml">YAML</ToggleGroupItem>
-              <ToggleGroupItem value="json">JSON</ToggleGroupItem>
+              <ToggleGroupItem value="canvas" aria-label="Canvas">
+                <WorkflowIcon />
+                <span className="hidden sm:inline">Canvas</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="code" aria-label="Code">
+                <Code2Icon />
+                <span className="hidden sm:inline">Code</span>
+              </ToggleGroupItem>
             </ToggleGroup>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInput.current?.click()}
-            >
-              <FileUpIcon data-icon="inline-start" />
-              Load a file
+            <Button onClick={publish} disabled={!ready || publishing}>
+              {publishing ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <SendIcon data-icon="inline-start" />
+              )}
+              {publishing ? 'Publishing…' : 'Publish'}
             </Button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept=".yaml,.yml,.json,application/json,application/yaml,text/yaml"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-
-                if (file !== undefined) void load(file);
-
-                event.target.value = '';
-              }}
-            />
-            <span className="text-xs text-muted-foreground">
-              Open Workflow DSL {conformance.dsl.at(-1)}; the builder and this
-              text edit the same document.
-            </span>
           </div>
-          <CodeView
-            text={text}
-            onText={editText}
-            diagnostics={diagnostics}
-            focus={focus}
-          />
         </div>
-      ) : (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className="flex min-w-0 flex-col gap-6">
-            <section id="about">
-              <HeaderCard
-                draft={draft}
-                onChange={update}
-                named={existing !== null}
-              />
-            </section>
-            <section id="start">
-              <TriggerCard draft={draft} onChange={update} />
-            </section>
-            <section id="steps" className="flex flex-col gap-3">
-              <div>
-                <h2 className="text-base font-semibold">Steps</h2>
-                <p className="text-sm text-muted-foreground">
-                  They run top to bottom; pick one to set it up.
-                </p>
-              </div>
-              <TaskList
-                draft={draft}
-                listPointer={ROOT_LIST}
-                selected={selected}
-                flagged={located?.taskPointer ?? null}
-                onSelect={setSelected}
-                onInsert={insert}
-              />
-            </section>
-          </div>
-          {isMobile ? (
-            <Sheet
-              open={entry !== null}
-              onOpenChange={(open) => !open && setSelected(null)}
-            >
-              <SheetContent
-                side="bottom"
-                className="max-h-[85svh] overflow-y-auto p-4"
+
+        {publishProblem !== null && (
+          <div className="flex flex-col gap-2 border-b bg-red-500/[0.03] px-4 py-3">
+            <ProblemMessage problem={publishProblem} />
+            {versionTaken && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                onClick={() =>
+                  update(
+                    withMember(
+                      draft,
+                      '/document/version',
+                      nextVersion(header.version),
+                    ),
+                  )
+                }
               >
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Step</SheetTitle>
-                </SheetHeader>
-                {inspector}
-              </SheetContent>
-            </Sheet>
-          ) : (
-            <aside className="lg:sticky lg:top-32 lg:max-h-[calc(100svh-9rem)] lg:overflow-y-auto">
-              {inspector}
-            </aside>
-          )}
-        </div>
-      )}
+                Use version {nextVersion(header.version)}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {view === 'code' ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                value={format}
+                onValueChange={(next) =>
+                  next !== '' &&
+                  textError === null &&
+                  showCode(next as TextFormat)
+                }
+              >
+                <ToggleGroupItem value="yaml">YAML</ToggleGroupItem>
+                <ToggleGroupItem value="json">JSON</ToggleGroupItem>
+              </ToggleGroup>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInput.current?.click()}
+              >
+                <FileUpIcon data-icon="inline-start" />
+                Load a file
+              </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept=".yaml,.yml,.json,application/json,application/yaml,text/yaml"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+
+                  if (file !== undefined) void load(file);
+
+                  event.target.value = '';
+                }}
+              />
+              <span className="text-xs text-muted-foreground">
+                Open Workflow DSL {conformance.dsl.at(-1)}; the canvas and this
+                text edit the same document.
+              </span>
+            </div>
+            <CodeView
+              text={text}
+              onText={editText}
+              diagnostics={diagnostics}
+              focus={focus}
+            />
+          </div>
+        ) : (
+          <div className="relative flex min-h-0 flex-1">
+            <WorkflowCanvas
+              document={draft}
+              editable
+              selected={selected}
+              flagged={flagged}
+              onSelect={select}
+              onInsert={openCreator}
+              onConnect={connect}
+              onDisconnect={disconnect}
+              className="flex-1"
+            />
+            {!panelOpen && (
+              <div className="pointer-events-none absolute top-3 left-1/2 hidden -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-xs backdrop-blur md:block">
+                Click a step to set it up, + to add one, drag from a dot to jump
+              </div>
+            )}
+            {isMobile ? (
+              <Sheet
+                open={panelOpen}
+                onOpenChange={(open) => !open && select(null)}
+              >
+                <SheetContent
+                  side="bottom"
+                  className="max-h-[85svh] overflow-y-auto p-0 [&>button]:hidden"
+                >
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>Panel</SheetTitle>
+                  </SheetHeader>
+                  {panel}
+                </SheetContent>
+              </Sheet>
+            ) : (
+              panelOpen && (
+                <aside className="flex w-[26rem] shrink-0 flex-col overflow-y-auto border-l bg-background shadow-[-8px_0_24px_-16px_rgb(0_0_0/0.15)]">
+                  {panel}
+                </aside>
+              )
+            )}
+          </div>
+        )}
+      </div>
     </EditingProvider>
+  );
+}
+
+function PanelFrame({
+  title,
+  onClose,
+  children,
+}: {
+  readonly title: string;
+  readonly onClose: () => void;
+  readonly children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-0 flex-col">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-4 py-2.5 backdrop-blur">
+        <span className="text-xs font-medium text-muted-foreground">
+          {title}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <XIcon />
+        </Button>
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -532,4 +641,11 @@ function siblingsOf(
   return entriesAt(draft, listPointer)
     .map((each) => each.name)
     .filter((name) => name !== own);
+}
+
+// The pointer of the `then` of a choice's case, by the case's position.
+function caseThen(draft: JsonObject, pointer: string, index: number): string {
+  const item = valueAt(draft, `${pointer}/switch/${index}`);
+  const name = isObject(item) ? (Object.keys(item)[0] ?? '') : '';
+  return `${pointer}/switch/${index}/${name}/then`;
 }

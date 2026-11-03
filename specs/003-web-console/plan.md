@@ -17,17 +17,17 @@ Decisions and their sources: [research.md](research.md). View models: [data-mode
 
 ## Technical Context
 
-|                          |                                                                                                                                                                                                 |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Language/Version**     | TypeScript 6.0.3, React 19.3, Next.js 16.4.3 (App Router, Turbopack), Node 26.13.0                                                                                                              |
-| **Primary Dependencies** | shadcn/ui (Radix, style nova) with `radix-ui`, `cn`, `class-variance-authority`, `lucide-react`, `tw-animate-css`; `sonner`; `yaml`; CodeMirror 6 through `@uiw/react-codemirror` (research R4) |
-| **Storage**              | None; the session token lives in an HttpOnly cookie on the web origin                                                                                                                           |
-| **Testing**              | Vitest 5 + Testing Library (jsdom), with the API stubbed at the HTTP boundary; the running stack for journeys                                                                                   |
-| **Target Platform**      | Browsers of the last two years; the existing Docker image (`output: 'standalone'`)                                                                                                              |
-| **Project Type**         | Web application: `apps/web` only, against the API's contracts ([001](../001-api-authentication/contracts/openapi.yaml), [002](../002-workflow-engine/contracts/openapi.yaml))                   |
-| **Performance Goals**    | SC-002, SC-003                                                                                                                                                                                  |
-| **Constraints**          | The API is the only authority; the API offers no push, so live views poll; Server Action bodies are capped at 2 MB, for 1 MiB documents                                                         |
-| **Scale/Scope**          | 23 routes, 8 user stories                                                                                                                                                                       |
+|                          |                                                                                                                                                                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Language/Version**     | TypeScript 6.0.3, React 19.3, Next.js 16.4.3 (App Router, Turbopack), Node 26.13.0                                                                                                                                                                      |
+| **Primary Dependencies** | shadcn/ui (Radix, style nova) with `radix-ui`, `cn`, `class-variance-authority`, `lucide-react`, `tw-animate-css`; `sonner`; `yaml`; CodeMirror 6 through `@uiw/react-codemirror` (R4); `@xyflow/react` for the canvas and `cmdk` for search (R11, R12) |
+| **Storage**              | None; the session token lives in an HttpOnly cookie on the web origin                                                                                                                                                                                   |
+| **Testing**              | Vitest 5 + Testing Library (jsdom), with the API stubbed at the HTTP boundary; the running stack for journeys                                                                                                                                           |
+| **Target Platform**      | Browsers of the last two years; the existing Docker image (`output: 'standalone'`)                                                                                                                                                                      |
+| **Project Type**         | Web application: `apps/web` only, against the API's contracts ([001](../001-api-authentication/contracts/openapi.yaml), [002](../002-workflow-engine/contracts/openapi.yaml))                                                                           |
+| **Performance Goals**    | SC-002, SC-003                                                                                                                                                                                                                                          |
+| **Constraints**          | The API is the only authority; the API offers no push, so live views poll; Server Action bodies are capped at 2 MB, for 1 MiB documents                                                                                                                 |
+| **Scale/Scope**          | 23 routes, 8 user stories                                                                                                                                                                                                                               |
 
 ## Constitution Check (3.0.1)
 
@@ -92,10 +92,10 @@ apps/web/src/
 │   ├── shell/modules/{console-frame, auth-frame}
 │   ├── identity/modules/{sign-in, password-recovery, password-reset, invitation-acceptance, account, invitations}
 │   └── automation/
-│       ├── modules/{workflow-list, workflow-detail, workflow-editor, version-document, instance-list,
+│       ├── modules/{overview, …}{workflow-list, workflow-detail, workflow-editor, version-document, instance-list,
 │       │            instance-detail, conformance, webhooks, secrets, event-sender, subscription-list,
 │       │            subscription-form, subscription-detail}
-│       └── __shared_context/{document, outline, vocabulary}
+│       └── __shared_context/{document, canvas, outline, vocabulary}   canvas: the graph layout, nodes and edges (R11)
 └── libs/
     ├── ui/                          design system: shadcn components + composites (page header, submit button, JSON block, copy, time)
     ├── data-access/                 the only API client (server-only): session cookie, problems, typed resources

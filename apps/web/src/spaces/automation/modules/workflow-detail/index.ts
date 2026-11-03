@@ -1,1 +1,1 @@
-export { WorkflowDetail } from './workflow-detail';
+export { WorkflowDetail, type WorkflowTab } from './workflow-detail';

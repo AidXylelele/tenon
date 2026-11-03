@@ -1,6 +1,11 @@
 import { isWithin } from '@/libs/document-text/json-pointer';
 import type { TaskRecord } from '@/libs/data-access/types';
-import type { TaskProgress } from './workflow-outline';
+
+export interface TaskProgress {
+  readonly status: TaskRecord['status'];
+  // How many times the task ran (iterations, retries, later visits).
+  readonly runs: number;
+}
 
 // Each task's latest progress on a run, by the task's pointer. A task that ran several times
 // (iterations, retries, later visits) shows its latest record and how many there were; a task

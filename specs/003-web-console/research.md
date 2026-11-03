@@ -123,3 +123,47 @@ An independent review of the tiers, the BFF rules and security found no import t
 - **Declaring a picked secret in `use.secrets` (R5) is authoring, not validation.** A person who picks a secret in a form has said which secret the call uses. The builder writes the document that says so, as an editor adds an import. The check stays the API's and still refuses an undeclared name in code.
 - **Hiding the controls a phase does not allow, and the 1 MiB pre-check, are UX.** The API still refuses both: a 409 and a 413. The console only avoids offering what would fail.
 - **The tier graph is reviewed, not linted.** The owner decided on 2026-10-28: "people review architecture". The constitution's lint clause and CODEOWNERS predate that decision for the whole repository, and the gap is recorded here.
+
+## R11. The canvas: React Flow, laid out by the document's own structure
+
+- **Decision.**
+  - The builder and the run view draw the workflow with `@xyflow/react` (React Flow 12): custom nodes, custom edges, pan, zoom, fit, mini-map, and connections dragged between handles.
+  - Positions come from a deterministic layout of the document's structure (`__shared_context/canvas/graph.ts`). Lists run left to right. Containers hold their lanes. Jumps arc above the line.
+- **Why React Flow.** It is the canvas library of the React ecosystem, MIT licensed and maintained. n8n's editor uses its Vue counterpart.
+- **Why not a layout library.** React Flow's layout guide (reactflow.dev/learn/layouting/layouting):
+  - dagre "currently has an open issue that prevents it from laying out sub-flows correctly if any nodes in the sub-flow are connected to nodes outside the sub-flow", and every `for`, `try` and `fork` is a sub-flow;
+  - d3-hierarchy "assigns the same width and height to all nodes";
+  - elkjs is about 1.4 MB, and the guide says "we don't often recommend elkjs".
+
+  The DSL is a structured program, so its syntax already fixes where each step goes: a sequence, branches stacked, a body inside its loop. A layered layout algorithm would only rediscover that, and could reorder it.
+
+- **What a connection is.** An edge is drawn only for what the DSL says:
+  - the next step;
+  - a case of a `switch`;
+  - a task's `then`;
+  - the end of the run.
+
+  Dragging from a step, or from a case's handle, to a step of the same list writes `then`. Deleting that edge removes it. No connection merges branches or crosses lists, because the DSL has none (002 spec: "without n8n mechanics").
+
+## R12. Organisation and look (Session 2026-11-03)
+
+- **Navigation.**
+  - The console opens on an **Overview**.
+  - Groups: _Workspace_ (Overview, Workflows, Runs), _Connections_ (Webhooks, Subscriptions, Event tester) and _Credentials_ (Secrets); _Supported standard_ and _Team_ sit at the foot.
+  - A top bar on every page carries the sidebar toggle, the search (⌘K, shadcn `command` on `cmdk`) and the main action.
+- **Pages.**
+  - A workflow's page has tabs: Overview (its graph), Runs and Versions.
+  - The editor and a run's page take the whole width, as canvases do.
+  - Every other page keeps a readable column (`PageBody`).
+- **Colour.**
+  - One accent, violet-indigo, for primary actions, focus and selection.
+  - Each family of steps has its own hue on its icon tile:
+    - calls: blue;
+    - data: teal;
+    - code: slate;
+    - events: amber;
+    - flow: violet;
+    - time: sky;
+    - sub-workflows: indigo;
+    - errors: rose.
+  - Status colours stay those of R8 and appear only as rings, dots and taken edges, so state is never confused with kind.

@@ -10,25 +10,6 @@ import {
 import { currentUser } from '@/libs/data-access/identity';
 import type { Instance } from '@/libs/data-access/types';
 import { LiveRefresh } from '@/libs/live/live-refresh';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '@/libs/ui/components/alert';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/libs/ui/components/card';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/libs/ui/components/tabs';
-import { JsonBlock } from '@/libs/ui/composites/json-block';
-import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Duration, Time } from '@/libs/ui/composites/time';
 import { canAuthor } from '../../__shared_context/access';
 import { allEntries } from '../../__shared_context/document/tasks';
@@ -37,17 +18,16 @@ import {
   versionHref,
   workflowHref,
 } from '../../__shared_context/links';
-import { progressOf } from '../../__shared_context/outline/progress';
-import { WorkflowOutline } from '../../__shared_context/outline/workflow-outline';
 import {
   isUnended,
   PhaseStatus,
   startedBy,
 } from '../../__shared_context/vocabulary';
 import { Controls } from './controls';
-import { EventList } from './event-list';
-import { Timeline } from './timeline';
+import { RunView } from './run-view';
 
+// A run, live until it ends (FR-008, FR-024): what it is, what it may still do, and its graph
+// with every step's status.
 export async function InstanceDetail({ id }: { readonly id: string }) {
   const [user, instance, records, events] = await Promise.all([
     currentUser(),
@@ -67,109 +47,52 @@ export async function InstanceDetail({ id }: { readonly id: string }) {
     document === null
       ? []
       : allEntries(document).map(({ entry }) => entry.pointer);
-  const progress = progressOf(records.items, pointers);
-  const faultAt =
-    instance.phase === 'faulted' ? (instance.error?.instance ?? null) : null;
   const live = isUnended(instance.phase);
-  const workflowPage = workflowHref(instance.namespace, instance.name);
 
   return (
-    <>
-      <PageHeader
-        eyebrow={
-          <Link href={workflowPage} className="hover:text-foreground">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3 border-b px-4 py-3 md:px-6">
+        <div className="min-w-0 flex-1">
+          <Link
+            href={workflowHref(instance.namespace, instance.name)}
+            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
             {instance.namespace} / {instance.name}
           </Link>
-        }
-        title={
-          <span className="flex flex-wrap items-center gap-3">
+          <h1 className="flex flex-wrap items-center gap-3 text-lg font-semibold tracking-tight">
             Run of {instance.name}
-            <PhaseStatus phase={instance.phase} className="text-base" />
-          </span>
-        }
-        description={<Facts instance={instance} />}
-        actions={
-          canAuthor(user) ? (
+            <PhaseStatus phase={instance.phase} />
+          </h1>
+          <Facts instance={instance} />
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          {canAuthor(user) && (
             <Controls id={instance.id} phase={instance.phase} />
-          ) : undefined
-        }
-      />
-      <div className="-mt-3">
-        <LiveRefresh
-          active={live}
-          renderedAt={records.readAt}
-          intervalMs={1500}
-        />
+          )}
+          <LiveRefresh
+            active={live}
+            renderedAt={records.readAt}
+            intervalMs={1500}
+          />
+        </div>
       </div>
       {instance.phase === 'faulted' && instance.error !== null && (
-        <FaultAlert instance={instance} pointers={pointers} />
+        <FaultStrip instance={instance} pointers={pointers} />
       )}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Steps</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {document === null ? (
-              <p className="text-sm text-muted-foreground">
-                The version is no longer readable.
-              </p>
-            ) : (
-              <WorkflowOutline
-                document={document}
-                progress={progress}
-                faultAt={faultAt}
-                startTone={instance.phase === 'pending' ? 'idle' : 'done'}
-              />
-            )}
-          </CardContent>
-        </Card>
-        <Tabs
-          defaultValue={instance.phase === 'completed' ? 'output' : 'timeline'}
-          className="min-w-0"
-        >
-          <TabsList>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="output">
-              {instance.phase === 'faulted' ? 'Error' : 'Output'}
-            </TabsTrigger>
-            <TabsTrigger value="input">Input</TabsTrigger>
-            <TabsTrigger value="events">
-              Events ({events.items.length})
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="timeline">
-            <Timeline records={records.items} more={records.next !== null} />
-          </TabsContent>
-          <TabsContent value="output">
-            {instance.phase === 'faulted' ? (
-              <JsonBlock value={instance.error} />
-            ) : (
-              <JsonBlock
-                value={instance.output}
-                empty={
-                  live
-                    ? 'The output appears when the run completes.'
-                    : 'No output.'
-                }
-              />
-            )}
-          </TabsContent>
-          <TabsContent value="input">
-            <JsonBlock value={instance.input} empty="No input." />
-          </TabsContent>
-          <TabsContent value="events">
-            <EventList events={events.items} />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </>
+      <RunView
+        instance={instance}
+        document={document}
+        records={records.items}
+        more={records.next !== null}
+        events={events.items}
+      />
+    </div>
   );
 }
 
 function Facts({ instance }: { readonly instance: Instance }) {
   return (
-    <span className="flex flex-wrap gap-x-4 gap-y-1">
+    <p className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
       <span>
         Version{' '}
         <Link
@@ -201,11 +124,11 @@ function Facts({ instance }: { readonly instance: Instance }) {
             : 'Started by its parent run'}
         </Link>
       )}
-    </span>
+    </p>
   );
 }
 
-function FaultAlert({
+function FaultStrip({
   instance,
   pointers,
 }: {
@@ -221,22 +144,23 @@ function FaultAlert({
   const kind = error.type.split('/').at(-1);
 
   return (
-    <Alert variant="destructive">
-      <CircleAlertIcon />
-      <AlertTitle>
-        {error.title ?? 'The run faulted'}
-        {name !== undefined && ` at ${name}`}
-      </AlertTitle>
-      <AlertDescription>
-        <p>
+    <div
+      className="flex items-start gap-3 border-b bg-red-500/[0.06] px-4 py-2.5 text-sm md:px-6"
+      role="alert"
+    >
+      <CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-red-600 dark:text-red-400" />
+      <div className="min-w-0">
+        <span className="font-medium text-red-700 dark:text-red-300">
+          {error.title ?? 'The run faulted'}
+          {name !== undefined && ` at ${name}`}
+        </span>
+        <span className="text-muted-foreground">
+          {' '}
           {error.detail ??
-            'The step raised an error the workflow did not handle.'}
-        </p>
-        <p className="text-xs">
-          {kind} error, status {error.status}, at{' '}
-          <code className="font-mono">{error.instance}</code>
-        </p>
-      </AlertDescription>
-    </Alert>
+            'The step raised an error the workflow did not handle.'}{' '}
+          ({kind}, status {error.status})
+        </span>
+      </div>
+    </div>
   );
 }

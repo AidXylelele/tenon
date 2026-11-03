@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { segment } from '@/libs/routing/segment';
-import { WorkflowDetail } from '@/spaces/automation/modules/workflow-detail';
+import {
+  WorkflowDetail,
+  type WorkflowTab,
+} from '@/spaces/automation/modules/workflow-detail';
 
 export async function generateMetadata({
   params,
@@ -14,12 +17,17 @@ export default async function WorkflowPage({
   searchParams,
 }: PageProps<'/workflows/[namespace]/[name]'>) {
   const { namespace, name } = await params;
-  const { start } = await searchParams;
+  const { start, tab } = await searchParams;
   return (
     <WorkflowDetail
       namespace={segment(namespace)}
       name={segment(name)}
+      tab={tabOf(tab)}
       starting={start === '1'}
     />
   );
+}
+
+function tabOf(value: string | string[] | undefined): WorkflowTab {
+  return value === 'runs' || value === 'versions' ? value : 'overview';
 }

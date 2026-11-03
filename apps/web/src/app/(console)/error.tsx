@@ -1,5 +1,6 @@
 'use client';
 
+import { PageBody } from '@/libs/ui/composites/page-body';
 import { ErrorPanel } from '@/libs/ui/composites/error-panel';
 
 export default function ConsoleError({
@@ -13,5 +14,9 @@ export default function ConsoleError({
     error instanceof Error && 'digest' in error
       ? String(error.digest)
       : undefined;
-  return <ErrorPanel retry={retry} digest={digest} />;
+  return (
+    <PageBody>
+      <ErrorPanel retry={retry} digest={digest} />
+    </PageBody>
+  );
 }

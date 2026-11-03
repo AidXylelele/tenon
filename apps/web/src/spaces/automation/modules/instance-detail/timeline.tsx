@@ -13,9 +13,12 @@ import {
 export function Timeline({
   records,
   more,
+  open = false,
 }: {
   readonly records: readonly TaskRecord[];
   readonly more: boolean;
+  // Opens a single record at once, as when one step is picked.
+  readonly open?: boolean;
 }) {
   if (records.length === 0)
     return (
@@ -29,7 +32,7 @@ export function Timeline({
       <ol className="flex flex-col divide-y rounded-lg border">
         {records.map((record) => (
           <li key={record.execution}>
-            <details className="group">
+            <details className="group" open={open && records.length === 1}>
               <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-muted/50">
                 <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
                 <span className="min-w-0 flex-1">

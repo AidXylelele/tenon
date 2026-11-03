@@ -1,16 +1,20 @@
+import { PlusIcon } from 'lucide-react';
+import Link from 'next/link';
 import { Suspense } from 'react';
 import { currentUser } from '@/libs/data-access/identity';
+import { Button } from '@/libs/ui/components/button';
+import { Separator } from '@/libs/ui/components/separator';
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from '@/libs/ui/components/sidebar';
-import { BrandMark, PRODUCT_NAME } from '../../__shared_context/brand-mark';
+import { CommandPalette } from './command-palette';
 import { ConsoleSidebar } from './console-sidebar';
 
-// The frame of every console page: the navigation by role and the page. The session is read
-// behind its own Suspense boundary, so a navigation never waits for it (docs, Instant
-// navigation).
+// The frame of every console page: the navigation by role, a top bar with the search and the
+// main action, and the page, which decides its own width (research R12). The session is read
+// behind its own Suspense boundaries, so a navigation never waits for it.
 export function ConsoleFrame({
   children,
 }: {
@@ -21,15 +25,15 @@ export function ConsoleFrame({
       <Suspense fallback={<ConsoleSidebar user={null} />}>
         <SignedInSidebar />
       </Suspense>
-      <SidebarInset>
-        <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur md:hidden">
+      <SidebarInset className="min-w-0">
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-background/85 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:px-4">
           <SidebarTrigger />
-          <BrandMark className="size-5" />
-          <span className="text-sm font-medium">{PRODUCT_NAME}</span>
+          <Separator orientation="vertical" className="!h-5" />
+          <Suspense fallback={<CommandPalette role={null} />}>
+            <TopBar />
+          </Suspense>
         </header>
-        <div className="mx-auto flex w-full max-w-6xl min-w-0 flex-1 flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-          {children}
-        </div>
+        <main className="flex min-w-0 flex-1 flex-col">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -38,4 +42,23 @@ export function ConsoleFrame({
 async function SignedInSidebar() {
   const user = await currentUser();
   return <ConsoleSidebar user={user} />;
+}
+
+async function TopBar() {
+  const user = await currentUser();
+  const author = user?.role === 'admin' || user?.role === 'editor';
+
+  return (
+    <>
+      <CommandPalette role={user?.role ?? null} />
+      {author && (
+        <Button asChild size="sm" className="ml-auto">
+          <Link href="/workflows/new">
+            <PlusIcon data-icon="inline-start" />
+            <span className="hidden sm:inline">New workflow</span>
+          </Link>
+        </Button>
+      )}
+    </>
+  );
 }

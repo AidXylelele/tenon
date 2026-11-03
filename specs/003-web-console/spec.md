@@ -8,6 +8,12 @@
 
 **Input**: User description: "реализуй теперь UI ко всему этому разработанному функционалу, чтобы можно было потестировать. Основное - отзывчивость, информативность и простота и возможность как "продвинутого" использования, так и основной упор на no-code. Дизайн делай современным, чистым, красивым, минимализм, используй стабильные и красивые и популярные библиотеки для UI. Архитектура как я и говорил строго по строгой и заданной архитектуре. Важно - скорость интерфейса, и его информативность, отзывчивость, чтобы не оставлять пользователя в недоумении что происходит в системе."
 
+## Clarifications
+
+### Session 2026-11-03
+
+- Q: How should the builder and a run's progress look? → A: As a graph on a canvas, as in n8n and similar platforms. Steps are nodes, configured in a side panel, and the connections between them are drawn so that their meaning is clear. The design is to be cleaner, more colourful and more modern, and the console to be organised cleanly. What a connection can mean stays what the standard defines: the next step, a path of a choice (`switch`), a jump (`then`), the handling of a failure (`try`/`catch`), the steps of a loop or of a branch. The canvas offers nothing the DSL cannot express.
+
 ## User Scenarios & Testing _(mandatory)_
 
 The console is the "no-code editor (web)" that feature 002 lists under its later iterations, together with every screen a person needs to use what features 001 and 002 built. It adds no behaviour to the platform: every rule stays in the API, and the console shows the API's answers.
@@ -203,6 +209,29 @@ A signed-in person changes their password. Someone who forgot theirs requests a 
 **Account and team**
 
 - **FR-016**: The console MUST cover feature 001's flows: password change, recovery request and completion, invitations (create, list, revoke) for administrators, and invitation acceptance.
+
+**Canvas and organisation** (Session 2026-11-03)
+
+- **FR-022**: The builder and a run's page MUST show the workflow as a graph on a canvas:
+  - steps are nodes with the colour and icon of their kind;
+  - steps that hold others (`do`, `for`, `try`, `fork`) are containers with their lanes;
+  - connections are edges labelled by their meaning: next, a path of a choice, a jump, failure handling;
+  - the canvas pans, zooms and fits the view.
+- **FR-023**: Authors MUST be able to:
+  - add a step on any connection or at the end of any list;
+  - configure a step in a side panel;
+  - connect a step, or a path of a choice, to another step of the same list by dragging, which is written as `then`.
+
+  Connections the DSL cannot express MUST NOT be offered.
+
+- **FR-024**: A run's canvas MUST colour each node by its latest status and each connection the run took, mark the faulting step, and show a step's executions when it is picked.
+- **FR-025**: The console MUST open on an overview showing:
+  - which workflows start by themselves;
+  - the runs of the last 24 hours by phase;
+  - the recent failures;
+  - what is running now.
+
+  It MUST also offer a search (⌘K) across its pages and workflows.
 
 **Feedback**
 

@@ -54,3 +54,14 @@
 ## Polish
 
 - [x] T090 Lint, types, unit and component suites green; the quickstart journeys on the running stack; README of `apps/web`
+
+## Iteration 2 — canvas and organisation (Session 2026-11-03)
+
+- [x] T100 Packages of R11 and R12 (`@xyflow/react`, shadcn `command` with `cmdk`); accent and family colours; `PageBody`
+- [x] T101 `automation/__shared_context/canvas/graph.ts`: the structured layout and the edges of FR-022, with unit tests
+- [x] T102 The canvas components (nodes, containers, edges, insert and connect) in `automation/__shared_context/canvas`
+- [x] T103 [US2] The builder on the canvas: a side panel per node, a searchable node creator, `then` written by dragging (FR-023)
+- [x] T104 [US3] A run's page on the canvas: statuses, taken edges, a step's executions in the panel (FR-024)
+- [x] T105 [US5] A workflow's page with Overview, Runs and Versions tabs
+- [x] T106 The Overview page, the regrouped navigation, the top bar and the ⌘K search (FR-025)
+- [ ] T107 Checks on the running stack, the critic round, and the artifacts synchronised
