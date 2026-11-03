@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/libs/ui/components/select';
 import { Spinner } from '@/libs/ui/components/spinner';
-import { PHASES, phaseLabel } from '../../__shared_context/vocabulary';
+import { phaseLabel, PHASES } from '@/operations/run-progress';
 
 const ANY = 'any';
 

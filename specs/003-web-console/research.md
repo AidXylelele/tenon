@@ -378,6 +378,19 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
   - A request the proxy does not see (a prefetch) fails as unauthorized.
 - **Confirm-then-act.** The webhook, secret, notification and archive buttons use the `ui` composite `ConfirmAction`. The run controls confirm before a navigation and keep their own dialog.
 
+### Made in T121
+
+- **Four operations.** `workflow-document`, `run-progress`, `access-policy` and `app-routes` live under `src/operations`. Each exports only what is used from outside it. Coverage: 100 % of lines, at least 92 % of branches. Their playgrounds come with T125.
+- **Status.** A run's phase is shown as the `ui` lib's `Status`, filled by `phaseStatusOf(phase)`.
+- **Access.** Navigation and ⌘K entries carry an access rule (`canAuthor`, `isAdministrator`) instead of role lists.
+- **Addresses.** Every address is built by `app-routes`, including the proxy's and the `next.config` redirects:
+  - fixed pages are `*_HREF` constants;
+  - pages with parameters or queries are `*Href()` functions.
+- **Single-module code.** It moved into its module:
+  - the editor's draft, problems and secrets into `workflow-editor`;
+  - the run input form into `workflow-detail`;
+  - delivery statuses wait in automation for T123.
+
 ### Order
 
 Bottom up, one slice per tier: libs, then operations, then features, then spaces, then entries, then governance. In each slice, modules change in place: suites, a browser check of every route, and the critic round run before its commit.

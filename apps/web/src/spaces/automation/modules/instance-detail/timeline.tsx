@@ -3,11 +3,11 @@ import type { TaskRecord } from '@/libs/data-access/types';
 import { JsonBlock } from '@/libs/ui/composites/json-block';
 import { Status } from '@/libs/ui/composites/status';
 import { Countdown, Duration, Time } from '@/libs/ui/composites/time';
-import { attemptsOf } from '../../__shared_context/outline/progress';
 import {
+  attemptsOf,
   taskStatusLabel,
   taskStatusTone,
-} from '../../__shared_context/vocabulary';
+} from '@/operations/run-progress';
 
 // The task records in start order, one per execution (002 FR-016), each attempt of a retried
 // step its own; each opens to its input, output and error, and a retried attempt says when the

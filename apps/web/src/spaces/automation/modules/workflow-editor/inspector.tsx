@@ -31,16 +31,14 @@ import {
   TabsTrigger,
 } from '@/libs/ui/components/tabs';
 import { Textarea } from '@/libs/ui/components/textarea';
-import { infoOf } from '../../__shared_context/document/kinds';
-import type { LocatedProblem } from '../../__shared_context/document/problems';
-import {
-  protectionOf,
-  withProtectedStep,
-} from '../../__shared_context/document/protection';
 import {
   entriesAt,
+  infoOf,
+  protectionOf,
   type TaskEntry,
-} from '../../__shared_context/document/tasks';
+  withProtectedStep,
+} from '@/operations/workflow-document';
+import type { LocatedProblem } from './problems';
 import { tileOf } from '../../__shared_context/outline/families';
 import { TaskIcon } from '../../__shared_context/outline/task-icon';
 import { EditingProvider, useEditing } from './editing-context';

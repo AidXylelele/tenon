@@ -24,6 +24,7 @@ import {
 } from '@/libs/ui/components/table';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Time } from '@/libs/ui/composites/time';
+import { isAdministrator } from '@/operations/access-policy';
 import { InviteForm } from './invite-form';
 import { RevokeButton } from './revoke-button';
 
@@ -35,8 +36,9 @@ const ROLE: Record<string, string> = {
 
 export async function Invitations() {
   const user = await currentUser();
+  const administrator = isAdministrator(user);
 
-  if (user?.role !== 'admin')
+  if (!administrator)
     return (
       <Empty>
         <EmptyHeader>

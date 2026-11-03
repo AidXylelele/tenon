@@ -39,11 +39,8 @@ import {
   ToggleGroupItem,
 } from '@/libs/ui/components/toggle-group';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
-import {
-  type InputField,
-  inputFrom,
-} from '../../__shared_context/document/input-schema';
-import { instanceHref } from '../../__shared_context/links';
+import { instanceHref } from '@/operations/app-routes';
+import { type InputField, inputFrom } from './input-schema';
 import { startAction } from './actions';
 
 interface StartDialogProps {

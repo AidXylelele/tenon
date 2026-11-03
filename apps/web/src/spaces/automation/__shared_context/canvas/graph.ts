@@ -1,16 +1,14 @@
 import { isObject, type JsonObject } from '@/libs/document-text/json';
 import {
-  type Protection,
-  protectionOf,
-  retryTextOf,
-} from '../document/protection';
-import {
   allEntries,
   entriesAt,
   nestedListsOf,
+  type Protection,
+  protectionOf,
+  retryTextOf,
   ROOT_LIST,
   type TaskEntry,
-} from '../document/tasks';
+} from '@/operations/workflow-document';
 
 // A document as a graph (research R16): every step a node, every block a group that holds its
 // steps, a `try`'s failure handling a group of its own, and only what the DSL says becomes an

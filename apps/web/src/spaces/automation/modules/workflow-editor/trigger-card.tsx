@@ -19,7 +19,7 @@ import {
   type Trigger,
   triggerOf,
   withTrigger,
-} from '../../__shared_context/document/trigger';
+} from '@/operations/workflow-document';
 import { ChoiceField, DurationField, TextField } from './forms/fields';
 
 const CRON_PRESETS = [

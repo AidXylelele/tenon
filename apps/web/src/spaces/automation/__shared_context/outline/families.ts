@@ -1,4 +1,4 @@
-import type { TaskKind } from '../document/tasks';
+import type { TaskKind } from '@/operations/workflow-document';
 
 // Each family of steps has its own hue on its icon tile (research R12); status colours appear
 // only as rings, dots and taken edges, so a kind is never read as a state.

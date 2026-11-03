@@ -5,6 +5,8 @@ import { currentUser } from '@/libs/data-access/identity';
 import { Button } from '@/libs/ui/components/button';
 import { Separator } from '@/libs/ui/components/separator';
 import { SidebarInset, SidebarTrigger } from '@/libs/ui/components/sidebar';
+import { canAuthor } from '@/operations/access-policy';
+import { NEW_WORKFLOW_HREF } from '@/operations/app-routes';
 import { BottomBar } from './bottom-bar';
 import { CommandPalette } from './command-palette';
 import { ConsoleSidebar } from './console-sidebar';
@@ -28,12 +30,12 @@ export function ConsoleFrame({
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b bg-background/85 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 md:px-4">
           <SidebarTrigger />
           <Separator orientation="vertical" className="!h-5" />
-          <Suspense fallback={<CommandPalette role={null} />}>
+          <Suspense fallback={<CommandPalette user={null} />}>
             <TopBar />
           </Suspense>
         </header>
         <main className="flex min-w-0 flex-1 flex-col">{children}</main>
-        <Suspense fallback={<BottomBar role={null} />}>
+        <Suspense fallback={<BottomBar user={null} />}>
           <SignedInBottomBar />
         </Suspense>
       </SidebarInset>
@@ -48,19 +50,19 @@ async function SignedInSidebar() {
 
 async function SignedInBottomBar() {
   const user = await currentUser();
-  return <BottomBar role={user?.role ?? null} />;
+  return <BottomBar user={user} />;
 }
 
 async function TopBar() {
   const user = await currentUser();
-  const author = user?.role === 'admin' || user?.role === 'editor';
+  const author = canAuthor(user);
 
   return (
     <>
-      <CommandPalette role={user?.role ?? null} />
+      <CommandPalette user={user} />
       {author && (
         <Button asChild size="sm" className="ml-auto">
-          <Link href="/workflows/new">
+          <Link href={NEW_WORKFLOW_HREF}>
             <PlusIcon data-icon="inline-start" />
             <span className="hidden sm:inline">New workflow</span>
           </Link>

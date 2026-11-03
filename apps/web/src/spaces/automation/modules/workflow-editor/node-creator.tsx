@@ -11,8 +11,11 @@ import {
   CommandItem,
   CommandList,
 } from '@/libs/ui/components/command';
-import { type KindInfo, KINDS } from '../../__shared_context/document/kinds';
-import type { TaskKind } from '../../__shared_context/document/tasks';
+import {
+  type KindInfo,
+  KINDS,
+  type TaskKind,
+} from '@/operations/workflow-document';
 import { tileOf } from '../../__shared_context/outline/families';
 import { TaskIcon } from '../../__shared_context/outline/task-icon';
 

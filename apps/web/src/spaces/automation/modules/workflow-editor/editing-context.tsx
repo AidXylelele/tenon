@@ -1,10 +1,7 @@
 'use client';
 
 import { createContext, useContext } from 'react';
-import {
-  isFieldOf,
-  type LocatedProblem,
-} from '../../__shared_context/document/problems';
+import { isFieldOf, type LocatedProblem } from './problems';
 
 // What a form needs beyond its task: where the check's problem lies, the author's secrets, the
 // names a `then` may jump to, and the script languages the platform runs.

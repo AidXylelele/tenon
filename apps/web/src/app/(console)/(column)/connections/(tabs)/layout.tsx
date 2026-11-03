@@ -1,10 +1,15 @@
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { SectionTabs } from '@/libs/ui/composites/section-tabs';
+import {
+  NOTIFICATIONS_HREF,
+  TEST_EVENT_HREF,
+  WEBHOOKS_HREF,
+} from '@/operations/app-routes';
 
 const TABS = [
-  { href: '/connections/webhooks', label: 'Webhooks' },
-  { href: '/connections/notifications', label: 'Notifications' },
-  { href: '/connections/test-event', label: 'Test event' },
+  { href: WEBHOOKS_HREF, label: 'Webhooks' },
+  { href: NOTIFICATIONS_HREF, label: 'Notifications' },
+  { href: TEST_EVENT_HREF, label: 'Test event' },
 ];
 
 // How other applications start workflows and hear what happened (research R15).

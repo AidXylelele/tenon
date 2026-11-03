@@ -20,18 +20,24 @@ import { Button } from '@/libs/ui/components/button';
 import { ConfirmAction } from '@/libs/ui/composites/confirm-action';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Time } from '@/libs/ui/composites/time';
-import { canAuthor } from '../../__shared_context/access';
-import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
-import { headerOf } from '../../__shared_context/document/draft';
-import { inputFieldsOf } from '../../__shared_context/document/input-schema';
+import { canAuthor } from '@/operations/access-policy';
+import {
+  editorHref,
+  instancesHref,
+  versionHref,
+  workflowHref,
+  WORKFLOWS_HREF,
+} from '@/operations/app-routes';
+import { isUnended } from '@/operations/run-progress';
 import {
   describeTrigger,
+  headerOf,
   startsAutomatically,
   triggerOf,
-} from '../../__shared_context/document/trigger';
+} from '@/operations/workflow-document';
+import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
+import { inputFieldsOf } from './input-schema';
 import { InstanceTable } from '../../__shared_context/instance-table';
-import { versionHref, workflowHref } from '../../__shared_context/links';
-import { isUnended } from '../../__shared_context/vocabulary';
 import { archiveAction } from './actions';
 import { OnOffSwitch } from './on-off-switch';
 import { StartDialog } from './start-dialog';
@@ -72,13 +78,15 @@ export async function WorkflowDetail({
   const newestFirst = versions.slice().reverse();
   const live = recent.items.some((instance) => isUnended(instance.phase));
   const base = workflowHref(namespace, name);
+  const runsTab = workflowHref(namespace, name, { tab: 'runs' });
+  const versionsTab = workflowHref(namespace, name, { tab: 'versions' });
   const automatic = trigger !== null && startsAutomatically(trigger);
 
   return (
     <>
       <PageHeader
         crumbs={[
-          { label: 'Workflows', href: '/workflows' },
+          { label: 'Workflows', href: WORKFLOWS_HREF },
           { label: namespace },
           { label: name },
         ]}
@@ -101,7 +109,7 @@ export async function WorkflowDetail({
                 success={`${name} archived`}
               />
               <Button variant="outline" asChild>
-                <Link href={`${base}/edit`}>
+                <Link href={editorHref(namespace, name)}>
                   <PencilIcon data-icon="inline-start" />
                   Edit
                 </Link>
@@ -149,10 +157,10 @@ export async function WorkflowDetail({
         <Tab href={base} active={tab === 'overview'}>
           Overview
         </Tab>
-        <Tab href={`${base}?tab=runs`} active={tab === 'runs'}>
+        <Tab href={runsTab} active={tab === 'runs'}>
           Runs
         </Tab>
-        <Tab href={`${base}?tab=versions`} active={tab === 'versions'}>
+        <Tab href={versionsTab} active={tab === 'versions'}>
           Versions{' '}
           <span className="text-muted-foreground">{versions.length}</span>
         </Tab>
@@ -168,12 +176,7 @@ export async function WorkflowDetail({
               <WorkflowCanvas document={document} />
             )}
           </div>
-          <Runs
-            runs={recent}
-            live={live}
-            title="Recent runs"
-            more={`${base}?tab=runs`}
-          />
+          <Runs runs={recent} live={live} title="Recent runs" more={runsTab} />
         </>
       )}
       {tab === 'runs' && (
@@ -181,7 +184,7 @@ export async function WorkflowDetail({
           runs={recent}
           live={live}
           title="Runs"
-          more={`/instances?namespace=${encodeURIComponent(namespace)}&name=${encodeURIComponent(name)}`}
+          more={instancesHref({ namespace, name })}
         />
       )}
       {tab === 'versions' && (

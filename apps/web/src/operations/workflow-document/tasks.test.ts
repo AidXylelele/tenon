@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { JsonObject } from '@/libs/document-text/json';
 import {
   allEntries,
+  duplicateTask,
   entriesAt,
   entryAt,
   freeName,
@@ -138,5 +139,43 @@ describe('the task lists of a draft', () => {
   it('a_free_name_avoids_every_name_in_the_draft_nested_ones_too', () => {
     expect(freeName(draft(), 'notify')).toBe('notify2');
     expect(freeName(draft(), 'wait')).toBe('wait');
+  });
+
+  it('a_duplicate_follows_its_step_under_a_free_name', () => {
+    const [fetch] = entriesAt(draft(), ROOT_LIST);
+    const copied = fetch ? duplicateTask(draft(), fetch) : draft();
+
+    expect(entriesAt(copied, ROOT_LIST).map((entry) => entry.name)).toEqual([
+      'fetch',
+      'fetch2',
+      'each',
+      'guarded',
+    ]);
+    expect(entryAt(copied, '/do/1/fetch2')?.task).toEqual(fetch?.task);
+  });
+
+  it('a_group_and_a_fork_hold_their_steps_and_branches', () => {
+    const grouped: JsonObject = {
+      do: [
+        { steps: { do: [] } },
+        { side: { fork: { branches: [] } } },
+        { plain: { set: {} } },
+      ],
+    };
+    const lists = entriesAt(grouped, ROOT_LIST).map((entry) =>
+      nestedListsOf(entry).map((list) => list.pointer),
+    );
+
+    expect(lists).toEqual([
+      ['/do/0/steps/do'],
+      ['/do/1/side/fork/branches'],
+      [],
+    ]);
+  });
+
+  it('a_pointer_that_names_no_task_is_no_entry', () => {
+    expect(entryAt(draft(), '/do')).toBeNull();
+    expect(entryAt(draft(), '/do/0/other')).toBeNull();
+    expect(entriesAt(draft(), '/document')).toEqual([]);
   });
 });

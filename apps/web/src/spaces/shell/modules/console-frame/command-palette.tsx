@@ -4,6 +4,7 @@ import {
   ActivityIcon,
   KeyRoundIcon,
   HouseIcon,
+  type LucideIcon,
   PlusIcon,
   RadioTowerIcon,
   SearchIcon,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useEffectEvent, useState, useTransition } from 'react';
-import type { Role } from '@/libs/data-access/types';
+import type { User } from '@/libs/data-access/types';
 import {
   Command,
   CommandDialog,
@@ -29,71 +30,102 @@ import {
 } from '@/libs/ui/components/command';
 import { Kbd } from '@/libs/ui/components/kbd';
 import { Spinner } from '@/libs/ui/components/spinner';
+import {
+  type AccessRule,
+  canAuthor,
+  isAdministrator,
+} from '@/operations/access-policy';
+import {
+  ACCOUNT_HREF,
+  CREDENTIALS_HREF,
+  HOME_HREF,
+  INSTANCES_HREF,
+  instancesHref,
+  NEW_WORKFLOW_HREF,
+  NOTIFICATIONS_HREF,
+  STANDARD_HREF,
+  TEAM_HREF,
+  TEST_EVENT_HREF,
+  WEBHOOKS_HREF,
+  workflowHref,
+  WORKFLOWS_HREF,
+} from '@/operations/app-routes';
 import { type FoundWorkflow, searchableWorkflowsAction } from './actions';
 
-const AUTHORS: readonly Role[] = ['admin', 'editor'];
+interface Page {
+  readonly href: string;
+  readonly label: string;
+  readonly icon: LucideIcon;
+  // Who may open it, or null for everyone.
+  readonly access: AccessRule | null;
+}
 
-const PAGES = [
-  { href: '/', label: 'Home', icon: HouseIcon, roles: null },
-  { href: '/workflows', label: 'Workflows', icon: WaypointsIcon, roles: null },
-  { href: '/instances', label: 'Runs', icon: ActivityIcon, roles: null },
+const PAGES: readonly Page[] = [
+  { href: HOME_HREF, label: 'Home', icon: HouseIcon, access: null },
   {
-    href: '/instances?phase=faulted',
+    href: WORKFLOWS_HREF,
+    label: 'Workflows',
+    icon: WaypointsIcon,
+    access: null,
+  },
+  { href: INSTANCES_HREF, label: 'Runs', icon: ActivityIcon, access: null },
+  {
+    href: instancesHref({ phase: 'faulted' }),
     label: 'Runs that faulted',
     icon: ActivityIcon,
-    roles: null,
+    access: null,
   },
   {
-    href: '/connections/webhooks',
+    href: WEBHOOKS_HREF,
     label: 'Webhooks',
     icon: WebhookIcon,
-    roles: AUTHORS,
+    access: canAuthor,
   },
   {
-    href: '/connections/notifications',
+    href: NOTIFICATIONS_HREF,
     label: 'Notifications',
     icon: RadioTowerIcon,
-    roles: AUTHORS,
+    access: canAuthor,
   },
   {
-    href: '/connections/test-event',
+    href: TEST_EVENT_HREF,
     label: 'Send a test event',
     icon: SendIcon,
-    roles: AUTHORS,
+    access: canAuthor,
   },
   {
-    href: '/credentials',
+    href: CREDENTIALS_HREF,
     label: 'Credentials',
     icon: KeyRoundIcon,
-    roles: AUTHORS,
+    access: canAuthor,
   },
   {
-    href: '/settings/account',
+    href: ACCOUNT_HREF,
     label: 'Account and password',
     icon: UserIcon,
-    roles: null,
+    access: null,
   },
   {
-    href: '/settings/team',
+    href: TEAM_HREF,
     label: 'Team and invitations',
     icon: UsersIcon,
-    roles: ['admin'] as readonly Role[],
+    access: isAdministrator,
   },
   {
-    href: '/settings/standard',
+    href: STANDARD_HREF,
     label: 'Supported standard',
     icon: ShieldCheckIcon,
-    roles: null,
+    access: null,
   },
-] as const;
+];
 
-// Search (⌘K or Ctrl+K): every page the role may open, the main actions, and the workflows.
-export function CommandPalette({ role }: { readonly role: Role | null }) {
+// Search (⌘K or Ctrl+K): every page the user may open, the main actions, and the workflows.
+export function CommandPalette({ user }: { readonly user: User | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [found, setFound] = useState<readonly FoundWorkflow[] | null>(null);
   const [loading, startLoading] = useTransition();
-  const author = role !== null && AUTHORS.includes(role);
+  const author = canAuthor(user);
 
   // ⌘K opens it as the button does, workflows included.
   const toggle = useEffectEvent(() => change(!open));
@@ -125,8 +157,7 @@ export function CommandPalette({ role }: { readonly role: Role | null }) {
   }
 
   const pages = PAGES.filter(
-    (page) =>
-      page.roles === null || (role !== null && page.roles.includes(role)),
+    (page) => page.access === null || page.access(user),
   );
 
   return (
@@ -152,15 +183,15 @@ export function CommandPalette({ role }: { readonly role: Role | null }) {
             <CommandEmpty>Nothing matches.</CommandEmpty>
             {author && (
               <CommandGroup heading="Actions">
-                <CommandItem onSelect={() => go('/workflows/new')}>
+                <CommandItem onSelect={() => go(NEW_WORKFLOW_HREF)}>
                   <PlusIcon />
                   New workflow
                 </CommandItem>
-                <CommandItem onSelect={() => go('/connections/webhooks')}>
+                <CommandItem onSelect={() => go(WEBHOOKS_HREF)}>
                   <WebhookIcon />
                   New webhook
                 </CommandItem>
-                <CommandItem onSelect={() => go('/connections/test-event')}>
+                <CommandItem onSelect={() => go(TEST_EVENT_HREF)}>
                   <SendIcon />
                   Send a test event
                 </CommandItem>
@@ -177,11 +208,10 @@ export function CommandPalette({ role }: { readonly role: Role | null }) {
                 <CommandItem
                   key={`${each.namespace}/${each.name}`}
                   value={`${each.namespace} ${each.name}`}
-                  onSelect={() =>
-                    go(
-                      `/workflows/${encodeURIComponent(each.namespace)}/${encodeURIComponent(each.name)}`,
-                    )
-                  }
+                  onSelect={() => {
+                    const href = workflowHref(each.namespace, each.name);
+                    go(href);
+                  }}
                 >
                   <WaypointsIcon />
                   <span>{each.name}</span>

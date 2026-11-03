@@ -19,18 +19,20 @@ import {
 } from '@/libs/ui/components/tabs';
 import { JsonBlock } from '@/libs/ui/composites/json-block';
 import { isWithin } from '@/libs/document-text/json-pointer';
+import { isAdvancing, isUnended, progressOf } from '@/operations/run-progress';
+import {
+  allEntries,
+  entryAt,
+  infoOf,
+  protectionOf,
+} from '@/operations/workflow-document';
 import { START } from '../../__shared_context/canvas/graph';
 import {
   type Reveal,
   WorkflowCanvas,
 } from '../../__shared_context/canvas/workflow-canvas';
-import { infoOf } from '../../__shared_context/document/kinds';
-import { protectionOf } from '../../__shared_context/document/protection';
-import { allEntries, entryAt } from '../../__shared_context/document/tasks';
-import { progressOf } from '../../__shared_context/outline/progress';
 import { tileOf } from '../../__shared_context/outline/families';
 import { TaskIcon } from '../../__shared_context/outline/task-icon';
-import { isAdvancing, isUnended } from '../../__shared_context/vocabulary';
 import { EventList } from './event-list';
 import { FaultStrip } from './fault-strip';
 import { Timeline } from './timeline';

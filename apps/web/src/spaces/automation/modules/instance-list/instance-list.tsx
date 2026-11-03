@@ -13,8 +13,9 @@ import {
   EmptyTitle,
 } from '@/libs/ui/components/empty';
 import { PageHeader } from '@/libs/ui/composites/page-header';
+import { isUnended, PHASES } from '@/operations/run-progress';
+import { instancesHref } from '@/operations/app-routes';
 import { InstanceTable } from '../../__shared_context/instance-table';
-import { isUnended, PHASES } from '../../__shared_context/vocabulary';
 import { Filters } from './filters';
 
 // Runs newest first, filtered by what the address says, so a view can be shared and reloaded
@@ -27,9 +28,8 @@ export async function InstanceList({ query }: { readonly query: Query }) {
     ([key, value]) => key !== 'cursor' && value !== undefined && value !== '',
   );
   const next =
-    page.next === null
-      ? null
-      : `/instances?${queryOf({ ...filter, cursor: page.next })}`;
+    page.next === null ? null : instancesHref({ ...filter, cursor: page.next });
+  const newest = instancesHref({ ...filter, cursor: undefined });
 
   return (
     <>
@@ -66,11 +66,7 @@ export async function InstanceList({ query }: { readonly query: Query }) {
       <div className="flex justify-end gap-2">
         {filter.cursor !== undefined && (
           <Button variant="outline" asChild>
-            <Link
-              href={`/instances?${queryOf({ ...filter, cursor: undefined })}`}
-            >
-              Newest
-            </Link>
+            <Link href={newest}>Newest</Link>
           </Button>
         )}
         {next !== null && (
@@ -81,15 +77,6 @@ export async function InstanceList({ query }: { readonly query: Query }) {
       </div>
     </>
   );
-}
-
-function queryOf(filter: InstanceFilter): string {
-  const query = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(filter))
-    if (value !== undefined && value !== '') query.set(key, String(value));
-
-  return query.toString();
 }
 
 // The filter the address gives; an unknown phase is no filter, as the API would refuse it.

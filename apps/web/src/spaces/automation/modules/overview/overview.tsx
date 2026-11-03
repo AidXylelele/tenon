@@ -27,16 +27,25 @@ import {
   CardTitle,
 } from '@/libs/ui/components/card';
 import { PageHeader } from '@/libs/ui/composites/page-header';
-import { toneClasses } from '@/libs/ui/composites/status';
+import { Status, toneClasses } from '@/libs/ui/composites/status';
 import { Duration, Time } from '@/libs/ui/composites/time';
-import { canAuthor } from '../../__shared_context/access';
-import { instanceHref, workflowHref } from '../../__shared_context/links';
+import { canAuthor } from '@/operations/access-policy';
 import {
-  PHASES,
-  PhaseStatus,
+  instanceHref,
+  INSTANCES_HREF,
+  instancesHref,
+  NEW_WORKFLOW_HREF,
+  TEST_EVENT_HREF,
+  WEBHOOKS_HREF,
+  workflowHref,
+  WORKFLOWS_HREF,
+} from '@/operations/app-routes';
+import {
   phaseLabel,
+  PHASES,
+  phaseStatusOf,
   phaseTone,
-} from '../../__shared_context/vocabulary';
+} from '@/operations/run-progress';
 
 const DAY_MS = 24 * 3_600_000;
 
@@ -59,6 +68,8 @@ export async function Overview() {
   const inFlight = [...running.items, ...waiting.items].slice(0, 8);
   const more = day.next !== null;
   const firstName = user?.name.split(' ')[0];
+  const faultedRuns = instancesHref({ phase: 'faulted' });
+  const runningRuns = instancesHref({ phase: 'running' });
 
   return (
     <>
@@ -77,7 +88,7 @@ export async function Overview() {
           label="Workflows"
           value={active.items.length}
           hint={`${scheduled.length} start by themselves`}
-          href="/workflows"
+          href={WORKFLOWS_HREF}
           icon={<WaypointsIcon />}
           tone="bg-violet-500/12 text-violet-600 dark:text-violet-300"
         />
@@ -86,7 +97,7 @@ export async function Overview() {
           value={day.items.length}
           suffix={more ? '+' : ''}
           hint={`${counts.get('completed') ?? 0} completed`}
-          href="/instances"
+          href={INSTANCES_HREF}
           icon={<ActivityIcon />}
           tone="bg-sky-500/12 text-sky-600 dark:text-sky-300"
         />
@@ -98,7 +109,7 @@ export async function Overview() {
               ? 'Nothing failed'
               : 'Open them to see where'
           }
-          href="/instances?phase=faulted"
+          href={faultedRuns}
           icon={<CircleAlertIcon />}
           tone={
             (counts.get('faulted') ?? 0) > 0
@@ -110,7 +121,7 @@ export async function Overview() {
           label="Running now"
           value={inFlight.length}
           hint={`${waiting.items.length} waiting for an event or a time`}
-          href="/instances?phase=running"
+          href={runningRuns}
           icon={<ActivityIcon />}
           tone="bg-amber-500/14 text-amber-700 dark:text-amber-300"
         />
@@ -127,7 +138,7 @@ export async function Overview() {
             </CardDescription>
             <CardAction>
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/instances?phase=faulted">
+                <Link href={faultedRuns}>
                   All
                   <ArrowRightIcon data-icon="inline-end" />
                 </Link>
@@ -200,19 +211,19 @@ export async function Overview() {
       {author && (
         <div className="grid gap-4 sm:grid-cols-3">
           <Quick
-            href="/workflows/new"
+            href={NEW_WORKFLOW_HREF}
             icon={<PlusIcon />}
             title="Build a workflow"
             text="From steps, without code."
           />
           <Quick
-            href="/connections/webhooks"
+            href={WEBHOOKS_HREF}
             icon={<WebhookIcon />}
             title="Create a webhook"
             text="Let another application send events in."
           />
           <Quick
-            href="/connections/test-event"
+            href={TEST_EVENT_HREF}
             icon={<SendIcon />}
             title="Send a test event"
             text="Try a trigger or a waiting step."
@@ -313,7 +324,10 @@ function RunRows({ runs }: { readonly runs: readonly InstanceSummary[] }) {
             href={instanceHref(run.id)}
             className="flex items-center gap-3 py-2.5 hover:bg-muted/40"
           >
-            <PhaseStatus phase={run.phase} className="w-24 shrink-0 text-xs" />
+            <Status
+              {...phaseStatusOf(run.phase)}
+              className="w-24 shrink-0 text-xs"
+            />
             <span className="min-w-0 flex-1 truncate text-sm font-medium">
               {run.name}
             </span>

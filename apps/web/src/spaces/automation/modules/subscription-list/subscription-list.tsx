@@ -21,7 +21,11 @@ import {
 } from '@/libs/ui/components/table';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Time } from '@/libs/ui/composites/time';
-import { canAuthor } from '../../__shared_context/access';
+import { canAuthor } from '@/operations/access-policy';
+import {
+  NEW_NOTIFICATION_HREF,
+  notificationHref,
+} from '@/operations/app-routes';
 import { AuthorsOnly } from '../../__shared_context/authors-only';
 import { describeFilter } from '../../__shared_context/event-filter';
 
@@ -36,7 +40,7 @@ export async function SubscriptionList() {
   const list = await subscriptions();
   const create = (
     <Button asChild>
-      <Link href="/connections/notifications/new">
+      <Link href={NEW_NOTIFICATION_HREF}>
         <PlusIcon data-icon="inline-start" />
         New notification
       </Link>
@@ -81,7 +85,7 @@ export async function SubscriptionList() {
                 <TableRow key={subscription.id} className="relative">
                   <TableCell>
                     <Link
-                      href={`/connections/notifications/${subscription.id}`}
+                      href={notificationHref(subscription.id)}
                       className="font-medium after:absolute after:inset-0 hover:underline"
                     >
                       {subscription.name}

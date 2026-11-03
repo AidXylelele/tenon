@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react';
 import type { Phase } from '@/libs/data-access/types';
-import type { TaskProgress } from '../outline/progress';
+import type { TaskProgress } from '@/operations/run-progress';
 import type { Direction } from './layout';
 
 // What every node and edge of a canvas reads: whether it is edited, which way it runs, what is

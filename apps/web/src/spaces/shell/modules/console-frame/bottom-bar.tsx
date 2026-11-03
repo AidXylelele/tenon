@@ -2,20 +2,20 @@
 
 import { cn } from 'cn';
 import { usePathname } from 'next/navigation';
-import type { Role } from '@/libs/data-access/types';
+import type { User } from '@/libs/data-access/types';
 import { Link } from '@/libs/routing/link';
 import { destinationsOf, isUnder } from './destinations';
 import { useOnCanvas } from './frame-state';
 
 // The destinations at the bottom of a phone's screen, as native apps keep them (research R15).
 // A canvas needs the height, so it hides the bar, as a pushed screen does.
-export function BottomBar({ role }: { readonly role: Role | null }) {
+export function BottomBar({ user }: { readonly user: User | null }) {
   const pathname = usePathname();
   const canvas = useOnCanvas();
 
   if (canvas) return null;
 
-  const destinations = destinationsOf(role);
+  const destinations = destinationsOf(user);
 
   return (
     <nav

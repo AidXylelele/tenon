@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/libs/ui/components/card';
-import { headerOf } from '../../__shared_context/document/draft';
+import { headerOf } from '@/operations/workflow-document';
 import { TextField } from './forms/fields';
 
 interface HeaderCardProps {

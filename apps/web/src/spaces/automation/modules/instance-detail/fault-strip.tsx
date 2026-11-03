@@ -6,12 +6,12 @@ import type { JsonObject } from '@/libs/document-text/json';
 import { Button } from '@/libs/ui/components/button';
 import { Link } from '@/libs/routing/link';
 import { isWithin } from '@/libs/document-text/json-pointer';
-import { protectorOf } from '../../__shared_context/document/protection';
+import { editorHref } from '@/operations/app-routes';
 import {
   allEntries,
+  protectorOf,
   type TaskEntry,
-} from '../../__shared_context/document/tasks';
-import { workflowHref } from '../../__shared_context/links';
+} from '@/operations/workflow-document';
 
 interface FaultStripProps {
   readonly instance: Instance;
@@ -39,8 +39,7 @@ export function FaultStrip({
       ? null
       : protectorOf(document, step.pointer);
   const kind = error.type.split('/').at(-1);
-  const editor = `${workflowHref(instance.namespace, instance.name)}/edit`;
-  const at = node === null ? '' : `?step=${encodeURIComponent(node)}`;
+  const editor = editorHref(instance.namespace, instance.name, node);
 
   return (
     <section
@@ -71,7 +70,7 @@ export function FaultStrip({
         )}
         {canEdit && (
           <Button variant="outline" size="sm" asChild>
-            <Link href={`${editor}${at}`}>
+            <Link href={editor}>
               <PencilIcon data-icon="inline-start" />
               Open in the editor
             </Link>

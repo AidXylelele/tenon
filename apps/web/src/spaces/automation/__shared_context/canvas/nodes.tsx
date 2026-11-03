@@ -18,13 +18,19 @@ import {
   SkipForwardIcon,
 } from 'lucide-react';
 import { Countdown } from '@/libs/ui/composites/time';
-import { infoOf } from '../document/kinds';
-import { summaryOf } from '../document/summary';
-import type { TaskEntry } from '../document/tasks';
-import { isRetrying, type TaskProgress } from '../outline/progress';
+import {
+  isAdvancing,
+  isRetrying,
+  type TaskProgress,
+  taskStatusLabel,
+} from '@/operations/run-progress';
+import {
+  infoOf,
+  summaryOf,
+  type TaskEntry,
+} from '@/operations/workflow-document';
 import { accentOf, tileOf } from '../outline/families';
 import { TaskIcon } from '../outline/task-icon';
-import { isAdvancing, taskStatusLabel } from '../vocabulary';
 import { type CanvasState, useCanvas } from './canvas-context';
 import { CASE, type CanvasNode, FAILURE, OUT } from './graph';
 import { IN, type Point } from './layout';

@@ -1,7 +1,7 @@
 import { isWithin } from '@/libs/document-text/json-pointer';
 import type { JsonObject } from '@/libs/document-text/json';
 import type { Problem } from '@/libs/data-access/problem';
-import { allEntries } from './tasks';
+import { allEntries } from '@/operations/workflow-document';
 
 // Where a problem of the check lies in the builder: the task it belongs to, and the path
 // inside that task (`with/endpoint`), or a place outside every task (`/schedule`, `/use`).

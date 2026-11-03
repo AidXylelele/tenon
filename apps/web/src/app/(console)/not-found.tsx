@@ -8,6 +8,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from '@/libs/ui/components/empty';
+import { INSTANCES_HREF, WORKFLOWS_HREF } from '@/operations/app-routes';
 
 export default function ConsoleNotFound() {
   return (
@@ -22,10 +23,10 @@ export default function ConsoleNotFound() {
         <EmptyContent>
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link href="/instances">Runs</Link>
+              <Link href={INSTANCES_HREF}>Runs</Link>
             </Button>
             <Button asChild>
-              <Link href="/workflows">Workflows</Link>
+              <Link href={WORKFLOWS_HREF}>Workflows</Link>
             </Button>
           </div>
         </EmptyContent>

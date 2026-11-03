@@ -10,18 +10,16 @@ import { currentUser } from '@/libs/data-access/identity';
 import type { Instance } from '@/libs/data-access/types';
 import { RefreshControl } from '@/libs/live/refresh-control';
 import { Crumbs } from '@/libs/ui/composites/crumbs';
+import { Status } from '@/libs/ui/composites/status';
 import { Duration, Time } from '@/libs/ui/composites/time';
-import { canAuthor } from '../../__shared_context/access';
+import { canAuthor } from '@/operations/access-policy';
 import {
   instanceHref,
+  INSTANCES_HREF,
   versionHref,
   workflowHref,
-} from '../../__shared_context/links';
-import {
-  isUnended,
-  PhaseStatus,
-  startedBy,
-} from '../../__shared_context/vocabulary';
+} from '@/operations/app-routes';
+import { isUnended, phaseStatusOf, startedBy } from '@/operations/run-progress';
 import { Controls } from './controls';
 import { type RunPanel, RunView } from './run-view';
 
@@ -58,7 +56,7 @@ export async function InstanceDetail({ id, view }: InstanceDetailProps) {
         <div className="min-w-60 flex-1">
           <Crumbs
             trail={[
-              { label: 'Runs', href: '/instances' },
+              { label: 'Runs', href: INSTANCES_HREF },
               {
                 label: instance.name,
                 href: workflowHref(instance.namespace, instance.name),
@@ -68,7 +66,7 @@ export async function InstanceDetail({ id, view }: InstanceDetailProps) {
           />
           <h1 className="flex flex-wrap items-center gap-3 text-lg font-semibold tracking-tight">
             Run of {instance.name}
-            <PhaseStatus phase={instance.phase} />
+            <Status {...phaseStatusOf(instance.phase)} />
           </h1>
           <Facts instance={instance} />
         </div>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { draftFrom, headerOf, nextVersion } from './draft';
+import { headerOf } from '@/operations/workflow-document';
+import { draftFrom, nextVersion } from './draft';
 
 describe('a draft of a version', () => {
   it('proposes_the_next_patch_version', () => {

@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { deleteSubscription } from '@/libs/data-access/automation';
 import type { Outcome } from '@/libs/data-access/problem';
+import { NOTIFICATIONS_HREF } from '@/operations/app-routes';
 
 export async function deleteSubscriptionAction(
   id: string,
@@ -11,5 +12,5 @@ export async function deleteSubscriptionAction(
 
   if (!outcome.ok) return outcome;
 
-  redirect('/connections/notifications');
+  redirect(NOTIFICATIONS_HREF);
 }

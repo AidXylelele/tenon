@@ -33,6 +33,11 @@ import {
 } from '@/libs/ui/components/select';
 import { Spinner } from '@/libs/ui/components/spinner';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
+import {
+  CREDENTIALS_HREF,
+  notificationHref,
+  NOTIFICATIONS_HREF,
+} from '@/operations/app-routes';
 import { createSubscriptionAction } from './actions';
 
 const ATTRIBUTES = [
@@ -134,7 +139,7 @@ export function SubscriptionEditor({
       toast.success(`${outcome.value.name} subscribed`, {
         description: 'Matching events are delivered from now on.',
       });
-      router.push(`/connections/notifications/${outcome.value.id}`);
+      router.push(notificationHref(outcome.value.id));
     });
   }
 
@@ -208,7 +213,7 @@ export function SubscriptionEditor({
                     <FieldDescription>
                       You have no secrets yet.{' '}
                       <Link
-                        href="/credentials"
+                        href={CREDENTIALS_HREF}
                         className="underline underline-offset-4"
                       >
                         Add one
@@ -366,7 +371,7 @@ export function SubscriptionEditor({
           {pending ? 'Subscribing…' : 'Subscribe'}
         </Button>
         <Button type="button" variant="ghost" asChild>
-          <Link href="/connections/notifications">Cancel</Link>
+          <Link href={NOTIFICATIONS_HREF}>Cancel</Link>
         </Button>
       </div>
     </form>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { verifyInvitation } from '@/libs/data-access/identity';
+import { SIGN_IN_HREF } from '@/operations/app-routes';
 import { AuthCard } from '../../__shared_context/auth-card';
 import { InvitationForm } from './invitation-form';
 
@@ -16,7 +17,7 @@ export async function InvitationAcceptance({
   readonly token: string;
 }) {
   const signIn = (
-    <Link href="/sign-in" className="underline-offset-4 hover:underline">
+    <Link href={SIGN_IN_HREF} className="underline-offset-4 hover:underline">
       Already have an account? Sign in
     </Link>
   );

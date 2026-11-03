@@ -1,5 +1,14 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
+import {
+  ACCOUNT_HREF,
+  CREDENTIALS_HREF,
+  NOTIFICATIONS_HREF,
+  STANDARD_HREF,
+  TEAM_HREF,
+  TEST_EVENT_HREF,
+  WEBHOOKS_HREF,
+} from './src/operations/app-routes';
 
 const monorepoRoot = path.join(__dirname, '../..');
 
@@ -41,30 +50,30 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/webhooks',
-        destination: '/connections/webhooks',
+        destination: WEBHOOKS_HREF,
         permanent: true,
       },
       {
         source: '/subscriptions',
-        destination: '/connections/notifications',
+        destination: NOTIFICATIONS_HREF,
         permanent: true,
       },
       {
         source: '/subscriptions/:path*',
-        destination: '/connections/notifications/:path*',
+        destination: `${NOTIFICATIONS_HREF}/:path*`,
         permanent: true,
       },
       {
         source: '/events',
-        destination: '/connections/test-event',
+        destination: TEST_EVENT_HREF,
         permanent: true,
       },
-      { source: '/secrets', destination: '/credentials', permanent: true },
-      { source: '/account', destination: '/settings/account', permanent: true },
-      { source: '/team', destination: '/settings/team', permanent: true },
+      { source: '/secrets', destination: CREDENTIALS_HREF, permanent: true },
+      { source: '/account', destination: ACCOUNT_HREF, permanent: true },
+      { source: '/team', destination: TEAM_HREF, permanent: true },
       {
         source: '/conformance',
-        destination: '/settings/standard',
+        destination: STANDARD_HREF,
         permanent: true,
       },
     ];

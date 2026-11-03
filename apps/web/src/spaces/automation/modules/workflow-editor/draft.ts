@@ -1,20 +1,14 @@
 import { isObject, type JsonObject } from '@/libs/document-text/json';
 
-// The `document` header of a draft and the version a new edit proposes.
+// A new draft, a draft of an existing version with the version a new edit proposes, and its
+// size.
 
 export const DSL_VERSION = '1.0.3';
 
 // The API takes documents up to 1 MiB (002 spec, Assumptions).
 export const MAX_DOCUMENT_BYTES = 1024 * 1024;
 
-export interface Header {
-  readonly namespace: string;
-  readonly name: string;
-  readonly version: string;
-  readonly title: string;
-  readonly summary: string;
-}
-
+// The draft a new workflow starts from: one step that sets a greeting.
 export function newDraft(): JsonObject {
   return {
     document: {
@@ -24,21 +18,6 @@ export function newDraft(): JsonObject {
       version: '1.0.0',
     },
     do: [{ greet: { set: { message: 'Hello' } } }],
-  };
-}
-
-export function headerOf(draft: JsonObject): Header {
-  const document = isObject(draft.document) ? draft.document : {};
-  const text = (key: string) => {
-    const value = document[key];
-    return typeof value === 'string' ? value : '';
-  };
-  return {
-    namespace: text('namespace'),
-    name: text('name'),
-    version: text('version'),
-    title: text('title'),
-    summary: text('summary'),
   };
 }
 
@@ -62,6 +41,7 @@ export function nextVersion(version: string): string {
   return `${major}.${minor}.${Number(patch) + 1}`;
 }
 
+// The draft's size in bytes, as JSON.
 export function sizeOf(draft: JsonObject): number {
   return new TextEncoder().encode(JSON.stringify(draft)).length;
 }

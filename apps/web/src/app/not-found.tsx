@@ -8,6 +8,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from '@/libs/ui/components/empty';
+import { WORKFLOWS_HREF } from '@/operations/app-routes';
 
 // Rendered per request, so its scripts carry the request's CSP nonce.
 export default async function NotFound() {
@@ -24,7 +25,7 @@ export default async function NotFound() {
         </EmptyHeader>
         <EmptyContent>
           <Button asChild>
-            <Link href="/workflows">Go to workflows</Link>
+            <Link href={WORKFLOWS_HREF}>Go to workflows</Link>
           </Button>
         </EmptyContent>
       </Empty>

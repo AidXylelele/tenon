@@ -24,8 +24,8 @@ import {
 } from '@/libs/ui/components/alert-dialog';
 import { Button } from '@/libs/ui/components/button';
 import { Spinner } from '@/libs/ui/components/spinner';
-import { instanceHref } from '../../__shared_context/links';
-import { controlsOf } from '../../__shared_context/vocabulary';
+import { instanceHref, INSTANCES_HREF } from '@/operations/app-routes';
+import { controlsOf } from '@/operations/run-progress';
 import { controlAction, deleteAction, restartAction } from './actions';
 
 // What may be done with the run in its phase (002 FR-017); a refusal says why.
@@ -73,7 +73,7 @@ export function Controls({
       }
 
       toast.success('Run deleted');
-      router.push('/instances');
+      router.push(INSTANCES_HREF);
     });
   }
 

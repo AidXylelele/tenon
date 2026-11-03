@@ -17,6 +17,7 @@ import {
 import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
+import { SIGN_IN_HREF } from '@/operations/app-routes';
 import { AuthCard } from '../../__shared_context/auth-card';
 import { requestRecoveryAction } from './actions';
 
@@ -24,7 +25,7 @@ import { requestRecoveryAction } from './actions';
 export function PasswordRecovery() {
   const [state, action] = useActionState(requestRecoveryAction, IDLE);
   const back = (
-    <Link href="/sign-in" className="underline-offset-4 hover:underline">
+    <Link href={SIGN_IN_HREF} className="underline-offset-4 hover:underline">
       Back to sign in
     </Link>
   );

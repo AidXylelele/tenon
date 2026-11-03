@@ -23,7 +23,7 @@ import {
   type Duration,
   type DurationUnit,
   UNITS,
-} from '../../../__shared_context/document/trigger';
+} from '@/operations/workflow-document';
 import { useFieldProblem } from '../editing-context';
 
 // The fields task forms are made of. Each names the path it edits (`at`), so the check's problem

@@ -11,6 +11,7 @@ import {
 import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
+import { FORGOT_PASSWORD_HREF } from '@/operations/app-routes';
 import { AuthCard } from '../../__shared_context/auth-card';
 import { PASSWORD_MAX, PASSWORD_MIN } from '../../__shared_context/password';
 import { resetPasswordAction } from './actions';
@@ -19,7 +20,7 @@ export function PasswordReset({ token }: { readonly token: string }) {
   const [state, action] = useActionState(resetPasswordAction, IDLE);
   const again = (
     <Link
-      href="/forgot-password"
+      href={FORGOT_PASSWORD_HREF}
       className="underline-offset-4 hover:underline"
     >
       Ask for a new link

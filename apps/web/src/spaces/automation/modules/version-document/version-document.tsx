@@ -7,8 +7,12 @@ import { stringifyText } from '@/libs/document-text/document-text';
 import { Button } from '@/libs/ui/components/button';
 import { CopyButton } from '@/libs/ui/composites/copy-button';
 import { PageHeader } from '@/libs/ui/composites/page-header';
-import { canAuthor } from '../../__shared_context/access';
-import { workflowHref } from '../../__shared_context/links';
+import { canAuthor } from '@/operations/access-policy';
+import {
+  editorHref,
+  workflowHref,
+  WORKFLOWS_HREF,
+} from '@/operations/app-routes';
 
 interface VersionDocumentProps {
   readonly namespace: string;
@@ -36,7 +40,7 @@ export async function VersionDocument({
     <>
       <PageHeader
         crumbs={[
-          { label: 'Workflows', href: '/workflows' },
+          { label: 'Workflows', href: WORKFLOWS_HREF },
           { label: namespace },
           { label: name, href: workflowHref(namespace, name) },
           { label: `Version ${version}` },
@@ -54,7 +58,7 @@ export async function VersionDocument({
             </Button>
             {canAuthor(user) && (
               <Button variant="outline" asChild>
-                <Link href={`${workflowHref(namespace, name)}/edit`}>
+                <Link href={editorHref(namespace, name)}>
                   <PencilIcon data-icon="inline-start" />
                   Edit the current version
                 </Link>

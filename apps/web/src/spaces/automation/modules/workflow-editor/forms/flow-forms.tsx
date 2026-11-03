@@ -11,13 +11,11 @@ import { Field, FieldLabel } from '@/libs/ui/components/field';
 import { Input } from '@/libs/ui/components/input';
 import { Switch } from '@/libs/ui/components/switch';
 import {
-  ERROR_TYPE_BASE,
-  RAISE_TYPES,
-} from '../../../__shared_context/document/kinds';
-import {
   durationOf,
   durationValue,
-} from '../../../__shared_context/document/trigger';
+  ERROR_TYPE_BASE,
+  RAISE_TYPES,
+} from '@/operations/workflow-document';
 import { useEditing } from '../editing-context';
 import { ChoiceField, DurationField, TextField } from './fields';
 import { type TaskFormProps, taskEditor } from './task-form';

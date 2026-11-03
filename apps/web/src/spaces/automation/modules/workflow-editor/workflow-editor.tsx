@@ -13,8 +13,8 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from '@/libs/ui/components/empty';
-import { canAuthor } from '../../__shared_context/access';
-import { draftFrom, newDraft } from '../../__shared_context/document/draft';
+import { canAuthor } from '@/operations/access-policy';
+import { draftFrom, newDraft } from './draft';
 import { Editor } from './editor';
 
 interface WorkflowEditorProps {

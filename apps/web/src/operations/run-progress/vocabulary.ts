@@ -1,10 +1,5 @@
-import type {
-  DeliveryStatus,
-  Phase,
-  TaskStatus,
-  Trigger,
-} from '@/libs/data-access/types';
-import { Status, type Tone } from '@/libs/ui/composites/status';
+import type { Phase, TaskStatus, Trigger } from '@/libs/data-access/types';
+import type { Tone } from '@/libs/ui/composites/status';
 
 // The words of the run's states and the tone that colours each (research R8).
 
@@ -20,12 +15,29 @@ const PHASE: Record<Phase, { readonly label: string; readonly tone: Tone }> = {
 
 export const PHASES = Object.keys(PHASE) as Phase[];
 
+// The word of a phase: "Faulted".
 export function phaseLabel(phase: Phase): string {
   return PHASE[phase].label;
 }
 
+// The tone that colours a phase.
 export function phaseTone(phase: Phase): Tone {
   return PHASE[phase].tone;
+}
+
+// A phase as a status shows it, given to the `ui` lib's `Status`.
+export interface PhaseState {
+  readonly tone: Tone;
+  readonly label: string;
+  // Whether its dot pulses: the run is starting or running.
+  readonly live: boolean;
+}
+
+// The status of a phase: its tone, its word and whether it is changing.
+export function phaseStatusOf(phase: Phase): PhaseState {
+  const { label, tone } = PHASE[phase];
+  const live = phase === 'running' || phase === 'pending';
+  return { tone, label, live };
 }
 
 // An instance that has not ended still changes, so live views keep refreshing it.
@@ -54,10 +66,12 @@ const TASK_STATUS: Record<
   skipped: { label: 'Skipped', tone: 'ended' },
 };
 
+// The word of a task's status: "Skipped".
 export function taskStatusLabel(status: TaskStatus): string {
   return TASK_STATUS[status].label;
 }
 
+// The tone that colours a task's status.
 export function taskStatusTone(status: TaskStatus): Tone {
   return TASK_STATUS[status].tone;
 }
@@ -71,6 +85,7 @@ const TRIGGER: Record<Trigger, string> = {
   restart: 'Run again',
 };
 
+// What started a run, as a column names it: "Schedule".
 export function triggerLabel(trigger: Trigger): string {
   return TRIGGER[trigger];
 }
@@ -89,41 +104,6 @@ export function startedBy(trigger: Trigger): string {
   return STARTED[trigger];
 }
 
-const DELIVERY: Record<
-  DeliveryStatus,
-  { readonly label: string; readonly tone: Tone }
-> = {
-  pending: { label: 'Retrying', tone: 'waiting' },
-  delivered: { label: 'Delivered', tone: 'done' },
-  failed: { label: 'Failed', tone: 'failed' },
-};
-
-export function deliveryLabel(status: DeliveryStatus): string {
-  return DELIVERY[status].label;
-}
-
-export function deliveryTone(status: DeliveryStatus): Tone {
-  return DELIVERY[status].tone;
-}
-
-export function PhaseStatus({
-  phase,
-  className,
-}: {
-  readonly phase: Phase;
-  readonly className?: string;
-}) {
-  const live = phase === 'running' || phase === 'pending';
-  return (
-    <Status
-      tone={phaseTone(phase)}
-      label={phaseLabel(phase)}
-      live={live}
-      className={className}
-    />
-  );
-}
-
 // What a person may do with an instance in a phase; the API refuses the rest (002 FR-017).
 export interface Controls {
   readonly suspend: boolean;
@@ -133,6 +113,8 @@ export interface Controls {
   readonly remove: boolean;
 }
 
+// The controls a phase allows: an ended run is restarted or removed, a running one held or
+// cancelled.
 export function controlsOf(phase: Phase): Controls {
   const ended = !isUnended(phase);
   return {

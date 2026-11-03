@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { acceptInvitation } from '@/libs/data-access/identity';
 import { field, type FormState } from '@/libs/forms/form-state';
+import { HOME_HREF } from '@/operations/app-routes';
 
 export async function acceptInvitationAction(
   _previous: FormState,
@@ -18,5 +19,5 @@ export async function acceptInvitationAction(
   if (!outcome.ok)
     return { problem: outcome.problem, done: false, values: { name } };
 
-  redirect('/');
+  redirect(HOME_HREF);
 }

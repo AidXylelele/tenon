@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  durationOf,
-  durationValue,
-} from '../../../__shared_context/document/trigger';
+import { durationOf, durationValue } from '@/operations/workflow-document';
 import { useEditing } from '../editing-context';
 import { ChoiceField, DurationField, TextField } from './fields';
 import { type TaskFormProps, taskEditor } from './task-form';

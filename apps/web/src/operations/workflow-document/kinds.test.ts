@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KINDS, newTask } from './kinds';
+import { infoOf, KINDS, newTask } from './kinds';
 import { kindOf } from './tasks';
 
 describe('the tasks a builder adds', () => {
@@ -16,5 +16,10 @@ describe('the tasks a builder adds', () => {
 
     expect(first).toEqual(second);
     expect(first).not.toBe(second);
+  });
+
+  it('a_construct_without_a_form_is_advanced_and_starts_empty', () => {
+    expect(infoOf('advanced').label).toBe('Advanced');
+    expect(newTask('advanced')).toEqual({ set: {} });
   });
 });

@@ -8,9 +8,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/libs/ui/components/table';
+import { Status } from '@/libs/ui/composites/status';
 import { Duration, Time } from '@/libs/ui/composites/time';
-import { instanceHref } from './links';
-import { PhaseStatus, triggerLabel } from './vocabulary';
+import { instanceHref } from '@/operations/app-routes';
+import { phaseStatusOf, triggerLabel } from '@/operations/run-progress';
 
 interface InstanceTableProps {
   readonly instances: readonly InstanceSummary[];
@@ -45,7 +46,7 @@ export function InstanceTable({
                   className="after:absolute after:inset-0"
                   aria-label={`Run ${instance.id}`}
                 >
-                  <PhaseStatus phase={instance.phase} />
+                  <Status {...phaseStatusOf(instance.phase)} />
                 </Link>
               </TableCell>
               {showWorkflow && (

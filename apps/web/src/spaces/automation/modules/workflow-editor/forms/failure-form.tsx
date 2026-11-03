@@ -15,9 +15,9 @@ import {
   type FailureChoice,
   failureChoiceOf,
   type Protection,
+  type TaskEntry,
   withFailureChoice,
-} from '../../../__shared_context/document/protection';
-import type { TaskEntry } from '../../../__shared_context/document/tasks';
+} from '@/operations/workflow-document';
 
 interface FailureFormProps {
   readonly entry: TaskEntry;

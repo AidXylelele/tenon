@@ -3,9 +3,11 @@ import type { JsonObject } from '@/libs/document-text/json';
 import {
   failureChoiceOf,
   protectionOf,
+  protectorOf,
   renamedStep,
   retryTextOf,
   withFailureChoice,
+  withProtectedStep,
 } from './protection';
 import { entriesAt, replaceTask } from './tasks';
 
@@ -141,5 +143,92 @@ describe('what a step does when it fails', () => {
   it('a_named_retry_policy_reads_as_its_name', () => {
     expect(retryTextOf('crm-policy')).toBe('Retries as crm-policy');
     expect(retryTextOf(undefined)).toBeNull();
+  });
+
+  it('a_retry_policy_reads_as_its_count_delay_and_backoff', () => {
+    expect(
+      retryTextOf({
+        delay: { seconds: 1 },
+        backoff: { linear: {} },
+        limit: { attempt: { count: 3 } },
+      }),
+    ).toBe('Retries up to 3 times, 1 second apart, waiting longer each time');
+    expect(retryTextOf({})).toBe('Retries');
+  });
+
+  it('a_retry_in_minutes_hours_or_days_is_read_back_in_seconds', () => {
+    const retried = (delay: JsonObject) => {
+      const document: JsonObject = {
+        do: [
+          {
+            fetchLead: {
+              try: [{ fetchLead: { call: 'http', with: {} } }],
+              catch: { retry: { delay, limit: { attempt: { count: 2 } } } },
+            },
+          },
+        ],
+      };
+      const entry = first(document);
+      const protection = protectionOf(document, entry);
+      return failureChoiceOf(protection, entry);
+    };
+
+    expect(retried({ minutes: 2 })).toMatchObject({ seconds: 120 });
+    expect(retried({ hours: 1 })).toMatchObject({ seconds: 3600 });
+    expect(retried({ days: 1 })).toMatchObject({ seconds: 86_400 });
+  });
+
+  it('a_protected_step_is_drawn_as_its_try_and_any_other_as_itself', () => {
+    const entry = first(draft);
+    const wrapped = replaceTask(
+      draft,
+      entry,
+      withFailureChoice(entry, null, { kind: 'continue' }),
+    );
+
+    expect(protectorOf(wrapped, '/do/0/fetchLead/try/0/fetchLead')).toBe(
+      '/do/0/fetchLead',
+    );
+    expect(protectorOf(wrapped, '/do/0/fetchLead')).toBe('/do/0/fetchLead');
+    expect(protectorOf(draft, '/do/0/missing/try/0/step')).toBe(
+      '/do/0/missing/try/0/step',
+    );
+  });
+
+  it('a_try_with_steps_to_run_on_failure_is_a_block_not_a_protection', () => {
+    const block: JsonObject = {
+      do: [
+        {
+          guarded: {
+            try: [{ a: { set: {} } }],
+            catch: { do: [{ recover: { set: {} } }] },
+          },
+        },
+      ],
+    };
+    const entry = first(block);
+
+    expect(protectionOf(block, entry)).toBeNull();
+    expect(failureChoiceOf(null, entry)).toEqual({ kind: 'handle' });
+    expect(withFailureChoice(entry, null, { kind: 'stop' })).toBe(entry.task);
+    expect(protectorOf(block, '/do/0/guarded/try/0/a')).toBe(
+      '/do/0/guarded/try/0/a',
+    );
+  });
+
+  it('the_protected_step_is_replaced_inside_its_try', () => {
+    const entry = first(draft);
+    const wrapped = replaceTask(
+      draft,
+      entry,
+      withFailureChoice(entry, null, { kind: 'continue' }),
+    );
+    const wrapper = first(wrapped);
+    const protection = protectionOf(wrapped, wrapper);
+    const task = { set: { lead: true } };
+
+    expect(
+      protection && withProtectedStep(wrapper, protection, task).try,
+    ).toEqual([{ fetchLead: task }]);
   });
 });

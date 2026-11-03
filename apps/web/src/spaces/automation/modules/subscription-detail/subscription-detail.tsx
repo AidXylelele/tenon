@@ -24,10 +24,11 @@ import { JsonBlock } from '@/libs/ui/composites/json-block';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Status } from '@/libs/ui/composites/status';
 import { Time } from '@/libs/ui/composites/time';
-import { canAuthor } from '../../__shared_context/access';
+import { canAuthor } from '@/operations/access-policy';
+import { NOTIFICATIONS_HREF, WEBHOOKS_HREF } from '@/operations/app-routes';
 import { AuthorsOnly } from '../../__shared_context/authors-only';
 import { describeFilter } from '../../__shared_context/event-filter';
-import { deliveryLabel, deliveryTone } from '../../__shared_context/vocabulary';
+import { deliveryLabel, deliveryTone } from '../../__shared_context/delivery';
 import { deleteSubscriptionAction } from './actions';
 
 // A subscription and its 50 most recent deliveries, live while any is being retried (spec
@@ -53,8 +54,8 @@ export async function SubscriptionDetail({ id }: { readonly id: string }) {
     <>
       <PageHeader
         crumbs={[
-          { label: 'Connections', href: '/connections/webhooks' },
-          { label: 'Notifications', href: '/connections/notifications' },
+          { label: 'Connections', href: WEBHOOKS_HREF },
+          { label: 'Notifications', href: NOTIFICATIONS_HREF },
           { label: subscription.name },
         ]}
         title={subscription.name}

@@ -16,7 +16,7 @@ import {
   WaypointsIcon,
   WrenchIcon,
 } from 'lucide-react';
-import type { TaskKind } from '../document/tasks';
+import type { TaskKind } from '@/operations/workflow-document';
 
 const ICONS: Record<TaskKind, LucideIcon> = {
   http: GlobeIcon,

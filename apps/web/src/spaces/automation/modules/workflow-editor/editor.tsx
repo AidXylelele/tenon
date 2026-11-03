@@ -52,34 +52,29 @@ import {
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { useHydrated } from '@/libs/ui/hooks/use-hydrated';
 import { useIsMobile } from '@/libs/ui/hooks/use-mobile';
-import { type CanvasEdge, START } from '../../__shared_context/canvas/graph';
-import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
-import {
-  headerOf,
-  MAX_DOCUMENT_BYTES,
-  nextVersion,
-  sizeOf,
-} from '../../__shared_context/document/draft';
-import { infoOf, newTask } from '../../__shared_context/document/kinds';
-import { locate } from '../../__shared_context/document/problems';
-import {
-  protectionOf,
-  protectorOf,
-  renamedStep,
-} from '../../__shared_context/document/protection';
-import { withDeclaredSecrets } from '../../__shared_context/document/secrets';
+import { workflowHref, WORKFLOWS_HREF } from '@/operations/app-routes';
 import {
   duplicateTask,
   entriesAt,
   entryAt,
   freeName,
+  headerOf,
+  infoOf,
   insertTask,
   moveTask,
+  newTask,
+  protectionOf,
+  protectorOf,
   removeTask,
+  renamedStep,
   replaceTask,
   type TaskKind,
-} from '../../__shared_context/document/tasks';
-import { workflowHref } from '../../__shared_context/links';
+} from '@/operations/workflow-document';
+import { type CanvasEdge, START } from '../../__shared_context/canvas/graph';
+import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
+import { MAX_DOCUMENT_BYTES, nextVersion, sizeOf } from './draft';
+import { locate } from './problems';
+import { withDeclaredSecrets } from './secrets';
 import { publishAction } from './actions';
 import { CheckStatus } from './check-status';
 import { EditingProvider } from './editing-context';
@@ -387,11 +382,16 @@ export function Editor({
 
       published.current = true;
       const target = workflowHref(outcome.value.namespace, outcome.value.name);
+      const starting = workflowHref(
+        outcome.value.namespace,
+        outcome.value.name,
+        { start: true },
+      );
       toast.success(`Published version ${outcome.value.version}`, {
         description: 'Runs started from now on use it.',
         action: {
           label: 'Start a run',
-          onClick: () => router.push(`${target}?start=1`),
+          onClick: () => router.push(starting),
         },
       });
       router.push(target);
@@ -403,7 +403,7 @@ export function Editor({
     codeOf(publishProblem) === 'workflow.version-taken';
   const back =
     existing === null
-      ? '/workflows'
+      ? WORKFLOWS_HREF
       : workflowHref(existing.namespace, existing.name);
   const ready = check.kind === 'clean' && textError === null;
   const editing = {

@@ -28,6 +28,7 @@ import {
   useSidebar,
 } from '@/libs/ui/components/sidebar';
 import { Spinner } from '@/libs/ui/components/spinner';
+import { ACCOUNT_HREF, HOME_HREF } from '@/operations/app-routes';
 import { BrandMark, PRODUCT_NAME } from '../../__shared_context/brand-mark';
 import { signOutAction } from './actions';
 import {
@@ -48,7 +49,7 @@ const ROLE_LABEL: Record<Role, string> = {
 // read.
 export function ConsoleSidebar({ user }: { readonly user: User | null }) {
   const pathname = usePathname();
-  const destinations = destinationsOf(user?.role ?? null);
+  const destinations = destinationsOf(user);
 
   return (
     <Sidebar collapsible="icon">
@@ -56,7 +57,7 @@ export function ConsoleSidebar({ user }: { readonly user: User | null }) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size="lg" tooltip={PRODUCT_NAME}>
-              <Link href="/">
+              <Link href={HOME_HREF}>
                 <BrandMark className="size-8" />
                 <span className="truncate font-semibold group-data-[collapsible=icon]:hidden">
                   {PRODUCT_NAME}
@@ -171,7 +172,7 @@ function UserMenu({ user }: { readonly user: User }) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/settings/account">
+              <Link href={ACCOUNT_HREF}>
                 <UserIcon />
                 Account and password
               </Link>

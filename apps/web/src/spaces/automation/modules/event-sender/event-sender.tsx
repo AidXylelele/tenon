@@ -27,6 +27,7 @@ import { Spinner } from '@/libs/ui/components/spinner';
 import { Textarea } from '@/libs/ui/components/textarea';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { Time } from '@/libs/ui/composites/time';
+import { INSTANCES_HREF } from '@/operations/app-routes';
 import { sendEventAction } from './actions';
 
 interface Sent {
@@ -202,7 +203,10 @@ export function EventSender() {
           <CardTitle>Sent from here</CardTitle>
           <CardDescription>
             What they started shows on{' '}
-            <Link href="/instances" className="underline underline-offset-4">
+            <Link
+              href={INSTANCES_HREF}
+              className="underline underline-offset-4"
+            >
               Runs
             </Link>
             .

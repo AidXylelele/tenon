@@ -22,8 +22,13 @@ import {
 } from '@/libs/ui/components/table';
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { Status } from '@/libs/ui/composites/status';
-import { canAuthor } from '../../__shared_context/access';
-import { workflowHref } from '../../__shared_context/links';
+import { canAuthor } from '@/operations/access-policy';
+import {
+  NEW_WORKFLOW_HREF,
+  workflowHref,
+  WORKFLOWS_HREF,
+  workflowsHref,
+} from '@/operations/app-routes';
 
 interface WorkflowListProps {
   readonly status: WorkflowStatus;
@@ -36,9 +41,10 @@ export async function WorkflowList({ status, cursor }: WorkflowListProps) {
     workflows(status, cursor),
   ]);
   const author = canAuthor(user);
+  const archived = workflowsHref({ status: 'archived' });
   const actions = author ? (
     <Button asChild>
-      <Link href="/workflows/new">
+      <Link href={NEW_WORKFLOW_HREF}>
         <PlusIcon data-icon="inline-start" />
         New workflow
       </Link>
@@ -53,10 +59,10 @@ export async function WorkflowList({ status, cursor }: WorkflowListProps) {
         actions={actions}
       />
       <nav className="flex gap-1 border-b text-sm" aria-label="Workflow status">
-        <Tab href="/workflows" active={status === 'active'}>
+        <Tab href={WORKFLOWS_HREF} active={status === 'active'}>
           Active
         </Tab>
-        <Tab href="/workflows?status=archived" active={status === 'archived'}>
+        <Tab href={archived} active={status === 'archived'}>
           Archived
         </Tab>
       </nav>
@@ -78,7 +84,7 @@ export async function WorkflowList({ status, cursor }: WorkflowListProps) {
           {author && status === 'active' && (
             <EmptyContent>
               <Button asChild>
-                <Link href="/workflows/new">Build a workflow</Link>
+                <Link href={NEW_WORKFLOW_HREF}>Build a workflow</Link>
               </Button>
             </EmptyContent>
           )}
@@ -133,9 +139,7 @@ export async function WorkflowList({ status, cursor }: WorkflowListProps) {
       {page.next !== null && (
         <div className="flex justify-end">
           <Button variant="outline" asChild>
-            <Link
-              href={`/workflows?status=${status}&cursor=${encodeURIComponent(page.next)}`}
-            >
+            <Link href={workflowsHref({ status, cursor: page.next })}>
               Next page
             </Link>
           </Button>

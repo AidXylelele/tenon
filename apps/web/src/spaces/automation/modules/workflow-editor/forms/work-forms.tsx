@@ -1,7 +1,6 @@
 'use client';
 
 import { CodeEditor } from '@/libs/code-editor/code-editor';
-import { scriptLanguageName } from '../../../__shared_context/document/summary';
 import {
   isObject,
   type JsonObject,
@@ -13,7 +12,7 @@ import {
   FieldLabel,
 } from '@/libs/ui/components/field';
 import { Switch } from '@/libs/ui/components/switch';
-import { uriOf } from '../../../__shared_context/document/summary';
+import { scriptLanguageName, uriOf } from '@/operations/workflow-document';
 import { useEditing, useFieldProblem } from '../editing-context';
 import { ChoiceField, JsonField, PairsField, TextField } from './fields';
 import { type TaskFormProps, taskEditor } from './task-form';

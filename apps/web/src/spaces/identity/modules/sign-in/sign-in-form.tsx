@@ -7,6 +7,7 @@ import { Field, FieldGroup, FieldLabel } from '@/libs/ui/components/field';
 import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
+import { FORGOT_PASSWORD_HREF } from '@/operations/app-routes';
 import { signInAction } from './actions';
 
 export function SignInForm({ next }: { readonly next: string }) {
@@ -33,7 +34,7 @@ export function SignInForm({ next }: { readonly next: string }) {
           <div className="flex items-center justify-between">
             <FieldLabel htmlFor="password">Password</FieldLabel>
             <Link
-              href="/forgot-password"
+              href={FORGOT_PASSWORD_HREF}
               className="text-xs text-muted-foreground underline-offset-4 hover:underline"
             >
               Forgot it?

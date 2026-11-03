@@ -1,6 +1,6 @@
 import { currentUser } from '@/libs/data-access/identity';
 import { PageHeader } from '@/libs/ui/composites/page-header';
-import { canAuthor } from '../../__shared_context/access';
+import { canAuthor } from '@/operations/access-policy';
 import { AuthorsOnly } from '../../__shared_context/authors-only';
 import { EventSender } from './event-sender';
 
