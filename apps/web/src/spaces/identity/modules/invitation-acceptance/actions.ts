@@ -18,5 +18,5 @@ export async function acceptInvitationAction(
   if (!outcome.ok)
     return { problem: outcome.problem, done: false, values: { name } };
 
-  redirect('/workflows');
+  redirect('/');
 }

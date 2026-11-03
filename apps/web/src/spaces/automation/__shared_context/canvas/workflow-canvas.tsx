@@ -20,7 +20,14 @@ import { describeTrigger, triggerOf } from '../document/trigger';
 import type { TaskProgress } from '../outline/progress';
 import { CanvasProvider, type CanvasState } from './canvas-context';
 import { FlowEdge, type FlowEdgeData } from './flow-edge';
-import { type CanvasEdge, END, graphOf, placeOf, START } from './graph';
+import {
+  type CanvasEdge,
+  END,
+  graphOf,
+  isBranchList,
+  placeOf,
+  START,
+} from './graph';
 import {
   AddNode,
   type CanvasNodeData,
@@ -90,11 +97,12 @@ function Canvas({
   onDisconnect,
   className,
 }: WorkflowCanvasProps) {
-  const graph = useMemo(
-    () => graphOf(document, editable),
-    [document, editable],
-  );
-  const trigger = describeTrigger(triggerOf(document));
+  // A live refresh brings an equal document as a new object; the layout is redone only when
+  // the document itself changed.
+  const text = JSON.stringify(document);
+  const stable = useMemo(() => JSON.parse(text) as JsonObject, [text]);
+  const graph = useMemo(() => graphOf(stable, editable), [stable, editable]);
+  const trigger = describeTrigger(triggerOf(stable));
   const { setViewport } = useReactFlow();
   const frame = useRef<HTMLDivElement>(null);
 
@@ -103,7 +111,10 @@ function Canvas({
   function show() {
     const box = frame.current?.getBoundingClientRect();
 
-    if (box === undefined || box.width === 0) return;
+    if (box === undefined || box.width === 0) {
+      waitForSize();
+      return;
+    }
 
     const top = graph.nodes.filter((node) => node.parentId === null);
     const left = Math.min(...top.map((node) => node.x));
@@ -123,6 +134,22 @@ function Canvas({
         : PAD - left * zoom;
     const y = (box.height - height * zoom) / 2 - upper * zoom;
     void setViewport({ x, y, zoom });
+  }
+
+  // A canvas mounted while hidden (a closed sheet, a narrow layout) gets its first view when
+  // it gets a size.
+  function waitForSize() {
+    const element = frame.current;
+
+    if (element === null) return;
+
+    const observer = new ResizeObserver(() => {
+      if (element.getBoundingClientRect().width === 0) return;
+
+      observer.disconnect();
+      show();
+    });
+    observer.observe(element);
   }
 
   const nodes = useMemo<Node<CanvasNodeData>[]>(
@@ -178,17 +205,30 @@ function Canvas({
     [graph, progress, phase, editable],
   );
 
-  const state: CanvasState = {
-    editable,
-    selected,
-    flagged,
-    progress,
-    faultAt,
-    phase,
-    trigger,
-    onSelect,
-    onInsert,
-  };
+  const state = useMemo<CanvasState>(
+    () => ({
+      editable,
+      selected,
+      flagged,
+      progress,
+      faultAt,
+      phase,
+      trigger,
+      onSelect,
+      onInsert,
+    }),
+    [
+      editable,
+      selected,
+      flagged,
+      progress,
+      faultAt,
+      phase,
+      trigger,
+      onSelect,
+      onInsert,
+    ],
+  );
 
   function connect(connection: Connection) {
     if (onConnect === undefined) return;
@@ -208,7 +248,10 @@ function Canvas({
     if (from === null || to === null || connection.source === connection.target)
       return false;
 
-    return from.listPointer === to.listPointer;
+    // Fork branches run side by side; a `then` between them would mean nothing.
+    return (
+      from.listPointer === to.listPointer && !isBranchList(from.listPointer)
+    );
   }
 
   return (
@@ -225,6 +268,7 @@ function Canvas({
           maxZoom={1.6}
           nodesDraggable={false}
           nodesConnectable={editable}
+          nodesFocusable={false}
           elementsSelectable={editable}
           onConnect={connect}
           isValidConnection={connectable}

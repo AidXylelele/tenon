@@ -20,6 +20,8 @@ export function Timeline({
   // Opens a single record at once, as when one step is picked.
   readonly open?: boolean;
 }) {
+  // The panel beside the canvas is narrow: names get the room, and the start time moves into
+  // the record, where it is exact.
   if (records.length === 0)
     return (
       <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -49,14 +51,20 @@ export function Timeline({
                   live={record.status === 'running'}
                   className="shrink-0"
                 />
-                <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground sm:block">
-                  <Time value={record.startedAt} />
-                </span>
+
                 <span className="w-20 shrink-0 text-right text-xs">
                   <Duration from={record.startedAt} to={record.endedAt} />
                 </span>
               </summary>
-              <div className="grid gap-3 border-t bg-muted/20 p-3 md:grid-cols-2">
+              <div className="flex flex-col gap-3 border-t bg-muted/20 p-3">
+                <div className="text-xs text-muted-foreground">
+                  Started <Time value={record.startedAt} />
+                  {record.endedAt !== null && (
+                    <>
+                      , ended <Time value={record.endedAt} />
+                    </>
+                  )}
+                </div>
                 <div className="flex min-w-0 flex-col gap-1">
                   <div className="text-xs font-medium text-muted-foreground">
                     Input

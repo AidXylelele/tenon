@@ -134,3 +134,108 @@ describe('a document as a graph', () => {
     expect(placeOf('start')).toBeNull();
   });
 });
+
+describe('what the graph shows of flow directives', () => {
+  const doc = (tasks: JsonObject[]): JsonObject => ({
+    document: { name: 'x' },
+    do: tasks,
+  });
+
+  it('a_then_exit_at_the_root_ends_the_run_visibly', () => {
+    const graph = graphOf(
+      doc([
+        { stop: { set: { a: 1 }, then: 'exit' } },
+        { never: { set: { b: 2 } } },
+      ]),
+      false,
+    );
+
+    expect(edgesOf(graph)).toContain('end /do/0/stop -> end (then exit)');
+  });
+
+  it('a_then_exit_inside_a_block_marks_the_step_as_leaving_it', () => {
+    const graph = graphOf(
+      doc([
+        {
+          group: {
+            do: [{ out: { set: {}, then: 'exit' } }, { skipped: { set: {} } }],
+          },
+        },
+      ]),
+      false,
+    );
+    const out = graph.nodes.find((node) => node.id === '/do/0/group/do/0/out');
+
+    expect(out?.leaves).toBe(true);
+    expect(
+      graph.edges.some((each) => each.source === '/do/0/group/do/0/out'),
+    ).toBe(false);
+  });
+
+  it('a_choice_without_a_default_shows_where_no_match_goes', () => {
+    const graph = graphOf(
+      doc([
+        { route: { switch: [{ big: { when: '${ . > 1 }', then: 'end' } }] } },
+        { next: { set: {} } },
+      ]),
+      false,
+    );
+
+    expect(edgesOf(graph)).toContain(
+      'next /do/0/route -> /do/1/next (no match)',
+    );
+  });
+
+  it('a_case_keeps_its_position_in_the_document_even_after_a_broken_item', () => {
+    const graph = graphOf(
+      doc([
+        { route: { switch: ['broken', { only: { then: 'continue' } }] } },
+        { next: { set: {} } },
+      ]),
+      false,
+    );
+    const route = graph.nodes.find((node) => node.id === '/do/0/route');
+
+    expect(route?.cases.map((each) => each.index)).toEqual([1]);
+    expect(graph.edges.find((each) => each.kind === 'case')?.sourceHandle).toBe(
+      'case-1',
+    );
+  });
+
+  it('the_branches_of_a_fork_are_marked_and_not_connected_to_each_other', () => {
+    const graph = graphOf(
+      doc([
+        {
+          both: {
+            fork: { branches: [{ a: { set: {} } }, { b: { set: {} } }] },
+          },
+        },
+      ]),
+      false,
+    );
+    const a = graph.nodes.find(
+      (node) => node.id === '/do/0/both/fork/branches/0/a',
+    );
+
+    expect(a?.branch).toBe(true);
+    expect(graph.edges.some((each) => each.source.includes('/branches/'))).toBe(
+      false,
+    );
+  });
+
+  it('a_choice_is_measured_to_hold_its_cases', () => {
+    const graph = graphOf(
+      doc([
+        {
+          route: {
+            switch: [{ a: { then: 'continue' } }, { b: { then: 'continue' } }],
+          },
+        },
+      ]),
+      false,
+    );
+    const route = graph.nodes.find((node) => node.id === '/do/0/route');
+
+    expect(route?.height).toBe(64 + 2 * 24 + 8);
+  });
+});

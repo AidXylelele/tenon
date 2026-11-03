@@ -134,14 +134,18 @@ export function TaskNode({ data }: Props) {
     (canvas.faultAt === node.id || canvas.faultAt.startsWith(`${node.id}/`));
   const status = faulted ? 'faulted' : seen?.status;
   const cases = node.cases;
+  const connectable = canvas.editable && !node.branch;
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onKeyDown={(event) =>
-        (event.key === 'Enter' || event.key === ' ') && canvas.onSelect(node.id)
-      }
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+
+        event.preventDefault();
+        canvas.onSelect(node.id);
+      }}
       aria-pressed={selected}
       aria-label={`${entry.name}, ${infoOf(entry.kind).label}`}
       className={cn(
@@ -174,6 +178,14 @@ export function TaskNode({ data }: Props) {
             {summaryOf(entry)}
           </span>
         </span>
+        {node.leaves && (
+          <span
+            className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] text-muted-foreground"
+            title="then exit"
+          >
+            leaves the block
+          </span>
+        )}
       </div>
       {cases.length > 0 && (
         <ol className="flex flex-col px-3 pb-2">
@@ -191,12 +203,12 @@ export function TaskNode({ data }: Props) {
               <Handle
                 type="source"
                 position={Position.Right}
-                id={`case-${index}`}
+                id={`case-${each.index}`}
                 className={cn(HANDLE, '!bg-violet-500')}
                 style={{
                   top: SIZE.node.height + index * SIZE.case + SIZE.case / 2 - 4,
                 }}
-                isConnectable={canvas.editable}
+                isConnectable={connectable}
               />
             </li>
           ))}
@@ -210,15 +222,18 @@ export function TaskNode({ data }: Props) {
         position={Position.Left}
         id="in"
         className={HANDLE}
-        isConnectable={canvas.editable}
+        style={{ top: SIZE.node.height / 2 }}
+        isConnectable={connectable}
       />
-      {cases.length === 0 && entry.kind !== 'raise' && (
+      {entry.kind !== 'raise' && (
+        // A choice leaves from here when no case matches; any other step goes on from here.
         <Handle
           type="source"
           position={Position.Right}
           id="out"
           className={HANDLE}
-          isConnectable={canvas.editable}
+          style={{ top: SIZE.node.height / 2 }}
+          isConnectable={connectable}
         />
       )}
     </div>
@@ -288,7 +303,12 @@ export function ContainerNode({ data }: Props) {
     >
       <button
         type="button"
-        onKeyDown={(event) => event.key === 'Enter' && canvas.onSelect(node.id)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+
+          event.preventDefault();
+          canvas.onSelect(node.id);
+        }}
         className="flex h-[52px] w-full items-center gap-2.5 rounded-t-3xl px-4 text-left hover:bg-muted/60"
         aria-label={`${entry.name}, ${infoOf(entry.kind).label}`}
       >
@@ -346,14 +366,14 @@ export function ContainerNode({ data }: Props) {
         position={Position.Left}
         id="in"
         className={HANDLE}
-        isConnectable={canvas.editable}
+        isConnectable={canvas.editable && !node.branch}
       />
       <Handle
         type="source"
         position={Position.Right}
         id="out"
         className={HANDLE}
-        isConnectable={canvas.editable}
+        isConnectable={canvas.editable && !node.branch}
       />
     </div>
   );

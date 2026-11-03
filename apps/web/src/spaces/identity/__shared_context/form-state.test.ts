@@ -16,10 +16,10 @@ describe('the page to return to after signing in', () => {
     ['/\n/evil.example'],
     ['evil'],
   ])('never_leaves_the_console_for_%j', (next) => {
-    expect(returnPath(next)).toBe('/workflows');
+    expect(returnPath(next)).toBe('/');
   });
 
   it('without_one_it_is_the_start_page', () => {
-    expect(returnPath(undefined)).toBe('/workflows');
+    expect(returnPath(undefined)).toBe('/');
   });
 });

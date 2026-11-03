@@ -64,4 +64,4 @@
 - [x] T104 [US3] A run's page on the canvas: statuses, taken edges, a step's executions in the panel (FR-024)
 - [x] T105 [US5] A workflow's page with Overview, Runs and Versions tabs
 - [x] T106 The Overview page, the regrouped navigation, the top bar and the ⌘K search (FR-025)
-- [ ] T107 Checks on the running stack, the critic round, and the artifacts synchronised
+- [x] T107 Checks on the running stack, the critic round, and the artifacts synchronised

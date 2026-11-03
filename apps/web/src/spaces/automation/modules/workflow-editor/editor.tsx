@@ -19,6 +19,7 @@ import type {
   ConformanceStatement,
   JsonObject,
 } from '@/libs/data-access/types';
+import { pointerOf, tokensOf } from '@/libs/document-text/json-pointer';
 import {
   formatOf,
   parseText,
@@ -266,7 +267,7 @@ export function Editor({
     if (from === null) return;
 
     if (edge.kind === 'case') {
-      const index = Number(edge.id.split('#').at(-1));
+      const index = edge.caseIndex ?? 0;
       update(
         withValue(draft, caseThen(draft, from.pointer, index), 'continue'),
       );
@@ -644,8 +645,10 @@ function siblingsOf(
 }
 
 // The pointer of the `then` of a choice's case, by the case's position.
+// The case name is escaped as a pointer token (RFC 6901), as a name may hold `/` or `~`.
 function caseThen(draft: JsonObject, pointer: string, index: number): string {
-  const item = valueAt(draft, `${pointer}/switch/${index}`);
+  const tokens = [...tokensOf(pointer), 'switch', index];
+  const item = valueAt(draft, pointerOf(tokens));
   const name = isObject(item) ? (Object.keys(item)[0] ?? '') : '';
-  return `${pointer}/switch/${index}/${name}/then`;
+  return pointerOf([...tokens, name, 'then']);
 }

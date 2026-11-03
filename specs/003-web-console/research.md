@@ -167,3 +167,21 @@ An independent review of the tiers, the BFF rules and security found no import t
     - sub-workflows: indigo;
     - errors: rose.
   - Status colours stay those of R8 and appear only as rings, dots and taken edges, so state is never confused with kind.
+
+## R13. Critic round 2: the canvas (2026-11-03)
+
+**Fixed:**
+
+- **`then: exit`.** At the root it now draws an edge to the end. Inside a block it marks the step as leaving the block.
+- **A choice without a default case** now shows where _no match_ goes (its own `then`, or the next step).
+- **Case writes.** The case name is escaped as a pointer token. A case keeps its position in the document, so a broken item before it cannot shift the handle.
+- **The height of a choice** now holds its cases.
+- **Fork branches** can no longer be connected to each other: a `then` between concurrent branches would mean nothing.
+- **A hidden canvas** gets its first view when it gets a size.
+- **One tab stop per node**, and Space no longer scrolls the page.
+- **Live refresh is cheap.** An equal document is not laid out again, the canvas state and a run's progress are memoised, and `progressOf` takes one pass.
+
+**Known limits:**
+
+- **A green connection means "both ends ran", not "the choice took this path".** The task records do not say which case a `switch` took or which `then` a run followed.
+- **The run canvas reads the first 500 task records**, as the timeline does.

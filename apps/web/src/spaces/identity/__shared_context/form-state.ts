@@ -19,7 +19,7 @@ export function field(form: FormData, name: string): string {
 // resolves it, so a value that leaves the console (another origin, `//host`, `/\\host`, a tab or
 // a newline that browsers strip) returns to the start page instead.
 export function returnPath(next: string | undefined): string {
-  const start = '/workflows';
+  const start = '/';
 
   if (next === undefined || !next.startsWith('/')) return start;
 

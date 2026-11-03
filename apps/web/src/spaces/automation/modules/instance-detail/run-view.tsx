@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeftIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type {
   CloudEvent,
   Instance,
@@ -47,11 +47,18 @@ export function RunView({
   events,
 }: RunViewProps) {
   const [selected, setSelected] = useState<string | null>(null);
-  const pointers =
-    document === null
-      ? []
-      : allEntries(document).map(({ entry }) => entry.pointer);
-  const progress = progressOf(records, pointers);
+  // Kept across renders that bring the same run, so a live refresh redraws only what changed.
+  const pointers = useMemo(
+    () =>
+      document === null
+        ? []
+        : allEntries(document).map(({ entry }) => entry.pointer),
+    [document],
+  );
+  const progress = useMemo(
+    () => progressOf(records, pointers),
+    [records, pointers],
+  );
   const faultAt =
     instance.phase === 'faulted' ? (instance.error?.instance ?? null) : null;
   const step =
