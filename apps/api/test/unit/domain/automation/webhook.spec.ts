@@ -38,14 +38,14 @@ describe('Webhook', () => {
       {
         body: { order: 7 },
         query: { source: 'shop' },
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'content-type': 'application/json' },
         key: null,
       },
       now,
     );
 
     expect(event).toMatchObject({
-      webhookId: webhook.id,
+      source: `/webhooks/${webhook.id}`,
       type: 'com.example.form.submitted',
       at: now,
       data: {
@@ -54,22 +54,6 @@ describe('Webhook', () => {
         headers: { 'content-type': 'application/json' },
       },
     });
-  });
-
-  it('the_callers_credentials_never_reach_the_event', () => {
-    const webhook = aWebhook();
-
-    const event = webhook.receive(
-      {
-        body: null,
-        query: {},
-        headers: { Authorization: 'Bearer x', cookie: 'sid=1', 'x-trace': 't' },
-        key: null,
-      },
-      now,
-    );
-
-    expect(event.data.headers).toEqual({ 'x-trace': 't' });
   });
 
   it('the_callers_key_identifies_the_event_so_a_repeat_is_the_same', () => {

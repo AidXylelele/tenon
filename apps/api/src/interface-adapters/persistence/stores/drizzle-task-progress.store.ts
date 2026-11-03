@@ -104,6 +104,11 @@ export class DrizzleTaskProgressStore implements TaskProgress {
     const lifecycle = LifecycleEventMapper.ofTask(instanceId, names, task);
 
     if (lifecycle !== null)
-      await this.events.accept(lifecycle, EventOrigin.Lifecycle, instanceId);
+      await this.events.accept(
+        lifecycle,
+        EventOrigin.Lifecycle,
+        instanceId,
+        task.at,
+      );
   }
 }

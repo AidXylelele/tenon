@@ -17,6 +17,7 @@ import { DrizzleEventStore } from '../stores/drizzle-event.store.js';
 import type { WorkflowInstanceRepository } from '../../../application/automation/instances/ports.js';
 import type { WorkflowInstance } from '../../../domain/automation/instances/workflow-instance.js';
 import { StaleWriteError } from '../../../domain/errors.js';
+import { Clock } from '../../../application/automation/ports.js';
 import type { DrizzleTx } from '../interfaces.js';
 import { WorkflowInstanceMapper } from '../mappers/workflow-instance.mapper.js';
 import { workflowInstance as instances } from '../schema/index.js';
@@ -34,6 +35,7 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
     private readonly outbox: Outbox,
     private readonly events: DrizzleEventStore,
     private readonly names: DrizzleInstanceNames,
+    private readonly clock: Clock,
   ) {}
 
   async find(id: string): Promise<WorkflowInstance | null> {
@@ -128,11 +130,12 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
     if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
 
     const names = changes.length > 0 ? await this.names.of(instance.id) : null;
-    const at = new Date();
+    const now = this.clock.now();
 
     for (const change of changes) {
       if (names === null) break;
 
+      const at = LifecycleEventMapper.timeOf(change.kind, instance, now);
       const lifecycle = LifecycleEventMapper.ofInstance(
         change.kind,
         instance,
@@ -141,7 +144,12 @@ export class DrizzleWorkflowInstanceRepository implements WorkflowInstanceReposi
       );
 
       if (lifecycle !== null)
-        await this.events.accept(lifecycle, EventOrigin.Lifecycle, instance.id);
+        await this.events.accept(
+          lifecycle,
+          EventOrigin.Lifecycle,
+          instance.id,
+          at,
+        );
     }
 
     instance.clearEvents();

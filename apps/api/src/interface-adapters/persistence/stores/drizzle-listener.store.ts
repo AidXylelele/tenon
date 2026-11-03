@@ -19,8 +19,8 @@ export class DrizzleListenerStore implements ListenerStore {
     instanceId: string,
     key: string,
     types: string[] | null,
+    since: Date,
   ): Promise<void> {
-    const since = new Date();
     await this.txHost.tx
       .insert(listeners)
       .values({ instanceId, key, types, since })

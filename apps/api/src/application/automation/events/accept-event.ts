@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Transactional } from '@nestjs-cls/transactional';
 import type { EventOrigin } from './enums.js';
+import { Clock } from '../ports.js';
 import { type CloudEvent, EventStore } from './ports.js';
 
 export interface AcceptEventCommand {
@@ -13,14 +14,19 @@ export interface AcceptEventCommand {
 // (FR-023); a duplicate is acknowledged and has no effect.
 @Injectable()
 export class AcceptEvent {
-  constructor(private readonly events: EventStore) {}
+  constructor(
+    private readonly events: EventStore,
+    private readonly clock: Clock,
+  ) {}
 
   @Transactional()
   async execute(command: AcceptEventCommand): Promise<boolean> {
+    const now = this.clock.now();
     const sequence = await this.events.accept(
       command.cloudEvent,
       command.origin,
       command.instanceId,
+      now,
     );
     return sequence !== null;
   }

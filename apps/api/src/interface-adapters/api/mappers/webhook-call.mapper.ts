@@ -3,9 +3,11 @@ import type { JsonObject, JsonValue } from '../../../domain/automation/json.js';
 import type { WebhookCall } from '../../../domain/automation/webhooks/interfaces.js';
 
 // A request to a webhook's URL as the domain reads it: a JSON body as parsed, any other as the
-// text it was, repeated headers and query parameters as lists.
+// text it was, repeated headers and query parameters as lists, header names in lower case and
+// the caller's credentials left out, so that they never reach an event (FR-024).
 export class WebhookCallMapper {
   private static readonly KEY = 'idempotency-key';
+  private static readonly CREDENTIALS = new Set(['authorization', 'cookie']);
 
   static toCall(
     body: unknown,
@@ -17,9 +19,12 @@ export class WebhookCallMapper {
     const flattened: Record<string, string> = {};
 
     for (const [name, value] of Object.entries(headers)) {
-      if (value === undefined) continue;
+      const lowered = name.toLowerCase();
 
-      flattened[name] = typeof value === 'string' ? value : value.join(', ');
+      if (value === undefined || WebhookCallMapper.CREDENTIALS.has(lowered))
+        continue;
+
+      flattened[lowered] = typeof value === 'string' ? value : value.join(', ');
     }
 
     const key = flattened[WebhookCallMapper.KEY] ?? null;

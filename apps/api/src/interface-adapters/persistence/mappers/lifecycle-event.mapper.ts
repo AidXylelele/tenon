@@ -25,6 +25,11 @@ export class LifecycleEventMapper {
     [InstanceEventKind.Faulted, 'faulted'],
     [InstanceEventKind.Completed, 'completed'],
   ]);
+  static readonly #ENDS = new Set<InstanceEventKind>([
+    InstanceEventKind.Completed,
+    InstanceEventKind.Faulted,
+    InstanceEventKind.Cancelled,
+  ]);
   static readonly #TASK = new Map<TaskStatus, string>([
     [TaskStatus.Running, 'started'],
     [TaskStatus.Completed, 'completed'],
@@ -33,6 +38,19 @@ export class LifecycleEventMapper {
   ]);
 
   // The event of an instance's change, or null for a change the standard has no event for.
+  // A start and an end happen when the instance says; a suspend or a resume when it is saved.
+  static timeOf(
+    kind: InstanceEventKind,
+    instance: WorkflowInstance,
+    now: Date,
+  ): Date {
+    if (kind === InstanceEventKind.Started) return instance.startedAt ?? now;
+
+    if (LifecycleEventMapper.#ENDS.has(kind)) return instance.endedAt ?? now;
+
+    return now;
+  }
+
   static ofInstance(
     kind: InstanceEventKind,
     instance: WorkflowInstance,

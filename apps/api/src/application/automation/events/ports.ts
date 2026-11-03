@@ -22,6 +22,7 @@ export abstract class EventStore {
     cloudEvent: CloudEvent,
     origin: EventOrigin,
     instanceId: string | null,
+    acceptedAt: Date,
   ): Promise<number | null>;
   // A webhook call's event, once per webhook and id, as `accept` takes a CloudEvent.
   abstract acceptWebhookEvent(event: WebhookEvent): Promise<number | null>;
@@ -35,10 +36,12 @@ export interface Listener {
 
 // The `listen` tasks of running instances that wait now.
 export abstract class ListenerStore {
+  // `since`: when the listen began; events accepted before it do not reach it.
   abstract add(
     instanceId: string,
     key: string,
     types: string[] | null,
+    since: Date,
   ): Promise<void>;
   abstract remove(instanceId: string, key: string): Promise<void>;
   // The listeners of running instances that take events of this type and began before it was

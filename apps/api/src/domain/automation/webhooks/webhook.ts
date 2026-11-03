@@ -7,8 +7,7 @@ import type {
 } from './interfaces.js';
 
 export class Webhook {
-  // The caller's credentials never reach an event (FR-024).
-  static readonly #DROPPED = new Set(['authorization', 'cookie']);
+  static readonly #SOURCE = '/webhooks/';
 
   readonly #id: string;
   readonly #name: string;
@@ -57,18 +56,9 @@ export class Webhook {
 
   // A call becomes one event of the webhook's type with the body, query and headers as data.
   receive(call: WebhookCall, now: Date): WebhookEvent {
-    const headers: Record<string, string> = {};
-
-    for (const [name, value] of Object.entries(call.headers)) {
-      const lowered = name.toLowerCase();
-
-      if (Webhook.#DROPPED.has(lowered)) continue;
-
-      headers[lowered] = value;
-    }
-
     const id = call.key ?? randomUUID();
-    const data = { body: call.body, query: call.query, headers };
-    return { id, webhookId: this.#id, type: this.#eventType, data, at: now };
+    const source = `${Webhook.#SOURCE}${this.#id}`;
+    const data = { body: call.body, query: call.query, headers: call.headers };
+    return { id, source, type: this.#eventType, data, at: now };
   }
 }

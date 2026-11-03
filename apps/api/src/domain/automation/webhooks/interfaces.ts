@@ -16,8 +16,8 @@ export interface NewWebhook {
   readonly now: Date;
 }
 
-// A request to a webhook's URL: its body (text when it is not JSON), query and headers, and
-// the caller's idempotency key, if any.
+// A request to a webhook's URL: its body (text when it is not JSON), query and headers (the
+// caller's credentials already left out), and the caller's idempotency key, if any.
 export interface WebhookCall {
   readonly body: JsonValue;
   readonly query: JsonObject;
@@ -25,11 +25,11 @@ export interface WebhookCall {
   readonly key: string | null;
 }
 
-// The event a call becomes: one of the webhook's type, from the webhook, identified by the
-// caller's key so that a repeated call is the same event.
+// The event a call becomes: one of the webhook's type, from the webhook as its source, and
+// identified by the caller's key, so that a repeated call is the same event (US5 AS4).
 export interface WebhookEvent {
   readonly id: string;
-  readonly webhookId: string;
+  readonly source: string;
   readonly type: string;
   readonly data: JsonObject;
   readonly at: Date;

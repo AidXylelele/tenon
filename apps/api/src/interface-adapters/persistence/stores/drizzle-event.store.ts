@@ -34,8 +34,8 @@ export class DrizzleEventStore implements EventStore {
     cloudEvent: CloudEvent,
     origin: EventOrigin,
     instanceId: string | null,
+    acceptedAt: Date,
   ): Promise<number | null> {
-    const acceptedAt = new Date();
     // The intake's schema and the runtime made the three attributes text.
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
@@ -70,7 +70,7 @@ export class DrizzleEventStore implements EventStore {
   @Transactional(Propagation.Required)
   acceptWebhookEvent(event: WebhookEvent): Promise<number | null> {
     const cloudEvent = WebhookEventMapper.toCloudEvent(event);
-    return this.accept(cloudEvent, EventOrigin.Webhook, null);
+    return this.accept(cloudEvent, EventOrigin.Webhook, null, event.at);
   }
 
   async find(sequence: number): Promise<AcceptedEvent | null> {
