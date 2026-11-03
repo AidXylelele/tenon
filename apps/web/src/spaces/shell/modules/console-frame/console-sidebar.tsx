@@ -58,7 +58,9 @@ export function ConsoleSidebar({ user }: { readonly user: User | null }) {
             <SidebarMenuButton asChild size="lg" tooltip={PRODUCT_NAME}>
               <Link href="/">
                 <BrandMark className="size-8" />
-                <span className="font-semibold">{PRODUCT_NAME}</span>
+                <span className="truncate font-semibold group-data-[collapsible=icon]:hidden">
+                  {PRODUCT_NAME}
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

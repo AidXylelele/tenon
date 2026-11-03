@@ -50,6 +50,7 @@ The decisions in force, with their sources. Docs paths are under `apps/web/node_
 | `sonner`                                                                                     | shadcn's toast, for the outcome of every action (FR-017)                                                                                                                                                |
 | `yaml`                                                                                       | YAML 1.2 parse and stringify with source ranges: a pointer → line in the code view, and line numbers on parse errors                                                                                    |
 | `@uiw/react-codemirror`, `@codemirror/lang-yaml`, `@codemirror/lint`                         | CodeMirror 6: a small editor (Monaco is several MB, which hurts SC-002); lint diagnostics at a range; CSP nonce support                                                                                 |
+| `elkjs`                                                                                      | The canvas layout of R16: layered, hierarchical, orthogonal edges with placed labels; Microsoft's Logic Apps designer lays out the same constructs with it                                              |
 
 Audit (2026-11-03): the production dependencies of `web` have no known vulnerabilities. In the dev tools:
 
@@ -250,7 +251,7 @@ An independent review of the tiers, the BFF rules and security found no import t
   - **`try`** is its protected steps, then a rose "If it fails" container joined by a dashed failure edge. The retry policy reads on its header ("Retries 3 times, 1 s apart").
   - **A `try` around one step**, whose `catch` only retries or does nothing, is drawn as that step with a badge ("Retries 3×", "Continues on failure"). This is n8n's node setting: "Retry On Fail: when an execution fails, the node reruns until it succeeds"; "On Error, Continue".
   - **Readable first view.** 100 % from the start of the flow; Fit is a button.
-  - **Loading.** ELK loads with the canvas only, as a split chunk, and lays out off the render.
+  - **Loading.** ELK (`elkjs` 0.12.0, Eclipse, EPL-2.0) loads with the canvas only and lays out in a Web Worker of the console's own bundle (`worker-src 'self'`), so drawing never waits on it. A group's minimum size is not given to ELK: `elk.nodeSize.minimum` made every group square; an empty group gets its heading's size instead.
 
 - **Notes.** A step's note is `metadata.note`. The DSL's task `metadata` is free-form, so the note travels with the document and its versions. It shows under the step's name, as n8n's "Display note in flow" shows a node's note "as a subtitle". The workflow's `document.summary` shows on Start.
 - **Not free placement.**
