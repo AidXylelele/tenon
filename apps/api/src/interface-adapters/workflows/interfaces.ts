@@ -183,3 +183,16 @@ export abstract class ScheduleClient {
 export abstract class TriggerClient {
   abstract accepts(document: JsonObject, event: JsonObject): Promise<boolean>;
 }
+
+// The standard's event filter (`with`), as the runtime reads it for a subscription.
+export abstract class FilterClient {
+  abstract problemOf(filter: JsonObject): Promise<CheckProblem | null>;
+  abstract typesOf(filter: JsonObject): string[] | null;
+  abstract accepts(filter: JsonObject, event: JsonObject): Promise<boolean>;
+}
+
+// The engine's delivery of one event to one subscription, retried for about 24 hours; in the
+// caller's transaction, once per subscription and event.
+export abstract class DeliveryRunClient {
+  abstract start(subscriptionId: string, sequence: number): Promise<void>;
+}

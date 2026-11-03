@@ -305,6 +305,10 @@ export class OwnedSecrets implements SecretQueries {
     return this.names.slice();
   }
 
+  async valueOf(): Promise<string | null> {
+    return null;
+  }
+
   async valuesFor(): Promise<Record<string, string>> {
     return {};
   }

@@ -23,6 +23,7 @@ interface Described {
 export class ProblemPresenter {
   private static readonly TYPE = 'urn:problem:';
   private static readonly INVALID = 'definition.invalid';
+  private static readonly SUBSCRIPTION_INVALID = 'subscription.invalid';
 
   private static readonly DESCRIBED = new Map<string, Described>([
     [
@@ -90,6 +91,13 @@ export class ProblemPresenter {
       { status: HttpStatus.NOT_FOUND, title: 'The secret does not exist' },
     ],
     [
+      Missing.Subscription,
+      {
+        status: HttpStatus.NOT_FOUND,
+        title: 'The subscription does not exist',
+      },
+    ],
+    [
       Missing.Webhook,
       { status: HttpStatus.NOT_FOUND, title: 'The webhook does not exist' },
     ],
@@ -112,12 +120,33 @@ export class ProblemPresenter {
     });
   }
 
+  // A subscription refused at its first problem, located in the request.
+  static invalidSubscription(problem: DefinitionProblem): ProblemException {
+    return ProblemPresenter.#located(
+      problem,
+      ProblemPresenter.SUBSCRIPTION_INVALID,
+      'The subscription is invalid',
+    );
+  }
+
   static #invalid(problem: DefinitionProblem): ProblemException {
-    const type = `${ProblemPresenter.TYPE}${ProblemPresenter.INVALID}`;
+    return ProblemPresenter.#located(
+      problem,
+      ProblemPresenter.INVALID,
+      'The workflow definition is invalid',
+    );
+  }
+
+  static #located(
+    problem: DefinitionProblem,
+    code: string,
+    title: string,
+  ): ProblemException {
+    const type = `${ProblemPresenter.TYPE}${code}`;
     const location = { pointer: problem.pointer, detail: problem.detail };
     return new ProblemException({
       type,
-      title: 'The workflow definition is invalid',
+      title,
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       detail: problem.detail,
       errors: [location],

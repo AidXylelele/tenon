@@ -6,4 +6,5 @@ export enum Missing {
   // A deleted webhook and an unknown URL are the same miss (FR-024).
   Webhook = 'webhook.not-found',
   Secret = 'secret.not-found',
+  Subscription = 'subscription.not-found',
 }

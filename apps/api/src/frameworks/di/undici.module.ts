@@ -5,6 +5,8 @@ import {
   createEndpointDispatcher,
   EndpointDispatcher,
 } from '../undici/endpoint-dispatcher.js';
+import { DeliveryClient } from '../../interface-adapters/messaging/interfaces.js';
+import { UndiciDeliveryClient } from '../undici/undici-delivery.client.js';
 import { UndiciEndpointClient } from '../undici/undici-endpoint.client.js';
 import type { Env } from './config.module.js';
 
@@ -20,8 +22,10 @@ import type { Env } from './config.module.js';
     },
     UndiciEndpointClient,
     { provide: EndpointClient, useExisting: UndiciEndpointClient },
+    UndiciDeliveryClient,
+    { provide: DeliveryClient, useExisting: UndiciDeliveryClient },
   ],
-  exports: [EndpointClient],
+  exports: [EndpointClient, DeliveryClient],
 })
 export class UndiciModule implements OnApplicationShutdown {
   constructor(private readonly dispatcher: EndpointDispatcher) {}

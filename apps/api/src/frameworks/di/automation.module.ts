@@ -54,6 +54,33 @@ import { DrizzleSecretRepository } from '../../interface-adapters/persistence/re
 import { AesGcmCipher } from '../crypto/aes-gcm.cipher.js';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from './config.module.js';
+import { CreateSubscription } from '../../application/automation/subscriptions/create-subscription.js';
+import { DeleteSubscription } from '../../application/automation/subscriptions/delete-subscription.js';
+import { DeliverEvent } from '../../application/automation/subscriptions/deliver-event.js';
+import { FailDelivery } from '../../application/automation/subscriptions/fail-delivery.js';
+import { MatchSubscriptions } from '../../application/automation/subscriptions/match-subscriptions.js';
+import {
+  Deliveries,
+  DeliveryLog,
+  EventSender,
+  SubscriptionFilters,
+  SubscriptionRepository,
+} from '../../application/automation/subscriptions/ports.js';
+import { SubscriptionQueries } from '../../application/automation/subscriptions/queries.js';
+import { SubscriptionPolicy } from '../../application/automation/subscriptions/subscription.policy.js';
+import { SubscriptionsController } from '../../interface-adapters/api/controllers/subscriptions.controller.js';
+import { EventSenderGateway } from '../../interface-adapters/messaging/event-sender.gateway.js';
+import { SubscriptionController } from '../../interface-adapters/messaging/subscription.controller.js';
+import { DrizzleSubscriptionQueries } from '../../interface-adapters/persistence/queries/drizzle-subscription.queries.js';
+import { DrizzleSubscriptionRepository } from '../../interface-adapters/persistence/repositories/drizzle-subscription.repository.js';
+import { DrizzleDeliveryLog } from '../../interface-adapters/persistence/stores/drizzle-delivery.log.js';
+import { DeliveryRunClient } from '../../interface-adapters/workflows/interfaces.js';
+import { DeliveriesGateway } from '../../interface-adapters/workflows/subscriptions/deliveries.gateway.js';
+import { DeliveryRunController } from '../../interface-adapters/workflows/subscriptions/delivery-run.controller.js';
+import { SubscriptionFiltersGateway } from '../../interface-adapters/workflows/subscriptions/subscription-filters.gateway.js';
+import { SubscriptionOutboxHandler } from '../outbox/subscription.outbox.handler.js';
+import { DeliveryWorkflow } from '../workflows/delivery.workflow.js';
+import { EngineDeliveryClient } from '../workflows/engine-delivery.client.js';
 import { EventsController } from '../../interface-adapters/api/controllers/events.controller.js';
 import { DrizzleEventQueries } from '../../interface-adapters/persistence/queries/drizzle-event.queries.js';
 import { DrizzleInstanceNames } from '../../interface-adapters/persistence/queries/drizzle-instance-names.query.js';
@@ -112,9 +139,10 @@ import { ProcessWorkflow } from '../workflows/process.workflow.js';
 import { StepErrors } from '../workflows/step-errors.js';
 import { EngineModule } from './engine.module.js';
 import { RuntimeModule } from './runtime.module.js';
+import { UndiciModule } from './undici.module.js';
 
 @Module({
-  imports: [EngineModule, RuntimeModule],
+  imports: [EngineModule, RuntimeModule, UndiciModule],
   controllers: [
     WorkflowsController,
     InstancesController,
@@ -122,13 +150,41 @@ import { RuntimeModule } from './runtime.module.js';
     WebhooksController,
     HooksController,
     SecretsController,
+    SubscriptionsController,
   ],
   providers: [
     WorkflowPolicy,
     InstancePolicy,
     WebhookPolicy,
     SecretPolicy,
+    SubscriptionPolicy,
     { provide: Clock, useExisting: EngineClock },
+    CreateSubscription,
+    DeleteSubscription,
+    MatchSubscriptions,
+    DeliverEvent,
+    FailDelivery,
+    DrizzleSubscriptionRepository,
+    {
+      provide: SubscriptionRepository,
+      useExisting: DrizzleSubscriptionRepository,
+    },
+    DrizzleSubscriptionQueries,
+    { provide: SubscriptionQueries, useExisting: DrizzleSubscriptionQueries },
+    DrizzleDeliveryLog,
+    { provide: DeliveryLog, useExisting: DrizzleDeliveryLog },
+    SubscriptionFiltersGateway,
+    { provide: SubscriptionFilters, useExisting: SubscriptionFiltersGateway },
+    DeliveriesGateway,
+    { provide: Deliveries, useExisting: DeliveriesGateway },
+    EventSenderGateway,
+    { provide: EventSender, useExisting: EventSenderGateway },
+    EngineDeliveryClient,
+    { provide: DeliveryRunClient, useExisting: EngineDeliveryClient },
+    DeliveryRunController,
+    DeliveryWorkflow,
+    SubscriptionController,
+    SubscriptionOutboxHandler,
     {
       provide: Cipher,
       inject: [ConfigService],

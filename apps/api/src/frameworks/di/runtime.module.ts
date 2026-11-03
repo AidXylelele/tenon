@@ -32,7 +32,11 @@ import { WaitKind } from '../runtime/execution/kinds/wait-kind.js';
 import { CronCheck } from '../runtime/checking/cron-check.js';
 import { ScheduleTriggers } from '../runtime/schedule-triggers.js';
 import { EngineCronClient } from '../workflows/engine-cron.client.js';
-import { TriggerClient } from '../../interface-adapters/workflows/interfaces.js';
+import {
+  FilterClient,
+  TriggerClient,
+} from '../../interface-adapters/workflows/interfaces.js';
+import { SubscriptionFilterClient } from '../runtime/subscription-filter.client.js';
 import { ListenKind } from '../runtime/execution/kinds/listen-kind.js';
 import { EventFilters } from '../runtime/execution/events/event-filters.js';
 import { TaskKindRegistry } from '../runtime/execution/task-kind-registry.js';
@@ -67,6 +71,15 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
         const evaluator = new Evaluator(jq);
         const filters = new EventFilters(evaluator);
         return new ScheduleTriggers(filters);
+      },
+    },
+    {
+      provide: FilterClient,
+      inject: [JqClient],
+      useFactory: (jq: JqClient) => {
+        const evaluator = new Evaluator(jq);
+        const filters = new EventFilters(evaluator);
+        return new SubscriptionFilterClient(filters, jq);
       },
     },
     {
@@ -144,6 +157,6 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
       },
     },
   ],
-  exports: [RuntimeChecks, Runtime, TriggerClient, GoJudgeModule],
+  exports: [RuntimeChecks, Runtime, TriggerClient, FilterClient, GoJudgeModule],
 })
 export class RuntimeModule {}
