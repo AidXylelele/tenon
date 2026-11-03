@@ -5,6 +5,7 @@ import { workflows } from '@/libs/data-access/automation';
 import { signOut } from '@/libs/data-access/identity';
 import { signInHref } from '@/operations/app-routes';
 
+// Ends the session and opens sign-in, which says the person signed out.
 export async function signOutAction(): Promise<void> {
   await signOut();
   const signIn = signInHref({ reason: 'signed-out' });

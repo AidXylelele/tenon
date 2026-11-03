@@ -3,7 +3,7 @@ import type { TaskKind } from '@/operations/workflow-document';
 // Each family of steps has its own hue on its icon tile (research R12); status colours appear
 // only as rings, dots and taken edges, so a kind is never read as a state.
 
-export type Family =
+type Family =
   'call' | 'data' | 'code' | 'event' | 'flow' | 'time' | 'run' | 'error';
 
 const FAMILY: Record<TaskKind, Family> = {
@@ -45,10 +45,6 @@ const ACCENT: Record<Family, string> = {
   run: 'border-t-indigo-500',
   error: 'border-t-rose-500',
 };
-
-export function familyOf(kind: TaskKind): Family {
-  return FAMILY[kind];
-}
 
 // The classes of a kind's icon tile.
 export function tileOf(kind: TaskKind): string {

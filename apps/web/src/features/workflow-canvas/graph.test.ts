@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { JsonObject } from '@/libs/document-text/json';
-import { addId, END, graphOf, handlerId, placeOf, START } from './graph';
+import {
+  addId,
+  caseIndexOf,
+  END,
+  graphOf,
+  handlerId,
+  OUT,
+  placeOf,
+  START,
+} from './graph';
 
 const document: JsonObject = {
   document: {
@@ -91,6 +100,21 @@ describe('a document as a graph', () => {
     );
   });
 
+  it('a_then_naming_a_step_of_its_list_jumps_there', () => {
+    const jumping: JsonObject = {
+      document: { dsl: '1.0.3', namespace: 'n', name: 'w', version: '1.0.0' },
+      do: [
+        { first: { set: { a: 1 }, then: 'last' } },
+        { skipped: { set: { b: 2 } } },
+        { last: { set: { c: 3 } } },
+      ],
+    };
+    const edges = edgesOf(graphOf(jumping, READ));
+
+    expect(edges).toContain('jump /do/0/first -> /do/2/last (Go to last)');
+    expect(edges).not.toContain('next /do/0/first -> /do/1/skipped');
+  });
+
   it('a_loop_is_a_group_holding_its_steps_connected_inside_it', () => {
     const graph = graphOf(document, READ);
     const first = graph.nodes.find(
@@ -140,6 +164,17 @@ describe('a document as a graph', () => {
     expect(
       graph.nodes.find((node) => node.id === addId('/do/4/each/do'))?.addTo,
     ).toEqual({ listPointer: '/do/4/each/do', index: 2 });
+  });
+
+  it('a_case_port_names_its_case_by_its_position_and_no_other_port_does', () => {
+    const graph = graphOf(document, READ);
+    const cases = graph.edges
+      .filter((each) => each.kind === 'case')
+      .map((each) => caseIndexOf(each.port));
+
+    expect(cases).toEqual([0, 1]);
+    expect(caseIndexOf(OUT)).toBeNull();
+    expect(caseIndexOf(null)).toBeNull();
   });
 
   it('places_a_step_by_its_pointer_even_with_escaped_names', () => {

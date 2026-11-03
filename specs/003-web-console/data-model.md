@@ -37,6 +37,6 @@ Commands answer `Outcome<T> = { ok: true, value: T } | { ok: false, problem: Pro
   - `custom`, for any other `schedule`, which is kept as code.
 - **`Located problem`**: the problem's pointer, resolved to a task pointer and a field key; or to the root fields (`/document`, `/schedule`, `/use`).
 
-## Outline (`automation/__shared_context/outline`)
+## Outline (`operations/workflow-document`, `operations/run-progress`)
 
-The task tree of a version, flattened for display: depth, name, kind, pointer. On an instance it is joined with the task records by `reference`, so each task shows its latest record's status, and the error's `instance` pointer marks the faulting task.
+The task tree of a version, flattened for display: depth, name, kind, pointer. On an instance `run-progress` joins it with the task records by `reference`, so each task shows its latest record's status, and the error's `instance` pointer marks the faulting task.

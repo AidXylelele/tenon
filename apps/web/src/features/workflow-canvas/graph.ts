@@ -143,6 +143,13 @@ export function casesOf(entry: TaskEntry): Case[] {
   });
 }
 
+// The position of the case a port leaves from, or null for a port that is not a case's.
+export function caseIndexOf(port: string | null): number | null {
+  if (port === null || !port.startsWith(CASE)) return null;
+
+  return Number(port.slice(CASE.length));
+}
+
 // Whether a list is the branches of a fork, which run side by side.
 export function isBranchList(listPointer: string): boolean {
   return listPointer.endsWith(BRANCHES);

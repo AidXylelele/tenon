@@ -70,8 +70,7 @@ import {
   replaceTask,
   type TaskKind,
 } from '@/operations/workflow-document';
-import { type CanvasEdge, START } from '../../__shared_context/canvas/graph';
-import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
+import { START, WorkflowCanvas } from '@/features/workflow-canvas';
 import { MAX_DOCUMENT_BYTES, nextVersion, sizeOf } from './draft';
 import { locate } from './problems';
 import { withDeclaredSecrets } from './secrets';
@@ -117,8 +116,6 @@ interface Place {
   readonly listPointer: string;
   readonly index: number;
 }
-
-const CASE = 'case-';
 
 // The builder (FR-022, FR-023): the workflow as a graph, a side panel for the picked node,
 // "what happens next?" on every `+`, and the same document as YAML or JSON in the code view.
@@ -264,19 +261,15 @@ export function Editor({
 
   // A connection dragged from a step, or from a case of a choice, to another step of the
   // same list: the DSL says it with `then` (research R11).
-  function connect(
-    source: string,
-    sourceHandle: string | null,
-    target: string,
-  ) {
+  function connect(source: string, caseIndex: number | null, target: string) {
     const from = entryAt(draft, source);
     const to = entryAt(draft, target);
 
     if (from === null || to === null) return;
 
-    if (sourceHandle?.startsWith(CASE) === true) {
-      const index = Number(sourceHandle.slice(CASE.length));
-      update(withValue(draft, caseThen(draft, from.pointer, index), to.name));
+    if (caseIndex !== null) {
+      const pointer = caseThen(draft, from.pointer, caseIndex);
+      update(withValue(draft, pointer, to.name));
       toast.success(`That path of ${from.name} now goes to ${to.name}`);
       return;
     }
@@ -286,16 +279,14 @@ export function Editor({
   }
 
   // A jump or a case removed: the step goes on to the next one again.
-  function disconnect(edge: CanvasEdge) {
-    const from = entryAt(draft, edge.source);
+  function disconnect(source: string, caseIndex: number | null) {
+    const from = entryAt(draft, source);
 
     if (from === null) return;
 
-    if (edge.kind === 'case') {
-      const index = edge.caseIndex ?? 0;
-      update(
-        withValue(draft, caseThen(draft, from.pointer, index), 'continue'),
-      );
+    if (caseIndex !== null) {
+      const pointer = caseThen(draft, from.pointer, caseIndex);
+      update(withValue(draft, pointer, 'continue'));
       return;
     }
 

@@ -39,8 +39,7 @@ import {
   withProtectedStep,
 } from '@/operations/workflow-document';
 import type { LocatedProblem } from './problems';
-import { tileOf } from '../../__shared_context/outline/families';
-import { TaskIcon } from '../../__shared_context/outline/task-icon';
+import { TaskIcon, tileOf } from '@/features/workflow-canvas';
 import { EditingProvider, useEditing } from './editing-context';
 import { AdvancedForm } from './forms/advanced-form';
 import { CommonForm } from './forms/common-form';

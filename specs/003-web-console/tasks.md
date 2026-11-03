@@ -80,9 +80,9 @@
 ## Iteration 4 — the module system of the owner's RFC (R19)
 
 - [x] T120 Libs: JSON reads and writes in `document-text`, `Status` and confirm-then-act in `ui`, a `forms` lib; `data-access` names no route and keeps no view-shaped query; tests for every lib
-- [x] T121 Operations `workflow-document`, `run-progress`, `access-policy`, `app-routes`: no JSX, 75 % coverage, playground each
-- [ ] T122 Features `workflow-canvas`, `run-table`, `workflow-search`: composed through props and slots, playground, Cypress smoke test and coverage each
+- [x] T121 Operations `workflow-document`, `run-progress`, `access-policy`, `app-routes`: no JSX, 75 % coverage each (playgrounds with T125)
+- [x] T122 Features `workflow-canvas` and `run-table`, composed through props and slots, coverage each (playgrounds and smoke tests with T125); the workflow search stays in the console frame
 - [ ] T123 Spaces by experience: `home`, `workflows`, `runs`, `connections`, `credentials`, `settings` beside `shell` and `identity`; each `__shared_context` keeps only what two of its modules share
 - [ ] T124 Entries as rendering instructions: pages pass their params through, layouts reference layout modules, redirects in `next.config`, `not-found`, `loading` and `error` through shell modules
-- [ ] T125 Governance: `CODEOWNERS`, the development-only playground routes, Cypress with each space's e2e, coverage thresholds per tier, the dependency check in CI
+- [ ] T125 Governance: `CODEOWNERS`, the development-only playground routes for each feature and operation, Cypress with each space's e2e and each feature's smoke test, coverage thresholds per tier, the dependency check in CI
 - [ ] T126 The critic round (RFC, Clean Architecture) and the artifacts synchronised (plan structure, quickstart)

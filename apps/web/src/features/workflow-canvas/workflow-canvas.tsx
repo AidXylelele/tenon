@@ -28,6 +28,7 @@ import { elkEngine } from './elk-engine';
 import { FlowEdge, type FlowEdgeData, strokeOf } from './flow-edge';
 import {
   type CanvasEdge,
+  caseIndexOf,
   END,
   type Graph,
   graphOf,
@@ -74,14 +75,16 @@ export interface WorkflowCanvasProps {
   readonly phase?: Phase | null;
   readonly onSelect?: (id: string | null) => void;
   readonly onInsert?: (listPointer: string, index: number) => void;
-  // A dragged connection from a step or a case to another step of the same list.
+  // A dragged connection from a step, or from a case of a choice by its position in the
+  // document, to another step of the same list.
   readonly onConnect?: (
     source: string,
-    sourceHandle: string | null,
+    caseIndex: number | null,
     target: string,
   ) => void;
-  // A jump or a case removed with the Delete key.
-  readonly onDisconnect?: (edge: CanvasEdge) => void;
+  // A jump, an end or a case removed with the Delete key: the step it leaves from, and the
+  // position of its case, as `onConnect` gives them.
+  readonly onDisconnect?: (source: string, caseIndex: number | null) => void;
   // A node to bring into view, as when a fault or a link points at a step; a new request each
   // time, so the same node can be shown again.
   readonly reveal?: Reveal | null;
@@ -304,11 +307,9 @@ function Canvas({
   function connect(connection: Connection) {
     if (onConnect === undefined) return;
 
-    onConnect(
-      connection.source,
-      connection.sourceHandle ?? null,
-      connection.target,
-    );
+    const port = connection.sourceHandle ?? null;
+    const caseIndex = caseIndexOf(port);
+    onConnect(connection.source, caseIndex, connection.target);
   }
 
   // A connection the DSL can say: from a step or a case to another step of the same list.
@@ -362,7 +363,8 @@ function Canvas({
             for (const each of deleted) {
               const data = each.data as FlowEdgeData | undefined;
 
-              if (data !== undefined) onDisconnect(data.edge);
+              if (data !== undefined)
+                onDisconnect(data.edge.source, data.edge.caseIndex);
             }
           }}
           deleteKeyCode={editable ? ['Backspace', 'Delete'] : null}

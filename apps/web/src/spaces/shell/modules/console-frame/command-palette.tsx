@@ -16,7 +16,7 @@ import {
   WebhookIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useEffectEvent, useState, useTransition } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import type { User } from '@/libs/data-access/types';
 import {
   Command,
@@ -29,7 +29,6 @@ import {
   CommandSeparator,
 } from '@/libs/ui/components/command';
 import { Kbd } from '@/libs/ui/components/kbd';
-import { Spinner } from '@/libs/ui/components/spinner';
 import {
   type AccessRule,
   canAuthor,
@@ -47,10 +46,9 @@ import {
   TEAM_HREF,
   TEST_EVENT_HREF,
   WEBHOOKS_HREF,
-  workflowHref,
   WORKFLOWS_HREF,
 } from '@/operations/app-routes';
-import { type FoundWorkflow, searchableWorkflowsAction } from './actions';
+import { useWorkflowSearch, WorkflowResults } from './workflow-results';
 
 interface Page {
   readonly href: string;
@@ -123,8 +121,7 @@ const PAGES: readonly Page[] = [
 export function CommandPalette({ user }: { readonly user: User | null }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [found, setFound] = useState<readonly FoundWorkflow[] | null>(null);
-  const [loading, startLoading] = useTransition();
+  const workflows = useWorkflowSearch();
   const author = canAuthor(user);
 
   // ⌘K opens it as the button does, workflows included.
@@ -145,10 +142,7 @@ export function CommandPalette({ user }: { readonly user: User | null }) {
   function change(next: boolean) {
     setOpen(next);
 
-    if (next)
-      startLoading(async () => {
-        setFound(await searchableWorkflowsAction());
-      });
+    if (next) workflows.read();
   }
 
   function go(href: string) {
@@ -197,35 +191,7 @@ export function CommandPalette({ user }: { readonly user: User | null }) {
                 </CommandItem>
               </CommandGroup>
             )}
-            <CommandGroup heading="Workflows">
-              {loading && found === null && (
-                <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
-                  <Spinner className="size-3.5" />
-                  Reading workflows…
-                </div>
-              )}
-              {found?.map((each) => (
-                <CommandItem
-                  key={`${each.namespace}/${each.name}`}
-                  value={`${each.namespace} ${each.name}`}
-                  onSelect={() => {
-                    const href = workflowHref(each.namespace, each.name);
-                    go(href);
-                  }}
-                >
-                  <WaypointsIcon />
-                  <span>{each.name}</span>
-                  <span className="text-muted-foreground">
-                    {each.namespace}
-                  </span>
-                  {each.on && (
-                    <span className="ml-auto text-xs text-emerald-600 dark:text-emerald-400">
-                      On
-                    </span>
-                  )}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            <WorkflowResults search={workflows} onGo={go} />
             <CommandSeparator />
             <CommandGroup heading="Pages">
               {pages.map((page) => {

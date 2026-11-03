@@ -35,9 +35,9 @@ import {
   startsAutomatically,
   triggerOf,
 } from '@/operations/workflow-document';
-import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
+import { RunTable } from '@/features/run-table';
+import { WorkflowCanvas } from '@/features/workflow-canvas';
 import { inputFieldsOf } from './input-schema';
-import { InstanceTable } from '../../__shared_context/instance-table';
 import { archiveAction } from './actions';
 import { OnOffSwitch } from './on-off-switch';
 import { StartDialog } from './start-dialog';
@@ -219,13 +219,15 @@ function Runs({
           </Button>
         </div>
       </div>
-      {runs.items.length === 0 ? (
-        <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No runs yet. Start one to see it here.
-        </p>
-      ) : (
-        <InstanceTable instances={runs.items} showWorkflow={false} />
-      )}
+      <RunTable
+        runs={runs.items}
+        showWorkflow={false}
+        empty={
+          <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            No runs yet. Start one to see it here.
+          </p>
+        }
+      />
     </section>
   );
 }

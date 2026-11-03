@@ -15,7 +15,7 @@ import {
 import { PageHeader } from '@/libs/ui/composites/page-header';
 import { isUnended, PHASES } from '@/operations/run-progress';
 import { instancesHref } from '@/operations/app-routes';
-import { InstanceTable } from '../../__shared_context/instance-table';
+import { RunTable } from '@/features/run-table';
 import { Filters } from './filters';
 
 // Runs newest first, filtered by what the address says, so a view can be shared and reloaded
@@ -44,25 +44,26 @@ export async function InstanceList({ query }: { readonly query: Query }) {
         }
       />
       <Filters filter={filter} />
-      {page.items.length === 0 ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ActivityIcon />
-            </EmptyMedia>
-            <EmptyTitle>
-              {filtered ? 'No run matches these filters' : 'No runs yet'}
-            </EmptyTitle>
-            <EmptyDescription>
-              {filtered
-                ? 'Clear a filter to see more.'
-                : 'Start a workflow by hand, or turn on one with a schedule.'}
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <InstanceTable instances={page.items} />
-      )}
+      <RunTable
+        runs={page.items}
+        empty={
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ActivityIcon />
+              </EmptyMedia>
+              <EmptyTitle>
+                {filtered ? 'No run matches these filters' : 'No runs yet'}
+              </EmptyTitle>
+              <EmptyDescription>
+                {filtered
+                  ? 'Clear a filter to see more.'
+                  : 'Start a workflow by hand, or turn on one with a schedule.'}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        }
+      />
       <div className="flex justify-end gap-2">
         {filter.cursor !== undefined && (
           <Button variant="outline" asChild>

@@ -29,8 +29,8 @@ import {
   summaryOf,
   type TaskEntry,
 } from '@/operations/workflow-document';
-import { accentOf, tileOf } from '../outline/families';
-import { TaskIcon } from '../outline/task-icon';
+import { accentOf, tileOf } from './families';
+import { TaskIcon } from './task-icon';
 import { type CanvasState, useCanvas } from './canvas-context';
 import { CASE, type CanvasNode, FAILURE, OUT } from './graph';
 import { IN, type Point } from './layout';
@@ -75,6 +75,8 @@ export function StartNode({ data }: Props) {
     <button
       type="button"
       onKeyDown={(event) => event.key === 'Enter' && canvas.onSelect(node.id)}
+      data-started={started}
+      data-flagged={flagged}
       className={cn(
         'flex size-full min-w-0 flex-col justify-center gap-1 overflow-hidden rounded-2xl border bg-card px-3 text-left shadow-xs transition-shadow hover:shadow-md',
         selected && 'border-primary/60 ring-3 ring-primary/30',
@@ -113,6 +115,7 @@ export function EndNode({ data }: Props) {
 
   return (
     <div
+      data-phase={phase}
       className={cn(
         'flex size-full items-center justify-center gap-2 rounded-full border text-sm font-medium shadow-xs',
         tone,
@@ -145,6 +148,7 @@ export function TaskNode({ data }: Props) {
     canvas.flagged === node.id || canvas.flagged === shown.pointer;
   const seen = progressOf(canvas, shown, node.id);
   const status = faultedAt(canvas, node.id) ? 'faulted' : seen?.status;
+  const state = stateOf(canvas, status, seen);
   const connectable = canvas.editable && !node.branch;
   const hasDefault = node.cases.some((each) => each.when === null);
 
@@ -160,9 +164,11 @@ export function TaskNode({ data }: Props) {
       }}
       aria-pressed={selected}
       aria-label={`${shown.name}, ${infoOf(shown.kind).label}`}
+      data-status={state}
+      data-flagged={flagged}
       className={cn(
         'group relative flex size-full cursor-pointer flex-col justify-center gap-1 rounded-2xl border bg-card px-3 py-2.5 shadow-xs transition-shadow outline-none hover:shadow-md focus-visible:ring-3 focus-visible:ring-ring/50',
-        ringOf(canvas, status, seen),
+        ringOf(state),
         selected && 'border-primary/60 ring-3 ring-primary/30',
         flagged && 'border-red-500/70 ring-3 ring-red-500/25',
       )}
@@ -211,15 +217,19 @@ export function GroupNode({ data }: Props) {
   const flagged = canvas.flagged === node.id;
   const seen = canvas.progress?.get(node.id);
   const status = faultedAt(canvas, node.id) ? 'faulted' : seen?.status;
+  // Open, a group's steps show their own state.
+  const state = node.collapsed ? stateOf(canvas, status, seen) : undefined;
   const connectable = canvas.editable && !node.branch;
 
   return (
     <div
+      data-status={state}
+      data-flagged={flagged}
       className={cn(
         'relative size-full rounded-3xl border border-t-4 shadow-xs',
         node.collapsed ? 'bg-card' : 'bg-muted/35',
         accentOf(entry.kind),
-        node.collapsed && ringOf(canvas, status, seen),
+        ringOf(state),
         selected && 'ring-3 ring-primary/30',
         flagged && 'ring-3 ring-red-500/25',
       )}
@@ -286,6 +296,7 @@ export function HandlerNode({ data }: Props) {
 
   return (
     <div
+      data-used={used}
       className={cn(
         'relative size-full rounded-3xl border-2 border-dashed border-rose-400/50 bg-rose-500/[0.04] shadow-xs',
         used && 'border-rose-500/80',
@@ -566,16 +577,22 @@ function isWaiting(
   return seen?.status === status && isRetrying(seen, advancing);
 }
 
-// A step's ring on a run: its status, or amber while it waits to be tried again.
-function ringOf(
+// A step's state on a run: its status, or `retrying` while it waits to be tried again.
+function stateOf(
   canvas: CanvasState,
   status: string | undefined,
   seen: TaskProgress | undefined,
 ): string | undefined {
-  if (status === undefined) return undefined;
+  if (status === undefined || !isWaiting(canvas, status, seen)) return status;
 
-  const ring = isWaiting(canvas, status, seen) ? 'retrying' : status;
-  return STATUS_RING[ring];
+  return 'retrying';
+}
+
+// The ring a state draws around its step.
+function ringOf(state: string | undefined): string | undefined {
+  if (state === undefined) return undefined;
+
+  return STATUS_RING[state];
 }
 
 function faultedAt(canvas: CanvasState, id: string): boolean {

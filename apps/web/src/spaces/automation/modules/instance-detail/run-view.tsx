@@ -26,13 +26,13 @@ import {
   infoOf,
   protectionOf,
 } from '@/operations/workflow-document';
-import { START } from '../../__shared_context/canvas/graph';
 import {
   type Reveal,
+  START,
+  TaskIcon,
+  tileOf,
   WorkflowCanvas,
-} from '../../__shared_context/canvas/workflow-canvas';
-import { tileOf } from '../../__shared_context/outline/families';
-import { TaskIcon } from '../../__shared_context/outline/task-icon';
+} from '@/features/workflow-canvas';
 import { EventList } from './event-list';
 import { FaultStrip } from './fault-strip';
 import { Timeline } from './timeline';

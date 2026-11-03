@@ -16,8 +16,7 @@ import {
   KINDS,
   type TaskKind,
 } from '@/operations/workflow-document';
-import { tileOf } from '../../__shared_context/outline/families';
-import { TaskIcon } from '../../__shared_context/outline/task-icon';
+import { TaskIcon, tileOf } from '@/features/workflow-canvas';
 
 const GROUPS: readonly KindInfo['group'][] = ['Work', 'Events', 'Flow'];
 

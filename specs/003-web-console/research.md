@@ -132,7 +132,7 @@ An independent review of the tiers, the BFF rules and security found no import t
 
 - **Decision.**
   - The builder and the run view draw the workflow with `@xyflow/react` (React Flow 12): custom nodes, custom edges, pan, zoom, fit, mini-map, and connections dragged between handles.
-  - Positions come from a deterministic layout of the document's structure (`__shared_context/canvas/graph.ts`). Lists run left to right. Containers hold their lanes. Jumps arc above the line.
+  - Positions come from a deterministic layout of the document's structure (`features/workflow-canvas/graph.ts`). Lists run left to right. Containers hold their lanes. Jumps arc above the line.
 - **Why React Flow.** It is the canvas library of the React ecosystem, MIT licensed and maintained. n8n's editor uses its Vue counterpart.
 - **Why not a layout library.** React Flow's layout guide (reactflow.dev/learn/layouting/layouting):
   - dagre "currently has an open issue that prevents it from laying out sub-flows correctly if any nodes in the sub-flow are connected to nodes outside the sub-flow", and every `for`, `try` and `fork` is a sub-flow;
@@ -347,10 +347,9 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
 
 - **Features** (UI and logic, playground, Cypress smoke test, coverage):
   - `workflow-canvas`, for workflows and runs
-  - `run-table`, for runs, a workflow's runs and home
-  - `workflow-search`: the ⌘K source of workflows, which the console frame injects into the palette
+  - `run-table`, for runs and a workflow's runs
 
-  Features don't import features. A module combines them through props and slots, as in the RFC's header example.
+  Features don't import features. A module combines them through props and slots, as in the RFC's header example. What one domain uses stays in its module, since a feature is "repeated across domains": the ⌘K workflow search belongs to the console frame, and home lists runs in its own cards.
 
 - **Libs.**
   - `document-text` takes the JSON reads and writes.
@@ -390,6 +389,16 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
   - the editor's draft, problems and secrets into `workflow-editor`;
   - the run input form into `workflow-detail`;
   - delivery statuses wait in automation for T123.
+
+### Made in T122
+
+- **Two features.** `workflow-canvas` and `run-table` live under `src/features`, each behind its `index.ts`. Neither imports the other or a space. Coverage: 100 % of lines, 91 % of branches. Their playgrounds and Cypress smoke tests come with T125.
+- **Canvas.**
+  - It holds the graph, the ELK layout and its worker, the nodes and edges, and the step icons with their family hues.
+  - A connection dragged or removed reaches the module as its step and the position of its case (`caseIndex`), never as the canvas's own edge or handle.
+  - A node states what it shows in `data-status`, `data-phase`, `data-started`, `data-flagged` or `data-used`. Tests read these instead of colours.
+- **Run table.** The page gives its own empty state as a slot.
+- **Search stays in the console frame.** It was planned as a feature, but only the console frame uses it. The palette reads the active workflows and lists them itself.
 
 ### Order
 
