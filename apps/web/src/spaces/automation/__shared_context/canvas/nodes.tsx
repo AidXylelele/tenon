@@ -133,7 +133,8 @@ export function TaskNode({ data }: Props) {
   const protection = node.protection;
   const shown = protection?.step ?? entry;
   const selected = canvas.selected === node.id;
-  const flagged = canvas.flagged === node.id;
+  const flagged =
+    canvas.flagged === node.id || canvas.flagged === shown.pointer;
   const seen = progressOf(canvas, shown, node.id);
   const status = faultedAt(canvas, node.id) ? 'faulted' : seen?.status;
   const connectable = canvas.editable && !node.branch;

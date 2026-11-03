@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+import { CodeEditor } from '@/libs/code-editor/code-editor';
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldLabel,
 } from '@/libs/ui/components/field';
-import { Textarea } from '@/libs/ui/components/textarea';
 import { parseText, stringifyText } from '@/libs/document-text/document-text';
 import { isObject } from '../../../__shared_context/document/json';
 import { useFieldProblem } from '../editing-context';
@@ -41,13 +41,13 @@ export function AdvancedForm({ task, onChange }: TaskFormProps) {
   return (
     <Field data-invalid={error !== null || problem !== null}>
       <FieldLabel htmlFor="advanced-task">Task as YAML</FieldLabel>
-      <Textarea
+      <CodeEditor
         id="advanced-task"
-        rows={14}
-        spellCheck={false}
+        label="The task as YAML"
+        language="yaml"
         value={text}
-        onChange={(event) => edit(event.target.value)}
-        className="font-mono text-xs"
+        onChange={edit}
+        invalid={error !== null || problem !== null}
       />
       {error !== null ? (
         <FieldError>{error}</FieldError>

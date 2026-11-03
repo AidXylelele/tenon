@@ -29,6 +29,11 @@ import {
 } from '@/libs/document-text/document-text';
 import { Button } from '@/libs/ui/components/button';
 import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from '@/libs/ui/components/resizable';
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -41,6 +46,7 @@ import {
   ToggleGroupItem,
 } from '@/libs/ui/components/toggle-group';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
+import { useHydrated } from '@/libs/ui/hooks/use-hydrated';
 import { useIsMobile } from '@/libs/ui/hooks/use-mobile';
 import { type CanvasEdge, START } from '../../__shared_context/canvas/graph';
 import { WorkflowCanvas } from '../../__shared_context/canvas/workflow-canvas';
@@ -58,15 +64,20 @@ import {
 } from '../../__shared_context/document/json';
 import { infoOf, newTask } from '../../__shared_context/document/kinds';
 import { locate } from '../../__shared_context/document/problems';
+import {
+  protectionOf,
+  protectorOf,
+  renamedStep,
+} from '../../__shared_context/document/protection';
 import { withDeclaredSecrets } from '../../__shared_context/document/secrets';
 import {
+  duplicateTask,
   entriesAt,
   entryAt,
   freeName,
   insertTask,
   moveTask,
   removeTask,
-  renameTask,
   replaceTask,
   type TaskKind,
 } from '../../__shared_context/document/tasks';
@@ -78,6 +89,7 @@ import { HeaderCard } from './header-card';
 import { Inspector } from './inspector';
 import { NodeCreator } from './node-creator';
 import { TriggerCard } from './trigger-card';
+import { usePanelLayout } from './panel-layout';
 import { useCheck } from './use-check';
 
 // The code view loads only when asked for, so the canvas opens without CodeMirror.
@@ -181,9 +193,10 @@ export function Editor({
     setPublishProblem(null);
   }
 
+  // A step a `try` protects on its own is picked as its `try`, the node it is drawn as.
   function select(id: string | null) {
     setCreating(null);
-    setSelected(id);
+    setSelected(id === null ? null : protectorOf(draft, id));
   }
 
   function openCreator(listPointer: string, index: number) {
@@ -215,8 +228,19 @@ export function Editor({
   function rename(name: string) {
     if (entry === null) return;
 
-    update(renameTask(draft, entry, name));
+    const protection = protectionOf(draft, entry);
+    update(renamedStep(draft, entry, protection, name));
     setSelected(`${entry.listPointer}/${entry.index}/${name}`);
+  }
+
+  function duplicate() {
+    if (entry === null) return;
+
+    const next = duplicateTask(draft, entry);
+    const copy = entriesAt(next, entry.listPointer)[entry.index + 1];
+    update(next);
+    setSelected(copy?.pointer ?? null);
+    toast.success(`Duplicated ${entry.name}`);
   }
 
   function move(step: -1 | 1) {
@@ -385,6 +409,9 @@ export function Editor({
   };
   const flagged = located === null ? null : (located.taskPointer ?? START);
   const panelOpen = creating !== null || selected !== null;
+  const layout = usePanelLayout(panelOpen);
+  // The panels' sizes come from this browser, so the split is drawn after hydration.
+  const hydrated = useHydrated();
 
   const panel =
     creating !== null ? (
@@ -419,11 +446,32 @@ export function Editor({
             onChange={changeTask}
             onRename={rename}
             onMove={move}
+            onDuplicate={duplicate}
             onRemove={remove}
           />
         </EditingProvider>
       </PanelFrame>
     ) : null;
+
+  const canvas = (
+    <div className="relative size-full">
+      <WorkflowCanvas
+        document={draft}
+        editable
+        selected={selected}
+        flagged={flagged}
+        onSelect={select}
+        onInsert={openCreator}
+        onConnect={connect}
+        onDisconnect={disconnect}
+      />
+      {!panelOpen && (
+        <div className="pointer-events-none absolute top-3 left-1/2 hidden -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-xs backdrop-blur lg:block">
+          Click a step to set it up, + to add one, drag from a dot to jump
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <EditingProvider value={editing}>
@@ -559,43 +607,52 @@ export function Editor({
           </div>
         ) : (
           <div className="relative flex min-h-0 flex-1">
-            <WorkflowCanvas
-              document={draft}
-              editable
-              selected={selected}
-              flagged={flagged}
-              onSelect={select}
-              onInsert={openCreator}
-              onConnect={connect}
-              onDisconnect={disconnect}
-              className="flex-1"
-            />
-            {!panelOpen && (
-              <div className="pointer-events-none absolute top-3 left-1/2 hidden -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-xs backdrop-blur md:block">
-                Click a step to set it up, + to add one, drag from a dot to jump
-              </div>
-            )}
-            {isMobile ? (
-              <Sheet
-                open={panelOpen}
-                onOpenChange={(open) => !open && select(null)}
-              >
-                <SheetContent
-                  side="bottom"
-                  className="max-h-[85svh] overflow-y-auto p-0 [&>button]:hidden"
+            {!hydrated ? (
+              canvas
+            ) : isMobile ? (
+              <>
+                {canvas}
+                <Sheet
+                  open={panelOpen}
+                  onOpenChange={(open) => !open && select(null)}
                 >
-                  <SheetHeader className="sr-only">
-                    <SheetTitle>Panel</SheetTitle>
-                  </SheetHeader>
-                  {panel}
-                </SheetContent>
-              </Sheet>
+                  <SheetContent
+                    side="bottom"
+                    className="flex h-[85svh] flex-col p-0 [&>button]:hidden"
+                  >
+                    <SheetHeader className="sr-only">
+                      <SheetTitle>Panel</SheetTitle>
+                    </SheetHeader>
+                    {panel}
+                  </SheetContent>
+                </Sheet>
+              </>
             ) : (
-              panelOpen && (
-                <aside className="flex w-[26rem] shrink-0 flex-col overflow-y-auto border-l bg-background shadow-[-8px_0_24px_-16px_rgb(0_0_0/0.15)]">
-                  {panel}
-                </aside>
-              )
+              // The panel's width is the author's to drag, and is kept (research R17).
+              <ResizablePanelGroup
+                id="workflow-editor"
+                orientation="horizontal"
+                defaultLayout={layout.defaultLayout}
+                onLayoutChanged={layout.onLayoutChanged}
+              >
+                <ResizablePanel id="canvas" minSize="35">
+                  {canvas}
+                </ResizablePanel>
+                {panelOpen && (
+                  <>
+                    <ResizableHandle withHandle />
+                    <ResizablePanel
+                      id="panel"
+                      defaultSize="32"
+                      minSize={320}
+                      maxSize="60"
+                      className="flex min-h-0 flex-col bg-background shadow-[-8px_0_24px_-16px_rgb(0_0_0/0.15)]"
+                    >
+                      {panel}
+                    </ResizablePanel>
+                  </>
+                )}
+              </ResizablePanelGroup>
             )}
           </div>
         )}
@@ -614,8 +671,8 @@ function PanelFrame({
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-col">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/95 px-4 py-2.5 backdrop-blur">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center justify-between border-b bg-background/95 px-4 py-2.5 backdrop-blur">
         <span className="text-xs font-medium text-muted-foreground">
           {title}
         </span>
@@ -628,7 +685,9 @@ function PanelFrame({
           <XIcon />
         </Button>
       </div>
-      {children}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {children}
+      </div>
     </div>
   );
 }

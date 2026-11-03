@@ -3,7 +3,8 @@
 import { yaml } from '@codemirror/lang-yaml';
 import { type Diagnostic, lintGutter, setDiagnostics } from '@codemirror/lint';
 import CodeMirror, { EditorView } from '@uiw/react-codemirror';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState } from 'react';
+import { usePrefersDark } from '@/libs/code-editor/color-scheme';
 
 interface CodeViewProps {
   readonly text: string;
@@ -24,11 +25,7 @@ export default function CodeView({
   focus,
 }: CodeViewProps) {
   const [view, setView] = useState<EditorView | null>(null);
-  const dark = useSyncExternalStore(
-    subscribeToScheme,
-    prefersDark,
-    () => false,
-  );
+  const dark = usePrefersDark();
 
   useEffect(() => {
     if (view === null) return;
@@ -71,14 +68,4 @@ export default function CodeView({
       />
     </div>
   );
-}
-
-function subscribeToScheme(listener: () => void): () => void {
-  const query = window.matchMedia('(prefers-color-scheme: dark)');
-  query.addEventListener('change', listener);
-  return () => query.removeEventListener('change', listener);
-}
-
-function prefersDark(): boolean {
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
 }

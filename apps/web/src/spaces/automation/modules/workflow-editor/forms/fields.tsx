@@ -1,5 +1,6 @@
 'use client';
 
+import { CodeEditor } from '@/libs/code-editor/code-editor';
 import { PlusIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 import type { JsonObject, JsonValue } from '@/libs/data-access/types';
@@ -18,7 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/libs/ui/components/select';
-import { Textarea } from '@/libs/ui/components/textarea';
 import {
   type Duration,
   type DurationUnit,
@@ -180,15 +180,15 @@ export function JsonField({
           <span className="font-normal text-muted-foreground">optional</span>
         )}
       </FieldLabel>
-      <Textarea
+      <CodeEditor
         id={shell.id}
+        label={shell.label}
+        language="json"
+        size={rows > 6 ? 'regular' : 'short'}
         value={text}
-        rows={rows}
         placeholder={placeholder}
-        spellCheck={false}
-        onChange={(event) => edit(event.target.value)}
-        className="font-mono text-xs"
-        aria-invalid={problem !== null || error !== null}
+        onChange={edit}
+        invalid={problem !== null || error !== null}
       />
       {error !== null ? (
         <FieldError>Not JSON yet: {error}</FieldError>

@@ -53,10 +53,7 @@ export function summaryOf(entry: TaskEntry): string {
       return `Run ${namespace}/${name}`;
     }
     case 'run-script':
-      return `Run a ${textAt(task.run, ['script', 'language']) ?? ''} script`.replace(
-        '  ',
-        ' ',
-      );
+      return `Run ${scriptLanguageName(textAt(task.run, ['script', 'language']) ?? '')}`;
     case 'run-shell':
       return `$ ${textAt(task.run, ['shell', 'command']) ?? ''}`;
     case 'advanced':
@@ -92,4 +89,13 @@ function textAt(
 
 function countOf(count: number, one: string, many = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;
+}
+
+// A script language as people name it: `js` is JavaScript (DSL 1.0.3, script process).
+export function scriptLanguageName(language: string): string {
+  if (language === 'js' || language === 'javascript') return 'JavaScript';
+
+  if (language === 'python') return 'Python';
+
+  return language === '' ? 'a script' : language;
 }

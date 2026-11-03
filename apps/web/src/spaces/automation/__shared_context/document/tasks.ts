@@ -203,6 +203,18 @@ export function replaceTask(
   return withValue(draft, entry.listPointer, items);
 }
 
+// A copy of a step right after it, under a free name.
+export function duplicateTask(draft: JsonObject, entry: TaskEntry): JsonObject {
+  const name = freeName(draft, entry.name);
+  return insertTask(
+    draft,
+    entry.listPointer,
+    entry.index + 1,
+    name,
+    entry.task,
+  );
+}
+
 // A name no task of the draft has yet, from a stem: `fetch`, `fetch2`, `fetch3`.
 export function freeName(draft: JsonObject, stem: string): string {
   const taken = new Set(allEntries(draft).map(({ entry }) => entry.name));

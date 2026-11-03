@@ -1,5 +1,7 @@
 'use client';
 
+import { CodeEditor } from '@/libs/code-editor/code-editor';
+import { scriptLanguageName } from '../../../__shared_context/document/summary';
 import type { JsonObject } from '@/libs/data-access/types';
 import {
   Field,
@@ -7,7 +9,6 @@ import {
   FieldLabel,
 } from '@/libs/ui/components/field';
 import { Switch } from '@/libs/ui/components/switch';
-import { Textarea } from '@/libs/ui/components/textarea';
 import { isObject, withMember } from '../../../__shared_context/document/json';
 import { uriOf } from '../../../__shared_context/document/summary';
 import { useEditing, useFieldProblem } from '../editing-context';
@@ -249,11 +250,12 @@ export function ScriptForm(props: TaskFormProps) {
   const edit = taskEditor(props);
   const { scriptLanguages } = useEditing();
   const problem = useFieldProblem('run/script/code');
+  const language = edit.text('/run/script/language') || 'js';
   const languages = (
     scriptLanguages.length > 0 ? scriptLanguages : ['js', 'python']
-  ).map((language) => ({
-    value: language,
-    label: language,
+  ).map((each) => ({
+    value: each,
+    label: scriptLanguageName(each),
   }));
 
   return (
@@ -262,23 +264,23 @@ export function ScriptForm(props: TaskFormProps) {
         id="script-language"
         label="Language"
         at="run/script/language"
-        value={edit.text('/run/script/language') || 'js'}
-        onChange={(language) => edit.set('/run/script/language', language)}
+        value={language}
+        onChange={(chosen) => edit.set('/run/script/language', chosen)}
         options={languages}
       />
       <Field data-invalid={problem !== null}>
         <FieldLabel htmlFor="script-code">Code</FieldLabel>
-        <Textarea
+        <CodeEditor
           id="script-code"
-          rows={10}
-          spellCheck={false}
+          label={`The ${scriptLanguageName(language)} code`}
+          language={language === 'python' ? 'python' : 'javascript'}
           value={edit.text('/run/script/code')}
-          onChange={(event) => edit.set('/run/script/code', event.target.value)}
-          className="font-mono text-xs"
+          onChange={(code) => edit.set('/run/script/code', code)}
+          invalid={problem !== null}
         />
         <FieldDescription>
           {problem ??
-            'Runs in the sandbox without network access, for 30 seconds at most.'}
+            'Runs in the sandbox without network access, for 30 seconds at most. What it prints is its output; an error fails the step.'}
         </FieldDescription>
       </Field>
       <AwaitSwitch {...props} path="/run/await" />
