@@ -1,3 +1,4 @@
+import type { TransactionHost } from '@nestjs-cls/transactional';
 import type {
   DefinitionChecker,
   DefinitionProblem,
@@ -272,4 +273,12 @@ export class InMemoryWorkflowVersionRepository implements WorkflowVersionReposit
   async add(version: WorkflowVersion): Promise<void> {
     this.versions.set(version.id, version);
   }
+}
+
+// Runs the work at once: solitary tests have no database, so a transaction is the work itself.
+export function directTransactions(): TransactionHost {
+  const host = {
+    withTransaction: (work: () => Promise<unknown>) => work(),
+  };
+  return host as unknown as TransactionHost;
 }

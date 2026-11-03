@@ -13,6 +13,7 @@ import {
   FakeDefinitionChecker,
   InMemoryWorkflowRepository,
   InMemoryWorkflowVersionRepository,
+  directTransactions,
 } from '../../../support/fakes.js';
 
 const now = new Date('2026-11-03T10:00:00.000Z');
@@ -24,7 +25,8 @@ function setUp() {
   const workflows = new InMemoryWorkflowRepository();
   const versions = new InMemoryWorkflowVersionRepository(workflows);
   const check = new CheckDefinition(checker, workflows, versions, clock);
-  const publish = new PublishVersion(check, workflows, versions);
+  const transactions = directTransactions();
+  const publish = new PublishVersion(check, workflows, versions, transactions);
   const archive = new ArchiveWorkflow(workflows, clock);
   return { checker, workflows, versions, check, publish, archive };
 }

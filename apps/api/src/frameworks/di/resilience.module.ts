@@ -14,9 +14,11 @@ import { ResilienceModule as NestResilienceModule } from '@nestjs/resilience';
           timeout: '35s',
           bulkhead: { maxConcurrent: 8, maxQueue: 0 },
         },
-        jq: { timeout: '1s' },
+        // The bound of a runaway program or schema, not of an ordinary one: it counts the wait
+        // for a worker and the main thread's delays too, which a loaded process stretches.
+        jq: { timeout: '5s' },
         documents: { timeout: '2s' },
-        schemas: { timeout: '1s' },
+        schemas: { timeout: '5s' },
       },
     }),
   ],

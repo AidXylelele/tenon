@@ -27,6 +27,9 @@ export class EngineClockModule {}
         worker: {
           enabled: config.get('ENGINE_WORKER', { infer: true }) === 'on',
           concurrency: ENGINE_CONCURRENCY,
+          // A start in the caller's transaction wakes the worker before the commit, which then
+          // finds nothing due and sleeps until the next poll: a short one bounds that wait.
+          pollInterval: '100ms',
           leaseDuration: '120s',
           // One round's calls and processes take up to about 70 s; a shutdown lets it finish.
           shutdownTimeout: '90s',

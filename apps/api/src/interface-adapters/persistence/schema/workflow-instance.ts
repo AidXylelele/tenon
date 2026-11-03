@@ -39,14 +39,14 @@ export const workflowInstance = pgTable(
     waiting: boolean('waiting').notNull().default(false),
     version: integer('version').notNull().default(1),
   },
+  // Ascending, so a backward scan serves the lists' `created_at DESC, id DESC` (an index in
+  // `DESC NULLS LAST` does not match the `NULLS FIRST` that `DESC` sorts by).
   (table) => [
-    index('workflow_instance_created_idx').on(
-      table.createdAt.desc(),
-      table.id.desc(),
-    ),
+    index('workflow_instance_created_idx').on(table.createdAt, table.id),
     index('workflow_instance_workflow_idx').on(
       table.workflowId,
-      table.createdAt.desc(),
+      table.createdAt,
+      table.id,
     ),
   ],
 );

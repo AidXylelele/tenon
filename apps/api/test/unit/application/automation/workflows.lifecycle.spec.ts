@@ -8,7 +8,10 @@ import {
 } from '../../../../src/domain/automation/workflows/enums.js';
 import { WorkflowName } from '../../../../src/domain/automation/workflows/workflow-name.js';
 import { aDocument } from '../../../support/builders.js';
-import { FakeDefinitionChecker } from '../../../support/fakes.js';
+import {
+  FakeDefinitionChecker,
+  directTransactions,
+} from '../../../support/fakes.js';
 import {
   FixedClock,
   StoredWorkflowRepository,
@@ -26,7 +29,8 @@ function setUp() {
   const workflows = new StoredWorkflowRepository();
   const versions = new StoredWorkflowVersionRepository(workflows);
   const check = new CheckDefinition(checker, workflows, versions, clock);
-  const publish = new PublishVersion(check, workflows, versions);
+  const transactions = directTransactions();
+  const publish = new PublishVersion(check, workflows, versions, transactions);
   const archive = new ArchiveWorkflow(workflows, clock);
   return { clock, checker, workflows, versions, check, publish, archive };
 }
