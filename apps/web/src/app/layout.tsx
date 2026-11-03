@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { RootFrame } from '@/spaces/shell/modules/root-frame';
 import './globals.css';
 
 const geistSans = Geist({
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Workflow Platform',
-  description: 'Build and run automations',
+  title: { template: '%s | Workflow Platform', default: 'Workflow Platform' },
+  description: 'Build, run and watch automations on the Open Workflow standard',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
@@ -23,7 +24,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full">
+        <RootFrame>{children}</RootFrame>
+      </body>
     </html>
   );
 }
