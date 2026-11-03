@@ -1,8 +1,5 @@
 import type { Metadata } from 'next';
-import {
-  InstanceDetail,
-  type RunPanel,
-} from '@/spaces/automation/modules/instance-detail';
+import { RunDetail, type RunPanel } from '@/spaces/runs/modules/run-detail';
 
 export const metadata: Metadata = { title: 'Run' };
 
@@ -12,7 +9,7 @@ export default async function InstancePage({
 }: PageProps<'/instances/[id]'>) {
   const { id } = await params;
   const { view } = await searchParams;
-  return <InstanceDetail id={id} view={panelOf(view)} />;
+  return <RunDetail id={id} view={panelOf(view)} />;
 }
 
 function panelOf(value: string | string[] | undefined): RunPanel | null {

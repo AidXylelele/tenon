@@ -3,7 +3,7 @@ import { segment } from '@/libs/routing/segment';
 import {
   WorkflowDetail,
   type WorkflowTab,
-} from '@/spaces/automation/modules/workflow-detail';
+} from '@/spaces/workflows/modules/workflow-detail';
 
 export async function generateMetadata({
   params,

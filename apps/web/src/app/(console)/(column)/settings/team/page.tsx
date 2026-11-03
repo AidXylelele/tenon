@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { Invitations } from '@/spaces/identity/modules/invitations';
+import { Team } from '@/spaces/settings/modules/team';
 
-export const metadata: Metadata = { title: 'Invitations' };
+export const metadata: Metadata = { title: 'Team' };
 
 export default function TeamPage() {
-  return <Invitations />;
+  return <Team />;
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { WorkflowList } from '@/spaces/automation/modules/workflow-list';
+import { WorkflowList } from '@/spaces/workflows/modules/workflow-list';
 
 export const metadata: Metadata = { title: 'Workflows' };
 

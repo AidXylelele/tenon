@@ -1,14 +1,9 @@
 import Link from 'next/link';
 import { verifyInvitation } from '@/libs/data-access/identity';
+import { roleNoun } from '@/operations/access-policy';
 import { SIGN_IN_HREF } from '@/operations/app-routes';
 import { AuthCard } from '../../__shared_context/auth-card';
 import { InvitationForm } from './invitation-form';
-
-const ROLE: Record<string, string> = {
-  admin: 'an administrator',
-  editor: 'an editor',
-  viewer: 'a viewer',
-};
 
 // Checks the link first, so a used or expired invitation says so before anything is typed.
 export async function InvitationAcceptance({
@@ -41,7 +36,7 @@ export async function InvitationAcceptance({
       </AuthCard>
     );
 
-  const role = ROLE[verified.value.role] ?? verified.value.role;
+  const role = roleNoun(verified.value.role);
 
   return (
     <AuthCard

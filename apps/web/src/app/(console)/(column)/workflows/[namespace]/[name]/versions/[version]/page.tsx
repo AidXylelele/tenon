@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { segment } from '@/libs/routing/segment';
-import { VersionDocument } from '@/spaces/automation/modules/version-document';
+import { VersionDocument } from '@/spaces/workflows/modules/version-document';
 
 export async function generateMetadata({
   params,

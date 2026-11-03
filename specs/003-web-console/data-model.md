@@ -19,7 +19,7 @@ They are written from the contracts of [001](../001-api-authentication/contracts
 
 Commands answer `Outcome<T> = { ok: true, value: T } | { ok: false, problem: Problem }`. Reads answer the value, or `null` for a 404.
 
-## Draft document (`automation/__shared_context/document`)
+## Draft document (`operations/workflow-document`, `workflows/modules/workflow-editor`)
 
 - **`Draft`**: the document as JSON (`document`, `input`, `use`, `schedule`, `do`, and any other root property, kept untouched).
 - **`TaskEntry`**: one entry of a task list, with:

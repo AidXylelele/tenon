@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { WorkflowEditor } from '@/spaces/automation/modules/workflow-editor';
+import { WorkflowEditor } from '@/spaces/workflows/modules/workflow-editor';
 
 export const metadata: Metadata = { title: 'New workflow' };
 

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { Conformance } from '@/spaces/automation/modules/conformance';
+import { Standard } from '@/spaces/settings/modules/standard';
 
 export const metadata: Metadata = { title: 'Supported standard' };
 
 export default function ConformancePage() {
-  return <Conformance />;
+  return <Standard />;
 }

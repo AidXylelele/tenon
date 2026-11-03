@@ -8,17 +8,28 @@ The workflow platform's console: Next.js 16 (App Router, Turbopack).
 
 ## Layout
 
-| Path                     | Tier   | What                                                          |
-| ------------------------ | ------ | ------------------------------------------------------------- |
-| `src/app`                | entry  | Pages and layouts, each rendering one module                  |
-| `src/spaces/shell`       | module | The frames: root, signed-out, console                         |
-| `src/spaces/identity`    | module | Sign-in, recovery, account, invitations (feature 001)         |
-| `src/spaces/automation`  | module | Workflows, builder, runs, integrations (feature 002)          |
-| `src/libs/data-access`   | lib    | The only API client (server-only)                             |
-| `src/libs/ui`            | lib    | The design system: shadcn/ui (Radix, nova) and its composites |
-| `src/libs/live`          | lib    | Route refresh while something is in flight                    |
-| `src/libs/document-text` | lib    | YAML and JSON text with positions; JSON Pointers              |
-| `src/libs/routing`       | lib    | Route segments and search parameters                          |
+| Path                     | Tier      | What                                                                            |
+| ------------------------ | --------- | ------------------------------------------------------------------------------- |
+| `src/app`                | entry     | Pages and layouts, each rendering one module                                    |
+| `src/spaces/shell`       | module    | The frames: root, signed-out, and the console with its search                   |
+| `src/spaces/identity`    | module    | Sign in, recover and reset a password, accept an invitation                     |
+| `src/spaces/home`        | module    | The overview                                                                    |
+| `src/spaces/workflows`   | module    | The workflows, a workflow, its editor, a version                                |
+| `src/spaces/runs`        | module    | The runs and a run                                                              |
+| `src/spaces/connections` | module    | Webhooks, notifications, a test event                                           |
+| `src/spaces/credentials` | module    | Secrets                                                                         |
+| `src/spaces/settings`    | module    | Account, team, the supported standard                                           |
+| `src/features`           | feature   | The workflow canvas, the run table, the viewers' notice, the new-password field |
+| `src/operations`         | operation | The workflow document, run progress, access and roles, addresses                |
+| `src/libs/data-access`   | lib       | The only API client (server-only)                                               |
+| `src/libs/ui`            | lib       | The design system: shadcn/ui (Radix, nova) and its composites                   |
+| `src/libs/code-editor`   | lib       | CodeMirror with highlighting, formatting and syntax errors                      |
+| `src/libs/document-text` | lib       | YAML and JSON text with positions; JSON Pointers                                |
+| `src/libs/forms`         | lib       | Form state from a Server Action's answer                                        |
+| `src/libs/live`          | lib       | Route refresh while something is in flight                                      |
+| `src/libs/routing`       | lib       | Route segments and search parameters                                            |
+
+Imports go only down the tiers (entry → module → feature → operation → lib), as the owner's RFC Web Module System and [research R19](../../specs/003-web-console/research.md) set them.
 
 shadcn components are added with `pnpm dlx shadcn@4.23.0 add <name>`; `components.json` points them into `src/libs/ui`.
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Account } from '@/spaces/identity/modules/account';
+import { Account } from '@/spaces/settings/modules/account';
 
 export const metadata: Metadata = { title: 'Account' };
 

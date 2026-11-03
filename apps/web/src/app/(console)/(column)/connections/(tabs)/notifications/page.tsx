@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { SubscriptionList } from '@/spaces/automation/modules/subscription-list';
+import { NotificationList } from '@/spaces/connections/modules/notification-list';
 
 export const metadata: Metadata = { title: 'Notifications' };
 
 export default function SubscriptionsPage() {
-  return <SubscriptionList />;
+  return <NotificationList />;
 }

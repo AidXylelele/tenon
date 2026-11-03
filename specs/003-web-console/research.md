@@ -15,7 +15,7 @@ The decisions in force, with their sources. Docs paths are under `apps/web/node_
   - A client library (SWR, TanStack Query) is what the docs name for "a shared browser cache … interval polling, request deduplication" (`02-guides/client-side-data-fetching/index.md`). The console needs polling only. The router does it with the reads the page already has, so one data path remains.
 - **Cost accepted.** Each refresh re-runs the page's reads. Those are one to four API calls, and only while something is in flight.
 
-## R2. Tiers: two spaces, no features or operations yet
+## R2. Tiers: two spaces, no features or operations yet (replaced by R19)
 
 - **Decision.**
   - Spaces: `identity`, for 001's bounded context, and `automation`, for 002's.
@@ -325,7 +325,7 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
 
 ### Decision: the target
 
-- **Spaces by experience.** Each one matches a destination:
+- **Spaces by experience.** Each holds one experience: the frames, the signed-out journey, and one per destination of the console.
   - `shell`: the frames, not-found, error, the canvas and column bodies
   - `identity`: sign in, recover, reset, accept an invitation
   - `home`: overview
@@ -335,12 +335,12 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
   - `credentials`: secrets
   - `settings`: its frame with tabs, account, team, standard
 
-  A space's `__shared_context` keeps only what two of its own modules share. What one module uses moves into it.
+  A space's `__shared_context` keeps only what two of its own modules share. What one module uses moves into it. A module is named after the page it renders, in the console's words; the API's words stay in `data-access`. One app-level TypeScript and ESLint configuration serves every space, since lint is strict TypeScript only (2026-10-28).
 
 - **Operations** (no JSX, at least 75 % coverage, playground):
   - `workflow-document`: header, tasks, kinds, protection, summary, trigger
   - `run-progress`: phases and task statuses, the controls a phase allows, a run's progress by step, retries
-  - `access-policy`: authors, administrators
+  - `access-policy`: authors, administrators, and the words of each role
   - `app-routes`: every page's address
 
   No operation imports another.
@@ -348,6 +348,8 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
 - **Features** (UI and logic, playground, Cypress smoke test, coverage):
   - `workflow-canvas`, for workflows and runs
   - `run-table`, for runs and a workflow's runs
+  - `viewer-notice`: what a viewer sees on a page for authors, for credentials and connections
+  - `new-password-field`: a password being chosen, with the length the API checks, for identity and settings
 
   Features don't import features. A module combines them through props and slots, as in the RFC's header example. What one domain uses stays in its module, since a feature is "repeated across domains": the ⌘K workflow search belongs to the console frame, and home lists runs in its own cards.
 
@@ -399,6 +401,16 @@ The owner's "RFC Web Module System" (approved, Dec 2023; constitution, Web Rules
   - A node states what it shows in `data-status`, `data-phase`, `data-started`, `data-flagged` or `data-used`. Tests read these instead of colours.
 - **Run table.** The page gives its own empty state as a slot.
 - **Search stays in the console frame.** It was planned as a feature, but only the console frame uses it. The palette reads the active workflows and lists them itself.
+
+### Made in T123
+
+- **Eight spaces.** Sixteen modules moved with their history from `automation` and `identity` into `home`, `workflows`, `runs`, `connections`, `credentials` and `settings`. `automation` is gone. The frames with tabs of connections and settings come with T124.
+- **Pages' names.** Modules are named after the page they render, as the RFC's diagrams name theirs: `run-list`, `run-detail`, `notification-list`, `notification-detail`, `notification-form`, `test-event`, `team`, `standard`. The API's words (instance, subscription, conformance) stay in `data-access` and in the address `/instances`. Page titles say what the headings say.
+- **Shared contexts.** Each keeps what two of its modules use: the auth card in identity, the brand mark in shell, the event filter in connections. Delivery statuses moved into the one module that shows them.
+- **Across domains.** What two spaces need left both:
+  - the notice for viewers is the feature `viewer-notice` (credentials, connections);
+  - the field for a new password, with the length the API checks, is the feature `new-password-field` (identity, settings);
+  - the words of each role are in `access-policy` (shell, identity, settings).
 
 ### Order
 

@@ -3,17 +3,11 @@
 import Link from 'next/link';
 import { useActionState } from 'react';
 import { IDLE } from '@/libs/forms/form-state';
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from '@/libs/ui/components/field';
-import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
 import { FORGOT_PASSWORD_HREF } from '@/operations/app-routes';
+import { NewPasswordField } from '@/features/new-password-field';
 import { AuthCard } from '../../__shared_context/auth-card';
-import { PASSWORD_MAX, PASSWORD_MIN } from '../../__shared_context/password';
 import { resetPasswordAction } from './actions';
 
 export function PasswordReset({ token }: { readonly token: string }) {
@@ -49,22 +43,7 @@ export function PasswordReset({ token }: { readonly token: string }) {
       <form action={action} className="flex flex-col gap-4">
         <input type="hidden" name="token" value={token} />
         <ProblemMessage problem={state.problem} />
-        <Field>
-          <FieldLabel htmlFor="password">New password</FieldLabel>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={PASSWORD_MIN}
-            maxLength={PASSWORD_MAX}
-            autoFocus
-          />
-          <FieldDescription>
-            At least {PASSWORD_MIN} characters.
-          </FieldDescription>
-        </Field>
+        <NewPasswordField name="password" label="New password" autoFocus />
         <SubmitButton size="lg" pendingLabel="Saving…">
           Set password
         </SubmitButton>

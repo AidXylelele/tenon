@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { segment } from '@/libs/routing/segment';
-import { WorkflowEditor } from '@/spaces/automation/modules/workflow-editor';
+import { WorkflowEditor } from '@/spaces/workflows/modules/workflow-editor';
 
 export async function generateMetadata({
   params,

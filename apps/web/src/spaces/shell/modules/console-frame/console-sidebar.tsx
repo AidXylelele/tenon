@@ -3,7 +3,7 @@
 import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from 'lucide-react';
 import { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { Role, User } from '@/libs/data-access/types';
+import type { User } from '@/libs/data-access/types';
 import { Link } from '@/libs/routing/link';
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ import {
   useSidebar,
 } from '@/libs/ui/components/sidebar';
 import { Spinner } from '@/libs/ui/components/spinner';
+import { roleLabel } from '@/operations/access-policy';
 import { ACCOUNT_HREF, HOME_HREF } from '@/operations/app-routes';
 import { BrandMark, PRODUCT_NAME } from '../../__shared_context/brand-mark';
 import { signOutAction } from './actions';
@@ -37,12 +38,6 @@ import {
   isUnder,
   SETTINGS,
 } from './destinations';
-
-const ROLE_LABEL: Record<Role, string> = {
-  admin: 'Administrator',
-  editor: 'Editor',
-  viewer: 'Viewer',
-};
 
 // The console's navigation (research R15): the destinations the user's role may open, Settings
 // at the foot, and the user's menu. Without a user yet, it shows its shape while the session is
@@ -157,7 +152,7 @@ function UserMenu({ user }: { readonly user: User }) {
                   {user.name}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {ROLE_LABEL[user.role]}
+                  {roleLabel(user.role)}
                 </span>
               </span>
               <ChevronsUpDownIcon className="ml-auto" />

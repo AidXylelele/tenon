@@ -2,16 +2,11 @@
 
 import { useActionState } from 'react';
 import { IDLE } from '@/libs/forms/form-state';
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from '@/libs/ui/components/field';
+import { Field, FieldGroup, FieldLabel } from '@/libs/ui/components/field';
 import { Input } from '@/libs/ui/components/input';
 import { ProblemMessage } from '@/libs/ui/composites/problem-message';
 import { SubmitButton } from '@/libs/ui/composites/submit-button';
-import { PASSWORD_MAX, PASSWORD_MIN } from '../../__shared_context/password';
+import { NewPasswordField } from '@/features/new-password-field';
 import { acceptInvitationAction } from './actions';
 
 export function InvitationForm({
@@ -44,21 +39,7 @@ export function InvitationForm({
             defaultValue={state.values.name}
           />
         </Field>
-        <Field>
-          <FieldLabel htmlFor="password">Password</FieldLabel>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={PASSWORD_MIN}
-            maxLength={PASSWORD_MAX}
-          />
-          <FieldDescription>
-            At least {PASSWORD_MIN} characters.
-          </FieldDescription>
-        </Field>
+        <NewPasswordField name="password" label="Password" />
       </FieldGroup>
       <SubmitButton size="lg" pendingLabel="Creating your account…">
         Create account

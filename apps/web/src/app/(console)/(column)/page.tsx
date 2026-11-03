@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Overview } from '@/spaces/automation/modules/overview';
+import { Overview } from '@/spaces/home/modules/overview';
 
 export const metadata: Metadata = { title: 'Overview' };
 

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Webhooks } from '@/spaces/automation/modules/webhooks';
+import { Webhooks } from '@/spaces/connections/modules/webhooks';
 
 export const metadata: Metadata = { title: 'Webhooks' };
 

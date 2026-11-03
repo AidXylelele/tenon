@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { EventSenderPage } from '@/spaces/automation/modules/event-sender';
+import { TestEvent } from '@/spaces/connections/modules/test-event';
 
-export const metadata: Metadata = { title: 'Send an event' };
+export const metadata: Metadata = { title: 'Test event' };
 
 export default function EventsPage() {
-  return <EventSenderPage />;
+  return <TestEvent />;
 }

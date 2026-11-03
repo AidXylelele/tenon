@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { SubscriptionForm } from '@/spaces/automation/modules/subscription-form';
+import { NotificationForm } from '@/spaces/connections/modules/notification-form';
 
-export const metadata: Metadata = { title: 'New subscription' };
+export const metadata: Metadata = { title: 'New notification' };
 
 export default function NewSubscriptionPage() {
-  return <SubscriptionForm />;
+  return <NotificationForm />;
 }
