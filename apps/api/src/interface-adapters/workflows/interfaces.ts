@@ -83,6 +83,13 @@ export abstract class RunObserver {
     child: ChildRequest,
   ): Promise<ChildStart>;
   abstract outcomeOf(childId: string): Promise<ChildOutcome>;
+  // A `listen` task waits for events sent to `key`; `types` narrows them, null for any type.
+  abstract listen(
+    instanceId: string,
+    key: string,
+    types: string[] | null,
+  ): Promise<void>;
+  abstract unlisten(instanceId: string, key: string): Promise<void>;
   // An event an `emit` task published, accepted as any other event.
   abstract emitted(instanceId: string, event: JsonObject): Promise<void>;
 }
@@ -132,4 +139,10 @@ export abstract class RunClient {
   abstract cancel(instanceId: string): Promise<void>;
   abstract resume(instanceId: string): Promise<void>;
   abstract delete(instanceId: string): Promise<void>;
+  // An accepted event sent to the run listening under the key, once per signal id.
+  abstract deliver(
+    key: string,
+    event: JsonObject,
+    signalId: string,
+  ): Promise<void>;
 }

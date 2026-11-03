@@ -78,6 +78,7 @@ export class DrizzleEventStore implements EventStore {
       cloudEvent: row.cloudEvent,
       origin: row.origin,
       instanceId: row.instanceId,
+      acceptedAt: row.acceptedAt,
     };
   }
 }

@@ -1,6 +1,17 @@
 import { Module } from '@nestjs/common';
 import { AcceptEvent } from '../../application/automation/events/accept-event.js';
-import { EventStore } from '../../application/automation/events/ports.js';
+import { DispatchEvent } from '../../application/automation/events/dispatch-event.js';
+import { Listen } from '../../application/automation/events/listen.js';
+import { Unlisten } from '../../application/automation/events/unlisten.js';
+import { EventDispatchController } from '../../interface-adapters/messaging/event-dispatch.controller.js';
+import { DrizzleListenerStore } from '../../interface-adapters/persistence/stores/drizzle-listener.store.js';
+import { EventDeliveriesGateway } from '../../interface-adapters/workflows/runs/event-deliveries.gateway.js';
+import { EventDispatchOutboxHandler } from '../outbox/event-dispatch.outbox.handler.js';
+import {
+  EventDeliveries,
+  EventStore,
+  ListenerStore,
+} from '../../application/automation/events/ports.js';
 import { EventQueries } from '../../application/automation/events/queries.js';
 import { BeginInstance } from '../../application/automation/instances/begin-instance.js';
 import { EventsController } from '../../interface-adapters/api/controllers/events.controller.js';
@@ -91,6 +102,15 @@ import { RuntimeModule } from './runtime.module.js';
     { provide: EventQueries, useExisting: DrizzleEventQueries },
     DrizzleInstanceNames,
     AcceptEvent,
+    DispatchEvent,
+    Listen,
+    Unlisten,
+    DrizzleListenerStore,
+    { provide: ListenerStore, useExisting: DrizzleListenerStore },
+    EventDeliveriesGateway,
+    { provide: EventDeliveries, useExisting: EventDeliveriesGateway },
+    EventDispatchController,
+    EventDispatchOutboxHandler,
     DrizzleTaskProgressStore,
     { provide: TaskProgress, useExisting: DrizzleTaskProgressStore },
     DrizzleInstanceQueries,

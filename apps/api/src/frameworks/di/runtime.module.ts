@@ -29,6 +29,8 @@ import { SetKind } from '../runtime/execution/kinds/set-kind.js';
 import { SwitchKind } from '../runtime/execution/kinds/switch-kind.js';
 import { TryKind } from '../runtime/execution/kinds/try-kind.js';
 import { WaitKind } from '../runtime/execution/kinds/wait-kind.js';
+import { ListenKind } from '../runtime/execution/kinds/listen-kind.js';
+import { EventFilters } from '../runtime/execution/events/event-filters.js';
 import { TaskKindRegistry } from '../runtime/execution/task-kind-registry.js';
 import { TaskRunner } from '../runtime/execution/task-runner.js';
 import {
@@ -106,6 +108,7 @@ const manifest = createRequire(import.meta.url)('../../../package.json') as {
           ['for', new ForKind(evaluator)],
           ['fork', new ForkKind()],
           ['wait', new WaitKind(evaluator)],
+          ['listen', new ListenKind(new EventFilters(evaluator), evaluator)],
           ['call:function', new FunctionCallKind(evaluator)],
           ['run:detached', new DetachedProcessKind(limits, evaluator)],
           ['run:workflow', new WorkflowKind(evaluator)],

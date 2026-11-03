@@ -34,6 +34,7 @@ export class SubsetCheck implements DefinitionCheck {
   firstProblem(workflow: Specification.Workflow): Promise<CheckProblem | null> {
     const problem =
       SubsetCheck.#root(workflow) ??
+      SubsetCheck.#schedule(workflow) ??
       SubsetCheck.#use(workflow) ??
       SubsetCheck.#tasks(workflow) ??
       SubsetCheck.#authentications(workflow) ??
@@ -55,6 +56,20 @@ export class SubsetCheck implements DefinitionCheck {
     }
 
     return null;
+  }
+
+  // An event-driven schedule starts an instance per event of one filter, or of any of several;
+  // waiting for all of them would hold state between events outside any instance.
+  static #schedule(workflow: Specification.Workflow): CheckProblem | null {
+    const schedule = workflow.schedule as JsonObject | undefined;
+    const on = schedule?.on as JsonObject | undefined;
+
+    if (on?.all === undefined) return null;
+
+    return {
+      pointer: '/schedule/on/all',
+      detail: 'a schedule on all of several events is not supported',
+    };
   }
 
   static #use(workflow: Specification.Workflow): CheckProblem | null {
@@ -101,7 +116,30 @@ export class SubsetCheck implements DefinitionCheck {
 
     if (kind === TaskKind.Try) return SubsetCheck.#try(located);
 
+    if (kind === TaskKind.Listen) return SubsetCheck.#listen(located);
+
     return null;
+  }
+
+  static #listen(located: LocatedTask): CheckProblem | null {
+    const task = located.task as Specification.ListenTask;
+
+    if (task.foreach !== undefined) {
+      const pointer = located.pointer.child('foreach').toString();
+      return { pointer, detail: 'listen: foreach is not supported' };
+    }
+
+    const to = (task.listen?.to ?? {}) as JsonObject;
+    const until = to.until;
+
+    if (until === undefined || typeof until === 'string') return null;
+
+    const pointer = located.pointer
+      .child('listen')
+      .child('to')
+      .child('until')
+      .toString();
+    return { pointer, detail: 'an until of events is not supported' };
   }
 
   static #call(located: LocatedTask): CheckProblem | null {

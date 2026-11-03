@@ -11,7 +11,7 @@ import type {
   StepOptions,
   StepRetry,
 } from '../runtime/interfaces.js';
-import { RESUME_SIGNAL } from './engine.constants.js';
+import { EVENT_SIGNAL, RESUME_SIGNAL } from './engine.constants.js';
 import type { StepErrors } from './step-errors.js';
 
 // The runtime's durability on @nestjs/workflows: a step is `ctx.step`, a sleep `ctx.sleep`, a
@@ -67,6 +67,22 @@ export class EngineDurability implements Durability {
 
   async sleep(name: string, milliseconds: number): Promise<void> {
     await this.ctx.sleep(name, milliseconds);
+  }
+
+  async waitForEvent(
+    name: string,
+    key: string,
+    milliseconds: number | null,
+  ): Promise<JsonObject | null> {
+    const options =
+      milliseconds === null ? { key } : { key, timeout: milliseconds };
+    // Journaled<JsonObject> recurses too deep for the compiler: the payload is a CloudEvent object.
+    const event = await this.ctx.waitForSignal<unknown>(
+      name,
+      EVENT_SIGNAL,
+      options,
+    );
+    return event as JsonObject | null;
   }
 
   async awaitChild(name: string, instanceId: string): Promise<void> {

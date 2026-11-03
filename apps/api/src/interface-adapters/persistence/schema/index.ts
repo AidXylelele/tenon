@@ -9,3 +9,4 @@ export * from './workflow-version.js';
 export * from './workflow-instance.js';
 export * from './task-progress.js';
 export * from './event.js';
+export * from './listener.js';

@@ -57,6 +57,13 @@
       "when": 1793668492821,
       "tag": "0007_instance_waiting",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793668977068,
+      "tag": "0008_listener",
+      "breakpoints": true
     }
   ]
 }

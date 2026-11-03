@@ -360,4 +360,65 @@ describe('the checks a document passes before it is published', () => {
       pointer: '/input/schema/resource',
     });
   });
+
+  it.each([
+    [
+      'a_listen_over_a_stream',
+      {
+        listen: { to: { one: { with: { type: 'order.placed' } } } },
+        foreach: { item: 'order' },
+      },
+      '/do/0/task/foreach',
+    ],
+    [
+      'a_listen_until_other_events',
+      {
+        listen: {
+          to: {
+            any: [{ with: { type: 'order.placed' } }],
+            until: { one: { with: { type: 'order.closed' } } },
+          },
+        },
+      },
+      '/do/0/task/listen/to/until',
+    ],
+  ])('%s_is_refused', async (_, task, pointer) => {
+    const document = documentWith([{ task: task }]);
+
+    expect(await problemOf(document)).toMatchObject({ pointer });
+  });
+
+  it('a_listen_until_an_expression_is_accepted', async () => {
+    const document = documentWith([
+      {
+        task: {
+          listen: {
+            to: {
+              any: [{ with: { type: 'order.placed' } }],
+              until: '${ length > 2 }',
+            },
+          },
+        },
+      },
+    ]);
+
+    expect(await problemOf(document)).toBeNull();
+  });
+
+  it('a_schedule_on_all_of_several_events_is_refused', async () => {
+    const document = documentWith([{ greet: { set: { x: 1 } } }], {
+      schedule: {
+        on: {
+          all: [
+            { with: { type: 'order.placed' } },
+            { with: { type: 'order.paid' } },
+          ],
+        },
+      },
+    });
+
+    expect(await problemOf(document)).toMatchObject({
+      pointer: '/schedule/on/all',
+    });
+  });
 });

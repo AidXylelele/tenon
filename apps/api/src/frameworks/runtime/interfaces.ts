@@ -307,6 +307,12 @@ export interface Durability {
   // A platform instance run as this run's child, until it ends; or started on its own.
   awaitChild(name: string, instanceId: string): Promise<void>;
   detachChild(name: string, instanceId: string): Promise<void>;
+  // The next event sent to `key`, or null when `milliseconds` pass first (null: no limit).
+  waitForEvent(
+    name: string,
+    key: string,
+    milliseconds: number | null,
+  ): Promise<JsonObject | null>;
   // A process run on its own, its outcome unread.
   detachProcess(name: string, command: GoJudgeCommand): Promise<void>;
 }

@@ -7,7 +7,8 @@ import {
 import { WorkflowClient, WorkflowNotFoundError } from '@nestjs/workflows';
 import type { DrizzleTx } from '../../interface-adapters/persistence/interfaces.js';
 import type { RunClient } from '../../interface-adapters/workflows/interfaces.js';
-import { RESUME_SIGNAL } from './engine.constants.js';
+import type { JsonObject } from '../../domain/automation/json.js';
+import { EVENT_SIGNAL, RESUME_SIGNAL } from './engine.constants.js';
 import { InstanceWorkflow } from './instance.workflow.js';
 
 @Injectable()
@@ -40,6 +41,14 @@ export class EngineRunClient implements RunClient {
 
   async resume(instanceId: string): Promise<void> {
     await this.client.signal(RESUME_SIGNAL, null, { key: instanceId });
+  }
+
+  async deliver(
+    key: string,
+    event: JsonObject,
+    signalId: string,
+  ): Promise<void> {
+    await this.client.signal(EVENT_SIGNAL, event, { key, id: signalId });
   }
 
   async delete(instanceId: string): Promise<void> {

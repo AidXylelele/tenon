@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { AcceptEvent } from '../../../application/automation/events/accept-event.js';
 import { EventOrigin } from '../../../application/automation/events/enums.js';
+import { Listen } from '../../../application/automation/events/listen.js';
+import { Unlisten } from '../../../application/automation/events/unlisten.js';
 import { BeginInstance } from '../../../application/automation/instances/begin-instance.js';
 import { BeginWaiting } from '../../../application/automation/instances/begin-waiting.js';
 import { CompleteInstance } from '../../../application/automation/instances/complete-instance.js';
@@ -44,6 +46,8 @@ export class InstanceRunController extends RunObserver {
     private readonly faultInstance: FaultInstance,
     private readonly startSubWorkflow: StartSubWorkflow,
     private readonly acceptEvent: AcceptEvent,
+    private readonly listenUseCase: Listen,
+    private readonly unlistenUseCase: Unlisten,
   ) {
     super();
   }
@@ -141,6 +145,18 @@ export class InstanceRunController extends RunObserver {
     if (child === null) return { phase: null, output: null, error: null };
 
     return { phase: child.phase, output: child.output, error: child.error };
+  }
+
+  listen(
+    instanceId: string,
+    key: string,
+    types: string[] | null,
+  ): Promise<void> {
+    return this.listenUseCase.execute({ instanceId, key, types });
+  }
+
+  unlisten(instanceId: string, key: string): Promise<void> {
+    return this.unlistenUseCase.execute({ instanceId, key });
   }
 
   async emitted(instanceId: string, event: JsonObject): Promise<void> {
