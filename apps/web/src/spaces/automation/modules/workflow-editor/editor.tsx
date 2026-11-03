@@ -465,7 +465,8 @@ export function Editor({
       />
       {!panelOpen && (
         <div className="pointer-events-none absolute top-3 left-1/2 hidden -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1 text-xs text-muted-foreground shadow-xs backdrop-blur lg:block">
-          Click a step to set it up, + to add one, drag from a dot to jump
+          Click a step to set it up, + to add one, drag from a dot to jump,
+          click a jump and press Delete to remove it
         </div>
       )}
     </div>

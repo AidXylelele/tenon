@@ -78,10 +78,12 @@ function edgeOf(kind: EdgeKind, label: string | null = null): CanvasEdge {
 function draw(
   data: Partial<FlowEdgeData> & { readonly edge: CanvasEdge },
   changes: Partial<CanvasState> = {},
+  picked = false,
 ) {
   const state = { ...STATE, ...changes };
   const props = {
     id: data.edge.id,
+    selected: picked,
     data: { points: DOWN, labels: [], taken: false, live: false, ...data },
   } as EdgeComponentProps;
   return render(
@@ -173,6 +175,23 @@ describe('a connection on the canvas', () => {
     expect(path.dataset.stroke).toBe('var(--edge-taken)');
     expect(path.dataset.width).toBe('2.5');
     expect(path).toHaveClass('flow-edge-live');
+  });
+
+  it('picked_for_removal_it_keeps_its_colour_inside_a_halo_and_is_thicker', () => {
+    const jump = edgeOf('jump');
+    draw({ edge: jump }, {}, true);
+    const path = screen.getByTestId(`edge ${jump.id}`);
+
+    expect(screen.getByTestId(`halo ${jump.id}`)).toBeInTheDocument();
+    expect(path.dataset.stroke).toBe('var(--edge-choice)');
+    expect(path.dataset.width).toBe('2.5');
+  });
+
+  it('not_picked_it_has_no_halo', () => {
+    const jump = edgeOf('jump');
+    draw({ edge: jump });
+
+    expect(screen.queryByTestId(`halo ${jump.id}`)).not.toBeInTheDocument();
   });
 
   it('without_a_route_it_draws_nothing', () => {

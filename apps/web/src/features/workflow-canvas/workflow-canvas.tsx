@@ -6,6 +6,7 @@ import {
   type Connection,
   Controls,
   type Edge,
+  type EdgeChange,
   MarkerType,
   MiniMap,
   type Node,
@@ -155,6 +156,9 @@ function Canvas({
   const dark = usePrefersDark();
   const frame = useRef<HTMLDivElement>(null);
   const shownFor = useRef<Direction | null>(null);
+  // The connections picked for the Delete key. The edges come from the document, so the canvas
+  // keeps what React Flow reports picked and gives it back (a controlled flow).
+  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
 
   // The first view, and again when the direction changes: the whole graph when it fits at a
   // readable zoom, otherwise a readable zoom from the start. Edits keep the view where it is.
@@ -257,6 +261,7 @@ function Canvas({
               type: 'flow',
               deletable: removable,
               selectable: removable,
+              selected: removable && picked.has(edge.id),
               markerEnd: {
                 type: MarkerType.ArrowClosed,
                 width: 16,
@@ -272,7 +277,7 @@ function Canvas({
               },
             };
           }),
-    [laid, progress, phase, editable],
+    [laid, progress, phase, editable, picked],
   );
 
   const state = useMemo<CanvasState>(
@@ -357,6 +362,9 @@ function Canvas({
           elementsSelectable={editable}
           onConnect={connect}
           isValidConnection={connectable}
+          onEdgesChange={(changes) => {
+            setPicked((before) => pickedAfter(before, changes));
+          }}
           onEdgesDelete={(deleted) => {
             if (onDisconnect === undefined) return;
 
@@ -517,6 +525,26 @@ function activeOf(
     .filter(([, seen]) => seen.status === 'running')
     .map(([pointer]) => pointer);
   return faultAt === null ? running : [...running, faultAt];
+}
+
+// The picked connections after React Flow's changes: a connection is picked, let go, or
+// removed.
+function pickedAfter(
+  before: ReadonlySet<string>,
+  changes: readonly EdgeChange<Edge<FlowEdgeData>>[],
+): ReadonlySet<string> {
+  const after = new Set(before);
+
+  for (const change of changes) {
+    if (change.type === 'remove') after.delete(change.id);
+
+    if (change.type !== 'select') continue;
+
+    if (change.selected) after.add(change.id);
+    else after.delete(change.id);
+  }
+
+  return after;
 }
 
 // The viewer's closed groups, less those that hold what a run is at.

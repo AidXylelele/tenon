@@ -432,6 +432,37 @@ describe('a workflow on the canvas', () => {
 
     expect(remove).not.toThrow();
   });
+
+  it('a_connection_picked_is_given_back_picked_until_let_go_or_removed', async () => {
+    render(<WorkflowCanvas document={document} editable />);
+    await laidOut();
+    const id = 'end:/do/5/notify:out>end';
+    const pick = (selected: boolean) =>
+      act(() => current().onEdgesChange?.([{ type: 'select', id, selected }]));
+
+    pick(true);
+    const picked = edgeOf(id).selected;
+    pick(false);
+    const letGo = edgeOf(id).selected;
+    pick(true);
+    act(() => current().onEdgesChange?.([{ type: 'remove', id }]));
+
+    expect(picked).toBe(true);
+    expect(letGo).toBe(false);
+    expect(edgeOf(id).selected).toBe(false);
+  });
+
+  it('a_connection_that_cannot_be_removed_is_never_picked', async () => {
+    render(<WorkflowCanvas document={document} editable />);
+    await laidOut();
+    const id = 'next:start:out>/do/0/fetch';
+
+    act(() =>
+      current().onEdgesChange?.([{ type: 'select', id, selected: true }]),
+    );
+
+    expect(edgeOf(id).selected).toBe(false);
+  });
 });
 
 describe('a run on the canvas', () => {

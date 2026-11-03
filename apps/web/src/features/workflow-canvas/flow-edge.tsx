@@ -43,7 +43,8 @@ export function strokeOf(kind: EdgeKind): string {
 }
 
 // A connection along the route ELK found, its corners rounded, with what it means written on
-// it and, while editing, a `+` that adds a step there (research R16).
+// it and, while editing, a `+` that adds a step there (research R16). Picked for the Delete
+// key, it keeps its colour inside a halo of the accent.
 export function FlowEdge(props: Props) {
   const canvas = useCanvas();
   const data = props.data;
@@ -52,18 +53,30 @@ export function FlowEdge(props: Props) {
 
   const edge = data.edge;
   const path = roundedPath(data.points);
+  const picked = props.selected === true;
   const stroke = data.taken ? 'var(--edge-taken)' : strokeOf(edge.kind);
   const insertAt = edge.insertAt;
 
   return (
     <>
+      {picked && (
+        <path
+          d={path}
+          fill="none"
+          stroke="var(--primary)"
+          strokeOpacity={0.25}
+          strokeWidth={9}
+          strokeLinecap="round"
+          data-testid={`halo ${props.id}`}
+        />
+      )}
       <BaseEdge
         id={props.id}
         path={path}
         markerEnd={props.markerEnd}
         style={{
           stroke,
-          strokeWidth: data.taken ? 2.5 : 1.75,
+          strokeWidth: data.taken || picked ? 2.5 : 1.75,
           strokeDasharray: DASHED.has(edge.kind) ? '6 5' : undefined,
         }}
         className={cn(data.live && 'flow-edge-live')}
