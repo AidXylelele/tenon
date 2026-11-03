@@ -67,7 +67,7 @@ Stories run in dependency order: US1 → US2 → US3, then US7 → US5 → US4 �
 - [x] T070 [US4] Turn on and off; `cron` (UTC) and `every` as engine schedules; `after` as a chain of delayed links; `schedule.on` through its consumer's inbox; migration 0011 [b4ddb40]
 - [x] T071 [US4] The runtime reads a schedule's timing; `Workflow` decides the scheduled version and one chain at a time; `EngineCronModule` [2e13a75]
 - [x] T072 [US4] Tests: `test/component/automation/schedules.spec.ts`, `test/unit/application/automation/schedules.spec.ts`, `test/unit/domain/automation/workflow.lifecycle.spec.ts`
-- [ ] T073 [US4] A workflow's `schedule.on` is never satisfied by a lifecycle event of its own instances (edge case)
+- [x] T073 [US4] A workflow's `schedule.on` is never satisfied by a lifecycle event of its own instances (edge case): `Workflow.startScheduledInstance` with `lifecycleOf`
 - [ ] T074 [US4] Exactly once across two workers and one missed occurrence after downtime, in a journey (US4 AS1, AS6)
 
 ## US8 — Keep credentials for workflows (P2)

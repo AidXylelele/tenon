@@ -56,6 +56,7 @@ export class StartOnEvent {
         trigger: TriggerKind.Event,
         chained: false,
         chainRunning: false,
+        lifecycleOf: event.lifecycleOf,
         now,
       });
 

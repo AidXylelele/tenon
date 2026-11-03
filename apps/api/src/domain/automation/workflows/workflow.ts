@@ -161,7 +161,8 @@ export class Workflow {
 
   // Only while the workflow is on does its current version's schedule start instances
   // (FR-006); an occurrence of an earlier version's schedule starts none. A link of an `after`
-  // chain starts none while the schedule's instance runs, so one chain goes on at a time.
+  // chain starts none while the schedule's instance runs, so one chain goes on at a time; a
+  // lifecycle event of its own instances satisfies none of its `schedule.on`.
   startScheduledInstance(
     start: ScheduledStart,
   ): Result<WorkflowInstance | null, WorkflowRefusal> {
@@ -173,6 +174,9 @@ export class Workflow {
       return { ok: false, failure: WorkflowRefusal.Off };
 
     if (start.chained && start.chainRunning) return { ok: true, value: null };
+
+    // An instance's own lifecycle never starts its workflow again, or it would start forever.
+    if (start.lifecycleOf === this.#id) return { ok: true, value: null };
 
     const id = start.instanceId ?? randomUUID();
     const instance = WorkflowInstance.start(id, this.#id, {

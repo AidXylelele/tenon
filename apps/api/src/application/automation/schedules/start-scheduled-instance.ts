@@ -61,6 +61,7 @@ export class StartScheduledInstance {
       trigger: TriggerKind.Schedule,
       chained: command.chained,
       chainRunning,
+      lifecycleOf: null,
       now,
     });
 

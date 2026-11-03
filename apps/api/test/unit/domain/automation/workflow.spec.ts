@@ -346,6 +346,7 @@ describe('Workflow on and off', () => {
       trigger: TriggerKind.Schedule,
       chained: false,
       chainRunning: false,
+      lifecycleOf: null,
       now,
     });
 
@@ -364,6 +365,7 @@ describe('Workflow on and off', () => {
       trigger: TriggerKind.Event,
       chained: false,
       chainRunning: false,
+      lifecycleOf: null,
       now,
     });
 
@@ -383,6 +385,7 @@ describe('Workflow on and off', () => {
       trigger: TriggerKind.Schedule,
       chained: false,
       chainRunning: false,
+      lifecycleOf: null,
       now: later,
     });
 
@@ -401,6 +404,7 @@ describe('Workflow on and off', () => {
       trigger: TriggerKind.Schedule,
       chained: true,
       chainRunning: true,
+      lifecycleOf: null,
       now,
     });
 
@@ -416,5 +420,35 @@ describe('Workflow on and off', () => {
 
     expect(off).toBeNull();
     expect(workflow.scheduledVersionId).toBe(version.id);
+  });
+
+  it('a_lifecycle_event_of_its_own_instances_starts_nothing', () => {
+    const workflow = Workflow.register(name);
+    const version = published(workflow);
+    workflow.turnOn();
+
+    const own = workflow.startScheduledInstance({
+      instanceId: null,
+      version,
+      input: [],
+      trigger: TriggerKind.Event,
+      chained: false,
+      chainRunning: false,
+      lifecycleOf: workflow.id,
+      now,
+    });
+    const other = workflow.startScheduledInstance({
+      instanceId: null,
+      version,
+      input: [],
+      trigger: TriggerKind.Event,
+      chained: false,
+      chainRunning: false,
+      lifecycleOf: 'another-workflow',
+      now,
+    });
+
+    expect(own).toEqual({ ok: true, value: null });
+    expect(other.ok && other.value?.trigger).toBe(TriggerKind.Event);
   });
 });

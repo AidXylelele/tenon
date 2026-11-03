@@ -215,4 +215,27 @@ describe('starting workflows on a schedule and on events (US4)', () => {
     expect(response.status).toBe(422);
     expect(response.body.errors[0].pointer).toBe('/schedule/cron');
   });
+
+  it('a_workflow_on_its_own_lifecycle_type_is_started_by_others_never_by_itself', async () => {
+    const on = {
+      one: { with: { type: 'io.serverlessworkflow.workflow.completed.v1' } },
+    };
+    await publish(t, editor, aScheduledDocument({ on }));
+    await turn('on');
+    await publish(t, editor, aDocument({ name: 'other' }));
+
+    await request(t.server)
+      .post('/api/v1/workflows/sales/other/instances')
+      .set(editor)
+      .send({ input: {} })
+      .expect(201);
+    for (let round = 0; round < 3; round += 1) {
+      await drain(t);
+      await relay(t);
+    }
+    const triggers = (await instances()).map((row) => row.trigger);
+
+    // The other's completion starts one; that one's own completion starts none.
+    expect(triggers.sort()).toEqual(['event', 'manual']);
+  });
 });

@@ -79,7 +79,8 @@ export type StartRefusal = WorkflowRefusal | InstanceRefusal;
 // An instance the schedule starts: an occurrence names it, so a repeated occurrence is the
 // same instance (null: a new one).
 // `chained`: the occurrence is a link of an `after` chain; `chainRunning`: an instance the
-// schedule started has not ended.
+// schedule started has not ended; `lifecycleOf`: the workflow whose instance a lifecycle event
+// that satisfied `schedule.on` is about, if it was one.
 export interface ScheduledStart {
   readonly instanceId: string | null;
   readonly version: WorkflowVersion;
@@ -87,6 +88,7 @@ export interface ScheduledStart {
   readonly trigger: TriggerKind;
   readonly chained: boolean;
   readonly chainRunning: boolean;
+  readonly lifecycleOf: string | null;
   readonly now: Date;
 }
 

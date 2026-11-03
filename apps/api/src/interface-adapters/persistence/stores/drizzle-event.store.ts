@@ -5,7 +5,7 @@ import {
   TransactionHost,
 } from '@nestjs-cls/transactional';
 import { Outbox } from '@nestjs/outbox';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { EventOrigin } from '../../../application/automation/events/enums.js';
 import type {
   AcceptedEvent,
@@ -15,7 +15,10 @@ import type {
 import type { WebhookEvent } from '../../../domain/automation/webhooks/interfaces.js';
 import type { DrizzleTx } from '../interfaces.js';
 import { WebhookEventMapper } from '../mappers/webhook-event.mapper.js';
-import { event as events } from '../schema/index.js';
+import {
+  event as events,
+  workflowInstance as instances,
+} from '../schema/index.js';
 
 // An accepted event is written once per source and id; its dispatch leaves through the outbox
 // in the same transaction, one key for all so that listeners see them in the order accepted.
@@ -74,18 +77,21 @@ export class DrizzleEventStore implements EventStore {
   }
 
   async find(sequence: number): Promise<AcceptedEvent | null> {
+    const lifecycle = eq(events.origin, EventOrigin.Lifecycle);
     const [row] = await this.txHost.tx
-      .select()
+      .select({ event: events, lifecycleOf: instances.workflowId })
       .from(events)
+      .leftJoin(instances, and(lifecycle, eq(instances.id, events.instanceId)))
       .where(eq(events.sequence, sequence));
 
     if (!row) return null;
 
     return {
-      sequence: row.sequence,
-      type: row.type,
-      cloudEvent: row.cloudEvent,
-      acceptedAt: row.acceptedAt,
+      sequence: row.event.sequence,
+      type: row.event.type,
+      cloudEvent: row.event.cloudEvent,
+      acceptedAt: row.event.acceptedAt,
+      lifecycleOf: row.lifecycleOf,
     };
   }
 }

@@ -10,6 +10,8 @@ export interface AcceptedEvent {
   readonly type: string;
   readonly cloudEvent: CloudEvent;
   readonly acceptedAt: Date;
+  // The workflow whose instance a lifecycle event is about; null for any other event.
+  readonly lifecycleOf: string | null;
 }
 
 // The events the platform accepted, each once per source and id; an accepted one is dispatched
