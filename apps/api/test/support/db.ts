@@ -5,7 +5,7 @@ import type { Database } from '../../src/interface-adapters/persistence/interfac
 
 export async function truncateAll(db: Database): Promise<void> {
   await db.execute(
-    sql`truncate table event, listener, task_progress, workflow_instance, workflow_version, workflow, idempotency_key, invitation, email_token, session, account, "user" cascade`,
+    sql`truncate table event, listener, webhook, task_progress, workflow_instance, workflow_version, workflow, idempotency_key, invitation, email_token, session, account, "user" cascade`,
   );
   await db.execute(
     sql`truncate table nest_outbox.messages, nest_outbox.inbox, nest_outbox.dead_letters`,

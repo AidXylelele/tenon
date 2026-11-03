@@ -6,13 +6,15 @@ import {
 } from '@nestjs-cls/transactional';
 import { Outbox } from '@nestjs/outbox';
 import { eq } from 'drizzle-orm';
-import type { EventOrigin } from '../../../application/automation/events/enums.js';
+import { EventOrigin } from '../../../application/automation/events/enums.js';
 import type {
   AcceptedEvent,
   CloudEvent,
   EventStore,
 } from '../../../application/automation/events/ports.js';
+import type { WebhookEvent } from '../../../domain/automation/webhooks/interfaces.js';
 import type { DrizzleTx } from '../interfaces.js';
+import { WebhookEventMapper } from '../mappers/webhook-event.mapper.js';
 import { event as events } from '../schema/index.js';
 
 // An accepted event is written once per source and id; its dispatch leaves through the outbox
@@ -63,6 +65,12 @@ export class DrizzleEventStore implements EventStore {
       },
     ]);
     return sequence;
+  }
+
+  @Transactional(Propagation.Required)
+  acceptWebhookEvent(event: WebhookEvent): Promise<number | null> {
+    const cloudEvent = WebhookEventMapper.toCloudEvent(event);
+    return this.accept(cloudEvent, EventOrigin.Webhook, null);
   }
 
   async find(sequence: number): Promise<AcceptedEvent | null> {

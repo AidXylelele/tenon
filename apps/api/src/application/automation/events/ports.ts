@@ -1,4 +1,5 @@
 import type { JsonObject } from '../../../domain/automation/json.js';
+import type { WebhookEvent } from '../../../domain/automation/webhooks/interfaces.js';
 import type { EventOrigin } from './enums.js';
 
 // A CloudEvent 1.0 in its structured JSON form.
@@ -21,6 +22,8 @@ export abstract class EventStore {
     origin: EventOrigin,
     instanceId: string | null,
   ): Promise<number | null>;
+  // A webhook call's event, once per webhook and id, as `accept` takes a CloudEvent.
+  abstract acceptWebhookEvent(event: WebhookEvent): Promise<number | null>;
   abstract find(sequence: number): Promise<AcceptedEvent | null>;
 }
 

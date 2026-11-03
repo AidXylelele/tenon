@@ -14,6 +14,16 @@ import {
 } from '../../application/automation/events/ports.js';
 import { EventQueries } from '../../application/automation/events/queries.js';
 import { BeginInstance } from '../../application/automation/instances/begin-instance.js';
+import { CreateWebhook } from '../../application/automation/webhooks/create-webhook.js';
+import { DeleteWebhook } from '../../application/automation/webhooks/delete-webhook.js';
+import { WebhookRepository } from '../../application/automation/webhooks/ports.js';
+import { WebhookQueries } from '../../application/automation/webhooks/queries.js';
+import { ReceiveWebhookCall } from '../../application/automation/webhooks/receive-webhook-call.js';
+import { WebhookPolicy } from '../../application/automation/webhooks/webhook.policy.js';
+import { HooksController } from '../../interface-adapters/api/controllers/hooks.controller.js';
+import { WebhooksController } from '../../interface-adapters/api/controllers/webhooks.controller.js';
+import { DrizzleWebhookQueries } from '../../interface-adapters/persistence/queries/drizzle-webhook.queries.js';
+import { DrizzleWebhookRepository } from '../../interface-adapters/persistence/repositories/drizzle-webhook.repository.js';
 import { EventsController } from '../../interface-adapters/api/controllers/events.controller.js';
 import { DrizzleEventQueries } from '../../interface-adapters/persistence/queries/drizzle-event.queries.js';
 import { DrizzleInstanceNames } from '../../interface-adapters/persistence/queries/drizzle-instance-names.query.js';
@@ -75,11 +85,25 @@ import { RuntimeModule } from './runtime.module.js';
 
 @Module({
   imports: [EngineModule, RuntimeModule],
-  controllers: [WorkflowsController, InstancesController, EventsController],
+  controllers: [
+    WorkflowsController,
+    InstancesController,
+    EventsController,
+    WebhooksController,
+    HooksController,
+  ],
   providers: [
     WorkflowPolicy,
     InstancePolicy,
+    WebhookPolicy,
     { provide: Clock, useExisting: EngineClock },
+    CreateWebhook,
+    DeleteWebhook,
+    ReceiveWebhookCall,
+    DrizzleWebhookRepository,
+    { provide: WebhookRepository, useExisting: DrizzleWebhookRepository },
+    DrizzleWebhookQueries,
+    { provide: WebhookQueries, useExisting: DrizzleWebhookQueries },
     RuntimeDefinitionChecker,
     { provide: DefinitionChecker, useExisting: RuntimeDefinitionChecker },
     DrizzleWorkflowRepository,

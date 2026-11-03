@@ -69,6 +69,10 @@ export class ProblemPresenter {
         title: 'The workflow instance does not exist',
       },
     ],
+    [
+      Missing.Webhook,
+      { status: HttpStatus.NOT_FOUND, title: 'The webhook does not exist' },
+    ],
   ]);
 
   static of(failure: AutomationFailure): ProblemException {

@@ -3,4 +3,6 @@ export enum Missing {
   Workflow = 'workflow.not-found',
   Version = 'version.not-found',
   Instance = 'instance.not-found',
+  // A deleted webhook and an unknown URL are the same miss (FR-024).
+  Webhook = 'webhook.not-found',
 }

@@ -22,3 +22,5 @@ export type WorkflowRow = typeof schema.workflow.$inferSelect;
 export type WorkflowVersionRow = typeof schema.workflowVersion.$inferSelect;
 
 export type WorkflowInstanceRow = typeof schema.workflowInstance.$inferSelect;
+
+export type WebhookRow = typeof schema.webhook.$inferSelect;
