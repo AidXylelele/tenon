@@ -9,7 +9,7 @@ import type { LeafKind, LeafResult } from '../../endings.js';
 import type { Evaluator } from '../../evaluator.js';
 import { ErrorKind, TaskFault } from '../../faults.js';
 import type { Scope } from '../../scope.js';
-import type { Authorizations } from './authorizations.js';
+import { Authorizations } from './authorizations.js';
 import { HttpRequests } from './http-requests.js';
 import { HttpResponses } from './http-responses.js';
 import { OpenApiRequests } from './openapi-requests.js';
@@ -93,6 +93,7 @@ export class OpenApiCallKind implements LeafKind {
       redirect,
       scope,
     );
-    return { output, then: null };
+    const sent = Authorizations.sentBy(outcome);
+    return { output, then: null, authorization: sent };
   }
 }

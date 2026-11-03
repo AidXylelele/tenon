@@ -7,6 +7,7 @@ import type { JsonObject, JsonValue } from '../../../domain/automation/json.js';
 import type { CheckProblem } from '../../../interface-adapters/workflows/interfaces.js';
 import { TaskKind } from '../enums.js';
 import { TaskKinds } from '../document/task-kind.js';
+import { UriTemplate } from './uri-template.js';
 
 interface LocatedTaskValue {
   readonly pointer: string;
@@ -41,6 +42,7 @@ export class SchemaCheck {
   constructor() {
     const ajv = new Ajv2020({ strict: false });
     ajvFormats.default(ajv);
+    ajv.addFormat('uri-template', UriTemplate.FORMAT);
     const schema = workflowSchema as JsonObject;
     const id = schema.$id as string;
     ajv.addSchema(schema);

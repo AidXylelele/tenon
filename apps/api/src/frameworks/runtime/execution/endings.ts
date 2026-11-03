@@ -57,9 +57,11 @@ export interface Runner {
   ): Promise<ListEnding>;
 }
 
+// `authorization`: what a call sent (`$authorization` of its `output.as` and `export.as`).
 export interface LeafResult {
   readonly output: JsonValue;
   readonly then: string | null;
+  readonly authorization?: JsonObject | null;
 }
 
 // A task whose whole work is one engine step: its effect is journaled once.

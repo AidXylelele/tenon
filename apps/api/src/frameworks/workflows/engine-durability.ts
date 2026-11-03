@@ -4,6 +4,7 @@ import {
   type WorkflowRetryOptions,
 } from '@nestjs/workflows';
 import type { JsonObject } from '../../domain/automation/json.js';
+import type { EngineTime } from '../../interface-adapters/workflows/runs/interfaces.js';
 import { TaskFault } from '../runtime/execution/faults.js';
 import type {
   Durability,
@@ -33,10 +34,11 @@ export class EngineDurability implements Durability {
     private readonly ctx: WorkflowContext,
     private readonly errors: StepErrors,
     private readonly instanceId: string,
+    private readonly time: EngineTime,
   ) {}
 
-  now(): number {
-    return this.ctx.now();
+  stepTime(): number {
+    return this.time.now();
   }
 
   async step<T>(

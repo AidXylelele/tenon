@@ -82,7 +82,8 @@ export class TryKind implements CompositeKind {
     scope: Scope,
     runner: Runner,
   ): Promise<ListEnding> {
-    const firstAt = scope.run.durability.now();
+    const firstAt = scope.startedAt;
+    const durability = scope.run.durability;
     const attempts: AttemptPolicy = {
       retry: {
         attempts: policy.attempts,
@@ -97,7 +98,7 @@ export class TryKind implements CompositeKind {
           scope,
           this.evaluator,
         );
-        const elapsed = Date.now() - firstAt;
+        const elapsed = durability.stepTime() - firstAt;
         const allowed = caught && policy.allows(attempt, elapsed);
 
         if (!allowed) return false;
@@ -145,7 +146,7 @@ export class TryKind implements CompositeKind {
     runner: Runner,
   ): Promise<ListEnding> {
     const durability = scope.run.durability;
-    const firstAt = durability.now();
+    const firstAt = scope.startedAt;
 
     for (let attempt = 1; ; attempt += 1) {
       const attemptScope =
@@ -154,14 +155,13 @@ export class TryKind implements CompositeKind {
 
       if (ending.kind !== EndingKind.Faulted) return ending;
 
-      const elapsed = durability.now() - firstAt;
       const decision = await Journal.value(attemptScope, 'catch', () =>
         this.#decide(
           clause,
           policy,
           ending.error,
           attempt,
-          elapsed,
+          firstAt,
           input,
           args,
           attemptScope,
@@ -185,13 +185,14 @@ export class TryKind implements CompositeKind {
     }
   }
 
-  // Uncaught, handled without retry, retries spent, or the delay before the next attempt.
+  // Uncaught, handled without retry, retries spent, or the delay before the next attempt; the
+  // time spent counts from the try's start on the engine's clock.
   async #decide(
     clause: CatchClause,
     policy: RetryPolicy | null,
     error: JsonObject,
     attempt: number,
-    elapsed: number,
+    firstAt: number,
     input: JsonValue,
     args: JsonObject,
     scope: Scope,
@@ -208,6 +209,7 @@ export class TryKind implements CompositeKind {
 
     if (policy === null) return Verdict.Handled;
 
+    const elapsed = scope.run.durability.stepTime() - firstAt;
     const allowed =
       policy.allows(attempt, elapsed) &&
       (await clause.retries(policy, error, input, args, scope, this.evaluator));

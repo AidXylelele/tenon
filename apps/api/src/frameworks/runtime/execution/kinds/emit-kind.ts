@@ -52,7 +52,8 @@ export class EmitKind implements LeafKind {
 
     event.specversion = EmitKind.#SPEC_VERSION;
     event.id ??= randomUUID();
-    event.time ??= new Date().toISOString();
+    const now = scope.run.durability.stepTime();
+    event.time ??= new Date(now).toISOString();
     const run = scope.run;
     await run.observer.emitted(run.plan.instanceId, event);
     return { output: event, then: null };

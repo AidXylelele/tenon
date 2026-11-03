@@ -2,8 +2,8 @@ import type {
   JsonObject,
   JsonValue,
 } from '../../../../../domain/automation/json.js';
-import { AuthorizationKind } from '../../../enums.js';
-import type { Authorization } from '../../../interfaces.js';
+import { AuthorizationKind, EndpointOutcomeKind } from '../../../enums.js';
+import type { Authorization, ExchangeOutcome } from '../../../interfaces.js';
 import type { Evaluator } from '../../evaluator.js';
 import type { Scope } from '../../scope.js';
 
@@ -53,6 +53,34 @@ export class Authorizations {
     if (scheme === undefined) return null;
 
     return Authorizations.#clientCredentials(scheme, oauth2 !== undefined);
+  }
+
+  // `$authorization` (DSL 1.0.3, "Authorization Descriptor") as the task's definition reads it:
+  // a header scheme is resolved before the request, a client-credentials token only when sent.
+  static argumentsWith(
+    args: JsonObject,
+    authorization: Authorization | null,
+  ): JsonObject {
+    if (authorization?.kind !== AuthorizationKind.Header) return args;
+
+    const bound: Record<string, JsonValue> = {};
+    Object.assign(bound, args);
+    bound.authorization = {
+      scheme: authorization.scheme,
+      parameter: authorization.parameter,
+    };
+    return bound;
+  }
+
+  // `$authorization` as the call sent it, for its `output.as` and `export.as`.
+  static sentBy(outcome: ExchangeOutcome): JsonObject | null {
+    if (outcome.kind !== EndpointOutcomeKind.Responded) return null;
+
+    const sent = outcome.authorization;
+
+    if (sent === null) return null;
+
+    return { scheme: sent.scheme, parameter: sent.parameter };
   }
 
   #policyOf(declared: JsonValue | undefined, scope: Scope): JsonObject | null {

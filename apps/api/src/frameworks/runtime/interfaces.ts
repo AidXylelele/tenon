@@ -295,7 +295,9 @@ export interface StepOptions {
 // What a durable engine gives the runtime: each effect runs once and its result is journaled;
 // a sleep or a wait parks the run without holding a worker.
 export interface Durability {
-  now(): number;
+  // The engine's clock, unjournaled: only a step's effect reads it, so its result keeps the
+  // time (fork branches run concurrently, and journaled reads must come in a fixed order).
+  stepTime(): number;
   step<T>(
     name: string,
     effect: (attempt: number) => Promise<T>,

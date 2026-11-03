@@ -11,7 +11,8 @@ import { Journal } from '../journal.js';
 import type { Scope } from '../scope.js';
 
 // `wait`: the instance waits, holding no worker (a durable sleep), then goes on with the same
-// data. Past the workflow's deadline the task faults with a timeout instead.
+// data. Past its deadline (its own timeout, an enclosing task's or the workflow's) the task
+// faults with a timeout instead.
 export class WaitKind implements CompositeKind {
   constructor(private readonly evaluator: Evaluator) {}
 
@@ -25,27 +26,28 @@ export class WaitKind implements CompositeKind {
     const wait = (task as Specification.WaitTask).wait ?? 'PT0S';
     const begun = await Journal.value(scope, 'wait', async () => {
       const milliseconds = await this.#millisecondsOf(wait, input, args, scope);
+      const deadline = scope.deadline;
+      const now = run.durability.stepTime();
+      const remaining =
+        deadline === null ? milliseconds : Math.max(deadline - now, 0);
+      const sleep = Math.min(milliseconds, remaining);
+      const overdue = sleep < milliseconds;
       await run.observer.waiting(run.plan.instanceId);
-      return milliseconds;
+      return { sleep, overdue };
     });
 
     if (!begun.ok) return { kind: EndingKind.Faulted, error: begun.error };
 
-    const deadline = run.deadline;
-    const now = run.durability.now();
-    const remaining =
-      deadline === null ? begun.value : Math.max(deadline - now, 0);
-    const sleep = Math.min(begun.value, remaining);
-    await run.durability.sleep(scope.named('sleep'), sleep);
-    const overdue = sleep < begun.value;
+    const planned = begun.value;
+    await run.durability.sleep(scope.named('sleep'), planned.sleep);
     const ended = await Journal.value(scope, 'waited', async () => {
       await run.observer.running(run.plan.instanceId);
 
-      if (overdue)
+      if (planned.overdue)
         throw TaskFault.of(
           ErrorKind.Timeout,
           scope.pointer,
-          'The workflow outlasted its timeout',
+          'The wait outlasted its timeout',
         );
 
       return null;

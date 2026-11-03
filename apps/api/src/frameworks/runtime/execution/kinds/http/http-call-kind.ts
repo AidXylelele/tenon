@@ -7,7 +7,7 @@ import type { EndpointClient } from '../../../interfaces.js';
 import type { LeafKind, LeafResult } from '../../endings.js';
 import type { Evaluator } from '../../evaluator.js';
 import type { Scope } from '../../scope.js';
-import type { Authorizations } from './authorizations.js';
+import { Authorizations } from './authorizations.js';
 import { HttpRequests } from './http-requests.js';
 import { HttpResponses } from './http-responses.js';
 
@@ -38,18 +38,19 @@ export class HttpCallKind implements LeafKind {
       !Array.isArray(endpoint);
     const uri = HttpRequests.textOf(configured ? endpoint.uri : endpoint);
     const declared = configured ? endpoint.authentication : undefined;
+    const authorization = await this.authorizations.of(
+      declared,
+      input,
+      args,
+      scope,
+    );
+    const definitionArgs = Authorizations.argumentsWith(args, authorization);
     const request = await this.#requests.of(
       call.method,
       uri,
       call,
       input,
-      args,
-      scope,
-    );
-    const authorization = await this.authorizations.of(
-      declared,
-      input,
-      args,
+      definitionArgs,
       scope,
     );
     const outcome = await this.endpoints.exchange({
@@ -66,6 +67,7 @@ export class HttpCallKind implements LeafKind {
       redirect,
       scope,
     );
-    return { output, then: null };
+    const sent = Authorizations.sentBy(outcome);
+    return { output, then: null, authorization: sent };
   }
 }

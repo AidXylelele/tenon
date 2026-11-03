@@ -21,6 +21,8 @@ interface Match {
   readonly done: boolean;
   readonly filter: number;
   readonly correlation: JsonObject;
+  // When the event was matched, on the engine's clock: the next wait counts from it.
+  readonly at: number;
 }
 
 // `listen`: the instance waits, holding no worker, for the events its strategy names (`one`,
@@ -44,26 +46,29 @@ export class ListenKind implements CompositeKind {
     const read = listen?.read ?? 'data';
     const key = `${run.plan.instanceId}${scope.stepName}`;
     const types = ListenKind.#typesOf(strategy);
-    await Journal.value(scope, 'listen', async () => {
+    const began = await Journal.value(scope, 'listen', async () => {
       await run.observer.listen(run.plan.instanceId, key, types);
       await run.observer.waiting(run.plan.instanceId);
-      return null;
+      return run.durability.stepTime();
     });
+
+    if (!began.ok) return { kind: EndingKind.Faulted, error: began.error };
 
     const consumed: JsonObject[] = [];
     const matched = new Set<number>();
     let correlation: JsonObject = {};
+    let lastAt = began.value;
 
     for (let received = 1; ; received += 1) {
       const name = scope.named(`event${String(received)}`);
-      const remaining = ListenKind.#remaining(scope);
+      const remaining = ListenKind.#remaining(scope, lastAt);
       const event = await run.durability.waitForEvent(name, key, remaining);
 
       if (event === null) {
         const timedOut = TaskFault.of(
           ErrorKind.Timeout,
           scope.pointer,
-          'The workflow outlasted its timeout',
+          'The listen outlasted its timeout',
         );
         await this.#stop(scope, key);
         return { kind: EndingKind.Faulted, error: timedOut.error };
@@ -82,6 +87,7 @@ export class ListenKind implements CompositeKind {
 
       const match = decided.value as unknown as Match;
       correlation = match.correlation;
+      lastAt = match.at;
 
       if (match.consumed) {
         consumed.push(event);
@@ -115,9 +121,10 @@ export class ListenKind implements CompositeKind {
     );
     const consumed_ =
       filter >= 0 || (strategy.kind === 'any' && strategy.filters.length === 0);
+    const at = scope.run.durability.stepTime();
 
     if (!consumed_)
-      return { consumed: false, done: false, filter, correlation: known };
+      return { consumed: false, done: false, filter, correlation: known, at };
 
     const done = await this.#done(
       strategy,
@@ -127,7 +134,7 @@ export class ListenKind implements CompositeKind {
       event,
       scope,
     );
-    return { consumed: true, done, filter, correlation };
+    return { consumed: true, done, filter, correlation, at };
   }
 
   async #firstMatching(
@@ -207,12 +214,13 @@ export class ListenKind implements CompositeKind {
     return types.length === 0 ? null : types;
   }
 
-  static #remaining(scope: Scope): number | null {
-    const deadline = scope.run.deadline;
+  // The milliseconds left before the task's deadline, counted from the step that read `now`.
+  static #remaining(scope: Scope, now: number): number | null {
+    const deadline = scope.deadline;
 
     if (deadline === null) return null;
 
-    return Math.max(deadline - scope.run.durability.now(), 0);
+    return Math.max(deadline - now, 0);
   }
 
   static #read(consumed: readonly JsonObject[], read: string): JsonValue {

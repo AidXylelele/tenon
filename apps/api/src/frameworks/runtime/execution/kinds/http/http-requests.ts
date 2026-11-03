@@ -9,8 +9,8 @@ import { ErrorKind, TaskFault } from '../../faults.js';
 import type { Scope } from '../../scope.js';
 
 // The request an HTTP call sends: its URI template filled from the input's top-level values
-// (`{petId}`) or its expression evaluated, its query, headers and body with their expressions
-// evaluated. A body that is not text is sent as JSON.
+// (`{petId}`, `{pet.id}` the property named so) or its expression evaluated, its query, headers
+// and body with their expressions evaluated. A body that is not text is sent as JSON.
 export class HttpRequests {
   static readonly #VARIABLE = /\{([^{}]+)\}/g;
   static readonly #CONTENT_TYPE = 'content-type';
@@ -75,7 +75,7 @@ export class HttpRequests {
       ? HttpRequests.textOf(
           await this.evaluator.expression(uri, input, args, scope.pointer),
         )
-      : HttpRequests.expanded(uri, input);
+      : HttpRequests.expanded(uri, input, scope);
 
     if (!URL.canParse(expanded))
       throw TaskFault.of(
@@ -95,7 +95,9 @@ export class HttpRequests {
     return JSON.stringify(body);
   }
 
-  static expanded(template: string, input: JsonValue): string {
+  // "The referenced variable must be of type string, number, boolean, or null" (DSL 1.0.3,
+  // "URI Template"): another is an expression error.
+  static expanded(template: string, input: JsonValue, scope: Scope): string {
     const values =
       typeof input === 'object' && input !== null && !Array.isArray(input)
         ? input
@@ -104,6 +106,15 @@ export class HttpRequests {
       HttpRequests.#VARIABLE,
       (_match, name: string) => {
         const value = values[name];
+        const composite = typeof value === 'object' && value !== null;
+
+        if (composite)
+          throw TaskFault.of(
+            ErrorKind.Expression,
+            scope.pointer,
+            `The URI template variable ${name} is not a string, number, boolean or null`,
+          );
+
         const text = HttpRequests.textOf(value);
         return encodeURIComponent(text);
       },

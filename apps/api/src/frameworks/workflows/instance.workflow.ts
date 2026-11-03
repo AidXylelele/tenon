@@ -6,6 +6,7 @@ import {
 } from '@nestjs/workflows';
 import { RunDirective } from '../../domain/automation/instances/enums.js';
 import { RunOutcomeKind } from '../../interface-adapters/workflows/enums.js';
+import { EngineClock } from '../../interface-adapters/workflows/runs/engine.clock.js';
 import { InstanceRunController } from '../../interface-adapters/workflows/runs/instance-run.controller.js';
 import type { RunOutcome } from '../../interface-adapters/workflows/interfaces.js';
 import { ErrorKind, TaskFault } from '../runtime/execution/faults.js';
@@ -30,11 +31,17 @@ export class InstanceWorkflow implements WorkflowRunner<
     private readonly runtime: Runtime,
     private readonly controller: InstanceRunController,
     private readonly errors: StepErrors,
+    private readonly clock: EngineClock,
   ) {}
 
   async run(ctx: WorkflowContext, input: InstanceRunInput): Promise<void> {
     const id = input.instanceId;
-    const durability = new EngineDurability(ctx, this.errors, id);
+    const durability = new EngineDurability(
+      ctx,
+      this.errors,
+      id,
+      this.clock.source,
+    );
     const once = { timeoutMs: null, retry: null };
     const directive = await durability.step(
       'begin',

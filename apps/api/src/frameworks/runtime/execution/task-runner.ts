@@ -19,8 +19,10 @@ import type { Evaluator } from './evaluator.js';
 import { ErrorKind, RetryableFault, TaskFault } from './faults.js';
 import type { TaskKindRegistry } from './task-kind-registry.js';
 import type { Scope } from './scope.js';
+import { TaskMoment } from './task-moment.js';
 
 // The journaled result of a task's step: what the task produced and what the platform answered.
+// `halted`: no task ran, because the run was stopped or the task's race was decided.
 interface StepResult {
   readonly status: TaskStatus | null;
   readonly input: JsonValue;
@@ -29,9 +31,18 @@ interface StepResult {
   readonly then: string | null;
   readonly context: JsonObject | null;
   readonly directive: RunDirective;
+  readonly halted: boolean;
+}
+
+// A composite's start: also when it started and until when it may run.
+interface Begun extends StepResult {
+  readonly startedAt: number;
+  readonly deadline: number | null;
 }
 
 type Journaled = StepResult & JsonObject;
+
+type JournaledBegun = Begun & JsonObject;
 
 // Runs task lists in the order `then` gives, and each task: a leaf as one engine step (its
 // `if`, input, body, output and export together), a composite between a step that starts it
@@ -39,6 +50,18 @@ type Journaled = StepResult & JsonObject;
 export class TaskRunner implements Runner {
   static readonly #ONCE: StepOptions = { timeoutMs: null, retry: null };
   static readonly #RECHECK_MS = 60_000;
+  static readonly #HALTED: JournaledBegun = {
+    status: null,
+    input: null,
+    output: null,
+    error: null,
+    then: null,
+    context: null,
+    directive: RunDirective.Stop,
+    halted: true,
+    startedAt: 0,
+    deadline: null,
+  };
 
   constructor(
     private readonly kinds: TaskKindRegistry,
@@ -103,10 +126,9 @@ export class TaskRunner implements Runner {
     policy: AttemptPolicy | null,
   ): Promise<TaskEnding> {
     const durability = scope.run.durability;
-    const remaining = this.#remaining(scope);
     const options = { timeoutMs: null, retry: policy?.retry ?? null };
     const effect = (attempt: number) =>
-      this.#leafStep(leaf, item, input, scope, policy, attempt, remaining);
+      this.#leafStep(leaf, item, input, scope, policy, attempt);
 
     try {
       const result = await durability.step(scope.stepName, effect, options);
@@ -139,13 +161,15 @@ export class TaskRunner implements Runner {
     scope: Scope,
     policy: AttemptPolicy | null,
     attempt: number,
-    remaining: number | null,
   ): Promise<Journaled> {
+    if (scope.halted) return TaskRunner.#HALTED;
+
     const task = item.task;
-    await this.#started(item, scope, input);
+    const startedAt = await this.#started(item, scope, input);
+    const started = TaskMoment.started(item, startedAt, input);
 
     try {
-      const args = scope.argumentsFor(item.name, task, input, null);
+      const args = scope.argumentsFor(started);
       const guarded = await this.#passes(task, input, args, scope);
 
       if (!guarded)
@@ -166,23 +190,28 @@ export class TaskRunner implements Runner {
         args,
         scope.pointer,
       );
-      const taskArgs = scope.argumentsFor(item.name, task, taskInput, null);
-      const limit = await this.#timeoutOf(
+      const given = started.given(taskInput);
+      const taskArgs = scope.argumentsFor(given);
+      const limit = await this.#limitOf(
         task,
         taskInput,
         taskArgs,
         scope,
-        remaining,
+        startedAt,
       );
-      const work = leaf.run(task, taskInput, taskArgs, scope);
+      const work = () => leaf.run(task, taskInput, taskArgs, scope);
       const body = await TaskRunner.#within(work, limit, scope);
+      const authorization = body.authorization ?? null;
+      const produced = given.produced(body.output, authorization);
+      const outputArgs = scope.argumentsFor(produced);
       const output = await this.flow.output(
         task.output,
         body.output,
-        taskArgs,
+        outputArgs,
         scope.pointer,
       );
-      const exportArgs = scope.argumentsFor(item.name, task, taskInput, output);
+      const transformed = produced.transformed(output);
+      const exportArgs = scope.argumentsFor(transformed);
       const context = await this.flow.export(
         task.export,
         output,
@@ -235,16 +264,20 @@ export class TaskRunner implements Runner {
       begin,
       TaskRunner.#ONCE,
     );
+    const goesOn = begun.status === null && !begun.halted;
 
-    if (begun.status !== null) return this.#after(begun, scope);
+    if (!goesOn) return this.#after(begun, scope);
 
     const taskInput = begun.input;
-    const args = scope.argumentsFor(item.name, task, taskInput, null);
-    const body = await composite.run(task, taskInput, args, scope, this);
+    const bodyScope = scope.begun(begun.startedAt, begun.deadline);
+    const started = TaskMoment.started(item, begun.startedAt, input);
+    const given = started.given(taskInput);
+    const args = bodyScope.argumentsFor(given);
+    const body = await composite.run(task, taskInput, args, bodyScope, this);
 
     if (body.kind === EndingKind.Stopped) return body;
 
-    const end = () => this.#finish(item, scope, taskInput, body);
+    const end = () => this.#finish(item, bodyScope, given, body);
     const finished = await durability.step(
       scope.named('end'),
       end,
@@ -253,21 +286,25 @@ export class TaskRunner implements Runner {
     return this.#after(finished, scope);
   }
 
-  // A composite's start: its `if` and its input; null as the status means it goes on.
+  // A composite's start: its `if`, its input and its deadline (its own timeout within the
+  // enclosing ones); null as the status means it goes on.
   async #begin(
     item: TaskItem,
     input: JsonValue,
     scope: Scope,
-  ): Promise<Journaled> {
+  ): Promise<JournaledBegun> {
+    if (scope.halted) return TaskRunner.#HALTED;
+
     const task = item.task;
-    await this.#started(item, scope, input);
+    const startedAt = await this.#started(item, scope, input);
+    const started = TaskMoment.started(item, startedAt, input);
 
     try {
-      const args = scope.argumentsFor(item.name, task, input, null);
+      const args = scope.argumentsFor(started);
       const guarded = await this.#passes(task, input, args, scope);
 
-      if (!guarded)
-        return await this.#ended(
+      if (!guarded) {
+        const skipped = await this.#ended(
           item,
           scope,
           input,
@@ -277,6 +314,8 @@ export class TaskRunner implements Runner {
           null,
           null,
         );
+        return TaskRunner.#begun(skipped, startedAt, null);
+      }
 
       const taskInput = await this.flow.input(
         task.input,
@@ -284,6 +323,19 @@ export class TaskRunner implements Runner {
         args,
         scope.pointer,
       );
+      const given = started.given(taskInput);
+      const taskArgs = scope.argumentsFor(given);
+      const limit = await this.#limitOf(
+        task,
+        taskInput,
+        taskArgs,
+        scope,
+        startedAt,
+      );
+
+      if (limit !== null && limit <= 0) throw TaskRunner.#timedOut(scope);
+
+      const deadline = limit === null ? null : startedAt + limit;
       return {
         status: null,
         input: taskInput,
@@ -292,11 +344,14 @@ export class TaskRunner implements Runner {
         then: null,
         context: null,
         directive: RunDirective.Continue,
+        halted: false,
+        startedAt,
+        deadline,
       };
     } catch (error) {
       if (!(error instanceof TaskFault)) throw error;
 
-      return await this.#ended(
+      const faulted = await this.#ended(
         item,
         scope,
         input,
@@ -306,16 +361,37 @@ export class TaskRunner implements Runner {
         null,
         null,
       );
+      return TaskRunner.#begun(faulted, startedAt, null);
     }
+  }
+
+  static #begun(
+    result: Journaled,
+    startedAt: number,
+    deadline: number | null,
+  ): JournaledBegun {
+    return {
+      status: result.status,
+      input: result.input,
+      output: result.output,
+      error: result.error,
+      then: result.then,
+      context: result.context,
+      directive: result.directive,
+      halted: result.halted,
+      startedAt,
+      deadline,
+    };
   }
 
   async #finish(
     item: TaskItem,
     scope: Scope,
-    taskInput: JsonValue,
+    given: TaskMoment,
     body: Exclude<ListEnding, { kind: EndingKind.Stopped }>,
   ): Promise<Journaled> {
     const task = item.task;
+    const taskInput = given.input;
 
     if (body.kind === EndingKind.Faulted)
       return this.#ended(
@@ -330,14 +406,16 @@ export class TaskRunner implements Runner {
       );
 
     try {
-      const args = scope.argumentsFor(item.name, task, taskInput, null);
+      const produced = given.produced(body.output, null);
+      const args = scope.argumentsFor(produced);
       const output = await this.flow.output(
         task.output,
         body.output,
         args,
         scope.pointer,
       );
-      const exportArgs = scope.argumentsFor(item.name, task, taskInput, output);
+      const transformed = produced.transformed(output);
+      const exportArgs = scope.argumentsFor(transformed);
       const context = await this.flow.export(
         task.export,
         output,
@@ -384,13 +462,15 @@ export class TaskRunner implements Runner {
     return this.evaluator.condition(condition, input, args, scope.pointer);
   }
 
+  // The task's start, at the engine's time, which it returns.
   async #started(
     item: TaskItem,
     scope: Scope,
     input: JsonValue,
-  ): Promise<void> {
+  ): Promise<number> {
     const run = scope.run;
-    const at = new Date().toISOString();
+    const startedAt = run.durability.stepTime();
+    const at = new Date(startedAt).toISOString();
     await run.observer.taskStarted(run.plan.instanceId, {
       execution: scope.stepName,
       reference: scope.pointer.toString(),
@@ -398,6 +478,7 @@ export class TaskRunner implements Runner {
       input,
       at,
     });
+    return startedAt;
   }
 
   async #ended(
@@ -411,7 +492,8 @@ export class TaskRunner implements Runner {
     context: JsonObject | null,
   ): Promise<Journaled> {
     const run = scope.run;
-    const at = new Date().toISOString();
+    const endedAt = run.durability.stepTime();
+    const at = new Date(endedAt).toISOString();
     const directive = await run.observer.taskEnded(run.plan.instanceId, {
       execution: scope.stepName,
       reference: scope.pointer.toString(),
@@ -421,16 +503,24 @@ export class TaskRunner implements Runner {
       error,
       at,
     });
-    return { status, input, output, error, then, context, directive };
+
+    // Stopped: the other branches of a fork must not start a task meanwhile.
+    if (directive === RunDirective.Stop) run.stop();
+
+    const halted = false;
+    return { status, input, output, error, then, context, directive, halted };
   }
 
   // A step's result, applied where the run replays: its export replaces the context, and the
   // platform's answer stops the run or holds it until a resume.
   async #after(result: StepResult, scope: Scope): Promise<TaskEnding> {
-    if (result.context !== null) scope.run.context = result.context;
+    if (result.context !== null) scope.replaceContext(result.context);
 
-    if (result.directive === RunDirective.Stop)
+    if (result.directive === RunDirective.Stop) {
+      if (!result.halted) scope.run.stop();
+
       return { kind: EndingKind.Stopped };
+    }
 
     if (result.directive === RunDirective.Suspend) {
       const held = await TaskRunner.#held(scope);
@@ -468,28 +558,25 @@ export class TaskRunner implements Runner {
 
       if (directive === RunDirective.Continue) return true;
 
-      if (directive === RunDirective.Stop) return false;
+      if (directive === RunDirective.Stop) {
+        run.stop();
+        return false;
+      }
     }
   }
 
-  // The milliseconds left before the workflow's deadline, read where the run replays.
-  #remaining(scope: Scope): number | null {
-    const deadline = scope.run.deadline;
-
-    if (deadline === null) return null;
-
-    const now = scope.run.durability.now();
-    return Math.max(deadline - now, 0);
-  }
-
-  async #timeoutOf(
+  // The milliseconds a task started `now` may run: its own timeout within the deadline the
+  // enclosing timeouts set; null: no limit.
+  async #limitOf(
     task: Specification.Task,
     input: JsonValue,
     args: JsonObject,
     scope: Scope,
-    remaining: number | null,
+    now: number,
   ): Promise<number | null> {
-    const own = await this.#ownTimeout(task, input, args, scope);
+    const own = await this.timeoutOf(task.timeout, input, args, scope);
+    const deadline = scope.deadline;
+    const remaining = deadline === null ? null : deadline - now;
 
     if (own === null) return remaining;
 
@@ -498,14 +585,14 @@ export class TaskRunner implements Runner {
     return Math.min(own, remaining);
   }
 
-  async #ownTimeout(
-    task: Specification.Task,
+  // The milliseconds a timeout allows (DSL 1.0.3, "Timeout"), inline or declared by name in
+  // `use.timeouts`; one written as an expression is evaluated now. Null: no timeout.
+  async timeoutOf(
+    declared: Specification.Task['timeout'],
     input: JsonValue,
     args: JsonObject,
     scope: Scope,
   ): Promise<number | null> {
-    const declared = task.timeout;
-
     if (declared === undefined) return null;
 
     const timeouts = (scope.run.workflow.use?.timeouts ??
@@ -538,32 +625,38 @@ export class TaskRunner implements Runner {
     return Durations.millisecondsOf(evaluated as Specification.Duration);
   }
 
-  // The task's work, faulted with a timeout error when it outlasts its limit (FR-014).
+  // The task's work, faulted with a timeout error when it outlasts its limit (FR-014); a task
+  // with no time left does not begin its work.
   static async #within<T>(
-    work: Promise<T>,
+    work: () => Promise<T>,
     limit: number | null,
     scope: Scope,
   ): Promise<T> {
-    if (limit === null) return work;
+    if (limit === null) return work();
+
+    if (limit <= 0) throw TaskRunner.#timedOut(scope);
 
     let timer: NodeJS.Timeout | undefined;
     const expired = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
-        reject(
-          TaskFault.of(
-            ErrorKind.Timeout,
-            scope.pointer,
-            'The task outlasted its timeout',
-          ),
-        );
+        reject(TaskRunner.#timedOut(scope));
       }, limit);
     });
 
     try {
-      return await Promise.race([work, expired]);
+      const working = work();
+      return await Promise.race([working, expired]);
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  static #timedOut(scope: Scope): TaskFault {
+    return TaskFault.of(
+      ErrorKind.Timeout,
+      scope.pointer,
+      'The task outlasted its timeout',
+    );
   }
 
   static #itemAt(list: Specification.TaskList, index: number): TaskItem {
