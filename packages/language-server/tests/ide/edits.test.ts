@@ -1932,3 +1932,63 @@ test.each<readonly [StepVariant, string]>([
   const names = workflow.steps.steps.map((step) => step.name);
   expect(names).toEqual([name]);
 });
+
+const retriedGuard = `${inlineHeader}do:
+  - guard:
+      try:
+        - fetch:
+            set:
+              a: 1
+      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+`;
+
+function catchStepOf(index: number): EditAction {
+  return {
+    kind: "insertStep",
+    list: "/do/guard/catch/do",
+    index,
+    step: "wait",
+    name: null,
+  };
+}
+
+test.each([
+  [
+    "a catch with a retry keeps its retry and gains the steps that run once the retries are spent",
+    retriedGuard,
+    `${retriedGuard}        do:\n          - wait:\n              wait: PT30M\n`,
+  ],
+  [
+    "a catch with no retry gains its first step",
+    retriedGuard.replace(
+      "      catch:\n        retry:\n          delay:\n            seconds: 2\n          backoff:\n            exponential: {}\n          limit:\n            attempt:\n              count: 3\n",
+      "      catch: {}\n",
+    ),
+    `${inlineHeader}do:\n  - guard:\n      try:\n        - fetch:\n            set:\n              a: 1\n      catch:\n        do:\n          - wait:\n              wait: PT30M\n`,
+  ],
+])("%s", (_, text, expected) => {
+  const action = catchStepOf(0);
+
+  const outcome = outcomeOf(text, action);
+
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a catch's first step goes nowhere but the first place", () => {
+  const action = catchStepOf(1);
+
+  const editing = check(retriedGuard, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "The list has no place 1.",
+  });
+});

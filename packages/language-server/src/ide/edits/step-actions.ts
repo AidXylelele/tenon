@@ -1,5 +1,5 @@
 import { renameAt } from "../names/index.js";
-import { parentPointerOf, valueAt } from "../pointers/index.js";
+import { childPointerOf, parentPointerOf, valueAt } from "../pointers/index.js";
 import {
   listEndOf,
   listWithId,
@@ -21,6 +21,7 @@ import type {
   MoveStep,
   RemoveStep,
   RenameStep,
+  SetField,
   WrittenItem,
   WrittenStep,
 } from "./interfaces.js";
@@ -33,8 +34,11 @@ import {
   removalOf,
   withoutItem,
 } from "./collection-text.js";
+import { fieldSettingOf } from "./field-actions.js";
 import { idChangesOf, placedStepOf } from "./ids.js";
 import { copyNameOf, newNameOf } from "./step-names.js";
+
+const catchListId = "/catch/do";
 
 export function stepInsertionOf(
   editable: Editable,
@@ -43,7 +47,7 @@ export function stepInsertionOf(
   const list = listWithId(editable.tree, action.list);
 
   if (list === null) {
-    return { kind: "refused", reason: unknownListOf(action.list) };
+    return catchStepInsertionOf(editable, action);
   }
 
   const collection = listTextOf(editable, list);
@@ -72,6 +76,56 @@ export function stepInsertionOf(
   const forms = newItemFormsOf(item);
   const insertion = insertionOf(collection, action.index, forms);
   return { kind: "edited", changes: [insertion], ids: [] };
+}
+
+function catchStepInsertionOf(editable: Editable, action: InsertStep): Editing {
+  const list = unwrittenCatchListOf(editable.tree, action.list);
+
+  if (list === null) {
+    return { kind: "refused", reason: unknownListOf(action.list) };
+  }
+
+  if (action.index !== 0) {
+    return { kind: "refused", reason: outsideOf(action.index) };
+  }
+
+  const kind = kindOf(action.step);
+  const name = action.name ?? newNameOf(list, kind);
+  const conflict = nameConflictOf(list, name, null);
+
+  if (conflict !== null) {
+    return { kind: "refused", reason: conflict };
+  }
+
+  const otherwise = listEndOf(editable.tree, list);
+  const content = startingContentOf(action.step, otherwise);
+  const items = [{ [name]: content }];
+  const setting: SetField = {
+    kind: "setField",
+    pointer: list.pointer,
+    value: items,
+  };
+  return fieldSettingOf(editable, setting);
+}
+
+function unwrittenCatchListOf(tree: StepTree, id: string): StepNodeList | null {
+  const isCatchList = id.endsWith(catchListId);
+
+  if (!isCatchList) {
+    return null;
+  }
+
+  const tryId = id.slice(0, -catchListId.length);
+  const step = stepWithId(tree, tryId);
+  const task = step?.task;
+
+  if (step === null || task?.kind !== "try" || task.catch.do !== null) {
+    return null;
+  }
+
+  const caught = childPointerOf(step.pointer, "catch");
+  const pointer = childPointerOf(caught, "do");
+  return { id, pointer, part: "catch", role: "sequence", steps: [] };
 }
 
 export function stepMoveOf(editable: Editable, action: MoveStep): Editing {
