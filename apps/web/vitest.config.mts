@@ -37,6 +37,7 @@ const operationFloors = readdirSync(operations, { withFileTypes: true })
 const libFloors: [string, Floor][] = [
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
+  ["src/libs/language-client/**", LIB_FLOOR],
   ["src/libs/ui/components/**", LIB_FLOOR],
   ["src/libs/ui/components/dialog.tsx", LIB_FLOOR],
   ["src/libs/ui/components/dropdown-menu.tsx", LIB_FLOOR],
