@@ -31,6 +31,10 @@ import {
 } from "./outbound.js";
 
 const TOKEN = "token-1";
+const DATED = new Map([
+  ["/ancient", "1999-01-01"],
+  ["/older", "2025-03-26"],
+]);
 const DIGEST_REALM = "mcp@example.org";
 const DIGEST_NONCE = "dcd98b7102dd2f0e8b11d0f600bfb0c093";
 const REFUSED_ADDRESS =
@@ -105,20 +109,16 @@ describe("a call the MCP client performs for a run", () => {
       return;
     }
 
-    if (path === "/ancient") {
-      const initialize = JSON.parse(await bodyOf(request)) as { id?: number };
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          id: initialize.id,
-          result: {
-            protocolVersion: "1999-01-01",
-            capabilities: {},
-            serverInfo: { name: "ancient", version: "0.0.1" },
-          },
-        }),
-      );
+    if (path === "/elsewhere") {
+      const target = `http://localhost:${String(port)}/mcp`;
+      response.writeHead(307, { location: target }).end();
+      return;
+    }
+
+    const dated = DATED.get(path);
+
+    if (dated !== undefined) {
+      await initializeAt(request, response, dated);
       return;
     }
 
@@ -218,6 +218,11 @@ describe("a call the MCP client performs for a run", () => {
     mcp.registerTool("flood", { description: "Answers 2 MiB" }, () => ({
       content: [{ type: "text", text: "x".repeat(2 * 1024 * 1024) }],
     }));
+    mcp.registerTool(
+      "wait",
+      { description: "Never answers" },
+      () => new Promise<never>(() => undefined),
+    );
     mcp.registerPrompt(
       "greet",
       { description: "Greets a person", argsSchema: { name: z.string() } },
@@ -280,6 +285,7 @@ describe("a call the MCP client performs for a run", () => {
           tools: [
             { name: "add", description: "Adds two numbers" },
             { name: "flood", description: "Answers 2 MiB" },
+            { name: "wait", description: "Never answers" },
           ],
         },
       });
@@ -424,6 +430,50 @@ describe("a call the MCP client performs for a run", () => {
       expect(received.at(-1)).toBe("DELETE /mcp");
       expect(sessions.size).toBe(0);
     });
+
+    it("the_session_is_closed_after_a_method_that_expires", async () => {
+      const request = mcpOf("tools/call", { name: "wait", arguments: {} });
+
+      const outcome = await client.call(request, contextOf({}, 300));
+
+      expect(outcome).toEqual({ kind: "expired" });
+      expect(received).toContain("DELETE /mcp");
+      expect(sessions.size).toBe(0);
+    });
+
+    it("session_headers_the_workflow_lists_are_not_sent", async () => {
+      const plain = mcpOf("tools/list");
+      const request: HttpMcpRequest = {
+        ...plain,
+        transport: {
+          ...plain.transport,
+          headers: {
+            "Mcp-Session-Id": "forged",
+            "MCP-Protocol-Version": "1999-01-01",
+          },
+        },
+      };
+
+      const outcome = await client.call(request, contextOf());
+
+      expect(outcome).toMatchObject({ kind: "answered" });
+      expect(initialized[0]?.headers["mcp-session-id"]).toBeUndefined();
+      expect(initialized[0]?.headers["mcp-protocol-version"]).toBeUndefined();
+    });
+
+    it("a_server_older_than_the_version_the_workflow_requires_is_misconfigured", async () => {
+      const outcome = await client.call(
+        mcpOf("tools/list", null, "/older"),
+        contextOf(),
+      );
+
+      expect(outcome).toEqual({
+        kind: "misconfigured",
+        detail:
+          "The MCP server speaks a version of the protocol older than 2025-06-18",
+      });
+      expect(received).toEqual(["POST /older", "POST /older"]);
+    });
   });
 
   describe("authentication", () => {
@@ -510,7 +560,9 @@ describe("a call the MCP client performs for a run", () => {
 
       expect(outcome).toMatchObject({
         kind: "answered",
-        result: { tools: [{ name: "add" }, { name: "flood" }] },
+        result: {
+          tools: [{ name: "add" }, { name: "flood" }, { name: "wait" }],
+        },
       });
     });
 
@@ -593,9 +645,19 @@ describe("a call the MCP client performs for a run", () => {
       });
     });
 
-    it("a_redirect_is_rejected_and_not_followed", async () => {
+    it("a_redirect_within_the_origin_is_followed", async () => {
       const outcome = await client.call(
         mcpOf("tools/list", null, "/redirect"),
+        contextOf(),
+      );
+
+      expect(outcome).toMatchObject({ kind: "answered" });
+      expect(received.slice(0, 2)).toEqual(["POST /redirect", "POST /mcp"]);
+    });
+
+    it("a_redirect_to_another_origin_is_rejected_and_not_followed", async () => {
+      const outcome = await client.call(
+        mcpOf("tools/list", null, "/elsewhere"),
         contextOf(),
       );
 
@@ -604,7 +666,7 @@ describe("a call the MCP client performs for a run", () => {
         statusCode: 307,
         detail: "The MCP server answered with status 307",
       });
-      expect(received).toEqual(["POST /redirect"]);
+      expect(received).toEqual(["POST /elsewhere"]);
     });
 
     it("a_server_answering_a_protocol_version_the_host_does_not_speak_is_unreachable", async () => {
@@ -742,6 +804,26 @@ function digestAccepted(request: IncomingMessage): boolean {
     uri === request.url &&
     parameters.get("username") === "ada" &&
     parameters.get("response") === expected
+  );
+}
+
+async function initializeAt(
+  request: IncomingMessage,
+  response: ServerResponse,
+  protocolVersion: string,
+): Promise<void> {
+  const message = JSON.parse(await bodyOf(request)) as { id?: number };
+  response.writeHead(200, { "content-type": "application/json" });
+  response.end(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      id: message.id,
+      result: {
+        protocolVersion,
+        capabilities: {},
+        serverInfo: { name: "dated", version: "0.0.1" },
+      },
+    }),
   );
 }
 

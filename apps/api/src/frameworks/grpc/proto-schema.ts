@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-import { makeClientConstructor } from "@grpc/grpc-js";
 import { fromJSON } from "@grpc/proto-loader";
 import { Injectable } from "@nestjs/common";
 import type { GrpcRequest, JsonObject, JsonValue } from "interpreter";
@@ -21,7 +19,8 @@ export class ProtoSchema {
     if (parsed.kind === "misconfigured") return parsed;
 
     const serviceName = request.service.name;
-    const definition = fromJSON(parsed.root.toJSON(), {
+    const json = parsed.root.toJSON();
+    const definition = fromJSON(json, {
       keepCase: true,
       longs: String,
       enums: String,
@@ -50,14 +49,7 @@ export class ProtoSchema {
 
     try {
       const argument = this.#argumentOf(parsed.root, request);
-      return {
-        kind: "call",
-        digest: createHash("sha256").update(text).digest("hex"),
-        service: makeClientConstructor(service, serviceName),
-        method: request.method,
-        streamed: method.responseStream,
-        argument,
-      };
+      return { kind: "call", method, argument };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       return this.#misconfigured(

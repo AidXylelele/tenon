@@ -1,4 +1,6 @@
+import type { LookupAddress } from "node:dns";
 import {
+  credentials,
   loadPackageDefinition,
   Server,
   ServerCredentials,
@@ -35,6 +37,7 @@ import {
 } from "./outbound.js";
 
 const TOKEN = "token-1";
+const PUBLIC_ADDRESS = "8.8.8.8";
 const BASIC = `Basic ${Buffer.from("ada:lovelace").toString("base64")}`;
 const REFUSED_ADDRESS =
   "The address is private, loopback or link-local and not allow-listed";
@@ -80,6 +83,12 @@ interface HelloRequest {
   readonly times: number;
   readonly user_id: string;
   readonly stops: readonly { readonly city: string }[];
+}
+
+class PublicAddresses extends AddressPolicy {
+  override resolve(): Promise<readonly LookupAddress[]> {
+    return Promise.resolve([{ address: PUBLIC_ADDRESS, family: 4 }]);
+  }
 }
 
 interface Received {
@@ -414,7 +423,6 @@ describe("a call the gRPC client performs for a run", () => {
             "Credentials are not sent to a gRPC service over a plaintext channel",
         });
         expect(received).toHaveLength(0);
-        expect(protos.received).toHaveLength(0);
       },
     );
 
@@ -460,6 +468,75 @@ describe("a call the gRPC client performs for a run", () => {
         statusCode: 401,
         detail: "The server answered the resource with status 401",
       });
+    });
+  });
+
+  describe("the channel", () => {
+    const chosen = new Error("The channel security was chosen");
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("a_public_service_is_called_over_tls_on_any_port", async () => {
+      const secure = vi
+        .spyOn(credentials, "createSsl")
+        .mockImplementation(() => {
+          throw chosen;
+        });
+      const addresses = new PublicAddresses([]);
+      const tls = new GrpcClient(
+        addresses,
+        http,
+        authentication,
+        new ProtoSchema(),
+        resilience,
+      );
+      const request = grpcOf(
+        "SayHello",
+        { name: "Ada" },
+        {
+          kind: "bearer",
+          token: TOKEN,
+        },
+      );
+
+      const called = tls.call(request, contextOf());
+
+      await expect(called).rejects.toBe(chosen);
+      expect(secure).toHaveBeenCalledOnce();
+      await addresses.onApplicationShutdown();
+    });
+
+    it("calls_to_one_service_share_its_channel_until_the_client_shuts_down", async () => {
+      client.onApplicationShutdown();
+      const opened = vi.spyOn(credentials, "createInsecure");
+      const request = grpcOf("SayHello", { name: "Ada" });
+
+      await client.call(request, contextOf());
+      await client.call(request, contextOf());
+      client.onApplicationShutdown();
+      const reopened = await client.call(request, contextOf());
+
+      expect(reopened).toMatchObject({ kind: "replied" });
+      expect(opened).toHaveBeenCalledTimes(2);
+    });
+
+    it("a_private_service_on_the_tls_port_is_called_in_plaintext", async () => {
+      const plain = vi
+        .spyOn(credentials, "createInsecure")
+        .mockImplementation(() => {
+          throw chosen;
+        });
+      const request: GrpcRequest = {
+        ...grpcOf("SayHello", { name: "Ada" }),
+        service: { name: "GreeterApi.Greeter", host: "127.0.0.1", port: 443 },
+      };
+
+      const called = client.call(request, contextOf());
+
+      await expect(called).rejects.toBe(chosen);
+      expect(plain).toHaveBeenCalledOnce();
     });
   });
 

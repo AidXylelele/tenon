@@ -12,16 +12,15 @@ import type {
   HttpRequest,
   JsonObject,
   JsonValue,
+  RespondedHttpOutcome,
   RpcOutcome,
 } from "interpreter";
 import { HttpClient } from "../http-client/http.client.js";
 import type { CallContext } from "../interpreter/interfaces.js";
 import { AgentCard } from "./agent-card.js";
 import { AGENT_CARD } from "./agent-card.schema.js";
-import type { Agent, Responded } from "./interfaces.js";
+import type { Agent } from "./interfaces.js";
 import { JSON_RPC_RESPONSE } from "./json-rpc.schema.js";
-
-const UNFIT = "The agent answered other than JSON-RPC";
 
 @Injectable()
 export class A2aClient {
@@ -40,7 +39,8 @@ export class A2aClient {
     if (agent.kind !== "agent") return agent;
 
     const streamed = this.#streams(request);
-    const rpc = this.#rpcOf(request, agent.endpoint, context.idempotencyKey);
+    const key = context.idempotencyKey;
+    const rpc = this.#rpcOf(request, agent.endpoint, streamed, key);
 
     try {
       return await this.policy.execute(
@@ -59,17 +59,17 @@ export class A2aClient {
     if (agent.kind === "server")
       return { kind: "agent", endpoint: agent.endpoint };
 
-    const card = await this.http.text(agent.card, context);
+    const fetched = await this.http.text(agent.card, context);
 
-    if (card.kind !== "text") return card;
+    if (fetched.kind !== "text") return fetched;
 
-    const parsed = this.#cardOf(card.text);
+    const card = this.#cardOf(fetched.text);
 
-    if (parsed === null)
+    if (card === null)
       return { kind: "misconfigured", detail: "The agent card cannot be read" };
 
     const endpoint = agent.card.endpoint;
-    return parsed.jsonRpcEndpoint(endpoint.authentication, endpoint.uri);
+    return card.jsonRpcEndpoint(endpoint.authentication, endpoint.uri);
   }
 
   async #answered(
@@ -88,17 +88,17 @@ export class A2aClient {
   #rpcOf(
     request: A2aRequest,
     endpoint: Endpoint,
+    streamed: boolean,
     idempotencyKey: string,
   ): HttpRequest {
-    const accept = this.#streams(request)
-      ? "text/event-stream"
-      : "application/json";
+    const accept = streamed ? "text/event-stream" : "application/json";
+    const body = this.#envelopeOf(request, idempotencyKey);
     return {
       kind: "http",
       method: "POST",
       endpoint,
       headers: { accept },
-      body: this.#envelopeOf(request, idempotencyKey),
+      body,
       output: "content",
       revealAuthorization: false,
     };
@@ -113,17 +113,17 @@ export class A2aClient {
     return { jsonrpc: "2.0", id, method, params };
   }
 
-  #outcomeOf(response: Responded, streamed: boolean): RpcOutcome {
+  #outcomeOf(response: RespondedHttpOutcome, streamed: boolean): RpcOutcome {
     const status = response.statusCode;
     const content = response.content;
     const ok = status >= 200 && status < 300;
+    const events = streamed && ok && typeof content === "string";
 
-    if (streamed && ok && typeof content === "string")
-      return this.#eventsOf(content);
+    if (events) return this.#eventsOf(content);
 
     const answer = this.#answerOf(content);
 
-    if (answer.kind === "unreachable" && !ok)
+    if (!ok && answer.kind === "unreachable")
       return {
         kind: "rejected",
         statusCode: status,
@@ -137,15 +137,11 @@ export class A2aClient {
   }
 
   #eventsOf(text: string): RpcOutcome {
-    const data: string[] = [];
-    const parser = createParser({
-      onEvent: (event) => {
-        data.push(event.data);
-      },
+    const data = this.#eventDataOf(text);
+    const answers = data.map((item) => {
+      const envelope = this.#parsedOf(item);
+      return this.#answerOf(envelope);
     });
-    parser.feed(text);
-    parser.reset({ consume: true });
-    const answers = data.map((item) => this.#answerOf(this.#parsedOf(item)));
     const failed = answers.find((answer) => answer.kind !== "answered");
 
     if (failed !== undefined) return failed;
@@ -156,10 +152,26 @@ export class A2aClient {
     return { kind: "answered", result: results };
   }
 
+  #eventDataOf(text: string): readonly string[] {
+    const data: string[] = [];
+    const parser = createParser({
+      onEvent: (event) => {
+        data.push(event.data);
+      },
+    });
+    parser.feed(text);
+    parser.reset({ consume: true });
+    return data;
+  }
+
   #answerOf(envelope: JsonValue): RpcOutcome {
     const parsed = JSON_RPC_RESPONSE.safeParse(envelope);
 
-    if (!parsed.success) return { kind: "unreachable", detail: UNFIT };
+    if (!parsed.success)
+      return {
+        kind: "unreachable",
+        detail: "The agent answered other than JSON-RPC",
+      };
 
     const answer = parsed.data;
 
@@ -172,8 +184,12 @@ export class A2aClient {
   }
 
   #cardOf(text: string): AgentCard | null {
-    const parsed = AGENT_CARD.safeParse(this.#parsedOf(text));
-    return parsed.success ? new AgentCard(parsed.data) : null;
+    const document = this.#parsedOf(text);
+    const parsed = AGENT_CARD.safeParse(document);
+
+    if (!parsed.success) return null;
+
+    return new AgentCard(parsed.data);
   }
 
   #parsedOf(text: string): JsonValue {
