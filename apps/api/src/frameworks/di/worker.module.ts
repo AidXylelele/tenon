@@ -20,9 +20,11 @@ import { AutomationBackgroundModule } from "./automation-background.module.js";
 import { CoreModule } from "./core.module.js";
 import { IdentityBackgroundModule } from "./identity-background.module.js";
 import { workflowRetry } from "./resilience.presets.js";
+import { TelemetryModule } from "./telemetry.module.js";
 
 @Module({
   imports: [
+    TelemetryModule,
     CoreModule,
     WorkflowsModule.forRootAsync({
       imports: [CoreModule],

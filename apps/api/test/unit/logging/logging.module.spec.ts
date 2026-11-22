@@ -1,3 +1,5 @@
+import { IncomingMessage, ServerResponse } from "node:http";
+import { Socket } from "node:net";
 import { ConfigModule } from "@nestjs/config";
 import { Test } from "@nestjs/testing";
 import { DrizzleQueryError } from "drizzle-orm/errors";
@@ -28,6 +30,27 @@ describe("LoggingModule", () => {
     return lines.join("");
   };
 
+  const loggedExchange = (url: string): Record<string, unknown> => {
+    const lines: string[] = [];
+    const { logger } = pinoHttp(options, {
+      write: (line: string) => {
+        lines.push(line);
+      },
+    });
+    const request = new IncomingMessage(new Socket());
+    request.method = "POST";
+    request.url = url;
+    request.headers = {
+      cookie: "sid=session-secret",
+      authorization: "Bearer api-secret",
+    };
+    const response = new ServerResponse(request);
+    response.writeHead(202, { "set-cookie": "sid=session-secret" });
+    logger.info({ req: request, res: response }, "request completed");
+    const [line] = lines;
+    return JSON.parse(line ?? "{}") as Record<string, unknown>;
+  };
+
   it("a_failed_query_is_logged_with_its_statement_and_cause_but_without_the_values_it_carried", () => {
     const record = loggedRecord(
       new DrizzleQueryError(
@@ -49,5 +72,13 @@ describe("LoggingModule", () => {
       new Error("the mail server refused the message"),
     );
     expect(record).toContain("the mail server refused the message");
+  });
+
+  it("a_request_is_logged_by_its_method_and_path_without_headers_query_or_hook_token", () => {
+    const record = loggedExchange("/api/v1/hooks/whk_secret-token?source=crm");
+
+    expect(record.req).toEqual({ method: "POST", url: "/api/v1/hooks/:token" });
+    expect(record.res).toEqual({ statusCode: 202 });
+    expect(JSON.stringify(record)).not.toContain("secret");
   });
 });

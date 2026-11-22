@@ -21,6 +21,7 @@ import { WorkflowEventKind } from "../../domain/automation/workflows/enums.js";
 import { PermanentFault } from "../../domain/errors.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { MessageTopic } from "./enums.js";
+import { OutboxTracer } from "./outbox.tracer.js";
 import type {
   AcceptedEventMessage,
   EventOfferedMessage,
@@ -43,6 +44,7 @@ export class AutomationHandler {
     private readonly continueSchedule: ContinueSchedule,
     private readonly syncSchedule: SyncSchedule,
     private readonly runs: InstanceRuns,
+    private readonly tracer: OutboxTracer,
   ) {}
 
   @OnOutboxMessage(MessageTopic.EventAccepted, { consumer: "dispatch" })
@@ -173,7 +175,14 @@ export class AutomationHandler {
     );
   }
 
-  async #once(
+  #once(
+    context: OutboxHandlerContext,
+    work: () => Promise<void>,
+  ): Promise<void> {
+    return this.tracer.processed(context, () => this.#processed(context, work));
+  }
+
+  async #processed(
     context: OutboxHandlerContext,
     work: () => Promise<void>,
   ): Promise<void> {

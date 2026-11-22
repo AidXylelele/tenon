@@ -234,4 +234,5 @@ export abstract class EffectClient {
     request: SandboxedProcessRequest,
     step: StepCall,
   ): Promise<void>;
+  abstract sandboxed(effect: Effect): SandboxedProcessRequest;
 }

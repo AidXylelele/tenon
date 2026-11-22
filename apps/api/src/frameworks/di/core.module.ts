@@ -4,9 +4,6 @@ import { HttpClientModule } from "@nestjs/http-client";
 import { ResilienceModule } from "@nestjs/resilience";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AesGcmPayloadCodec } from "@nestjs/workflows";
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { sdk } from "../instrumentation.js";
-import { OpenTelemetryShutdown } from "../opentelemetry/open-telemetry.shutdown.js";
 import { AutomationModule } from "./automation.module.js";
 import { secretsConfig } from "./configs.js";
 import { DatabaseModule } from "./database.module.js";
@@ -38,8 +35,6 @@ import { resiliencePresets } from "./resilience.presets.js";
           current: "v1",
         }),
     },
-    { provide: NodeSDK, useValue: sdk },
-    OpenTelemetryShutdown,
   ],
   exports: [AesGcmPayloadCodec, AutomationModule],
 })

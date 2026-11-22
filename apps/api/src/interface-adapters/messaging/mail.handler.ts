@@ -13,46 +13,59 @@ import type {
 } from "../mailing/interfaces.js";
 import { InvitationMail } from "../mailing/templates/invitation.mail.js";
 import { PasswordResetMail } from "../mailing/templates/password-reset.mail.js";
+import { OutboxTracer } from "./outbox.tracer.js";
 
 @Injectable()
 export class MailHandler {
-  constructor(private readonly mailer: Mailer) {}
+  constructor(
+    private readonly mailer: Mailer,
+    private readonly tracer: OutboxTracer,
+  ) {}
 
   @OnOutboxMessage(MailTopic.Invitation, { consumer: "invitation-mail" })
-  async sendInvitation(
+  sendInvitation(
     mail: QueuedMail<InvitationMailData>,
-    { message, signal }: OutboxHandlerContext,
+    context: OutboxHandlerContext,
   ): Promise<void> {
-    const sending = this.mailer.send(InvitationMail, {
-      to: mail.to,
-      data: mail.data,
-      idempotencyKey: message.id,
-      signal,
-      retry: false,
-    });
-    await this.#delivered(sending);
+    return this.#delivered(context, () =>
+      this.mailer.send(InvitationMail, {
+        to: mail.to,
+        data: mail.data,
+        idempotencyKey: context.message.id,
+        signal: context.signal,
+        retry: false,
+      }),
+    );
   }
 
   @OnOutboxMessage(MailTopic.PasswordReset, {
     consumer: "password-reset-mail",
   })
-  async sendPasswordReset(
+  sendPasswordReset(
     mail: QueuedMail<PasswordResetMailData>,
-    { message, signal }: OutboxHandlerContext,
+    context: OutboxHandlerContext,
   ): Promise<void> {
-    const sending = this.mailer.send(PasswordResetMail, {
-      to: mail.to,
-      data: mail.data,
-      idempotencyKey: message.id,
-      signal,
-      retry: false,
-    });
-    await this.#delivered(sending);
+    return this.#delivered(context, () =>
+      this.mailer.send(PasswordResetMail, {
+        to: mail.to,
+        data: mail.data,
+        idempotencyKey: context.message.id,
+        signal: context.signal,
+        retry: false,
+      }),
+    );
   }
 
-  async #delivered(sending: Promise<MailSendResult>): Promise<void> {
+  #delivered(
+    context: OutboxHandlerContext,
+    send: () => Promise<MailSendResult>,
+  ): Promise<void> {
+    return this.tracer.processed(context, () => this.#sent(send));
+  }
+
+  async #sent(send: () => Promise<MailSendResult>): Promise<void> {
     try {
-      await sending;
+      await send();
     } catch (error) {
       if (error instanceof MailError && error.permanent)
         throw new NonRetryableMessageError(error.message, { cause: error });
