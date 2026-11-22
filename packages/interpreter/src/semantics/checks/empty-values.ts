@@ -6,12 +6,17 @@ import {
   isMemberOf,
 } from "../../standard/index.js";
 import type {
+  AsyncApiCall,
+  AsyncApiChannelTarget,
+  AsyncApiOperationTarget,
   Call,
   ContainerProcess,
   EventFilter,
   EventProperties,
   Finding,
+  GrpcCall,
   HttpCall,
+  OpenApiCall,
   Process,
   Task,
   ValueTemplate,
@@ -65,9 +70,12 @@ function emptyCallValuesOf(call: Call): readonly Finding[] {
   switch (call.kind) {
     case "http":
       return emptyMethodOf(call);
-    case "asyncapi":
     case "grpc":
+      return emptyGrpcMembersOf(call);
     case "openapi":
+      return emptyOperationOf(call);
+    case "asyncapi":
+      return emptyTargetOf(call);
     case "a2a":
     case "mcp":
     case "function":
@@ -79,7 +87,13 @@ function emptyMethodOf(call: HttpCall): readonly Finding[] {
   const method = call.method;
   const written = writtenTextOf(method);
 
-  if (written !== "") {
+  if (written === null) {
+    return none;
+  }
+
+  const isBlank = written.trim() === "";
+
+  if (!isBlank) {
     return none;
   }
 
@@ -93,6 +107,90 @@ function emptyMethodOf(call: HttpCall): readonly Finding[] {
       import: null,
     },
   ];
+}
+
+function emptyGrpcMembersOf(call: GrpcCall): readonly Finding[] {
+  const methodPointer = childPointerOf(call.pointer, "method");
+  const servicePointer = childPointerOf(call.service.pointer, "name");
+  const method = emptyGrpcMemberOf(methodPointer, "method", call.method);
+  const service = emptyGrpcMemberOf(
+    servicePointer,
+    "service",
+    call.service.name,
+  );
+
+  return [...method, ...service];
+}
+
+function emptyGrpcMemberOf(
+  pointer: string,
+  member: string,
+  name: string,
+): readonly Finding[] {
+  if (name !== "") {
+    return none;
+  }
+
+  return [
+    {
+      name: "emptyGrpcMember",
+      code: "schema",
+      pointer,
+      subject: null,
+      details: [member],
+      import: null,
+    },
+  ];
+}
+
+function emptyOperationOf(call: OpenApiCall): readonly Finding[] {
+  if (call.operationId !== "") {
+    return none;
+  }
+
+  const pointer = childPointerOf(call.pointer, "operationId");
+
+  return [
+    {
+      name: "emptyOperation",
+      code: "schema",
+      pointer,
+      subject: null,
+      details: [],
+      import: null,
+    },
+  ];
+}
+
+function emptyTargetOf(call: AsyncApiCall): readonly Finding[] {
+  const target = call.target;
+  const name = targetNameOf(target);
+
+  if (name !== "") {
+    return none;
+  }
+
+  return [
+    {
+      name: "emptyAsyncApiTarget",
+      code: "schema",
+      pointer: target.pointer,
+      subject: null,
+      details: [target.kind],
+      import: null,
+    },
+  ];
+}
+
+function targetNameOf(
+  target: AsyncApiChannelTarget | AsyncApiOperationTarget,
+): string {
+  switch (target.kind) {
+    case "channel":
+      return target.channel;
+    case "operation":
+      return target.operation;
+  }
 }
 
 function emptyEventAttributesOf(event: EventProperties): readonly Finding[] {

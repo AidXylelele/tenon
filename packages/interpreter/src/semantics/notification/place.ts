@@ -7,6 +7,9 @@ const restatements: ReadonlySet<MessageName> = new Set<MessageName>([
   "emptyFilterAttribute",
   "emptyImage",
   "emptyMethod",
+  "emptyGrpcMember",
+  "emptyOperation",
+  "emptyAsyncApiTarget",
   "emptyWorkflowIdentity",
 ]);
 

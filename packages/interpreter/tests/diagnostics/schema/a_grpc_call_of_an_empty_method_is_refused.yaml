@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: greet
+    version: '0.1.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/greeter.proto
+          service:
+            name: Greeter
+            host: example.com
+          method: ''
+diagnostics:
+  - code: schema
+    pointer: /do/0/greet/with/method
+    range: { start: { line: 15, column: 17 } }
+    message: A gRPC call must name its method.

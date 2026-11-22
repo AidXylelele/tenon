@@ -613,6 +613,29 @@ describe("analyze, of a value the standard needs written", () => {
     return { document: header, do: [{ start: { run: process } }] };
   }
 
+  function called(protocol: string, arguments_: JsonObject): JsonObject {
+    return {
+      document: header,
+      do: [{ call: { call: protocol, with: arguments_ } }],
+    };
+  }
+
+  function grpcWith(method: string, name: string): JsonObject {
+    return called("grpc", {
+      proto: { endpoint: "https://example.com/greeter.proto" },
+      service: { name, host: "example.com" },
+      method,
+    });
+  }
+
+  function asyncApiWith(target: JsonObject): JsonObject {
+    return called("asyncapi", {
+      document: { endpoint: "https://example.com/asyncapi.json" },
+      ...target,
+      message: { payload: {} },
+    });
+  }
+
   function workflowRun(identity: JsonObject): JsonObject {
     const workflow = {
       namespace: "test",
@@ -698,6 +721,39 @@ describe("analyze, of a value the standard needs written", () => {
           },
         ],
       },
+    ],
+    [
+      "the method of a gRPC call",
+      "schema",
+      "/do/0/call/with/method",
+      grpcWith("", "Greeter"),
+    ],
+    [
+      "the service of a gRPC call",
+      "schema",
+      "/do/0/call/with/service/name",
+      grpcWith("SayHello", ""),
+    ],
+    [
+      "the operation of an OpenAPI call",
+      "schema",
+      "/do/0/call/with/operationId",
+      called("openapi", {
+        document: { endpoint: "https://example.com/openapi.json" },
+        operationId: "",
+      }),
+    ],
+    [
+      "the channel of an AsyncAPI call",
+      "schema",
+      "/do/0/call/with/channel",
+      asyncApiWith({ channel: "" }),
+    ],
+    [
+      "the operation of an AsyncAPI call",
+      "schema",
+      "/do/0/call/with/operation",
+      asyncApiWith({ operation: "" }),
     ],
     [
       "the specversion of an emitted event",
@@ -818,6 +874,20 @@ describe("analyze, of a value the standard needs written", () => {
     expect(analysis).toMatchObject({
       kind: "analyzed",
       diagnostics: [{ pointer: "/do/0/tell/emit/event/with/type" }],
+    });
+  });
+
+  test("takes a method of spaces alone for an empty one", () => {
+    const document = called("http", {
+      method: "  ",
+      endpoint: "https://example.com",
+    });
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis).toMatchObject({
+      kind: "analyzed",
+      diagnostics: [{ code: "schema", pointer: "/do/0/call/with/method" }],
     });
   });
 
