@@ -42,8 +42,12 @@ import { PostgresLifecycleEventStore } from "../../interface-adapters/persistenc
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
 import { EngineRunGateway } from "../../interface-adapters/workflows/gateways/engine-run.gateway.js";
 import { EngineScheduleGateway } from "../../interface-adapters/workflows/gateways/engine-schedule.gateway.js";
+import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
+import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
 import { InterpreterClient } from "../../interface-adapters/workflows/interfaces.js";
-import { InterpreterGateway } from "../../interface-adapters/workflows/interpreter.gateway.js";
+import { DefinitionMapper } from "../../interface-adapters/workflows/mappers/definition.mapper.js";
+import { ProtocolMapper } from "../../interface-adapters/workflows/mappers/protocol.mapper.js";
+import { RunTurnMapper } from "../../interface-adapters/workflows/mappers/run-turn.mapper.js";
 import { AesGcmCipher } from "../crypto/aes-gcm.cipher.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { AuthorizationServer } from "../http-client/authorization-server.js";
@@ -93,9 +97,13 @@ import { OutboundModule } from "./outbound.module.js";
   ],
   providers: [
     CancelInstance,
-    InterpreterGateway,
-    { provide: WorkflowRuntime, useExisting: InterpreterGateway },
-    { provide: SubscriptionFilters, useExisting: InterpreterGateway },
+    ProtocolMapper,
+    RunTurnMapper,
+    DefinitionMapper,
+    InterpreterRuntimeGateway,
+    { provide: WorkflowRuntime, useExisting: InterpreterRuntimeGateway },
+    InterpreterFilterGateway,
+    { provide: SubscriptionFilters, useExisting: InterpreterFilterGateway },
     EngineRunGateway,
     { provide: InstanceRuns, useExisting: EngineRunGateway },
     EngineScheduleGateway,
@@ -150,7 +158,8 @@ import { OutboundModule } from "./outbound.module.js";
   ],
   exports: [
     CancelInstance,
-    InterpreterGateway,
+    ProtocolMapper,
+    DefinitionMapper,
     WorkflowRuntime,
     SubscriptionFilters,
     EngineRunGateway,
@@ -166,6 +175,7 @@ import { OutboundModule } from "./outbound.module.js";
     SubscriptionRepository,
     Cipher,
     WorkerInterpreterClient,
+    InterpreterClient,
     HttpAuthentication,
     HttpClient,
     ImportFetcher,

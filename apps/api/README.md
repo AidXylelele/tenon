@@ -40,9 +40,7 @@ tick (`@OnOneInstance`), and each AsyncAPI receiver is held by one worker under 
 - The API stays at one replica until the rate limiter's storage is shared between replicas.
 - A worker has no health check: a worker that hangs without exiting is restarted only when it dies, and its leases
   move to the other workers then.
-- A run whose program this build of the interpreter cannot rebuild is cancelled at its next turn. A release that
-  changes the interpreter's state format registers the run workflow under a new version, and has to remove the
-  engine runs of the old format with `WorkflowClient.delete(id, { force: true })`, since no worker claims them.
+- A run whose program this build of the interpreter cannot rebuild is cancelled at its next turn.
 
 ## Run
 

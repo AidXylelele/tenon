@@ -12,7 +12,6 @@ import {
   type Effect,
   type EffectOutcome,
   type EffectResponse,
-  stateFormatVersion,
   type WorkflowOutcome,
 } from "interpreter";
 import { PermanentFault } from "../../../domain/errors.js";
@@ -34,7 +33,7 @@ import type {
 } from "./interfaces.js";
 import { ProcessRun } from "./process.run.js";
 
-@Workflow(EngineRunGateway.RUN, { version: stateFormatVersion })
+@Workflow(EngineRunGateway.RUN, { version: EngineRunGateway.VERSION })
 export class OpenWorkflowRun implements WorkflowRunner<
   OpenWorkflowRunInput,
   void
