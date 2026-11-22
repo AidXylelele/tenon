@@ -3,7 +3,6 @@ import type { Diagnostic, JsonObject } from "interpreter";
 import { ImportRefusal } from "../../../../src/application/automation/imports/enums.js";
 import type { ImportResult } from "../../../../src/application/automation/imports/interfaces.js";
 import { ImportFetcher } from "../../../../src/application/automation/imports/ports.js";
-import type { WorkflowQueries } from "../../../../src/application/automation/workflows/queries.js";
 import type { ImportTexts } from "../../../../src/domain/automation/workflows/interfaces.js";
 import { InterpreterCompilerGateway } from "../../../../src/interface-adapters/workflows/gateways/interpreter-compiler.gateway.js";
 import type {
@@ -89,11 +88,10 @@ function gatewayOf(
   compilations: ScriptedCompilations,
   imports: ScriptedImports,
 ): InterpreterCompilerGateway {
-  const queries = {} as WorkflowQueries;
   return new InterpreterCompilerGateway(
     compilations as unknown as InterpreterClient,
     imports,
-    new ProtocolMapper(queries),
+    new ProtocolMapper(),
     new DefinitionMapper(),
   );
 }

@@ -44,6 +44,7 @@ import {
 } from "../interfaces.js";
 import { ProtocolMapper } from "../mappers/protocol.mapper.js";
 import { RunTurnMapper } from "../mappers/run-turn.mapper.js";
+import { ProgramCalls } from "../program-calls.js";
 
 @Injectable()
 export class InterpreterRuntimeGateway implements WorkflowRuntime {
@@ -55,6 +56,7 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
   constructor(
     private readonly client: InterpreterClient,
     private readonly workflows: WorkflowQueries,
+    private readonly calls: ProgramCalls,
     private readonly protocol: ProtocolMapper,
     private readonly turns: RunTurnMapper,
   ) {}
@@ -65,7 +67,7 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     now: Date,
     signal: AbortSignal,
   ): Promise<RunTurn> {
-    const call = this.protocol.toCall(instance.versionId, null, signal);
+    const call = this.calls.of(instance.versionId, null, signal);
     const context = this.#startContextOf(instance.id, secrets, now);
 
     if (instance.trigger !== TriggerKind.Event) {
@@ -175,7 +177,7 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     now: Date,
     signal: AbortSignal,
   ): Promise<boolean> {
-    const call = this.protocol.toCall(version.id, null, signal);
+    const call = this.calls.of(version.id, null, signal);
     const trial = InterpreterRuntimeGateway.TRIAL;
     const context = this.#startContextOf(trial, secrets, now);
     const correlated = await this.client.correlate(call, context);
@@ -190,7 +192,7 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     version: WorkflowVersion,
     input: JsonValue,
   ): Promise<readonly InputProblem[]> {
-    const call = this.protocol.toCall(version.id, null, null);
+    const call = this.calls.of(version.id, null, null);
     const value = this.protocol.toValue(input);
     return this.client.inputProblemsOf(call, value);
   }
@@ -414,7 +416,7 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     signal: AbortSignal | null,
   ): Program {
     const fingerprint = run.fingerprint;
-    const call = this.protocol.toCall(instance.versionId, fingerprint, signal);
+    const call = this.calls.of(instance.versionId, fingerprint, signal);
     return { call, fingerprint, awaited: run.awaited };
   }
 

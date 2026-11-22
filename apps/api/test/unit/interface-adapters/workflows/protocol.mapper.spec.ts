@@ -1,9 +1,7 @@
-import type { WorkflowQueries } from "../../../../src/application/automation/workflows/queries.js";
 import { ProtocolMapper } from "../../../../src/interface-adapters/workflows/mappers/protocol.mapper.js";
 
 describe("the values the interpreter receives from the host", () => {
-  const queries = {} as WorkflowQueries;
-  const protocol = new ProtocolMapper(queries);
+  const protocol = new ProtocolMapper();
 
   it("a_member_without_a_value_does_not_reach_the_interpreter", () => {
     const value = { a: 1, b: undefined, c: [{ d: undefined, e: "x" }] };

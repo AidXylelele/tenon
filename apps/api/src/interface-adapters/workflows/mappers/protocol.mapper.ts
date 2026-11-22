@@ -7,7 +7,7 @@ import type {
   JsonValue as ProtocolValue,
 } from "interpreter";
 import type { Receipt } from "../../../application/automation/instances/interfaces.js";
-import { WorkflowQueries } from "../../../application/automation/workflows/queries.js";
+import type { VersionProgram } from "../../../application/automation/workflows/interfaces.js";
 import {
   InboundKind,
   Phase,
@@ -18,13 +18,11 @@ import type {
   JsonObject,
   JsonValue,
 } from "../../../domain/automation/interfaces.js";
-import type { JsonOf, ProgramCall, ProgramSource } from "../interfaces.js";
+import type { JsonOf, ProgramSource } from "../interfaces.js";
 
 @Injectable()
 export class ProtocolMapper {
   private static readonly MESSAGE = "message";
-
-  constructor(private readonly workflows: WorkflowQueries) {}
 
   toObject(value: JsonObject): ProtocolObject {
     const members = Object.entries(value).flatMap(([key, item]) =>
@@ -76,21 +74,7 @@ export class ProtocolMapper {
     return { effectId, outcome };
   }
 
-  toCall(
-    versionId: string,
-    fingerprint: string | null,
-    signal: AbortSignal | null,
-  ): ProgramCall {
-    const source = () => this.#sourceOf(versionId);
-    return { versionId, fingerprint, source, signal };
-  }
-
-  async #sourceOf(versionId: string): Promise<ProgramSource> {
-    const program = await this.workflows.programById(versionId);
-
-    if (program === null)
-      throw new TypeError(`The version ${versionId} is gone`);
-
+  toSource(program: VersionProgram): ProgramSource {
     const document = this.toObject(program.document);
     return { document, imports: program.imports, secrets: program.secrets };
   }

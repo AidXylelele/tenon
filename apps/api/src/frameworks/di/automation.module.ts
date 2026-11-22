@@ -50,6 +50,7 @@ import { InterpreterClient } from "../../interface-adapters/workflows/interfaces
 import { DefinitionMapper } from "../../interface-adapters/workflows/mappers/definition.mapper.js";
 import { ProtocolMapper } from "../../interface-adapters/workflows/mappers/protocol.mapper.js";
 import { RunTurnMapper } from "../../interface-adapters/workflows/mappers/run-turn.mapper.js";
+import { ProgramCalls } from "../../interface-adapters/workflows/program-calls.js";
 import { AesGcmCipher } from "../crypto/aes-gcm.cipher.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { AuthorizationServer } from "../http-client/authorization-server.js";
@@ -81,6 +82,7 @@ import { OutboundModule } from "./outbound.module.js";
   providers: [
     CancelInstance,
     ProtocolMapper,
+    ProgramCalls,
     RunTurnMapper,
     DefinitionMapper,
     InterpreterRuntimeGateway,
@@ -143,6 +145,7 @@ import { OutboundModule } from "./outbound.module.js";
   exports: [
     CancelInstance,
     ProtocolMapper,
+    ProgramCalls,
     DefinitionMapper,
     WorkflowRuntime,
     SubscriptionFilters,

@@ -28,6 +28,7 @@ import type {
   StartedStep,
   VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
+import { durationBoundaries } from "../opentelemetry/histogram.presets.js";
 import type {
   AcceptingCall,
   CompileSource,
@@ -50,10 +51,6 @@ export class InterpreterWorker {
   static readonly INTERPRETER = "interpreter";
   private static readonly KEPT = 1_000;
   private static readonly MILLISECONDS_PER_SECOND = 1_000;
-  private static readonly WAIT_BUCKETS = [
-    0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
-    0.5, 1, 2.5, 5, 10,
-  ];
 
   readonly #programs = new LRUCache<string, KeptProgram, CompileSource>({
     max: InterpreterWorker.KEPT,
@@ -75,7 +72,7 @@ export class InterpreterWorker {
     this.#wait = meter.createHistogram("tenon.interpreter.pool.wait.duration", {
       unit: "s",
       description: "The time a task waits for an interpreter thread.",
-      advice: { explicitBucketBoundaries: InterpreterWorker.WAIT_BUCKETS },
+      advice: { explicitBucketBoundaries: durationBoundaries },
     });
   }
 

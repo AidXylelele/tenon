@@ -10,6 +10,7 @@ import type {
   State,
   StepContext,
 } from "interpreter";
+import type { Imports } from "interpreter/front-end";
 import type { BulkheadPolicy, ResiliencePolicy } from "@nestjs/resilience";
 import type { Piscina } from "piscina";
 import type {
@@ -17,13 +18,12 @@ import type {
   StepCall,
   VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
-import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
 import type * as thread from "./interpreter.thread.js";
 
 export interface CompileSource {
   readonly document: JsonObject | string;
   readonly profile: HostProfile;
-  readonly imports: ImportTexts;
+  readonly imports: Imports;
 }
 
 export interface ThreadProgram {

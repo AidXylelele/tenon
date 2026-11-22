@@ -257,16 +257,10 @@ describe("the interpreter in its worker threads", () => {
   });
 
   it("a_version_structure_is_read_once_and_kept", async () => {
-    const program = {
-      versionId: "version-structured",
-      digest: "digest",
-      document: waiting,
-      imports: {},
-      secrets: [],
-    };
+    const source = { document: waiting, imports: {}, secrets: [] };
 
-    const first = await client.structureOf(program);
-    const again = await client.structureOf(program);
+    const first = await client.structureOf("version-structured", source);
+    const again = await client.structureOf("version-structured", source);
 
     expect(first).toMatchObject({ namespace: "sales", name: "pause" });
     expect(again).toEqual(first);

@@ -23,8 +23,8 @@ import type {
   StepContext,
   WorkflowRequest,
 } from "interpreter";
+import type { Imports } from "interpreter/front-end";
 import type { WorkflowStructure } from "language-server/structure";
-import type { VersionProgram } from "../../application/automation/workflows/interfaces.js";
 import type {
   AwaitedEffect,
   TakenEvent,
@@ -79,7 +79,7 @@ export interface VersionStructure extends WorkflowStructure {
 
 export interface ProgramSource {
   readonly document: JsonObject;
-  readonly imports: ImportTexts;
+  readonly imports: Imports;
   readonly secrets: readonly string[];
 }
 
@@ -178,7 +178,7 @@ export abstract class InterpreterClient {
   abstract compile(
     source: JsonObject | string,
     secrets: readonly string[],
-    imports: ImportTexts,
+    imports: Imports,
   ): Promise<CompilationData>;
   abstract start(
     call: ProgramCall,
@@ -231,9 +231,10 @@ export abstract class InterpreterClient {
 
 export abstract class StructureClient {
   abstract structureOf(
-    program: VersionProgram,
+    versionId: string,
+    source: ProgramSource,
   ): Promise<VersionStructure | null>;
-  abstract tagOf(program: VersionProgram): string;
+  abstract tagOf(digest: string): string;
 }
 
 export abstract class EffectClient {

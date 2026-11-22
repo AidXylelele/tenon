@@ -7,11 +7,13 @@ import type {
 } from "../../../domain/automation/instances/interfaces.js";
 import { InterpreterClient } from "../interfaces.js";
 import { ProtocolMapper } from "../mappers/protocol.mapper.js";
+import { ProgramCalls } from "../program-calls.js";
 
 @Injectable()
 export class InterpreterRoutingGateway implements EventRouting {
   constructor(
     private readonly client: InterpreterClient,
+    private readonly calls: ProgramCalls,
     private readonly protocol: ProtocolMapper,
   ) {}
 
@@ -24,7 +26,7 @@ export class InterpreterRoutingGateway implements EventRouting {
     const matches: RoutingMatch[] = [];
 
     for (const program of programs) {
-      const call = this.protocol.toCall(program.versionId, null, signal);
+      const call = this.calls.of(program.versionId, null, signal);
       const routed = await this.client.route(call, offered);
 
       for (const route of routed)

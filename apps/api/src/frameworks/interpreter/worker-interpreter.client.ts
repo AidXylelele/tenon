@@ -29,23 +29,25 @@ import {
   type Step,
   type StepContext,
 } from "interpreter";
+import type { Imports } from "interpreter/front-end";
 import { LRUCache } from "lru-cache";
 import { Piscina } from "piscina";
 import { PermanentFault } from "../../domain/errors.js";
 import { IncompatibleRun } from "../../interface-adapters/workflows/incompatible-run.error.js";
-import type { VersionProgram } from "../../application/automation/workflows/interfaces.js";
-import {
-  type CompilationData,
-  type FilterCheck,
+import type {
+  CompilationData,
+  FilterCheck,
   InterpreterClient,
-  type NamedFilter,
-  type ProgramCall,
-  type RouteMatch,
-  type StartedStep,
-  type StructureClient,
-  type VersionStructure,
+  NamedFilter,
+  ProgramCall,
+  ProgramSource,
+  RouteMatch,
+  StartedStep,
+  StructureClient,
+  VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
 import type {
+  CompileSource,
   KeptStructure,
   PoolName,
   TaskCall,
@@ -57,7 +59,6 @@ import type {
   WorkerAnswer,
   WorkerPool,
 } from "./interfaces.js";
-import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
 import { RELEASE_VERSION } from "../release.js";
 import { HOST_PROFILE } from "./host-profile.js";
 
@@ -65,25 +66,27 @@ const NOT_STARTED = "The interpreter has not started its threads";
 
 @Injectable()
 export class WorkerInterpreterClient
-  extends InterpreterClient
-  implements StructureClient, OnModuleInit, OnApplicationShutdown
+  implements
+    InterpreterClient,
+    StructureClient,
+    OnModuleInit,
+    OnApplicationShutdown
 {
   static readonly RUN_THREADS = 10;
   static readonly CHECK_THREADS = 2;
   private static readonly IDLE_RUN_THREAD_MS = 60_000;
   private static readonly MOST_KEPT_STRUCTURES = 1_000;
 
-  readonly #structures = new LRUCache<string, KeptStructure, VersionProgram>({
+  readonly #structures = new LRUCache<string, KeptStructure, ProgramSource>({
     max: WorkerInterpreterClient.MOST_KEPT_STRUCTURES,
-    fetchMethod: (_versionId, _kept, { context: program }) =>
-      this.#keptStructureOf(program),
+    fetchMethod: (_versionId, _kept, { context: source }) =>
+      this.#keptStructureOf(source),
   });
   private readonly descriptor: RuntimeDescriptor;
   private runs: WorkerPool | null = null;
   private checks: WorkerPool | null = null;
 
   constructor(private readonly resilience: ResilienceService) {
-    super();
     this.descriptor = this.#descriptorOf();
   }
 
@@ -117,20 +120,23 @@ export class WorkerInterpreterClient
     await this.checks?.threads.close();
   }
 
-  async structureOf(program: VersionProgram): Promise<VersionStructure | null> {
-    const options = { context: program };
-    const kept = await this.#structures.forceFetch(program.versionId, options);
+  async structureOf(
+    versionId: string,
+    source: ProgramSource,
+  ): Promise<VersionStructure | null> {
+    const options = { context: source };
+    const kept = await this.#structures.forceFetch(versionId, options);
     return kept.structure;
   }
 
-  tagOf(program: VersionProgram): string {
-    return `${program.digest}.${this.descriptor.version}`;
+  tagOf(digest: string): string {
+    return `${digest}.${this.descriptor.version}`;
   }
 
   async compile(
     document: JsonObject | string,
     secrets: readonly string[],
-    imports: ImportTexts,
+    imports: Imports,
   ): Promise<CompilationData> {
     const profile = this.profile(secrets);
     const source = { document, profile, imports };
@@ -278,30 +284,30 @@ export class WorkerInterpreterClient
     if (first.kind !== "missing") return first;
 
     const source = await call.source();
-    const profile = this.profile(source.secrets);
-    const document = source.document;
-    const imports = source.imports;
+    const compileSource = this.#compileSourceOf(source);
     const compiled = {
       versionId: call.versionId,
       fingerprint: call.fingerprint,
-      source: { document, profile, imports },
+      source: compileSource,
     };
     const compiledCall = callOf(compiled);
     return this.#answer(pool, name, compiledCall, call.signal);
   }
 
-  async #keptStructureOf(program: VersionProgram): Promise<KeptStructure> {
-    const profile = this.profile(program.secrets);
-    const document = program.document as JsonObject;
-    const imports = program.imports;
-    const source = { document, profile, imports };
+  async #keptStructureOf(source: ProgramSource): Promise<KeptStructure> {
+    const compileSource = this.#compileSourceOf(source);
     const structure = await this.#called(
       this.#checks(),
       "structure",
-      source,
+      compileSource,
       null,
     );
     return { structure };
+  }
+
+  #compileSourceOf(source: ProgramSource): CompileSource {
+    const profile = this.profile(source.secrets);
+    return { document: source.document, profile, imports: source.imports };
   }
 
   async #called<N extends TaskName>(
