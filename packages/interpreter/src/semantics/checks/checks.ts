@@ -4,6 +4,7 @@ import { checkCapabilities } from "./capabilities.js";
 import { checkCron } from "./cron.js";
 import { checkDuplicateDefaults } from "./duplicate-defaults.js";
 import { checkDurations } from "./durations.js";
+import { checkEmptyValues } from "./empty-values.js";
 import { checkExpressionLanguage } from "./expression-language.js";
 import { checkExpressions } from "./expressions.js";
 import { checkGrpcAuthentication } from "./grpc-authentication.js";
@@ -23,6 +24,7 @@ export const checks: readonly Check[] = [
   checkJsonSchemas,
   checkSecrets,
   checkAttributeNames,
+  checkEmptyValues,
   checkCapabilities,
   checkGrpcAuthentication,
 ];

@@ -76,19 +76,22 @@ function millisecondsOf(duration: ast.Duration): number | null {
   }
 }
 
-function callSummaryOf(call: ast.Call, document: JsonValue): string {
+function callSummaryOf(call: ast.Call, document: JsonValue): string | null {
   switch (call.kind) {
     case "http": {
       const method = writtenAt(document, call.method.pointer);
       const endpoint = writtenAt(document, call.endpoint.uri.pointer);
-      return `${method.toUpperCase()} ${endpoint}`;
+      const verb = method.toUpperCase();
+      return writtenPartsOf([verb, endpoint], " ");
     }
     case "openapi":
-      return call.operationId;
+      return writtenPartsOf([call.operationId], "");
     case "grpc":
-      return `${call.service.name}.${call.method}`;
-    case "asyncapi":
-      return asyncApiTargetOf(call.target);
+      return writtenPartsOf([call.service.name, call.method], ".");
+    case "asyncapi": {
+      const target = asyncApiTargetOf(call.target);
+      return writtenPartsOf([target], "");
+    }
     case "a2a":
       return call.method;
     case "mcp":
@@ -109,10 +112,13 @@ function asyncApiTargetOf(
   }
 }
 
-function processSummaryOf(process: ast.Process, document: JsonValue): string {
+function processSummaryOf(
+  process: ast.Process,
+  document: JsonValue,
+): string | null {
   const detail = processDetailOf(process, document);
 
-  return `${process.kind} ${detail}`;
+  return writtenPartsOf([process.kind, detail], " ");
 }
 
 function processDetailOf(process: ast.Process, document: JsonValue): string {
@@ -158,7 +164,8 @@ function emittedTypeOf(
     return null;
   }
 
-  return writtenAt(document, type.pointer);
+  const written = writtenAt(document, type.pointer);
+  return writtenPartsOf([written], "");
 }
 
 function eventTypesOf(
@@ -171,11 +178,7 @@ function eventTypesOf(
     return type === undefined ? [] : [writtenAt(document, type.pointer)];
   });
 
-  if (types.length === 0) {
-    return null;
-  }
-
-  return types.join(", ");
+  return writtenPartsOf(types, ", ");
 }
 
 function filtersOf(
@@ -219,6 +222,19 @@ function countOf(count: number, one: string, many: string): string {
   const noun = count === 1 ? one : many;
 
   return `${String(count)} ${noun}`;
+}
+
+function writtenPartsOf(
+  parts: readonly string[],
+  separator: string,
+): string | null {
+  const written = parts.filter((part) => part.trim() !== "");
+
+  if (written.length === 0) {
+    return null;
+  }
+
+  return written.join(separator);
 }
 
 function writtenAt(document: JsonValue, pointer: string): string {

@@ -139,6 +139,18 @@ export const uriEventAttributes = [
 ] as const satisfies readonly EventAttribute[];
 export type UriEventAttribute = (typeof uriEventAttributes)[number];
 
+export const contextEventAttributes = [
+  "specversion",
+  "id",
+  "source",
+  "type",
+  "datacontenttype",
+  "dataschema",
+  "subject",
+  "time",
+] as const;
+export type ContextEventAttribute = (typeof contextEventAttributes)[number];
+
 export const defaultedEventAttributes = [
   "specversion",
   "id",

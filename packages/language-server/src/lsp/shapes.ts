@@ -1,17 +1,22 @@
-import { type HostProfile, taskKinds } from "interpreter/front-end";
+import type { HostProfile } from "interpreter/front-end";
 import {
   ErrorCodes,
   ResponseError,
   TextDocumentIdentifier,
   VersionedTextDocumentIdentifier,
 } from "vscode-languageserver/browser";
+import { type Comparison, secondValues } from "../ide/conditions/index.js";
+import { timeExpressions } from "../ide/jq-text/index.js";
+import { isChosenResult, stepVariants } from "../ide/variants/index.js";
 import type {
+  DataAtParams,
   DidFetchImportsParams,
   EditParams,
   FromJsonParams,
   InitializationOptions,
   NewDocumentParams,
   RangesOfParams,
+  ReadConditionParams,
   StepFormParams,
 } from "../protocol/index.js";
 import type { ActionKind } from "./interfaces.js";
@@ -32,7 +37,7 @@ const profileShapes: Record<keyof HostProfile, (member: unknown) => boolean> = {
 
 const draftMembers: readonly string[] = ["namespace", "name"];
 
-const kindsOfTask: ReadonlySet<unknown> = new Set(taskKinds);
+const variantsOfStep: ReadonlySet<unknown> = new Set(stepVariants);
 
 const plainFailureKinds: ReadonlySet<string> = new Set([
   "stop",
@@ -42,13 +47,18 @@ const plainFailureKinds: ReadonlySet<string> = new Set([
 
 const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
   insertStep: holdsInsertion,
+  insertStepOnBranch: holdsBranchInsertion,
   moveStep: holdsMove,
   removeStep: (action) => holdsStrings(action, ["step"]),
   renameStep: (action) => holdsStrings(action, ["step", "name"]),
   duplicateStep: (action) => holdsStrings(action, ["step"]),
   setField: holdsSetting,
+  setCondition: holdsConditionSetting,
   clearField: (action) => holdsStrings(action, ["pointer"]),
   setFailure: holdsFailureSetting,
+  setResult: holdsResultSetting,
+  useData: holdsDataUse,
+  wrapSteps: holdsWrapping,
 };
 
 export function invalidParamsOf(method: string): ResponseError {
@@ -128,6 +138,18 @@ export function holdsStepFormParams(params: unknown): params is StepFormParams {
   return holdsVersionedDocument(params) && holdsStrings(params, ["step"]);
 }
 
+export function holdsDataAtParams(params: unknown): params is DataAtParams {
+  return (
+    holdsVersionedDocument(params) && holdsStrings(params, ["step", "field"])
+  );
+}
+
+export function holdsReadConditionParams(
+  params: unknown,
+): params is ReadConditionParams {
+  return holdsStrings(params, ["text"]);
+}
+
 export function holdsEditParams(params: unknown): params is EditParams {
   const action = memberOf(params, "action");
   const kind = memberOf(action, "kind");
@@ -138,16 +160,21 @@ export function holdsEditParams(params: unknown): params is EditParams {
 }
 
 function holdsInsertion(action: unknown): boolean {
+  return (
+    holdsStrings(action, ["list"]) && holdsIndex(action) && holdsNewStep(action)
+  );
+}
+
+function holdsBranchInsertion(action: unknown): boolean {
+  return holdsStrings(action, ["switch", "case"]) && holdsNewStep(action);
+}
+
+function holdsNewStep(action: unknown): boolean {
   const name = memberOf(action, "name");
   const step = memberOf(action, "step");
   const isNamed = name === null || typeof name === "string";
 
-  return (
-    holdsStrings(action, ["list"]) &&
-    holdsIndex(action) &&
-    kindsOfTask.has(step) &&
-    isNamed
-  );
+  return variantsOfStep.has(step) && isNamed;
 }
 
 function holdsMove(action: unknown): boolean {
@@ -173,13 +200,101 @@ function holdsFailureSetting(action: unknown): boolean {
   return holdsStrings(action, ["step"]) && isChoice;
 }
 
+function holdsConditionSetting(action: unknown): boolean {
+  const condition = memberOf(action, "condition");
+  const join = memberOf(condition, "join");
+  const rows = memberOf(condition, "rows");
+  const isJoin = join === "all" || join === "any";
+  const isList = Array.isArray(rows);
+  const isConditional = isJoin && isList && rows.every(holdsRow);
+
+  return holdsStrings(action, ["pointer"]) && isConditional;
+}
+
+function holdsRow(row: unknown): boolean {
+  const comparison = memberOf(row, "comparison");
+  const right = memberOf(row, "right");
+  const isLeft = holdsStrings(row, ["left"]);
+
+  if (!isComparison(comparison) || !isLeft) {
+    return false;
+  }
+
+  switch (secondValues[comparison]) {
+    case "none":
+      return right === null;
+    case "value":
+      return holdsValueOperand(right);
+    case "operand":
+      return holdsOperand(right);
+  }
+}
+
+function holdsOperand(operand: unknown): boolean {
+  const kind = memberOf(operand, "kind");
+  const time = memberOf(operand, "time");
+  const isTime =
+    typeof time === "string" && Object.hasOwn(timeExpressions, time);
+
+  if (kind === "data") {
+    return holdsStrings(operand, ["path"]);
+  }
+
+  if (kind === "time") {
+    return isTime;
+  }
+
+  return holdsValueOperand(operand);
+}
+
+function isComparison(value: unknown): value is Comparison {
+  return typeof value === "string" && Object.hasOwn(secondValues, value);
+}
+
+function holdsValueOperand(operand: unknown): boolean {
+  const kind = memberOf(operand, "kind");
+  const value = memberOf(operand, "value");
+  const isLiteral =
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    Number.isFinite(value);
+
+  return kind === "value" && isLiteral;
+}
+
+function holdsWrapping(action: unknown): boolean {
+  const steps = memberOf(action, "steps");
+  const block = memberOf(action, "block");
+  const name = memberOf(action, "name");
+  const isNamed = name === null || typeof name === "string";
+  const isBlock = block === "try" || block === "for" || block === "do";
+  const isList = Array.isArray(steps);
+  const areSteps = isList && steps.every((step) => typeof step === "string");
+
+  return areSteps && isBlock && isNamed;
+}
+
+function holdsDataUse(action: unknown): boolean {
+  const exported = memberOf(action, "export");
+  const isExport = exported === null || typeof exported === "string";
+
+  return holdsStrings(action, ["pointer", "value"]) && isExport;
+}
+
+function holdsResultSetting(action: unknown): boolean {
+  const result = memberOf(action, "result");
+
+  return holdsStrings(action, ["step"]) && isChosenResult(result);
+}
+
 function holdsRetry(failure: unknown): boolean {
-  const attempts = memberOf(failure, "attempts");
+  const retries = memberOf(failure, "retries");
   const seconds = memberOf(failure, "seconds");
   const growing = memberOf(failure, "growing");
 
   return (
-    Number.isInteger(attempts) &&
+    Number.isInteger(retries) &&
     typeof seconds === "number" &&
     typeof growing === "boolean"
   );

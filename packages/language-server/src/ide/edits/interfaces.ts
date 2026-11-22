@@ -1,13 +1,18 @@
 import type {
+  ast,
   JsonObject,
   JsonValue,
+  Range,
   RangeLocator,
-  TaskKind,
 } from "interpreter/front-end";
 import type { TextChange } from "../text/index.js";
+import type { Condition } from "../conditions/index.js";
 import type { Snapshot } from "../snapshot/index.js";
+import type { ChosenResult, StepVariant } from "../variants/index.js";
 import type {
   FailureKind,
+  ListEnd,
+  Retry,
   StepNode,
   StepNodeList,
   StepTree,
@@ -17,7 +22,15 @@ export interface InsertStep {
   readonly kind: "insertStep";
   readonly list: string;
   readonly index: number;
-  readonly step: TaskKind;
+  readonly step: StepVariant;
+  readonly name: string | null;
+}
+
+export interface InsertStepOnBranch {
+  readonly kind: "insertStepOnBranch";
+  readonly switch: string;
+  readonly case: string;
+  readonly step: StepVariant;
   readonly name: string | null;
 }
 
@@ -50,16 +63,15 @@ export interface SetField {
   readonly value: JsonValue;
 }
 
+export interface SetCondition {
+  readonly kind: "setCondition";
+  readonly pointer: string;
+  readonly condition: Condition;
+}
+
 export interface ClearField {
   readonly kind: "clearField";
   readonly pointer: string;
-}
-
-interface Retry {
-  readonly kind: "retry";
-  readonly attempts: number;
-  readonly seconds: number;
-  readonly growing: boolean;
 }
 
 export type Failure = { readonly kind: Exclude<FailureKind, "retry"> } | Retry;
@@ -70,10 +82,65 @@ export interface SetFailure {
   readonly failure: Failure;
 }
 
-export type StepAction =
-  InsertStep | MoveStep | RemoveStep | RenameStep | DuplicateStep | SetFailure;
+export interface SetResult {
+  readonly kind: "setResult";
+  readonly step: string;
+  readonly result: ChosenResult;
+}
 
-export type FieldAction = SetField | ClearField;
+export interface UseData {
+  readonly kind: "useData";
+  readonly pointer: string;
+  readonly value: string;
+  readonly export: string | null;
+}
+
+export type WrapBlock = "try" | "for" | "do";
+
+export interface WrapSteps {
+  readonly kind: "wrapSteps";
+  readonly steps: readonly string[];
+  readonly block: WrapBlock;
+  readonly name: string | null;
+}
+
+export interface Run {
+  readonly list: StepNodeList;
+  readonly steps: readonly StepNode[];
+  readonly name: string;
+}
+
+export interface Redirections {
+  readonly inner: readonly SetField[];
+  readonly outer: readonly SetField[];
+}
+
+export interface RunWrapping {
+  readonly run: Run;
+  readonly block: WrapBlock;
+  readonly jumps: ReadonlyMap<string, string>;
+  readonly after: StepNode | null;
+  readonly listEnd: ListEnd;
+}
+
+export type Redirection =
+  | { readonly kind: "kept" }
+  | { readonly kind: "set"; readonly setting: SetField }
+  | { readonly kind: "refused"; readonly reason: string };
+
+export type StepAction =
+  | InsertStep
+  | InsertStepOnBranch
+  | MoveStep
+  | RemoveStep
+  | RenameStep
+  | DuplicateStep
+  | SetFailure
+  | SetResult
+  | UseData
+  | WrapSteps;
+
+export type FieldAction = SetField | ClearField | SetCondition;
 
 export type EditAction = StepAction | FieldAction;
 
@@ -103,6 +170,16 @@ export interface Editable extends EditableText {
 
 export interface Span {
   readonly start: number;
+  readonly end: number;
+}
+
+export interface WrittenField {
+  readonly item: Range;
+  readonly node: Range;
+}
+
+export interface ValueText {
+  readonly text: string;
   readonly end: number;
 }
 
@@ -141,6 +218,12 @@ export interface WrittenStep {
   readonly list: StepNodeList;
   readonly collection: CollectionText;
   readonly span: Span;
+}
+
+export interface Switching {
+  readonly written: WrittenStep;
+  readonly task: ast.TaskCommon & ast.SwitchTask;
+  readonly chosen: ast.SwitchCase;
 }
 
 export interface Destination {

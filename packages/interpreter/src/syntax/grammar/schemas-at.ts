@@ -86,6 +86,19 @@ function declaredNodeOf(node: JsonObject, token: string): JsonValue {
   return first;
 }
 
+export function declaredNamesOf(node: JsonValue): readonly string[] {
+  const isNode = isJsonObject(node);
+
+  if (!isNode) {
+    return [];
+  }
+
+  const nodes = nodesOf(node);
+  const declarations = nodes.flatMap(propertiesOf);
+
+  return declarations.map(({ name }) => name);
+}
+
 function schemaAtOf(node: JsonObject): SchemaAt {
   const description = descriptionOf(node);
   const types = typesOf(node);

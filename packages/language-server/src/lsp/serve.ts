@@ -20,6 +20,8 @@ import { AnalysisHost } from "./analysis-host.js";
 import { serverCapabilities } from "./capabilities.js";
 import { lspDiagnosticOf } from "./diagnostics.js";
 import {
+  dataAtHandlerOf,
+  dataAtRequest,
   didFetchImportsNotification,
   documentHandlerOf,
   documentRequest,
@@ -33,8 +35,12 @@ import {
   newDocumentRequest,
   rangesOfHandlerOf,
   rangesOfRequest,
+  readConditionAnswerOf,
+  readConditionRequest,
   stepFormHandlerOf,
   stepFormRequest,
+  stepVariantsHandlerOf,
+  stepVariantsRequest,
   workflowFormHandlerOf,
   workflowFormRequest,
   structureHandlerOf,
@@ -76,6 +82,9 @@ export function serve(
 
   const answerFromJson = lifecycle.guarded(fromJsonAnswerOf);
   connection.onRequest(fromJsonRequest, answerFromJson);
+
+  const answerCondition = lifecycle.guarded(readConditionAnswerOf);
+  connection.onRequest(readConditionRequest, answerCondition);
 
   const shutdown = lifecycle.guarded(() => {
     lifecycle.shutDown();
@@ -236,8 +245,10 @@ function serveFeatures(
   const project = structureHandlerOf(documents, host);
   const formStep = stepFormHandlerOf(documents, host, schemasAt);
   const formWorkflow = workflowFormHandlerOf(documents, host, reads);
+  const readData = dataAtHandlerOf(documents, host);
   const edit = editHandlerOf(documents, host);
   const writeNew = newDocumentHandlerOf(host);
+  const listVariants = stepVariantsHandlerOf(host);
   const answerCompletion = lifecycle.guarded(complete);
   const answerHover = lifecycle.guarded(hover);
   const answerCodeAction = lifecycle.guarded(fix);
@@ -247,8 +258,10 @@ function serveFeatures(
   const answerStructure = lifecycle.guarded(project);
   const answerStepForm = lifecycle.guarded(formStep);
   const answerWorkflowForm = lifecycle.guarded(formWorkflow);
+  const answerData = lifecycle.guarded(readData);
   const answerEdit = lifecycle.guarded(edit);
   const answerNewDocument = lifecycle.guarded(writeNew);
+  const answerVariants = lifecycle.guarded(listVariants);
 
   connection.onCompletion(answerCompletion);
   connection.onHover(answerHover);
@@ -259,8 +272,10 @@ function serveFeatures(
   connection.onRequest(structureRequest, answerStructure);
   connection.onRequest(stepFormRequest, answerStepForm);
   connection.onRequest(workflowFormRequest, answerWorkflowForm);
+  connection.onRequest(dataAtRequest, answerData);
   connection.onRequest(editRequest, answerEdit);
   connection.onRequest(newDocumentRequest, answerNewDocument);
+  connection.onRequest(stepVariantsRequest, answerVariants);
 }
 
 function pushOf(

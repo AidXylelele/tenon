@@ -31,6 +31,14 @@ export interface MessageDetails {
   readonly undeclaredSecret: readonly [name: string];
   readonly unknownSecret: readonly [name: string];
   readonly misnamedAttribute: readonly [name: string];
+  readonly emptyEventAttribute: readonly [name: string];
+  readonly emptyFilterAttribute: readonly [name: string];
+  readonly emptyImage: readonly [];
+  readonly emptyMethod: readonly [];
+  readonly emptyGrpcMember: readonly [member: string];
+  readonly emptyOperation: readonly [];
+  readonly emptyAsyncApiTarget: readonly [target: string];
+  readonly emptyWorkflowIdentity: readonly [member: string];
   readonly invalidDuration: readonly [text: string];
   readonly dynamicSchedule: readonly [text: string];
   readonly calendarSchedule: readonly [text: string];

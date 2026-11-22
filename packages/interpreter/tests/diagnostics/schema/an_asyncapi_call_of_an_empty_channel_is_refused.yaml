@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: publish
+    version: '0.1.0'
+  do:
+    - publish:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          channel: ''
+          message:
+            payload: {}
+diagnostics:
+  - code: schema
+    pointer: /do/0/publish/with/channel
+    range: { start: { line: 12, column: 18 } }
+    message: An AsyncAPI call must name its channel.

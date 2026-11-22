@@ -1,6 +1,7 @@
 import { renameAt } from "../names/index.js";
 import { parentPointerOf, valueAt } from "../pointers/index.js";
 import {
+  listEndOf,
   listWithId,
   nameConflictOf,
   type StepNode,
@@ -9,7 +10,8 @@ import {
   stepWithId,
 } from "../steps/index.js";
 import { offsetOf } from "../text/index.js";
-import { inlineYamlOf, scalarLike, yamlOf } from "../yaml-text/index.js";
+import { startingContentOf } from "../variants/index.js";
+import { scalarLike } from "../yaml-text/index.js";
 import type {
   Destination,
   DuplicateStep,
@@ -27,11 +29,12 @@ import {
   inTextOrder,
   itemFormsOf,
   listTextOf,
+  newItemFormsOf,
   removalOf,
   withoutItem,
 } from "./collection-text.js";
 import { idChangesOf, placedStepOf } from "./ids.js";
-import { copyNameOf, newNameOf, templateOf } from "./templates.js";
+import { copyNameOf, newNameOf } from "./step-names.js";
 
 export function stepInsertionOf(
   editable: Editable,
@@ -62,11 +65,10 @@ export function stepInsertionOf(
     return { kind: "refused", reason: conflict };
   }
 
-  const template = templateOf(action.step);
-  const item = { [name]: template };
-  const block = yamlOf([item]);
-  const inline = inlineYamlOf(item);
-  const forms = { block, inline };
+  const otherwise = listEndOf(editable.tree, list);
+  const content = startingContentOf(action.step, otherwise);
+  const item = { [name]: content };
+  const forms = newItemFormsOf(item);
   const insertion = insertionOf(collection, action.index, forms);
   return { kind: "edited", changes: [insertion], ids: [] };
 }
