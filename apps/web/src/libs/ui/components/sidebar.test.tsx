@@ -8,9 +8,11 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
@@ -30,7 +32,9 @@ function Navigation() {
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Home">Home</SidebarMenuButton>
+                <SidebarMenuButton asChild tooltip="Home">
+                  <Link href="/">Home</Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive tooltip="Workflows">
@@ -39,6 +43,9 @@ function Navigation() {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarContent>
+          <SidebarFooter>
+            <button type="button">Administrator</button>
+          </SidebarFooter>
         </Sidebar>
         <SidebarInset>
           <SidebarTrigger />
@@ -76,6 +83,13 @@ describe("the console's navigation below 1024 px", () => {
     const trigger = openedAt(800);
 
     expect(trigger).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("the_open_sheet_starts_on_its_first_place_not_on_the_account_menu", () => {
+    openedAt(800);
+
+    const home = screen.getByRole("link", { name: "Home" });
+    expect(home).toHaveFocus();
   });
 
   it("the_sheet_has_its_close_button", () => {
@@ -116,7 +130,7 @@ describe("the console's navigation from 1024 px", () => {
     const viewport = fakeViewport(1440);
     vi.stubGlobal("matchMedia", viewport.matchMedia);
     render(<Navigation />);
-    const home = screen.getByRole("button", { name: "Home" });
+    const home = screen.getByRole("link", { name: "Home" });
     act(() => {
       home.focus();
     });
@@ -133,7 +147,7 @@ describe("the console's navigation from 1024 px", () => {
     const viewport = fakeViewport(1440);
     vi.stubGlobal("matchMedia", viewport.matchMedia);
     render(<Navigation />);
-    const home = screen.getByRole("button", { name: "Home" });
+    const home = screen.getByRole("link", { name: "Home" });
     act(() => {
       fireEvent.pointerMove(home, { pointerType: "mouse" });
       vi.runAllTimers();
@@ -160,7 +174,7 @@ describe("the console's navigation from 1024 px", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "b", ctrlKey: true });
     });
-    const home = screen.getByRole("button", { name: "Home" });
+    const home = screen.getByRole("link", { name: "Home" });
 
     act(() => {
       fireEvent.pointerMove(home, { pointerType: "mouse" });
@@ -175,7 +189,7 @@ describe("the console's navigation from 1024 px", () => {
     const viewport = fakeViewport(1440);
     vi.stubGlobal("matchMedia", viewport.matchMedia);
     render(<Navigation />);
-    const home = screen.getByRole("button", { name: "Home" });
+    const home = screen.getByRole("link", { name: "Home" });
 
     act(() => {
       home.focus();
@@ -209,10 +223,12 @@ function Column({
         <SidebarHeader>Tenon</SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
+            <SidebarGroupLabel id="activity">Activity</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu aria-labelledby="activity">
                 <SidebarMenuItem>
                   <SidebarMenuButton>Runs</SidebarMenuButton>
+                  <SidebarMenuBadge>10</SidebarMenuBadge>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuSkeleton showIcon />
@@ -247,6 +263,27 @@ describe("the console's navigation as a column", () => {
     });
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("a_group_of_places_is_named_by_its_label", () => {
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+
+    render(<Column onOpenChange={vi.fn()} />);
+
+    const group = screen.getByRole("list", { name: "Activity" });
+    expect(group).toBeInTheDocument();
+  });
+
+  it("a_place_shows_its_count_after_its_name", () => {
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+    render(<Column onOpenChange={vi.fn()} />);
+
+    const runs = screen.getByRole("button", { name: "Runs" });
+
+    const place = runs.closest("li");
+    expect(place).toHaveTextContent("Runs10");
   });
 
   it("asking_for_the_sidebar_outside_its_provider_is_refused", () => {

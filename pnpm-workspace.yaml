@@ -32,3 +32,8 @@ allowBuilds:
 # drizzle-kit's deprecated @esbuild-kit/core-utils pins esbuild 0.18 (dev-server advisory, fixed in 0.25).
 overrides:
   "@esbuild-kit/core-utils>esbuild": 0.25.12
+
+# cmdk 1.1.1 runs the tasks it queues while flushing in the same pass, before the items re-render,
+# so the input's aria-activedescendant stays empty (dip/cmdk#373, #413); drop with a fixed release.
+patchedDependencies:
+  cmdk@1.1.1: patches/cmdk@1.1.1.patch

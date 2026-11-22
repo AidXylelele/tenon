@@ -1,12 +1,27 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { HouseIcon, PlayIcon, SettingsIcon, WorkflowIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  BellIcon,
+  HouseIcon,
+  KeyRoundIcon,
+  SettingsIcon,
+  WebhookIcon,
+  WorkflowIcon,
+  type LucideIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { useId } from "react";
+import { expect, screen, waitFor } from "storybook/test";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
@@ -14,12 +29,51 @@ import {
 } from "./sidebar";
 import { TooltipProvider } from "./tooltip";
 
-const PLACES = [
-  { label: "Home", icon: HouseIcon, current: false },
-  { label: "Workflows", icon: WorkflowIcon, current: true },
-  { label: "Runs", icon: PlayIcon, current: false },
-  { label: "Settings", icon: SettingsIcon, current: false },
-];
+interface PlaceProps {
+  readonly label: string;
+  readonly href: string;
+  readonly icon: LucideIcon;
+  readonly current?: boolean;
+  readonly running?: number;
+}
+
+function Place({ label, href, icon: Icon, current, running }: PlaceProps) {
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={current} tooltip={label}>
+        <Link href={href}>
+          <Icon />
+          <span>
+            {label}
+            {running !== undefined && (
+              <span className="sr-only">, {running} runs in progress now</span>
+            )}
+          </span>
+        </Link>
+      </SidebarMenuButton>
+      {running !== undefined && (
+        <SidebarMenuBadge aria-hidden>{running}</SidebarMenuBadge>
+      )}
+    </SidebarMenuItem>
+  );
+}
+
+function Connect() {
+  const labelId = useId();
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel id={labelId}>Connect</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu aria-labelledby={labelId}>
+          <Place label="Webhooks" href="/webhooks" icon={WebhookIcon} />
+          <Place label="Notifications" href="/notifications" icon={BellIcon} />
+          <Place label="Secrets" href="/secrets" icon={KeyRoundIcon} />
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
 
 function Navigation({ open }: { readonly open: boolean }) {
   return (
@@ -30,24 +84,29 @@ function Navigation({ open }: { readonly open: boolean }) {
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {PLACES.map((place) => {
-                    const Icon = place.icon;
-                    return (
-                      <SidebarMenuItem key={place.label}>
-                        <SidebarMenuButton
-                          isActive={place.current}
-                          tooltip={place.label}
-                        >
-                          <Icon />
-                          <span>{place.label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
+                  <Place label="Home" href="/" icon={HouseIcon} />
+                  <Place
+                    label="Workflows"
+                    href="/workflows"
+                    icon={WorkflowIcon}
+                    current
+                  />
+                  <Place
+                    label="Runs"
+                    href="/runs"
+                    icon={ActivityIcon}
+                    running={10}
+                  />
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+            <Connect />
           </SidebarContent>
+          <SidebarFooter>
+            <SidebarMenu>
+              <Place label="Settings" href="/settings" icon={SettingsIcon} />
+            </SidebarMenu>
+          </SidebarFooter>
         </Sidebar>
         <SidebarInset className="p-4">
           <SidebarTrigger />
@@ -77,5 +136,10 @@ export const MobileSheetOpen: Story = {
   play: async ({ canvas, userEvent }) => {
     const trigger = await canvas.findByRole("button", { name: "Navigation" });
     await userEvent.click(trigger);
+
+    const home = await screen.findByRole("link", { name: "Home" });
+    await waitFor(async () => {
+      await expect(home).toHaveFocus();
+    });
   },
 };
