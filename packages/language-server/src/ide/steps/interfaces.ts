@@ -43,7 +43,7 @@ export type FailureKind = "stop" | "continue" | "retry" | "handle";
 
 export interface Retry {
   readonly kind: "retry";
-  readonly attempts: number;
+  readonly retries: number;
   readonly seconds: number;
   readonly growing: boolean;
 }

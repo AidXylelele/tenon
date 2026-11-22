@@ -289,12 +289,12 @@ function holdsResultSetting(action: unknown): boolean {
 }
 
 function holdsRetry(failure: unknown): boolean {
-  const attempts = memberOf(failure, "attempts");
+  const retries = memberOf(failure, "retries");
   const seconds = memberOf(failure, "seconds");
   const growing = memberOf(failure, "growing");
 
   return (
-    Number.isInteger(attempts) &&
+    Number.isInteger(retries) &&
     typeof seconds === "number" &&
     typeof growing === "boolean"
   );

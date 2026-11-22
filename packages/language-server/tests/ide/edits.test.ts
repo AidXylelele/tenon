@@ -557,7 +557,7 @@ const retried = guardedFlow.replace(
 
 const retry = {
   kind: "retry",
-  attempts: 3,
+  retries: 3,
   seconds: 5,
   growing: false,
 } as const;

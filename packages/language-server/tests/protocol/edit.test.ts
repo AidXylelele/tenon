@@ -119,7 +119,7 @@ test("a failure choice answers its edit and the ids it moves", async () => {
   ]);
 });
 
-test("a retry with no attempts is invalid", async () => {
+test("a retry with no number of retries is invalid", async () => {
   useFakeClock();
   const session = await sessionWith(guardedFlow);
   const params = {

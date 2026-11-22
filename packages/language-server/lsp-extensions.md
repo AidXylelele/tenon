@@ -663,7 +663,7 @@ interface StepVariantsResult {
   | `raise`                      | `raise.error: { type: …/errors/validation, status: 400, title: "" }`                                                                           | the title                                    |
   | `set`                        | `set: { value: "" }` and `output.as: ${ $input + . }`, which keeps the data that came in beside the values set                                 | the values                                   |
   | `switch`                     | `switch: [ { default: { then: continue } } ]`                                                                                                  | its branches                                 |
-  | `try`                        | `try: []`, `catch` with the retry `setFailure` writes for 3 attempts, 2 s apart, growing                                                       | its steps                                    |
+  | `try`                        | `try: []`, `catch` with the retry `setFailure` writes for 3 retries, 2 s apart, growing (waits of 2, 4 and 8 s)                                | its steps                                    |
   | `wait`                       | `wait: PT30M`                                                                                                                                  |                                              |
 
 - **An address left empty.** The grammar refuses an empty address (`schema`, "Endpoint is not in the form the standard requires."), so the analysis of a text holding a call step with no address yet is refused: the structure stays that of the last version that analysed, without the new step, until the address is written. For the same reason a call variant's `capability` is not checked, and it is listed whatever the profile.
@@ -941,7 +941,7 @@ type EditAction =
 type Failure =
   | { kind: "stop" }
   | { kind: "continue" }
-  | { kind: "retry"; attempts: number; seconds: number; growing: boolean }
+  | { kind: "retry"; retries: number; seconds: number; growing: boolean }
   | { kind: "handle" };
 
 interface EditResult {
@@ -982,7 +982,7 @@ interface EditResult {
 - **If it fails** (`setFailure`: `stop`, `continue`, `retry` or `handle`), on a step's id:
   - on a step no try protects, `continue`, `retry` and `handle` wrap the author's step text, re-indented, in a try of the same name, and move the step's `then` to the try; `stop` changes nothing;
   - on a protecting try (a try whose `try` list holds one step), `continue`, `retry` and `handle` replace its `catch`, and `stop` gives the step its own text back in the try's place, with the try's `then`;
-  - the `catch` written: `continue` `{}`; `retry` `{ retry: { delay: { seconds }, backoff: { constant: {} } or { exponential: {} } when growing, limit: { attempt: { count: attempts } } } }`; `handle` `{ do: [] }`, an empty list the web fills with `insertStep` into `<id>/catch/do`; a `handle` on a try whose catch already writes `do` changes nothing;
+  - the `catch` written: `continue` `{}`; `retry` `{ retry: { delay: { seconds }, backoff: { constant: {} } or { exponential: {} } when growing, limit: { attempt: { count: retries } } } }`, the language counting retries in `count`; `handle` `{ do: [] }`, an empty list the web fills with `insertStep` into `<id>/catch/do`; a `handle` on a try whose catch already writes `do` changes nothing;
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
 - **The step's result** (`setResult`) writes the members of the chosen result and removes the others: `output.as`, and the `output` that holds nothing else; a script's `run.return`, set to the mode the result needs (`stdout` or `code`) where the step returns another. A result the step does not offer is refused.
 - **Conditions** (`setCondition`) write the condition at the field in its one form (`workflow/readCondition`), as `setField` would its text.

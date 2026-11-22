@@ -121,7 +121,7 @@ export function retryCatchOf(retry: Retry): JsonObject {
   const policy = {
     delay: { seconds: retry.seconds },
     backoff: { [backoff]: {} },
-    limit: { attempt: { count: retry.attempts } },
+    limit: { attempt: { count: retry.retries } },
   };
 
   return { retry: policy };

@@ -73,7 +73,7 @@ test.each<readonly [string, HostProfile, readonly string[]]>([
     ["shell"],
   ],
   [
-    "no timer leaves out the wait and the try, whose retry waits between attempts",
+    "no timer leaves out the wait and the try, whose retry waits between retries",
     { ...profile, effects: effectsWithoutTimer },
     ["try", "wait"],
   ],

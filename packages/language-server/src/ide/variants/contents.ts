@@ -8,7 +8,7 @@ const validationError =
 
 const startingRetry: Retry = {
   kind: "retry",
-  attempts: 3,
+  retries: 3,
   seconds: 2,
   growing: true,
 };
