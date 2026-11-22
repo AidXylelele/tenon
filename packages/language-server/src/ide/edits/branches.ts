@@ -1,6 +1,6 @@
 import type { ast, JsonObject } from "interpreter/front-end";
 import { listEndOf, nameConflictOf, type StepTree } from "../steps/index.js";
-import { startingContentOf } from "../variants/index.js";
+import { kindOf, startingContentOf } from "../variants/index.js";
 import { insertionOf, newItemFormsOf } from "./collection-text.js";
 import { combinedOf, fieldSettingOf } from "./field-actions.js";
 import type {
@@ -55,7 +55,8 @@ function newBranchStepOf(
   action: InsertStepOnBranch,
 ): Editing {
   const { step, list, collection } = switching.written;
-  const name = action.name ?? newNameOf(list, action.step);
+  const kind = kindOf(action.step);
+  const name = action.name ?? newNameOf(list, kind);
   const conflict = nameConflictOf(list, name, null);
 
   if (conflict !== null) {

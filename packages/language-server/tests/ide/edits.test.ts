@@ -1140,7 +1140,7 @@ function startOf(variant: StepVariant) {
     list: "/do",
     index: 0,
     step: variant,
-    name: null,
+    name: variant,
   };
   const edited = editedOf(emptyFlow, action);
   const snapshot = snapshotOf(edited);
@@ -1333,7 +1333,7 @@ test("a JavaScript step starts with code that prints its result as JSON and an o
   const outcome = outcomeOf(emptyFlow, action);
 
   const expected = `${inlineHeader}do:
-  - script-js:
+  - run:
       run:
         script:
           language: js
@@ -1881,11 +1881,11 @@ test("a new HTTP step with its address to fill is in the structure and has its f
   const snapshot = snapshotOf(edited);
 
   const reading = structureReadingOf(snapshot);
-  const form = formOf(snapshot, "/do/http", formSchemasAt);
+  const form = formOf(snapshot, "/do/call", formSchemasAt);
 
   const ids = reading.workflow.steps.steps.map((step) => step.id);
   expect(reading.stale).toBe(false);
-  expect(ids).toEqual(["/do/http"]);
+  expect(ids).toEqual(["/do/call"]);
   expect(form).toMatchObject({ kind: "form" });
 });
 
@@ -1906,4 +1906,29 @@ test("a new choice in a loop leaves only the item when no branch matches", () =>
     `      do:\n        - switch:\n            switch:\n              - branch-1:\n                  when: ""\n                  then: continue\n              - default:\n                  then: exit\n`,
   );
   expect(outcome).toMatchObject({ text: expected });
+});
+
+test.each<readonly [StepVariant, string]>([
+  ["http", "call"],
+  ["mcp", "call"],
+  ["script-js", "run"],
+  ["shell", "run"],
+  ["workflow", "run"],
+  ["switch", "switch"],
+  ["wait", "wait"],
+])("a new %s step with no name takes its kind's name, %s", (variant, name) => {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: variant,
+    name: null,
+  };
+
+  const edited = editedOf(emptyFlow, action);
+
+  const snapshot = snapshotOf(edited);
+  const { workflow } = structureReadingOf(snapshot);
+  const names = workflow.steps.steps.map((step) => step.name);
+  expect(names).toEqual([name]);
 });
