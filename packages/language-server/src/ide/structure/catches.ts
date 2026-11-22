@@ -18,7 +18,7 @@ export function catchPolicyOf(
   const caught = task.catch;
   const errors = caughtErrorsOf(caught.errors);
   const policy = retryPolicyOf(caught.retry, model);
-  const retry = policy === null ? null : retryPlanOf(policy);
+  const retry = retryPlanOf(policy);
   const afterward = afterwardOf(caught);
   const when = caught.when?.source ?? null;
   const exceptWhen = caught.exceptWhen?.source ?? null;
@@ -47,11 +47,15 @@ function retryPolicyOf(
     case "retry":
       return retry;
     case "reference":
-      return model.symbols.components.retries.get(retry.name) ?? null;
+      return model.symbols.references.retries.get(retry.pointer) ?? null;
   }
 }
 
-function retryPlanOf(policy: ast.RetryPolicy): RetryPlan {
+function retryPlanOf(policy: ast.RetryPolicy | null): RetryPlan | null {
+  if (policy === null) {
+    return null;
+  }
+
   const milliseconds = delayOf(policy.delay);
   const when = policy.when?.source ?? null;
   const exceptWhen = policy.exceptWhen?.source ?? null;
@@ -67,7 +71,7 @@ function retryPlanOf(policy: ast.RetryPolicy): RetryPlan {
 
 function delayOf(delay: ast.Duration | null): number | null {
   if (delay === null) {
-    return null;
+    return 0;
   }
 
   return millisecondsOf(delay);

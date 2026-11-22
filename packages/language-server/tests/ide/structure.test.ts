@@ -503,6 +503,40 @@ test.each([
       afterward: "handle",
     },
   ],
+  [
+    "a retry with a then and no steps goes on once the retries are spent",
+    `guard: { try: ${tried}, catch: { retry: ${growingRetry}, then: end } }`,
+    {
+      errors: null,
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "exponential",
+        when: null,
+        exceptWhen: null,
+      },
+      afterward: "continue",
+    },
+  ],
+  [
+    "a retry with no delay retries at once, and without a count retries with no count",
+    `guard: { try: ${tried}, catch: { retry: { backoff: { constant: {} }, limit: { duration: { minutes: 5 } } } } }`,
+    {
+      errors: null,
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: null,
+        milliseconds: 0,
+        backoff: "constant",
+        when: null,
+        exceptWhen: null,
+      },
+      afterward: "stop",
+    },
+  ],
 ])("a try's catch is data: %s", (_, step, policy) => {
   const text = `${inlineHeader}do:\n  - ${step}\n`;
   const snapshot = snapshotOf(text);

@@ -323,8 +323,8 @@ interface CatchPolicy {
   when: string | null; // the catch's condition, its source
   exceptWhen: string | null;
   retry: {
-    retries: number | null; // limit.attempt.count: the language counts retries
-    milliseconds: number | null; // the delay, where fixed
+    retries: number | null; // limit.attempt.count: the language counts retries; null: no count is written, so it retries until its duration limit, if any
+    milliseconds: number | null; // the delay: 0 where none is written; null where it is not fixed (calendar, expression, mistake)
     backoff: "constant" | "linear" | "exponential";
     when: string | null;
     exceptWhen: string | null;
@@ -994,7 +994,7 @@ interface EditResult {
 - **Ids** are the structure's. `index` is the step's index in the target list after the action. `ids` lists every id the action changes: `renameStep`, and `moveStep` into another list, give the step and every step and list below it; the others give none.
 - **Names.** A new step without a name takes its kind's name, whatever its variant (`call` for an HTTP or MCP call, `run` for a script or a shell), then `<kind>-2`, `-3`, …; a duplicate takes the next free `<name>-2`.
 - **Starting content.** A new step is its variant's starting content (`workflow/stepVariants`).
-- **A catch's first step.** `insertStep` into `<id>/catch/do` of a try whose catch writes no `do`, at index 0, writes that list with the new step and keeps the rest of the catch, its `retry` included, so the step's `catch.afterward` becomes `handle`.
+- **A catch's first step.** `insertStep` into `<id>/catch/do`, `<id>` being the try's id, where the try's catch writes no `do`, writes that list with the new step and keeps the rest of the catch, its `retry` included, so the step's `catch.afterward` becomes `handle`. The list has no steps yet, so any index other than 0 is refused.
 - **Fields.** `setField` and `clearField` act at any member of a step or of the document, such as `/schedule/cron`. `setField` also writes the holders the text lacks, as an author would: a member added to a block mapping is written in block style, so `setField` at `/input/schema` on a workflow with no `input` writes `input:`, then `schema:` and the value below it; one added to a flow mapping stays on its line.
 - **Text with line breaks.** A string with a line break, set in a block mapping or sequence, is written as a literal block scalar indented under its key or dash: `|` when it ends in one line break, `|-` when it ends in none, `|+` when it ends in more, the indentation indicator where its first line starts with a space; a comment after the old value moves to the block's header, and a block's header comment stays beside a value that becomes one line. Where a block would take in what follows it (an empty line after a value that ends in several line breaks, or a comment indented under the key) the value is written double-quoted instead; an old block that keeps its final line breaks (`|+`) is replaced with them. A one-line string keeps the style it was written in, a block scalar's included (`code: |-` and the line). In a flow collection a string stays on its line, double-quoted where it holds a line break.
 - **A step on a branch** (`insertStepOnBranch`). The new step goes directly after the switch, in the switch's list, because flow directives name only tasks of their own list (dsl.md, "Task Flow") and the only step that can run into that place is the switch itself. Where the branch led stays where it leads, through the new step:

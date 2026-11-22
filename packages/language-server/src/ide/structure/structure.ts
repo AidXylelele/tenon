@@ -6,8 +6,6 @@ import type {
 } from "interpreter/front-end";
 import { type ConditionReading, conditionOf } from "../conditions/index.js";
 import { stepFamilies } from "../families/index.js";
-import { catchPolicyOf } from "./catches.js";
-import { variantOf } from "../variants/index.js";
 import { parentPointerOf, valueAt } from "../pointers/index.js";
 import { type Basis, type Snapshot, sourceOf } from "../snapshot/index.js";
 import {
@@ -17,6 +15,7 @@ import {
   stepTreeOf,
   targetOf,
 } from "../steps/index.js";
+import { variantOf } from "../variants/index.js";
 import type {
   Destination,
   NestedList,
@@ -28,6 +27,7 @@ import type {
   Trigger,
   WorkflowStructure,
 } from "./interfaces.js";
+import { catchPolicyOf } from "./catches.js";
 import {
   stepMillisecondsOf,
   summaryOf,
@@ -137,7 +137,7 @@ function stepOf(node: StepNode, sources: Sources): Step {
   const selectionRange = sources.positions?.keyRangeOf(node.pointer) ?? null;
   const lists = node.lists.flatMap((list) => nestedListsOf(list, sources));
   const flow = flowOf(node, sources);
-  const caught = catchPolicyOf(task, sources.model);
+  const catchPolicy = catchPolicyOf(task, sources.model);
 
   return {
     id: node.id,
@@ -153,7 +153,7 @@ function stepOf(node: StepNode, sources: Sources): Step {
     selectionRange,
     lists,
     flow,
-    catch: caught,
+    catch: catchPolicy,
   };
 }
 

@@ -1,4 +1,5 @@
 import type {
+  ast,
   Range,
   RangeLocator,
   SemanticModel,
@@ -42,18 +43,12 @@ export interface Step<Place = Range> {
   readonly catch: CatchPolicy | null;
 }
 
-export interface CaughtErrors {
-  readonly type: string | null;
-  readonly status: number | null;
-  readonly instance: string | null;
-  readonly title: string | null;
-  readonly detail: string | null;
-}
+export type CaughtErrors = Omit<ast.ErrorFilter, "pointer">;
 
 export interface RetryPlan {
   readonly retries: number | null;
   readonly milliseconds: number | null;
-  readonly backoff: "constant" | "linear" | "exponential";
+  readonly backoff: ast.Backoff["kind"];
   readonly when: string | null;
   readonly exceptWhen: string | null;
 }

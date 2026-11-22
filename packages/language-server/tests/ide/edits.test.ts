@@ -1968,10 +1968,7 @@ test.each([
   ],
   [
     "a catch with no retry gains its first step",
-    retriedGuard.replace(
-      "      catch:\n        retry:\n          delay:\n            seconds: 2\n          backoff:\n            exponential: {}\n          limit:\n            attempt:\n              count: 3\n",
-      "      catch: {}\n",
-    ),
+    `${inlineHeader}do:\n  - guard:\n      try:\n        - fetch:\n            set:\n              a: 1\n      catch: {}\n`,
     `${inlineHeader}do:\n  - guard:\n      try:\n        - fetch:\n            set:\n              a: 1\n      catch:\n        do:\n          - wait:\n              wait: PT30M\n`,
   ],
 ])("%s", (_, text, expected) => {
@@ -1982,13 +1979,27 @@ test.each([
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
-test("a catch's first step goes nowhere but the first place", () => {
-  const action = catchStepOf(1);
+test.each([
+  [
+    "a catch's first step goes nowhere but the first place",
+    retriedGuard,
+    catchStepOf(1),
+    "The list has no place 1.",
+  ],
+  [
+    "a step that is not a try has no catch to fill",
+    `${inlineHeader}do:\n  - pause:\n      wait: PT1S\n`,
+    {
+      kind: "insertStep",
+      list: "/do/pause/catch/do",
+      index: 0,
+      step: "wait",
+      name: null,
+    },
+    "No list with the id /do/pause/catch/do stands in the text.",
+  ],
+] as const)("%s", (_, text, action, reason) => {
+  const editing = check(text, action);
 
-  const editing = check(retriedGuard, action);
-
-  expect(editing).toEqual({
-    kind: "refused",
-    reason: "The list has no place 1.",
-  });
+  expect(editing).toEqual({ kind: "refused", reason });
 });

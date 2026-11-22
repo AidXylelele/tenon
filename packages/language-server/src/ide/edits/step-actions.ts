@@ -1,5 +1,6 @@
+import type { JsonObject } from "interpreter/front-end";
 import { renameAt } from "../names/index.js";
-import { childPointerOf, parentPointerOf, valueAt } from "../pointers/index.js";
+import { parentPointerOf, valueAt } from "../pointers/index.js";
 import {
   listEndOf,
   listWithId,
@@ -8,6 +9,7 @@ import {
   type StepNodeList,
   type StepTree,
   stepWithId,
+  unwrittenCatchListWithId,
 } from "../steps/index.js";
 import { offsetOf } from "../text/index.js";
 import { kindOf, startingContentOf } from "../variants/index.js";
@@ -38,25 +40,20 @@ import { fieldSettingOf } from "./field-actions.js";
 import { idChangesOf, placedStepOf } from "./ids.js";
 import { copyNameOf, newNameOf } from "./step-names.js";
 
-const catchListId = "/catch/do";
-
 export function stepInsertionOf(
   editable: Editable,
   action: InsertStep,
 ): Editing {
-  const list = listWithId(editable.tree, action.list);
+  const written = listWithId(editable.tree, action.list);
+  const unwritten = unwrittenCatchListWithId(editable.tree, action.list);
+  const list = written ?? unwritten;
 
   if (list === null) {
-    return catchStepInsertionOf(editable, action);
-  }
-
-  const collection = listTextOf(editable, list);
-  const room = list.steps.length;
-  const isWithin = isIndexWithin(action.index, room);
-
-  if (collection === null) {
     return { kind: "refused", reason: unknownListOf(action.list) };
   }
+
+  const room = list.steps.length;
+  const isWithin = isIndexWithin(action.index, room);
 
   if (!isWithin) {
     return { kind: "refused", reason: outsideOf(action.index) };
@@ -73,33 +70,20 @@ export function stepInsertionOf(
   const otherwise = listEndOf(editable.tree, list);
   const content = startingContentOf(action.step, otherwise);
   const item = { [name]: content };
-  const forms = newItemFormsOf(item);
-  const insertion = insertionOf(collection, action.index, forms);
-  return { kind: "edited", changes: [insertion], ids: [] };
+
+  if (written === null) {
+    return listWritingOf(editable, list, item);
+  }
+
+  return itemInsertionOf(editable, written, action.index, item);
 }
 
-function catchStepInsertionOf(editable: Editable, action: InsertStep): Editing {
-  const list = unwrittenCatchListOf(editable.tree, action.list);
-
-  if (list === null) {
-    return { kind: "refused", reason: unknownListOf(action.list) };
-  }
-
-  if (action.index !== 0) {
-    return { kind: "refused", reason: outsideOf(action.index) };
-  }
-
-  const kind = kindOf(action.step);
-  const name = action.name ?? newNameOf(list, kind);
-  const conflict = nameConflictOf(list, name, null);
-
-  if (conflict !== null) {
-    return { kind: "refused", reason: conflict };
-  }
-
-  const otherwise = listEndOf(editable.tree, list);
-  const content = startingContentOf(action.step, otherwise);
-  const items = [{ [name]: content }];
+function listWritingOf(
+  editable: Editable,
+  list: StepNodeList,
+  item: JsonObject,
+): Editing {
+  const items = [item];
   const setting: SetField = {
     kind: "setField",
     pointer: list.pointer,
@@ -108,24 +92,21 @@ function catchStepInsertionOf(editable: Editable, action: InsertStep): Editing {
   return fieldSettingOf(editable, setting);
 }
 
-function unwrittenCatchListOf(tree: StepTree, id: string): StepNodeList | null {
-  const isCatchList = id.endsWith(catchListId);
+function itemInsertionOf(
+  editable: Editable,
+  list: StepNodeList,
+  index: number,
+  item: JsonObject,
+): Editing {
+  const collection = listTextOf(editable, list);
 
-  if (!isCatchList) {
-    return null;
+  if (collection === null) {
+    return { kind: "refused", reason: unknownListOf(list.id) };
   }
 
-  const tryId = id.slice(0, -catchListId.length);
-  const step = stepWithId(tree, tryId);
-  const task = step?.task;
-
-  if (step === null || task?.kind !== "try" || task.catch.do !== null) {
-    return null;
-  }
-
-  const caught = childPointerOf(step.pointer, "catch");
-  const pointer = childPointerOf(caught, "do");
-  return { id, pointer, part: "catch", role: "sequence", steps: [] };
+  const forms = newItemFormsOf(item);
+  const insertion = insertionOf(collection, index, forms);
+  return { kind: "edited", changes: [insertion], ids: [] };
 }
 
 export function stepMoveOf(editable: Editable, action: MoveStep): Editing {

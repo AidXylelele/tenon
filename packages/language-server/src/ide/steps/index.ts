@@ -23,4 +23,5 @@ export {
   stepTreeOf,
   stepWithId,
   targetOf,
+  unwrittenCatchListWithId,
 } from "./steps.js";
