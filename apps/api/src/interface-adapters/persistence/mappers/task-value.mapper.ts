@@ -1,8 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { TaskValueKind } from "../../../domain/automation/instances/enums.js";
 import type { JsonValue } from "../../../domain/automation/interfaces.js";
-import type { TaskValueRow, TaskValues } from "../interfaces.js";
-import { Cipher } from "../ports.js";
+import { Cipher, type TaskValueRow, type TaskValues } from "../interfaces.js";
 
 @Injectable()
 export class TaskValueMapper {

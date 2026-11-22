@@ -32,8 +32,10 @@ import { WorkflowQueries } from "../../../application/automation/workflows/queri
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { User } from "../../../domain/identity/user.js";
-import type { VersionStructure } from "../../workflows/interfaces.js";
-import { StructureClient } from "../../workflows/ports.js";
+import {
+  StructureClient,
+  type VersionStructure,
+} from "../../workflows/interfaces.js";
 import { EntityTagMapper } from "../mappers/entity-tag.mapper.js";
 import { Missing } from "../../../application/automation/enums.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";

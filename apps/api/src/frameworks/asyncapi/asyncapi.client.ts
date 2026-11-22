@@ -17,16 +17,20 @@ import { PermanentFault } from "../../domain/errors.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import { HttpClient } from "../http-client/http.client.js";
 import type { UnusableSecret } from "../http-client/interfaces.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type {
+  AsyncApiInbox,
+  Subscribed,
+  SubscriptionClient,
+} from "../../interface-adapters/messaging/interfaces.js";
+import type { StepCall } from "../../interface-adapters/workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import { AmqpBroker } from "./amqp.broker.js";
 import { AsyncApiDocuments } from "./asyncapi-documents.js";
 import type {
-  AsyncApiInbox,
   BrokerCredentials,
   BrokerClient,
   BrokerTarget,
   ReceivedBrokerMessage,
-  Subscribed,
 } from "./interfaces.js";
 import { BrokerProtocol } from "./enums.js";
 import { KafkaBroker } from "./kafka.broker.js";
@@ -35,7 +39,7 @@ import { NatsBroker } from "./nats.broker.js";
 import { RedisBroker } from "./redis.broker.js";
 
 @Injectable()
-export class AsyncApiClient {
+export class AsyncApiClient implements SubscriptionClient {
   private static readonly MESSAGE_BYTES = 1024 * 1024;
   private static readonly JSON = /^application\/(?:[\w.+-]+\+)?json\b/i;
   private static readonly ANONYMOUS: BrokerCredentials = { kind: "anonymous" };
@@ -102,9 +106,15 @@ export class AsyncApiClient {
 
   async subscribe(
     request: AsyncApiRequest,
-    call: CallContext,
+    step: StepCall,
     inbox: AsyncApiInbox,
   ): Promise<Subscribed> {
+    const call: CallContext = {
+      idempotencyKey: step.idempotencyKey,
+      signal: step.signal,
+      secrets: step.secrets,
+      remaining: null,
+    };
     const document = await this.http.text(request.document, call);
 
     if (document.kind !== "text") return document;

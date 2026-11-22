@@ -239,6 +239,13 @@
       "when": 1795350296708,
       "tag": "0033_on_schedule_types",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795365834451,
+      "tag": "0034_first_administrator",
+      "breakpoints": true
     }
   ]
 }

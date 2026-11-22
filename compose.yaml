@@ -106,6 +106,7 @@ services:
       target: migrate
     environment:
       DATABASE_URL_FILE: /run/secrets/database-url
+      PGOPTIONS: "-c tenon.admin_email=${ADMIN_EMAIL:?set ADMIN_EMAIL in .env}"
     secrets: [database-url]
     depends_on:
       postgres:
@@ -117,19 +118,65 @@ services:
     build:
       <<: *api-build
       target: runtime
+    image: tenon-api
     environment:
       <<: *telemetry
+      OTEL_SERVICE_NAME: tenon-api
       DATABASE_URL_FILE: /run/secrets/api-database-url
-      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:?set DATABASE_POOL_SIZE in .env}
+      DATABASE_POOL_SIZE: ${API_DATABASE_POOL_SIZE:?set API_DATABASE_POOL_SIZE in .env}
       WEB_BASE_URL: ${WEB_BASE_URL:?set WEB_BASE_URL in .env}
       API_BASE_URL: ${API_BASE_URL:?set API_BASE_URL in .env}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in .env}
       TRUSTED_ORIGINS: ${TRUSTED_ORIGINS?set TRUSTED_ORIGINS in .env}
       TRUSTED_PROXIES: 172.31.250.2
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:?set SESSION_COOKIE_SECURE in .env}
-      HTTP: ${HTTP:?set HTTP in .env}
-      ENGINE_WORKER: ${ENGINE_WORKER:?set ENGINE_WORKER in .env}
-      OUTBOX_RELAY: ${OUTBOX_RELAY:?set OUTBOX_RELAY in .env}
+      SECRETS_KEY_FILE: /run/secrets/secrets-key
+      OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST?set OUTBOUND_ALLOW_LIST in .env}
+      LOG_LEVEL: ${LOG_LEVEL:?set LOG_LEVEL in .env}
+    secrets: [api-database-url, secrets-key]
+    extra_hosts: [host.docker.internal:host-gateway]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+    networks: [default, console, telemetry]
+    ports:
+      - 127.0.0.1:${API_PORT:-53000}:3000
+    healthcheck:
+      test:
+        - CMD
+        - /nodejs/bin/node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/v1/health/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    tmpfs: [/tmp]
+    init: true
+    restart: unless-stopped
+    # Shutdown waits for Terminus (5 s) and the requests in flight.
+    stop_grace_period: 15s
+    <<: *hardening
+
+  worker:
+    build:
+      <<: *api-build
+      target: runtime
+    image: tenon-api
+    command:
+      - --import
+      - ./dist/frameworks/instrumentation.js
+      - dist/frameworks/worker.js
+    environment:
+      <<: *telemetry
+      OTEL_SERVICE_NAME: tenon-worker
+      DATABASE_URL_FILE: /run/secrets/api-database-url
+      DATABASE_POOL_SIZE: ${WORKER_DATABASE_POOL_SIZE:?set WORKER_DATABASE_POOL_SIZE in .env}
+      WEB_BASE_URL: ${WEB_BASE_URL:?set WEB_BASE_URL in .env}
+      API_BASE_URL: ${API_BASE_URL:?set API_BASE_URL in .env}
       SECRETS_KEY_FILE: /run/secrets/secrets-key
       OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST?set OUTBOUND_ALLOW_LIST in .env}
       SANDBOX_URL: http://go-judge:5050
@@ -152,13 +199,13 @@ services:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started
-    networks: [default, sandbox, console, telemetry]
-    ports:
-      - 127.0.0.1:${API_PORT:-53000}:3000
+    networks: [default, sandbox, telemetry]
+    deploy:
+      replicas: ${WORKER_REPLICAS:?set WORKER_REPLICAS in .env}
     tmpfs: [/tmp]
     init: true
     restart: unless-stopped
-    # Shutdown lets the engine finish a round (90 s), then drains the outbox (60 s), then Terminus (5 s).
+    # Shutdown lets the engine finish a round (90 s), then drains the outbox (60 s).
     stop_grace_period: 170s
     <<: *hardening
 

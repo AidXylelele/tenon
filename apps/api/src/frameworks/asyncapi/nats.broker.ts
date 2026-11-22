@@ -9,13 +9,13 @@ import {
   type NatsConnection,
 } from "@nats-io/transport-node";
 import type { AsyncApiOutcome, Failure } from "interpreter";
+import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { BrokerConnections } from "./broker-connections.js";
 import type {
   BrokerCredentials,
   BrokerMessage,
   BrokerInbox,
-  Subscribed,
   BrokerClient,
   BrokerServer,
   BrokerTarget,

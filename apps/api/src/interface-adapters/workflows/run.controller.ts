@@ -13,13 +13,9 @@ import { EmitEvent } from "../../application/automation/events/emit-event.js";
 import { AnswerChildren } from "../../application/automation/instances/answer-children.js";
 import { AnswerReceives } from "../../application/automation/instances/answer-receives.js";
 import { BeginRun } from "../../application/automation/instances/begin-run.js";
-import { CancelStrandedRun } from "../../application/automation/instances/cancel-stranded-run.js";
 import { FailRun } from "../../application/automation/instances/fail-run.js";
 import type { ReceiverView } from "../../application/automation/instances/interfaces.js";
-import {
-  InstanceQueries,
-  ReceiverQueries,
-} from "../../application/automation/instances/queries.js";
+import { ReceiverQueries } from "../../application/automation/instances/queries.js";
 import { ReceiveInbound } from "../../application/automation/instances/receive-inbound.js";
 import { RespondToEffect } from "../../application/automation/instances/respond-to-effect.js";
 import { StartSubWorkflow } from "../../application/automation/instances/start-sub-workflow.js";
@@ -66,8 +62,6 @@ export class RunController {
     private readonly answerReceives: AnswerReceives,
     private readonly answerChildren: AnswerChildren,
     private readonly receiveInbound: ReceiveInbound,
-    private readonly cancelStrandedRun: CancelStrandedRun,
-    private readonly instances: InstanceQueries,
     private readonly receivers: ReceiverQueries,
     private readonly secrets: SecretQueries,
   ) {}
@@ -162,13 +156,6 @@ export class RunController {
 
   demands(instanceId: string, execution: string): Promise<boolean> {
     return this.receivers.demands(instanceId, execution);
-  }
-
-  async cutOver(): Promise<void> {
-    const live = await this.instances.liveInstances();
-
-    for (const instanceId of live)
-      await this.cancelStrandedRun.execute({ instanceId });
   }
 
   fail(instanceId: string): Promise<void> {

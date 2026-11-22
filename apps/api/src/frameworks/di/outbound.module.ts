@@ -1,15 +1,16 @@
 import { Module } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { AddressPolicy } from "../http-client/address-policy.js";
-import type { Env } from "./env.schema.js";
+import { outboundConfig } from "./configs.js";
 
 @Module({
+  imports: [ConfigModule.forFeature(outboundConfig)],
   providers: [
     {
       provide: AddressPolicy,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) =>
-        new AddressPolicy(config.get("OUTBOUND_ALLOW_LIST", { infer: true })),
+      inject: [outboundConfig.KEY],
+      useFactory: (outbound: ConfigType<typeof outboundConfig>) =>
+        new AddressPolicy(outbound.OUTBOUND_ALLOW_LIST),
     },
   ],
   exports: [AddressPolicy],

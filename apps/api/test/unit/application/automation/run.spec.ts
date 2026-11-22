@@ -3,7 +3,6 @@ import { AnswerChildren } from "../../../../src/application/automation/instances
 import { AnswerReceives } from "../../../../src/application/automation/instances/answer-receives.js";
 import { BeginRun } from "../../../../src/application/automation/instances/begin-run.js";
 import { CancelInstance } from "../../../../src/application/automation/instances/cancel-instance.js";
-import { CancelStrandedRun } from "../../../../src/application/automation/instances/cancel-stranded-run.js";
 import type {
   AgendaResult,
   InputProblem,
@@ -50,10 +49,7 @@ import {
 class ScriptedRuntime extends WorkflowRuntime {
   readonly calls: string[] = [];
 
-  constructor(
-    private readonly turn: PlayedTurn,
-    private readonly continued = true,
-  ) {
+  constructor(private readonly turn: PlayedTurn) {
     super();
   }
 
@@ -102,11 +98,6 @@ class ScriptedRuntime extends WorkflowRuntime {
     return Promise.resolve(true);
   }
 
-  continues(): Promise<boolean> {
-    this.calls.push("continues");
-    return Promise.resolve(this.continued);
-  }
-
   inputProblemsOf(): Promise<readonly InputProblem[]> {
     return Promise.resolve([]);
   }
@@ -114,11 +105,6 @@ class ScriptedRuntime extends WorkflowRuntime {
   faultedEnding(): Promise<RunEnding> {
     this.calls.push("faultedEnding");
     return Promise.resolve(aFaultedEnding());
-  }
-
-  cancelledEnding(): Promise<RunEnding> {
-    this.calls.push("cancelledEnding");
-    return Promise.resolve(aCancelledEnding());
   }
 
   #played(call: string): PlayedTurn {
@@ -460,37 +446,5 @@ describe("receives answered from the stored messages", () => {
     expect(fixture.runtime.calls).toEqual(["receive"]);
     expect(messages.forgotten).toEqual(["/fork/0/a@message[0]"]);
     expect(fixture.instances.phaseOf(pending.id)).toBe(Phase.Completed);
-  });
-});
-
-describe("the cut-over to a new build of the interpreter", () => {
-  it("cancels_a_live_run_this_build_cannot_continue_and_wakes_it", async () => {
-    const instance = await aBegunInstance();
-    const instances = new StoredWorkflowInstanceRepository(instance);
-    const runtime = new ScriptedRuntime(aTurn(), false);
-    const runs = new RecordingInstanceRuns(instances);
-    const cutOver = new CancelStrandedRun(instances, runtime, runs);
-
-    await cutOver.execute({ instanceId: instance.id });
-    const stored = await instances.find(instance.id);
-
-    expect(runtime.calls).toEqual(["continues", "cancelledEnding"]);
-    expect(stored?.cancelReason).toBe(CancelReason.InterpreterChanged);
-    expect(runs.woken).toEqual([instance.id]);
-  });
-
-  it("leaves_a_live_run_this_build_continues", async () => {
-    const instance = await aBegunInstance();
-    const instances = new StoredWorkflowInstanceRepository(instance);
-    const runtime = new ScriptedRuntime(aTurn(), true);
-    const runs = new RecordingInstanceRuns(instances);
-    const cutOver = new CancelStrandedRun(instances, runtime, runs);
-
-    await cutOver.execute({ instanceId: instance.id });
-    const stored = await instances.find(instance.id);
-
-    expect(stored?.phase).toBe(Phase.Running);
-    expect(stored?.cancelReason).toBeNull();
-    expect(runs.woken).toEqual([]);
   });
 });

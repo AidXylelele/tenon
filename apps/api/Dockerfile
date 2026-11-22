@@ -34,6 +34,4 @@ FROM node AS runtime
 COPY --from=build /prod/api ./
 ENV PORT=3000
 EXPOSE 3000
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
-  CMD ["/nodejs/bin/node", "-e", "if (process.env.HTTP === 'off') process.exit(0); fetch('http://127.0.0.1:3000/api/v1/health/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["--import", "./dist/frameworks/instrumentation.js", "dist/frameworks/main.js"]

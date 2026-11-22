@@ -9,7 +9,6 @@ import {
   gte,
   inArray,
   isNotNull,
-  isNull,
   lt,
   lte,
   type SQL,
@@ -337,14 +336,6 @@ export class PostgresInstanceQueries implements InstanceQueries {
 
   #nameOf(): SQL<LifecycleEventName> {
     return sql<LifecycleEventName>`${events.lifecycle}`;
-  }
-
-  async liveInstances(): Promise<readonly string[]> {
-    const rows = await this.txHost.tx
-      .select({ id: instances.id })
-      .from(instances)
-      .where(and(isNull(instances.endedAt), isNotNull(instances.runState)));
-    return rows.map((row) => row.id);
   }
 
   async #waitsOf(

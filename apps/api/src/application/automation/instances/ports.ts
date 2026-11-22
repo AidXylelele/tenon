@@ -61,7 +61,6 @@ export abstract class InstanceRuns {
     instance: WorkflowInstance,
     control: Control,
   ): Promise<void>;
-  abstract wakeOnCutOver(instance: WorkflowInstance): Promise<void>;
   abstract wakeOnInbound(
     instance: WorkflowInstance,
     execution: string,
@@ -128,16 +127,11 @@ export abstract class WorkflowRuntime {
     now: Date,
     signal: AbortSignal,
   ): Promise<boolean>;
-  abstract continues(instance: WorkflowInstance): Promise<boolean>;
   abstract inputProblemsOf(
     version: WorkflowVersion,
     input: JsonValue,
   ): Promise<readonly InputProblem[]>;
   abstract faultedEnding(
-    instance: WorkflowInstance,
-    now: Date,
-  ): Promise<RunEnding>;
-  abstract cancelledEnding(
     instance: WorkflowInstance,
     now: Date,
   ): Promise<RunEnding>;

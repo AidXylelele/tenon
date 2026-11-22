@@ -10,13 +10,11 @@ import type {
   OpenApiRequest,
   ResourceRequest,
 } from "interpreter";
-import { ConfigModule } from "@nestjs/config";
-import { envSchema } from "../../../src/frameworks/di/env.schema.js";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import type { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
-import type { CallContext } from "../../../src/frameworks/workflows/interfaces.js";
+import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
 import {
   closedPort,
   type ReceivedRequest,
@@ -66,13 +64,7 @@ describe("a call the HTTP client performs for a run", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          validationSchema: envSchema,
-        }),
-        ResilienceModule.forRoot({ presets: resiliencePresets }),
-      ],
+      imports: [ResilienceModule.forRoot({ presets: resiliencePresets })],
     }).compile();
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);

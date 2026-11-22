@@ -28,7 +28,7 @@ import { HttpAuthentication } from "../http-client/http-authentication.js";
 import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
 import { RELEASE_VERSION } from "../release.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import type { HttpMcpRequest, McpMethod } from "./interfaces.js";
 
 const RESULTS = {

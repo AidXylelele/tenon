@@ -16,14 +16,12 @@ import { ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
 import type { Authentication, JsonObject, JsonValue } from "interpreter";
 import { z } from "zod";
-import { ConfigModule } from "@nestjs/config";
-import { envSchema } from "../../../src/frameworks/di/env.schema.js";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import type { HttpMcpRequest } from "../../../src/frameworks/mcp/interfaces.js";
 import { McpClient } from "../../../src/frameworks/mcp/mcp.client.js";
-import type { CallContext } from "../../../src/frameworks/workflows/interfaces.js";
+import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
 import { closedPort } from "../../support/stub-server.js";
 import {
   authenticationOf,
@@ -58,13 +56,7 @@ describe("a call the MCP client performs for a run", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          validationSchema: envSchema,
-        }),
-        ResilienceModule.forRoot({ presets: resiliencePresets }),
-      ],
+      imports: [ResilienceModule.forRoot({ presets: resiliencePresets })],
     }).compile();
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);

@@ -74,10 +74,6 @@ export class InMemoryUserRepository extends UserRepository {
     );
   }
 
-  hasAdministrator(): Promise<boolean> {
-    return Promise.resolve(this.all().some((user) => user.isAdmin));
-  }
-
   private all(): User[] {
     return [...this.users.values()];
   }
@@ -471,10 +467,6 @@ export class RecordingInstanceRuns extends InstanceRuns {
 
   wakeOnControl(instance: WorkflowInstance, control: Control): Promise<void> {
     return this.#woken(instance, control);
-  }
-
-  wakeOnCutOver(instance: WorkflowInstance): Promise<void> {
-    return this.#woken(instance, "cut-over");
   }
 
   wakeOnInbound(instance: WorkflowInstance): Promise<void> {

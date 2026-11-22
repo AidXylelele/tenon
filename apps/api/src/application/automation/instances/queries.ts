@@ -22,7 +22,6 @@ export abstract class InstanceQueries {
     limit: number,
   ): Promise<TaskPage | null>;
   abstract countsByPhase(from: Date, to: Date): Promise<readonly PhaseCount[]>;
-  abstract liveInstances(): Promise<readonly string[]>;
   abstract taskOutput(
     id: string,
     execution: string,

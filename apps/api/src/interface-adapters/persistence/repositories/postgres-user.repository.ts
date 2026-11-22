@@ -11,7 +11,6 @@ import type { UserRepository } from "../../../application/identity/ports.js";
 import type { Transaction } from "../interfaces.js";
 import { user as users } from "../schema/index.js";
 import { UserMapper } from "../mappers/user.mapper.js";
-import { Role } from "../../../domain/identity/enums.js";
 
 @Injectable()
 export class PostgresUserRepository implements UserRepository {
@@ -38,15 +37,6 @@ export class PostgresUserRepository implements UserRepository {
 
   findByEmail(email: string): Promise<User | null> {
     return this.findOne(eq(users.email, email));
-  }
-
-  async hasAdministrator(): Promise<boolean> {
-    const [row] = await this.txHost.tx
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.role, Role.Admin))
-      .limit(1);
-    return row !== undefined;
   }
 
   private async findOne(where: SQL | undefined): Promise<User | null> {

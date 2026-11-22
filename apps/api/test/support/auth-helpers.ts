@@ -7,7 +7,6 @@ import {
   PasswordHasher,
   UserRepository,
 } from "../../src/application/identity/ports.js";
-import { SeedAdministrator } from "../../src/application/identity/seed-administrator.js";
 import { Account } from "../../src/domain/identity/account.js";
 import { Role, UserStatus } from "../../src/domain/identity/enums.js";
 import { User } from "../../src/domain/identity/user.js";
@@ -99,5 +98,14 @@ export async function suspendUser(db: Database, userId: string): Promise<void> {
 }
 
 export async function seedAdministrator(t: TestApp): Promise<void> {
-  await t.app.get(SeedAdministrator).execute({ email: SEED_ADMIN_EMAIL });
+  const now = new Date();
+  const administrator = User.create({
+    email: SEED_ADMIN_EMAIL,
+    name: "Administrator",
+    role: Role.Admin,
+    now,
+  });
+  await inTransaction(t.app, () =>
+    t.app.get(UserRepository).add(administrator),
+  );
 }

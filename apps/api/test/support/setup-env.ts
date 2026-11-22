@@ -1,18 +1,18 @@
-import { inject } from "vitest";
+import { inject, vi } from "vitest";
+
+vi.mock("../../src/frameworks/instrumentation.js", () => ({
+  sdk: { shutdown: () => Promise.resolve() },
+}));
 
 Object.assign(process.env, {
   NODE_ENV: "test",
   PORT: "3000",
   DATABASE_URL: inject("DATABASE_URL"),
   WEB_BASE_URL: "http://127.0.0.1:3001",
-  ADMIN_EMAIL: "first-admin@example.com",
   API_BASE_URL: "http://127.0.0.1:3000",
   TRUSTED_ORIGINS: "http://127.0.0.1:3001",
   TRUSTED_PROXIES: "127.0.0.1",
   SESSION_COOKIE_SECURE: "false",
-  HTTP: "on",
-  ENGINE_WORKER: "off",
-  OUTBOX_RELAY: "off",
   SECRETS_KEY: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
   OUTBOUND_ALLOW_LIST: "",
   SANDBOX_URL: "http://127.0.0.1:55050",

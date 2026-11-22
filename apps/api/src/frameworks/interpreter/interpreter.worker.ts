@@ -66,7 +66,6 @@ export class InterpreterWorker {
       case "resume":
       case "cancel":
       case "route":
-      case "rebuild":
       case "input":
         return this.#ofProgram(call);
     }
@@ -124,8 +123,6 @@ export class InterpreterWorker {
         return program.cancel(call.state, call.context);
       case "route":
         return this.#routes(program, call.event);
-      case "rebuild":
-        return null;
       case "input":
         return program.inputProblemsOf(call.input);
     }

@@ -140,19 +140,6 @@ describe("the interpreter in its worker threads", () => {
     await expect(answered).rejects.toBeInstanceOf(IncompatibleRun);
   });
 
-  it("this_build_rebuilds_the_program_a_run_recorded_and_no_other", async () => {
-    const started = await client.start(
-      callOf("version-recorded"),
-      {},
-      { ...context, instance: "instance-5" },
-    );
-    const recorded = callOf("version-recorded", started.fingerprint);
-    const elsewhere = callOf("version-recorded", "another-build");
-
-    expect(await client.rebuilds(recorded)).toBe(true);
-    expect(await client.rebuilds(elsewhere)).toBe(false);
-  });
-
   it("a_state_that_is_no_state_arrives_as_a_permanent_fault", async () => {
     const call = callOf("version-faulted");
     const broken = { blob: "no state" } as unknown as State;

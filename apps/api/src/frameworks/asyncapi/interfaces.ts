@@ -5,15 +5,11 @@ import type {
 import type { ConnectionOptions as TlsConnection } from "node:tls";
 import type { NodeConnectionOptions } from "@nats-io/transport-node";
 import type { ChannelModel, ConfirmChannel } from "amqplib";
-import type {
-  AsyncApiInboundMessage,
-  AsyncApiOutcome,
-  Failure,
-  JsonObject,
-} from "interpreter";
+import type { AsyncApiOutcome, Failure, JsonObject } from "interpreter";
 import type { IClientOptions } from "mqtt";
 import type { RedisClientType } from "redis";
 import type { z } from "zod";
+import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import type { PasswordCredentials } from "../http-client/interfaces.js";
 import type { AMQP_CHANNEL, MQTT_OPERATION } from "./bindings.schema.js";
 
@@ -68,30 +64,6 @@ export interface BrokerInbox {
   deliver(message: ReceivedBrokerMessage): Promise<void>;
   lost(): void;
 }
-
-export interface AsyncApiInbox {
-  readonly ended: AbortSignal;
-  demanded(): Promise<void>;
-  message(message: AsyncApiInboundMessage): Promise<void>;
-  failure(failure: Failure): Promise<void>;
-  lost(): void;
-}
-
-export interface BrokerSubscription {
-  close(): Promise<void>;
-}
-
-export interface Consumer {
-  readonly stopped: AbortController;
-  readonly done: Promise<void>;
-}
-
-export type Subscribed =
-  | {
-      readonly kind: "subscribed";
-      readonly subscription: BrokerSubscription;
-    }
-  | Failure;
 
 export interface BrokerClient {
   publish(

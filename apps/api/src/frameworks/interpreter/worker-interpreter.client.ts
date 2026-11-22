@@ -21,24 +21,21 @@ import {
   type State,
   type Step,
   type StepContext,
-  stateFormatVersion,
 } from "interpreter";
 import { Piscina } from "piscina";
 import { PermanentFault } from "../../domain/errors.js";
 import { IncompatibleRun } from "../../interface-adapters/workflows/incompatible-run.error.js";
 import type { VersionProgram } from "../../application/automation/workflows/interfaces.js";
 import {
+  type CompilationData,
+  type FilterCheck,
   InterpreterClient,
+  type NamedFilter,
+  type ProgramCall,
+  type RouteMatch,
+  type StartedStep,
   type StructureClient,
-} from "../../interface-adapters/workflows/ports.js";
-import type {
-  CompilationData,
-  FilterCheck,
-  NamedFilter,
-  ProgramCall,
-  RouteMatch,
-  StartedStep,
-  VersionStructure,
+  type VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
 import type {
   ThreadProgram,
@@ -59,6 +56,7 @@ export class WorkerInterpreterClient
 {
   static readonly RUN_THREADS = 10;
   static readonly CHECK_THREADS = 2;
+  private static readonly IDLE_RUN_THREAD_MS = 60_000;
   private static readonly MOST_KEPT_STRUCTURES = 1_000;
 
   readonly #structures = new Map<string, VersionStructure | null>();
@@ -73,11 +71,19 @@ export class WorkerInterpreterClient
 
   onModuleInit(): void {
     this.runs = {
-      threads: this.#threadsOf(WorkerInterpreterClient.RUN_THREADS),
+      threads: this.#threadsOf(
+        0,
+        WorkerInterpreterClient.RUN_THREADS,
+        WorkerInterpreterClient.IDLE_RUN_THREAD_MS,
+      ),
       policy: this.resilience.preset("interpreter"),
     };
     this.checks = {
-      threads: this.#threadsOf(WorkerInterpreterClient.CHECK_THREADS),
+      threads: this.#threadsOf(
+        WorkerInterpreterClient.CHECK_THREADS,
+        WorkerInterpreterClient.CHECK_THREADS,
+        0,
+      ),
       policy: this.resilience.preset("interpreter-checks"),
     };
   }
@@ -209,19 +215,6 @@ export class WorkerInterpreterClient
     );
   }
 
-  async rebuilds(call: ProgramCall): Promise<boolean> {
-    const answer = await this.#programAnswer<null>(
-      this.#checks(),
-      call,
-      (program) => ({ kind: "rebuild", program }),
-    );
-
-    if (answer.kind === "incompatible") return false;
-
-    this.#unwrapped(answer);
-    return true;
-  }
-
   inputProblemsOf(
     call: ProgramCall,
     input: JsonValue,
@@ -253,10 +246,6 @@ export class WorkerInterpreterClient
 
   runtime(): RuntimeDescriptor {
     return this.descriptor;
-  }
-
-  stateFormat(): number {
-    return stateFormatVersion;
   }
 
   ending(end: HostEnd): Ending {
@@ -378,14 +367,15 @@ export class WorkerInterpreterClient
     return { name: "tenon", version: RELEASE_VERSION, metadata: {} };
   }
 
-  #threadsOf(threads: number): Piscina {
+  #threadsOf(least: number, most: number, idleMs: number): Piscina {
     const extension = extname(fileURLToPath(import.meta.url));
     const thread = `./interpreter.thread${extension}`;
     const filename = new URL(thread, import.meta.url).href;
     return new Piscina({
       filename,
-      minThreads: threads,
-      maxThreads: threads,
+      minThreads: least,
+      maxThreads: most,
+      idleTimeout: idleMs,
       resourceLimits: { maxOldGenerationSizeMb: 256 },
     });
   }

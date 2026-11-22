@@ -19,7 +19,7 @@ import { AddressPolicy } from "../http-client/address-policy.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import type {
   PreparedCall,
   ServerStreamMethod,

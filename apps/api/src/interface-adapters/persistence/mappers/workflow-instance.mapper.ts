@@ -1,8 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { Run } from "../../../domain/automation/instances/run.js";
 import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
-import type { SealedRun, WorkflowInstanceRow } from "../interfaces.js";
-import { Cipher } from "../ports.js";
+import {
+  Cipher,
+  type SealedRun,
+  type WorkflowInstanceRow,
+} from "../interfaces.js";
 
 @Injectable()
 export class WorkflowInstanceMapper {

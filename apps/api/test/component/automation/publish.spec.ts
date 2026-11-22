@@ -1,6 +1,6 @@
 import request from "supertest";
 import { Role } from "../../../src/domain/identity/enums.js";
-import { StructureClient } from "../../../src/interface-adapters/workflows/ports.js";
+import { StructureClient } from "../../../src/interface-adapters/workflows/interfaces.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import { createTestApp, type TestApp } from "../../support/create-test-app.js";

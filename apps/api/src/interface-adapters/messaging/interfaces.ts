@@ -1,3 +1,10 @@
+import type {
+  AsyncApiInboundMessage,
+  AsyncApiRequest,
+  Failure,
+} from "interpreter";
+import type { StepCall } from "../workflows/interfaces.js";
+
 export interface AcceptedEventMessage {
   readonly sequence: number;
 }
@@ -19,4 +26,36 @@ export interface InstanceMessage {
 
 export interface WorkflowMessage {
   readonly workflowId: string;
+}
+
+export interface AsyncApiInbox {
+  readonly ended: AbortSignal;
+  demanded(): Promise<void>;
+  message(message: AsyncApiInboundMessage): Promise<void>;
+  failure(failure: Failure): Promise<void>;
+  lost(): void;
+}
+
+export interface BrokerSubscription {
+  close(): Promise<void>;
+}
+
+export interface Consumer {
+  readonly stopped: AbortController;
+  readonly done: Promise<void>;
+}
+
+export type Subscribed =
+  | {
+      readonly kind: "subscribed";
+      readonly subscription: BrokerSubscription;
+    }
+  | Failure;
+
+export abstract class SubscriptionClient {
+  abstract subscribe(
+    request: AsyncApiRequest,
+    step: StepCall,
+    inbox: AsyncApiInbox,
+  ): Promise<Subscribed>;
 }

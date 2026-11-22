@@ -13,6 +13,10 @@ const journal = JSON.parse(
   readFileSync(join(MIGRATIONS, "meta", "_journal.json"), "utf8"),
 ) as { entries: unknown[] };
 
+const ADMIN_EMAIL = "Owner@Example.COM";
+
+const FIRST_ADMINISTRATOR = "0034_first_administrator.sql";
+
 interface Applied {
   readonly platform: number;
   readonly outbox: number;
@@ -24,7 +28,12 @@ describe("the migrations applied before the API starts", () => {
   const server = drizzle({ connection: process.env.DATABASE_URL ?? "" });
   const url = new URL(process.env.DATABASE_URL ?? "");
   url.pathname = `/${name}`;
-  const db = drizzle({ connection: url.toString() });
+  const db = drizzle({
+    connection: {
+      connectionString: url.toString(),
+      options: `-c tenon.admin_email=${ADMIN_EMAIL}`,
+    },
+  });
   const migrations = { migrationsFolder: MIGRATIONS };
 
   beforeAll(async () => {
@@ -67,5 +76,25 @@ describe("the migrations applied before the API starts", () => {
     const after = await applied();
 
     expect(after).toEqual(before);
+  });
+
+  it("the_first_administrator_is_seeded_once_from_the_address_the_migration_is_given", async () => {
+    await migrate(db, migrations);
+    const file = join(MIGRATIONS, FIRST_ADMINISTRATOR);
+    const seed = readFileSync(file, "utf8");
+    const reseed = sql.raw(seed);
+    await db.execute(reseed);
+    const result = await db.execute(
+      sql`select email, name, role, status from "user"`,
+    );
+
+    expect(result.rows).toEqual([
+      {
+        email: "owner@example.com",
+        name: "Administrator",
+        role: "admin",
+        status: "active",
+      },
+    ]);
   });
 });

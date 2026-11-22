@@ -94,7 +94,7 @@ export class PostgresIdempotencyStore implements IdempotencyStore {
     return extended.length === 1;
   }
 
-  async prune(limit: number): Promise<number> {
+  async prune(limit = 1_000): Promise<number> {
     const now = Date.now();
     const expired = this.db
       .select({ keyHash: records.keyHash })

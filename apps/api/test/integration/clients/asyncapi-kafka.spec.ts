@@ -22,7 +22,7 @@ import type {
 import { AmqpBroker } from "../../../src/frameworks/asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../../../src/frameworks/asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../../../src/frameworks/asyncapi/asyncapi-documents.js";
-import type { BrokerSubscription } from "../../../src/frameworks/asyncapi/interfaces.js";
+import type { BrokerSubscription } from "../../../src/interface-adapters/messaging/interfaces.js";
 import { KafkaBroker } from "../../../src/frameworks/asyncapi/kafka.broker.js";
 import { MqttBroker } from "../../../src/frameworks/asyncapi/mqtt.broker.js";
 import { NatsBroker } from "../../../src/frameworks/asyncapi/nats.broker.js";

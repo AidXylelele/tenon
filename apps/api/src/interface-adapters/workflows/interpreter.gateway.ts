@@ -5,7 +5,7 @@ import type {
 import type { HostCapabilities } from "../../application/automation/host/queries.js";
 import { createHash } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { lifecycleEventCatalogue } from "interpreter";
+import { lifecycleEventCatalogue, stateFormatVersion } from "interpreter";
 import type {
   AsyncApiRequest,
   CloudEvent,
@@ -85,17 +85,17 @@ import type { Result } from "../../domain/interfaces.js";
 import { ImportFetcher } from "../../application/automation/imports/ports.js";
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
 import { IncompatibleRun } from "./incompatible-run.error.js";
-import type {
-  ControlStep,
-  FetchedImportText,
-  NeededImport,
-  Played,
-  Program,
-  ProgramCall,
-  ProgramSource,
-  ResolvedCompilation,
+import {
+  type ControlStep,
+  type FetchedImportText,
+  InterpreterClient,
+  type NeededImport,
+  type Played,
+  type Program,
+  type ProgramCall,
+  type ProgramSource,
+  type ResolvedCompilation,
 } from "./interfaces.js";
-import { InterpreterClient } from "./ports.js";
 
 @Injectable()
 export class InterpreterGateway
@@ -488,17 +488,6 @@ export class InterpreterGateway
     return this.client.inputProblemsOf(call, value);
   }
 
-  async continues(instance: WorkflowInstance): Promise<boolean> {
-    const run = instance.run;
-
-    if (run === null) return true;
-
-    if (run.format !== this.client.stateFormat()) return false;
-
-    const call = this.#callOf(instance.versionId, run.fingerprint, null);
-    return this.client.rebuilds(call);
-  }
-
   async faultedEnding(
     instance: WorkflowInstance,
     now: Date,
@@ -515,7 +504,7 @@ export class InterpreterGateway
     return this.#endingOf(end);
   }
 
-  async cancelledEnding(
+  async #cancelledEnding(
     instance: WorkflowInstance,
     now: Date,
   ): Promise<RunEnding> {
@@ -571,7 +560,7 @@ export class InterpreterGateway
     } catch (error) {
       if (!(error instanceof IncompatibleRun)) throw error;
 
-      const ending = await this.cancelledEnding(instance, now);
+      const ending = await this.#cancelledEnding(instance, now);
       return { status: TurnStatus.Stranded, ending };
     }
   }
@@ -724,7 +713,7 @@ export class InterpreterGateway
     return {
       status: InterpreterGateway.STATUSES[last.status],
       fingerprint: program.fingerprint,
-      format: this.client.stateFormat(),
+      format: stateFormatVersion,
       memento: last.state,
       requested,
       listening,

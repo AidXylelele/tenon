@@ -15,7 +15,7 @@ import type {
   RpcOutcome,
 } from "interpreter";
 import { HttpClient } from "../http-client/http.client.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import { AgentCard } from "./agent-card.js";
 import { AGENT_CARD } from "./agent-card.schema.js";
 import type { Agent, Responded } from "./interfaces.js";

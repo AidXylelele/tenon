@@ -3,8 +3,6 @@ import type { AddressInfo } from "node:net";
 import { Test } from "@nestjs/testing";
 import { ResilienceService } from "@nestjs/resilience";
 import type { INestApplicationContext } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { envSchema } from "../../../src/frameworks/di/env.schema.js";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
@@ -24,13 +22,7 @@ describe("a delivery and the outbound address policy", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          validationSchema: envSchema,
-        }),
-        ResilienceModule.forRoot({ presets: resiliencePresets }),
-      ],
+      imports: [ResilienceModule.forRoot({ presets: resiliencePresets })],
     }).compile();
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);

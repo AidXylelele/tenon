@@ -1,16 +1,6 @@
-import type {
-  JsonValue,
-  ProcessOutcome,
-  ProcessRequest,
-  Script,
-  Shell,
-} from "interpreter";
+import type { JsonValue, ProcessOutcome } from "interpreter";
 import type { z } from "zod";
 import type { SANDBOX_RESULTS } from "./sandbox-result.schema.js";
-
-export type SandboxedProcessRequest = ProcessRequest & {
-  readonly process: Script | Shell;
-};
 
 export interface SandboxLimitsProps {
   readonly time: Temporal.Duration;

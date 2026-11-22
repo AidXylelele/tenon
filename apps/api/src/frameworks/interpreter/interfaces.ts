@@ -10,7 +10,10 @@ import type {
 } from "interpreter";
 import type { ResiliencePolicy } from "@nestjs/resilience";
 import type { Piscina } from "piscina";
-import type { NamedFilter } from "../../interface-adapters/workflows/interfaces.js";
+import type {
+  NamedFilter,
+  StepCall,
+} from "../../interface-adapters/workflows/interfaces.js";
 import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
 
 export interface CompileSource {
@@ -64,11 +67,6 @@ interface RouteCall {
   readonly event: CloudEvent;
 }
 
-interface RebuildCall {
-  readonly kind: "rebuild";
-  readonly program: ThreadProgram;
-}
-
 interface InputCall {
   readonly kind: "input";
   readonly program: ThreadProgram;
@@ -92,13 +90,7 @@ interface AcceptingCall {
 }
 
 export type ProgramWorkerCall =
-  | StartCall
-  | CorrelateCall
-  | RespondCall
-  | ControlCall
-  | RouteCall
-  | RebuildCall
-  | InputCall;
+  StartCall | CorrelateCall | RespondCall | ControlCall | RouteCall | InputCall;
 
 export type WorkerCall =
   CompileCall | StructureCall | FilterCall | AcceptingCall | ProgramWorkerCall;
@@ -128,4 +120,8 @@ export type WorkerAnswer<T> =
 export interface WorkerPool {
   readonly threads: Piscina;
   readonly policy: ResiliencePolicy;
+}
+
+export interface CallContext extends StepCall {
+  readonly remaining: number | null;
 }

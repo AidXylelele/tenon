@@ -138,7 +138,8 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
   async function callInFlight(id: string): Promise<void> {
     await eventually(async () => {
       const tasks = await tasksOf(t, viewer, id);
-      return tasks.some((task) => task.status === "running");
+      const running = tasks.some((task) => task.status === "running");
+      return running && unanswered.length > 0;
     });
   }
 

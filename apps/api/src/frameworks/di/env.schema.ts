@@ -1,13 +1,6 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
-const SECRET_FILES = [
-  "DATABASE_URL",
-  "SECRETS_KEY",
-  "SANDBOX_TOKEN",
-  "SMTP_PASSWORD",
-] as const;
-
 const TRAILING_LINE_BREAKS = /[\r\n]+$/;
 
 const list = z
@@ -26,8 +19,6 @@ const allowedPrivateAddresses = list.pipe(
 
 const optional = z.string().default("");
 
-const role = z.enum(["on", "off"]).default("on");
-
 const encryptionKey = z
   .base64()
   .refine((value) => Buffer.from(value, "base64").length === 32, {
@@ -37,12 +28,13 @@ const encryptionKey = z
 function withSecretFiles(
   input: unknown,
   context: z.core.$RefinementCtx,
+  secrets: readonly string[],
 ): unknown {
   if (typeof input !== "object" || input === null) return input;
 
   const env = new Map<string, unknown>(Object.entries(input));
 
-  for (const name of SECRET_FILES) {
+  for (const name of secrets) {
     const variable = `${name}_FILE`;
     const file = env.get(variable);
 
@@ -75,44 +67,69 @@ function withSecretFiles(
   return Object.fromEntries(env);
 }
 
-const variables = z.object({
+const databaseVariables = z.object({
+  DATABASE_URL: z.string().min(1),
+  DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(20),
+});
+
+export const loggingEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
-  PORT: z.coerce.number().int().positive().default(3000),
-  DATABASE_URL: z.string().min(1),
-  DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(20),
-  WEB_BASE_URL: z.url(),
-  ADMIN_EMAIL: z.string().trim().toLowerCase().pipe(z.email()),
-  API_BASE_URL: z.url(),
-  TRUSTED_ORIGINS: list,
-  TRUSTED_PROXIES: list,
-  SESSION_COOKIE_SECURE: z.stringbool().default(true),
-  HTTP: role,
-  ENGINE_WORKER: role,
-  OUTBOX_RELAY: role,
-  SECRETS_KEY: encryptionKey,
-  OUTBOUND_ALLOW_LIST: allowedPrivateAddresses,
-  SANDBOX_URL: z.url(),
-  SANDBOX_TOKEN: z.string().min(32),
-  SMTP_HOST: z.string().min(1),
-  SMTP_PORT: z.coerce.number().int().positive(),
-  SMTP_STARTTLS: z
-    .enum(["required", "opportunistic", "never"])
-    .default("required"),
-  SMTP_USER: optional,
-  SMTP_PASSWORD: optional,
-  SMTP_FROM: z.string().min(1),
   LOG_LEVEL: z
     .enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"])
     .default("info"),
 });
 
-export const envSchema = z.preprocess(withSecretFiles, variables);
+export const databaseEnvSchema = z.preprocess(
+  (input, context) => withSecretFiles(input, context, ["DATABASE_URL"]),
+  databaseVariables,
+);
 
-export type Env = z.infer<typeof envSchema>;
+export const secretsEnvSchema = z.preprocess(
+  (input, context) => withSecretFiles(input, context, ["SECRETS_KEY"]),
+  z.object({ SECRETS_KEY: encryptionKey }),
+);
+
+export const linksEnvSchema = z.object({
+  WEB_BASE_URL: z.url(),
+  API_BASE_URL: z.url(),
+});
+
+export const httpEnvSchema = z.object({
+  PORT: z.coerce.number().int().positive().default(3000),
+  TRUSTED_ORIGINS: list,
+  TRUSTED_PROXIES: list,
+  SESSION_COOKIE_SECURE: z.stringbool().default(true),
+});
+
+export const outboundEnvSchema = z.object({
+  OUTBOUND_ALLOW_LIST: allowedPrivateAddresses,
+});
+
+export const sandboxEnvSchema = z.preprocess(
+  (input, context) => withSecretFiles(input, context, ["SANDBOX_TOKEN"]),
+  z.object({
+    SANDBOX_URL: z.url(),
+    SANDBOX_TOKEN: z.string().min(32),
+  }),
+);
+
+export const mailEnvSchema = z.preprocess(
+  (input, context) => withSecretFiles(input, context, ["SMTP_PASSWORD"]),
+  z.object({
+    SMTP_HOST: z.string().min(1),
+    SMTP_PORT: z.coerce.number().int().positive(),
+    SMTP_STARTTLS: z
+      .enum(["required", "opportunistic", "never"])
+      .default("required"),
+    SMTP_USER: optional,
+    SMTP_PASSWORD: optional,
+    SMTP_FROM: z.string().min(1),
+  }),
+);
 
 export const migrationEnvSchema = z.preprocess(
-  withSecretFiles,
-  variables.pick({ DATABASE_URL: true }).partial(),
+  (input, context) => withSecretFiles(input, context, ["DATABASE_URL"]),
+  databaseVariables.pick({ DATABASE_URL: true }).partial(),
 );

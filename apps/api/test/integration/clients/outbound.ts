@@ -2,7 +2,7 @@ import { HttpClient as NestHttpClient } from "@nestjs/http-client";
 import type { ResilienceService } from "@nestjs/resilience";
 import type { AsyncApiInboundMessage, JsonObject } from "interpreter";
 import { Agent } from "undici";
-import type { AsyncApiInbox } from "../../../src/frameworks/asyncapi/interfaces.js";
+import type { AsyncApiInbox } from "../../../src/interface-adapters/messaging/interfaces.js";
 import type { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import { AuthorizationServer } from "../../../src/frameworks/http-client/authorization-server.js";
 import { DigestAuthentication } from "../../../src/frameworks/http-client/digest-authentication.js";
@@ -10,7 +10,7 @@ import { HttpAuthentication } from "../../../src/frameworks/http-client/http-aut
 import { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
 import { OpenApiOperations } from "../../../src/frameworks/http-client/openapi-operations.js";
 import { ResponseSizeLimit } from "../../../src/frameworks/http-client/response-size-limit.js";
-import type { CallContext } from "../../../src/frameworks/workflows/interfaces.js";
+import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
 
 export const SELF_SIGNED = {
   cert: `-----BEGIN CERTIFICATE-----

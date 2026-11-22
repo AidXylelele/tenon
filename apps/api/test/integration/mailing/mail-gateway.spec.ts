@@ -2,7 +2,7 @@ import { MailSmtpError } from "@nestjs/mail";
 import { OutboxDeadLetters, type OutboxHandlerContext } from "@nestjs/outbox";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { Mailing } from "../../../src/application/identity/ports.js";
-import { MailOutboxHandler } from "../../../src/frameworks/outbox/mail.outbox.handler.js";
+import { MailHandler } from "../../../src/interface-adapters/messaging/mail.handler.js";
 import { createTestApp, type TestApp } from "../../support/create-test-app.js";
 import { queuedMailCount, truncateAll } from "../../support/db.js";
 
@@ -83,7 +83,7 @@ describe("mail queued through the outbox and sent by its handler", () => {
   });
 
   it("a_redelivered_message_is_sent_again_with_the_same_message_id", async () => {
-    const handler = t.app.get(MailOutboxHandler);
+    const handler = t.app.get(MailHandler);
     const context = {
       message: { id: "redelivered-message" },
       signal: new AbortController().signal,

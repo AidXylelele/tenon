@@ -1,4 +1,5 @@
 import type { ResiliencePreset } from "@nestjs/resilience";
+import type { WorkflowRetryOptions } from "@nestjs/workflows";
 import { HostLimits } from "../../application/automation/host/queries.js";
 import { WorkerInterpreterClient } from "../interpreter/worker-interpreter.client.js";
 import { HttpClient } from "../http-client/http.client.js";
@@ -19,6 +20,11 @@ export const hostLimits = new HostLimits(
   PROCESS_SECONDS,
   HttpClient.RESPONSE_BYTES,
 );
+
+export const workflowRetry: WorkflowRetryOptions = {
+  attempts: 10,
+  backoff: { delay: "1s", maxDelay: "1m", jitter: "equal" },
+};
 
 export const resiliencePresets: Readonly<Record<string, ResiliencePreset>> = {
   "service-calls": {

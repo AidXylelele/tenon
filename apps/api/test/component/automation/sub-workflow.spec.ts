@@ -142,7 +142,7 @@ describe("running sub-workflows and processes as runs of their own", () => {
       parents.map((parent) => instanceOf(t, editor, parent.id)),
     );
     const response = await request(t.server)
-      .get("/api/v1/instances?name=child&limit=500")
+      .get("/api/v1/instances?name=child&limit=200")
       .set(editor)
       .expect(200);
     const completed = (response.body as Page<InstanceBody>).items.filter(

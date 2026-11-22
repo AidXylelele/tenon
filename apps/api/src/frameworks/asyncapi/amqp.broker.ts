@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { type ConsumeMessage, connect, type Options } from "amqplib";
 import type { AsyncApiOutcome, Failure } from "interpreter";
+import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { AMQP_CHANNEL } from "./bindings.schema.js";
 import { BrokerConnections } from "./broker-connections.js";
@@ -12,7 +13,6 @@ import type {
   BrokerCredentials,
   BrokerMessage,
   BrokerInbox,
-  Subscribed,
   BrokerClient,
   BrokerServer,
   BrokerTarget,

@@ -11,7 +11,9 @@
   "scripts": {
     "build": "nest build",
     "dev": "nest start --watch",
+    "dev:worker": "node --watch dist/frameworks/worker.js",
     "start": "node --import ./dist/frameworks/instrumentation.js dist/frameworks/main.js",
+    "start:worker": "node --import ./dist/frameworks/instrumentation.js dist/frameworks/worker.js",
     "migrate": "drizzle-kit migrate",
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "check-types": "tsc --noEmit",

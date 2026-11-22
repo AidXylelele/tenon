@@ -16,10 +16,7 @@ const instrumentations = getNodeAutoInstrumentations({
   "@opentelemetry/instrumentation-pg": { requireParentSpan: true },
 });
 
-export const sdk = new NodeSDK({
-  serviceName: "tenon-api",
-  instrumentations: [instrumentations],
-});
+export const sdk = new NodeSDK({ instrumentations: [instrumentations] });
 
 if (isMainThread) {
   register();

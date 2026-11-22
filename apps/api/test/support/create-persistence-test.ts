@@ -11,7 +11,6 @@ import { InvitationQueries } from "../../src/application/identity/queries.js";
 import type { Role } from "../../src/domain/identity/enums.js";
 import { User } from "../../src/domain/identity/user.js";
 import { ConfigModule } from "@nestjs/config";
-import { envSchema } from "../../src/frameworks/di/env.schema.js";
 import { DatabaseModule } from "../../src/frameworks/di/database.module.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import { getDrizzleToken } from "@nestjs/drizzle";
@@ -59,13 +58,7 @@ export async function createPersistenceTest(
 ): Promise<PersistenceTest> {
   const bindings = Array.from(providers);
   const builder = Test.createTestingModule({
-    imports: [
-      ConfigModule.forRoot({
-        isGlobal: true,
-        validationSchema: envSchema,
-      }),
-      DatabaseModule,
-    ],
+    imports: [ConfigModule.forRoot({ isGlobal: true }), DatabaseModule],
     providers: bindings,
   });
   const module = await builder.compile();

@@ -3,17 +3,15 @@ import { HttpClient as NestHttpClient } from "@nestjs/http-client";
 import { CircuitOpenError, ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
 import type { Script, Shell } from "interpreter";
-import { ConfigModule } from "@nestjs/config";
-import { envSchema } from "../../../src/frameworks/di/env.schema.js";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
-import type { SandboxedProcessRequest } from "../../../src/frameworks/go-judge/interfaces.js";
 import { SandboxClient } from "../../../src/frameworks/go-judge/sandbox.client.js";
 import { SandboxLimits } from "../../../src/frameworks/go-judge/sandbox-limits.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import type { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
 import { ResponseSizeLimit } from "../../../src/frameworks/http-client/response-size-limit.js";
-import type { CallContext } from "../../../src/frameworks/workflows/interfaces.js";
+import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
+import type { SandboxedProcessRequest } from "../../../src/interface-adapters/workflows/interfaces.js";
 import {
   closedPort,
   startStubServer,
@@ -48,13 +46,7 @@ describe("a process the sandbox runs for a run", () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          validationSchema: envSchema,
-        }),
-        ResilienceModule.forRoot({ presets: resiliencePresets }),
-      ],
+      imports: [ResilienceModule.forRoot({ presets: resiliencePresets })],
     }).compile();
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);

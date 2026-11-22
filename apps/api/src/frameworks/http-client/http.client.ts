@@ -31,7 +31,7 @@ import type {
   ImportResult,
 } from "../../application/automation/imports/interfaces.js";
 import type { ImportFetcher } from "../../application/automation/imports/ports.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import { AddressPolicy } from "./address-policy.js";
 import { AuthorizationServer } from "./authorization-server.js";
 import { DigestAuthentication } from "./digest-authentication.js";

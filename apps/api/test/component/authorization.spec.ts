@@ -36,14 +36,16 @@ describe("authentication, authorization policies and error responses", () => {
     });
   });
 
-  it("the_readiness_route_is_public_and_checks_the_database", async () => {
+  it("the_readiness_route_is_public_and_checks_no_other_system", async () => {
     const response = await request(t.server)
       .get("/api/v1/health/ready")
       .expect(200);
 
-    expect(response.body).toMatchObject({
+    expect(response.body).toEqual({
       status: "ok",
-      details: { database: { status: "up" } },
+      info: {},
+      error: {},
+      details: {},
     });
   });
 

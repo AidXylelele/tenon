@@ -1,17 +1,30 @@
 import type {
   AsyncApiRequest,
+  CloudEvent,
   Diagnostic,
   Effect,
   EffectOutcome,
+  EffectResponse,
+  Ending,
+  HostEnd,
+  HostProfile,
+  InputProblem,
   JsonObject,
   JsonValue,
   Manifest,
+  ProcessRequest,
   RoutingFilter,
+  RuntimeDescriptor,
+  Script,
+  Shell,
+  StartContext,
   State,
   Step,
+  StepContext,
   WorkflowRequest,
 } from "interpreter";
 import type { WorkflowStructure } from "language-server/structure";
+import type { VersionProgram } from "../../application/automation/workflows/interfaces.js";
 import type {
   AwaitedEffect,
   TakenEvent,
@@ -95,6 +108,16 @@ export type ControlStep = (call: ProgramCall, state: State) => Promise<Step>;
 
 export type ChildEffect = Effect & WorkflowRequest;
 
+export type SandboxedProcessRequest = ProcessRequest & {
+  readonly process: Script | Shell;
+};
+
+export interface StepCall {
+  readonly idempotencyKey: string;
+  readonly signal: AbortSignal;
+  readonly secrets: JsonObject;
+}
+
 export interface TimeAnswer {
   readonly at: number;
   readonly outcome: EffectOutcome;
@@ -141,4 +164,74 @@ export interface FetchedImportText {
   readonly reference: string;
   readonly text: string | null;
   readonly reason: string | null;
+}
+
+export abstract class InterpreterClient {
+  abstract compile(
+    source: JsonObject | string,
+    secrets: readonly string[],
+    imports: ImportTexts,
+  ): Promise<CompilationData>;
+  abstract start(
+    call: ProgramCall,
+    input: JsonValue,
+    context: StartContext,
+  ): Promise<StartedStep>;
+  abstract correlate(
+    call: ProgramCall,
+    context: StartContext,
+  ): Promise<StartedStep>;
+  abstract respond(
+    call: ProgramCall,
+    state: State,
+    response: EffectResponse,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract suspend(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract resume(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract cancel(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract route(
+    call: ProgramCall,
+    event: CloudEvent,
+  ): Promise<readonly RouteMatch[]>;
+  abstract filter(filter: JsonValue): Promise<FilterCheck>;
+  abstract accepting(
+    filters: readonly NamedFilter[],
+    event: CloudEvent,
+    signal: AbortSignal | null,
+  ): Promise<readonly string[]>;
+  abstract inputProblemsOf(
+    call: ProgramCall,
+    input: JsonValue,
+  ): Promise<readonly InputProblem[]>;
+  abstract profile(secrets: readonly string[]): Required<HostProfile>;
+  abstract runtime(): RuntimeDescriptor;
+  abstract ending(end: HostEnd): Ending;
+}
+
+export abstract class StructureClient {
+  abstract structureOf(
+    program: VersionProgram,
+  ): Promise<VersionStructure | null>;
+  abstract tagOf(program: VersionProgram): string;
+}
+
+export abstract class EffectClient {
+  abstract perform(effect: Effect, step: StepCall): Promise<EffectOutcome>;
+  abstract performDetached(
+    request: SandboxedProcessRequest,
+    step: StepCall,
+  ): Promise<void>;
 }

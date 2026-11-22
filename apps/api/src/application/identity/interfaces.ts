@@ -105,7 +105,3 @@ export interface ListedInvitation {
   readonly expiresAt: Date;
   readonly createdAt: Date;
 }
-
-export interface SeedAdministratorCommand {
-  readonly email: string;
-}

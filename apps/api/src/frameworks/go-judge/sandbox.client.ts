@@ -5,15 +5,13 @@ import {
   ResilienceTimeoutError,
 } from "@nestjs/resilience";
 import type { ProcessOutcome, Script, Shell } from "interpreter";
-import type { ShellSupport } from "../../application/automation/host/interfaces.js";
-import type { ProcessPlatform } from "../../application/automation/host/queries.js";
+import type { SandboxedProcessRequest } from "../../interface-adapters/workflows/interfaces.js";
 import type { FetchedText } from "../http-client/interfaces.js";
 import type { HttpClient } from "../http-client/http.client.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import type {
   BuiltCommand,
   SandboxCommand,
-  SandboxedProcessRequest,
   SandboxFile,
   SandboxResult,
   ScriptLanguage,
@@ -26,7 +24,7 @@ import shellPlatform from "./shell-platform.json" with { type: "json" };
 
 const DIRECTORY = "directory";
 
-export class SandboxClient implements ProcessPlatform {
+export class SandboxClient {
   private readonly policy: ResiliencePolicy;
   private readonly languages: Readonly<
     Record<Script["language"], ScriptLanguage>
@@ -57,10 +55,6 @@ export class SandboxClient implements ProcessPlatform {
     } catch (error) {
       return this.#failureOf(error, context.signal);
     }
-  }
-
-  shell(): ShellSupport {
-    return shellPlatform;
   }
 
   async #commandOf(

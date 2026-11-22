@@ -15,6 +15,7 @@ import {
   stringSerializer,
 } from "@platformatic/kafka";
 import type { AsyncApiOutcome, Failure } from "interpreter";
+import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { KAFKA_CHANNEL } from "./bindings.schema.js";
 import { BrokerConnections } from "./broker-connections.js";
@@ -25,7 +26,6 @@ import type {
   BrokerServer,
   BrokerTarget,
   BrokerInbox,
-  Subscribed,
   KafkaConsumer,
   KafkaProducer,
   Lost,

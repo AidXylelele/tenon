@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { DrizzleModule, getDrizzleToken } from "@nestjs/drizzle";
 import { ClsPluginTransactional } from "@nestjs-cls/transactional";
 import { TransactionalAdapterDrizzleOrm } from "@nestjs-cls/transactional-adapter-drizzle-orm";
@@ -7,17 +7,18 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { ClsModule } from "nestjs-cls";
 import type { Database } from "../../interface-adapters/persistence/interfaces.js";
 import * as schema from "../../interface-adapters/persistence/schema/index.js";
-import type { Env } from "./env.schema.js";
+import { databaseConfig } from "./configs.js";
 
 @Module({
   imports: [
     DrizzleModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) => ({
+      imports: [ConfigModule.forFeature(databaseConfig)],
+      inject: [databaseConfig.KEY],
+      useFactory: (database: ConfigType<typeof databaseConfig>) => ({
         drizzle,
         connection: {
-          connectionString: config.get("DATABASE_URL", { infer: true }),
-          max: config.get("DATABASE_POOL_SIZE", { infer: true }),
+          connectionString: database.DATABASE_URL,
+          max: database.DATABASE_POOL_SIZE,
           connectionTimeoutMillis: 10_000,
           keepAlive: true,
         },
