@@ -16,6 +16,13 @@ const LIB_FLOOR = {
   statements: 85,
 };
 
+const FEATURE_FLOOR = {
+  lines: 85,
+  branches: 85,
+  functions: 85,
+  statements: 85,
+};
+
 type Floor = typeof OPERATION_FLOOR;
 
 const operations = new URL("./src/operations/", import.meta.url);
@@ -42,7 +49,11 @@ const libFloors: [string, Floor][] = [
   ["src/libs/ui/tokens/**", LIB_FLOOR],
 ];
 
-const floors = operationFloors.concat(libFloors);
+const featureFloors: [string, Floor][] = [
+  ["src/features/step-form/**", FEATURE_FLOOR],
+];
+
+const floors = operationFloors.concat(libFloors, featureFloors);
 
 const thresholds = Object.fromEntries(floors);
 
