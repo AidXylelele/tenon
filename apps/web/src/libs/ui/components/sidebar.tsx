@@ -11,7 +11,6 @@ import { Separator } from "@/libs/ui/components/separator";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/libs/ui/components/sheet";
@@ -38,6 +37,8 @@ interface SidebarContextProps {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  sidebarId: string;
+  triggerRef: React.RefObject<HTMLButtonElement | null>;
 }
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -65,6 +66,8 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void;
 }) {
   const isMobile = useIsMobile();
+  const sidebarId = React.useId();
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
   const [openMobile, setOpenMobile] = React.useState(false);
 
   const [_open, _setOpen] = React.useState(defaultOpen);
@@ -119,8 +122,19 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      sidebarId,
+      triggerRef,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+    [
+      state,
+      open,
+      setOpen,
+      isMobile,
+      openMobile,
+      setOpenMobile,
+      toggleSidebar,
+      sidebarId,
+    ],
   );
 
   return (
@@ -159,7 +173,8 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, sidebarId, triggerRef } =
+    useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -179,11 +194,17 @@ function Sidebar({
   const mobileSheet = isMobile ? (
     <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
       <SheetContent
+        id={sidebarId}
+        aria-describedby={undefined}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          triggerRef.current?.focus();
+        }}
         dir={dir}
         data-sidebar="sidebar"
         data-slot="sidebar"
         data-mobile="true"
-        className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground data-[side=left]:w-(--sidebar-width) data-[side=right]:w-(--sidebar-width) [&>button]:hidden"
+        className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground data-[side=left]:w-(--sidebar-width) data-[side=right]:w-(--sidebar-width)"
         style={
           {
             "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -192,8 +213,7 @@ function Sidebar({
         side={side}
       >
         <SheetHeader className="sr-only">
-          <SheetTitle>Sidebar</SheetTitle>
-          <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+          <SheetTitle>Navigation</SheetTitle>
         </SheetHeader>
         <div className="flex h-full w-full flex-col">{children}</div>
       </SheetContent>
@@ -223,6 +243,7 @@ function Sidebar({
           )}
         />
         <div
+          id={isMobile ? undefined : sidebarId}
           data-slot="sidebar-container"
           data-side={side}
           className={cn(
@@ -252,10 +273,15 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, isMobile, open, openMobile, sidebarId, triggerRef } =
+    useSidebar();
+  const expanded = isMobile ? openMobile : open;
 
   return (
     <Button
+      ref={triggerRef}
+      aria-expanded={expanded}
+      aria-controls={sidebarId}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
@@ -268,7 +294,7 @@ function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">Navigation</span>
     </Button>
   );
 }
@@ -445,9 +471,12 @@ function SidebarMenuButton({
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const Comp = asChild ? Slot.Root : "button";
   const { isMobile, state } = useSidebar();
+  const current = isActive ? "page" : undefined;
+  const iconsOnly = state === "collapsed" && !isMobile;
 
   const button = (
     <Comp
+      aria-current={current}
       data-slot="sidebar-menu-button"
       data-sidebar="menu-button"
       data-size={size}
@@ -457,25 +486,16 @@ function SidebarMenuButton({
     />
   );
 
-  if (!tooltip) {
+  if (!tooltip || !iconsOnly) {
     return button;
   }
 
-  if (typeof tooltip === "string") {
-    tooltip = {
-      children: tooltip,
-    };
-  }
+  const content = typeof tooltip === "string" ? { children: tooltip } : tooltip;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>{button}</TooltipTrigger>
-      <TooltipContent
-        side="right"
-        align="center"
-        hidden={state !== "collapsed" || isMobile}
-        {...tooltip}
-      />
+      <TooltipContent side="right" align="center" {...content} />
     </Tooltip>
   );
 }
