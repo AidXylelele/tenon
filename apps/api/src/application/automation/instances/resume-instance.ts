@@ -36,7 +36,7 @@ export class ResumeInstance {
     const turn = await this.runtime.resume(instance, secrets, now);
     instance.advance(turn, secrets, now);
     await this.instances.save(instance);
-    await this.runs.wake(instance);
+    await this.runs.wakeOnControl(instance, Control.Resume);
     return { ok: true, value: undefined };
   }
 }

@@ -31,9 +31,12 @@ import { CheckDefinition } from "../../../application/automation/workflows/check
 import { WorkflowQueries } from "../../../application/automation/workflows/queries.js";
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import type { User } from "../../../domain/identity/user.js";
-import type { VersionStructure } from "../../workflows/interfaces.js";
-import { StructureClient } from "../../workflows/ports.js";
+import type { User } from "../../../domain/identity/users/user.js";
+import {
+  StructureClient,
+  type VersionStructure,
+} from "../../workflows/interfaces.js";
+import { ProtocolMapper } from "../../workflows/mappers/protocol.mapper.js";
 import { EntityTagMapper } from "../mappers/entity-tag.mapper.js";
 import { Missing } from "../../../application/automation/enums.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
@@ -48,7 +51,7 @@ import {
   WorkflowPageResponse,
   WorkflowParams,
   WorkflowResponse,
-} from "../schemas/workflow.schemas.js";
+} from "../schemas/workflow.schema.js";
 
 @ApiTags("workflows")
 @ApiCookieAuth("sessionCookie")
@@ -61,6 +64,7 @@ export class WorkflowsController {
     private readonly turnWorkflowOff: TurnWorkflowOff,
     private readonly workflows: WorkflowQueries,
     private readonly structures: StructureClient,
+    private readonly protocol: ProtocolMapper,
     private readonly workflowPresenter: WorkflowPresenter,
     private readonly problemPresenter: ProblemPresenter,
     private readonly entityTagMapper: EntityTagMapper,
@@ -228,7 +232,7 @@ export class WorkflowsController {
 
     if (program === null) throw this.problemPresenter.of(Missing.Version);
 
-    const tag = this.structures.tagOf(program);
+    const tag = this.structures.tagOf(program.digest);
     const digest = this.entityTagMapper.digestOf({ tag });
     const etag = this.entityTagMapper.fromRevision(digest);
     const unchanged = this.entityTagMapper.isUnchanged(ifNoneMatch, digest);
@@ -239,7 +243,11 @@ export class WorkflowsController {
       return undefined;
     }
 
-    const structure = await this.structures.structureOf(program);
+    const source = this.protocol.toSource(program);
+    const structure = await this.structures.structureOf(
+      program.versionId,
+      source,
+    );
 
     if (structure === null) throw this.problemPresenter.of(Missing.Structure);
 

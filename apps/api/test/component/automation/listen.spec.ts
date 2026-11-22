@@ -1,5 +1,5 @@
 import request from "supertest";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";

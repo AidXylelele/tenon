@@ -1,5 +1,5 @@
 import { Policy } from "@nestjs/authorization";
-import type { User } from "../../../domain/identity/user.js";
+import type { User } from "../../../domain/identity/users/user.js";
 
 @Policy()
 export class InvitationPolicy {

@@ -28,7 +28,7 @@ import {
   CreateWebhookBody,
   WebhookListResponse,
   WebhookParams,
-} from "../schemas/webhook.schemas.js";
+} from "../schemas/webhook.schema.js";
 
 @ApiTags("webhooks")
 @ApiCookieAuth("sessionCookie")

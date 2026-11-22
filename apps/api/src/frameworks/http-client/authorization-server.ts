@@ -25,15 +25,15 @@ import { HttpClientName } from "./enums.js";
 import type { OAuth2Credentials } from "./interfaces.js";
 import { ResponseSizeLimit } from "./response-size-limit.js";
 
-const JWT_BEARER = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-
 @Injectable()
 export class AuthorizationServer {
   static readonly REFUSED = "ERR_TOKEN_REFUSED";
+  private static readonly JWT_BEARER =
+    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
   constructor(
-    @InjectHttpClient(HttpClientName.IdentityProvider)
-    private readonly identityProvider: NestHttpClient,
+    @InjectHttpClient(HttpClientName.Outbound)
+    private readonly outbound: NestHttpClient,
   ) {}
 
   async accessTokenFor(
@@ -42,8 +42,9 @@ export class AuthorizationServer {
   ): Promise<string> {
     const configuration = await this.#configurationOf(credentials, signal);
     const token = await this.#granted(configuration, credentials);
+    const accepted = this.#issuedByAccepted(token, credentials);
 
-    if (!this.#issuedByAccepted(token, credentials))
+    if (!accepted)
       throw this.#refused(
         "The token was not issued by one of the accepted issuers",
       );
@@ -149,17 +150,12 @@ export class AuthorizationServer {
   #parametersOf(credentials: OAuth2Credentials): URLSearchParams {
     const parameters = new URLSearchParams();
 
-    if (credentials.scopes.length > 0)
-      parameters.set("scope", credentials.scopes.join(" "));
+    const scope = credentials.scopes.join(" ");
+
+    if (scope !== "") parameters.set("scope", scope);
 
     for (const audience of credentials.audiences)
       parameters.append("audience", audience);
-
-    if (credentials.username !== null)
-      parameters.set("username", credentials.username);
-
-    if (credentials.password !== null)
-      parameters.set("password", credentials.password);
 
     if (credentials.subject !== null) {
       parameters.set("subject_token", credentials.subject.token);
@@ -178,15 +174,21 @@ export class AuthorizationServer {
     const client = credentials.client;
 
     switch (client.authentication) {
-      case "client_secret_basic":
-        return ClientSecretBasic(this.#secretOf(credentials));
-      case "client_secret_post":
-        return ClientSecretPost(this.#secretOf(credentials));
-      case "client_secret_jwt":
+      case "client_secret_basic": {
+        const secret = this.#secretOf(credentials);
+        return ClientSecretBasic(secret);
+      }
+      case "client_secret_post": {
+        const secret = this.#secretOf(credentials);
+        return ClientSecretPost(secret);
+      }
+      case "client_secret_jwt": {
         if (client.assertion !== null)
           return this.#assertedBy(client.assertion);
 
-        return ClientSecretJwt(this.#secretOf(credentials));
+        const secret = this.#secretOf(credentials);
+        return ClientSecretJwt(secret);
+      }
       case "private_key_jwt":
         if (client.assertion === null)
           throw this.#refused("private_key_jwt needs the client assertion");
@@ -199,7 +201,7 @@ export class AuthorizationServer {
 
   #assertedBy(assertion: string): ClientAuth {
     return (_server, _client, body) => {
-      body.set("client_assertion_type", JWT_BEARER);
+      body.set("client_assertion_type", AuthorizationServer.JWT_BEARER);
       body.set("client_assertion", assertion);
     };
   }
@@ -215,8 +217,9 @@ export class AuthorizationServer {
 
   #tokenEndpointOf(credentials: OAuth2Credentials): string {
     const path = credentials.endpoints?.token ?? "/oauth2/token";
+    const absolute = URL.canParse(path);
 
-    if (URL.canParse(path)) return path;
+    if (absolute) return path;
 
     const authority = credentials.authority.replace(/\/+$/, "");
     const relative = path.replace(/^\/+/, "");
@@ -245,10 +248,11 @@ export class AuthorizationServer {
 
     if (json) headers.set("content-type", encoding);
 
-    const response = await this.identityProvider.request(url, {
+    const response = await this.outbound.request(url, {
       method: options.method,
       headers,
       body,
+      redirect: options.redirect,
       signal: scoped,
       responseType: "response",
     });
@@ -263,7 +267,8 @@ export class AuthorizationServer {
     for (const name of body.keys()) {
       const values = body.getAll(name);
       const [single = ""] = values;
-      fields.set(name, values.length === 1 ? single : values);
+      const value = values.length === 1 ? single : values;
+      fields.set(name, value);
     }
 
     const object = Object.fromEntries(fields);
@@ -278,7 +283,11 @@ export class AuthorizationServer {
 
     if (claims === null) return true;
 
-    return claims.iss !== undefined && credentials.issuers.includes(claims.iss);
+    const issuer = claims.iss;
+
+    if (issuer === undefined) return false;
+
+    return credentials.issuers.includes(issuer);
   }
 
   #claimsOf(token: string): JWTPayload | null {
@@ -291,8 +300,9 @@ export class AuthorizationServer {
 
   #refusalOf(error: unknown, detail: string): unknown {
     const cause: unknown = error instanceof ClientError ? error.cause : null;
+    const transported = this.#transported(cause);
 
-    if (this.#transported(cause)) return cause;
+    if (transported) return cause;
 
     const plaintext =
       error instanceof ClientError &&

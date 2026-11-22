@@ -26,12 +26,10 @@ import { InstanceRefusal } from "../../../domain/automation/instances/enums.js";
 import { SecretRefusal } from "../../../domain/automation/secrets/enums.js";
 import { SubscriptionRefusal } from "../../../domain/automation/subscriptions/enums.js";
 import { WorkflowRefusal } from "../../../domain/automation/workflows/enums.js";
-import {
-  AccountRefusal,
-  InvitationRefusal,
-  UserRefusal,
-} from "../../../domain/identity/enums.js";
-import type { ProblemDetails } from "../filters/interfaces.js";
+import { AccountRefusal } from "../../../domain/identity/accounts/enums.js";
+import { InvitationRefusal } from "../../../domain/identity/invitations/enums.js";
+import { UserRefusal } from "../../../domain/identity/users/enums.js";
+import type { ProblemDetails } from "../pipeline/interfaces.js";
 import type { Described, Failure, Refusal } from "./interfaces.js";
 
 @Injectable()
@@ -474,8 +472,10 @@ export class ProblemPresenter {
   #exceptionOf(problem: ProblemDetails): HttpException {
     const Exception = ProblemPresenter.EXCEPTIONS.get(problem.status);
 
-    if (Exception === undefined)
-      throw new TypeError(`No exception answers ${String(problem.status)}`);
+    if (Exception === undefined) {
+      const status = String(problem.status);
+      throw new TypeError(`No exception answers ${status}`);
+    }
 
     return new Exception(problem);
   }

@@ -1,9 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import type { AwaitedEffect } from "../../../domain/automation/instances/interfaces.js";
 import { Run } from "../../../domain/automation/instances/run.js";
 import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
-import type { SealedRun, WorkflowInstanceRow } from "../interfaces.js";
-import { Cipher } from "../ports.js";
+import {
+  Cipher,
+  type SealedRun,
+  type WorkflowInstanceRow,
+} from "../interfaces.js";
 
 @Injectable()
 export class WorkflowInstanceMapper {
@@ -36,6 +38,8 @@ export class WorkflowInstanceMapper {
   }
 
   toEntity(row: WorkflowInstanceRow): WorkflowInstance {
+    const input = row.input ?? null;
+    const run = this.#runOf(row);
     return new WorkflowInstance({
       id: row.id,
       workflowId: row.workflowId,
@@ -44,7 +48,7 @@ export class WorkflowInstanceMapper {
       starterId: row.starterId,
       originId: row.originId,
       originEffectId: row.originEffectId,
-      input: row.input ?? null,
+      input,
       phase: row.phase,
       output: row.output,
       error: row.error,
@@ -52,14 +56,9 @@ export class WorkflowInstanceMapper {
       startedAt: row.startedAt,
       endedAt: row.endedAt,
       cancelReason: row.cancelReason,
-      run: this.#runOf(row),
+      run,
       version: row.version,
     });
-  }
-
-  awaitedOf(row: WorkflowInstanceRow): readonly AwaitedEffect[] {
-    const run = this.#runOf(row);
-    return run?.awaited ?? [];
   }
 
   #sealed(run: Run | null): string | null {
@@ -86,9 +85,11 @@ export class WorkflowInstanceMapper {
 
     const text = this.cipher.open(sealed);
     const state = JSON.parse(text) as SealedRun;
+    const fingerprint = row.programFingerprint ?? "";
+    const format = row.runFormat ?? 0;
     return new Run({
-      fingerprint: row.programFingerprint ?? "",
-      format: row.runFormat ?? 0,
+      fingerprint,
+      format,
       memento: state.memento,
       awaited: state.awaited,
       listening: state.listening,

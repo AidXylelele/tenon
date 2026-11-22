@@ -5,9 +5,9 @@ import {
   type PasswordResetLink,
 } from "@nestjs/authentication";
 import { Injectable } from "@nestjs/common";
-import { FindRecoveryAccount } from "../../../application/identity/find-recovery-account.js";
-import { ResetPassword } from "../../../application/identity/reset-password.js";
-import { SendRecoveryLink } from "../../../application/identity/send-recovery-link.js";
+import { FindRecoveryAccount } from "../../../application/identity/accounts/find-recovery-account.js";
+import { ResetPassword } from "../../../application/identity/accounts/reset-password.js";
+import { SendRecoveryLink } from "../../../application/identity/accounts/send-recovery-link.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
 
 @Injectable()

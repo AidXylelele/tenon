@@ -67,34 +67,39 @@ export class PostgresIdempotencyStore implements IdempotencyStore {
     ttl: number,
   ): Promise<boolean> {
     const now = Date.now();
+    const expiresAt = now + ttl;
+    const owned = this.ownedBy(key, owner, now);
     const completed = await this.db
       .update(records)
-      .set({ owner: null, response, expiresAt: now + ttl })
-      .where(this.ownedBy(key, owner, now))
+      .set({ owner: null, response, expiresAt })
+      .where(owned)
       .returning({ keyHash: records.keyHash });
     return completed.length === 1;
   }
 
   async release(key: string, owner: string): Promise<boolean> {
     const now = Date.now();
+    const owned = this.ownedBy(key, owner, now);
     const released = await this.db
       .delete(records)
-      .where(this.ownedBy(key, owner, now))
+      .where(owned)
       .returning({ keyHash: records.keyHash });
     return released.length === 1;
   }
 
   async extend(key: string, owner: string, lockTtl: number): Promise<boolean> {
     const now = Date.now();
+    const expiresAt = now + lockTtl;
+    const owned = this.ownedBy(key, owner, now);
     const extended = await this.db
       .update(records)
-      .set({ expiresAt: now + lockTtl })
-      .where(this.ownedBy(key, owner, now))
+      .set({ expiresAt })
+      .where(owned)
       .returning({ keyHash: records.keyHash });
     return extended.length === 1;
   }
 
-  async prune(limit: number): Promise<number> {
+  async prune(limit = 1_000): Promise<number> {
     const now = Date.now();
     const expired = this.db
       .select({ keyHash: records.keyHash })
@@ -111,8 +116,9 @@ export class PostgresIdempotencyStore implements IdempotencyStore {
   }
 
   private ownedBy(key: string, owner: string, now: number) {
+    const keyHash = this.#hashOf(key);
     return and(
-      eq(records.keyHash, this.#hashOf(key)),
+      eq(records.keyHash, keyHash),
       eq(records.owner, owner),
       gt(records.expiresAt, now),
     );

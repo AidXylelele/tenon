@@ -1,6 +1,6 @@
 import { SessionService } from "@nestjs/authentication";
 import { Injectable } from "@nestjs/common";
-import type { Sessions } from "../../../application/identity/ports.js";
+import type { Sessions } from "../../../application/identity/accounts/ports.js";
 
 @Injectable()
 export class SessionsGateway implements Sessions {

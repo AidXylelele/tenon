@@ -36,7 +36,9 @@ export class AnswerReceives {
     const answered: Receipt[] = [];
 
     for (const receipt of receipts) {
-      if (!instance.awaits(receipt.wait.effectId)) continue;
+      const awaited = instance.awaits(receipt.wait.effectId);
+
+      if (!awaited) continue;
 
       const turn = await this.runtime.receive(
         instance,

@@ -1,5 +1,5 @@
 import request from "supertest";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import shellPlatform from "../../../src/frameworks/go-judge/shell-platform.json" with { type: "json" };
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { createTestApp, type TestApp } from "../../support/create-test-app.js";

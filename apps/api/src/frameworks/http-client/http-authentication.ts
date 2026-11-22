@@ -3,8 +3,11 @@ import {
   type Authentication,
   createSecretPolicies,
   type JsonObject,
+  type ResolvedAuthentication,
+  type RevealedAuthorization,
   type SecretPolicies,
 } from "interpreter";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { AuthorizationServer } from "./authorization-server.js";
 import type {
@@ -37,10 +40,10 @@ export class HttpAuthentication {
         return credentials;
       case "bearer":
         return this.#header("Bearer", credentials.token);
-      case "basic":
-        return this.#header("Basic", this.#pairOf(credentials));
-      case "digest":
-        return { kind: "digest", credentials };
+      case "basic": {
+        const pair = this.#pairOf(credentials);
+        return this.#header("Basic", pair);
+      }
       case "oauth2":
       case "oidc": {
         const token = await this.server.accessTokenFor(credentials, signal);
@@ -53,13 +56,33 @@ export class HttpAuthentication {
     authentication: Authentication | null,
     secrets: JsonObject,
   ): Credentials | UnusableSecret | null {
+    const resolved = this.#resolvedOf(authentication, secrets);
+    const performable = this.#performable(resolved);
+
+    if (!performable)
+      throw new PermanentFault(
+        "The host does not perform 'authentication.digest'; its profile refuses it at publish",
+      );
+
+    return resolved;
+  }
+
+  headerValueOf(authorization: RevealedAuthorization): string {
+    return `${authorization.scheme} ${authorization.parameter}`;
+  }
+
+  #resolvedOf(
+    authentication: Authentication | null,
+    secrets: JsonObject,
+  ): ResolvedAuthentication | UnusableSecret | null {
     if (authentication === null) return null;
 
     if (authentication.kind !== "secret") return authentication;
 
     const name = authentication.secret;
+    const given = Object.hasOwn(secrets, name);
 
-    if (!Object.hasOwn(secrets, name))
+    if (!given)
       return {
         kind: "forbidden",
         detail: "The secret is not among the secrets of this run",
@@ -76,6 +99,12 @@ export class HttpAuthentication {
       };
 
     return held;
+  }
+
+  #performable(
+    resolved: ResolvedAuthentication | UnusableSecret | null,
+  ): resolved is Credentials | UnusableSecret | null {
+    return resolved?.kind !== "digest";
   }
 
   #header(scheme: string, parameter: string): Authorized {

@@ -5,12 +5,12 @@ import type {
   SubscriptionView,
 } from "../../../application/automation/subscriptions/interfaces.js";
 import { SubscriptionEndpointMapper } from "../mappers/subscription-endpoint.mapper.js";
-import type { ResponseJson } from "../schemas/instance.schemas.js";
+import type { ResponseJson } from "../schemas/instance.schema.js";
 import type {
   SubscriptionDetailResponse,
   SubscriptionListResponse,
   SubscriptionResponse,
-} from "../schemas/subscription.schemas.js";
+} from "../schemas/subscription.schema.js";
 
 @Injectable()
 export class SubscriptionPresenter {

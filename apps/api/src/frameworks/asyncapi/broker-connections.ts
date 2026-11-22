@@ -1,49 +1,90 @@
 import { createHash } from "node:crypto";
+import { LRUCache } from "lru-cache";
 import type { AddressPolicy } from "../http-client/address-policy.js";
-import type { BrokerCredentials, BrokerServer, Lost } from "./interfaces.js";
+import type {
+  BrokerCredentials,
+  BrokerServer,
+  Lost,
+  Opening,
+} from "./interfaces.js";
 
-export class BrokerConnections<T> {
-  readonly #opened = new Map<string, Promise<T>>();
+export class BrokerConnections<C extends object> {
+  static readonly CONNECT_MS = 5_000;
+  private static readonly OPEN_MS = 10_000;
+  private static readonly KEPT = 64;
+  private static readonly IDLE_MS = 5 * 60 * 1000;
+
+  readonly #opened: LRUCache<string, C, Opening<C>>;
+  readonly #closing = new Set<Promise<unknown>>();
 
   constructor(
     private readonly addresses: AddressPolicy,
-    private readonly closing: (connection: T) => Promise<void>,
-  ) {}
+    private readonly closing: (connection: C) => Promise<void> | void,
+  ) {
+    this.#opened = new LRUCache<string, C, Opening<C>>({
+      max: BrokerConnections.KEPT,
+      ttl: BrokerConnections.IDLE_MS,
+      ttlAutopurge: true,
+      updateAgeOnGet: true,
+      fetchMethod: (key, _stale, { signal, context }) =>
+        this.#fetched(key, signal, context),
+      dispose: (connection) => {
+        this.#closed(connection);
+      },
+    });
+  }
 
   of(
     server: BrokerServer,
     credentials: BrokerCredentials,
-    open: (address: string, lost: Lost) => Promise<T>,
-  ): Promise<T> {
+    open: (address: string, lost: Lost) => Promise<C>,
+  ): Promise<C> {
     const key = this.#keyOf(server, credentials);
-    const kept = this.#opened.get(key);
-
-    if (kept !== undefined) return kept;
-
-    const lost = () => {
-      this.#forget(key, opening);
-    };
-    const opening = this.#opening(server, (address) => open(address, lost));
-    this.#opened.set(key, opening);
-    void opening.catch(lost);
-    return opening;
+    const context = { server, open };
+    const signal = AbortSignal.timeout(BrokerConnections.OPEN_MS);
+    return this.#opened.forceFetch(key, { context, signal });
   }
 
   dedicated<Dedicated>(
     server: BrokerServer,
     open: (address: string) => Promise<Dedicated>,
   ): Promise<Dedicated> {
-    return this.#opening(server, open);
+    return this.#dialled(server, open);
   }
 
   async close(): Promise<void> {
-    const opened = Array.from(this.#opened.values());
     this.#opened.clear();
-    const closed = opened.map((opening) => this.#closed(opening));
-    await Promise.allSettled(closed);
+    const closing = Array.from(this.#closing);
+    await Promise.all(closing);
   }
 
-  async #opening<Opened>(
+  async #fetched(
+    key: string,
+    signal: AbortSignal,
+    opening: Opening<C>,
+  ): Promise<C> {
+    const ended = new AbortController();
+    const lost = () => {
+      ended.abort();
+    };
+    const connection = await this.#dialled(opening.server, (address) =>
+      opening.open(address, lost),
+    );
+    const dropped = signal.aborted || ended.signal.aborted;
+
+    if (dropped) {
+      this.#closed(connection);
+      throw new Error("The broker connection ended as it opened");
+    }
+
+    const forget = () => {
+      this.#forgotten(key, connection);
+    };
+    ended.signal.addEventListener("abort", forget, { once: true });
+    return connection;
+  }
+
+  async #dialled<Opened>(
     server: BrokerServer,
     open: (address: string) => Promise<Opened>,
   ): Promise<Opened> {
@@ -55,13 +96,17 @@ export class BrokerConnections<T> {
     return open(resolved.address);
   }
 
-  async #closed(opening: Promise<T>): Promise<void> {
-    const connection = await opening;
-    await this.closing(connection);
+  #forgotten(key: string, connection: C): void {
+    const kept = this.#opened.peek(key);
+
+    if (kept === connection) this.#opened.delete(key);
   }
 
-  #forget(key: string, opening: Promise<T>): void {
-    if (this.#opened.get(key) === opening) this.#opened.delete(key);
+  #closed(connection: C): void {
+    const closing = this.closing(connection);
+    const settled = Promise.allSettled([closing]);
+    this.#closing.add(settled);
+    void settled.then(() => this.#closing.delete(settled));
   }
 
   #keyOf(server: BrokerServer, credentials: BrokerCredentials): string {

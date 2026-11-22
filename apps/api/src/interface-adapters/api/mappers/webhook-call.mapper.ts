@@ -28,9 +28,9 @@ export class WebhookCallMapper {
 
     for (const [name, value] of Object.entries(headers)) {
       const lowered = name.toLowerCase();
+      const credential = WebhookCallMapper.CREDENTIALS.has(lowered);
 
-      if (value === undefined || WebhookCallMapper.CREDENTIALS.has(lowered))
-        continue;
+      if (value === undefined || credential) continue;
 
       flattened[lowered] = typeof value === "string" ? value : value.join(", ");
     }

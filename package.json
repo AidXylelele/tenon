@@ -14,9 +14,9 @@
     }
   },
   "scripts": {
-    "dev": "pnpm -r --parallel run dev",
+    "dev": "pnpm -r --parallel run \"/^dev(:worker)?$/\"",
     "build": "pnpm -r run build",
-    "start": "pnpm -r --parallel run start",
+    "start": "pnpm -r --parallel run \"/^start(:worker)?$/\"",
     "lint": "pnpm -r run lint",
     "check-types": "pnpm -r run check-types",
     "test": "pnpm -r run test",

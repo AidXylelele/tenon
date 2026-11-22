@@ -1,18 +1,27 @@
 import { isIP } from "node:net";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
-import { type ConsumeMessage, connect, type Options } from "amqplib";
+import {
+  type Channel,
+  type ChannelModel,
+  type ConfirmChannel,
+  type ConsumeMessage,
+  connect,
+  type Options,
+  type RecoveringChannelModel,
+  type RecoveryOptions,
+} from "amqplib";
 import type { AsyncApiOutcome, Failure } from "interpreter";
+import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
+import { AmqpPublisher } from "./amqp-publisher.js";
 import { AMQP_CHANNEL } from "./bindings.schema.js";
 import { BrokerConnections } from "./broker-connections.js";
 import type {
   AmqpBinding,
-  AmqpConnection,
   AmqpQueue,
   BrokerCredentials,
   BrokerMessage,
   BrokerInbox,
-  Subscribed,
   BrokerClient,
   BrokerServer,
   BrokerTarget,
@@ -34,11 +43,12 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
   private static readonly DEFAULT_VHOST = "/";
   private static readonly REFUSED_LOGIN = "ACCESS_REFUSED";
 
-  private readonly connections: BrokerConnections<AmqpConnection>;
+  readonly system = "rabbitmq";
+  private readonly connections: BrokerConnections<AmqpPublisher>;
 
   constructor(addresses: AddressPolicy) {
-    this.connections = new BrokerConnections(addresses, (connection) =>
-      connection.model.close(),
+    this.connections = new BrokerConnections(addresses, (publisher) =>
+      publisher.close(),
     );
   }
 
@@ -47,23 +57,21 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
     message: BrokerMessage,
     credentials: BrokerCredentials,
   ): Promise<AsyncApiOutcome> {
-    const binding = AMQP_CHANNEL.safeParse(target.bindings.channel.amqp ?? {});
+    const declared = target.bindings.channel.amqp ?? {};
+    const binding = AMQP_CHANNEL.safeParse(declared);
 
-    if (!binding.success)
-      return {
-        kind: "misconfigured",
-        detail: "The channel's amqp binding is not one the host reads",
-      };
+    if (!binding.success) return AmqpBroker.UNREAD_BINDING;
 
     try {
-      const connection = await this.connections.of(
+      const publisher = await this.connections.of(
         target.server,
         credentials,
         (address, lost) =>
-          this.#connected(target.server, address, credentials, lost),
+          this.#publisher(target.server, address, credentials, lost),
       );
-      this.#sent(connection, binding.data, target.address, message);
-      await connection.channel.waitForConfirms();
+      const channel = await publisher.channel();
+      this.#sent(channel, binding.data, target.address, message);
+      await channel.waitForConfirms();
       return { kind: "published" };
     } catch (error) {
       return this.#failureOf(error);
@@ -75,25 +83,23 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
-    const binding = AMQP_CHANNEL.safeParse(target.bindings.channel.amqp ?? {});
+    const declared = target.bindings.channel.amqp ?? {};
+    const binding = AMQP_CHANNEL.safeParse(declared);
 
     if (!binding.success) return AmqpBroker.UNREAD_BINDING;
 
+    const lost = () => {
+      inbox.lost();
+    };
+    const setup = (connected: ChannelModel) =>
+      this.#consumed(connected, binding.data, target, inbox);
+
     try {
-      const connection = await this.connections.dedicated(
-        target.server,
-        (address) =>
-          this.#connected(target.server, address, credentials, () => {
-            inbox.lost();
-          }),
+      const model = await this.connections.dedicated(target.server, (address) =>
+        this.#recovering(target.server, address, credentials, lost, setup),
       );
-      const subscription = { close: () => connection.model.close() };
-      await this.#consumed(connection, binding.data, target, inbox).catch(
-        async (error: unknown) => {
-          await Promise.allSettled([subscription.close()]);
-          throw error;
-        },
-      );
+      await model.waitForConnect();
+      const subscription = { close: () => model.close() };
       return { kind: "subscribed", subscription };
     } catch (error) {
       return this.#failureOf(error);
@@ -104,44 +110,62 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
     return this.connections.close();
   }
 
-  async #connected(
+  async #publisher(
     server: BrokerServer,
     address: string,
     credentials: BrokerCredentials,
     lost: Lost,
-  ): Promise<AmqpConnection> {
+  ): Promise<AmqpPublisher> {
+    const model = await this.#recovering(server, address, credentials, lost);
+    const publisher = new AmqpPublisher(model);
+    await model.waitForConnect();
+    return publisher;
+  }
+
+  async #recovering(
+    server: BrokerServer,
+    address: string,
+    credentials: BrokerCredentials,
+    lost: Lost,
+    setup?: RecoveryOptions["setup"],
+  ): Promise<RecoveringChannelModel> {
     const port = server.secure ? AmqpBroker.SECURE_PORT : AmqpBroker.PORT;
     const login = credentials.kind === "password" ? credentials : null;
     const named = isIP(server.hostname) === 0;
-    const model = await connect(
-      {
-        protocol: server.secure ? "amqps" : "amqp",
-        hostname: address,
-        port: server.port ?? port,
-        username: login?.username,
-        password: login?.password,
-        vhost: this.#vhostOf(server),
-      },
-      { servername: named ? server.hostname : undefined },
-    );
-    model.on("error", lost);
-    model.on("close", lost);
-    const channel = await model.createConfirmChannel();
-    channel.on("error", lost);
-    channel.on("close", () => {
-      void model.close().then(lost, lost);
-    });
-    return { model, channel };
+    const vhost = this.#vhostOf(server);
+    const recovery = {
+      waitForConnect: false,
+      initialMaxRetries: 0,
+      maxRetries: Infinity,
+      setup,
+    };
+    const endpoint: Options.Connect = {
+      protocol: server.secure ? "amqps" : "amqp",
+      hostname: address,
+      port: server.port ?? port,
+      username: login?.username,
+      password: login?.password,
+      vhost,
+    };
+    const socket = {
+      servername: named ? server.hostname : undefined,
+      timeout: BrokerConnections.CONNECT_MS,
+      recovery,
+    };
+    const model = await connect(endpoint, socket);
+    model.on("error", () => undefined);
+    model.on("reconnect-failed", lost);
+    return model;
   }
 
   #sent(
-    connection: AmqpConnection,
+    channel: ConfirmChannel,
     binding: AmqpBinding,
     address: string,
     message: BrokerMessage,
   ): void {
     const options: Options.Publish = {
-      headers: message.headers,
+      headers: { ...message.headers },
       messageId: message.idempotencyKey,
       contentType: message.contentType,
       persistent: true,
@@ -149,21 +173,25 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
     const exchange = binding.exchange.name;
 
     if (binding.is === "routingKey" && exchange !== undefined) {
-      connection.channel.publish(exchange, address, message.body, options);
+      channel.publish(exchange, address, message.body, options);
       return;
     }
 
     const queue = binding.queue.name ?? address;
-    connection.channel.sendToQueue(queue, message.body, options);
+    channel.sendToQueue(queue, message.body, options);
   }
 
   async #consumed(
-    connection: AmqpConnection,
+    connected: ChannelModel,
     binding: AmqpBinding,
     target: BrokerTarget,
     inbox: BrokerInbox,
   ): Promise<void> {
-    const channel = connection.channel;
+    const channel = await connected.createChannel();
+    const lost = () => {
+      inbox.lost();
+    };
+    channel.on("error", lost);
     const queue = await this.#queueOf(channel, binding, target.address, inbox);
     await channel.prefetch(AmqpBroker.IN_FLIGHT);
     await channel.consume(
@@ -174,16 +202,14 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
           return;
         }
 
-        void this.#handled(channel, message, inbox, queue.shared).catch(() => {
-          inbox.lost();
-        });
+        void this.#handled(channel, message, inbox, queue.shared).catch(lost);
       },
       { noAck: false },
     );
   }
 
   async #handled(
-    channel: AmqpConnection["channel"],
+    channel: Channel,
     message: ConsumeMessage,
     inbox: BrokerInbox,
     shared: boolean,
@@ -210,7 +236,7 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
   }
 
   async #queueOf(
-    channel: AmqpConnection["channel"],
+    channel: Channel,
     binding: AmqpBinding,
     address: string,
     inbox: BrokerInbox,
@@ -242,8 +268,9 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
   #failureOf(error: unknown): Failure {
     const detail = error instanceof Error ? error.message : String(error);
 
-    if (detail.includes(AmqpBroker.REFUSED_LOGIN))
-      return { kind: "unauthenticated", detail };
+    const refusedLogin = detail.includes(AmqpBroker.REFUSED_LOGIN);
+
+    if (refusedLogin) return { kind: "unauthenticated", detail };
 
     return { kind: "unreachable", detail };
   }

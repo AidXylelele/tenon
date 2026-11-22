@@ -6,12 +6,14 @@ import {
 } from "@nestjs/authentication";
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, eq, lte } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import type { Transaction } from "../interfaces.js";
 import { emailToken as tokens } from "../schema/index.js";
 
 @Injectable()
 export class PostgresEmailTokenStore implements EmailTokenStore {
+  private static readonly MOST_PENDING = 100_000;
+
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
     storage: AuthenticationStorage,
@@ -20,15 +22,17 @@ export class PostgresEmailTokenStore implements EmailTokenStore {
   }
 
   async saveEmailToken(record: EmailTokenRecord): Promise<void> {
+    const fingerprint = record.fingerprint ?? null;
     await this.txHost.tx.insert(tokens).values({
       id: record.id,
       purpose: record.purpose,
       userId: record.userId,
       email: record.email,
-      fingerprint: record.fingerprint ?? null,
+      fingerprint,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,
     });
+    await this.trim(record.createdAt);
   }
 
   async consumeEmailToken(
@@ -62,12 +66,19 @@ export class PostgresEmailTokenStore implements EmailTokenStore {
       .where(and(eq(tokens.userId, userId), eq(tokens.purpose, purpose)));
   }
 
-  async prune(): Promise<number> {
-    const now = new Date();
-    const pruned = await this.txHost.tx
+  private async trim(now: Date): Promise<void> {
+    await this.txHost.tx.delete(tokens).where(lte(tokens.expiresAt, now));
+    const [cutoff] = await this.txHost.tx
+      .select({ expiresAt: tokens.expiresAt })
+      .from(tokens)
+      .orderBy(desc(tokens.expiresAt))
+      .limit(1)
+      .offset(PostgresEmailTokenStore.MOST_PENDING);
+
+    if (!cutoff) return;
+
+    await this.txHost.tx
       .delete(tokens)
-      .where(lte(tokens.expiresAt, now))
-      .returning({ id: tokens.id });
-    return pruned.length;
+      .where(lte(tokens.expiresAt, cutoff.expiresAt));
   }
 }

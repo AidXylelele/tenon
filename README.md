@@ -38,8 +38,9 @@ docker compose up --build --wait
 ```
 
 The console answers at `http://localhost:3001`, the API at `http://localhost:53000/api/v1`, Mailpit at
-`http://localhost:58025`, and Grafana at `http://localhost:58888`. The api creates the first administrator at
-`ADMIN_EMAIL` with no password: set one through password recovery, whose mail arrives in Mailpit.
+`http://localhost:58025`, and Grafana at `http://localhost:58888`. The `migrate` service creates the first administrator
+at `ADMIN_EMAIL` with no password, and fails while no administrator exists and `ADMIN_EMAIL` is not an email address:
+set the password through password recovery, whose mail arrives in Mailpit.
 `docker compose down` stops the stand; `--volumes` also deletes its data.
 
 The migrations run as the database owner `tenon`; the api connects as `tenon_app`, which may only read and write data.
@@ -50,12 +51,12 @@ In production the console goes behind a proxy that appends `X-Forwarded-For`; th
 ## Observability
 
 `compose.yaml` runs the platform and includes `compose.observability.yaml`, the observability stack;
-`docker compose up --wait otel-collector grafana` starts that stack alone. The api and the console send their traces and
-metrics, and the api its logs, over OTLP to the OpenTelemetry Collector (`docker/otel-collector`), the only entry: it
-derives span metrics and the service graph from the traces and forwards traces to Tempo, metrics to Mimir and logs to
-Loki. Grafana (`docker/grafana`) opens on the Tenon dashboards (overview, HTTP, Node.js runtime, interpreter, workflow
-engine, database) with the links between the three stores; it needs no sign-in on `127.0.0.1`. Traces and logs are
-kept for 72 hours, metrics for 7 days.
+`docker compose up --wait otel-collector grafana` starts that stack alone. The api, the worker and the console send
+their traces and metrics, and the api and the worker their logs, over OTLP to the OpenTelemetry Collector
+(`docker/otel-collector`), the only entry: it derives span metrics and the service graph from the traces and forwards
+traces to Tempo, metrics to Mimir and logs to Loki. Grafana (`docker/grafana`) opens on the Tenon dashboards (overview,
+HTTP, Node.js runtime, interpreter, workflow engine, database) with the links between the three stores; it needs no
+sign-in on `127.0.0.1`. Traces and logs are kept for 72 hours, metrics for 7 days.
 
 ## Develop
 
@@ -65,7 +66,7 @@ pnpm build
 pnpm dev
 ```
 
-`pnpm dev` rebuilds the packages on change and runs the API and the console, both with the root `.env`.
+`pnpm dev` rebuilds the packages on change and runs the API, the worker and the console, all with the root `.env`.
 
 ## Test
 

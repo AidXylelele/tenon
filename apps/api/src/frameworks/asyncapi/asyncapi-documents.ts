@@ -28,17 +28,16 @@ export class AsyncApiDocuments {
     "tls:",
   ];
   private static readonly VARIABLE = /\{([^{}]+)\}/g;
+  private static readonly RESOLVERS = ["file", "http", "https"].map(
+    (schema) => ({
+      schema,
+      order: 1,
+      read: () => AsyncApiDocuments.REFUSED_REFERENCE,
+    }),
+  );
 
   private readonly parser = new Parser({
-    __unstable: {
-      resolver: {
-        resolvers: ["file", "http", "https"].map((schema) => ({
-          schema,
-          order: 1,
-          read: () => AsyncApiDocuments.REFUSED_REFERENCE,
-        })),
-      },
-    },
+    __unstable: { resolver: { resolvers: AsyncApiDocuments.RESOLVERS } },
   });
 
   async targetOf(text: string, request: AsyncApiRequest): Promise<Targeted> {
@@ -65,8 +64,9 @@ export class AsyncApiDocuments {
     request: AsyncApiRequest,
   ): Targeted {
     const address = channel.address() ?? "";
+    const parameterised = address.includes("{");
 
-    if (address === "" || address.includes("{"))
+    if (address === "" || parameterised)
       return this.#misconfigured(
         "The channel has no address of its own, or one with parameters the call cannot give",
       );
@@ -125,31 +125,31 @@ export class AsyncApiDocuments {
     if (request.server !== null) return servers.get(request.server.name);
 
     const protocol = request.protocol;
-    const [first] = servers.filterBy(
-      (server) => protocol === null || server.protocol() === protocol,
-    );
+    const [first] = servers.filterBy((server) => {
+      const spoken = server.protocol();
+      return protocol === null || spoken === protocol;
+    });
     return first;
   }
 
   #urlOf(server: ServerInterface, variables: JsonObject): URL | null {
-    const defaults = new Map(
-      server
-        .variables()
-        .all()
-        .map((variable) => [variable.id(), variable.defaultValue()]),
-    );
+    const entries = server
+      .variables()
+      .all()
+      .map((variable) => [variable.id(), variable.defaultValue()] as const);
+    const defaults = new Map(entries);
     const declared = server
       .url()
-      .replace(
-        AsyncApiDocuments.VARIABLE,
-        (written, name: string) =>
-          this.#variableOf(variables[name], defaults.get(name)) ?? written,
-      );
-    const schemed = declared.includes("://")
-      ? declared
-      : `${server.protocol()}://${declared}`;
+      .replace(AsyncApiDocuments.VARIABLE, (written, name: string) => {
+        const fallback = defaults.get(name);
+        return this.#variableOf(variables[name], fallback) ?? written;
+      });
+    const absolute = declared.includes("://");
+    const schemed = absolute ? declared : `${server.protocol()}://${declared}`;
+    const parameterised = schemed.includes("{");
+    const parsable = URL.canParse(schemed);
 
-    if (schemed.includes("{") || !URL.canParse(schemed)) return null;
+    if (parameterised || !parsable) return null;
 
     return new URL(schemed);
   }

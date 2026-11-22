@@ -18,7 +18,7 @@ import type {
 import type { StartRefusal } from "../../../domain/automation/workflows/interfaces.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { Result } from "../../../domain/interfaces.js";
-import type { Person } from "../../identity/interfaces.js";
+import type { Person } from "../../identity/users/interfaces.js";
 import type { Missing } from "../enums.js";
 import type { TaskStatus } from "./enums.js";
 

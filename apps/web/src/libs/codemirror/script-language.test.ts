@@ -3,7 +3,7 @@ import {
   currentCompletions,
   startCompletion,
 } from "@codemirror/autocomplete";
-import { language, syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree, language } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { classHighlighter, highlightTree } from "@lezer/highlight";
@@ -13,11 +13,15 @@ import { scriptLanguage } from "./script-language";
 
 type Highlight = readonly [text: string, classes: string];
 
+const PARSE_TIMEOUT_MS = 5_000;
+
 function highlightsOf(name: ScriptLanguage, doc: string): Highlight[] {
   const extensions = scriptLanguage(name);
   const state = EditorState.create({ doc, extensions });
-  const tree = syntaxTree(state);
+  const tree = ensureSyntaxTree(state, doc.length, PARSE_TIMEOUT_MS);
   const highlights: Highlight[] = [];
+
+  if (tree === null) throw new Error("The script was not parsed in time.");
 
   highlightTree(tree, classHighlighter, (from, to, classes) => {
     const text = doc.slice(from, to);

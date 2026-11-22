@@ -1,6 +1,7 @@
 import type { LookupAddress } from "node:dns";
 import {
   type CallOptions,
+  Client,
   connectivityState,
   credentials,
   Metadata,
@@ -8,53 +9,50 @@ import {
   status,
 } from "@grpc/grpc-js";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
-import {
-  ResilienceError,
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from "@nestjs/resilience";
+import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type { GrpcOutcome, GrpcRequest, JsonValue } from "interpreter";
+import { LRUCache } from "lru-cache";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
-import type { CallContext } from "../workflows/interfaces.js";
-import type {
-  PreparedCall,
-  ServerStreamMethod,
-  ServiceClient,
-  UnaryMethod,
-} from "./interfaces.js";
+import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
+import { TransportFailures } from "../http-client/transport-failures.js";
+import type { CallContext } from "../interpreter/interfaces.js";
+import type { PreparedCall, ServiceAddress } from "./interfaces.js";
 import { ProtoSchema } from "./proto-schema.js";
-
-const TLS_PORT = 443;
 
 @Injectable()
 export class GrpcClient implements OnApplicationShutdown {
+  private static readonly DEFAULT_PORT = 443;
+  private static readonly CHANNEL_LIMIT = 64;
+  private static readonly CHANNEL_IDLE_TIMEOUT = 5 * 60 * 1_000;
+
   private readonly policy: ResiliencePolicy;
-  private readonly clients = new Map<string, ServiceClient>();
+  private readonly channels = new LRUCache<string, Client, ServiceAddress>({
+    max: GrpcClient.CHANNEL_LIMIT,
+    ttl: GrpcClient.CHANNEL_IDLE_TIMEOUT,
+    ttlAutopurge: true,
+    updateAgeOnGet: true,
+    memoMethod: (_key, _stale, { context }) => this.#channelOf(context),
+    dispose: (channel) => {
+      channel.close();
+    },
+  });
 
   constructor(
     private readonly addresses: AddressPolicy,
     private readonly http: HttpClient,
     private readonly authentication: HttpAuthentication,
     private readonly schema: ProtoSchema,
+    private readonly failures: TransportFailures,
+    private readonly limit: ResponseSizeLimit,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("grpc-calls");
   }
 
   async call(request: GrpcRequest, context: CallContext): Promise<GrpcOutcome> {
-    const port = request.service.port ?? TLS_PORT;
-
-    if (request.authentication !== null && port !== TLS_PORT)
-      return {
-        kind: "misconfigured",
-        detail:
-          "Credentials are not sent to a gRPC service over a plaintext channel",
-      };
-
     const proto = await this.http.text(request.proto, context);
 
     if (proto.kind !== "text") return proto;
@@ -69,12 +67,12 @@ export class GrpcClient implements OnApplicationShutdown {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, context.signal);
     }
   }
 
   onApplicationShutdown(): void {
-    for (const client of this.clients.values()) client.close();
+    this.channels.clear();
   }
 
   async #called(
@@ -83,6 +81,21 @@ export class GrpcClient implements OnApplicationShutdown {
     context: CallContext,
     signal: AbortSignal,
   ): Promise<GrpcOutcome> {
+    const service = await this.#serviceOf(request);
+
+    if (service === null)
+      return {
+        kind: "unreachable",
+        detail: "The host name could not be resolved",
+      };
+
+    if (service.plaintext && request.authentication !== null)
+      return {
+        kind: "misconfigured",
+        detail:
+          "Credentials are not sent to a gRPC service over a plaintext channel",
+      };
+
     const authorization = await this.authentication.authorizationOf(
       request.authentication,
       context.secrets,
@@ -93,62 +106,57 @@ export class GrpcClient implements OnApplicationShutdown {
 
     if (authorization.kind === "misconfigured") return authorization;
 
-    if (authorization.kind === "digest")
-      return {
-        kind: "unauthenticated",
-        detail:
-          "Digest authentication answers an HTTP challenge, which a gRPC call never receives",
-      };
-
-    const [address] = await this.addresses.resolve(request.service.host, 0);
-
-    if (address === undefined)
-      return {
-        kind: "unreachable",
-        detail: "The host name could not be resolved",
-      };
-
     signal.throwIfAborted();
-    const client = this.#clientOf(request, prepared, address);
+    const channel = this.#channelFor(service);
     const metadata = this.#metadataOf(context.idempotencyKey, authorization);
     const options = this.#optionsOf(context.remaining);
 
-    if (prepared.streamed)
-      return this.#streamed(client, prepared, metadata, options, signal);
+    if (prepared.method.responseStream)
+      return this.#streamed(channel, prepared, metadata, options, signal);
 
-    return this.#unary(client, prepared, metadata, options, signal);
+    return this.#unary(channel, prepared, metadata, options, signal);
   }
 
-  #clientOf(
-    request: GrpcRequest,
-    prepared: PreparedCall,
-    address: LookupAddress,
-  ): ServiceClient {
+  async #serviceOf(request: GrpcRequest): Promise<ServiceAddress | null> {
     const host = request.service.host;
-    const port = request.service.port ?? TLS_PORT;
-    const target =
-      address.family === 6
-        ? `ipv6:[${address.address}]:${String(port)}`
-        : `ipv4:${address.address}:${String(port)}`;
-    const key = `${prepared.digest} ${request.service.name} ${target} ${host}`;
-    const cached = this.clients.get(key);
+    const port = request.service.port ?? GrpcClient.DEFAULT_PORT;
+    const [resolved] = await this.addresses.resolve(host, 0);
 
-    if (cached !== undefined) return cached;
+    if (resolved === undefined) return null;
 
-    const security =
-      port === TLS_PORT
-        ? credentials.createSsl()
-        : credentials.createInsecure();
-    const client = new prepared.service(target, security, {
-      "grpc.default_authority": `${host}:${String(port)}`,
-      "grpc.ssl_target_name_override": host,
+    const target = this.#targetOf(resolved, port);
+    const privateAddress = this.addresses.isPrivate(resolved.address);
+    const tlsPort = port === GrpcClient.DEFAULT_PORT;
+    const plaintext = privateAddress && !tlsPort;
+    return { target, host, port, plaintext };
+  }
+
+  #targetOf(address: LookupAddress, port: number): string {
+    const at = String(port);
+
+    if (address.family === 6) return `ipv6:[${address.address}]:${at}`;
+
+    return `ipv4:${address.address}:${at}`;
+  }
+
+  #channelFor(service: ServiceAddress): Client {
+    const key = `${service.target} ${service.host}`;
+    return this.channels.memo(key, { context: service });
+  }
+
+  #channelOf(service: ServiceAddress): Client {
+    const security = service.plaintext
+      ? credentials.createInsecure()
+      : credentials.createSsl();
+    const authority = `${service.host}:${String(service.port)}`;
+    return new Client(service.target, security, {
+      "grpc.default_authority": authority,
+      "grpc.ssl_target_name_override": service.host,
       "grpc.enable_http_proxy": 0,
       "grpc.enable_retries": 0,
-      "grpc.max_receive_message_length": HttpClient.RESPONSE_BYTES,
+      "grpc.max_receive_message_length": this.limit.bytes,
       "grpc.service_config_disable_resolution": 1,
     });
-    this.clients.set(key, client);
-    return client;
   }
 
   #metadataOf(
@@ -159,8 +167,8 @@ export class GrpcClient implements OnApplicationShutdown {
     metadata.set("idempotency-key", idempotencyKey);
 
     if (authorization.kind === "header") {
-      const header = authorization.header;
-      metadata.set("authorization", `${header.scheme} ${header.parameter}`);
+      const value = this.authentication.headerValueOf(authorization.header);
+      metadata.set("authorization", value);
     }
 
     return metadata;
@@ -173,16 +181,18 @@ export class GrpcClient implements OnApplicationShutdown {
   }
 
   #unary(
-    client: ServiceClient,
+    channel: Client,
     prepared: PreparedCall,
     metadata: Metadata,
     options: CallOptions,
     signal: AbortSignal,
   ): Promise<GrpcOutcome> {
-    const unary = client[prepared.method] as UnaryMethod;
+    const method = prepared.method;
     return new Promise((resolve, reject) => {
-      const call = unary.call(
-        client,
+      const call = channel.makeUnaryRequest(
+        method.path,
+        method.requestSerialize,
+        method.responseDeserialize,
         prepared.argument,
         metadata,
         options,
@@ -195,11 +205,13 @@ export class GrpcClient implements OnApplicationShutdown {
           }
 
           if (error !== null) {
-            resolve(this.#statusOf(error, client));
+            const answer = this.#statusOf(error, channel);
+            resolve(answer);
             return;
           }
 
-          resolve({ kind: "replied", message: this.#jsonOf(response) });
+          const message = this.#jsonOf(response);
+          resolve({ kind: "replied", message });
         },
       );
       const cancel = (): void => {
@@ -210,16 +222,18 @@ export class GrpcClient implements OnApplicationShutdown {
   }
 
   #streamed(
-    client: ServiceClient,
+    channel: Client,
     prepared: PreparedCall,
     metadata: Metadata,
     options: CallOptions,
     signal: AbortSignal,
   ): Promise<GrpcOutcome> {
-    const streaming = client[prepared.method] as ServerStreamMethod;
+    const method = prepared.method;
     return new Promise((resolve, reject) => {
-      const stream = streaming.call(
-        client,
+      const stream = channel.makeServerStreamRequest(
+        method.path,
+        method.requestSerialize,
+        method.responseDeserialize,
         prepared.argument,
         metadata,
         options,
@@ -232,13 +246,15 @@ export class GrpcClient implements OnApplicationShutdown {
       signal.addEventListener("abort", cancel, { once: true });
       stream.on("data", (message: object) => {
         const json = this.#jsonOf(message);
-        received += Buffer.byteLength(JSON.stringify(json));
+        const text = JSON.stringify(json);
+        received += Buffer.byteLength(text);
 
-        if (received > HttpClient.RESPONSE_BYTES) {
+        if (received > this.limit.bytes) {
+          const size = this.limit.inMebibytes();
           resolve({
             kind: "status",
             code: status.RESOURCE_EXHAUSTED,
-            message: "The response is larger than 1 MiB",
+            message: `The response is larger than ${size}`,
           });
           stream.cancel();
           return;
@@ -254,7 +270,8 @@ export class GrpcClient implements OnApplicationShutdown {
           return;
         }
 
-        resolve(this.#statusOf(error, client));
+        const answer = this.#statusOf(error, channel);
+        resolve(answer);
       });
       stream.on("end", () => {
         signal.removeEventListener("abort", cancel);
@@ -263,8 +280,8 @@ export class GrpcClient implements OnApplicationShutdown {
     });
   }
 
-  #statusOf(error: ServiceError, client: ServiceClient): GrpcOutcome {
-    const state = client.getChannel().getConnectivityState(false);
+  #statusOf(error: ServiceError, channel: Client): GrpcOutcome {
+    const state = channel.getChannel().getConnectivityState(false);
     const unconnected =
       error.code === status.UNAVAILABLE && state !== connectivityState.READY;
 
@@ -278,20 +295,8 @@ export class GrpcClient implements OnApplicationShutdown {
   }
 
   #jsonOf(message: object | undefined): JsonValue {
-    const text = JSON.stringify(message ?? null);
+    const defined = message ?? null;
+    const text = JSON.stringify(defined);
     return JSON.parse(text) as JsonValue;
-  }
-
-  #failureOf(error: unknown, signal: AbortSignal): GrpcOutcome {
-    if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return { kind: "expired" };
-
-    if (error instanceof ResilienceError) throw error;
-
-    const failure = this.http.transportFailureOf(error);
-
-    if (failure === null) throw error;
-
-    return failure;
   }
 }

@@ -14,7 +14,9 @@ import {
   stringDeserializer,
   stringSerializer,
 } from "@platformatic/kafka";
+import { context, propagation } from "@opentelemetry/api";
 import type { AsyncApiOutcome, Failure } from "interpreter";
+import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { KAFKA_CHANNEL } from "./bindings.schema.js";
 import { BrokerConnections } from "./broker-connections.js";
@@ -25,7 +27,6 @@ import type {
   BrokerServer,
   BrokerTarget,
   BrokerInbox,
-  Subscribed,
   KafkaConsumer,
   KafkaProducer,
   Lost,
@@ -43,6 +44,7 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     detail: "The channel's kafka binding is not one the host reads",
   };
 
+  readonly system = "kafka";
   private readonly connections: BrokerConnections<KafkaProducer>;
 
   constructor(private readonly addresses: AddressPolicy) {
@@ -56,9 +58,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     message: BrokerMessage,
     credentials: BrokerCredentials,
   ): Promise<AsyncApiOutcome> {
-    const binding = KAFKA_CHANNEL.safeParse(
-      target.bindings.channel.kafka ?? {},
-    );
+    const declared = target.bindings.channel.kafka ?? {};
+    const binding = KAFKA_CHANNEL.safeParse(declared);
 
     if (!binding.success) return KafkaBroker.UNREAD_BINDING;
 
@@ -86,9 +87,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
-    const binding = KAFKA_CHANNEL.safeParse(
-      target.bindings.channel.kafka ?? {},
-    );
+    const declared = target.bindings.channel.kafka ?? {};
+    const binding = KAFKA_CHANNEL.safeParse(declared);
 
     if (!binding.success) return KafkaBroker.UNREAD_BINDING;
 
@@ -102,7 +102,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
       const subscription = { close: () => consumer.close(true) };
       const stream = await this.#streamOf(consumer, topic).catch(
         async (error: unknown) => {
-          await Promise.allSettled([subscription.close()]);
+          const closed = subscription.close();
+          await Promise.allSettled([closed]);
           throw error;
         },
       );
@@ -126,12 +127,17 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     lost: Lost,
   ): Promise<KafkaProducer> {
+    const bootstrap = this.#bootstrapOf(server, address);
+    const tls = server.secure ? {} : undefined;
+    const tlsServerName = this.#serverNameOf(server);
+    const sasl = this.#saslOf(credentials);
     const producer = new Producer({
       clientId: KafkaBroker.CLIENT_ID,
-      bootstrapBrokers: [this.#bootstrapOf(server, address)],
-      tls: server.secure ? {} : undefined,
-      tlsServerName: this.#serverNameOf(server),
-      sasl: this.#saslOf(credentials),
+      bootstrapBrokers: [bootstrap],
+      tls,
+      tlsServerName,
+      sasl,
+      connectTimeout: BrokerConnections.CONNECT_MS,
       retries: false,
       serializers: {
         headerKey: stringSerializer,
@@ -153,13 +159,18 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<KafkaConsumer> {
+    const bootstrap = this.#bootstrapOf(server, address);
+    const tls = server.secure ? {} : undefined;
+    const tlsServerName = this.#serverNameOf(server);
+    const sasl = this.#saslOf(credentials);
     const consumer = new Consumer({
       clientId: KafkaBroker.CLIENT_ID,
       groupId: inbox.subscriber,
-      bootstrapBrokers: [this.#bootstrapOf(server, address)],
-      tls: server.secure ? {} : undefined,
-      tlsServerName: this.#serverNameOf(server),
-      sasl: this.#saslOf(credentials),
+      bootstrapBrokers: [bootstrap],
+      tls,
+      tlsServerName,
+      sasl,
+      connectTimeout: BrokerConnections.CONNECT_MS,
       deserializers: {
         headerKey: stringDeserializer,
         headerValue: stringDeserializer,
@@ -215,8 +226,10 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
   #guarded(metadata: ClusterMetadata, refused: () => void): void {
     for (const broker of metadata.brokers.values()) {
       const host = broker.host;
+      const literal = isIP(host) !== 0;
+      const refusedHost = literal && !this.addresses.permits(host);
 
-      if (isIP(host) !== 0 && !this.addresses.permits(host)) {
+      if (refusedHost) {
         refused();
         return;
       }
@@ -226,7 +239,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
   }
 
   #bootstrapOf(server: BrokerServer, address: string): string {
-    const host = isIP(address) === 6 ? `[${address}]` : address;
+    const ipv6 = isIP(address) === 6;
+    const host = ipv6 ? `[${address}]` : address;
     const port = server.port ?? KafkaBroker.PORT;
     return `${host}:${String(port)}`;
   }
@@ -254,6 +268,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     for (const [name, value] of Object.entries(message.headers))
       headers[name] = typeof value === "string" ? value : JSON.stringify(value);
 
+    const active = context.active();
+    propagation.inject(active, headers);
     return headers;
   }
 

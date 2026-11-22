@@ -8,7 +8,7 @@ import { and, eq, type SQL } from "drizzle-orm";
 import type { DraftRepository } from "../../../application/automation/drafts/ports.js";
 import type { Draft } from "../../../domain/automation/drafts/draft.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { DraftRow, Transaction } from "../interfaces.js";
 import { DraftMapper } from "../mappers/draft.mapper.js";
 import { draft as drafts } from "../schema/index.js";
@@ -21,10 +21,8 @@ export class PostgresDraftRepository implements DraftRepository {
   ) {}
 
   async findByName(name: WorkflowName): Promise<Draft | null> {
-    const [row] = await this.txHost.tx
-      .select()
-      .from(drafts)
-      .where(this.named(name));
+    const named = this.named(name);
+    const [row] = await this.txHost.tx.select().from(drafts).where(named);
 
     if (!row) return null;
 
@@ -40,6 +38,7 @@ export class PostgresDraftRepository implements DraftRepository {
       return;
     }
 
+    const named = this.named(draft.name);
     const saved = await this.txHost.tx
       .update(drafts)
       .set({
@@ -50,7 +49,7 @@ export class PostgresDraftRepository implements DraftRepository {
         savedByName: row.savedByName,
         savedAt: row.savedAt,
       })
-      .where(and(this.named(draft.name), eq(drafts.revision, draft.basis)))
+      .where(and(named, eq(drafts.revision, draft.basis)))
       .returning({ revision: drafts.revision });
 
     if (saved.length === 0) throw new StaleWriteError();

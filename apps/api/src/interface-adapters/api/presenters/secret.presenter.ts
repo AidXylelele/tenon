@@ -7,7 +7,7 @@ import type {
 import type {
   SecretListResponse,
   SecretResponse,
-} from "../schemas/secret.schemas.js";
+} from "../schemas/secret.schema.js";
 
 @Injectable()
 export class SecretPresenter {

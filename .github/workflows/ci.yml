@@ -153,7 +153,7 @@ jobs:
       - name: The sandbox image against its documented platform
         env:
           SANDBOX_IMAGE: tenon-go-judge
-        run: pnpm --filter api exec vitest run --project integration test/integration/clients/sandbox-image.spec.ts
+        run: pnpm --filter api exec vitest run --project integration test/integration/frameworks/go-judge/sandbox-image.spec.ts
       - name: End-to-end journeys
         run: pnpm --filter api exec vitest run --project e2e
       - name: Stand logs on failure

@@ -5,35 +5,30 @@ import {
   HttpClient as NestHttpClient,
 } from "@nestjs/http-client";
 import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
-import {
-  createSecretPolicies,
-  type JsonValue,
-  type SecretPolicies,
-} from "interpreter";
-import type { AcceptedEvent } from "../../application/automation/events/interfaces.js";
-import type { EventSender } from "../../application/automation/subscriptions/ports.js";
-import type { Secret } from "../../domain/automation/secrets/secret.js";
-import { DeliveryScheme } from "../../domain/automation/subscriptions/enums.js";
-import type { Subscription } from "../../domain/automation/subscriptions/subscription.js";
-import { HOST_PROFILE } from "../interpreter/host-profile.js";
+import type { Authentication, JsonObject } from "interpreter";
+import type {
+  EventDeliveries,
+  EventDelivery,
+} from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "./address-policy.js";
 import { HttpClientName } from "./enums.js";
+import { HttpAuthentication } from "./http-authentication.js";
+import type { Authorization } from "./interfaces.js";
 
 @Injectable()
-export class DeliveryClient implements EventSender {
-  private static readonly NO_PAIR = ":";
+export class DeliveryClient implements EventDeliveries {
+  private static readonly SECRET = "subscription";
 
   private readonly policy: ResiliencePolicy;
-  private readonly policies: SecretPolicies;
 
   constructor(
-    @InjectHttpClient(HttpClientName.Deliveries)
-    private readonly deliveries: NestHttpClient,
+    @InjectHttpClient(HttpClientName.Outbound)
+    private readonly outbound: NestHttpClient,
     private readonly addresses: AddressPolicy,
+    private readonly authentication: HttpAuthentication,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("service-calls");
-    this.policies = createSecretPolicies();
   }
 
   admits(uri: string): Promise<boolean> {
@@ -41,43 +36,11 @@ export class DeliveryClient implements EventSender {
     return this.addresses.admits(hostname);
   }
 
-  async send(
-    subscription: Subscription,
-    secret: Secret | null,
-    event: AcceptedEvent,
-  ): Promise<string | null> {
-    const endpoint = subscription.endpoint;
-    const credential = secret?.value.text ?? null;
-    const authorization = this.#authorizationOf(endpoint.scheme, credential);
-    const headers = {
-      "content-type": "application/cloudevents+json",
-      authorization,
-    };
-    const body = JSON.stringify(event.cloudEvent);
-    const failure = await this.#failureOf(endpoint.uri, headers, body);
-
-    if (failure === null || credential === null) return failure;
-
-    return failure.replaceAll(credential, "***");
-  }
-
-  async #failureOf(
-    uri: string,
-    headers: Readonly<Record<string, string | null>>,
-    body: string,
-  ): Promise<string | null> {
+  async deliver(delivery: EventDelivery): Promise<string | null> {
     try {
-      const response = await this.policy.execute(({ signal }) =>
-        this.deliveries.post(uri, {
-          headers,
-          body,
-          signal,
-          responseType: "response",
-        }),
+      return await this.policy.execute(({ signal }) =>
+        this.#delivered(delivery, signal),
       );
-      await response.data.body?.cancel();
-      const status = String(response.status);
-      return response.ok ? null : `The destination answered ${status}`;
     } catch (error) {
       const cause: unknown =
         error instanceof HttpNetworkError ? error.cause : error;
@@ -86,33 +49,70 @@ export class DeliveryClient implements EventSender {
     }
   }
 
-  #authorizationOf(
-    scheme: DeliveryScheme | null,
-    credential: string | null,
-  ): string | null {
-    if (scheme === null || credential === null) return null;
+  async #delivered(
+    delivery: EventDelivery,
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    const authentication = this.#authenticationOf(delivery);
+    const secrets = this.#secretsOf(delivery);
+    const authorization = await this.authentication.authorizationOf(
+      authentication,
+      secrets,
+      signal,
+    );
 
-    const value = this.#parsedOf(credential);
-    const held = this.policies.authenticationOf(scheme, value, HOST_PROFILE);
+    if (authorization.kind === "forbidden") return authorization.detail;
 
-    if (scheme === DeliveryScheme.Basic) {
-      const pair =
-        held.kind === "basic"
-          ? `${held.username}:${held.password}`
-          : DeliveryClient.NO_PAIR;
-      const encoded = Buffer.from(pair, "utf8").toString("base64");
-      return `Basic ${encoded}`;
-    }
+    if (authorization.kind === "misconfigured") return authorization.detail;
 
-    const token = held.kind === "bearer" ? held.token : credential;
-    return `Bearer ${token}`;
+    const headers = this.#headersOf(authorization);
+    return this.#posted(delivery, headers, signal);
   }
 
-  #parsedOf(credential: string): JsonValue {
-    try {
-      return JSON.parse(credential) as JsonValue;
-    } catch {
-      return null;
-    }
+  async #posted(
+    delivery: EventDelivery,
+    headers: Readonly<Record<string, string | null>>,
+    signal: AbortSignal,
+  ): Promise<string | null> {
+    const body = JSON.stringify(delivery.event);
+    const response = await this.outbound.post(delivery.uri, {
+      headers,
+      body,
+      redirect: "manual",
+      signal,
+      responseType: "response",
+    });
+    await response.data.body?.cancel();
+    const status = String(response.status);
+    return response.ok ? null : `The destination answered ${status}`;
+  }
+
+  #headersOf(
+    authorization: Authorization,
+  ): Readonly<Record<string, string | null>> {
+    const value =
+      authorization.kind === "header"
+        ? this.authentication.headerValueOf(authorization.header)
+        : null;
+    return {
+      "content-type": "application/cloudevents+json",
+      authorization: value,
+    };
+  }
+
+  #authenticationOf(delivery: EventDelivery): Authentication | null {
+    const scheme = delivery.scheme;
+
+    if (scheme === null || delivery.credential === null) return null;
+
+    return { kind: "secret", scheme, secret: DeliveryClient.SECRET };
+  }
+
+  #secretsOf(delivery: EventDelivery): JsonObject {
+    const credential = delivery.credential;
+
+    if (credential === null) return {};
+
+    return { [DeliveryClient.SECRET]: credential };
   }
 }

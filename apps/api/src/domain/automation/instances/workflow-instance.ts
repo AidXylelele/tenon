@@ -254,14 +254,16 @@ export class WorkflowInstance {
   abandons(child: WorkflowInstance): boolean {
     if (child.awaitedBy !== this.#id) return false;
 
-    return !this.awaitsChild(child);
+    const awaited = this.awaitsChild(child);
+    return !awaited;
   }
 
   static controlsIn(phase: Phase): Control[] {
     const controls = Object.values(Control);
-    return controls.filter(
-      (control) => WorkflowInstance.#refusalIn(phase, control) === null,
-    );
+    return controls.filter((control) => {
+      const refusal = WorkflowInstance.#refusalIn(phase, control);
+      return refusal === null;
+    });
   }
 
   admits(control: Control): Result<void, InstanceRefusal> {
@@ -289,7 +291,7 @@ export class WorkflowInstance {
     if (this.ended || this.#run === null) return;
 
     if (turn.status === TurnStatus.Stranded) {
-      this.cancelStranded(turn.ending, now);
+      this.#cancelStranded(turn.ending, now);
       return;
     }
 
@@ -300,14 +302,6 @@ export class WorkflowInstance {
   cancel(now: Date): void {
     if (this.ended) return;
 
-    this.#end(Phase.Cancelled, now);
-  }
-
-  cancelStranded(ending: RunEnding, now: Date): void {
-    if (this.ended || this.#run === null) return;
-
-    this.#cancelReason = CancelReason.InterpreterChanged;
-    this.#tell(ending);
     this.#end(Phase.Cancelled, now);
   }
 
@@ -331,6 +325,12 @@ export class WorkflowInstance {
     if (!told) this.#raise(InstanceEventKind.Deleted);
 
     return admitted;
+  }
+
+  #cancelStranded(ending: RunEnding, now: Date): void {
+    this.#cancelReason = CancelReason.InterpreterChanged;
+    this.#tell(ending);
+    this.#end(Phase.Cancelled, now);
   }
 
   #take(turn: RunTurn, secrets: RunSecrets, run: Run, now: Date): void {
@@ -371,10 +371,12 @@ export class WorkflowInstance {
         this.#output = secrets.mask(turn.output, past);
         this.#end(Phase.Completed, now);
         return;
-      case TurnStatus.Faulted:
-        this.#error = secrets.maskObject(turn.error ?? {}, past);
+      case TurnStatus.Faulted: {
+        const error = turn.error ?? {};
+        this.#error = secrets.maskObject(error, past);
         this.#end(Phase.Faulted, now);
         return;
+      }
       case TurnStatus.Cancelled:
         this.#end(Phase.Cancelled, now);
         return;
@@ -406,7 +408,9 @@ export class WorkflowInstance {
   }
 
   static #suspendRefusalIn(phase: Phase): InstanceRefusal | null {
-    if (WorkflowInstance.#SUSPENDABLE.includes(phase)) return null;
+    const suspendable = WorkflowInstance.#SUSPENDABLE.includes(phase);
+
+    if (suspendable) return null;
 
     return InstanceRefusal.NotRunning;
   }
@@ -418,13 +422,17 @@ export class WorkflowInstance {
   }
 
   static #cancelRefusalIn(phase: Phase): InstanceRefusal | null {
-    if (WorkflowInstance.#ENDED.includes(phase)) return InstanceRefusal.Ended;
+    const ended = WorkflowInstance.#ENDED.includes(phase);
+
+    if (ended) return InstanceRefusal.Ended;
 
     return null;
   }
 
   static #endedRefusalIn(phase: Phase): InstanceRefusal | null {
-    if (WorkflowInstance.#ENDED.includes(phase)) return null;
+    const ended = WorkflowInstance.#ENDED.includes(phase);
+
+    if (ended) return null;
 
     return InstanceRefusal.NotEnded;
   }

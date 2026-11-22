@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import type { Cipher } from "../../interface-adapters/persistence/ports.js";
+import type { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 
 export class AesGcmCipher implements Cipher {
   static readonly #ALGORITHM = "aes-256-gcm";

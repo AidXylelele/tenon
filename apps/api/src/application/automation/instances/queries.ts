@@ -1,4 +1,3 @@
-import type { RunAgenda } from "../../../domain/automation/instances/interfaces.js";
 import type {
   InstanceDetail,
   InstanceFilter,
@@ -22,9 +21,7 @@ export abstract class InstanceQueries {
     after: number | null,
     limit: number,
   ): Promise<TaskPage | null>;
-  abstract agendaOf(id: string): Promise<RunAgenda | null>;
   abstract countsByPhase(from: Date, to: Date): Promise<readonly PhaseCount[]>;
-  abstract liveInstances(): Promise<readonly string[]>;
   abstract taskOutput(
     id: string,
     execution: string,

@@ -30,15 +30,20 @@ export class PostgresSessionStore implements SessionStore {
   }
 
   async createSession(record: SessionRecord): Promise<void> {
+    const mfa = record.mfa ?? null;
+    const metadata = record.metadata ?? null;
     await this.txHost.tx.insert(sessions).values({
       id: record.id,
       userId: record.userId,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,
       lastActiveAt: record.lastActiveAt,
-      mfa: record.mfa ?? null,
-      metadata: record.metadata ?? null,
+      mfa,
+      metadata,
     });
+    await this.txHost.tx
+      .delete(sessions)
+      .where(lte(sessions.expiresAt, record.createdAt));
   }
 
   async touchSession(id: string, lastActiveAt: Date): Promise<void> {
@@ -66,15 +71,6 @@ export class PostgresSessionStore implements SessionStore {
 
   async deleteUserSessions(userId: string): Promise<void> {
     await this.txHost.tx.delete(sessions).where(eq(sessions.userId, userId));
-  }
-
-  async prune(): Promise<number> {
-    const now = new Date();
-    const pruned = await this.txHost.tx
-      .delete(sessions)
-      .where(lte(sessions.expiresAt, now))
-      .returning({ id: sessions.id });
-    return pruned.length;
   }
 
   private toRecord(row: SessionRow): SessionRecord {

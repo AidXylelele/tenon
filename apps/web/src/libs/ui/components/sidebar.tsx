@@ -28,6 +28,7 @@ const SIDEBAR_WIDTH = "15rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3.5rem";
 const SIDEBAR_KEYBOARD_SHORTCUT = "b";
+const SIDEBAR_FIRST_PLACE = '[data-sidebar="menu-button"]';
 
 interface SidebarContextProps {
   state: "expanded" | "collapsed";
@@ -175,6 +176,7 @@ function Sidebar({
 }) {
   const { isMobile, state, openMobile, setOpenMobile, sidebarId, triggerRef } =
     useSidebar();
+  const sheetRef = React.useRef<HTMLDivElement>(null);
 
   if (collapsible === "none") {
     return (
@@ -194,8 +196,19 @@ function Sidebar({
   const mobileSheet = isMobile ? (
     <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
       <SheetContent
+        ref={sheetRef}
         id={sidebarId}
         aria-describedby={undefined}
+        onOpenAutoFocus={(event) => {
+          const firstPlace =
+            sheetRef.current?.querySelector<HTMLElement>(SIDEBAR_FIRST_PLACE);
+          if (!firstPlace) {
+            return;
+          }
+
+          event.preventDefault();
+          firstPlace.focus();
+        }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
           triggerRef.current?.focus();
@@ -276,12 +289,14 @@ function SidebarTrigger({
   const { toggleSidebar, isMobile, open, openMobile, sidebarId, triggerRef } =
     useSidebar();
   const expanded = isMobile ? openMobile : open;
+  const reachable = isMobile && openMobile ? -1 : undefined;
 
   return (
     <Button
       ref={triggerRef}
       aria-expanded={expanded}
       aria-controls={sidebarId}
+      tabIndex={reachable}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
@@ -398,6 +413,26 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+function SidebarGroupLabel({
+  className,
+  asChild = false,
+  ...props
+}: React.ComponentProps<"div"> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : "div";
+
+  return (
+    <Comp
+      data-slot="sidebar-group-label"
+      data-sidebar="group-label"
+      className={cn(
+        "flex h-5 shrink-0 items-start rounded-md px-2 caps text-muted-foreground ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear group-data-[collapsible=icon]:-mt-5 group-data-[collapsible=icon]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
 function SidebarGroupContent({
   className,
   ...props
@@ -473,6 +508,13 @@ function SidebarMenuButton({
   const { isMobile, state } = useSidebar();
   const current = isActive ? "page" : undefined;
   const iconsOnly = state === "collapsed" && !isMobile;
+  const [hinting, setHinting] = React.useState(false);
+  const [hintedIconsOnly, setHintedIconsOnly] = React.useState(iconsOnly);
+
+  if (hintedIconsOnly !== iconsOnly) {
+    setHintedIconsOnly(iconsOnly);
+    setHinting(false);
+  }
 
   const button = (
     <Comp
@@ -491,23 +533,30 @@ function SidebarMenuButton({
   }
 
   const content = typeof tooltip === "string" ? { children: tooltip } : tooltip;
-  const leavingCloses = !iconsOnly;
-
-  function holdWhileExpanded(event: React.SyntheticEvent) {
-    if (!iconsOnly) event.preventDefault();
-  }
+  const open = iconsOnly && hinting;
 
   return (
-    <Tooltip disableHoverableContent={leavingCloses}>
-      <TooltipTrigger
-        asChild
-        onFocus={holdWhileExpanded}
-        onPointerMove={holdWhileExpanded}
-      >
-        {button}
-      </TooltipTrigger>
-      {iconsOnly && <TooltipContent side="right" align="center" {...content} />}
+    <Tooltip open={open} onOpenChange={setHinting}>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right" align="center" {...content} />
     </Tooltip>
+  );
+}
+
+function SidebarMenuBadge({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sidebar-menu-badge"
+      data-sidebar="menu-badge"
+      className={cn(
+        "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-caption text-info tabular-nums select-none group-data-[collapsible=icon]:hidden peer-data-[size=default]/menu-button:top-1.5 peer-data-[size=lg]/menu-button:top-2.5 peer-data-[size=sm]/menu-button:top-1 peer-hover/menu-button:text-info-strong peer-active/menu-button:text-info-strong peer-data-active/menu-button:text-accent-text",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
@@ -550,14 +599,17 @@ function SidebarMenuSkeleton({
 }
 
 export {
+  SIDEBAR_COOKIE_NAME,
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,

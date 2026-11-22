@@ -14,7 +14,7 @@ import {
   WorkflowCursor,
   type WorkflowPageResponse,
   type WorkflowResponse,
-} from "../schemas/workflow.schemas.js";
+} from "../schemas/workflow.schema.js";
 import { ApiRoute } from "../enums.js";
 
 @Injectable()

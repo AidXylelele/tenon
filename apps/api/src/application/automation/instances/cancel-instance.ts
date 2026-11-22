@@ -48,7 +48,7 @@ export class CancelInstance {
     );
     instance.advance(turn, secrets, now);
     await this.instances.save(instance);
-    await this.runs.wake(instance);
+    await this.runs.wakeOnControl(instance, Control.Cancel);
     return { ok: true, value: undefined };
   }
 }

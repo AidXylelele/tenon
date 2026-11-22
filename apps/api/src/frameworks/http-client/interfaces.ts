@@ -1,23 +1,24 @@
 import type {
-  Authentication,
+  AuthenticationScheme,
   Failure,
   HttpRequest,
+  ResolvedAuthentication,
   RevealedAuthorization,
 } from "interpreter";
+import type ipaddr from "ipaddr.js";
 import type { z } from "zod";
 import type {
   OPENAPI_DOCUMENT,
   OPENAPI_OPERATION,
-  OPENAPI_PARAMETER,
   OPENAPI_PATH,
-  OPENAPI_SERVER,
 } from "./openapi-document.schema.js";
 
 export interface OutboundRequest {
   readonly method: string;
   readonly uri: string;
-  readonly headers: Readonly<Record<string, string>>;
+  readonly headers: Headers;
   readonly body: string | null;
+  readonly redirect: NonNullable<RequestInit["redirect"]>;
 }
 
 export interface Signed {
@@ -30,7 +31,9 @@ export type ResponseOptions = Pick<
   "output" | "revealAuthorization"
 >;
 
-export type Credentials = Exclude<Authentication, { readonly kind: "secret" }>;
+export type Credentials = ResolvedAuthentication & {
+  readonly kind: Exclude<AuthenticationScheme, "digest">;
+};
 
 export type OAuth2Credentials = Extract<
   Credentials,
@@ -49,69 +52,30 @@ export type UnusableSecret = Extract<
 
 export type Authorization =
   | { readonly kind: "anonymous" }
-  | { readonly kind: "header"; readonly header: RevealedAuthorization }
-  | { readonly kind: "digest"; readonly credentials: PasswordCredentials };
+  | { readonly kind: "header"; readonly header: RevealedAuthorization };
 
 export type Authorized = Authorization | UnusableSecret;
-
-export interface DigestChallenge {
-  readonly parameters: ReadonlyMap<string, string>;
-  readonly algorithm: string;
-  readonly hashName: string;
-  readonly session: boolean;
-}
-
-export type FetchedText =
-  { readonly kind: "text"; readonly text: string } | Failure;
 
 export type EndpointFetch = (
   url: string | URL,
   init?: RequestInit,
 ) => Promise<Response>;
 
+export type IpAddress = ipaddr.IPv4 | ipaddr.IPv6;
+
+export type AddressRange = [IpAddress, number];
+
+export type AddressRanges = Parameters<typeof ipaddr.subnetMatch>[1];
+
 export type OpenApiDocument = z.infer<typeof OPENAPI_DOCUMENT>;
 
-export type OpenApiPath = z.infer<typeof OPENAPI_PATH>;
+type OpenApiPath = z.infer<typeof OPENAPI_PATH>;
 
-export type OpenApiOperation = z.infer<typeof OPENAPI_OPERATION>;
-
-export type OpenApiParameter = z.infer<typeof OPENAPI_PARAMETER>;
-
-export type OpenApiServer = z.infer<typeof OPENAPI_SERVER>;
+type OpenApiOperation = z.infer<typeof OPENAPI_OPERATION>;
 
 export interface LocatedOperation {
-  readonly path: string;
-  readonly method: string;
   readonly item: OpenApiPath;
   readonly operation: OpenApiOperation;
-}
-
-export interface Operation {
-  readonly swagger: boolean;
-  readonly path: string;
-  readonly method: string;
-  readonly base: string;
-  readonly parameters: readonly OperationParameter[];
-  readonly media: string;
-  readonly body: OperationBody | null;
-}
-
-export interface OperationParameter {
-  readonly name: string;
-  readonly location: string;
-  readonly required: boolean;
-  readonly separator: string;
-  readonly exploded: boolean;
-}
-
-export interface OperationBody {
-  readonly media: string;
-  readonly required: boolean;
-}
-
-export interface OperationContent {
-  readonly media: string;
-  readonly body: string;
 }
 
 export type OperationRequest =

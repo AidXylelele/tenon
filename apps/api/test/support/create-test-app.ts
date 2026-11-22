@@ -6,6 +6,7 @@ import {
 import { MailTransport, type SentMail } from "@nestjs/mail";
 import { OutboxRelay } from "@nestjs/outbox";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import { SchedulerRegistry } from "@nestjs/schedule";
 import { Test, type TestingModuleBuilder } from "@nestjs/testing";
 import { getStorageToken } from "@nestjs/throttler";
 import {
@@ -17,8 +18,10 @@ import {
 } from "rxjs";
 import { text } from "express";
 import type { App } from "supertest/types.js";
-import { AppModule } from "../../src/frameworks/di/app.module.js";
-import { WorkerInterpreterClient } from "../../src/frameworks/interpreter/worker-interpreter.client.js";
+import { ApiModule } from "../../src/frameworks/di/api.module.js";
+import { AutomationBackgroundModule } from "../../src/frameworks/di/automation-background.module.js";
+import { IdentityBackgroundModule } from "../../src/frameworks/di/identity-background.module.js";
+import { PiscinaInterpreterClient } from "../../src/frameworks/interpreter/piscina-interpreter.client.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import { getDrizzleToken } from "@nestjs/drizzle";
 import { queuedMailCount } from "./db.js";
@@ -48,7 +51,7 @@ export function withoutInterpreter(
   builder: TestingModuleBuilder,
 ): TestingModuleBuilder {
   return builder
-    .overrideProvider(WorkerInterpreterClient)
+    .overrideProvider(PiscinaInterpreterClient)
     .useValue(absentInterpreter);
 }
 
@@ -57,7 +60,7 @@ export async function createTestApp(
 ): Promise<TestApp> {
   const mail = new Mailbox();
   const builder = Test.createTestingModule({
-    imports: [AppModule],
+    imports: [ApiModule, IdentityBackgroundModule, AutomationBackgroundModule],
     controllers: [ProbeController],
   })
     .overrideProvider(MailTransport)
@@ -82,6 +85,10 @@ export async function createTestApp(
     text({ type: () => true, limit: "1mb" }),
   );
   await app.init();
+  const scheduler = app.get(SchedulerRegistry);
+
+  for (const name of scheduler.getIntervals()) scheduler.deleteInterval(name);
+
   const db = app.get<Database>(getDrizzleToken());
   const server = app.getHttpServer() as App;
   const relay = app.get(OutboxRelay);

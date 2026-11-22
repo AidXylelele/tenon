@@ -1,6 +1,6 @@
 import type { ServerResponse } from "node:http";
 import request from "supertest";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import type { TestApp } from "../../support/create-test-app.js";
@@ -138,7 +138,8 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
   async function callInFlight(id: string): Promise<void> {
     await eventually(async () => {
       const tasks = await tasksOf(t, viewer, id);
-      return tasks.some((task) => task.status === "running");
+      const running = tasks.some((task) => task.status === "running");
+      return running && unanswered.length > 0;
     });
   }
 

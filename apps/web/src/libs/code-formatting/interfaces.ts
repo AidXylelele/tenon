@@ -1,13 +1,22 @@
-import type { ScriptLanguage } from "@/libs/codemirror/interfaces";
+import type { CodeProblem, ScriptLanguage } from "@/libs/codemirror/interfaces";
 
-export interface FormattingRequest {
-  readonly language: ScriptLanguage;
-  readonly text: string;
-}
+export type WorkerRequest =
+  | {
+      readonly kind: "format";
+      readonly language: ScriptLanguage;
+      readonly text: string;
+      readonly cursor: number;
+    }
+  | {
+      readonly kind: "check";
+      readonly language: ScriptLanguage;
+      readonly text: string;
+    };
 
 export interface Formatted {
   readonly kind: "formatted";
   readonly text: string;
+  readonly cursor: number;
 }
 
 export interface Refused {
@@ -21,6 +30,11 @@ export interface Failed {
   readonly message: string;
 }
 
-export type Formatting = Formatted | Refused;
+export interface Checked {
+  readonly kind: "checked";
+  readonly problems: readonly CodeProblem[];
+}
 
-export type FormattingAnswer = Formatting | Failed;
+export type Formatting = Formatted | Refused | Failed;
+
+export type WorkerAnswer = Formatted | Refused | Checked | Failed;

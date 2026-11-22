@@ -87,12 +87,16 @@ export class Draft {
   }
 
   save(edit: DraftEdit): Result<boolean, DraftRefusal> {
-    if (this.isAt(edit.expected)) {
+    const current = this.isAt(edit.expected);
+
+    if (current) {
       this.#apply(edit);
       return { ok: true, value: true };
     }
 
-    if (this.#holds(edit)) return { ok: true, value: false };
+    const held = this.#holds(edit);
+
+    if (held) return { ok: true, value: false };
 
     return { ok: false, failure: DraftRefusal.Stale };
   }

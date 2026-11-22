@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { Inbound } from "../../../domain/automation/instances/interfaces.js";
-import { Cipher } from "../ports.js";
+import { Cipher } from "../interfaces.js";
 
 @Injectable()
 export class InboundMapper {
