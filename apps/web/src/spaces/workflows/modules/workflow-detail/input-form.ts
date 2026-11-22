@@ -156,6 +156,7 @@ function fieldOf(
     required,
     written: written !== undefined,
     value: written ?? null,
+    essentialRank: null,
     fields,
     diagnostics,
   };
