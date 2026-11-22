@@ -10,7 +10,7 @@ import {
   stepWithId,
 } from "../steps/index.js";
 import { offsetOf } from "../text/index.js";
-import { startingContentOf } from "../variants/index.js";
+import { kindOf, startingContentOf } from "../variants/index.js";
 import { scalarLike } from "../yaml-text/index.js";
 import type {
   Destination,
@@ -58,7 +58,8 @@ export function stepInsertionOf(
     return { kind: "refused", reason: outsideOf(action.index) };
   }
 
-  const name = action.name ?? newNameOf(list, action.step);
+  const kind = kindOf(action.step);
+  const name = action.name ?? newNameOf(list, kind);
   const conflict = nameConflictOf(list, name, null);
 
   if (conflict !== null) {

@@ -19,6 +19,7 @@ export {
   writtenResultOf,
 } from "./results.js";
 export {
+  kindOf,
   type StepVariant,
   stepVariants,
   supportedVariantsOf,

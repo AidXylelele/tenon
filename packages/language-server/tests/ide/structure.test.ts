@@ -239,6 +239,11 @@ test.each([
     "container",
   ],
   [
+    "a loop with no list yet",
+    'loop: { for: { each: item, in: "" }, do: [] }',
+    "item",
+  ],
+  [
     "an emitted event with no type yet",
     'send: { emit: { event: { with: { type: "" } } } }',
     null,

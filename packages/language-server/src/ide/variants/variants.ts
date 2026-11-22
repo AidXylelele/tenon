@@ -3,6 +3,7 @@ import {
   type ast,
   type JsonObject,
   standardVersion,
+  type TaskKind,
 } from "interpreter/front-end";
 import { yamlOf } from "../yaml-text/index.js";
 import { startingContentOf } from "./contents.js";
@@ -116,5 +117,34 @@ function scriptVariantOf(language: ast.ScriptProcess["language"]): StepVariant {
       return "script-js";
     case "python":
       return "script-python";
+  }
+}
+
+export function kindOf(variant: StepVariant): TaskKind {
+  switch (variant) {
+    case "http":
+    case "openapi":
+    case "grpc":
+    case "asyncapi":
+    case "mcp":
+    case "a2a":
+      return "call";
+    case "script-js":
+    case "script-python":
+    case "shell":
+    case "container":
+    case "workflow":
+      return "run";
+    case "do":
+    case "emit":
+    case "for":
+    case "fork":
+    case "listen":
+    case "raise":
+    case "set":
+    case "switch":
+    case "try":
+    case "wait":
+      return variant;
   }
 }

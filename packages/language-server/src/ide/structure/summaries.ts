@@ -205,10 +205,15 @@ function raisedSummaryOf(
   }
 }
 
-function forSummaryOf(task: ast.ForTask, document: JsonValue): string {
+function forSummaryOf(task: ast.ForTask, document: JsonValue): string | null {
   const collection = writtenAt(document, task.in.pointer);
+  const written = writtenPartsOf([collection], "");
 
-  return `${task.each} in ${collection}`;
+  if (written === null) {
+    return writtenPartsOf([task.each], "");
+  }
+
+  return `${task.each} in ${written}`;
 }
 
 function forkSummaryOf(task: ast.ForkTask): string {
