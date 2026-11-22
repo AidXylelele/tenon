@@ -144,6 +144,7 @@ export const nonEmptyEventAttributes = [
   "source",
   "type",
   "subject",
+  "datacontenttype",
 ] as const satisfies readonly EventAttribute[];
 export type NonEmptyEventAttribute = (typeof nonEmptyEventAttributes)[number];
 

@@ -4,10 +4,12 @@ import {
   nonEmptyEventAttributes,
 } from "../../standard/index.js";
 import type {
+  Call,
   ContainerProcess,
   EventFilter,
   EventProperties,
   Finding,
+  HttpCall,
   Process,
   Task,
   WorkflowProcess,
@@ -37,11 +39,12 @@ export function checkEmptyValues(subject: CheckSubject): readonly Finding[] {
 
 function emptyTaskValuesOf(task: Task): readonly Finding[] {
   switch (task.kind) {
+    case "call":
+      return emptyCallValuesOf(task.call);
     case "emit":
       return emptyEventAttributesOf(task.event);
     case "run":
       return emptyProcessValuesOf(task.process);
-    case "call":
     case "do":
     case "for":
     case "fork":
@@ -53,6 +56,40 @@ function emptyTaskValuesOf(task: Task): readonly Finding[] {
     case "wait":
       return none;
   }
+}
+
+function emptyCallValuesOf(call: Call): readonly Finding[] {
+  switch (call.kind) {
+    case "http":
+      return emptyMethodOf(call);
+    case "asyncapi":
+    case "grpc":
+    case "openapi":
+    case "a2a":
+    case "mcp":
+    case "function":
+      return none;
+  }
+}
+
+function emptyMethodOf(call: HttpCall): readonly Finding[] {
+  const method = call.method;
+  const written = writtenTextOf(method);
+
+  if (written !== "") {
+    return none;
+  }
+
+  return [
+    {
+      name: "emptyMethod",
+      code: "schema",
+      pointer: method.pointer,
+      subject: null,
+      details: [],
+      import: null,
+    },
+  ];
 }
 
 function emptyEventAttributesOf(event: EventProperties): readonly Finding[] {

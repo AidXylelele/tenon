@@ -34,6 +34,7 @@ export interface MessageDetails {
   readonly emptyEventAttribute: readonly [name: string];
   readonly emptyFilterAttribute: readonly [name: string];
   readonly emptyImage: readonly [];
+  readonly emptyMethod: readonly [];
   readonly emptyWorkflowIdentity: readonly [member: string];
   readonly invalidDuration: readonly [text: string];
   readonly dynamicSchedule: readonly [text: string];

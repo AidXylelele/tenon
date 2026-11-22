@@ -586,6 +586,49 @@ describe("analyze, of a value the standard needs written", () => {
       "/do/0/start/run/workflow/version",
       workflowRun({ version: "" }),
     ],
+    [
+      "the method of an HTTP call",
+      "schema",
+      "/do/0/fetch/with/method",
+      {
+        document: header,
+        do: [
+          {
+            fetch: {
+              call: "http",
+              with: { method: "", endpoint: "https://example.com" },
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "the content type of an emitted event",
+      "event-attribute",
+      "/do/0/tell/emit/event/with/datacontenttype",
+      emittedWith({ datacontenttype: "" }),
+    ],
+    [
+      "the content type an event filter awaits",
+      "event-attribute",
+      "/do/0/await/listen/to/one/with/datacontenttype",
+      {
+        document: header,
+        do: [
+          {
+            await: {
+              listen: {
+                to: {
+                  one: {
+                    with: { type: "com.example.event", datacontenttype: "" },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
   ])(
     "models a document where %s is empty, with the %s diagnostic at %s",
     (_, code, pointer, document) => {
@@ -628,6 +671,26 @@ describe("analyze, of a value the standard needs written", () => {
 
     expect(analysis.diagnostics).toMatchObject([
       { message: "A container must name its image.", subject: null },
+    ]);
+  });
+
+  test("words the empty method of an HTTP call", () => {
+    const document = {
+      document: header,
+      do: [
+        {
+          fetch: {
+            call: "http",
+            with: { method: "", endpoint: "https://example.com" },
+          },
+        },
+      ],
+    };
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis.diagnostics).toMatchObject([
+      { message: "An HTTP call must name its method.", subject: null },
     ]);
   });
 

@@ -2,6 +2,7 @@ import type { CloudEvent, JsonObject, JsonValue } from "../../api/index.js";
 import {
   type EventPayloadMember,
   isExtensionAttribute,
+  nonEmptyEventAttributes,
   requiredEventAttributes,
 } from "../../standard/index.js";
 import { Raised } from "../errors/index.js";
@@ -29,6 +30,7 @@ export function cloudEventOf(attributes: JsonObject): CloudEvent {
   const presentAttributes = setMembersOf(attributes);
 
   checkRequired(presentAttributes);
+  checkNonEmpty(presentAttributes);
   checkPayload(presentAttributes);
   checkExtensions(presentAttributes);
 
@@ -49,6 +51,19 @@ function checkRequired(
   );
 
   throw refusalOf("attributes as strings", notText);
+}
+
+function checkNonEmpty(attributes: JsonObject): void {
+  const empty = nonEmptyEventAttributes.filter(
+    (attribute) => attributes[attribute] === "",
+  );
+  const isWritten = empty.length === 0;
+
+  if (isWritten) {
+    return;
+  }
+
+  throw refusalOf("attributes as non-empty strings", empty);
 }
 
 function checkPayload(attributes: JsonObject): void {

@@ -77,6 +77,7 @@ const texts: Texts = {
   emptyFilterAttribute: (name) =>
     `An event filter on an empty '${name}' matches no event.`,
   emptyImage: () => "A container must name its image.",
+  emptyMethod: () => "An HTTP call must name its method.",
   emptyWorkflowIdentity: (member) =>
     `The workflow to run must have a ${member}.`,
   invalidDuration: (text) => `Duration '${text}' is not an ISO 8601 duration.`,
