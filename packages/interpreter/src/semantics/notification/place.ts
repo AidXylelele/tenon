@@ -13,6 +13,13 @@ const restatements: ReadonlySet<MessageName> = new Set<MessageName>([
   "emptyWorkflowIdentity",
 ]);
 
+const emptyTextRestatements: ReadonlySet<MessageName> = new Set<MessageName>([
+  "undeclaredAuthentication",
+  "undeclaredSecret",
+  "unresolvedImport",
+  "invalidExpression",
+]);
+
 export function placedAtCallSites(
   findings: readonly Finding[],
   functions: ReadonlyMap<string, FunctionSymbol>,
@@ -31,13 +38,23 @@ export function withoutRestatements(
 }
 
 function isRestatement(finding: Finding, flagged: readonly Finding[]): boolean {
-  const isRestating = restatements.has(finding.name);
+  const isFlagged = flagged.some((flag) => flag.pointer === finding.pointer);
 
-  if (!isRestating) {
+  if (!isFlagged) {
     return false;
   }
 
-  return flagged.some((flag) => flag.pointer === finding.pointer);
+  const isRestating = restatements.has(finding.name);
+  const isOfEmptyText = isOfEmptyTextRestatement(finding);
+
+  return isRestating || isOfEmptyText;
+}
+
+function isOfEmptyTextRestatement(finding: Finding): boolean {
+  const isNamed = emptyTextRestatements.has(finding.name);
+  const [written] = finding.details;
+
+  return isNamed && written === "";
 }
 
 function callSiteOf(

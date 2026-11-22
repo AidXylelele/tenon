@@ -517,24 +517,58 @@ do:
     },
   );
 
-  test("models an empty authentication name, the one alternative it takes", () => {
-    const document = fetchedAt({
-      uri: "https://example.com",
-      authentication: { use: "" },
-    });
+  test.each([
+    [
+      "an authentication",
+      "/do/0/fetch/with/endpoint/authentication/use",
+      fetchedAt({ uri: "https://example.com", authentication: { use: "" } }),
+    ],
+    [
+      "a secret",
+      "/do/0/fetch/with/endpoint/authentication/basic/use",
+      fetchedAt({
+        uri: "https://example.com",
+        authentication: { basic: { use: "" } },
+      }),
+    ],
+    [
+      "an import",
+      "/input/schema/resource/endpoint",
+      {
+        document: header,
+        input: { schema: { format: "json", resource: { endpoint: "" } } },
+        do: [{ a: { set: { x: 1 } } }],
+      },
+    ],
+    ["an expression", "/do/0/fetch/with/endpoint", fetchedAt("${}")],
+  ])(
+    "reports %s left empty once, by the grammar alone",
+    (_, pointer, document) => {
+      const analysis = analyzer.analyze(document, fullOptions);
+
+      expect(analysis).toMatchObject({
+        kind: "analyzed",
+        diagnostics: [{ code: "schema", pointer }],
+      });
+    },
+  );
+
+  test("keeps the unresolved import of an endpoint written but malformed", () => {
+    const document = {
+      document: header,
+      input: { schema: { format: "json", resource: { endpoint: "a b" } } },
+      do: [{ a: { set: { x: 1 } } }],
+    };
 
     const analysis = analyzer.analyze(document, fullOptions);
 
     expect(analysis).toMatchObject({
       kind: "analyzed",
       diagnostics: [
+        { code: "schema", pointer: "/input/schema/resource/endpoint" },
         {
-          code: "schema",
-          pointer: "/do/0/fetch/with/endpoint/authentication/use",
-        },
-        {
-          code: "undeclared-component",
-          pointer: "/do/0/fetch/with/endpoint/authentication/use",
+          code: "unresolved-import",
+          pointer: "/input/schema/resource/endpoint",
         },
       ],
     });
