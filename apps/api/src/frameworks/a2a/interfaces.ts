@@ -1,4 +1,4 @@
-import type { Endpoint, Failure, HttpOutcome } from "interpreter";
+import type { Endpoint, Failure } from "interpreter";
 import type { z } from "zod";
 import type { AGENT_CARD } from "./agent-card.schema.js";
 
@@ -12,5 +12,3 @@ export interface AgentOffer {
   readonly binding: string;
   readonly version: string;
 }
-
-export type Responded = Extract<HttpOutcome, { readonly kind: "responded" }>;

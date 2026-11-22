@@ -188,6 +188,11 @@ describe("a call the A2A client performs for a run", () => {
       return;
     }
 
+    if (path === "/versionless") {
+      json(response, 200, { id: "run-1/do/0/report", result: TASK });
+      return;
+    }
+
     if (request.method !== "POST") {
       response.writeHead(404).end();
       return;
@@ -694,6 +699,18 @@ describe("a call the A2A client performs for a run", () => {
     it("an_answer_that_is_not_json_rpc_is_unreachable", async () => {
       const outcome = await client.call(
         serverOf("tasks/get", { id: "task-1" }, "/garbled"),
+        contextOf(),
+      );
+
+      expect(outcome).toEqual({
+        kind: "unreachable",
+        detail: "The agent answered other than JSON-RPC",
+      });
+    });
+
+    it("an_envelope_of_another_json_rpc_version_is_unreachable", async () => {
+      const outcome = await client.call(
+        serverOf("tasks/get", { id: "task-1" }, "/versionless"),
         contextOf(),
       );
 

@@ -4,6 +4,7 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
 } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
   CallToolResultSchema,
   ErrorCode,
@@ -41,6 +42,15 @@ const RESULTS = {
   "resources/templates/list": ListResourceTemplatesResultSchema,
 } as const satisfies Record<McpMethod, unknown>;
 
+const SESSION_HEADERS: readonly string[] = [
+  "mcp-session-id",
+  "mcp-protocol-version",
+];
+
+const CLEANUP_TIMEOUT = 2_000;
+
+const LONGEST_TIMEOUT = 2 ** 31 - 1;
+
 @Injectable()
 export class McpClient {
   private readonly policy: ResiliencePolicy;
@@ -57,7 +67,11 @@ export class McpClient {
     request: HttpMcpRequest,
     context: CallContext,
   ): Promise<RpcOutcome> {
-    if (!SUPPORTED_PROTOCOL_VERSIONS.includes(request.protocolVersion))
+    const spoken = SUPPORTED_PROTOCOL_VERSIONS.includes(
+      request.protocolVersion,
+    );
+
+    if (!spoken)
       return {
         kind: "misconfigured",
         detail:
@@ -65,8 +79,9 @@ export class McpClient {
       };
 
     const parameters = request.parameters;
+    const unfit = parameters !== null && !this.#isObject(parameters);
 
-    if (parameters !== null && !this.#isObject(parameters))
+    if (unfit)
       return {
         kind: "misconfigured",
         detail: "The parameters of an MCP method are an object",
@@ -100,23 +115,30 @@ export class McpClient {
     if (authorization.kind === "misconfigured") return authorization;
 
     const transport = this.#transportOf(request, authorization, signal);
-    const identity = request.client ?? {
-      name: "tenon",
-      version: RELEASE_VERSION,
-    };
-    const client = new Client(identity, { capabilities: {} });
+    const client = this.#clientOf(request);
+    const options = this.#optionsOf(context.remaining, signal);
 
     try {
-      await client.connect(transport, { signal });
+      await client.connect(transport, options);
+      const negotiated = transport.protocolVersion ?? "";
+
+      if (negotiated < request.protocolVersion)
+        return {
+          kind: "misconfigured",
+          detail: `The MCP server speaks a version of the protocol older than ${request.protocolVersion}`,
+        };
+
+      const params = parameters ?? undefined;
       const result = await client.request(
-        { method: request.method, params: parameters ?? undefined },
+        { method: request.method, params },
         RESULTS[request.method],
-        { signal },
+        options,
       );
-      await Promise.allSettled([transport.terminateSession()]);
-      return { kind: "answered", result: this.#jsonOf(result) };
+      const answer = this.#jsonOf(result);
+      return { kind: "answered", result: answer };
     } finally {
       await client.close();
+      await this.#terminated(transport, request, authorization);
     }
   }
 
@@ -124,18 +146,68 @@ export class McpClient {
     request: HttpMcpRequest,
     authorization: Authorization,
     signal: AbortSignal,
+    sessionId?: string,
   ): StreamableHTTPClientTransport {
     const endpoint = new URL(request.transport.endpoint.uri);
+    const fetch = this.http.fetchFor(authorization, signal);
+    const headers = this.#workflowHeadersOf(request.transport.headers);
     return new StreamableHTTPClientTransport(endpoint, {
-      fetch: this.http.fetchFor(authorization, signal),
-      requestInit: { headers: request.transport.headers, redirect: "manual" },
+      fetch,
+      requestInit: { headers },
       reconnectionOptions: {
         initialReconnectionDelay: 0,
         maxReconnectionDelay: 0,
         reconnectionDelayGrowFactor: 1,
         maxRetries: 0,
       },
+      sessionId,
     });
+  }
+
+  #workflowHeadersOf(
+    headers: Readonly<Record<string, string>>,
+  ): Record<string, string> {
+    const kept = Object.entries(headers).filter(([name]) => {
+      const lowered = name.toLowerCase();
+      return !SESSION_HEADERS.includes(lowered);
+    });
+    return Object.fromEntries(kept);
+  }
+
+  #clientOf(request: HttpMcpRequest): Client {
+    const identity = request.client ?? {
+      name: "tenon",
+      version: RELEASE_VERSION,
+    };
+    return new Client(identity, { capabilities: {} });
+  }
+
+  #optionsOf(remaining: number | null, signal: AbortSignal): RequestOptions {
+    if (remaining === null) return { signal };
+
+    const timeout = Math.min(remaining, LONGEST_TIMEOUT);
+    return { signal, timeout };
+  }
+
+  async #terminated(
+    session: StreamableHTTPClientTransport,
+    request: HttpMcpRequest,
+    authorization: Authorization,
+  ): Promise<void> {
+    const sessionId = session.sessionId;
+    const version = session.protocolVersion;
+
+    if (sessionId === undefined || version === undefined) return;
+
+    const cleanup = AbortSignal.timeout(CLEANUP_TIMEOUT);
+    const ending = this.#transportOf(
+      request,
+      authorization,
+      cleanup,
+      sessionId,
+    );
+    ending.setProtocolVersion(version);
+    await ending.terminateSession().catch(() => undefined);
   }
 
   #failureOf(error: unknown, signal: AbortSignal): RpcOutcome {
