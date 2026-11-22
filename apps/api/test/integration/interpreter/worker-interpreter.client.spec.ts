@@ -1,7 +1,19 @@
 import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceModule } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
+import {
+  context,
+  createNoopMeter,
+  metrics,
+  type ObservableCallback,
+  propagation,
+  ROOT_CONTEXT,
+  trace,
+  TraceFlags,
+} from "@opentelemetry/api";
+import { NodeSDK } from "@opentelemetry/sdk-node";
 import type { JsonObject, State } from "interpreter";
+import { Piscina } from "piscina";
 import { PermanentFault } from "../../../src/domain/errors.js";
 import { IncompatibleRun } from "../../../src/interface-adapters/workflows/incompatible-run.error.js";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
@@ -17,13 +29,46 @@ const waiting: JsonObject = {
   do: [{ pause: { wait: { seconds: 30 } } }, { done: { set: { done: true } } }],
 };
 
-const context = {
+const fetchingWith = (authentication: JsonObject): JsonObject => ({
+  document: {
+    dsl: "1.1.0",
+    namespace: "sales",
+    name: "fetch",
+    version: "1.0.0",
+  },
+  do: [
+    {
+      fetch: {
+        call: "http",
+        with: {
+          method: "get",
+          endpoint: { uri: "https://crm.example.com", authentication },
+        },
+      },
+    },
+  ],
+});
+
+const TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+const CALLER_ID = "00f067aa0ba902b7";
+
+const moment = {
   now: Date.UTC(2026, 0, 1),
   secrets: {},
   runtime: { name: "tenon", version: "0.0.1", metadata: {} },
 };
 
 describe("the interpreter in its worker threads", () => {
+  const sdk = new NodeSDK({
+    autoDetectResources: false,
+    instrumentations: [],
+    spanProcessors: [],
+    metricReaders: [],
+    logRecordProcessors: [],
+  });
+  const meter = createNoopMeter();
+  const gauges = new Map<string, ObservableCallback>();
+  const run = vi.spyOn(Piscina.prototype, "run");
   let app: INestApplicationContext;
   let client: WorkerInterpreterClient;
   let sources = 0;
@@ -39,6 +84,14 @@ describe("the interpreter in its worker threads", () => {
   });
 
   beforeAll(async () => {
+    sdk.start();
+    vi.spyOn(meter, "createObservableGauge").mockImplementation((name) => ({
+      addCallback: (callback) => {
+        gauges.set(name, callback);
+      },
+      removeCallback: () => undefined,
+    }));
+    vi.spyOn(metrics, "getMeter").mockReturnValue(meter);
     const moduleRef = await Test.createTestingModule({
       imports: [ResilienceModule.forRoot({ presets: resiliencePresets })],
       providers: [WorkerInterpreterClient],
@@ -49,6 +102,10 @@ describe("the interpreter in its worker threads", () => {
 
   afterAll(async () => {
     await app.close();
+    await sdk.shutdown();
+    vi.restoreAllMocks();
+    context.disable();
+    propagation.disable();
   });
 
   it("a_document_compiles_to_its_manifest_and_program_fingerprint", async () => {
@@ -85,19 +142,52 @@ describe("the interpreter in its worker threads", () => {
     });
   });
 
+  it.each([
+    ["authentication.digest", { digest: { username: "u", password: "p" } }],
+    [
+      "grant.password",
+      {
+        oauth2: {
+          authority: "https://id.example.com",
+          grant: "password",
+          client: { id: "crm", secret: "s" },
+          username: "u",
+          password: "p",
+        },
+      },
+    ],
+  ])(
+    "a_document_needing_%s_is_refused_as_a_capability_the_host_lacks",
+    async (capability, authentication) => {
+      const document = fetchingWith(authentication);
+
+      const compilation = await client.compile(document, [], {});
+
+      expect(compilation).toMatchObject({
+        kind: "refused",
+        diagnostics: [
+          {
+            code: "capability",
+            message: `The host does not provide '${capability}'.`,
+          },
+        ],
+      });
+    },
+  );
+
   it("a_run_is_started_and_answered_by_effect_id_across_threads", async () => {
     const call = callOf("version-answered");
     const started = await client.start(
       call,
       {},
       {
-        ...context,
+        ...moment,
         instance: "instance-1",
       },
     );
     const [timer] = started.step.requested;
     const response = { id: timer?.id ?? "", outcome: { kind: "elapsed" } };
-    const due = { ...context, now: context.now + 30_000 };
+    const due = { ...moment, now: moment.now + 30_000 };
 
     const answered = await client.respond(
       call,
@@ -118,8 +208,8 @@ describe("the interpreter in its worker threads", () => {
     const call = callOf("version-rebuilt");
     const before = sources;
 
-    await client.start(call, {}, { ...context, instance: "instance-2" });
-    await client.start(call, {}, { ...context, instance: "instance-3" });
+    await client.start(call, {}, { ...moment, instance: "instance-2" });
+    await client.start(call, {}, { ...moment, instance: "instance-3" });
 
     expect(sources - before).toBeLessThanOrEqual(
       WorkerInterpreterClient.RUN_THREADS,
@@ -131,11 +221,11 @@ describe("the interpreter in its worker threads", () => {
     const started = await client.start(
       callOf("version-incompatible"),
       {},
-      { ...context, instance: "instance-4" },
+      { ...moment, instance: "instance-4" },
     );
     const elsewhere = callOf("version-incompatible", "another-build");
 
-    const answered = client.suspend(elsewhere, started.step.state, context);
+    const answered = client.suspend(elsewhere, started.step.state, moment);
 
     await expect(answered).rejects.toBeInstanceOf(IncompatibleRun);
   });
@@ -144,8 +234,57 @@ describe("the interpreter in its worker threads", () => {
     const call = callOf("version-faulted");
     const broken = { blob: "no state" } as unknown as State;
 
-    const answered = client.suspend(call, broken, context);
+    const answered = client.suspend(call, broken, moment);
 
     await expect(answered).rejects.toBeInstanceOf(PermanentFault);
+  });
+
+  it("a_call_carries_its_callers_trace_context_to_the_thread", async () => {
+    const caller = {
+      traceId: TRACE_ID,
+      spanId: CALLER_ID,
+      traceFlags: TraceFlags.SAMPLED,
+    };
+    const traced = trace.setSpanContext(ROOT_CONTEXT, caller);
+    const traceparent = `00-${TRACE_ID}-${CALLER_ID}-01`;
+
+    await context.with(traced, () => client.compile(waiting, [], {}));
+
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ pool: "checks", trace: { traceparent } }),
+      expect.objectContaining({ name: "compile" }),
+    );
+  });
+
+  it("a_version_structure_is_read_once_and_kept", async () => {
+    const program = {
+      versionId: "version-structured",
+      digest: "digest",
+      document: waiting,
+      imports: {},
+      secrets: [],
+    };
+
+    const first = await client.structureOf(program);
+    const again = await client.structureOf(program);
+
+    expect(first).toMatchObject({ namespace: "sales", name: "pause" });
+    expect(again).toEqual(first);
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it("the_queue_of_each_pool_is_observed_under_its_name", async () => {
+    const observe = vi.fn();
+    const observeQueues = gauges.get("tenon.interpreter.pool.queue.length");
+    const result = { observe };
+
+    await observeQueues?.(result);
+
+    expect(observe).toHaveBeenCalledWith(0, {
+      "tenon.interpreter.pool": "runs",
+    });
+    expect(observe).toHaveBeenCalledWith(0, {
+      "tenon.interpreter.pool": "checks",
+    });
   });
 });
