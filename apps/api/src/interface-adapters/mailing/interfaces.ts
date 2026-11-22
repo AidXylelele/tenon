@@ -1,4 +1,4 @@
-import type { Role } from "../../domain/identity/enums.js";
+import type { Role } from "../../domain/identity/users/enums.js";
 
 export interface InvitationMailData {
   readonly token: string;

@@ -1,6 +1,9 @@
 import { Missing } from "../../../src/application/identity/enums.js";
-import { ResolveSessionUser } from "../../../src/application/identity/resolve-session-user.js";
-import { UserRefusal, UserStatus } from "../../../src/domain/identity/enums.js";
+import { ResolveSessionUser } from "../../../src/application/identity/users/resolve-session-user.js";
+import {
+  UserRefusal,
+  UserStatus,
+} from "../../../src/domain/identity/users/enums.js";
 import { aUser } from "../../support/builders.js";
 import { InMemoryUserRepository } from "../../support/fakes.js";
 

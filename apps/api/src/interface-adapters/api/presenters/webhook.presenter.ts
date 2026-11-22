@@ -7,7 +7,7 @@ import type {
   CreatedWebhookResponse,
   WebhookListResponse,
   WebhookResponse,
-} from "../schemas/webhook.schemas.js";
+} from "../schemas/webhook.schema.js";
 import { ApiRoute } from "../enums.js";
 
 @Injectable()

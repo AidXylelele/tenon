@@ -1,6 +1,6 @@
 import request from "supertest";
 import { z } from "zod";
-import { Role } from "../../src/domain/identity/enums.js";
+import { Role } from "../../src/domain/identity/users/enums.js";
 import {
   authHeaders,
   cookieHeader,

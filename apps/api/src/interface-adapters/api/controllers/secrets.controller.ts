@@ -26,7 +26,7 @@ import { CreateSecret } from "../../../application/automation/secrets/create-sec
 import { DeleteSecret } from "../../../application/automation/secrets/delete-secret.js";
 import { SecretQueries } from "../../../application/automation/secrets/queries.js";
 import { ReplaceSecret } from "../../../application/automation/secrets/replace-secret.js";
-import type { User } from "../../../domain/identity/user.js";
+import type { User } from "../../../domain/identity/users/user.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
 import { SecretPresenter } from "../presenters/secret.presenter.js";
 import {
@@ -35,7 +35,7 @@ import {
   SecretListResponse,
   SecretParams,
   SecretResponse,
-} from "../schemas/secret.schemas.js";
+} from "../schemas/secret.schema.js";
 
 @ApiTags("secrets")
 @ApiCookieAuth("sessionCookie")

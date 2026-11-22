@@ -1,5 +1,5 @@
-import { InstanceCursor } from "../../../src/interface-adapters/api/schemas/instance.schemas.js";
-import { WorkflowCursor } from "../../../src/interface-adapters/api/schemas/workflow.schemas.js";
+import { InstanceCursor } from "../../../src/interface-adapters/api/schemas/instance.schema.js";
+import { WorkflowCursor } from "../../../src/interface-adapters/api/schemas/workflow.schema.js";
 
 describe("the page cursors", () => {
   it("an_instance_position_comes_back_from_its_cursor", () => {

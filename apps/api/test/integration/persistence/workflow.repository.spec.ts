@@ -6,7 +6,7 @@ import { Workflow } from "../../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../../src/domain/automation/workflows/workflow-name.js";
 import type { WorkflowVersion } from "../../../src/domain/automation/workflows/workflow-version.js";
 import { StaleWriteError } from "../../../src/domain/errors.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { createUser } from "../../support/auth-helpers.js";
 import { aDefinition } from "../../support/builders.js";
 import { createTestApp, type TestApp } from "../../support/create-test-app.js";

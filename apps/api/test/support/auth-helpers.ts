@@ -7,11 +7,11 @@ import type { App } from "supertest/types.js";
 import {
   AccountRepository,
   PasswordHasher,
-  UserRepository,
-} from "../../src/application/identity/ports.js";
-import { Account } from "../../src/domain/identity/account.js";
-import { Role, UserStatus } from "../../src/domain/identity/enums.js";
-import { User } from "../../src/domain/identity/user.js";
+} from "../../src/application/identity/accounts/ports.js";
+import { UserRepository } from "../../src/application/identity/users/ports.js";
+import { Account } from "../../src/domain/identity/accounts/account.js";
+import { Role, UserStatus } from "../../src/domain/identity/users/enums.js";
+import { User } from "../../src/domain/identity/users/user.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import {
   session,

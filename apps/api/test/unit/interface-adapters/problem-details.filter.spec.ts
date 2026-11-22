@@ -8,8 +8,8 @@ import {
 } from "@nestjs/common";
 import type { HttpAdapterHost } from "@nestjs/core";
 import { StaleWriteError } from "../../../src/domain/errors.js";
-import { ConditionalRequestException } from "../../../src/interface-adapters/api/filters/conditional-request.exception.js";
-import { ProblemDetailsFilter } from "../../../src/interface-adapters/api/filters/problem-details.filter.js";
+import { ConditionalRequestException } from "../../../src/interface-adapters/api/pipeline/conditional-request.exception.js";
+import { ProblemDetailsFilter } from "../../../src/interface-adapters/api/pipeline/problem-details.filter.js";
 
 const PROBLEM = "application/problem+json";
 

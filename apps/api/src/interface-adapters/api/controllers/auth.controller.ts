@@ -30,10 +30,9 @@ import {
 } from "@nestjs/swagger";
 import { Transactional } from "@nestjs-cls/transactional";
 import { minutes, Throttle } from "@nestjs/throttler";
-import { accountEmail } from "../auth/account-email.js";
-import { AuthenticateUser } from "../../../application/identity/authenticate-user.js";
-import { ChangePassword } from "../../../application/identity/change-password.js";
-import type { User } from "../../../domain/identity/user.js";
+import { AuthenticateUser } from "../../../application/identity/accounts/authenticate-user.js";
+import { ChangePassword } from "../../../application/identity/accounts/change-password.js";
+import type { User } from "../../../domain/identity/users/user.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
 import { UserPresenter } from "../presenters/user.presenter.js";
 import {
@@ -42,7 +41,7 @@ import {
   PasswordRecoveryBody,
   SessionResponse,
   SignInBody,
-} from "../schemas/auth.schemas.js";
+} from "../schemas/auth.schema.js";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -101,7 +100,7 @@ export class AuthController {
   @Public()
   @Throttle({
     default: { limit: 10, ttl: minutes(15) },
-    account: { limit: 3, ttl: minutes(15), getTracker: accountEmail },
+    account: { limit: 3, ttl: minutes(15) },
   })
   @HttpCode(202)
   @ApiAcceptedResponse()

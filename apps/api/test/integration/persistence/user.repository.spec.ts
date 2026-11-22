@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { UserRepository } from "../../../src/application/identity/ports.js";
-import { Role, UserStatus } from "../../../src/domain/identity/enums.js";
+import { UserRepository } from "../../../src/application/identity/users/ports.js";
+import { Role, UserStatus } from "../../../src/domain/identity/users/enums.js";
 import { StaleWriteError } from "../../../src/domain/errors.js";
-import { User } from "../../../src/domain/identity/user.js";
+import { User } from "../../../src/domain/identity/users/user.js";
 import { suspendUser } from "../../support/auth-helpers.js";
 import {
   addUser,

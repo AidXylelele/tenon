@@ -1,12 +1,12 @@
-import { AcceptInvitation } from "../../../src/application/identity/accept-invitation.js";
+import { AcceptInvitation } from "../../../src/application/identity/invitations/accept-invitation.js";
 import { Missing } from "../../../src/application/identity/enums.js";
-import { VerifyInvitationLink } from "../../../src/application/identity/verify-invitation-link.js";
+import { VerifyInvitationLink } from "../../../src/application/identity/invitations/verify-invitation-link.js";
 import {
   InvitationRefusal,
   InvitationStatus,
-  Role,
-} from "../../../src/domain/identity/enums.js";
-import { InvitationToken } from "../../../src/domain/identity/invitation-token.js";
+} from "../../../src/domain/identity/invitations/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
+import { InvitationToken } from "../../../src/domain/identity/invitations/invitation-token.js";
 import {
   anInvitation,
   anInvitee,

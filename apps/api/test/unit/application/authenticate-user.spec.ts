@@ -1,9 +1,9 @@
-import { AuthenticateUser } from "../../../src/application/identity/authenticate-user.js";
+import { AuthenticateUser } from "../../../src/application/identity/accounts/authenticate-user.js";
+import { AccountRefusal } from "../../../src/domain/identity/accounts/enums.js";
 import {
-  AccountRefusal,
   UserRefusal,
   UserStatus,
-} from "../../../src/domain/identity/enums.js";
+} from "../../../src/domain/identity/users/enums.js";
 import {
   aPasswordAccount,
   aUser,

@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { firstValueFrom, throwError } from "rxjs";
 import { StaleWriteError } from "../../../src/domain/errors.js";
-import { StaleDraftInterceptor } from "../../../src/interface-adapters/api/interceptors/stale-draft.interceptor.js";
+import { StaleDraftInterceptor } from "../../../src/interface-adapters/api/pipeline/stale-draft.interceptor.js";
 import { EntityTagMapper } from "../../../src/interface-adapters/api/mappers/entity-tag.mapper.js";
 import { DraftPresenter } from "../../../src/interface-adapters/api/presenters/draft.presenter.js";
 import { ProblemPresenter } from "../../../src/interface-adapters/api/presenters/problem.presenter.js";

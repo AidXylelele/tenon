@@ -1,19 +1,19 @@
 import { MailSmtpError } from "@nestjs/mail";
 import { OutboxDeadLetters, type OutboxHandlerContext } from "@nestjs/outbox";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { Mailing } from "../../../src/application/identity/ports.js";
-import { MailHandler } from "../../../src/interface-adapters/messaging/mail.handler.js";
+import { RecoveryMail } from "../../../src/application/identity/accounts/ports.js";
+import { MailHandler } from "../../../src/interface-adapters/mailing/mail.handler.js";
 import { createTestApp, type TestApp } from "../../support/create-test-app.js";
 import { queuedMailCount, truncateAll } from "../../support/db.js";
 
 describe("mail queued through the outbox and sent by its handler", () => {
   let t: TestApp;
-  let mailing: Mailing;
+  let recoveryMail: RecoveryMail;
   let txHost: TransactionHost;
 
   beforeAll(async () => {
     t = await createTestApp();
-    mailing = t.app.get(Mailing);
+    recoveryMail = t.app.get(RecoveryMail);
     txHost = t.app.get(TransactionHost);
   });
 
@@ -29,7 +29,7 @@ describe("mail queued through the outbox and sent by its handler", () => {
   const link = "http://127.0.0.1:3001/reset-password?token=abc";
   const expiresAt = new Date("2026-10-11T11:00:00.000Z");
   const queueReset = () =>
-    mailing.sendPasswordReset("user@example.com", link, expiresAt);
+    recoveryMail.sendPasswordReset("user@example.com", link, expiresAt);
 
   it("a_mail_queued_in_a_transaction_that_rolls_back_is_neither_queued_nor_sent", async () => {
     await expect(

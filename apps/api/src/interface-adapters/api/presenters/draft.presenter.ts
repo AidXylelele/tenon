@@ -5,10 +5,13 @@ import type {
 } from "../../../application/automation/drafts/interfaces.js";
 import { DraftRefusal } from "../../../domain/automation/drafts/enums.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import { ConditionalRequestException } from "../filters/conditional-request.exception.js";
-import type { ProblemDetails, ResponseHeaders } from "../filters/interfaces.js";
+import { ConditionalRequestException } from "../pipeline/conditional-request.exception.js";
+import type {
+  ProblemDetails,
+  ResponseHeaders,
+} from "../pipeline/interfaces.js";
 import { EntityTagMapper } from "../mappers/entity-tag.mapper.js";
-import type { DraftLayout, DraftResponse } from "../schemas/draft.schemas.js";
+import type { DraftLayout, DraftResponse } from "../schemas/draft.schema.js";
 import type { Failure } from "./interfaces.js";
 import { ProblemPresenter } from "./problem.presenter.js";
 import { ApiRoute } from "../enums.js";

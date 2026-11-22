@@ -1,5 +1,5 @@
-import { ChangePassword } from "../../../src/application/identity/change-password.js";
-import { AccountRefusal } from "../../../src/domain/identity/enums.js";
+import { ChangePassword } from "../../../src/application/identity/accounts/change-password.js";
+import { AccountRefusal } from "../../../src/domain/identity/accounts/enums.js";
 import {
   aPasswordAccount,
   PASSWORD,

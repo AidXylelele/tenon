@@ -1,10 +1,10 @@
 import {
   InvitationRefusal,
   InvitationStatus,
-  Role,
-} from "../../../src/domain/identity/enums.js";
-import { Invitation } from "../../../src/domain/identity/invitation.js";
-import { InvitationToken } from "../../../src/domain/identity/invitation-token.js";
+} from "../../../src/domain/identity/invitations/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
+import { Invitation } from "../../../src/domain/identity/invitations/invitation.js";
+import { InvitationToken } from "../../../src/domain/identity/invitations/invitation-token.js";
 import { anInvitation, anInvitee, aUser } from "../../support/builders.js";
 
 const created = new Date("2026-10-11T10:00:00.000Z");

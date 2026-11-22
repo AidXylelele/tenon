@@ -1,6 +1,9 @@
 import { Missing } from "../../../src/application/identity/enums.js";
-import { FindRecoveryAccount } from "../../../src/application/identity/find-recovery-account.js";
-import { UserRefusal, UserStatus } from "../../../src/domain/identity/enums.js";
+import { FindRecoveryAccount } from "../../../src/application/identity/accounts/find-recovery-account.js";
+import {
+  UserRefusal,
+  UserStatus,
+} from "../../../src/domain/identity/users/enums.js";
 import { aPasswordAccount, aUser } from "../../support/builders.js";
 import {
   InMemoryAccountRepository,

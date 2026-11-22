@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import type { SignedInUser } from "../../../application/identity/interfaces.js";
-import type { User } from "../../../domain/identity/user.js";
-import type { SessionResponse, UserResponse } from "../schemas/auth.schemas.js";
+import type { SignedInUser } from "../../../application/identity/users/interfaces.js";
+import type { User } from "../../../domain/identity/users/user.js";
+import type { SessionResponse, UserResponse } from "../schemas/auth.schema.js";
 
 @Injectable()
 export class UserPresenter {

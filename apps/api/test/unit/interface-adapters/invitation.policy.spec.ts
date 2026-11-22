@@ -1,5 +1,5 @@
 import { InvitationPolicy } from "../../../src/interface-adapters/api/auth/invitation.policy.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { aUser } from "../../support/builders.js";
 
 describe("InvitationPolicy", () => {

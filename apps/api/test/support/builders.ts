@@ -11,12 +11,12 @@ import type {
 import type { JsonObject } from "../../src/domain/automation/interfaces.js";
 import { CheckedDefinition } from "../../src/domain/automation/workflows/checked-definition.js";
 import { WorkflowName } from "../../src/domain/automation/workflows/workflow-name.js";
-import { Account } from "../../src/domain/identity/account.js";
-import { Role, UserStatus } from "../../src/domain/identity/enums.js";
-import type { UserProps } from "../../src/domain/identity/interfaces.js";
-import { Invitation } from "../../src/domain/identity/invitation.js";
-import { InvitationToken } from "../../src/domain/identity/invitation-token.js";
-import { User } from "../../src/domain/identity/user.js";
+import { Account } from "../../src/domain/identity/accounts/account.js";
+import { Role, UserStatus } from "../../src/domain/identity/users/enums.js";
+import type { UserProps } from "../../src/domain/identity/users/interfaces.js";
+import { Invitation } from "../../src/domain/identity/invitations/invitation.js";
+import { InvitationToken } from "../../src/domain/identity/invitations/invitation-token.js";
+import { User } from "../../src/domain/identity/users/user.js";
 import { FakePasswordHasher } from "./fakes.js";
 
 export const PASSWORD = "correct-horse-battery-staple";
