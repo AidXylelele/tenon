@@ -90,7 +90,7 @@ function schemaKindOf(schema: JsonObject): DataShape {
   return hasProperties ? "object" : "unknown";
 }
 
-function literalShapeOf(value: JsonValue): Shape {
+export function literalShapeOf(value: JsonValue): Shape {
   if (!isJsonObject(value)) {
     const kind = literalKindOf(value);
     return { kind, members: noMembers };

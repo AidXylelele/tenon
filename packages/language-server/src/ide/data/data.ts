@@ -50,6 +50,8 @@ const probe = runtimeExpressionOf(".");
 
 const noScope: ReadonlyMap<string, Binding> = new Map();
 
+const typedField = /^[A-Za-z_][\w-]*(?:\.[A-Za-z_][\w-]*)*$/;
+
 const memberPlaces: ReadonlyMap<string, FieldPlace> = new Map([
   ["if", "raw"],
   ["input", "raw"],
@@ -107,7 +109,7 @@ function dataInFlowOf(
   request: DataRequest,
   speculate: (text: string) => Analysis,
 ): DataReading {
-  const { step, field } = request;
+  const { step, field, samples } = request;
   const node = stepWithId(flow.tree, step);
 
   if (node === null) {
@@ -123,7 +125,8 @@ function dataInFlowOf(
   const place = placeOf(node, field);
   const scope = scopeAt(flow.document, field, speculate);
   const shapes = chainShapesOf(flow, node);
-  const site = { flow, node, field, place, scope, shapes };
+  const typed = typedNamesOf(request.typed);
+  const site = { flow, node, field, place, scope, shapes, samples, typed };
 
   return dataOf(site);
 }
@@ -232,6 +235,21 @@ function scopeAt(
 
   const [resolution] = resolutionsOf(analysis.model, field);
   return resolution?.scope ?? noScope;
+}
+
+function typedNamesOf(typed: string | null): readonly string[] | null {
+  if (typed === null) {
+    return null;
+  }
+
+  const text = typed.trim();
+  const isField = typedField.test(text);
+
+  if (!isField) {
+    return null;
+  }
+
+  return text.split(".");
 }
 
 function unknownStepOf(step: string): string {

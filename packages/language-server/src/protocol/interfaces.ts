@@ -24,6 +24,8 @@ export interface DataAtParams {
   readonly textDocument: VersionedTextDocumentIdentifier;
   readonly step: string;
   readonly field: string;
+  readonly samples?: Readonly<Record<string, JsonValue>>;
+  readonly typed?: string;
 }
 
 export interface DataAtResult {

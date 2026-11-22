@@ -126,6 +126,12 @@ export function holdsFetchedImports(
   return TextDocumentIdentifier.is(textDocument) && holdsTexts && holdsFailures;
 }
 
+function isRecord(value: unknown): boolean {
+  const isObject = typeof value === "object" && value !== null;
+
+  return isObject && !Array.isArray(value);
+}
+
 function holdsTextsByReference(value: unknown): boolean {
   const isObject = typeof value === "object" && value !== null;
 
@@ -139,8 +145,16 @@ export function holdsStepFormParams(params: unknown): params is StepFormParams {
 }
 
 export function holdsDataAtParams(params: unknown): params is DataAtParams {
+  const samples = memberOf(params, "samples");
+  const typed = memberOf(params, "typed");
+  const holdsSamples = samples === undefined || isRecord(samples);
+  const holdsTyped = typed === undefined || typeof typed === "string";
+
   return (
-    holdsVersionedDocument(params) && holdsStrings(params, ["step", "field"])
+    holdsVersionedDocument(params) &&
+    holdsStrings(params, ["step", "field"]) &&
+    holdsSamples &&
+    holdsTyped
   );
 }
 

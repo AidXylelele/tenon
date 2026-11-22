@@ -741,6 +741,8 @@ interface DataAtParams {
   textDocument: VersionedTextDocumentIdentifier;
   step: string; // a step id of workflow/structure
   field: string; // the pointer of the field the data goes into, under the step
+  samples?: { [step: string]: JsonValue }; // the last test run's outputs, by step id
+  typed?: string; // a field name the person typed, e.g. "items.title"
 }
 
 interface DataAtResult {
@@ -757,14 +759,16 @@ interface DataEntry extends DataMember {
   source: "step" | "workflowInput" | "variable" | "secret" | "time";
   step: string | null; // the step id of a step's output
   needsExport: boolean; // using it writes the step's export (useData)
+  typed: DataMember | null; // the typed field of a step's output
 }
 
 interface DataMember {
   name: string;
   expression: string; // jq, e.g. "$context.fetch.items"
   value: string; // the field holding only it, e.g. "${ $context.fetch.items }"
+  isPath: boolean; // the expression is a path; false for the times
   shape: "object" | "list" | "text" | "number" | "boolean" | "unknown";
-  members: DataMember[]; // where the shape is known before the run
+  members: DataMember[]; // where the shape is known before the run, or from a sample
 }
 ```
 
@@ -774,11 +778,14 @@ interface DataMember {
 - **Through the context.** Any other step before reaches only through `$context` (step 7): its entry reads `$context.<name>` and `needsExport` is true until the step writes the export that adds it, `export.as: ${ $context + { "<name>": . } }`. A step that writes another `export.as` is not offered, and neither is any step before a step that does, or before a block holding one (in any of its lists, a listen's or a subscription's `foreach` export included), since that export replaces the context. A block that holds the field's step counts the same way for the steps before it where its list runs again or after other steps of it: a loop (`for`, a `foreach`) whose list replaces the context hides them from the second item on, and so does a try whose tried steps replace it, for the steps that handle its failure. Step names are unique only within a list, so a step whose name another step already exports under is not offered, and `useData` refuses to export it, naming both steps. `$context` starts as the workflow's transformed input (the interpreter's initial context), so the exported keys share its names, and `$context + { … }` fails at run time where that input is not an object or `null`.
 - **Shapes.** An `output.schema` gives a step's output (step 6). Else a `set` gives its values, with its input's members beside them where its `output.as` keeps the input (research D13); a script passes on the text it prints (`text`), its exit code (`number`), or, parsed by `output.as: ${ fromjson }`, JSON whose fields are not known before the run (`unknown`, research D14); everything else is `unknown`. The workflow's input is `$workflow.input`, its raw input (dsl.md, "Workflow Descriptor"), shaped by `input.schema`.
 - **Scope.** The server writes `${ . }` into the field, analyses that copy of the document again and reads what the interpreter resolves there. This second analysis departs from one analysis per version (rubric A3, P19); a request costs 9.5 ms on a document of 62 steps, 27.6 ms on 201 and 45.8 ms on 401 (steps that each merge their input, measured on the reference machine), growing linearly with the steps and most of it that second analysis, and it ends once the interpreter answers the scope at a pointer from the model it already holds, which is asked of it. What the scope gives: the workflow's input needs `$workflow`, the steps through the context `$context`, the secrets `$secrets`, and the variables are the binders in scope (a `for`'s `each` and `at`, a catch's error).
+- **References.** Every reference the client inserts comes from here: `expression` to put into an expression, `value` for a field that holds only it, and `isPath` where a field takes only a path (`.items`, `$context.fetch["a name"]`, `$secrets.token`); the times are computed, so they are no paths. A client builds no reference of its own.
+- **Samples.** `samples` gives what each step put out in the last test run, as plain JSON keyed by step id. A step whose shape gives no members before the run takes its `shape` and `members` from its sample: each field of the sample's objects, at any depth, with its own expression (lists are not looked into). A step whose members are known before the run keeps them, whatever its sample holds.
+- **Typed fields.** `typed`, where it is a field name (names of letters, digits, `_` and `-`, not starting with a digit or `-`, joined by `.`), gives each step entry whose shape is `object` or `unknown` the field it names in that step's output as `typed`: its `name` the typed text, its `expression` the path (`items.title` on `$context.fetch` is `$context.fetch.items.title`, `first-name` is `$context.fetch["first-name"]`), its `shape` `unknown`. It is `null` on the other entries, where no field name is typed, and where the step already offers that member. The test run shows whether the output has it.
 - **Secrets** are offered only in fields where credentials go: under `authentication` or `headers`, or an address (`endpoint`, `uri`, `server`) (research D16). Each reads `$secrets.<name>`.
 - **Times** are UTC times jq computes from the run's clock: `now` (`now | todate`), `today` and `yesterday` (the start of the day, `now | strftime("%Y-%m-%dT00:00:00Z")`, a day earlier for `yesterday`).
 - **Warnings.** `inputNotKnownObject` on a set that keeps its input (`output.as: ${ $input + . }`) where that input is not known to be an object: jq adds an object only to an object or `null`. `mayHoldNothing` for a step offered through the context that has an `if`, or sits in a block that has one apart from the field's step: when it is skipped it exports nothing, and inside a loop the previous item's value stays. A step a jump passes over reads `null` too; no warning names it. `contextNotKnownObject` where data is read through the context and the workflow's transformed input is not known to be an object.
 - **Broken text.** A text whose structure the grammar refuses answers from the steps of the last version that analysed.
-- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a field outside the step, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
+- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a field outside the step, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602), also for `samples` that are not an object and a `typed` that is not text.
 
 **Example**, at the first condition of `route` in a document whose `greet` sets a message and whose `guard` then runs a try:
 
@@ -786,7 +793,9 @@ interface DataMember {
 {
   "textDocument": { "uri": "file:///flow.yaml", "version": 1 },
   "step": "/do/route",
-  "field": "/do/2/route/switch/0/again/when"
+  "field": "/do/2/route/switch/0/again/when",
+  "samples": { "/do/guard": { "status": 200 } },
+  "typed": "body.id"
 }
 ```
 
@@ -800,9 +809,27 @@ interface DataMember {
       "step": "/do/guard",
       "expression": ".",
       "value": "${ . }",
-      "shape": "unknown",
+      "isPath": true,
+      "shape": "object",
       "needsExport": false,
-      "members": []
+      "members": [
+        {
+          "name": "status",
+          "expression": ".status",
+          "value": "${ .status }",
+          "isPath": true,
+          "shape": "number",
+          "members": []
+        }
+      ],
+      "typed": {
+        "name": "body.id",
+        "expression": ".body.id",
+        "value": "${ .body.id }",
+        "isPath": true,
+        "shape": "unknown",
+        "members": []
+      }
     },
     {
       "source": "step",
@@ -810,6 +837,7 @@ interface DataMember {
       "step": "/do/greet",
       "expression": "$context.greet",
       "value": "${ $context.greet }",
+      "isPath": true,
       "shape": "object",
       "needsExport": true,
       "members": [
@@ -817,10 +845,19 @@ interface DataMember {
           "name": "message",
           "expression": "$context.greet.message",
           "value": "${ $context.greet.message }",
+          "isPath": true,
           "shape": "text",
           "members": []
         }
-      ]
+      ],
+      "typed": {
+        "name": "body.id",
+        "expression": "$context.greet.body.id",
+        "value": "${ $context.greet.body.id }",
+        "isPath": true,
+        "shape": "unknown",
+        "members": []
+      }
     },
     {
       "source": "workflowInput",
@@ -828,9 +865,11 @@ interface DataMember {
       "step": null,
       "expression": "$workflow.input",
       "value": "${ $workflow.input }",
+      "isPath": true,
       "shape": "unknown",
       "needsExport": false,
-      "members": []
+      "members": [],
+      "typed": null
     },
     {
       "source": "time",
@@ -838,9 +877,11 @@ interface DataMember {
       "step": null,
       "expression": "now | todate",
       "value": "${ now | todate }",
+      "isPath": false,
       "shape": "text",
       "needsExport": false,
-      "members": []
+      "members": [],
+      "typed": null
     }
   ],
   "warnings": [{ "kind": "contextNotKnownObject" }]

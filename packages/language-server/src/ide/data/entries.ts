@@ -22,6 +22,7 @@ import type {
   DataEntry,
   DataFlow,
   DataMember,
+  DataShape,
   DataSite,
   Earlier,
   Offered,
@@ -29,7 +30,7 @@ import type {
   Reach,
   Shape,
 } from "./interfaces.js";
-import { textShape, unknownShape } from "./shapes.js";
+import { literalShapeOf, textShape, unknownShape } from "./shapes.js";
 
 const credentialHolders: ReadonlySet<string> = new Set([
   "authentication",
@@ -58,6 +59,8 @@ const fromSecrets: Origin = {
 
 const fromClock: Origin = { source: "time", step: null, needsExport: false };
 
+const fieldedShapes: ReadonlySet<DataShape> = new Set(["object", "unknown"]);
+
 export function stepEntriesOf(site: DataSite): readonly Offered[] {
   const { flow, node, place } = site;
   const earlier = earlierOf(flow, node);
@@ -85,7 +88,7 @@ export function workflowInputEntriesOf(site: DataSite): readonly DataEntry[] {
 
   const shape = workflowInputShapeOf(site.flow.workflow);
   const member = memberOf("input", "$workflow.input", shape);
-  return [entryOf(member, fromWorkflow)];
+  return [entryOf(member, fromWorkflow, null)];
 }
 
 export function variableEntriesOf(site: DataSite): readonly DataEntry[] {
@@ -94,7 +97,7 @@ export function variableEntriesOf(site: DataSite): readonly DataEntry[] {
 
   return binders.map(([name]) => {
     const member = memberOf(name, `$${name}`, unknownShape);
-    return entryOf(member, fromVariable);
+    return entryOf(member, fromVariable, null);
   });
 }
 
@@ -110,7 +113,7 @@ export function secretEntriesOf(site: DataSite): readonly DataEntry[] {
   return site.flow.secrets.map((name) => {
     const expression = memberAccessOf("$secrets", name);
     const member = memberOf(name, expression, textShape);
-    return entryOf(member, fromSecrets);
+    return entryOf(member, fromSecrets, null);
   });
 }
 
@@ -118,8 +121,16 @@ export function timeEntriesOf(): readonly DataEntry[] {
   const times = Object.entries(timeExpressions);
 
   return times.map(([name, expression]) => {
-    const member = memberOf(name, expression, textShape);
-    return entryOf(member, fromClock);
+    const value = runtimeExpressionOf(expression);
+    const member: DataMember = {
+      name,
+      expression,
+      value,
+      isPath: false,
+      shape: "text",
+      members: [],
+    };
+    return entryOf(member, fromClock, null);
   });
 }
 
@@ -143,8 +154,9 @@ function flowingEntryOf(site: DataSite, step: StepNode): DataEntry {
   const shape = outputOf(site, step);
   const member = memberOf(step.name, ".", shape);
   const origin = { source: "step", step: step.id, needsExport: false } as const;
+  const typed = typedMemberOf(site, member);
 
-  return entryOf(member, origin);
+  return entryOf(member, origin, typed);
 }
 
 function exportedEntriesOf(site: DataSite, reach: Reach): readonly Offered[] {
@@ -166,7 +178,8 @@ function exportedEntriesOf(site: DataSite, reach: Reach): readonly Offered[] {
   const member = memberOf(step.name, expression, shape);
   const needsExport = written === undefined;
   const origin = { source: "step", step: step.id, needsExport } as const;
-  const entry = entryOf(member, origin);
+  const typed = typedMemberOf(site, member);
+  const entry = entryOf(member, origin, typed);
   return [{ entry, step }];
 }
 
@@ -180,7 +193,53 @@ function isReplacingOf(flow: DataFlow, earlier: Earlier): boolean {
 }
 
 function outputOf(site: DataSite, step: StepNode): Shape {
-  return site.shapes.get(step.pointer)?.output ?? unknownShape;
+  const output = site.shapes.get(step.pointer)?.output ?? unknownShape;
+  const sample = site.samples.get(step.id);
+  const isKnown = output.members.size > 0;
+
+  if (isKnown || sample === undefined) {
+    return output;
+  }
+
+  return literalShapeOf(sample);
+}
+
+function typedMemberOf(site: DataSite, member: DataMember): DataMember | null {
+  const names = site.typed;
+
+  if (names === null) {
+    return null;
+  }
+
+  const isFielded = fieldedShapes.has(member.shape);
+
+  if (!isFielded) {
+    return null;
+  }
+
+  const expression = names.reduce(memberAccessOf, member.expression);
+  const isOffered = isOfferedIn(member, expression);
+
+  if (isOffered) {
+    return null;
+  }
+
+  const name = names.join(".");
+  const value = runtimeExpressionOf(expression);
+  return {
+    name,
+    expression,
+    value,
+    isPath: true,
+    shape: "unknown",
+    members: [],
+  };
+}
+
+function isOfferedIn(member: DataMember, expression: string): boolean {
+  return member.members.some(
+    (each) => each.expression === expression || isOfferedIn(each, expression),
+  );
 }
 
 function exportWrittenOf(
@@ -200,11 +259,15 @@ function memberOf(name: string, expression: string, shape: Shape): DataMember {
     return memberOf(memberName, access, memberShape);
   });
 
-  return { name, expression, value, shape: shape.kind, members };
+  return { name, expression, value, isPath: true, shape: shape.kind, members };
 }
 
-function entryOf(member: DataMember, origin: Origin): DataEntry {
-  return { ...origin, ...member };
+function entryOf(
+  member: DataMember,
+  origin: Origin,
+  typed: DataMember | null,
+): DataEntry {
+  return { ...origin, ...member, typed };
 }
 
 function isCredentialFieldOf(node: StepNode, field: string): boolean {

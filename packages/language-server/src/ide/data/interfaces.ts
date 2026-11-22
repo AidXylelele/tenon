@@ -13,6 +13,7 @@ export interface DataMember {
   readonly name: string;
   readonly expression: string;
   readonly value: string;
+  readonly isPath: boolean;
   readonly shape: DataShape;
   readonly members: readonly DataMember[];
 }
@@ -26,7 +27,9 @@ export interface Origin {
   readonly needsExport: boolean;
 }
 
-export interface DataEntry extends DataMember, Origin {}
+export interface DataEntry extends DataMember, Origin {
+  readonly typed: DataMember | null;
+}
 
 export type DataWarning =
   | { readonly kind: "inputNotKnownObject"; readonly step: string }
@@ -44,6 +47,8 @@ export type DataReading =
 export interface DataRequest {
   readonly step: string;
   readonly field: string;
+  readonly samples: ReadonlyMap<string, JsonValue>;
+  readonly typed: string | null;
 }
 
 export type FieldPlace = "raw" | "definition" | "result";
@@ -83,6 +88,8 @@ export interface DataSite {
   readonly place: FieldPlace;
   readonly scope: ReadonlyMap<string, Binding>;
   readonly shapes: ReadonlyMap<string, StepShapes>;
+  readonly samples: ReadonlyMap<string, JsonValue>;
+  readonly typed: readonly string[] | null;
 }
 
 export interface Reach {
