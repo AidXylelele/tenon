@@ -20,6 +20,14 @@ export interface SchemaBreach extends Located {
   readonly problem: string;
   readonly value: JsonValue;
   readonly pattern: string | null;
+  readonly location: string | null;
+  readonly ambiguous: boolean;
+  readonly branches: readonly Branch[];
+}
+
+export interface Branch {
+  readonly schema: JsonValue;
+  readonly violations: readonly SchemaBreach[];
 }
 
 export interface RuleBreach extends Located {
@@ -28,8 +36,6 @@ export interface RuleBreach extends Located {
 }
 
 export type Violation = SchemaBreach | RuleBreach;
-
-export type KeywordRole = "value" | "choice" | "alternative" | "structure";
 
 interface Malformed {
   readonly kind: "malformed";

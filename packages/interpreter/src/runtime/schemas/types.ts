@@ -1,4 +1,4 @@
-import type { JsonValue } from "../../api/index.js";
+import type { JsonObject, JsonValue } from "../../api/index.js";
 
 export interface SchemaViolation {
   readonly pointer: string;
@@ -8,6 +8,19 @@ export interface SchemaViolation {
   readonly subject: string;
   readonly value: JsonValue;
   readonly pattern: string | null;
+  readonly location: string | null;
+  readonly ambiguous: boolean;
+  readonly branches: readonly SchemaBranch[];
+}
+
+export interface SchemaBranch {
+  readonly schema: JsonValue;
+  readonly violations: readonly SchemaViolation[];
+}
+
+export interface SchemaLocation {
+  readonly uri: string;
+  readonly node: JsonObject;
 }
 
 export type Validator = (value: JsonValue) => readonly SchemaViolation[];

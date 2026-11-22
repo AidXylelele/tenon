@@ -6,11 +6,20 @@ import {
 import formats from "ajv-formats";
 import type { JsonObject, JsonValue } from "../../api/index.js";
 import { InterpreterError } from "../faults/index.js";
-import { childPointerOf, isJsonObject, pointedValueOf } from "../json/index.js";
+import {
+  childPointerOf,
+  isJsonArray,
+  isJsonObject,
+  pointedValueOf,
+  rootPointer,
+} from "../json/index.js";
+import { schemaLocationsOf } from "./schema-locations.js";
 import { sentenceOf } from "./sentences.js";
 import type {
+  SchemaBranch,
   SchemaCompilation,
   SchemaCompiler,
+  SchemaLocation,
   SchemaReferences,
   SchemaViolation,
   Validator,
@@ -21,7 +30,10 @@ const options = {
   allErrors: true,
   logger: false,
   addUsedSchema: false,
+  verbose: true,
 } as const;
+
+const choices = new Set(["oneOf", "anyOf"]);
 
 const notASchema = "A schema must be an object or a boolean.";
 
@@ -33,6 +45,7 @@ const uriTemplate = new RegExp(`^(?:${literal}|${expression})*$`, "i");
 
 export class JsonSchemas implements SchemaCompiler, SchemaReferences {
   readonly #ajv: Ajv2020;
+  readonly #locations: ReadonlyMap<object, SchemaLocation>;
 
   constructor(documents: readonly JsonObject[]) {
     const ajv = new Ajv2020(options);
@@ -43,15 +56,11 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
     ajv.addSchema(registered);
 
     this.#ajv = ajv;
+    this.#locations = schemaLocationsOf(documents);
   }
 
   validatorOf(reference: string): Validator {
-    const validate = this.#ajv.getSchema(reference);
-
-    if (validate === undefined) {
-      throw new InterpreterError(`The schema '${reference}' is not defined.`);
-    }
-
+    const validate = this.#validateFunctionOf(reference);
     return this.#validatorOfFunction(validate);
   }
 
@@ -80,26 +89,101 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
     }
   }
 
-  #validatorOfFunction(validate: ValidateFunction): Validator {
-    return (value) => {
-      validate(value);
-      const errors = validate.errors ?? [];
-      return errors.map((error) => this.#violationOf(error, value));
-    };
+  #validateFunctionOf(reference: string): ValidateFunction {
+    const validate = this.#ajv.getSchema(reference);
+
+    if (validate === undefined) {
+      throw new InterpreterError(`The schema '${reference}' is not defined.`);
+    }
+
+    return validate;
   }
 
-  #violationOf(error: ErrorObject, validated: JsonValue): SchemaViolation {
-    const instance = error.instancePath;
+  #validatorOfFunction(validate: ValidateFunction): Validator {
+    return (value) => this.#violationsOf(validate, value, rootPointer);
+  }
+
+  #violationsOf(
+    validate: ValidateFunction,
+    value: JsonValue,
+    base: string,
+  ): readonly SchemaViolation[] {
+    validate(value);
+    const errors = [...(validate.errors ?? [])];
+
+    return errors.map((error) => this.#violationOf(error, value, base));
+  }
+
+  #violationOf(
+    error: ErrorObject,
+    validated: JsonValue,
+    base: string,
+  ): SchemaViolation {
+    const instance = `${base}${error.instancePath}`;
     const params: Record<string, unknown> = error.params;
     const property = params.unevaluatedProperty ?? params.additionalProperty;
     const pointer = this.#pointerOf(instance, property);
     const subject = this.#pointerOf(pointer, params.missingProperty);
     const keyword = error.keyword;
     const message = sentenceOf(error, subject);
-    const value = pointedValueOf(validated, instance);
+    const value = pointedValueOf(validated, error.instancePath);
     const pattern = typeof params.pattern === "string" ? params.pattern : null;
+    const parent = this.#locationOf(error);
+    const location = parent?.uri ?? null;
+    const ambiguous = Array.isArray(params.passingSchemas);
+    const branches = this.#branchesOf(error, value, instance);
 
-    return { pointer, instance, keyword, message, subject, value, pattern };
+    return {
+      pointer,
+      instance,
+      keyword,
+      message,
+      subject,
+      value,
+      pattern,
+      location,
+      ambiguous,
+      branches,
+    };
+  }
+
+  #locationOf(error: ErrorObject): SchemaLocation | null {
+    const parent = error.parentSchema;
+
+    if (parent === undefined) {
+      return null;
+    }
+
+    return this.#locations.get(parent) ?? null;
+  }
+
+  #branchesOf(
+    error: ErrorObject,
+    value: JsonValue,
+    instance: string,
+  ): readonly SchemaBranch[] {
+    const isChoice = choices.has(error.keyword);
+
+    if (!isChoice) {
+      return [];
+    }
+
+    const parent = this.#locationOf(error);
+
+    if (parent === null) {
+      return [];
+    }
+
+    const alternatives = parent.node[error.keyword] ?? null;
+    const listed = isJsonArray(alternatives) ? alternatives : [];
+    const choice = `${parent.uri}/${error.keyword}`;
+
+    return listed.map((schema, index) => {
+      const reference = `${choice}/${String(index)}`;
+      const validate = this.#validateFunctionOf(reference);
+      const violations = this.#violationsOf(validate, value, instance);
+      return { schema, violations };
+    });
   }
 
   #pointerOf(parent: string, property: unknown): string {

@@ -322,6 +322,70 @@ do:
       grpcCalled(65536),
     ],
     [
+      "minLength",
+      "an empty authentication name, the one alternative it takes",
+      "analyzed",
+      "/do/0/fetch/with/endpoint/authentication/use",
+      fetchedAt({
+        uri: "https://example.com",
+        authentication: { use: "" },
+      }),
+    ],
+    [
+      "pattern",
+      "an empty source of the one event awaited, the one strategy it takes",
+      "analyzed",
+      "/do/0/await/listen/to/one/with/source",
+      {
+        document: header,
+        do: [{ await: { listen: { to: { one: { with: { source: "" } } } } } }],
+      },
+    ],
+    [
+      "pattern",
+      "a container lifetime of no duration, the one process it takes",
+      "analyzed",
+      "/do/0/start/run/container/lifetime/after",
+      {
+        document: header,
+        do: [
+          {
+            start: {
+              run: {
+                container: {
+                  image: "hello-world",
+                  lifetime: { cleanup: "eventually", after: "soon" },
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "oneOf",
+      "an AsyncAPI call in two forms at once, beside an empty document endpoint",
+      "refused",
+      "/do/0/publish/with/document/endpoint",
+      {
+        document: header,
+        do: [
+          {
+            publish: {
+              call: "asyncapi",
+              with: {
+                document: { endpoint: "" },
+                channel: "orders",
+                operation: "placeOrder",
+                message: { payload: {} },
+                subscription: { consume: { amount: 1 } },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    [
       "type",
       "an endpoint that is a number",
       "refused",
@@ -344,16 +408,6 @@ do:
         document: header,
         do: [{ fetch: { call: "http", with: { endpoint: "" } } }],
       },
-    ],
-    [
-      "required",
-      "an empty authentication name, whose other schemes each require a member of their own",
-      "refused",
-      "/do/0/fetch/with/endpoint/authentication/use",
-      fetchedAt({
-        uri: "https://example.com",
-        authentication: { use: "" },
-      }),
     ],
     [
       "unevaluatedProperties",
@@ -479,6 +533,29 @@ do:
       expect(analysis).toMatchObject({ kind, diagnostics: [{ pointer }] });
     },
   );
+
+  test("refuses an unknown member inside the one alternative whose value is wrong", () => {
+    const document = {
+      document: header,
+      do: [
+        {
+          await: {
+            listen: { to: { one: { with: { source: "" }, nope: 1 } } },
+          },
+        },
+      ],
+    };
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis).toMatchObject({
+      kind: "refused",
+      diagnostics: [
+        { pointer: "/do/0/await/listen/to/one/with/source" },
+        { pointer: "/do/0/await/listen/to/one/nope" },
+      ],
+    });
+  });
 
   test("refuses a document in a DSL version it does not support", () => {
     const document = {
