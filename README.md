@@ -38,13 +38,22 @@ docker compose up --build --wait
 ```
 
 The console answers at `http://localhost:3001`, the API at `http://localhost:53000/api/v1`, Mailpit at
-`http://localhost:58025`, and the traces and metrics of both apps with the api's logs at `http://localhost:58888`. The
+`http://localhost:58025`, and Grafana at `http://localhost:58888`. The
 api creates the first administrator at `ADMIN_EMAIL` with no password: set one through password recovery, whose mail
 arrives in Mailpit.
 `docker compose down` stops the stand; `--volumes` also deletes its data.
 
 The migrations run as the database owner `tenon`; the api connects as `tenon_app`, which may only read and write data.
 A database created before that role existed gets it only when created again (`docker compose down --volumes`).
+
+## Observability
+
+`compose.yaml` runs the platform and includes `compose.observability.yaml`, the observability stack; that file also
+runs alone (`docker compose -f compose.observability.yaml up`). Every service sends its traces, metrics and logs over
+OTLP to the OpenTelemetry Collector (`docker/otel-collector`), the only entry: it derives span metrics and the service
+graph from the traces and forwards traces to Tempo, metrics to Mimir and logs to Loki. Grafana (`docker/grafana`) opens
+on the Tenon dashboards (overview, HTTP, Node.js runtime, interpreter, workflow engine, database) with the links between
+the three stores; it needs no sign-in on `127.0.0.1`. Traces and logs are kept for 72 hours, metrics for 7 days.
 
 In production the console goes behind a proxy that appends `X-Forwarded-For`; the API trusts only the console's address.
 
