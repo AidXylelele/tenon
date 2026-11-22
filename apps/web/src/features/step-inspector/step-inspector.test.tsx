@@ -22,6 +22,7 @@ const form: StepFormResult = {
   version: 3,
   step: fetchLead.id,
   failure: "stop",
+  result: null,
   fields: [],
 };
 
@@ -40,15 +41,16 @@ function inspect(onEdit = vi.fn()) {
 }
 
 describe("the inspector of one task", () => {
-  it("choosing_to_try_again_asks_the_server_to_protect_the_task", () => {
+  it("choosing_to_retry_asks_the_server_for_three_retries_five_seconds_apart", () => {
     const onEdit = inspect();
+    const retry = screen.getByRole("radio", { name: "Retry" });
 
-    fireEvent.click(screen.getByRole("radio", { name: "Try again" }));
+    fireEvent.click(retry);
 
     expect(onEdit).toHaveBeenCalledWith({
       kind: "setFailure",
       step: "/do/fetchLead",
-      failure: { kind: "retry", attempts: 3, seconds: 5, growing: false },
+      failure: { kind: "retry", retries: 3, seconds: 5, growing: false },
     });
   });
 

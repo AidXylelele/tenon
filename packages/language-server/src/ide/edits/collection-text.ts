@@ -1,7 +1,8 @@
-import type { Range } from "interpreter/front-end";
+import type { JsonObject, Range } from "interpreter/front-end";
 import { childPointerOf, parentPointerOf, valueAt } from "../pointers/index.js";
 import type { StepNodeList } from "../steps/index.js";
 import {
+  appliedOf,
   comparedPositions,
   dedentedOf,
   indentedOf,
@@ -10,7 +11,7 @@ import {
   positionAt,
   type TextChange,
 } from "../text/index.js";
-import { inlineYamlOf } from "../yaml-text/index.js";
+import { inlineYamlOf, yamlOf } from "../yaml-text/index.js";
 import type {
   CollectionText,
   EditableText,
@@ -75,6 +76,13 @@ export function itemFormsOf(
   }
 }
 
+export function newItemFormsOf(item: JsonObject): ItemText {
+  const block = yamlOf([item]);
+  const inline = inlineYamlOf(item);
+
+  return { block, inline };
+}
+
 export function insertionOf(
   collection: CollectionText,
   index: number,
@@ -121,6 +129,17 @@ export function inTextOrder(
     const ends = comparedPositions(one.range.end, other.range.end);
     return starts === 0 ? ends : starts;
   });
+}
+
+export function editedSliceOf(
+  text: string,
+  span: Span,
+  changes: readonly TextChange[],
+): string {
+  const edited = appliedOf(text, changes);
+  const growth = edited.length - text.length;
+
+  return edited.slice(span.start, span.end + growth);
 }
 
 export function afterColonOf(text: string, key: Range): number {
@@ -191,7 +210,10 @@ function collectionTextOf(
   };
 }
 
-function isBlockMember(editable: EditableText, pointer: string): boolean {
+export function isBlockMember(
+  editable: EditableText,
+  pointer: string,
+): boolean {
   const { text, positions } = editable;
   const parent = parentPointerOf(pointer);
   const parentRange = positions.rangeOf(parent);

@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: fetch
+    version: '0.1.0'
+  do:
+    - fetch:
+        call: http
+        with:
+          method: ''
+          endpoint: https://example.com
+diagnostics:
+  - code: schema
+    pointer: /do/0/fetch/with/method
+    range: { start: { line: 10, column: 17 } }
+    message: An HTTP call must name its method.

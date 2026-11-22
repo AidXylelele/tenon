@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-schema
+    version: '0.1.0'
+  do:
+    - greet:
+        run:
+          workflow:
+            namespace: test
+            name: ''
+            version: '1.0.0'
+diagnostics:
+  - code: schema
+    pointer: /do/0/greet/run/workflow/name
+    range: { start: { line: 11, column: 17 } }
+    message: The workflow to run must have a name.

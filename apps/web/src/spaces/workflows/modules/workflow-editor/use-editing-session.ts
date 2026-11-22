@@ -6,6 +6,7 @@ import { EditorView, type ViewUpdate } from "@codemirror/view";
 import type {
   EditAction,
   IdChange,
+  StepVariant,
   StructureResult,
 } from "language-server/protocol";
 import {
@@ -26,10 +27,15 @@ import type { DiagnosticsBoard } from "@/libs/language-client/diagnostics-board"
 import { isOutdated, reasonOf } from "@/libs/language-client/failures";
 import { applyTextEdits } from "@/libs/language-client/text-edits";
 import { START, stepAt, stepWithId } from "@/operations/workflow-graph";
-import { WorkflowSession } from "@/operations/workflow-language";
+import {
+  stepVariantsOf,
+  WorkflowSession,
+} from "@/operations/workflow-language";
 import type { EditingSession, FormReading } from "./interfaces";
 
 const NONE: readonly Diagnostic[] = [];
+
+const NO_VARIANTS: readonly StepVariant[] = [];
 
 export function useEditingSession(
   client: LSPClient,
@@ -51,8 +57,26 @@ export function useEditingSession(
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reading, setReading] = useState<FormReading | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  const [variants, setVariants] = useState<readonly StepVariant[]>(NO_VARIANTS);
   const known = useRef<StructureResult | null>(null);
   const pending = useRef<string | null>(task);
+
+  useEffect(() => {
+    let current = true;
+
+    stepVariantsOf(client).then(
+      (read) => {
+        if (current) setVariants(read.variants);
+      },
+      (failure: unknown) => {
+        if (current) setRefusal(reasonOf(failure));
+      },
+    );
+
+    return () => {
+      current = false;
+    };
+  }, [client]);
 
   useEffect(() => {
     let current = true;
@@ -205,6 +229,7 @@ export function useEditingSession(
     formless: stepReading !== null && stepReading.form === null,
     startForm: startReading?.form ?? null,
     startFormless: startReading !== null && startReading.form === null,
+    variants,
     refusal,
     view: currentView,
     onView,

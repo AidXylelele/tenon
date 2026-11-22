@@ -119,7 +119,7 @@ test("a failure choice answers its edit and the ids it moves", async () => {
   ]);
 });
 
-test("a retry with no attempts is invalid", async () => {
+test("a retry with no number of retries is invalid", async () => {
   useFakeClock();
   const session = await sessionWith(guardedFlow);
   const params = {
@@ -128,6 +128,99 @@ test("a retry with no attempts is invalid", async () => {
       kind: "setFailure",
       step: "/do/greet",
       failure: { kind: "retry", seconds: 5, growing: false },
+    },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});
+
+test("a step on a branch that names no case is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: {
+      kind: "insertStepOnBranch",
+      switch: "/do/route",
+      step: "wait",
+      name: null,
+    },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});
+
+test("a result that is none of the step results is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: { kind: "setResult", step: "/do/greet", result: "everything" },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});
+
+test("data used with an export that is not a step id is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: {
+      kind: "useData",
+      pointer: "/do/0/greet/set/message",
+      value: "${ . }",
+      export: 1,
+    },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});
+
+test("a condition row with a second value it does not take is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: {
+      kind: "setCondition",
+      pointer: "/do/2/route/switch/0/again/when",
+      condition: {
+        join: "all",
+        rows: [
+          {
+            left: ".items",
+            comparison: "isEmpty",
+            right: { kind: "value", value: 1 },
+          },
+        ],
+      },
+    },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});
+
+test("a wrap in a block the editor does not offer is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: {
+      kind: "wrapSteps",
+      steps: ["/do/greet"],
+      block: "loop",
+      name: null,
     },
   };
 

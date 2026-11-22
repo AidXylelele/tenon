@@ -20,6 +20,21 @@ export function tokensOf(pointer: string): readonly string[] {
   return tokens.map(unescape);
 }
 
+export function lastTokenOf(pointer: string): string | null {
+  if (pointer === rootPointer) {
+    return null;
+  }
+
+  const start = pointer.lastIndexOf("/") + 1;
+  const token = pointer.slice(start);
+
+  return unescape(token);
+}
+
+export function isPointerWithin(pointer: string, root: string): boolean {
+  return pointer === root || pointer.startsWith(`${root}/`);
+}
+
 export function relativePointerOf(base: string, pointer: string): string {
   const baseParts = base.split("/");
   const parts = pointer.split("/");

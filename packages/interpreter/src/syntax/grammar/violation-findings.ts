@@ -1,8 +1,10 @@
-import type { SchemaViolation } from "../../runtime/index.js";
+import type { SchemaBranch, SchemaViolation } from "../../runtime/index.js";
 import type { Finding } from "../findings.js";
-import type { RuleBreach, SchemaBreach, Violation } from "./types.js";
+import type { Branch, RuleBreach, SchemaBreach, Violation } from "./types.js";
 
 export function schemaBreachOf(violation: SchemaViolation): SchemaBreach {
+  const branches = violation.branches.map(branchOf);
+
   return {
     kind: "schema",
     pointer: violation.pointer,
@@ -11,6 +13,9 @@ export function schemaBreachOf(violation: SchemaViolation): SchemaBreach {
     problem: violation.message,
     value: violation.value,
     pattern: violation.pattern,
+    location: violation.location,
+    ambiguous: violation.ambiguous,
+    branches,
   };
 }
 
@@ -27,11 +32,42 @@ export function prefixedViolationOf(
   violation: Violation,
   pointer: string,
 ): Violation {
+  switch (violation.kind) {
+    case "schema":
+      return prefixedBreachOf(violation, pointer);
+    case "rule":
+      return {
+        ...violation,
+        pointer: `${pointer}${violation.pointer}`,
+        instance: `${pointer}${violation.instance}`,
+      };
+  }
+}
+
+function branchOf(branch: SchemaBranch): Branch {
+  const violations = branch.violations.map(schemaBreachOf);
+  return { schema: branch.schema, violations };
+}
+
+function prefixedBreachOf(breach: SchemaBreach, pointer: string): SchemaBreach {
+  const branches = breach.branches.map((branch) =>
+    prefixedBranchOf(branch, pointer),
+  );
+
   return {
-    ...violation,
-    pointer: `${pointer}${violation.pointer}`,
-    instance: `${pointer}${violation.instance}`,
+    ...breach,
+    pointer: `${pointer}${breach.pointer}`,
+    instance: `${pointer}${breach.instance}`,
+    branches,
   };
+}
+
+function prefixedBranchOf(branch: Branch, pointer: string): Branch {
+  const violations = branch.violations.map((violation) =>
+    prefixedBreachOf(violation, pointer),
+  );
+
+  return { schema: branch.schema, violations };
 }
 
 function schemaFindingOf(breach: SchemaBreach): Finding<"schema"> {

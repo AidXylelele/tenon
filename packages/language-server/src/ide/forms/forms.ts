@@ -11,6 +11,14 @@ import {
   type SchemasAt,
 } from "../places/index.js";
 import { amountsOf, isDurationAt } from "./durations.js";
+import {
+  resultChoicesOf,
+  type ResultReading,
+  resultReadingOf,
+  variantOf,
+  writtenResultOf,
+} from "../variants/index.js";
+import { stepEssentialsOf, workflowEssentialsOf } from "./essentials.js";
 import { titleOf } from "./titles.js";
 import { childPointerOf, isJsonObject, valueAt } from "../pointers/index.js";
 import {
@@ -126,32 +134,50 @@ export function formOf(
   }
 
   const tree = stepTreeOf(model.workflow);
-  const node = stepWithId(tree, step);
-  const unknown: FormRefusal = {
-    kind: "refused",
-    reason: `No step has the id '${step}'.`,
-  };
+  const document = source.document;
+  const node = standingStepOf(tree, step, document);
 
   if (node === null) {
-    return unknown;
-  }
-
-  const document = source.document;
-  const written = valueAt(document, node.pointer);
-  const isStanding = isJsonObject(written);
-
-  if (!isStanding) {
-    return unknown;
+    return { kind: "refused", reason: `No step has the id '${step}'.` };
   }
 
   const suggestions = suggestionsOf(node, tree);
   const diagnostics = problemsOf(snapshot);
-  const sources = { document, schemasAt, diagnostics, suggestions };
+  const essentials = stepEssentialsOf(node, document);
+  const sources = { document, schemasAt, diagnostics, suggestions, essentials };
   const fields = stepFieldsOf(node.pointer, sources);
-
   const failure = failureOf(node);
+  const result = stepResultOf(node, document);
 
-  return { kind: "form", failure, fields };
+  return { kind: "form", failure, result, fields };
+}
+
+function standingStepOf(
+  tree: StepTree,
+  step: string,
+  document: JsonValue,
+): StepNode | null {
+  const node = stepWithId(tree, step);
+
+  if (node === null) {
+    return null;
+  }
+
+  const written = valueAt(document, node.pointer);
+  const isStanding = isJsonObject(written);
+
+  return isStanding ? node : null;
+}
+
+function stepResultOf(
+  node: StepNode,
+  document: JsonValue,
+): ResultReading | null {
+  const variant = variantOf(node.task);
+  const choices = resultChoicesOf(variant);
+  const written = writtenResultOf(node, document);
+
+  return resultReadingOf(choices, written);
 }
 
 export function workflowFormOf(
@@ -168,7 +194,8 @@ export function workflowFormOf(
   const document = source.document;
   const diagnostics = problemsOf(snapshot);
   const suggestions = new Map<string, readonly JsonValue[]>();
-  const sources = { document, schemasAt, diagnostics, suggestions };
+  const essentials = workflowEssentialsOf();
+  const sources = { document, schemasAt, diagnostics, suggestions, essentials };
   const fields = workflowMembers.flatMap((place) =>
     workflowFieldsOf(place, sources, profile),
   );
@@ -304,7 +331,9 @@ function groupFieldsOf(
   return members.map((member) => {
     const field = memberFieldOf(member, pointer, sources);
     const isGroup = field.input === "group";
-    const input = isGroup ? "structured" : field.input;
+    const isOpened = holdsEssentialOf(field.pointer, sources);
+    const isFlattened = isGroup && !isOpened;
+    const input = isFlattened ? "structured" : field.input;
     const flat = { ...field, input };
     const fields = fieldsBelowOf(flat, section, sources);
 
@@ -338,6 +367,7 @@ function unitFieldsOf(
       required: false,
       written: writtenUnit !== undefined,
       value: amounts.get(unit.name) ?? null,
+      essentialRank: null,
       fields: [],
       diagnostics,
     };
@@ -360,6 +390,7 @@ function memberFieldOf(
   const input = inputOf(entries, written);
   const choices = choicesOf(entries, pointer, sources);
   const diagnostics = diagnosticsAt(pointer, sources);
+  const essentialRank = sources.essentials.get(pointer) ?? null;
 
   return {
     key: member.name,
@@ -371,8 +402,16 @@ function memberFieldOf(
     required: member.required,
     written: written !== undefined,
     value: written ?? null,
+    essentialRank,
     diagnostics,
   };
+}
+
+function holdsEssentialOf(pointer: string, sources: FieldSources): boolean {
+  const below = `${pointer}/`;
+  const essentials = [...sources.essentials.keys()];
+
+  return essentials.some((essential) => essential.startsWith(below));
 }
 
 function diagnosticsAt(

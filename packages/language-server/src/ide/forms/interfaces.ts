@@ -2,6 +2,7 @@ import type { JsonValue, SchemaMember } from "interpreter/front-end";
 import type { SchemasAt } from "../places/index.js";
 import type { Problem } from "../snapshot/index.js";
 import type { FailureKind } from "../steps/index.js";
+import type { ResultReading } from "../variants/index.js";
 
 export type FormSection = "settings" | "failure" | "data" | "note";
 
@@ -26,6 +27,7 @@ export interface FormField<Report = Problem> {
   readonly required: boolean;
   readonly written: boolean;
   readonly value: JsonValue;
+  readonly essentialRank: number | null;
   readonly fields: readonly FormField<Report>[];
   readonly diagnostics: readonly Report[];
 }
@@ -59,6 +61,7 @@ export type StepFormReading =
   | {
       readonly kind: "form";
       readonly failure: FailureKind;
+      readonly result: ResultReading | null;
       readonly fields: readonly FormField[];
     }
   | FormRefusal;
@@ -68,4 +71,5 @@ export interface FieldSources {
   readonly schemasAt: SchemasAt;
   readonly diagnostics: readonly Problem[];
   readonly suggestions: ReadonlyMap<string, readonly JsonValue[]>;
+  readonly essentials: ReadonlyMap<string, number>;
 }

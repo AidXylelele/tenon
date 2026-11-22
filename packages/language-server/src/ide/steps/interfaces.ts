@@ -40,3 +40,12 @@ export interface HeldList {
 }
 
 export type FailureKind = "stop" | "continue" | "retry" | "handle";
+
+export type ListEnd = "end" | "exit";
+
+export interface Retry {
+  readonly kind: "retry";
+  readonly retries: number;
+  readonly seconds: number;
+  readonly growing: boolean;
+}

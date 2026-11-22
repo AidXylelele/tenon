@@ -1,6 +1,8 @@
 export type {
   FailureKind,
+  ListEnd,
   ListPart,
+  Retry,
   ListRole,
   StepNode,
   StepNodeList,
@@ -8,11 +10,14 @@ export type {
 } from "./interfaces.js";
 export {
   directiveAt,
+  directivesOf,
   failureOf,
+  listEndOf,
   listNamesOf,
   listWithId,
   nameConflictOf,
   protectedStepOf,
+  retryCatchOf,
   stepHolding,
   stepIdOf,
   stepTreeOf,

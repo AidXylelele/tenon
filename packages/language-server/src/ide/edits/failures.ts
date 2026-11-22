@@ -3,18 +3,14 @@ import { childPointerOf, isJsonObject, valueAt } from "../pointers/index.js";
 import {
   nameConflictOf,
   protectedStepOf,
+  retryCatchOf,
   type StepNode,
 } from "../steps/index.js";
-import {
-  appliedOf,
-  dedentedOf,
-  indentedOf,
-  type TextChange,
-  textIn,
-} from "../text/index.js";
+import { dedentedOf, indentedOf, textIn } from "../text/index.js";
 import { inlineYamlOf, yamlOf } from "../yaml-text/index.js";
 import {
   changeOf,
+  editedSliceOf,
   insertionOf,
   itemFormsOf,
   mappingTextOf,
@@ -26,7 +22,6 @@ import type {
   Editing,
   Failure,
   SetFailure,
-  Span,
   Wrapping,
   WrittenItem,
   WrittenStep,
@@ -65,15 +60,8 @@ function handlingOf(failure: Failure): JsonObject | null {
       return null;
     case "continue":
       return {};
-    case "retry": {
-      const backoff = failure.growing ? "exponential" : "constant";
-      const retry = {
-        delay: { seconds: failure.seconds },
-        backoff: { [backoff]: {} },
-        limit: { attempt: { count: failure.attempts } },
-      };
-      return { retry };
-    }
+    case "retry":
+      return retryCatchOf(failure);
     case "handle":
       return { do: [] };
   }
@@ -253,15 +241,4 @@ function writtenThenOf(editable: Editable, step: StepNode): string | null {
   const range = isWritten ? editable.positions.rangeOf(pointer) : null;
 
   return range === null ? null : textIn(editable.text, range);
-}
-
-function editedSliceOf(
-  text: string,
-  span: Span,
-  changes: readonly TextChange[],
-): string {
-  const edited = appliedOf(text, changes);
-  const growth = edited.length - text.length;
-
-  return edited.slice(span.start, span.end + growth);
 }
