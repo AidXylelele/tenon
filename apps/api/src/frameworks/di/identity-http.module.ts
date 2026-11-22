@@ -21,6 +21,7 @@ import { InvitationQueries } from "../../application/identity/invitations/querie
 import { RevokeInvitation } from "../../application/identity/invitations/revoke-invitation.js";
 import { VerifyInvitationLink } from "../../application/identity/invitations/verify-invitation-link.js";
 import { UserRepository } from "../../application/identity/users/ports.js";
+import { MemberQueries } from "../../application/identity/users/queries.js";
 import { ResolveSessionUser } from "../../application/identity/users/resolve-session-user.js";
 import { InvitationPolicy } from "../../interface-adapters/api/auth/invitation.policy.js";
 import { PasswordRecoveryHandler } from "../../interface-adapters/api/auth/password-recovery.handler.js";
@@ -28,6 +29,7 @@ import { SessionAuthenticationProvider } from "../../interface-adapters/api/auth
 import { SessionsGateway } from "../../interface-adapters/api/auth/sessions.gateway.js";
 import { AuthController } from "../../interface-adapters/api/controllers/auth.controller.js";
 import { InvitationsController } from "../../interface-adapters/api/controllers/invitations.controller.js";
+import { MembersController } from "../../interface-adapters/api/controllers/members.controller.js";
 import { InvitationPresenter } from "../../interface-adapters/api/presenters/invitation.presenter.js";
 import { UserPresenter } from "../../interface-adapters/api/presenters/user.presenter.js";
 import { MailGateway } from "../../interface-adapters/mailing/mail.gateway.js";
@@ -35,6 +37,7 @@ import { AccountMapper } from "../../interface-adapters/persistence/mappers/acco
 import { InvitationMapper } from "../../interface-adapters/persistence/mappers/invitation.mapper.js";
 import { UserMapper } from "../../interface-adapters/persistence/mappers/user.mapper.js";
 import { PostgresInvitationQueries } from "../../interface-adapters/persistence/queries/postgres-invitation.queries.js";
+import { PostgresMemberQueries } from "../../interface-adapters/persistence/queries/postgres-member.queries.js";
 import { PostgresAccountRepository } from "../../interface-adapters/persistence/repositories/postgres-account.repository.js";
 import { PostgresInvitationRepository } from "../../interface-adapters/persistence/repositories/postgres-invitation.repository.js";
 import { PostgresUserRepository } from "../../interface-adapters/persistence/repositories/postgres-user.repository.js";
@@ -44,7 +47,7 @@ import { HttpModule } from "./http.module.js";
 
 @Module({
   imports: [HttpModule],
-  controllers: [AuthController, InvitationsController],
+  controllers: [AuthController, InvitationsController, MembersController],
   providers: [
     AuthenticateUser,
     ResolveSessionUser,
@@ -71,6 +74,7 @@ import { HttpModule } from "./http.module.js";
     { provide: AccountRepository, useClass: PostgresAccountRepository },
     { provide: InvitationRepository, useClass: PostgresInvitationRepository },
     { provide: InvitationQueries, useClass: PostgresInvitationQueries },
+    { provide: MemberQueries, useClass: PostgresMemberQueries },
     PostgresSessionStore,
     PostgresEmailTokenStore,
     UserPresenter,

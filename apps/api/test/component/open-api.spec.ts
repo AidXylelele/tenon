@@ -25,6 +25,9 @@ describe("the OpenAPI document", () => {
         "/api/v1/workflows/{namespace}/{name}/archive",
         "/api/v1/workflows/{namespace}/{name}/versions",
         "/api/v1/workflows/{namespace}/{name}/versions/{version}",
+        "/api/v1/workflows/{namespace}/{name}/draft/test-runs",
+        "/api/v1/instance-counts",
+        "/api/v1/members",
       ]),
     );
   });

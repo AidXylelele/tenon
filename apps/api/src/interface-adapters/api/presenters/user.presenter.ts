@@ -1,7 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import type { SignedInUser } from "../../../application/identity/users/interfaces.js";
+import type {
+  Member,
+  SignedInUser,
+} from "../../../application/identity/users/interfaces.js";
 import type { User } from "../../../domain/identity/users/user.js";
 import type { SessionResponse, UserResponse } from "../schemas/auth.schema.js";
+import type { MemberListResponse } from "../schemas/member.schema.js";
 
 @Injectable()
 export class UserPresenter {
@@ -22,5 +26,16 @@ export class UserPresenter {
       administrator: user.isAdmin,
     };
     return { user: presented, capabilities };
+  }
+
+  members(members: readonly Member[]): MemberListResponse {
+    return members.map((member) => ({
+      id: member.id,
+      email: member.email,
+      name: member.name,
+      role: member.role,
+      status: member.status,
+      since: member.since.toISOString(),
+    }));
   }
 }
