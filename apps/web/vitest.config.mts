@@ -64,8 +64,10 @@ const featureFloors = floorsOf(
 );
 
 const libFloors: [string, Floor][] = [
+  ["src/features/workflow-flow/**", LIB_FLOOR],
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
+  ["src/libs/flow/**", LIB_FLOOR],
   ["src/libs/ui/components/**", LIB_FLOOR],
   ["src/libs/ui/components/dialog.tsx", LIB_FLOOR],
   ["src/libs/ui/components/dropdown-menu.tsx", LIB_FLOOR],

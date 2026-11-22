@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
 import type { Phase } from "@/libs/data-access/types";
 import type { RunStatus, Started } from "./interfaces";
+
+const PHASE_WORDS: Readonly<Record<Phase, string>> = {
+  pending: "Queued",
+  running: "Running",
+  waiting: "Waiting",
+  suspended: "Paused",
+  completed: "Succeeded",
+  faulted: "Failed",
+  cancelled: "Cancelled",
+};
+
+function phaseWord(phase: Phase): string {
+  return PHASE_WORDS[phase];
+}
 import {
   phasesOf,
   statusesOf,
@@ -9,7 +23,7 @@ import {
   summaryOf,
 } from "./statuses";
 
-describe("a run's status in the person's words", () => {
+describe("a run's status in the person's words, a single phase's in the words given", () => {
   it.each<[RunStatus, string, readonly Phase[]]>([
     [
       "in-progress",
@@ -20,7 +34,7 @@ describe("a run's status in the person's words", () => {
     ["failed", "Failed", ["faulted"]],
     ["cancelled", "Cancelled", ["cancelled"]],
   ])("%s_is_named_%s_and_counts_%o", (status, label, phases) => {
-    const named = statusLabel(status);
+    const named = statusLabel(status, phaseWord);
     const counted = phasesOf(status);
 
     expect({ named, counted }).toEqual({ named: label, counted: phases });
@@ -68,7 +82,7 @@ describe("the line that sums up a list of runs", () => {
       "Succeeded, failed or cancelled in the last 30 days",
     ],
   ])("%o_%s_reads_%s", (statuses, started, line) => {
-    const summary = summaryOf(statuses, started);
+    const summary = summaryOf(statuses, started, phaseWord);
 
     expect(summary).toBe(line);
   });
