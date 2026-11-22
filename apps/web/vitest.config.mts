@@ -30,6 +30,7 @@ const operationFloors = readdirSync(operations, { withFileTypes: true })
 const libFloors: [string, Floor][] = [
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
+  ["src/libs/ui/components/**", LIB_FLOOR],
   ["src/libs/ui/composites/**", LIB_FLOOR],
   ["src/libs/ui/hooks/**", LIB_FLOOR],
   ["src/libs/ui/tokens/**", LIB_FLOOR],
@@ -56,11 +57,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/{operations,features,libs}/**/*.{ts,tsx}"],
-      exclude: [
-        "src/**/*.stories.tsx",
-        "src/**/*.test-support.ts",
-        "src/libs/ui/components/**",
-      ],
+      exclude: ["src/**/*.stories.tsx", "src/**/*.test-support.ts"],
       thresholds,
     },
   },

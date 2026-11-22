@@ -5,12 +5,20 @@ import { fakeViewport } from "../hooks/viewport.test-support";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
   SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
   SidebarTrigger,
+  useSidebar,
 } from "./sidebar";
 import { TooltipProvider } from "./tooltip";
 
@@ -121,5 +129,93 @@ describe("the console's navigation from 1024 px", () => {
     });
 
     expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+function Column({
+  onOpenChange,
+}: {
+  readonly onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <SidebarProvider open onOpenChange={onOpenChange}>
+      <Sidebar collapsible="icon">
+        <SidebarHeader>Tenon</SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton>Runs</SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuSkeleton showIcon />
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarSeparator />
+        </SidebarContent>
+        <SidebarFooter>Settings</SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+    </SidebarProvider>
+  );
+}
+
+function Stray() {
+  useSidebar();
+  return null;
+}
+
+describe("the console's navigation as a column", () => {
+  it("a_column_held_by_its_owner_asks_its_owner_to_close", () => {
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+    const onOpenChange = vi.fn();
+    render(<Column onOpenChange={onOpenChange} />);
+    const rail = screen.getByRole("button", { name: "Toggle Sidebar" });
+
+    act(() => {
+      fireEvent.click(rail);
+    });
+
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("its_parts_render_their_places_and_loading_rows", () => {
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+
+    const { container } = render(<Column onOpenChange={vi.fn()} />);
+
+    const runs = screen.getByRole("button", { name: "Runs" });
+    const loading = container.querySelectorAll('[data-slot="skeleton"]');
+    expect(runs).toBeInTheDocument();
+    expect(loading).toHaveLength(2);
+  });
+
+  it("a_column_that_cannot_collapse_is_a_plain_panel", () => {
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+
+    render(
+      <SidebarProvider>
+        <Sidebar collapsible="none">Places</Sidebar>
+      </SidebarProvider>,
+    );
+
+    const panel = screen.getByText("Places");
+    expect(panel).toHaveAttribute("data-slot", "sidebar");
+  });
+
+  it("asking_for_the_sidebar_outside_its_provider_is_refused", () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const rendering = () => render(<Stray />);
+
+    expect(rendering).toThrow(
+      new Error("useSidebar must be used within a SidebarProvider."),
+    );
   });
 });
