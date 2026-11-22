@@ -1,6 +1,7 @@
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { ExpressLayerType } from "@opentelemetry/instrumentation-express";
 import { NodeSDK } from "@opentelemetry/sdk-node";
+import { KafkaInstrumentation } from "@platformatic/kafka-opentelemetry";
 import { register } from "import-in-the-middle/register-hooks.mjs";
 import { RequestPath } from "./request-path.js";
 
@@ -45,7 +46,9 @@ const instrumentations = getNodeAutoInstrumentations({
   "@opentelemetry/instrumentation-net": { enabled: false },
 });
 
-export const sdk = new NodeSDK({ instrumentations: [instrumentations] });
+const kafka = new KafkaInstrumentation();
+
+export const sdk = new NodeSDK({ instrumentations: [instrumentations, kafka] });
 
 register();
 sdk.start();
