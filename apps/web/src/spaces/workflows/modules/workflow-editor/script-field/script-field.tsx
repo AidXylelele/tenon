@@ -1,7 +1,5 @@
 "use client";
 
-import { isolateHistory } from "@codemirror/commands";
-import { setDiagnostics } from "@codemirror/lint";
 import type { EditorView, ViewUpdate } from "@codemirror/view";
 import {
   Loader2Icon,
@@ -18,11 +16,16 @@ import {
 } from "react";
 import { CodeStatusLine } from "@/libs/codemirror/code-status-line";
 import { CodeMirrorView } from "@/libs/codemirror/codemirror-view";
-import { isChangedHere, takeOwnersText } from "@/libs/codemirror/owned-text";
+import type { CodeProblem } from "@/libs/codemirror/interfaces";
 import {
-  codeProblemsOf,
-  lintDiagnosticsOf,
-} from "@/libs/language-client/codemirror-diagnostics";
+  isProblemsChange,
+  lineProblemsOf,
+} from "@/libs/codemirror/line-problems";
+import {
+  isChangedHere,
+  replaceTextAsOneStep,
+  takeOwnersText,
+} from "@/libs/codemirror/owned-text";
 import { Button } from "@/libs/ui/components/button";
 import { Kbd } from "@/libs/ui/components/kbd";
 import {
@@ -30,7 +33,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
-import { formatScript } from "@/libs/code-formatting/format-script";
+import {
+  FORMATTER_NAMES,
+  formatScript,
+} from "@/libs/code-formatting/format-script";
 import { formatWordsOf } from "./formatting";
 import type {
   FormatOutcome,
@@ -50,6 +56,8 @@ const RUNNING: FormatState = { kind: "running" };
 
 const OUTDATED: FormatOutcome = { kind: "outdated" };
 
+const NO_PROBLEMS: readonly CodeProblem[] = [];
+
 const NARROW = "min-h-35";
 
 const EXPANDED = "min-h-105";
@@ -58,19 +66,19 @@ export function ScriptField({
   language,
   label,
   value,
-  problems,
   expanded,
   onChange,
   onExpandedChange,
 }: ScriptFieldProps): JSX.Element {
   const view = useRef<EditorView>(null);
   const [formatting, setFormatting] = useState(IDLE);
+  const [problems, setProblems] = useState(NO_PROBLEMS);
   const settings = SCRIPT_LANGUAGES[language];
+  const formatter = FORMATTER_NAMES[settings.library];
   const running = formatting.kind === "running";
   const isTold = formatting.kind === "told";
   const told = isTold ? formatting.words : "";
   const height = expanded ? EXPANDED : NARROW;
-  const lineProblems = codeProblemsOf(problems);
   const ExpandIcon = expanded ? MinimizeIcon : MaximizeIcon;
 
   useEffect(() => {
@@ -81,21 +89,25 @@ export function ScriptField({
     takeOwnersText(editor, value);
   }, [value]);
 
-  useEffect(() => {
-    const editor = view.current;
-
-    if (editor === null) return;
-
-    const marks = lintDiagnosticsOf(problems, editor.state.doc);
-    const marking = setDiagnostics(editor.state, marks);
-    editor.dispatch(marking);
-  }, [problems]);
-
   function keep(created: EditorView): void {
     view.current = created;
   }
 
   function report(update: ViewUpdate): void {
+    showProblems(update);
+    reportCode(update);
+  }
+
+  function showProblems(update: ViewUpdate): void {
+    const problemsChanged = isProblemsChange(update);
+
+    if (!problemsChanged) return;
+
+    const found = lineProblemsOf(update.state);
+    setProblems(found);
+  }
+
+  function reportCode(update: ViewUpdate): void {
     const changedHere = isChangedHere(update);
 
     if (!changedHere) return;
@@ -119,7 +131,7 @@ export function ScriptField({
     const unchanged = current === text;
     const outcome = unchanged ? answer : OUTDATED;
     applyFormatting(editor, outcome, text);
-    const words = formatWordsOf(outcome, settings.formatter);
+    const words = formatWordsOf(outcome, formatter);
     setFormatting({ kind: "told", words });
   }
 
@@ -145,8 +157,10 @@ export function ScriptField({
 
   return (
     <div
+      role="group"
+      aria-label={label}
       onKeyDown={formatOnShortcut}
-      className="flex flex-col overflow-hidden rounded-md border border-control bg-(--code-bg)"
+      className="flex min-w-0 flex-col overflow-hidden rounded-md border border-control bg-(--code-bg)"
     >
       <div className="flex items-center gap-1.5 border-b bg-subtle py-1 pr-1 pl-2.5 text-caption text-muted-foreground">
         <span className="flex-1">{settings.title}</span>
@@ -170,11 +184,7 @@ export function ScriptField({
         onView={keep}
         onUpdate={report}
       />
-      <CodeStatusLine
-        problems={lineProblems}
-        note={settings.formatter}
-        message={told}
-      />
+      <CodeStatusLine problems={problems} note={formatter} message={told} />
     </div>
   );
 }
@@ -219,9 +229,5 @@ function applyFormatting(
   if (outcome.kind !== "formatted") return;
   if (outcome.text === text) return;
 
-  const ownStep = isolateHistory.of("full");
-  editor.dispatch({
-    changes: { from: 0, to: text.length, insert: outcome.text },
-    annotations: ownStep,
-  });
+  replaceTextAsOneStep(editor, outcome.text, outcome.cursor);
 }

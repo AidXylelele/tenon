@@ -26,7 +26,7 @@ test.describe("the script field playground", () => {
     await page.goto(story);
 
     const told = page.getByRole("status");
-    const problem = page.getByText("Line 3: “(” was never closed");
+    const problem = page.getByText("Line 3: unexpected EOF while parsing");
     await expect(told).toHaveText(
       "Fix line 3 first: unexpected EOF while parsing. Ruff formats only code that parses.",
     );
@@ -53,5 +53,25 @@ test.describe("the script field playground", () => {
     const box = await code.boundingBox();
     const height = box?.height ?? 0;
     expect(height).toBeGreaterThanOrEqual(400);
+  });
+
+  test("a_long_line_scrolls_inside_the_field", async ({ page }) => {
+    const story = storyOf("java-script-formatted");
+    await page.goto(story);
+    const code = page.getByRole("textbox", { name: "Code" });
+    await code.click();
+    await page.keyboard.press("Control+End");
+    const line = `\nconst total = ${"1 + ".repeat(16)}1;`;
+
+    await page.keyboard.type(line);
+
+    const field = page.getByRole("group", { name: "Code" });
+    const fieldBox = await field.boundingBox();
+    const codeBox = await code.boundingBox();
+    const fieldWidth = fieldBox?.width ?? 0;
+    const codeRight = (codeBox?.x ?? 0) + (codeBox?.width ?? 0);
+    const fieldRight = (fieldBox?.x ?? 0) + fieldWidth;
+    expect(fieldWidth).toBeLessThanOrEqual(368);
+    expect(codeRight).toBeGreaterThan(fieldRight);
   });
 });

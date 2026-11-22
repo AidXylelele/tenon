@@ -1,5 +1,5 @@
 import { undo } from "@codemirror/commands";
-import { diagnosticCount } from "@codemirror/lint";
+import { diagnosticCount, forceLinting } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import {
@@ -11,10 +11,7 @@ import {
   type Mock,
   vi,
 } from "vitest";
-import {
-  type Diagnostic,
-  DiagnosticSeverity,
-} from "vscode-languageserver-protocol";
+import type { CodeProblem } from "@/libs/codemirror/interfaces";
 import type {
   WorkerAnswer,
   WorkerRequest,
@@ -40,17 +37,16 @@ const JS_FORMATTED =
 const PY_UNCLOSED =
   'import json\nscore = 10 if lead.get("email") else 0\nprint(json.dumps({"score": score})';
 
-const UNCLOSED: Diagnostic = {
-  range: { start: { line: 2, character: 5 }, end: { line: 2, character: 6 } },
-  severity: DiagnosticSeverity.Error,
-  message: "“(” was never closed",
+const UNCLOSED: CodeProblem = {
+  line: 3,
+  message: "unexpected EOF while parsing",
+  severity: "error",
 };
 
 const JAVASCRIPT: Shown = {
   language: "js",
   label: "Code",
   value: JS_RAW,
-  problems: [],
   expanded: false,
 };
 
@@ -58,12 +54,13 @@ const PYTHON: Shown = {
   language: "python",
   label: "Code",
   value: PY_UNCLOSED,
-  problems: [UNCLOSED],
   expanded: false,
 };
 
-const requests: WorkerRequest[] = [];
+const formatRequests: WorkerRequest[] = [];
+const checkRequests: WorkerRequest[] = [];
 const answers: WorkerAnswer[] = [];
+const found: CodeProblem[] = [];
 const held: MessagePort[] = [];
 
 function scriptedWorker(): EventTarget {
@@ -73,11 +70,19 @@ function scriptedWorker(): EventTarget {
     request: WorkerRequest,
     ports: readonly MessagePort[],
   ): void {
-    requests.push(request);
     const [port] = ports;
-    const answer = answers.shift();
 
     if (port === undefined) return;
+    if (request.kind === "check") {
+      checkRequests.push(request);
+      const problems = found.slice();
+      port.postMessage({ kind: "checked", problems });
+      return;
+    }
+
+    formatRequests.push(request);
+    const answer = answers.shift();
+
     if (answer === undefined) {
       held.push(port);
       return;
@@ -100,7 +105,6 @@ function showField(shown: Shown): Owner {
         language={next.language}
         label={next.label}
         value={next.value}
-        problems={next.problems}
         expanded={next.expanded}
         onChange={onChange}
         onExpandedChange={onExpandedChange}
@@ -144,8 +148,10 @@ function release(answer: WorkerAnswer): void {
 
 describe("the script field", () => {
   beforeEach(() => {
-    requests.length = 0;
+    formatRequests.length = 0;
+    checkRequests.length = 0;
     answers.length = 0;
+    found.length = 0;
     held.length = 0;
     vi.stubGlobal("Worker", scriptedWorker);
   });
@@ -160,6 +166,16 @@ describe("the script field", () => {
     const content = code();
 
     expect(content).toHaveTextContent(JS_RAW);
+  });
+
+  it("the_field_groups_its_code_and_its_controls_under_its_label", () => {
+    showField(JAVASCRIPT);
+
+    const field = screen.getByRole("group", { name: "Code" });
+    const content = code();
+    const format = screen.getByRole("button", { name: "Format" });
+    expect(field).toContainElement(content);
+    expect(field).toContainElement(format);
   });
 
   it.each<[Shown, string]>([
@@ -191,7 +207,6 @@ describe("the script field", () => {
       language: "js",
       label: "Code",
       value: "console.log(1);",
-      problems: [],
       expanded: false,
     };
 
@@ -210,13 +225,77 @@ describe("the script field", () => {
     expect(clean).toBeVisible();
   });
 
-  it("a_problem_is_marked_in_the_code_and_named_by_its_line", () => {
+  it("a_syntax_problem_the_formatter_finds_is_marked_and_named_by_its_line", async () => {
+    found.push(UNCLOSED);
     showField(PYTHON);
+    const view = editor();
 
-    const named = screen.getByText("Line 3: “(” was never closed");
-    const marked = diagnosticCount(editor().state);
+    act(() => {
+      forceLinting(view);
+    });
+
+    const named = await screen.findByText(
+      "Line 3: unexpected EOF while parsing",
+    );
+    const marked = diagnosticCount(view.state);
     expect(named).toBeVisible();
     expect(marked).toBe(1);
+  });
+
+  it("the_script_is_checked_in_its_language", async () => {
+    showField(PYTHON);
+    const view = editor();
+
+    act(() => {
+      forceLinting(view);
+    });
+
+    await vi.waitFor(() => {
+      expect(checkRequests).toContainEqual({
+        kind: "check",
+        language: "python",
+        text: PY_UNCLOSED,
+      });
+    });
+  });
+
+  it("an_owner_value_that_did_not_change_keeps_newer_typing", () => {
+    const { show } = showField(JAVASCRIPT);
+    const view = editor();
+    act(() => {
+      view.dispatch({ changes: { from: 0, insert: "// names\n" } });
+    });
+
+    show(JAVASCRIPT);
+
+    const text = editor().state.doc.toString();
+    const typed = `// names\n${JS_RAW}`;
+    expect(text).toBe(typed);
+  });
+
+  it("format_sends_the_code_with_the_cursor", () => {
+    showField(JAVASCRIPT);
+    const view = editor();
+    act(() => {
+      view.dispatch({ selection: { anchor: 6 } });
+    });
+
+    format();
+
+    expect(formatRequests).toEqual([
+      { kind: "format", language: "javascript", text: JS_RAW, cursor: 6 },
+    ]);
+  });
+
+  it("format_puts_the_cursor_where_the_formatter_says", async () => {
+    showField(JAVASCRIPT);
+    answers.push({ kind: "formatted", text: JS_FORMATTED, cursor: 5 });
+
+    format();
+
+    await screen.findByText("Formatted with Prettier");
+    const cursor = editor().state.selection.main.head;
+    expect(cursor).toBe(5);
   });
 
   it("format_replaces_the_javascript_with_prettiers_and_says_so", async () => {
@@ -227,7 +306,7 @@ describe("the script field", () => {
 
     const told = await screen.findByText("Formatted with Prettier");
     expect(told).toBeVisible();
-    expect(requests).toEqual([
+    expect(formatRequests).toEqual([
       { kind: "format", language: "javascript", text: JS_RAW, cursor: 0 },
     ]);
     expect(onChange).toHaveBeenCalledExactlyOnceWith(JS_FORMATTED);
@@ -238,7 +317,6 @@ describe("the script field", () => {
       language: "python",
       label: "Code",
       value: "x=1",
-      problems: [],
       expanded: false,
     };
     const { onChange } = showField(shown);
@@ -248,7 +326,7 @@ describe("the script field", () => {
 
     const told = await screen.findByText("Formatted with Ruff");
     expect(told).toBeVisible();
-    expect(requests).toEqual([
+    expect(formatRequests).toEqual([
       { kind: "format", language: "python", text: "x=1", cursor: 0 },
     ]);
     expect(onChange).toHaveBeenCalledExactlyOnceWith("x = 1\n");
@@ -311,7 +389,7 @@ describe("the script field", () => {
 
     format();
 
-    expect(requests).toEqual([
+    expect(formatRequests).toEqual([
       { kind: "format", language: "javascript", text: JS_RAW, cursor: 0 },
     ]);
   });
@@ -391,7 +469,6 @@ describe("the script field", () => {
       language: "js",
       label: "Code",
       value: JS_RAW,
-      problems: [],
       expanded: true,
     };
     const { onExpandedChange } = showField(shown);

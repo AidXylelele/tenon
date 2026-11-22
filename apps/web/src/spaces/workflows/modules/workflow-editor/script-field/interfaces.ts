@@ -1,5 +1,4 @@
 import type { Extension } from "@codemirror/state";
-import type { Diagnostic } from "vscode-languageserver-protocol";
 import type { Formatting } from "@/libs/code-formatting/interfaces";
 import type { ScriptLanguage } from "@/libs/codemirror/interfaces";
 
@@ -9,7 +8,6 @@ export interface ScriptFieldProps {
   readonly language: RunScriptLanguage;
   readonly label: string;
   readonly value: string;
-  readonly problems: readonly Diagnostic[];
   readonly expanded: boolean;
   readonly onChange: (code: string) => void;
   readonly onExpandedChange: (expanded: boolean) => void;
@@ -18,7 +16,6 @@ export interface ScriptFieldProps {
 export interface ScriptLanguageSettings {
   readonly library: ScriptLanguage;
   readonly title: string;
-  readonly formatter: string;
   readonly extensions: Extension;
 }
 
