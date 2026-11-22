@@ -54,7 +54,9 @@ export class RunTracer {
     try {
       return await work();
     } catch (error) {
-      if (!isWorkflowInterrupt(error)) this.#failed(span, error);
+      const interrupted = isWorkflowInterrupt(error);
+
+      if (!interrupted) this.#failed(span, error);
 
       throw error;
     } finally {

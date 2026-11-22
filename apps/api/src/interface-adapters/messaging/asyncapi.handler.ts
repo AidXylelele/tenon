@@ -44,13 +44,19 @@ export class AsyncApiHandler implements OnModuleDestroy {
     );
     const open = new Map(keyed);
 
-    for (const [key, consumer] of this.#consumers)
-      if (!open.has(key)) consumer.stopped.abort();
+    for (const [key, consumer] of this.#consumers) {
+      const wanted = open.has(key);
+
+      if (!wanted) consumer.stopped.abort();
+    }
 
     if (this.#closing) return;
 
-    for (const [key, receiver] of open)
-      if (!this.#consumers.has(key)) this.#start(key, receiver);
+    for (const [key, receiver] of open) {
+      const started = this.#consumers.has(key);
+
+      if (!started) this.#start(key, receiver);
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
@@ -149,10 +155,15 @@ export class AsyncApiHandler implements OnModuleDestroy {
     const instanceId = receiver.instanceId;
     const execution = receiver.execution;
 
-    while (!(await this.runs.demands(instanceId, execution)))
+    for (;;) {
+      const demanded = await this.runs.demands(instanceId, execution);
+
+      if (demanded) return;
+
       await setTimeout(AsyncApiHandler.DEMAND_MS, undefined, {
         signal: ended,
       });
+    }
   }
 
   async #taken(

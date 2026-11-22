@@ -26,7 +26,9 @@ export class PublishDraft {
 
     if (draft === null) return { ok: false, failure: Missing.Draft };
 
-    if (!draft.isAt(command.expected))
+    const current = draft.isAt(command.expected);
+
+    if (!current)
       return {
         ok: false,
         failure: { refusal: DraftRefusal.Stale, current: draft.snapshot },

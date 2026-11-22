@@ -115,8 +115,9 @@ export class Invitation {
 
     if (closed !== null) return { ok: false, failure: closed };
 
-    if (this.#isExpired(now))
-      return { ok: false, failure: InvitationRefusal.Expired };
+    const expired = this.#isExpired(now);
+
+    if (expired) return { ok: false, failure: InvitationRefusal.Expired };
 
     return { ok: true, value: undefined };
   }
@@ -150,7 +151,9 @@ export class Invitation {
   }
 
   #isExpired(now: Date): boolean {
-    return this.#expiresAt.getTime() <= now.getTime();
+    const expiry = this.#expiresAt.getTime();
+    const moment = now.getTime();
+    return expiry <= moment;
   }
 
   #closedRefusal(): InvitationRefusal | null {

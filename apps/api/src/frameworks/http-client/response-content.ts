@@ -86,13 +86,16 @@ export class ResponseContent {
     if (output === "raw") return body.toString("base64");
 
     const media = this.#mediaOf(response);
+    const json = this.#readsAsJson(media, body);
 
-    if (this.#readsAsJson(media, body)) {
+    if (json) {
       const text = this.#decoded(body, media);
       return this.documentOf(text);
     }
 
-    if (this.#readsAsText(media)) return this.#decoded(body, media);
+    const textual = this.#readsAsText(media);
+
+    if (textual) return this.#decoded(body, media);
 
     return body.toString("base64");
   }
@@ -114,7 +117,8 @@ export class ResponseContent {
 
     if (media.type !== "application") return false;
 
-    return media.subtype === "json" || media.subtype.endsWith("+json");
+    const suffixed = media.subtype.endsWith("+json");
+    return media.subtype === "json" || suffixed;
   }
 
   #readsAsText(media: MIMEType | null): boolean {
@@ -124,10 +128,9 @@ export class ResponseContent {
 
     if (media.type !== "application") return false;
 
-    return (
-      ResponseContent.TEXT_APPLICATIONS.includes(media.subtype) ||
-      media.subtype.endsWith("+xml")
-    );
+    const listed = ResponseContent.TEXT_APPLICATIONS.includes(media.subtype);
+    const suffixed = media.subtype.endsWith("+xml");
+    return listed || suffixed;
   }
 
   #decoded(body: Buffer, media: MIMEType | null): string {

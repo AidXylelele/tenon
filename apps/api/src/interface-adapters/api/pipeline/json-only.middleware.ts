@@ -8,7 +8,9 @@ import type { NextFunction, Request, Response } from "express";
 @Injectable()
 export class JsonOnlyMiddleware implements NestMiddleware {
   use(request: Request, _response: Response, next: NextFunction): void {
-    if (this.#hasBody(request) && !this.#isJson(request))
+    const unsupported = this.#hasBody(request) && !this.#isJson(request);
+
+    if (unsupported)
       throw new UnsupportedMediaTypeException(
         "The API reads application/json only",
       );

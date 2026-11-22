@@ -127,11 +127,11 @@ export class Run {
 
   after(turn: RunTurn, secrets: RunSecrets): Run {
     const known = this.#awaited.concat(turn.requested);
-    const awaited = known.filter(
-      (effect) =>
-        !turn.answered.includes(effect.id) &&
-        !turn.withdrawn.includes(effect.id),
-    );
+    const awaited = known.filter((effect) => {
+      const answered = turn.answered.includes(effect.id);
+      const withdrawn = turn.withdrawn.includes(effect.id);
+      return !answered && !withdrawn;
+    });
     const awaitedIds = awaited.map((effect) => effect.id);
     const listening = this.#listening
       .concat(turn.listening)
@@ -158,12 +158,14 @@ export class Run {
 
   #receivingAfter(turn: RunTurn): readonly Receiving[] {
     const renewed = turn.receiving.map((receive) => receive.execution);
-    const kept = this.#receiving.filter(
-      (receive) => !renewed.includes(receive.execution),
-    );
-    return kept
-      .concat(turn.receiving)
-      .filter((receive) => !turn.endedExecutions.includes(receive.execution));
+    const kept = this.#receiving.filter((receive) => {
+      const replaced = renewed.includes(receive.execution);
+      return !replaced;
+    });
+    return kept.concat(turn.receiving).filter((receive) => {
+      const ended = turn.endedExecutions.includes(receive.execution);
+      return !ended;
+    });
   }
 
   #takenAfter(turn: RunTurn): readonly TakenEvent[] {

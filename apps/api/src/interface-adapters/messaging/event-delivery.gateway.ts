@@ -49,8 +49,9 @@ export class EventDeliveryGateway implements EventSender {
     if (secret === null) return null;
 
     const held = secret.value.held;
+    const policy = this.#isPolicy(held);
 
-    if (this.#isPolicy(held)) return this.protocol.toObject(held);
+    if (policy) return this.protocol.toObject(held);
 
     const bearer = { token: held };
     return this.protocol.toObject(bearer);
@@ -67,6 +68,7 @@ export class EventDeliveryGateway implements EventSender {
   }
 
   #isPolicy(value: JsonValue): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    const list = Array.isArray(value);
+    return typeof value === "object" && value !== null && !list;
   }
 }

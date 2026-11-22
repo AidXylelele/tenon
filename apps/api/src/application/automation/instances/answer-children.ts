@@ -29,7 +29,9 @@ export class AnswerChildren {
     const now = new Date();
 
     for (const child of ended) {
-      if (!parent.awaitsChild(child)) continue;
+      const awaited = parent.awaitsChild(child);
+
+      if (!awaited) continue;
 
       const turn = await this.runtime.answerChild(
         parent,

@@ -226,8 +226,10 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
   #guarded(metadata: ClusterMetadata, refused: () => void): void {
     for (const broker of metadata.brokers.values()) {
       const host = broker.host;
+      const literal = isIP(host) !== 0;
+      const refusedHost = literal && !this.addresses.permits(host);
 
-      if (isIP(host) !== 0 && !this.addresses.permits(host)) {
+      if (refusedHost) {
         refused();
         return;
       }
@@ -237,7 +239,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
   }
 
   #bootstrapOf(server: BrokerServer, address: string): string {
-    const host = isIP(address) === 6 ? `[${address}]` : address;
+    const ipv6 = isIP(address) === 6;
+    const host = ipv6 ? `[${address}]` : address;
     const port = server.port ?? KafkaBroker.PORT;
     return `${host}:${String(port)}`;
   }

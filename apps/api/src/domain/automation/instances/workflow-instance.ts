@@ -254,14 +254,16 @@ export class WorkflowInstance {
   abandons(child: WorkflowInstance): boolean {
     if (child.awaitedBy !== this.#id) return false;
 
-    return !this.awaitsChild(child);
+    const awaited = this.awaitsChild(child);
+    return !awaited;
   }
 
   static controlsIn(phase: Phase): Control[] {
     const controls = Object.values(Control);
-    return controls.filter(
-      (control) => WorkflowInstance.#refusalIn(phase, control) === null,
-    );
+    return controls.filter((control) => {
+      const refusal = WorkflowInstance.#refusalIn(phase, control);
+      return refusal === null;
+    });
   }
 
   admits(control: Control): Result<void, InstanceRefusal> {
@@ -406,7 +408,9 @@ export class WorkflowInstance {
   }
 
   static #suspendRefusalIn(phase: Phase): InstanceRefusal | null {
-    if (WorkflowInstance.#SUSPENDABLE.includes(phase)) return null;
+    const suspendable = WorkflowInstance.#SUSPENDABLE.includes(phase);
+
+    if (suspendable) return null;
 
     return InstanceRefusal.NotRunning;
   }
@@ -418,13 +422,17 @@ export class WorkflowInstance {
   }
 
   static #cancelRefusalIn(phase: Phase): InstanceRefusal | null {
-    if (WorkflowInstance.#ENDED.includes(phase)) return InstanceRefusal.Ended;
+    const ended = WorkflowInstance.#ENDED.includes(phase);
+
+    if (ended) return InstanceRefusal.Ended;
 
     return null;
   }
 
   static #endedRefusalIn(phase: Phase): InstanceRefusal | null {
-    if (WorkflowInstance.#ENDED.includes(phase)) return null;
+    const ended = WorkflowInstance.#ENDED.includes(phase);
+
+    if (ended) return null;
 
     return InstanceRefusal.NotEnded;
   }

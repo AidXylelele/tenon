@@ -58,8 +58,9 @@ export class RunSecrets {
   static #masked(value: JsonValue, texts: readonly string[]): JsonValue {
     if (typeof value === "string") return RunSecrets.#maskedText(value, texts);
 
-    if (RunSecrets.#isList(value))
-      return value.map((item) => RunSecrets.#masked(item, texts));
+    const list = RunSecrets.#isList(value);
+
+    if (list) return value.map((item) => RunSecrets.#masked(item, texts));
 
     if (typeof value !== "object" || value === null) return value;
 

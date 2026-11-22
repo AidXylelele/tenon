@@ -268,8 +268,9 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
   #failureOf(error: unknown): Failure {
     const detail = error instanceof Error ? error.message : String(error);
 
-    if (detail.includes(AmqpBroker.REFUSED_LOGIN))
-      return { kind: "unauthenticated", detail };
+    const refusedLogin = detail.includes(AmqpBroker.REFUSED_LOGIN);
+
+    if (refusedLogin) return { kind: "unauthenticated", detail };
 
     return { kind: "unreachable", detail };
   }

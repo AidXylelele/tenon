@@ -168,7 +168,8 @@ export class McpClient {
   ): Record<string, string> {
     const kept = Object.entries(headers).filter(([name]) => {
       const lowered = name.toLowerCase();
-      return !McpClient.SESSION_HEADERS.includes(lowered);
+      const session = McpClient.SESSION_HEADERS.includes(lowered);
+      return !session;
     });
     return Object.fromEntries(kept);
   }
@@ -244,7 +245,8 @@ export class McpClient {
       };
 
     const prefix = `MCP error ${String(error.code)}: `;
-    const message = error.message.startsWith(prefix)
+    const prefixed = error.message.startsWith(prefix);
+    const message = prefixed
       ? error.message.slice(prefix.length)
       : error.message;
     const data = this.#jsonOf(error.data);
@@ -276,6 +278,7 @@ export class McpClient {
   }
 
   #isObject(value: JsonValue): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    const list = Array.isArray(value);
+    return typeof value === "object" && value !== null && !list;
   }
 }

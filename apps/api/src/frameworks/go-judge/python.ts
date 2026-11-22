@@ -43,7 +43,9 @@ export class Python implements ScriptLanguage {
   readonly interpreter = "/usr/bin/python3";
 
   declares(name: string): boolean {
-    return /^[A-Za-z_]\w*$/.test(name) && !Python.RESERVED.has(name);
+    const identifier = /^[A-Za-z_]\w*$/.test(name);
+    const reserved = Python.RESERVED.has(name);
+    return identifier && !reserved;
   }
 
   declarationOf(name: string, value: JsonValue): string {

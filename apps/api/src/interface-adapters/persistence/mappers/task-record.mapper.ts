@@ -130,8 +130,9 @@ export class TaskRecordMapper {
 
   #errorOf(end: LifecycleEventRow | null): JsonObject | null {
     const error = end?.data.error;
+    const object = this.#isObject(error);
 
-    if (!this.#isObject(error)) return null;
+    if (!object) return null;
 
     return error;
   }
@@ -153,6 +154,7 @@ export class TaskRecordMapper {
   }
 
   #isObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    const list = Array.isArray(value);
+    return typeof value === "object" && value !== null && !list;
   }
 }

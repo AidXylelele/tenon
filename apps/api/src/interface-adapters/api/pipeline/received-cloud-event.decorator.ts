@@ -22,7 +22,9 @@ function fromBinary(headers: IncomingHttpHeaders, body: unknown): CloudEvent {
   const event: Record<string, JsonValue> = {};
 
   for (const [name, value] of Object.entries(headers)) {
-    if (!name.startsWith(PREFIX) || typeof value !== "string") continue;
+    const prefixed = name.startsWith(PREFIX);
+
+    if (!prefixed || typeof value !== "string") continue;
 
     const attribute = name.slice(PREFIX.length);
     event[attribute] = decodeURIComponent(value);

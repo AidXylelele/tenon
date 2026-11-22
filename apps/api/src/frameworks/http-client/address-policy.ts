@@ -38,17 +38,21 @@ export class AddressPolicy implements OnApplicationShutdown {
 
   permits(address: string): boolean {
     const parsed = ipaddr.process(address);
+    const allowListed = this.#listedIn(this.allowed, parsed);
 
-    if (this.#listedIn(this.allowed, parsed)) return true;
+    if (allowListed) return true;
 
-    if (this.#listedIn(this.refused, parsed)) return false;
+    const refused = this.#listedIn(this.refused, parsed);
+
+    if (refused) return false;
 
     return this.#isUnicast(parsed);
   }
 
   isPrivate(address: string): boolean {
     const parsed = ipaddr.process(address);
-    return !this.#isUnicast(parsed);
+    const unicast = this.#isUnicast(parsed);
+    return !unicast;
   }
 
   async admits(hostname: string): Promise<boolean> {
@@ -72,9 +76,10 @@ export class AddressPolicy implements OnApplicationShutdown {
     family: LookupOptions["family"],
   ): Promise<readonly LookupAddress[]> {
     const addresses = await lookup(hostname, { family, all: true });
-    const refused = addresses.some(
-      (resolved) => !this.permits(resolved.address),
-    );
+    const refused = addresses.some((resolved) => {
+      const permitted = this.permits(resolved.address);
+      return !permitted;
+    });
 
     if (refused) throw this.#refusal();
 
@@ -88,8 +93,9 @@ export class AddressPolicy implements OnApplicationShutdown {
   ): void {
     const host = this.#unbracketed(options.hostname);
     const literal = isIP(host) !== 0;
+    const refused = literal && !this.permits(host);
 
-    if (literal && !this.permits(host)) {
+    if (refused) {
       const refusal = this.#refusal();
       callback(refusal, null);
       return;
@@ -130,7 +136,8 @@ export class AddressPolicy implements OnApplicationShutdown {
   }
 
   #isUnicast(address: IpAddress): boolean {
-    return address.range() === "unicast";
+    const range = address.range();
+    return range === "unicast";
   }
 
   #listedIn(ranges: AddressRanges, address: IpAddress): boolean {
@@ -139,7 +146,9 @@ export class AddressPolicy implements OnApplicationShutdown {
   }
 
   #rangeOf(entry: string): AddressRange {
-    if (ipaddr.isValidCIDR(entry)) return ipaddr.parseCIDR(entry);
+    const cidr = ipaddr.isValidCIDR(entry);
+
+    if (cidr) return ipaddr.parseCIDR(entry);
 
     const address = ipaddr.process(entry);
     const kind = address.kind();

@@ -71,7 +71,9 @@ export class OpenWorkflowRun implements WorkflowRunner<
     try {
       await this.#driven(ctx, input);
     } catch (error) {
-      if (isWorkflowInterrupt(error)) throw error;
+      const interrupted = isWorkflowInterrupt(error);
+
+      if (interrupted) throw error;
 
       await this.#step(ctx, "failed", () => this.runs.fail(instanceId));
     }
@@ -139,8 +141,9 @@ export class OpenWorkflowRun implements WorkflowRunner<
     agenda: RunAgendaView,
     turn: number,
   ): Promise<Turn> {
-    if (this.#busy(generation, agenda))
-      return this.#performed(generation, agenda);
+    const busy = this.#busy(generation, agenda);
+
+    if (busy) return this.#performed(generation, agenda);
 
     return this.#waited(generation, agenda, turn);
   }
@@ -156,9 +159,10 @@ export class OpenWorkflowRun implements WorkflowRunner<
     generation: Generation,
     agenda: RunAgendaView,
   ): readonly ChildEffect[] {
-    return agenda.children.filter(
-      (effect) => !generation.children.has(effect.id),
-    );
+    return agenda.children.filter((effect) => {
+      const started = generation.children.has(effect.id);
+      return !started;
+    });
   }
 
   async #performed(
@@ -231,7 +235,10 @@ export class OpenWorkflowRun implements WorkflowRunner<
 
   #answeredAny(agenda: RunAgendaView, next: RunAgendaView): boolean {
     const remaining = new Set(next.receives);
-    return agenda.receives.some((id) => !remaining.has(id));
+    return agenda.receives.some((id) => {
+      const waiting = remaining.has(id);
+      return !waiting;
+    });
   }
 
   async #slept(

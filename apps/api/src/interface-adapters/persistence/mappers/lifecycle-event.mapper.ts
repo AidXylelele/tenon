@@ -47,7 +47,11 @@ export class LifecycleEventMapper {
 
     if (event.name !== LifecycleEventMapper.TASK_COMPLETED) return event;
 
-    if (execution === null || !outputs.includes(execution)) return event;
+    if (execution === null) return event;
+
+    const written = outputs.includes(execution);
+
+    if (!written) return event;
 
     const outputUri = this.#outputUriOf(instanceId, execution);
     const data = { ...event.data, outputUri };
@@ -95,7 +99,8 @@ export class LifecycleEventMapper {
   }
 
   #nameOf(name: string): LifecycleEventName | null {
-    return this.#isCatalogued(name) ? name : null;
+    const catalogued = this.#isCatalogued(name);
+    return catalogued ? name : null;
   }
 
   #isCatalogued(name: string): name is LifecycleEventName {

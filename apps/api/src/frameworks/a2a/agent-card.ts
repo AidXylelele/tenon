@@ -5,9 +5,10 @@ export class AgentCard {
   constructor(private readonly properties: AgentCardProperties) {}
 
   jsonRpcEndpoint(credentials: Authentication | null, cardUri: string): Agent {
-    const chosen = this.#offers().find(
-      (offer) => offer.binding === "JSONRPC" && offer.version.startsWith("0."),
-    );
+    const chosen = this.#offers().find((offer) => {
+      const beforeOne = offer.version.startsWith("0.");
+      return offer.binding === "JSONRPC" && beforeOne;
+    });
 
     if (chosen === undefined)
       return {
@@ -15,7 +16,8 @@ export class AgentCard {
         detail: "The agent card offers no JSON-RPC interface of A2A 0.3",
       };
 
-    const authentication = this.#secured() ? credentials : null;
+    const secured = this.#secured();
+    const authentication = secured ? credentials : null;
     const foreign =
       authentication !== null &&
       this.#originOf(chosen.url) !== this.#originOf(cardUri);
@@ -56,6 +58,7 @@ export class AgentCard {
   }
 
   #originOf(uri: string): string | null {
-    return URL.canParse(uri) ? new URL(uri).origin : null;
+    const parsable = URL.canParse(uri);
+    return parsable ? new URL(uri).origin : null;
   }
 }

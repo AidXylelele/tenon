@@ -346,8 +346,9 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
         context,
       );
       steps.push(step);
+      const declined = step.declined.includes(event.id);
 
-      if (!step.declined.includes(event.id)) answered.push(listen.id);
+      if (!declined) answered.push(listen.id);
     }
 
     return { steps, answered, taken: null };
@@ -371,8 +372,9 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
       const step = await this.client.respond(call, current, response, context);
       steps.push(step);
       current = step.state;
+      const declined = step.declined.includes(event.id);
 
-      if (step.declined.includes(event.id)) continue;
+      if (declined) continue;
 
       const taken = { eventId: event.id, execution: candidate.execution };
       return { steps, answered: [candidate.effectId], taken };
@@ -426,13 +428,15 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
   ): Effect | null {
     const withdrawn = steps.flatMap((step) => step.withdrawn);
     const requested = steps.flatMap((step) => step.requested);
-    const listens = requested.filter(
-      (effect) =>
-        effect.kind === "listen" &&
-        effect.subscription === InterpreterRuntimeGateway.ROOT_EXECUTION &&
-        !withdrawn.includes(effect.id) &&
-        !answered.includes(effect.id),
-    );
+    const listens = requested.filter((effect) => {
+      if (effect.kind !== "listen") return false;
+
+      const dropped = withdrawn.includes(effect.id);
+      const met = answered.includes(effect.id);
+      const root =
+        effect.subscription === InterpreterRuntimeGateway.ROOT_EXECUTION;
+      return root && !dropped && !met;
+    });
     return listens[0] ?? null;
   }
 }

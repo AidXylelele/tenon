@@ -61,7 +61,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
   constructor(private readonly adapterHost: HttpAdapterHost) {}
 
   catch(error: unknown, host: ArgumentsHost): void {
-    if (host.getType() !== ProblemDetailsFilter.HTTP) throw error;
+    const type = host.getType();
+
+    if (type !== ProblemDetailsFilter.HTTP) throw error;
 
     const exception = this.#httpExceptionOf(error);
     const status = exception.getStatus();
@@ -87,7 +89,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     if (error instanceof StaleWriteError)
       return new ConflictException(error.message, { cause: error });
 
-    if (this.#isShed(error))
+    const shed = this.#isShed(error);
+
+    if (shed)
       return new ServiceUnavailableException(error.message, { cause: error });
 
     this.logger.error(error);
@@ -96,8 +100,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
   #problemOf(exception: HttpException): ProblemDetails {
     const answer = exception.getResponse();
+    const problem = this.#isProblem(answer);
 
-    if (this.#isProblem(answer)) return answer;
+    if (problem) return answer;
 
     const status = exception.getStatus();
     const title = STATUS_CODES[status] ?? exception.name;
@@ -121,8 +126,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     if (told) return message;
 
-    if (Array.isArray(message))
-      return message.join(ProblemDetailsFilter.SEPARATOR);
+    const listed = Array.isArray(message);
+
+    if (listed) return message.join(ProblemDetailsFilter.SEPARATOR);
 
     const sentence = ProblemDetailsFilter.SENTENCES.get(status);
     return sentence ?? ProblemDetailsFilter.UNEXPLAINED;
@@ -146,9 +152,11 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     if (exception instanceof ConditionalRequestException)
       return exception.headers;
 
-    const shed = this.#isShed(error) ? error : exception.cause;
+    const errorShed = this.#isShed(error);
+    const shed = errorShed ? error : exception.cause;
+    const shedding = this.#isShed(shed);
 
-    if (this.#isShed(shed)) {
+    if (shedding) {
       const after = shed.retryAfterMs ?? ProblemDetailsFilter.SOON_MS;
       const exact = after / 1_000;
       const whole = Math.ceil(exact);

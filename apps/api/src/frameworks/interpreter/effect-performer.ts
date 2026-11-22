@@ -71,8 +71,9 @@ export class EffectPerformer implements EffectClient {
   }
 
   sandboxed(effect: Effect): SandboxedProcessRequest {
-    if (!this.#isSandboxed(effect))
-      throw this.#unperformable("process.container");
+    const contained = this.#isSandboxed(effect);
+
+    if (!contained) throw this.#unperformable("process.container");
 
     return effect;
   }
@@ -164,7 +165,9 @@ export class EffectPerformer implements EffectClient {
     effect: Effect & McpRequest,
     context: CallContext,
   ): Promise<EffectOutcome> {
-    if (!this.#overHttp(effect)) throw this.#unperformable("mcp.stdio");
+    const overHttp = this.#overHttp(effect);
+
+    if (!overHttp) throw this.#unperformable("mcp.stdio");
 
     return this.mcp.call(effect, context);
   }

@@ -15,9 +15,10 @@ export const EndpointBody = z.strictObject({
 export type EndpointBody = z.infer<typeof EndpointBody>;
 
 const FilterBody = z.strictObject({
-  with: z
-    .record(z.string(), z.json())
-    .refine((attributes) => Object.keys(attributes).length > 0),
+  with: z.record(z.string(), z.json()).refine((attributes) => {
+    const names = Object.keys(attributes);
+    return names.length > 0;
+  }),
 });
 
 export const CreateSubscriptionBody = z.strictObject({

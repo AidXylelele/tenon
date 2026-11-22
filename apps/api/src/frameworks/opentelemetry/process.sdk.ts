@@ -12,8 +12,9 @@ const instrumentations = getNodeAutoInstrumentations({
     },
     startIncomingSpanHook: (request) => {
       const path = new RequestPath(request.url);
+      const hook = path.isHook();
 
-      if (!path.isHook()) return {};
+      if (!hook) return {};
 
       return { "url.path": path.redacted() };
     },

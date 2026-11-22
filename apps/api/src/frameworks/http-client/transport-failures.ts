@@ -102,7 +102,9 @@ export class TransportFailures {
         detail: TransportFailures.INVALID_REQUEST,
       };
 
-    if (code.startsWith("CERT_"))
+    const certificate = code.startsWith("CERT_");
+
+    if (certificate)
       return {
         kind: "unreachable",
         detail: TransportFailures.CERTIFICATE_REFUSED,

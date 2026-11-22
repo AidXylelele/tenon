@@ -103,7 +103,8 @@ export class NatsBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     lost: Lost,
   ): Promise<NatsConnection> {
-    const host = isIP(address) === 6 ? `[${address}]` : address;
+    const ipv6 = isIP(address) === 6;
+    const host = ipv6 ? `[${address}]` : address;
     const port = server.port ?? NatsBroker.PORT;
     const login = credentials.kind === "password" ? credentials : null;
     const servers = `${host}:${String(port)}`;

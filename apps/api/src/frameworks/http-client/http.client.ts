@@ -302,7 +302,9 @@ export class HttpClient implements ResourceClient {
   }
 
   #keyed(request: OutboundRequest, idempotencyKey: string): OutboundRequest {
-    if (request.headers.has("idempotency-key")) return request;
+    const carried = request.headers.has("idempotency-key");
+
+    if (carried) return request;
 
     return this.#withHeader(request, "idempotency-key", idempotencyKey);
   }

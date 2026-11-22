@@ -352,7 +352,9 @@ export class PiscinaInterpreterClient
     } catch (error) {
       if (signal?.aborted === true) throw error;
 
-      if (this.#exhausted(error))
+      const exhausted = this.#exhausted(error);
+
+      if (exhausted)
         throw new PermanentFault("The interpreter ran out of time or memory", {
           cause: error,
         });

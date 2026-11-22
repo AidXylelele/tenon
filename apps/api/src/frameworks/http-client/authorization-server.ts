@@ -42,8 +42,9 @@ export class AuthorizationServer {
   ): Promise<string> {
     const configuration = await this.#configurationOf(credentials, signal);
     const token = await this.#granted(configuration, credentials);
+    const accepted = this.#issuedByAccepted(token, credentials);
 
-    if (!this.#issuedByAccepted(token, credentials))
+    if (!accepted)
       throw this.#refused(
         "The token was not issued by one of the accepted issuers",
       );
@@ -216,8 +217,9 @@ export class AuthorizationServer {
 
   #tokenEndpointOf(credentials: OAuth2Credentials): string {
     const path = credentials.endpoints?.token ?? "/oauth2/token";
+    const absolute = URL.canParse(path);
 
-    if (URL.canParse(path)) return path;
+    if (absolute) return path;
 
     const authority = credentials.authority.replace(/\/+$/, "");
     const relative = path.replace(/^\/+/, "");
@@ -281,7 +283,11 @@ export class AuthorizationServer {
 
     if (claims === null) return true;
 
-    return claims.iss !== undefined && credentials.issuers.includes(claims.iss);
+    const issuer = claims.iss;
+
+    if (issuer === undefined) return false;
+
+    return credentials.issuers.includes(issuer);
   }
 
   #claimsOf(token: string): JWTPayload | null {
@@ -294,8 +300,9 @@ export class AuthorizationServer {
 
   #refusalOf(error: unknown, detail: string): unknown {
     const cause: unknown = error instanceof ClientError ? error.cause : null;
+    const transported = this.#transported(cause);
 
-    if (this.#transported(cause)) return cause;
+    if (transported) return cause;
 
     const plaintext =
       error instanceof ClientError &&

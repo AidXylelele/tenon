@@ -51,7 +51,9 @@ export class DraftPresenter {
   }
 
   refusalOf(failure: DraftConflict | Failure): HttpException {
-    if (this.#isConflict(failure)) return this.conflict(failure);
+    const conflict = this.#isConflict(failure);
+
+    if (conflict) return this.conflict(failure);
 
     return this.problemPresenter.of(failure);
   }

@@ -108,8 +108,9 @@ export class Workflow {
 
     if (taken !== null) return taken.republish(definition);
 
-    if (this.#isArchived())
-      return { ok: false, failure: WorkflowRefusal.Archived };
+    const archived = this.#isArchived();
+
+    if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
 
     const version = WorkflowVersion.publish(input);
     this.#versions = this.#versions.concat([version]);
@@ -138,7 +139,9 @@ export class Workflow {
   }
 
   archive(now: Date): boolean {
-    if (this.#isArchived()) return false;
+    const archived = this.#isArchived();
+
+    if (archived) return false;
 
     this.#status = WorkflowStatus.Archived;
     this.#archivedAt = now;
@@ -147,8 +150,9 @@ export class Workflow {
   }
 
   turnOn(): Result<boolean, WorkflowRefusal> {
-    if (this.#isArchived())
-      return { ok: false, failure: WorkflowRefusal.Archived };
+    const archived = this.#isArchived();
+
+    if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
 
     if (this.#on) return { ok: true, value: false };
 
@@ -170,8 +174,9 @@ export class Workflow {
 
     if (!own) throw new TypeError("The version belongs to another workflow");
 
-    if (this.#isArchived())
-      return { ok: false, failure: WorkflowRefusal.Archived };
+    const archived = this.#isArchived();
+
+    if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
 
     const id = input.instanceId ?? randomUUID();
     const instance = WorkflowInstance.start(id, this.#id, input);

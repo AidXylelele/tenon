@@ -121,7 +121,9 @@ export class RunTurnMapper {
   }
 
   #retriedOf(effectId: string): string | null {
-    if (!effectId.endsWith(RunTurnMapper.RETRY)) return null;
+    const retry = effectId.endsWith(RunTurnMapper.RETRY);
+
+    if (!retry) return null;
 
     const next = effectId.slice(0, -RunTurnMapper.RETRY.length);
     return next.replace(RunTurnMapper.ATTEMPT, "");
@@ -245,7 +247,9 @@ export class RunTurnMapper {
   #endedExecutionOf(event: ProtocolEvent): readonly string[] {
     if (event.subject !== "task") return [];
 
-    if (!this.#ends(event.name)) return [];
+    const ends = this.#ends(event.name);
+
+    if (!ends) return [];
 
     return [event.execution];
   }

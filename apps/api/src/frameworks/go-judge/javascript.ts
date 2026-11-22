@@ -56,7 +56,9 @@ export class JavaScript implements ScriptLanguage {
   readonly interpreter = "/usr/local/bin/node";
 
   declares(name: string): boolean {
-    return /^[A-Za-z_$][\w$]*$/.test(name) && !JavaScript.RESERVED.has(name);
+    const identifier = /^[A-Za-z_$][\w$]*$/.test(name);
+    const reserved = JavaScript.RESERVED.has(name);
+    return identifier && !reserved;
   }
 
   declarationOf(name: string, value: JsonValue): string {

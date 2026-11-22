@@ -183,7 +183,8 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     acked?: AckHandler,
   ): Promise<MqttClient> {
     const scheme = server.secure ? "mqtts" : "mqtt";
-    const host = isIP(address) === 6 ? `[${address}]` : address;
+    const ipv6 = isIP(address) === 6;
+    const host = ipv6 ? `[${address}]` : address;
     const defaultPort = server.secure
       ? MqttBroker.SECURE_PORT
       : MqttBroker.PORT;
@@ -235,8 +236,10 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     const received = properties ?? {};
     const headers: Record<string, string> = {};
 
-    for (const [name, value] of Object.entries(received))
-      headers[name] = Array.isArray(value) ? value.join(",") : value;
+    for (const [name, value] of Object.entries(received)) {
+      const repeated = Array.isArray(value);
+      headers[name] = repeated ? value.join(",") : value;
+    }
 
     return headers;
   }

@@ -148,10 +148,14 @@ export type EventPageResponse = z.infer<typeof EventPageResponse>;
 
 export const InstanceCountsQuery = z
   .strictObject({ from: z.iso.datetime(), to: z.iso.datetime() })
-  .refine((window) => Date.parse(window.from) < Date.parse(window.to), {
-    message: "from is before to",
-    path: ["to"],
-  });
+  .refine(
+    (window) => {
+      const from = Date.parse(window.from);
+      const to = Date.parse(window.to);
+      return from < to;
+    },
+    { message: "from is before to", path: ["to"] },
+  );
 
 export type InstanceCountsQuery = z.infer<typeof InstanceCountsQuery>;
 

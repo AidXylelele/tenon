@@ -57,8 +57,9 @@ export class HttpAuthentication {
     secrets: JsonObject,
   ): Credentials | UnusableSecret | null {
     const resolved = this.#resolvedOf(authentication, secrets);
+    const performable = this.#performable(resolved);
 
-    if (!this.#performable(resolved))
+    if (!performable)
       throw new PermanentFault(
         "The host does not perform 'authentication.digest'; its profile refuses it at publish",
       );
@@ -79,8 +80,9 @@ export class HttpAuthentication {
     if (authentication.kind !== "secret") return authentication;
 
     const name = authentication.secret;
+    const given = Object.hasOwn(secrets, name);
 
-    if (!Object.hasOwn(secrets, name))
+    if (!given)
       return {
         kind: "forbidden",
         detail: "The secret is not among the secrets of this run",

@@ -17,9 +17,10 @@ export const CloudEventBody = z
   .catchall(z.json())
   .refine(
     (event) =>
-      Object.keys(event).every(
-        (name) => ATTRIBUTE.test(name) || name === "data_base64",
-      ),
+      Object.keys(event).every((name) => {
+        const attribute = ATTRIBUTE.test(name);
+        return attribute || name === "data_base64";
+      }),
     {
       message: "An attribute name holds only lower-case letters and digits",
     },

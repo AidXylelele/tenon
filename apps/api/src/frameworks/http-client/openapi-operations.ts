@@ -98,8 +98,9 @@ export class OpenApiOperations {
       .concat(located.operation.parameters)
       .map((parameter) => parameter.name);
     const swagger = document.swagger !== undefined;
+    const namesBody = declared.includes(OpenApiOperations.BODY);
 
-    if (!swagger && declared.includes(OpenApiOperations.BODY))
+    if (!swagger && namesBody)
       return `The operation "${operationId}" declares a parameter named "${OpenApiOperations.BODY}", the name of its request body`;
 
     const requestBody = located.operation.requestBody;
@@ -111,11 +112,11 @@ export class OpenApiOperations {
       return `The operation "${operationId}" requires a request body`;
 
     const placesBody = requestBody !== undefined;
-    const unknown = Object.keys(parameters).find(
-      (name) =>
-        !declared.includes(name) &&
-        !(name === OpenApiOperations.BODY && placesBody),
-    );
+    const unknown = Object.keys(parameters).find((name) => {
+      const listed = declared.includes(name);
+      const body = name === OpenApiOperations.BODY && placesBody;
+      return !listed && !body;
+    });
 
     if (unknown !== undefined)
       return `The operation "${operationId}" has no parameter "${unknown}"`;

@@ -19,11 +19,13 @@ const allowedPrivateAddresses = list.pipe(
 
 const optional = z.string().default("");
 
-const encryptionKey = z
-  .base64()
-  .refine((value) => Buffer.from(value, "base64").length === 32, {
-    message: "SECRETS_KEY must be 32 bytes in base64",
-  });
+const encryptionKey = z.base64().refine(
+  (value) => {
+    const key = Buffer.from(value, "base64");
+    return key.length === 32;
+  },
+  { message: "SECRETS_KEY must be 32 bytes in base64" },
+);
 
 function withSecretFiles(
   input: unknown,

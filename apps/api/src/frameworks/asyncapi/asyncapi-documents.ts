@@ -64,8 +64,9 @@ export class AsyncApiDocuments {
     request: AsyncApiRequest,
   ): Targeted {
     const address = channel.address() ?? "";
+    const parameterised = address.includes("{");
 
-    if (address === "" || address.includes("{"))
+    if (address === "" || parameterised)
       return this.#misconfigured(
         "The channel has no address of its own, or one with parameters the call cannot give",
       );
@@ -124,9 +125,10 @@ export class AsyncApiDocuments {
     if (request.server !== null) return servers.get(request.server.name);
 
     const protocol = request.protocol;
-    const [first] = servers.filterBy(
-      (server) => protocol === null || server.protocol() === protocol,
-    );
+    const [first] = servers.filterBy((server) => {
+      const spoken = server.protocol();
+      return protocol === null || spoken === protocol;
+    });
     return first;
   }
 
@@ -142,11 +144,12 @@ export class AsyncApiDocuments {
         const fallback = defaults.get(name);
         return this.#variableOf(variables[name], fallback) ?? written;
       });
-    const schemed = declared.includes("://")
-      ? declared
-      : `${server.protocol()}://${declared}`;
+    const absolute = declared.includes("://");
+    const schemed = absolute ? declared : `${server.protocol()}://${declared}`;
+    const parameterised = schemed.includes("{");
+    const parsable = URL.canParse(schemed);
 
-    if (schemed.includes("{") || !URL.canParse(schemed)) return null;
+    if (parameterised || !parsable) return null;
 
     return new URL(schemed);
   }

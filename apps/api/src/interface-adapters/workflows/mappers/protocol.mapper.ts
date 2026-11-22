@@ -32,7 +32,9 @@ export class ProtocolMapper {
   }
 
   toValue(value: JsonValue): ProtocolValue {
-    if (this.#isList(value)) return value.map((item) => this.toValue(item));
+    const list = this.#isList(value);
+
+    if (list) return value.map((item) => this.toValue(item));
 
     if (typeof value !== "object" || value === null) return value;
 
@@ -49,7 +51,9 @@ export class ProtocolMapper {
   }
 
   toCloudEvents(input: JsonValue): readonly CloudEvent[] {
-    if (!this.#isList(input)) return [];
+    const list = this.#isList(input);
+
+    if (!list) return [];
 
     return input.map((event) => this.#cloudEventIn(event));
   }
@@ -89,7 +93,9 @@ export class ProtocolMapper {
   }
 
   #cloudEventIn(value: JsonValue): CloudEvent {
-    if (typeof value !== "object" || value === null || this.#isList(value))
+    const list = this.#isList(value);
+
+    if (typeof value !== "object" || value === null || list)
       throw new TypeError("The input holds a value that is not an event");
 
     return this.toCloudEvent(value);

@@ -20,7 +20,9 @@ export class RequestPath {
   }
 
   redacted(): string {
-    if (this.isHook()) return RequestPath.HOOK;
+    const hook = this.isHook();
+
+    if (hook) return RequestPath.HOOK;
 
     const query = this.#url.indexOf("?");
 
