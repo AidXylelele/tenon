@@ -6,7 +6,7 @@ import {
 } from "@nestjs-cls/transactional";
 import { and, eq, type SQL } from "drizzle-orm";
 import type { Account } from "../../../domain/identity/accounts/account.js";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { AccountRepository } from "../../../application/identity/accounts/ports.js";
 import type { AccountRow, Transaction } from "../interfaces.js";
 import { AccountMapper } from "../mappers/account.mapper.js";

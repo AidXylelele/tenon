@@ -42,13 +42,13 @@ import {
   Sessions,
 } from "../../src/application/identity/accounts/ports.js";
 import {
-  InvitationMail,
+  InvitationMailer,
   InvitationRepository,
 } from "../../src/application/identity/invitations/ports.js";
 import { UserRepository } from "../../src/application/identity/users/ports.js";
 import type { Account } from "../../src/domain/identity/accounts/account.js";
 import { InvitationStatus } from "../../src/domain/identity/invitations/enums.js";
-import { StaleWriteError } from "../../src/domain/errors.js";
+import { StaleWriteError } from "../../src/domain/stale-write.error.js";
 import type { Invitation } from "../../src/domain/identity/invitations/invitation.js";
 import type { InvitationToken } from "../../src/domain/identity/invitations/invitation-token.js";
 import type { User } from "../../src/domain/identity/users/user.js";
@@ -165,7 +165,7 @@ export interface SentInvitation {
   readonly inviterName: string;
 }
 
-export class RecordingInvitationMail extends InvitationMail {
+export class RecordingInvitationMailer extends InvitationMailer {
   readonly sent: SentInvitation[] = [];
 
   sendInvitation(

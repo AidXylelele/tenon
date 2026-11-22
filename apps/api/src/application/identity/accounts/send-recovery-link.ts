@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import type { SendRecoveryLinkCommand } from "./interfaces.js";
-import { RecoveryMail } from "./ports.js";
+import { RecoveryMailer } from "./ports.js";
 
 @Injectable()
 export class SendRecoveryLink {
-  constructor(private readonly mail: RecoveryMail) {}
+  constructor(private readonly mailer: RecoveryMailer) {}
 
   execute(command: SendRecoveryLinkCommand): Promise<void> {
-    return this.mail.sendPasswordReset(
+    return this.mailer.sendPasswordReset(
       command.to,
       command.link,
       command.expiresAt,

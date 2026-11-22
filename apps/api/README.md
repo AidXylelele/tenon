@@ -42,6 +42,94 @@ tick (`@OnOneInstance`), and each AsyncAPI receiver is held by one worker under 
   move to the other workers then.
 - A run whose program this build of the interpreter cannot rebuild is cancelled at its next turn.
 
+## Structure
+
+`src/` follows Clean Architecture (R. C. Martin, 2012): a layer imports only the layers inside it — `frameworks` →
+`interface-adapters` → `application` → `domain` — and each layer groups its folders one way.
+
+```
+src/
+├── domain/                     business rules, free of frameworks: aggregates, value objects, their enums and props
+│   ├── automation/             the Open Workflow context, one folder per aggregate
+│   │   ├── drafts/             Draft — a workflow's editable text before it is published
+│   │   ├── instances/          WorkflowInstance and its Run — one execution's lifecycle and journal
+│   │   ├── secrets/            Secret, SecretValue and the RunSecrets a run sees
+│   │   ├── subscriptions/      Subscription — where accepted events are delivered
+│   │   ├── webhooks/           Webhook and its WebhookToken
+│   │   ├── workflows/          Workflow, WorkflowVersion, WorkflowName, CheckedDefinition
+│   │   └── interfaces.ts       the JSON values the context's aggregates hold
+│   ├── identity/               accounts/, invitations/, users/ — Account, Invitation and its token, User
+│   ├── interfaces.ts           Result — the success or refusal of every domain decision
+│   └── stale-write.error.ts    StaleWriteError — a save over a revision that changed meanwhile
+├── application/                use cases (one class, `execute`), the ports they need, the query ports adapters answer
+│   ├── automation/             one folder per business concept: the aggregates above and the concepts without one
+│   │   ├── drafts/ instances/ secrets/ subscriptions/ webhooks/ workflows/   the use cases of each aggregate
+│   │   ├── events/             accepting, dispatching and emitting CloudEvents; the event store
+│   │   ├── schedules/          a schedule's occurrences and the starts on events
+│   │   ├── imports/            fetching a document a definition imports
+│   │   ├── host/               the host's capabilities, process platform and limits the console reads
+│   │   └── enums.ts            Missing — what a use case of the context did not find
+│   └── identity/               accounts/, invitations/, users/ (with Person, the name a view shows); Missing in enums.ts
+├── interface-adapters/         marry a framework to the application and map both ways; one folder per mechanism or store
+│   ├── api/                    the HTTP API
+│   │   ├── controllers/        routes: validate, call a use case or a query, present
+│   │   ├── schemas/            zod request and response schemas, also read by the OpenAPI document
+│   │   ├── presenters/         response bodies and problem details from application results
+│   │   ├── mappers/            HTTP values to application values: entity tags, webhook calls, subscription endpoints
+│   │   ├── auth/               what @nestjs/authentication and @nestjs/authorization call: policies, the session
+│   │   │                       provider, the password-recovery handler, the sessions gateway
+│   │   └── pipeline/           around the routes: JSON-only middleware, throttler guard, stale-draft interceptor and
+│   │                           its conditional-request exception, problem-details filter, CloudEvent decorator
+│   ├── messaging/              outbox handlers, the AsyncAPI receivers' handler, event delivery to subscribers, the
+│   │                           outbox topics and tracer, the contracts it needs from broker and delivery clients
+│   ├── mailing/                the mail gateway, its outbox handler, its topics and templates/
+│   ├── workflows/              the durable engine and the interpreter
+│   │   ├── runners/            the engine's @Workflow classes (run, process, schedule, delivery) and the run tracer
+│   │   ├── gateways/           application ports over the engine (engine-*), the interpreter (interpreter-*) and
+│   │   │                       outbound HTTP (http-import)
+│   │   ├── mappers/            domain values ↔ the interpreter's protocol, definitions and run turns
+│   │   ├── run.controller.ts   the runners' way into the use cases
+│   │   ├── program-calls.ts    a version's program call, its source fetched on demand
+│   │   ├── *.error.ts          PermanentFault (a failure no retry mends) and IncompatibleRun
+│   │   └── interfaces.ts       the contracts this group needs from framework clients, and their types
+│   ├── jobs/                   scheduled jobs (idempotency pruning, retention) and their tracer
+│   └── persistence/            PostgreSQL through Drizzle
+│       ├── schema/             the Drizzle tables, source of the migrations in drizzle/
+│       ├── repositories/       one per aggregate: load and save (upsert, optimistic lock)
+│       ├── queries/            the read models the query ports ask for
+│       ├── stores/             records outside aggregates and the stores the Nest libraries register
+│       └── mappers/            rows ↔ domain objects
+└── frameworks/                 one folder per tool, plus the processes and the composition root
+    ├── main.ts, worker.ts      the two processes' entries
+    ├── instrumentation.ts      the --import preload that starts OpenTelemetry first
+    ├── release.ts              the build's version, read from package.json
+    ├── di/                     the roots (api, worker), core and shared modules, feature modules (*-http in the API,
+    │                           *-background in the worker), the interpreter thread's module, configuration, host presets
+    ├── http-client/            outbound HTTP: the effect client, OpenAPI operations, authentication and OAuth tokens,
+    │                           address policy, size limit, transport failures, response content, event delivery
+    ├── grpc/, mcp/, a2a/       one client per effect protocol
+    ├── asyncapi/               AsyncAPI documents, the client, one broker per protocol, broker connections and tracer
+    ├── go-judge/               the sandbox client for script and shell processes, its limits, the image's shell platform
+    ├── interpreter/            the interpreter on Piscina threads (client, tasks, thread entry), the host profile, the
+    │                           effect performer
+    ├── crypto/                 AES-GCM sealing of secret values
+    └── opentelemetry/          the process and thread SDKs, the engine, outbox and lock metrics, the instrumentation
+                                scope, the request path traces and logs redact, the shutdown
+```
+
+Each kind of file has one suffix: `*.controller.ts`, `*.presenter.ts`, `*.schema.ts`, `*.mapper.ts`, `*.policy.ts`,
+`*.gateway.ts`, `*.handler.ts`, `*.run.ts`, `*.jobs.ts`, `*.tracer.ts`, `*.repository.ts`, `*.queries.ts`, `*.store.ts`,
+`*.client.ts`, `*.broker.ts`, `*.metrics.ts`, `*.mail.ts`, `*.error.ts`, `*.module.ts`, `*.presets.ts`, and Nest's own
+`*.middleware.ts`, `*.guard.ts`, `*.interceptor.ts`, `*.filter.ts`, `*.decorator.ts`, `*.provider.ts`. A use case is
+named for its action (`publish-draft.ts`), an aggregate or value object for itself (`workflow.ts`). Each folder keeps
+its types in `interfaces.ts` and its enums in `enums.ts`; an application folder keeps its ports in `ports.ts` and its
+query ports in `queries.ts`.
+
+`test/` mirrors `src/`: `unit/` and `integration/` by `<layer>/<group>/…` (integration against PostgreSQL, the brokers
+and stub servers in Docker); `component/` the composed `ApiModule` with the worker's background modules, by context
+(`identity/`, `automation/`), with the specs of the whole composition at its root; `e2e/` journeys against the whole
+stand (its `support/` imports nothing from `src`); `support/` the builders, fakes, harnesses and setup.
+
 ## Observability
 
 Both processes start the OpenTelemetry `NodeSDK` from `--import ./dist/frameworks/instrumentation.js` and send

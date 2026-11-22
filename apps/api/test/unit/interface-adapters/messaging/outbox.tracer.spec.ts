@@ -29,7 +29,8 @@ describe("the trace an outbox message carries from its producer to its consumer"
 
   beforeEach(() => {
     spans = new RecordedSpans();
-    tracer = new OutboxTracer();
+    const recording = trace.getTracer("test");
+    tracer = new OutboxTracer(recording);
   });
 
   afterEach(async () => {

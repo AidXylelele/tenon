@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import {
   isWorkflowInterrupt,
   type WorkflowContext,
@@ -9,15 +8,12 @@ import {
   type Span,
   SpanKind,
   SpanStatusCode,
-  trace,
+  type Tracer,
 } from "@opentelemetry/api";
 import { StepName } from "./step-name.js";
 
-@Injectable()
 export class RunTracer {
-  private static readonly SCOPE = "tenon-api";
-
-  readonly #tracer = trace.getTracer(RunTracer.SCOPE);
+  constructor(private readonly tracer: Tracer) {}
 
   execution<T>(
     ctx: WorkflowContext,
@@ -30,7 +26,7 @@ export class RunTracer {
       kind: SpanKind.CONSUMER,
       attributes: { "tenon.workflow": workflow },
     };
-    return this.#tracer.startActiveSpan(name, options, (span) => {
+    return this.tracer.startActiveSpan(name, options, (span) => {
       span.setAttributes(attributes);
       return this.#traced(span, work);
     });
@@ -49,7 +45,7 @@ export class RunTracer {
       "tenon.step.attempt": attempt.attempt,
     };
     const options = { attributes };
-    return this.#tracer.startActiveSpan(name, options, (span) =>
+    return this.tracer.startActiveSpan(name, options, (span) =>
       this.#traced(span, work),
     );
   }

@@ -5,7 +5,7 @@ import {
   TransactionHost,
 } from "@nestjs-cls/transactional";
 import { eq, type SQL } from "drizzle-orm";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { User } from "../../../domain/identity/users/user.js";
 import type { UserRepository } from "../../../application/identity/users/ports.js";
 import type { Transaction } from "../interfaces.js";

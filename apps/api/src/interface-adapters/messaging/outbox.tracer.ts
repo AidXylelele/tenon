@@ -1,4 +1,3 @@
-import { Injectable } from "@nestjs/common";
 import type { OutboxHandlerContext } from "@nestjs/outbox";
 import {
   context,
@@ -9,15 +8,14 @@ import {
   SpanKind,
   SpanStatusCode,
   trace,
+  type Tracer,
 } from "@opentelemetry/api";
 
-@Injectable()
 export class OutboxTracer {
-  private static readonly SCOPE = "tenon-api";
   private static readonly SYSTEM = "outbox";
   private static readonly OPERATION = "process";
 
-  readonly #tracer = trace.getTracer(OutboxTracer.SCOPE);
+  constructor(private readonly tracer: Tracer) {}
 
   headers(): Record<string, string> {
     const carrier: Record<string, string> = {};
@@ -40,7 +38,7 @@ export class OutboxTracer {
       "messaging.destination.name": topic,
     };
     const options = { kind: SpanKind.CONSUMER, links, attributes };
-    return this.#tracer.startActiveSpan(name, options, (span) =>
+    return this.tracer.startActiveSpan(name, options, (span) =>
       this.#traced(span, work),
     );
   }

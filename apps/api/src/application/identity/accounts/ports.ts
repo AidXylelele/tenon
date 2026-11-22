@@ -15,7 +15,7 @@ export abstract class Sessions {
   abstract endAll(userId: string, except: string | null): Promise<void>;
 }
 
-export abstract class RecoveryMail {
+export abstract class RecoveryMailer {
   abstract sendPasswordReset(
     to: string,
     link: string,

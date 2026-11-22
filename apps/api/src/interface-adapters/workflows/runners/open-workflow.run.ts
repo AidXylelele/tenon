@@ -14,7 +14,6 @@ import {
   type EffectResponse,
   type WorkflowOutcome,
 } from "interpreter";
-import { PermanentFault } from "../../../domain/errors.js";
 import { EngineRunGateway } from "../gateways/engine-run.gateway.js";
 import {
   type ChildEffect,
@@ -23,6 +22,7 @@ import {
   type StepCall,
   type TimedWait,
 } from "../interfaces.js";
+import { PermanentFault } from "../permanent-fault.error.js";
 import { RunController } from "../run.controller.js";
 import type {
   Generation,

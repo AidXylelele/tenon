@@ -7,16 +7,15 @@ import {
 import { LocksEvents } from "@nestjs/locks";
 import { type Counter, metrics } from "@opentelemetry/api";
 import { Subscription } from "rxjs";
+import { Instrumentation } from "./enums.js";
 
 @Injectable()
 export class LockMetrics implements OnModuleInit, OnApplicationShutdown {
-  private static readonly SCOPE = "tenon-api";
-
   readonly #subscription = new Subscription();
   readonly #losses: Counter;
 
   constructor(@Optional() private readonly events?: LocksEvents) {
-    const meter = metrics.getMeter(LockMetrics.SCOPE);
+    const meter = metrics.getMeter(Instrumentation.Scope);
     this.#losses = meter.createCounter("tenon.lock.losses", {
       unit: "{loss}",
       description: "The locks a holder lost while using them.",

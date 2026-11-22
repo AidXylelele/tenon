@@ -8,7 +8,7 @@ export abstract class InvitationRepository {
   abstract findPendingByEmail(email: string): Promise<Invitation | null>;
 }
 
-export abstract class InvitationMail {
+export abstract class InvitationMailer {
   abstract sendInvitation(
     invitation: Invitation,
     token: InvitationToken,

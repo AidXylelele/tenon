@@ -3,7 +3,7 @@ import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import { outboundConfig } from "./configs.js";
-import { responseSizeLimit } from "./resilience.presets.js";
+import { responseSizeLimit } from "./host.presets.js";
 
 @Module({
   imports: [ConfigModule.forFeature(outboundConfig)],

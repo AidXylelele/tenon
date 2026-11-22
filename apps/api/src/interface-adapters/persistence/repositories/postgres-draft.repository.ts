@@ -8,7 +8,7 @@ import { and, eq, type SQL } from "drizzle-orm";
 import type { DraftRepository } from "../../../application/automation/drafts/ports.js";
 import type { Draft } from "../../../domain/automation/drafts/draft.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { DraftRow, Transaction } from "../interfaces.js";
 import { DraftMapper } from "../mappers/draft.mapper.js";
 import { draft as drafts } from "../schema/index.js";

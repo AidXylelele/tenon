@@ -18,8 +18,8 @@ import { SyncSchedule } from "../../application/automation/schedules/sync-schedu
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
 import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
 import { WorkflowEventKind } from "../../domain/automation/workflows/enums.js";
-import { PermanentFault } from "../../domain/errors.js";
 import type { Transaction } from "../persistence/interfaces.js";
+import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { MessageTopic } from "./enums.js";
 import { OutboxTracer } from "./outbox.tracer.js";
 import type {

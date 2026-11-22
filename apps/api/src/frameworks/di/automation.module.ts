@@ -8,7 +8,6 @@ import {
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../../application/automation/instances/ports.js";
-import { InstanceQueries } from "../../application/automation/instances/queries.js";
 import { WorkflowSchedules } from "../../application/automation/schedules/ports.js";
 import { SecretRepository } from "../../application/automation/secrets/ports.js";
 import { SecretQueries } from "../../application/automation/secrets/queries.js";
@@ -25,13 +24,11 @@ import { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 import { LifecycleEventMapper } from "../../interface-adapters/persistence/mappers/lifecycle-event.mapper.js";
 import { SecretMapper } from "../../interface-adapters/persistence/mappers/secret.mapper.js";
 import { SubscriptionMapper } from "../../interface-adapters/persistence/mappers/subscription.mapper.js";
-import { TaskRecordMapper } from "../../interface-adapters/persistence/mappers/task-record.mapper.js";
 import { TaskValueMapper } from "../../interface-adapters/persistence/mappers/task-value.mapper.js";
 import { WebhookEventMapper } from "../../interface-adapters/persistence/mappers/webhook-event.mapper.js";
 import { WorkflowInstanceMapper } from "../../interface-adapters/persistence/mappers/workflow-instance.mapper.js";
 import { WorkflowMapper } from "../../interface-adapters/persistence/mappers/workflow.mapper.js";
 import { WorkflowVersionMapper } from "../../interface-adapters/persistence/mappers/workflow-version.mapper.js";
-import { PostgresInstanceQueries } from "../../interface-adapters/persistence/queries/postgres-instance.queries.js";
 import { PostgresSecretQueries } from "../../interface-adapters/persistence/queries/postgres-secret.queries.js";
 import { PostgresWorkflowQueries } from "../../interface-adapters/persistence/queries/postgres-workflow.queries.js";
 import { PostgresSecretRepository } from "../../interface-adapters/persistence/repositories/postgres-secret.repository.js";
@@ -61,7 +58,7 @@ import { OpenApiOperations } from "../http-client/openapi-operations.js";
 import { ResponseContent } from "../http-client/response-content.js";
 import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import { TransportFailures } from "../http-client/transport-failures.js";
-import { WorkerInterpreterClient } from "../interpreter/worker-interpreter.client.js";
+import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
 import { linksConfig, secretsConfig } from "./configs.js";
 import { OutboundModule } from "./outbound.module.js";
 
@@ -103,7 +100,6 @@ import { OutboundModule } from "./outbound.module.js";
       useFactory: (links: ConfigType<typeof linksConfig>) =>
         new LifecycleEventMapper(links.API_BASE_URL),
     },
-    TaskRecordMapper,
     TaskValueMapper,
     WebhookEventMapper,
     SecretMapper,
@@ -114,7 +110,6 @@ import { OutboundModule } from "./outbound.module.js";
       provide: WorkflowInstanceRepository,
       useClass: PostgresWorkflowInstanceRepository,
     },
-    { provide: InstanceQueries, useClass: PostgresInstanceQueries },
     PostgresLifecycleEventStore,
     PostgresTaskValueStore,
     PostgresEventStore,
@@ -131,8 +126,8 @@ import { OutboundModule } from "./outbound.module.js";
       useFactory: (secrets: ConfigType<typeof secretsConfig>) =>
         new AesGcmCipher(secrets.SECRETS_KEY),
     },
-    WorkerInterpreterClient,
-    { provide: InterpreterClient, useExisting: WorkerInterpreterClient },
+    PiscinaInterpreterClient,
+    { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
     AuthorizationServer,
     HttpAuthentication,
     OpenApiOperations,
@@ -157,13 +152,14 @@ import { OutboundModule } from "./outbound.module.js";
     WorkflowRepository,
     WorkflowQueries,
     WorkflowInstanceRepository,
-    InstanceQueries,
+    WorkflowInstanceMapper,
+    TaskValueMapper,
     EventStore,
     SecretRepository,
     SecretQueries,
     SubscriptionRepository,
     Cipher,
-    WorkerInterpreterClient,
+    PiscinaInterpreterClient,
     InterpreterClient,
     HttpAuthentication,
     TransportFailures,

@@ -11,19 +11,18 @@ import {
 } from "@nestjs/outbox";
 import { type Counter, type Histogram, metrics } from "@opentelemetry/api";
 import { Subscription } from "rxjs";
+import { Instrumentation } from "./enums.js";
 import { durationBoundaries } from "./histogram.presets.js";
 
 @Injectable()
 export class OutboxMetrics implements OnModuleInit, OnApplicationShutdown {
-  private static readonly SCOPE = "tenon-api";
-
   readonly #subscription = new Subscription();
   readonly #publishDuration: Histogram;
   readonly #lag: Histogram;
   readonly #failures: Counter;
 
   constructor(private readonly events: OutboxEvents) {
-    const meter = metrics.getMeter(OutboxMetrics.SCOPE);
+    const meter = metrics.getMeter(Instrumentation.Scope);
     this.#publishDuration = meter.createHistogram(
       "tenon.outbox.publish.duration",
       {

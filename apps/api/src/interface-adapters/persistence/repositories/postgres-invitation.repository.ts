@@ -5,7 +5,7 @@ import {
   TransactionHost,
 } from "@nestjs-cls/transactional";
 import { and, eq } from "drizzle-orm";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import { InvitationStatus } from "../../../domain/identity/invitations/enums.js";
 import type { Invitation } from "../../../domain/identity/invitations/invitation.js";
 import type { InvitationToken } from "../../../domain/identity/invitations/invitation-token.js";

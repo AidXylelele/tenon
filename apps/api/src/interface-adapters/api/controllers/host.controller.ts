@@ -40,7 +40,7 @@ export class HostController {
   @ApiUnauthorizedResponse()
   profile(): HostProfileResponse {
     const analysis = this.capabilities.profile();
-    const shell = this.platform.shell();
+    const shell = this.platform.shell;
     const events = this.capabilities.lifecycleEvents();
     return this.hostPresenter.profile(analysis, shell, this.limits, events);
   }

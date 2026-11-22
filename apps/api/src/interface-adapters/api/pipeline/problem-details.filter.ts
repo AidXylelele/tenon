@@ -16,7 +16,7 @@ import {
   OutboundRateLimitError,
 } from "@nestjs/resilience";
 import { STATUS_CODES } from "node:http";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import { ConditionalRequestException } from "./conditional-request.exception.js";
 import type {
   NestErrorBody,

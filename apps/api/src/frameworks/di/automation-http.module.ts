@@ -15,6 +15,7 @@ import {
 import { FetchImport } from "../../application/automation/imports/fetch-import.js";
 import { ImportFetcher } from "../../application/automation/imports/ports.js";
 import { DeleteInstance } from "../../application/automation/instances/delete-instance.js";
+import { InstanceQueries } from "../../application/automation/instances/queries.js";
 import { RestartInstance } from "../../application/automation/instances/restart-instance.js";
 import { ResumeInstance } from "../../application/automation/instances/resume-instance.js";
 import { StartInstance } from "../../application/automation/instances/start-instance.js";
@@ -58,9 +59,11 @@ import { SubscriptionPresenter } from "../../interface-adapters/api/presenters/s
 import { WebhookPresenter } from "../../interface-adapters/api/presenters/webhook.presenter.js";
 import { WorkflowPresenter } from "../../interface-adapters/api/presenters/workflow.presenter.js";
 import { DraftMapper } from "../../interface-adapters/persistence/mappers/draft.mapper.js";
+import { TaskRecordMapper } from "../../interface-adapters/persistence/mappers/task-record.mapper.js";
 import { WebhookMapper } from "../../interface-adapters/persistence/mappers/webhook.mapper.js";
 import { PostgresDraftQueries } from "../../interface-adapters/persistence/queries/postgres-draft.queries.js";
 import { PostgresEventQueries } from "../../interface-adapters/persistence/queries/postgres-event.queries.js";
+import { PostgresInstanceQueries } from "../../interface-adapters/persistence/queries/postgres-instance.queries.js";
 import { PostgresSubscriptionQueries } from "../../interface-adapters/persistence/queries/postgres-subscription.queries.js";
 import { PostgresWebhookQueries } from "../../interface-adapters/persistence/queries/postgres-webhook.queries.js";
 import { PostgresDraftRepository } from "../../interface-adapters/persistence/repositories/postgres-draft.repository.js";
@@ -72,16 +75,15 @@ import {
   ResourceClient,
   StructureClient,
 } from "../../interface-adapters/workflows/interfaces.js";
-import { SandboxPlatform } from "../go-judge/sandbox-platform.js";
 import { HttpClient } from "../http-client/http.client.js";
-import { WorkerInterpreterClient } from "../interpreter/worker-interpreter.client.js";
+import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
+import { AutomationModule } from "./automation.module.js";
 import { linksConfig } from "./configs.js";
-import { CoreModule } from "./core.module.js";
+import { hostLimits, processPlatform } from "./host.presets.js";
 import { HttpModule } from "./http.module.js";
-import { hostLimits } from "./resilience.presets.js";
 
 @Module({
-  imports: [CoreModule, HttpModule, ConfigModule.forFeature(linksConfig)],
+  imports: [AutomationModule, HttpModule, ConfigModule.forFeature(linksConfig)],
   controllers: [
     WorkflowsController,
     DraftsController,
@@ -127,8 +129,10 @@ import { hostLimits } from "./resilience.presets.js";
     { provide: HostCapabilities, useExisting: InterpreterCapabilitiesGateway },
     DraftMapper,
     WebhookMapper,
+    TaskRecordMapper,
     { provide: DraftRepository, useClass: PostgresDraftRepository },
     { provide: DraftQueries, useClass: PostgresDraftQueries },
+    { provide: InstanceQueries, useClass: PostgresInstanceQueries },
     { provide: EventQueries, useClass: PostgresEventQueries },
     { provide: WebhookRepository, useClass: PostgresWebhookRepository },
     { provide: WebhookQueries, useClass: PostgresWebhookQueries },
@@ -149,8 +153,8 @@ import { hostLimits } from "./resilience.presets.js";
         new WebhookPresenter(links.API_BASE_URL),
     },
     WebhookCallMapper,
-    { provide: StructureClient, useExisting: WorkerInterpreterClient },
-    { provide: ProcessPlatform, useClass: SandboxPlatform },
+    { provide: StructureClient, useExisting: PiscinaInterpreterClient },
+    { provide: ProcessPlatform, useValue: processPlatform },
     { provide: HostLimits, useValue: hostLimits },
   ],
 })

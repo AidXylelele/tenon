@@ -25,7 +25,7 @@ import type {
   TaskPage,
 } from "../../../application/automation/instances/interfaces.js";
 import type { InstanceQueries } from "../../../application/automation/instances/queries.js";
-import type { Person } from "../../../application/identity/interfaces.js";
+import type { Person } from "../../../application/identity/users/interfaces.js";
 import {
   TaskValueKind,
   WaitKind,

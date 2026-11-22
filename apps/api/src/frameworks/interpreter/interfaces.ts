@@ -37,35 +37,35 @@ export interface AcceptingCall {
   readonly event: CloudEvent;
 }
 
-export interface ProgramWorkerCall {
+export interface ProgramTaskCall {
   readonly program: ThreadProgram;
 }
 
-export interface StartCall extends ProgramWorkerCall {
+export interface StartCall extends ProgramTaskCall {
   readonly input: JsonValue;
   readonly context: StartContext;
 }
 
-export interface CorrelateCall extends ProgramWorkerCall {
+export interface CorrelateCall extends ProgramTaskCall {
   readonly context: StartContext;
 }
 
-export interface RespondCall extends ProgramWorkerCall {
+export interface RespondCall extends ProgramTaskCall {
   readonly state: State;
   readonly response: EffectResponse;
   readonly context: StepContext;
 }
 
-export interface ControlCall extends ProgramWorkerCall {
+export interface ControlCall extends ProgramTaskCall {
   readonly state: State;
   readonly context: StepContext;
 }
 
-export interface RouteCall extends ProgramWorkerCall {
+export interface RouteCall extends ProgramTaskCall {
   readonly event: CloudEvent;
 }
 
-export interface InputCall extends ProgramWorkerCall {
+export interface InputCall extends ProgramTaskCall {
   readonly input: JsonValue;
 }
 
@@ -78,7 +78,7 @@ export type TaskCall<N extends TaskName> = Parameters<
 >[0]["call"];
 
 export type TaskValue<N extends TaskName> =
-  ReturnType<ThreadTasks[N]> extends WorkerAnswer<infer V> ? V : never;
+  ReturnType<ThreadTasks[N]> extends TaskAnswer<infer V> ? V : never;
 
 export type PoolName = "runs" | "checks";
 
@@ -113,7 +113,7 @@ interface Fault {
   readonly message: string;
 }
 
-export type WorkerAnswer<T> =
+export type TaskAnswer<T> =
   Answered<T> | MissingProgram | IncompatibleProgram | Fault;
 
 export interface KeptProgram {
@@ -128,7 +128,7 @@ export interface KeptStructure {
   readonly structure: VersionStructure | null;
 }
 
-export interface WorkerPool {
+export interface ThreadPool {
   readonly name: PoolName;
   readonly threads: Piscina;
   readonly policy: ResiliencePolicy;

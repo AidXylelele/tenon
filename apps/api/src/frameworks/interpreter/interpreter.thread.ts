@@ -1,23 +1,23 @@
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
-import { InterpreterWorkerModule } from "../di/interpreter-worker.module.js";
-import { InterpreterWorker } from "./interpreter.worker.js";
+import { InterpreterThreadModule } from "../di/interpreter-thread.module.js";
+import { InterpreterTasks } from "./interpreter.tasks.js";
 
 Logger.overrideLogger(["error"]);
 const context = await NestFactory.createApplicationContext(
-  InterpreterWorkerModule,
+  InterpreterThreadModule,
 );
-const worker = context.get(InterpreterWorker);
+const tasks = context.get(InterpreterTasks);
 
-export const compile = worker.compile.bind(worker);
-export const structure = worker.structure.bind(worker);
-export const filter = worker.filter.bind(worker);
-export const accepting = worker.accepting.bind(worker);
-export const start = worker.start.bind(worker);
-export const correlate = worker.correlate.bind(worker);
-export const respond = worker.respond.bind(worker);
-export const suspend = worker.suspend.bind(worker);
-export const resume = worker.resume.bind(worker);
-export const cancel = worker.cancel.bind(worker);
-export const route = worker.route.bind(worker);
-export const input = worker.input.bind(worker);
+export const compile = tasks.compile.bind(tasks);
+export const structure = tasks.structure.bind(tasks);
+export const filter = tasks.filter.bind(tasks);
+export const accepting = tasks.accepting.bind(tasks);
+export const start = tasks.start.bind(tasks);
+export const correlate = tasks.correlate.bind(tasks);
+export const respond = tasks.respond.bind(tasks);
+export const suspend = tasks.suspend.bind(tasks);
+export const resume = tasks.resume.bind(tasks);
+export const cancel = tasks.cancel.bind(tasks);
+export const route = tasks.route.bind(tasks);
+export const input = tasks.input.bind(tasks);

@@ -69,9 +69,9 @@ export type AddressRanges = Parameters<typeof ipaddr.subnetMatch>[1];
 
 export type OpenApiDocument = z.infer<typeof OPENAPI_DOCUMENT>;
 
-export type OpenApiPath = z.infer<typeof OPENAPI_PATH>;
+type OpenApiPath = z.infer<typeof OPENAPI_PATH>;
 
-export type OpenApiOperation = z.infer<typeof OPENAPI_OPERATION>;
+type OpenApiOperation = z.infer<typeof OPENAPI_OPERATION>;
 
 export interface LocatedOperation {
   readonly item: OpenApiPath;

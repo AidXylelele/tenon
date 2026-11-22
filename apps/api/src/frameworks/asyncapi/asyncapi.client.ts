@@ -14,7 +14,7 @@ import type {
   JsonObject,
   JsonValue,
 } from "interpreter";
-import { PermanentFault } from "../../domain/errors.js";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import { HttpClient } from "../http-client/http.client.js";
 import type { UnusableSecret } from "../http-client/interfaces.js";
@@ -28,7 +28,7 @@ import type { StepCall } from "../../interface-adapters/workflows/interfaces.js"
 import type { CallContext } from "../interpreter/interfaces.js";
 import { AmqpBroker } from "./amqp.broker.js";
 import { AsyncApiDocuments } from "./asyncapi-documents.js";
-import { BrokerSpans } from "./broker-spans.js";
+import { BrokerTracer } from "./broker.tracer.js";
 import type {
   BrokerCredentials,
   BrokerClient,
@@ -55,7 +55,7 @@ export class AsyncApiClient implements SubscriptionClient {
     private readonly http: HttpClient,
     private readonly authentication: HttpAuthentication,
     private readonly documents: AsyncApiDocuments,
-    private readonly spans: BrokerSpans,
+    private readonly tracer: BrokerTracer,
     private readonly limit: ResponseSizeLimit,
     amqp: AmqpBroker,
     kafka: KafkaBroker,
@@ -148,7 +148,7 @@ export class AsyncApiClient implements SubscriptionClient {
       demanded: () => inbox.demanded(),
       deliver: (message: ReceivedBrokerMessage) => {
         const delivering = () => this.#delivered(message, target, inbox);
-        return this.spans.processing(
+        return this.tracer.processing(
           target,
           broker.system,
           message.headers,
@@ -207,7 +207,7 @@ export class AsyncApiClient implements SubscriptionClient {
     const publishing = (attempt: AttemptContext) =>
       publisher.publish(target, sent, credentials, attempt.signal);
     const bounded = () => this.#bounded(publishing, call.signal);
-    return this.spans.sending(target, publisher.system, bounded);
+    return this.tracer.sending(target, publisher.system, bounded);
   }
 
   async #bounded(

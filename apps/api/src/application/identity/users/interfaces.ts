@@ -6,6 +6,11 @@ import type { User } from "../../../domain/identity/users/user.js";
 import type { Result } from "../../../domain/interfaces.js";
 import type { Missing } from "../enums.js";
 
+export interface Person {
+  readonly id: string;
+  readonly name: string;
+}
+
 export interface SignedInUser {
   readonly id: string;
   readonly email: string;

@@ -135,7 +135,7 @@ export interface RunEnding {
   readonly error: JsonObject | null;
 }
 
-export interface StrandedTurn {
+interface StrandedTurn {
   readonly status: TurnStatus.Stranded;
   readonly ending: RunEnding;
 }

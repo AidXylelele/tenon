@@ -18,15 +18,15 @@ import { GrpcClient } from "../grpc/grpc.client.js";
 import { HttpClient } from "../http-client/http.client.js";
 import type { HttpMcpRequest } from "../mcp/interfaces.js";
 import { McpClient } from "../mcp/mcp.client.js";
+import { Instrumentation } from "../opentelemetry/enums.js";
 import { effectDurationBoundaries } from "../opentelemetry/histogram.presets.js";
-import { PermanentFault } from "../../domain/errors.js";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import type { CallContext } from "./interfaces.js";
-import { LONGEST_TIMER } from "./longest-timer.js";
 
 @Injectable()
 export class EffectPerformer implements EffectClient {
-  private static readonly SCOPE = "tenon-api";
   private static readonly OTHER_ERROR = "_OTHER";
+  private static readonly LONGEST_TIMER = 2 ** 31 - 1;
 
   readonly #duration: Histogram;
 
@@ -38,7 +38,7 @@ export class EffectPerformer implements EffectClient {
     private readonly asyncApi: AsyncApiClient,
     private readonly sandbox: SandboxClient,
   ) {
-    const meter = metrics.getMeter(EffectPerformer.SCOPE);
+    const meter = metrics.getMeter(Instrumentation.Scope);
     this.#duration = meter.createHistogram("tenon.effect.duration", {
       unit: "s",
       description: "The time an effect takes to perform.",
@@ -47,12 +47,11 @@ export class EffectPerformer implements EffectClient {
   }
 
   async perform(effect: Effect, step: StepCall): Promise<EffectOutcome> {
-    const remaining =
-      effect.deadline === null ? null : effect.deadline - Date.now();
+    const left = effect.deadline === null ? null : effect.deadline - Date.now();
 
-    if (remaining !== null && remaining <= 0) return { kind: "expired" };
+    if (left !== null && left <= 0) return { kind: "expired" };
 
-    const context = this.#contextOf(step, remaining);
+    const context = this.#contextOf(step, left);
     const outcome = await this.#measured(effect.kind, () =>
       this.#performed(effect, context),
     );
@@ -115,11 +114,13 @@ export class EffectPerformer implements EffectClient {
     return EffectPerformer.OTHER_ERROR;
   }
 
-  #contextOf(step: StepCall, remaining: number | null): CallContext {
-    const timed = remaining !== null && remaining <= LONGEST_TIMER;
-    const signals = timed
-      ? [step.signal, AbortSignal.timeout(Math.ceil(remaining))]
-      : [step.signal];
+  #contextOf(step: StepCall, left: number | null): CallContext {
+    const remaining =
+      left === null ? null : Math.min(left, EffectPerformer.LONGEST_TIMER);
+    const signals =
+      remaining === null
+        ? [step.signal]
+        : [step.signal, AbortSignal.timeout(Math.ceil(remaining))];
     const signal = AbortSignal.any(signals);
     return {
       idempotencyKey: step.idempotencyKey,

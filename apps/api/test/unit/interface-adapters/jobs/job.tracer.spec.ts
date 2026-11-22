@@ -1,12 +1,15 @@
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { JobTracer } from "../../../../src/interface-adapters/jobs/job.tracer.js";
 import { RecordedSpans } from "../../../support/recorded-spans.js";
 
 describe("the span of a scheduled job's run", () => {
   let spans: RecordedSpans;
+  let tracer: JobTracer;
 
   beforeEach(() => {
     spans = new RecordedSpans();
+    const recording = trace.getTracer("test");
+    tracer = new JobTracer(recording);
   });
 
   afterEach(async () => {
@@ -14,8 +17,6 @@ describe("the span of a scheduled job's run", () => {
   });
 
   it("a_run_is_one_internal_span_named_after_its_job", async () => {
-    const tracer = new JobTracer();
-
     await tracer.run("outbox:prune-inbox", () => Promise.resolve());
 
     const [run] = spans.named("job outbox:prune-inbox");
@@ -25,7 +26,6 @@ describe("the span of a scheduled job's run", () => {
   });
 
   it("a_run_that_fails_ends_its_span_as_an_error", async () => {
-    const tracer = new JobTracer();
     const failing = () => Promise.reject(new Error("The lock store is down"));
 
     await expect(tracer.run("workflows:purge", failing)).rejects.toThrow(

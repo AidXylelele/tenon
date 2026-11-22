@@ -7,7 +7,7 @@ import {
   type RevealedAuthorization,
   type SecretPolicies,
 } from "interpreter";
-import { PermanentFault } from "../../domain/errors.js";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { AuthorizationServer } from "./authorization-server.js";
 import type {

@@ -1,4 +1,4 @@
-import { PermanentFault } from "../../domain/errors.js";
+import { PermanentFault } from "./permanent-fault.error.js";
 
 export class IncompatibleRun extends PermanentFault {
   constructor() {

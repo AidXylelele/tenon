@@ -25,14 +25,13 @@ import {
 } from "@nestjs/resilience";
 import type { JsonObject, JsonValue, RpcOutcome } from "interpreter";
 import { $ZodError } from "zod/v4/core";
-import { PermanentFault } from "../../domain/errors.js";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
 import { TransportFailures } from "../http-client/transport-failures.js";
 import { RELEASE_VERSION } from "../release.js";
 import type { CallContext } from "../interpreter/interfaces.js";
-import { LONGEST_TIMER } from "../interpreter/longest-timer.js";
 import type { HttpMcpRequest, McpMethod } from "./interfaces.js";
 
 const RESULTS = {
@@ -187,8 +186,7 @@ export class McpClient {
   #optionsOf(remaining: number | null, signal: AbortSignal): RequestOptions {
     if (remaining === null) return { signal };
 
-    const timeout = Math.min(remaining, LONGEST_TIMER);
-    return { signal, timeout };
+    return { signal, timeout: remaining };
   }
 
   async #terminated(

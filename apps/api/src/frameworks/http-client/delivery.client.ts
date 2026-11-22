@@ -5,7 +5,7 @@ import {
   HttpClient as NestHttpClient,
 } from "@nestjs/http-client";
 import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
-import type { Authentication, JsonObject, JsonValue } from "interpreter";
+import type { Authentication, JsonObject } from "interpreter";
 import type {
   EventDeliveries,
   EventDelivery,
@@ -37,15 +37,6 @@ export class DeliveryClient implements EventDeliveries {
   }
 
   async deliver(delivery: EventDelivery): Promise<string | null> {
-    const credential = delivery.credential;
-    const failure = await this.#failureOf(delivery);
-
-    if (failure === null || credential === null) return failure;
-
-    return failure.replaceAll(credential, "***");
-  }
-
-  async #failureOf(delivery: EventDelivery): Promise<string | null> {
     try {
       return await this.policy.execute(({ signal }) =>
         this.#delivered(delivery, signal),
@@ -122,20 +113,6 @@ export class DeliveryClient implements EventDeliveries {
 
     if (credential === null) return {};
 
-    const parsed = this.#parsedOf(credential);
-    const policy = this.#isPolicy(parsed) ? parsed : { token: credential };
-    return { [DeliveryClient.SECRET]: policy };
-  }
-
-  #parsedOf(credential: string): JsonValue {
-    try {
-      return JSON.parse(credential) as JsonValue;
-    } catch {
-      return null;
-    }
-  }
-
-  #isPolicy(value: JsonValue): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    return { [DeliveryClient.SECRET]: credential };
   }
 }

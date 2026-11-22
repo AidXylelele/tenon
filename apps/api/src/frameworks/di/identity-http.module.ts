@@ -6,7 +6,7 @@ import { FindRecoveryAccount } from "../../application/identity/accounts/find-re
 import {
   AccountRepository,
   PasswordHasher,
-  RecoveryMail,
+  RecoveryMailer,
   Sessions,
 } from "../../application/identity/accounts/ports.js";
 import { ResetPassword } from "../../application/identity/accounts/reset-password.js";
@@ -14,7 +14,7 @@ import { SendRecoveryLink } from "../../application/identity/accounts/send-recov
 import { AcceptInvitation } from "../../application/identity/invitations/accept-invitation.js";
 import { InviteUser } from "../../application/identity/invitations/invite-user.js";
 import {
-  InvitationMail,
+  InvitationMailer,
   InvitationRepository,
 } from "../../application/identity/invitations/ports.js";
 import { InvitationQueries } from "../../application/identity/invitations/queries.js";
@@ -62,8 +62,8 @@ import { HttpModule } from "./http.module.js";
     SessionsGateway,
     { provide: Sessions, useExisting: SessionsGateway },
     MailGateway,
-    { provide: InvitationMail, useExisting: MailGateway },
-    { provide: RecoveryMail, useExisting: MailGateway },
+    { provide: InvitationMailer, useExisting: MailGateway },
+    { provide: RecoveryMailer, useExisting: MailGateway },
     UserMapper,
     AccountMapper,
     InvitationMapper,

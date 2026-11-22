@@ -1,15 +1,11 @@
-import { Injectable } from "@nestjs/common";
-import { type Span, SpanStatusCode, trace } from "@opentelemetry/api";
+import { type Span, SpanStatusCode, type Tracer } from "@opentelemetry/api";
 
-@Injectable()
 export class JobTracer {
-  private static readonly SCOPE = "tenon-api";
-
-  readonly #tracer = trace.getTracer(JobTracer.SCOPE);
+  constructor(private readonly tracer: Tracer) {}
 
   run<T>(job: string, work: () => Promise<T>): Promise<T> {
     const name = `job ${job}`;
-    return this.#tracer.startActiveSpan(name, (span) =>
+    return this.tracer.startActiveSpan(name, (span) =>
       this.#traced(span, work),
     );
   }

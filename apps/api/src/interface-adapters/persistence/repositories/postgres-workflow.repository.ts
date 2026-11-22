@@ -9,7 +9,7 @@ import { and, eq } from "drizzle-orm";
 import type { WorkflowRepository } from "../../../application/automation/workflows/ports.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { Workflow } from "../../../domain/automation/workflows/workflow.js";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { WorkflowMessage } from "../../messaging/interfaces.js";
 import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type { Transaction, WorkflowRow } from "../interfaces.js";

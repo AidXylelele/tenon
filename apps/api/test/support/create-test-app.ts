@@ -21,7 +21,7 @@ import type { App } from "supertest/types.js";
 import { ApiModule } from "../../src/frameworks/di/api.module.js";
 import { AutomationBackgroundModule } from "../../src/frameworks/di/automation-background.module.js";
 import { IdentityBackgroundModule } from "../../src/frameworks/di/identity-background.module.js";
-import { WorkerInterpreterClient } from "../../src/frameworks/interpreter/worker-interpreter.client.js";
+import { PiscinaInterpreterClient } from "../../src/frameworks/interpreter/piscina-interpreter.client.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import { getDrizzleToken } from "@nestjs/drizzle";
 import { queuedMailCount } from "./db.js";
@@ -51,7 +51,7 @@ export function withoutInterpreter(
   builder: TestingModuleBuilder,
 ): TestingModuleBuilder {
   return builder
-    .overrideProvider(WorkerInterpreterClient)
+    .overrideProvider(PiscinaInterpreterClient)
     .useValue(absentInterpreter);
 }
 

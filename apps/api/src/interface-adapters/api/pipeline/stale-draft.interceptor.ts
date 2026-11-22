@@ -5,7 +5,7 @@ import {
   type NestInterceptor,
 } from "@nestjs/common";
 import { catchError, type Observable, throwError } from "rxjs";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import { DraftPresenter } from "../presenters/draft.presenter.js";
 
 @Injectable()

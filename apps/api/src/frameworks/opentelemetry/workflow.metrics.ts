@@ -11,20 +11,19 @@ import {
 } from "@nestjs/workflows";
 import { type Counter, type Histogram, metrics } from "@opentelemetry/api";
 import { Subscription } from "rxjs";
+import { Instrumentation } from "./enums.js";
 import { StepName } from "../../interface-adapters/workflows/runners/step-name.js";
 import { durationBoundaries } from "./histogram.presets.js";
 
 @Injectable()
 export class WorkflowMetrics implements OnModuleInit, OnApplicationShutdown {
-  private static readonly SCOPE = "tenon-api";
-
   readonly #subscription = new Subscription();
   readonly #executions: Counter;
   readonly #stepDuration: Histogram;
   readonly #compensationFailures: Counter;
 
   constructor(private readonly events: WorkflowEvents) {
-    const meter = metrics.getMeter(WorkflowMetrics.SCOPE);
+    const meter = metrics.getMeter(Instrumentation.Scope);
     this.#executions = meter.createCounter("tenon.workflow.executions", {
       unit: "{execution}",
       description: "The executions of workflow instances that began.",

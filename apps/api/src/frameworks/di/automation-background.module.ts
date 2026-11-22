@@ -57,7 +57,7 @@ import { A2aClient } from "../a2a/a2a.client.js";
 import { AmqpBroker } from "../asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../asyncapi/asyncapi-documents.js";
-import { BrokerSpans } from "../asyncapi/broker-spans.js";
+import { BrokerTracer } from "../asyncapi/broker.tracer.js";
 import { KafkaBroker } from "../asyncapi/kafka.broker.js";
 import { MqttBroker } from "../asyncapi/mqtt.broker.js";
 import { NatsBroker } from "../asyncapi/nats.broker.js";
@@ -70,20 +70,14 @@ import { HttpClientName } from "../http-client/enums.js";
 import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import { EffectPerformer } from "../interpreter/effect-performer.js";
 import { McpClient } from "../mcp/mcp.client.js";
+import { AutomationModule } from "./automation.module.js";
 import { sandboxConfig } from "./configs.js";
-import { CoreModule } from "./core.module.js";
+import { sandboxLimits } from "./host.presets.js";
 import { OutboundModule } from "./outbound.module.js";
-
-const sandboxLimits = new SandboxLimits({
-  time: Temporal.Duration.from({ seconds: 30 }),
-  memoryBytes: 256 * 1024 * 1024,
-  processes: 50,
-  outputBytes: 1024 * 1024,
-});
 
 @Module({
   imports: [
-    CoreModule,
+    AutomationModule,
     OutboundModule,
     LocksModule.forRoot(),
     HttpClientModule.registerAsync({
@@ -143,7 +137,7 @@ const sandboxLimits = new SandboxLimits({
     McpClient,
     A2aClient,
     AsyncApiDocuments,
-    BrokerSpans,
+    BrokerTracer,
     AmqpBroker,
     KafkaBroker,
     MqttBroker,

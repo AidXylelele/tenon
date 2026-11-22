@@ -20,7 +20,7 @@ import {
   WaitKind,
 } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { InstanceMessage } from "../../messaging/interfaces.js";
 import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type { Transaction } from "../interfaces.js";
