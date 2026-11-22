@@ -24,7 +24,7 @@ import {
   retryChangeOf,
   type RetrySettings,
 } from "../form-fields";
-import { Disclosure } from "./disclosure";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { FieldView } from "./field-view";
 import { useFormSettings } from "./form-settings";
 

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import {
   AFTER_FETCH,
   AT_AN_ADDRESS,
@@ -15,13 +16,15 @@ function picker(props: Partial<DataPickerProps> = {}) {
   const onWriteExpression = vi.fn();
   const onOpenChange = vi.fn();
   render(
-    <DataPicker
-      data={AFTER_FETCH}
-      onPick={onPick}
-      onWriteExpression={onWriteExpression}
-      onOpenChange={onOpenChange}
-      {...props}
-    />,
+    <Announcer>
+      <DataPicker
+        data={AFTER_FETCH}
+        onPick={onPick}
+        onWriteExpression={onWriteExpression}
+        onOpenChange={onOpenChange}
+        {...props}
+      />
+    </Announcer>,
   );
   return { onPick, onWriteExpression, onOpenChange };
 }
@@ -49,22 +52,24 @@ function field(props: Partial<DataFieldProps> = {}) {
   const onUse = vi.fn();
   const onClear = vi.fn();
   render(
-    <TooltipProvider>
-      <label htmlFor="address">Address</label>
-      <DataField
-        pointer="/do/2/post/with/endpoint"
-        value=""
-        inputId="address"
-        describedBy={undefined}
-        invalid={false}
-        placeholder="https://"
-        data={AT_AN_ADDRESS}
-        onText={onText}
-        onUse={onUse}
-        onClear={onClear}
-        {...props}
-      />
-    </TooltipProvider>,
+    <Announcer>
+      <TooltipProvider>
+        <label htmlFor="address">Address</label>
+        <DataField
+          pointer="/do/2/post/with/endpoint"
+          value=""
+          inputId="address"
+          describedBy={undefined}
+          invalid={false}
+          placeholder="https://"
+          data={AT_AN_ADDRESS}
+          onText={onText}
+          onUse={onUse}
+          onClear={onClear}
+          {...props}
+        />
+      </TooltipProvider>
+    </Announcer>,
   );
   return { onText, onUse, onClear };
 }
@@ -131,6 +136,16 @@ describe("the data picker", () => {
       "Greet › titlea field of the answer",
     ]);
     expect(screen.getByRole("status")).toHaveTextContent("3 pieces of data");
+  });
+
+  it("one_match_is_said_as_one_piece", () => {
+    picker({ samples: SAMPLES });
+    openPicker();
+
+    type("slideshow › slides");
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("1 piece of data");
   });
 
   it("nothing_that_matches_is_said", () => {

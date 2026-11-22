@@ -16,6 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/libs/ui/components/popover";
+import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { choicesOf, type DataChoice } from "./data-choices";
 import { ChoiceIcon } from "./choice-icon";
 import type { DataPick, DataPickerProps, Json } from "./interfaces";
@@ -127,21 +128,26 @@ function ChoiceList({
   readonly onlyPaths: boolean;
   readonly onPick: (choice: DataChoice) => void;
 }) {
+  const announce = useAnnounce();
   const [query, setQuery] = useState("");
   const choices = choicesOf(data, samples, query, onlyPaths);
   const typed = query.trim();
-  const found =
-    choices.count === 0
-      ? `Nothing matches “${typed}”.`
-      : `${String(choices.count)} pieces of data`;
+
+  function search(next: string) {
+    setQuery(next);
+
+    const words = next.trim();
+
+    if (words === "") return;
+
+    const found = choicesOf(data, samples, next, onlyPaths);
+    const told = foundText(found.count, words);
+    announce(told);
+  }
 
   return (
     <Command shouldFilter={false} label={SEARCH}>
-      <CommandInput
-        placeholder={SEARCH}
-        value={query}
-        onValueChange={setQuery}
-      />
+      <CommandInput placeholder={SEARCH} value={query} onValueChange={search} />
       <CommandList className="max-h-80">
         <CommandEmpty>Nothing matches “{typed}”.</CommandEmpty>
         {choices.groups.map((group) => (
@@ -165,11 +171,16 @@ function ChoiceList({
           {note}
         </p>
       ))}
-      <p role="status" className="sr-only">
-        {typed === "" ? "" : found}
-      </p>
     </Command>
   );
+}
+
+function foundText(count: number, typed: string): string {
+  if (count === 0) return `Nothing matches “${typed}”.`;
+
+  if (count === 1) return "1 piece of data";
+
+  return `${String(count)} pieces of data`;
 }
 
 function ChoiceItem({

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { ConditionReading } from "language-server/protocol";
 import { fn } from "storybook/test";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import {
   FETCH_FORM,
   FETCH_STEP,
@@ -88,11 +89,13 @@ const meta = {
   component: StepForm,
   decorators: [
     (Story) => (
-      <TooltipProvider>
-        <div className="w-[400px] p-4">
-          <Story />
-        </div>
-      </TooltipProvider>
+      <Announcer>
+        <TooltipProvider>
+          <div className="w-[400px] p-4">
+            <Story />
+          </div>
+        </TooltipProvider>
+      </Announcer>
     ),
   ],
   args: {

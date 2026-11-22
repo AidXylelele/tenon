@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { EditAction } from "language-server/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import {
   FETCH_FORM,
   FETCH_STEP,
@@ -46,9 +47,11 @@ function shown(props: Shown = {}) {
     ...props,
   };
   render(
-    <TooltipProvider>
-      <StepForm {...all} />
-    </TooltipProvider>,
+    <Announcer>
+      <TooltipProvider>
+        <StepForm {...all} />
+      </TooltipProvider>
+    </Announcer>,
   );
   return { onEdit };
 }
@@ -61,12 +64,11 @@ function leave(element: HTMLElement, text: string) {
   });
 }
 
-function open(summary: string) {
-  const toggle = screen.getByText(summary);
-  const details = toggle.closest("details");
+function open(title: string) {
+  const header = screen.getByRole("button", { name: title });
 
   act(() => {
-    details?.setAttribute("open", "");
+    fireEvent.click(header);
   });
 }
 
@@ -86,11 +88,13 @@ describe("a step's essential fields", () => {
 
     const method = screen.getByRole("radio", { name: "Get data" });
     const address = screen.getByLabelText("Address");
-    const headers = screen.getByLabelText(/Headers/);
+    const more = screen.getByRole("button", { name: "More options" });
+    const headers = screen.queryByLabelText(/Headers/);
 
     expect(method).toHaveAttribute("aria-checked", "true");
     expect(address).toHaveValue("https://httpbin.org/json");
-    expect(headers).not.toBeVisible();
+    expect(more).toHaveAttribute("aria-expanded", "false");
+    expect(headers).toBeNull();
   });
 
   it("an_address_to_fill_says_fill_in_and_no_error_yet", () => {

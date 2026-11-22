@@ -10,7 +10,7 @@ import {
 } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
 import { formKindOf, layoutOf, pathOf, summaryOf } from "../form-fields";
-import { Disclosure } from "./disclosure";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { FailureBox } from "./failure-box";
 import { OTHER_METHODS } from "./field-control";
 import { FieldView } from "./field-view";

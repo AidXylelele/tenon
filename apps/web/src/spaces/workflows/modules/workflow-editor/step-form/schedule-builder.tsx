@@ -35,7 +35,7 @@ import {
   type TimeOfDay,
   type Weekday,
 } from "@/operations/schedule-words";
-import { Disclosure } from "./disclosure";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { ProblemLines, useFieldProblems } from "./field-shell";
 import { useFormSettings } from "./form-settings";
 

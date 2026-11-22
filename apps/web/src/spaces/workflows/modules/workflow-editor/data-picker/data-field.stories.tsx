@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import {
   AFTER_FETCH,
   AT_AN_ADDRESS,
@@ -12,14 +13,16 @@ const meta = {
   component: DataField,
   decorators: [
     (Story) => (
-      <TooltipProvider>
-        <div className="flex w-[400px] flex-col gap-2 p-4">
-          <label htmlFor="address" className="font-semibold">
-            Address
-          </label>
-          <Story />
-        </div>
-      </TooltipProvider>
+      <Announcer>
+        <TooltipProvider>
+          <div className="flex w-[400px] flex-col gap-2 p-4">
+            <label htmlFor="address" className="font-semibold">
+              Address
+            </label>
+            <Story />
+          </div>
+        </TooltipProvider>
+      </Announcer>
     ),
   ],
   args: {

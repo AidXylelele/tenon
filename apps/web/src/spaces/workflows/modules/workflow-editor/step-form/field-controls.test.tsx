@@ -122,11 +122,11 @@ function choose(trigger: HTMLElement, option: string) {
   });
 }
 
-function open(summary: string) {
-  const details = screen.getByText(summary).closest("details");
+function open(title: string) {
+  const header = screen.getByRole("button", { name: title });
 
   act(() => {
-    details?.setAttribute("open", "");
+    fireEvent.click(header);
   });
 }
 

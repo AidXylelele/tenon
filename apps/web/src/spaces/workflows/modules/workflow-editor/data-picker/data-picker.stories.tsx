@@ -6,15 +6,18 @@ import {
   FIRST_STEP,
   SAMPLES,
 } from "./data-choices/data.test-support";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import { DataPicker } from "./data-picker";
 
 const meta = {
   component: DataPicker,
   decorators: [
     (Story) => (
-      <div className="flex h-[560px] w-[440px] justify-end p-4">
-        <Story />
-      </div>
+      <Announcer>
+        <div className="flex h-[560px] w-[440px] justify-end p-4">
+          <Story />
+        </div>
+      </Announcer>
     ),
   ],
   args: {

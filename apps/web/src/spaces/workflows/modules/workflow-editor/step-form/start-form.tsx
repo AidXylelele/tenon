@@ -29,7 +29,7 @@ import {
   textEditsOf,
 } from "../form-fields";
 import { cronOf, REPEAT_CHOICES } from "@/operations/schedule-words";
-import { Disclosure } from "./disclosure";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { ProblemLines, useFieldProblems } from "./field-shell";
 import { FieldView } from "./field-view";
 import {
