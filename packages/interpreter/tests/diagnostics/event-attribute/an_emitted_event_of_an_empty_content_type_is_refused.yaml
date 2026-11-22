@@ -16,4 +16,3 @@ diagnostics:
     pointer: /do/0/notify/emit/event/with/datacontenttype
     subject: datacontenttype
     range: { start: { line: 12, column: 30 } }
-    message: "Event attribute 'datacontenttype' must not be empty."

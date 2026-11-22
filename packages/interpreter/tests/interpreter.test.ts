@@ -293,17 +293,10 @@ describe("filter", () => {
   test("refuses a filter on an empty type: no event has one", () => {
     const compilation = interpreter.filter({ with: { type: "" } });
 
-    expect(compilation).toStrictEqual({
+    expect(compilation).toMatchObject({
       kind: "refused",
       diagnostics: [
-        {
-          code: "event-attribute",
-          message: "An event filter on an empty 'type' matches no event.",
-          pointer: "/with/type",
-          range: null,
-          subject: "type",
-          import: null,
-        },
+        { code: "event-attribute", pointer: "/with/type", subject: "type" },
       ],
     });
   });

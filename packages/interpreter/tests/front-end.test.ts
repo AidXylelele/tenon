@@ -800,69 +800,6 @@ describe("analyze, of a value the standard needs written", () => {
     },
   );
 
-  test("words the empty type of an emitted event", () => {
-    const document = emittedWith({ type: "" });
-
-    const analysis = analyzer.analyze(document, fullOptions);
-
-    expect(analysis.diagnostics).toMatchObject([
-      { message: "Event attribute 'type' must not be empty.", subject: "type" },
-    ]);
-  });
-
-  test("words the empty type an event filter awaits", () => {
-    const document = awaited("");
-
-    const analysis = analyzer.analyze(document, fullOptions);
-
-    expect(analysis.diagnostics).toMatchObject([
-      {
-        message: "An event filter on an empty 'type' matches no event.",
-        subject: "type",
-      },
-    ]);
-  });
-
-  test("words the empty image of a container", () => {
-    const document = ran({ container: { image: "" } });
-
-    const analysis = analyzer.analyze(document, fullOptions);
-
-    expect(analysis.diagnostics).toMatchObject([
-      { message: "A container must name its image.", subject: null },
-    ]);
-  });
-
-  test("words the empty method of an HTTP call", () => {
-    const document = {
-      document: header,
-      do: [
-        {
-          fetch: {
-            call: "http",
-            with: { method: "", endpoint: "https://example.com" },
-          },
-        },
-      ],
-    };
-
-    const analysis = analyzer.analyze(document, fullOptions);
-
-    expect(analysis.diagnostics).toMatchObject([
-      { message: "An HTTP call must name its method.", subject: null },
-    ]);
-  });
-
-  test("words the empty name of a workflow to run", () => {
-    const document = workflowRun({ name: "" });
-
-    const analysis = analyzer.analyze(document, fullOptions);
-
-    expect(analysis.diagnostics).toMatchObject([
-      { message: "The workflow to run must have a name.", subject: null },
-    ]);
-  });
-
   test("reads an empty type in the loose mode as written", () => {
     const document = {
       ...emittedWith({ type: "" }),

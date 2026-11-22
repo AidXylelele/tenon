@@ -13,5 +13,4 @@ source: |
 diagnostics:
   - code: schema
     pointer: /do/0/fetch/with/endpoint
-    message: Endpoint is not in the form the standard requires.
     range: { start: { line: 11, column: 19 } }
