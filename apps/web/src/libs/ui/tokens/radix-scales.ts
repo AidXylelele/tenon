@@ -14,43 +14,34 @@ import {
 } from "@radix-ui/colors";
 import plugin from "tailwindcss/plugin";
 
-type Scale = Readonly<Record<string, string>>;
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
 
-interface ScalePair {
-  readonly name: string;
-  readonly light: Scale;
-  readonly dark: Scale;
-}
+type Scale<Name extends string> = Readonly<Record<`${Name}${Step}`, string>>;
 
-const SCALES: readonly ScalePair[] = [
-  { name: "slate", light: slate, dark: slateDark },
-  { name: "iris", light: iris, dark: irisDark },
-  { name: "grass", light: grass, dark: grassDark },
-  { name: "amber", light: amber, dark: amberDark },
-  { name: "red", light: red, dark: redDark },
-  { name: "blue", light: blue, dark: blueDark },
-];
+const STEPS: readonly Step[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-export function scaleEntriesOf(
-  name: string,
-  light: Scale,
-  dark: Scale,
+function scaleEntriesOf<Name extends string>(
+  name: Name,
+  light: Scale<Name>,
+  dark: Scale<Name>,
 ): [string, string][] {
-  return Object.entries(light).map(([key, day]) => {
-    const step = key.slice(name.length);
-    const night = dark[key];
-
-    if (night === undefined)
-      throw new Error(`The dark ${name} scale has no step ${step}.`);
-
-    return [`--${name}-${step}`, `light-dark(${day}, ${night})`];
+  return STEPS.map((step) => {
+    const key: `${Name}${Step}` = `${name}${step}`;
+    const variable = `--${name}-${String(step)}`;
+    return [variable, `light-dark(${light[key]}, ${dark[key]})`];
   });
 }
 
+const ENTRIES = [
+  scaleEntriesOf("slate", slate, slateDark),
+  scaleEntriesOf("iris", iris, irisDark),
+  scaleEntriesOf("grass", grass, grassDark),
+  scaleEntriesOf("amber", amber, amberDark),
+  scaleEntriesOf("red", red, redDark),
+  scaleEntriesOf("blue", blue, blueDark),
+].flat();
+
 export default plugin(({ addBase }) => {
-  const entries = SCALES.flatMap(({ name, light, dark }) =>
-    scaleEntriesOf(name, light, dark),
-  );
-  const variables = Object.fromEntries(entries);
+  const variables = Object.fromEntries(ENTRIES);
   addBase({ ":root": variables });
 });
