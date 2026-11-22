@@ -271,13 +271,6 @@ do:
     ],
     [
       "pattern",
-      "an endpoint expression with nothing inside",
-      "analyzed",
-      "/do/0/fetch/with/endpoint",
-      fetchedAt("${}"),
-    ],
-    [
-      "pattern",
       "a wait in neither form of a duration",
       "analyzed",
       "/do/0/pause/wait",
@@ -320,16 +313,6 @@ do:
       "analyzed",
       "/do/0/greet/with/service/port",
       grpcCalled(65536),
-    ],
-    [
-      "minLength",
-      "an empty authentication name, the one alternative it takes",
-      "analyzed",
-      "/do/0/fetch/with/endpoint/authentication/use",
-      fetchedAt({
-        uri: "https://example.com",
-        authentication: { use: "" },
-      }),
     ],
     [
       "pattern",
@@ -533,6 +516,43 @@ do:
       expect(analysis).toMatchObject({ kind, diagnostics: [{ pointer }] });
     },
   );
+
+  test("models an empty authentication name, the one alternative it takes", () => {
+    const document = fetchedAt({
+      uri: "https://example.com",
+      authentication: { use: "" },
+    });
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis).toMatchObject({
+      kind: "analyzed",
+      diagnostics: [
+        {
+          code: "schema",
+          pointer: "/do/0/fetch/with/endpoint/authentication/use",
+        },
+        {
+          code: "undeclared-component",
+          pointer: "/do/0/fetch/with/endpoint/authentication/use",
+        },
+      ],
+    });
+  });
+
+  test("keeps a finding of its own at a place the grammar flagged", () => {
+    const document = fetchedAt("${ $nowhere |\n . }");
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis).toMatchObject({
+      kind: "analyzed",
+      diagnostics: [
+        { code: "schema", pointer: "/do/0/fetch/with/endpoint" },
+        { code: "unknown-variable", pointer: "/do/0/fetch/with/endpoint" },
+      ],
+    });
+  });
 
   test("refuses an unknown member inside the one alternative whose value is wrong", () => {
     const document = {

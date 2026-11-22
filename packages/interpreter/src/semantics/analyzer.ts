@@ -21,10 +21,10 @@ import {
 } from "./filter-document.js";
 import type { Analysis, SemanticModel } from "./model.js";
 import {
-  atUnflaggedPlaces,
   diagnosticOf,
   diagnosticsOf,
   placedAtCallSites,
+  withoutRestatements,
 } from "./notification/index.js";
 import { resolve } from "./resolve/index.js";
 import { symbolsOf } from "./symbols/index.js";
@@ -164,8 +164,8 @@ export class Analyzer {
     };
     const checked = this.#findingsOf(model, options);
     const semantic = [...findings, ...checked];
-    const unflagged = atUnflaggedPlaces(semantic, grammarFindings);
-    const found = [...grammarFindings, ...unflagged];
+    const own = withoutRestatements(semantic, grammarFindings);
+    const found = [...grammarFindings, ...own];
     const placed = placedAtCallSites(found, symbols.components.functions);
 
     const diagnostics = diagnosticsOf(placed, source, "document");

@@ -1,6 +1,14 @@
-import { isPointerWithin } from "../../runtime/index.js";
-import type { Finding } from "../../syntax/index.js";
+import type { Finding, MessageName } from "../../syntax/index.js";
 import { type FunctionSymbol, importedFunctionOf } from "../symbols/index.js";
+
+const restatements: ReadonlySet<MessageName> = new Set<MessageName>([
+  "invalidDuration",
+  "emptyEventAttribute",
+  "emptyFilterAttribute",
+  "emptyImage",
+  "emptyMethod",
+  "emptyWorkflowIdentity",
+]);
 
 export function placedAtCallSites(
   findings: readonly Finding[],
@@ -12,15 +20,21 @@ export function placedAtCallSites(
   });
 }
 
-export function atUnflaggedPlaces(
+export function withoutRestatements(
   findings: readonly Finding[],
   flagged: readonly Finding[],
 ): readonly Finding[] {
-  return findings.filter((finding) => !isFlagged(finding, flagged));
+  return findings.filter((finding) => !isRestatement(finding, flagged));
 }
 
-function isFlagged(finding: Finding, flagged: readonly Finding[]): boolean {
-  return flagged.some((flag) => isPointerWithin(finding.pointer, flag.pointer));
+function isRestatement(finding: Finding, flagged: readonly Finding[]): boolean {
+  const isRestating = restatements.has(finding.name);
+
+  if (!isRestating) {
+    return false;
+  }
+
+  return flagged.some((flag) => flag.pointer === finding.pointer);
 }
 
 function callSiteOf(
