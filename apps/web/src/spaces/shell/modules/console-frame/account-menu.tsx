@@ -58,7 +58,7 @@ export function AccountMenu({ user, signOut, keepTheme }: AccountMenuProps) {
               <span className="grid flex-1 text-left">
                 <span className="truncate font-semibold">{user.name}</span>
                 <span className="truncate text-caption text-muted-foreground">
-                  {role}
+                  {user.email}
                 </span>
               </span>
               <ChevronsUpDownIcon className="ml-auto" />
@@ -71,6 +71,9 @@ export function AccountMenu({ user, signOut, keepTheme }: AccountMenuProps) {
               </div>
               <div className="truncate text-caption text-muted-foreground">
                 {user.email}
+              </div>
+              <div className="truncate text-caption text-muted-foreground">
+                {role}
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

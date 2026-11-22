@@ -47,12 +47,12 @@ describe("the account menu", () => {
     vi.stubGlobal("matchMedia", viewport.matchMedia);
   });
 
-  it("names_the_person_with_initials_and_their_role", () => {
+  it("names_the_person_with_initials_and_their_email", () => {
     renderMenu();
 
     const button = screen.getByRole("button", { name: /Ada Lovelace/ });
 
-    expect(button).toHaveTextContent("ALAda LovelaceEditor");
+    expect(button).toHaveTextContent("ALAda Lovelaceada@example.com");
   });
 
   it.each([
@@ -73,13 +73,13 @@ describe("the account menu", () => {
     expect(avatar).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("shows_the_email_once_opened", () => {
+  it("shows_the_role_once_opened", () => {
     renderMenu();
 
     openMenu();
 
-    const email = screen.getByText("ada@example.com");
-    expect(email).toBeVisible();
+    const role = screen.getByText("Editor");
+    expect(role).toBeVisible();
   });
 
   it("offers_the_themes_in_order_with_the_present_one_checked", () => {
