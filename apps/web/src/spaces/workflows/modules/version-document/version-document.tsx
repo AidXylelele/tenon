@@ -9,11 +9,7 @@ import {
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
 import { Link } from "@/libs/routing/link";
-import {
-  editorHref,
-  workflowHref,
-  WORKFLOWS_HREF,
-} from "@/libs/routing/routes";
+import { editorHref } from "@/libs/routing/routes";
 import { segment } from "@/libs/routing/segment";
 import { Badge } from "@/libs/ui/components/badge";
 import { Button } from "@/libs/ui/components/button";
@@ -72,12 +68,6 @@ export async function VersionDocument({
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "Workflows", href: WORKFLOWS_HREF },
-          { label: namespace },
-          { label: name, href: workflowHref(namespace, name) },
-          { label: title },
-        ]}
         title={title}
         description={
           facts === undefined ? undefined : (
