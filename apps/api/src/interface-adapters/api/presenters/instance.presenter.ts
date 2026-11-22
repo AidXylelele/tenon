@@ -30,6 +30,7 @@ export class InstancePresenter {
       version: instance.version,
       phase: instance.phase,
       trigger: instance.trigger,
+      test: instance.test,
       createdAt: instance.createdAt.toISOString(),
       startedAt: instance.startedAt?.toISOString() ?? null,
       endedAt: instance.endedAt?.toISOString() ?? null,

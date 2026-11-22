@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, asc, desc, eq, type SQL, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, type SQL, sql } from "drizzle-orm";
 import type {
   LastRun,
   VersionIdentity,
@@ -39,8 +39,9 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     const status = this.#status(page.status);
     const search = this.#search(page.search);
     const fetched = page.limit + 1;
+    const published = this.#published();
     const rows = await this.#summaries()
-      .where(and(after, status, search))
+      .where(and(published, after, status, search))
       .orderBy(asc(workflows.namespace), asc(workflows.name))
       .limit(fetched);
     const summaries = rows.map((row) => this.#summaryOf(row));
@@ -52,7 +53,8 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
 
   async get(name: WorkflowName): Promise<WorkflowSummary | null> {
     const named = this.#named(name);
-    const [row] = await this.#summaries().where(named);
+    const published = this.#published();
+    const [row] = await this.#summaries().where(and(named, published));
 
     if (!row) return null;
 
@@ -63,10 +65,8 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionSummary | null> {
-    const named = this.#named(name);
-    const [row] = await this.#versions().where(
-      and(named, eq(versions.semver, version)),
-    );
+    const numbered = this.#numbered(name, version);
+    const [row] = await this.#versions().where(numbered);
 
     if (!row) return null;
 
@@ -75,15 +75,16 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
 
   async versions(name: WorkflowName): Promise<VersionSummary[] | null> {
     const named = this.#named(name);
+    const published = this.#published();
     const [found] = await this.txHost.tx
       .select({ id: workflows.id })
       .from(workflows)
-      .where(named);
+      .where(and(named, published));
 
     if (!found) return null;
 
     const rows = await this.#versions()
-      .where(eq(workflows.id, found.id))
+      .where(and(eq(workflows.id, found.id), eq(versions.test, false)))
       .orderBy(asc(versions.publishedAt));
     return rows.map((row) => this.#versionOf(row));
   }
@@ -92,12 +93,12 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<JsonObject | null> {
-    const named = this.#named(name);
+    const numbered = this.#numbered(name, version);
     const [row] = await this.txHost.tx
       .select({ document: versions.document })
       .from(versions)
       .innerJoin(workflows, eq(workflows.id, versions.workflowId))
-      .where(and(named, eq(versions.semver, version)));
+      .where(numbered);
     return row?.document ?? null;
   }
 
@@ -105,12 +106,12 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionSource | null> {
-    const named = this.#named(name);
+    const numbered = this.#numbered(name, version);
     const [row] = await this.txHost.tx
       .select({ source: versions.source })
       .from(versions)
       .innerJoin(workflows, eq(workflows.id, versions.workflowId))
-      .where(and(named, eq(versions.semver, version)));
+      .where(numbered);
     return row ?? null;
   }
 
@@ -118,10 +119,10 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionProgram | null> {
-    const named = this.#named(name);
+    const numbered = this.#numbered(name, version);
     const [row] = await this.#programs()
       .innerJoin(workflows, eq(workflows.id, versions.workflowId))
-      .where(and(named, eq(versions.semver, version)));
+      .where(numbered);
     return row ?? null;
   }
 
@@ -165,11 +166,13 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
         createdAt: instances.createdAt,
       })
       .from(instances)
-      .where(eq(instances.workflowId, workflows.id))
+      .where(
+        and(eq(instances.workflowId, workflows.id), eq(instances.test, false)),
+      )
       .orderBy(desc(instances.createdAt), desc(instances.id))
       .limit(1)
       .as("last_run");
-    const starts = sql<number>`(select count(*)::int from ${instances} where ${instances.workflowId} = ${workflows.id})`;
+    const starts = sql<number>`(select count(*)::int from ${instances} where ${instances.workflowId} = ${workflows.id} and not ${instances.test})`;
     return this.txHost.tx
       .select({
         namespace: workflows.namespace,
@@ -254,6 +257,15 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     );
     const pattern = `%${escaped}%`;
     return sql`(${workflows.namespace} || '/' || ${workflows.name}) ilike ${pattern}`;
+  }
+
+  #numbered(name: WorkflowName, version: string): SQL | undefined {
+    const named = this.#named(name);
+    return and(named, eq(versions.semver, version), eq(versions.test, false));
+  }
+
+  #published(): SQL {
+    return isNotNull(workflows.currentVersionId);
   }
 
   #named(name: WorkflowName): SQL | undefined {

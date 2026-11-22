@@ -84,6 +84,7 @@ export const InstanceSummaryResponse = z.object({
   version: z.string(),
   phase: z.enum(Phase),
   trigger: z.enum(TriggerKind),
+  test: z.boolean(),
   createdAt: z.iso.datetime(),
   startedAt: z.iso.datetime().nullable(),
   endedAt: z.iso.datetime().nullable(),

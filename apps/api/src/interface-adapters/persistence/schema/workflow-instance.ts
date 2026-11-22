@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -49,6 +50,7 @@ export const workflowInstance = pgTable(
       .notNull()
       .default([]),
     cancelReason: text("cancel_reason").$type<CancelReason>(),
+    test: boolean("test").notNull().default(false),
     version: integer("version").notNull().default(1),
   },
   (table) => [

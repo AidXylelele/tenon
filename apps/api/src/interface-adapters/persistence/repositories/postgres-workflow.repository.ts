@@ -103,6 +103,7 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
         secrets: versions.secrets,
         publisherId: versions.publisherId,
         publishedAt: versions.publishedAt,
+        test: versions.test,
       })
       .from(versions)
       .where(eq(versions.workflowId, row.id));

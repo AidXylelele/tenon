@@ -5,6 +5,7 @@ import { DraftRepository } from "../../application/automation/drafts/ports.js";
 import { PublishDraft } from "../../application/automation/drafts/publish-draft.js";
 import { DraftQueries } from "../../application/automation/drafts/queries.js";
 import { SaveDraft } from "../../application/automation/drafts/save-draft.js";
+import { TestDraft } from "../../application/automation/drafts/test-draft.js";
 import { AcceptEvent } from "../../application/automation/events/accept-event.js";
 import { EventQueries } from "../../application/automation/events/queries.js";
 import {
@@ -45,6 +46,7 @@ import { ImportsController } from "../../interface-adapters/api/controllers/impo
 import { InstancesController } from "../../interface-adapters/api/controllers/instances.controller.js";
 import { SecretsController } from "../../interface-adapters/api/controllers/secrets.controller.js";
 import { SubscriptionsController } from "../../interface-adapters/api/controllers/subscriptions.controller.js";
+import { TestRunsController } from "../../interface-adapters/api/controllers/test-runs.controller.js";
 import { WebhooksController } from "../../interface-adapters/api/controllers/webhooks.controller.js";
 import { WorkflowsController } from "../../interface-adapters/api/controllers/workflows.controller.js";
 import { EntityTagMapper } from "../../interface-adapters/api/mappers/entity-tag.mapper.js";
@@ -87,6 +89,7 @@ import { HttpModule } from "./http.module.js";
   controllers: [
     WorkflowsController,
     DraftsController,
+    TestRunsController,
     InstancesController,
     EventsController,
     WebhooksController,
@@ -104,6 +107,7 @@ import { HttpModule } from "./http.module.js";
     CreateDraft,
     SaveDraft,
     PublishDraft,
+    TestDraft,
     FetchImport,
     StartInstance,
     RestartInstance,

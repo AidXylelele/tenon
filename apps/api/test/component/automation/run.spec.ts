@@ -32,6 +32,7 @@ const SUMMARY_KEYS = [
   "namespace",
   "phase",
   "startedAt",
+  "test",
   "trigger",
   "version",
 ];

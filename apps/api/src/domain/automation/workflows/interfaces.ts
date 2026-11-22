@@ -42,6 +42,7 @@ export interface WorkflowVersionProps {
   readonly secrets: readonly string[];
   readonly publisherId: string;
   readonly publishedAt: Date;
+  readonly test: boolean;
 }
 
 export type ImportTexts = Readonly<Record<string, string>>;

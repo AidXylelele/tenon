@@ -28,6 +28,7 @@ export interface WorkflowInstanceProps {
   readonly endedAt: Date | null;
   readonly cancelReason: CancelReason | null;
   readonly run: Run | null;
+  readonly test: boolean;
   readonly version: number;
 }
 

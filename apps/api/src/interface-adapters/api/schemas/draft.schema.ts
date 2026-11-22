@@ -27,3 +27,9 @@ export const DraftConflictResponse = z.object({
   detail: z.string(),
   current: DraftResponse.optional(),
 });
+
+export const TestRunBody = z.strictObject({ input: z.json().default({}) });
+
+export type TestRunBody = z.infer<typeof TestRunBody>;
+
+export const TestRunFingerprint = TestRunBody.or(z.unknown());

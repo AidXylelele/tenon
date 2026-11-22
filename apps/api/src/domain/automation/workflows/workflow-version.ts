@@ -19,6 +19,7 @@ export class WorkflowVersion {
   readonly #secrets: readonly string[];
   readonly #publisherId: string;
   readonly #publishedAt: Date;
+  readonly #test: boolean;
 
   constructor(props: WorkflowVersionProps) {
     this.#id = props.id;
@@ -30,6 +31,7 @@ export class WorkflowVersion {
     this.#secrets = props.secrets;
     this.#publisherId = props.publisherId;
     this.#publishedAt = props.publishedAt;
+    this.#test = props.test;
   }
 
   static publish(input: NewPublication): WorkflowVersion {
@@ -45,6 +47,24 @@ export class WorkflowVersion {
       secrets: definition.secrets,
       publisherId: input.publisherId,
       publishedAt: input.now,
+      test: false,
+    });
+  }
+
+  static forTest(input: NewPublication): WorkflowVersion {
+    const definition = input.definition;
+    const id = randomUUID();
+    return new WorkflowVersion({
+      id,
+      semver: definition.version,
+      dsl: definition.dsl,
+      digest: definition.digest,
+      programFingerprint: definition.programFingerprint,
+      schedule: definition.schedule,
+      secrets: definition.secrets,
+      publisherId: input.publisherId,
+      publishedAt: input.now,
+      test: true,
     });
   }
 
@@ -82,6 +102,21 @@ export class WorkflowVersion {
 
   get publishedAt(): Date {
     return this.#publishedAt;
+  }
+
+  get test(): boolean {
+    return this.#test;
+  }
+
+  isNumbered(semver: string): boolean {
+    const published = !this.#test;
+    const same = this.#semver === semver;
+    return published && same;
+  }
+
+  isTestOf(definition: CheckedDefinition): boolean {
+    const same = this.#digest === definition.digest;
+    return this.#test && same;
   }
 
   republish(

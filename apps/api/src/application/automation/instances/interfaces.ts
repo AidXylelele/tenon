@@ -29,7 +29,7 @@ export interface StartInstanceCommand {
   readonly starterId: string;
 }
 
-interface StartedInstance {
+export interface StartedInstance {
   readonly instanceId: string;
 }
 
@@ -92,6 +92,7 @@ export interface InstanceSummary {
   readonly version: string;
   readonly phase: Phase;
   readonly trigger: TriggerKind;
+  readonly test: boolean;
   readonly createdAt: Date;
   readonly startedAt: Date | null;
   readonly endedAt: Date | null;

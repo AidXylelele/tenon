@@ -40,6 +40,7 @@ export class WorkflowInstance {
   readonly #originEffectId: string | null;
   readonly #input: JsonValue;
   readonly #createdAt: Date;
+  readonly #test: boolean;
   readonly #version: number;
   #phase: Phase;
   #output: JsonValue | null;
@@ -69,6 +70,7 @@ export class WorkflowInstance {
     this.#endedAt = props.endedAt;
     this.#cancelReason = props.cancelReason;
     this.#run = props.run;
+    this.#test = props.test;
     this.#version = props.version;
   }
 
@@ -94,6 +96,7 @@ export class WorkflowInstance {
       endedAt: null,
       cancelReason: null,
       run: null,
+      test: input.version.test,
       version: 0,
     });
   }
@@ -112,6 +115,10 @@ export class WorkflowInstance {
 
   get trigger(): TriggerKind {
     return this.#trigger;
+  }
+
+  get test(): boolean {
+    return this.#test;
   }
 
   get starterId(): string | null {

@@ -256,6 +256,7 @@ function instanceRow(
     endedAt: instance.endedAt,
     cancelReason: instance.cancelReason,
     run: instance.run,
+    test: instance.test,
     version,
   };
 }
@@ -526,6 +527,7 @@ export function anInstanceIn(
     endedAt: overrides.endedAt === undefined ? endedAt : overrides.endedAt,
     cancelReason: null,
     run: overrides.run ?? null,
+    test: false,
     version: overrides.version ?? 1,
   });
 }

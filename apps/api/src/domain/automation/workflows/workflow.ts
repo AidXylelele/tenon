@@ -127,6 +127,34 @@ export class Workflow {
     return { ok: true, value: { version, created: true } };
   }
 
+  testDraft(input: NewPublication): Result<Publication, WorkflowRefusal> {
+    const definition = input.definition;
+    const own = definition.name.equals(this.#name);
+
+    if (!own) throw new TypeError("The definition belongs to another workflow");
+
+    const archived = this.#isArchived();
+
+    if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
+
+    const tested = this.#versions.find((version) =>
+      version.isTestOf(definition),
+    );
+
+    if (tested !== undefined)
+      return { ok: true, value: { version: tested, created: false } };
+
+    const version = WorkflowVersion.forTest(input);
+    this.#versions = this.#versions.concat([version]);
+    this.#publications.push({
+      version,
+      document: definition.document,
+      imports: definition.imports,
+      source: input.source,
+    });
+    return { ok: true, value: { version, created: true } };
+  }
+
   versionToRun(semver: string | null): WorkflowVersion | null {
     if (semver !== null) return this.#versionAt(semver);
 
@@ -258,7 +286,7 @@ export class Workflow {
   }
 
   #versionAt(semver: string): WorkflowVersion | null {
-    const found = this.#versions.find((version) => version.semver === semver);
+    const found = this.#versions.find((version) => version.isNumbered(semver));
     return found ?? null;
   }
 
