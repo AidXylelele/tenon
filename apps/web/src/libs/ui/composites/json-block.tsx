@@ -13,7 +13,7 @@ export function JsonBlock({ value, empty = "Nothing" }: JsonBlockProps) {
 
   return (
     <div className="relative min-w-0">
-      <pre className="max-h-96 overflow-auto rounded-lg border bg-muted p-3 pr-10 font-mono text-xs leading-relaxed">
+      <pre className="max-h-96 overflow-auto rounded-lg border bg-muted p-3 pr-10 font-mono text-code">
         {text}
       </pre>
       <div className="absolute top-1.5 right-1.5">

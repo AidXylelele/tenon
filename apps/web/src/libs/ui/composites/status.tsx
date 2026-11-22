@@ -27,7 +27,7 @@ export function Status({ look, live = false, className }: StatusProps) {
   const Icon = look.icon;
   const iconClasses = cn("size-4 shrink-0", live && "animate-live");
   const classes = cn(
-    "inline-flex items-center gap-1.5 text-sm font-medium whitespace-nowrap",
+    "inline-flex items-center gap-1.5 text-body whitespace-nowrap",
     TEXT[look.tone],
     className,
   );
