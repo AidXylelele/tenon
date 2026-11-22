@@ -27,7 +27,7 @@ export function Announcer({
   return (
     <AnnounceContext.Provider value={announce}>
       {children}
-      <div role="status" className="sr-only">
+      <div role="status" aria-live="polite" className="sr-only">
         <p key={said.count}>{said.message}</p>
       </div>
     </AnnounceContext.Provider>

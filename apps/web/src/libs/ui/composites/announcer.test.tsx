@@ -1,5 +1,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "../components/dialog";
 import { Announcer, useAnnounce } from "./announcer";
 
 function AddStep() {
@@ -61,6 +67,25 @@ describe("the console's announcer", () => {
     const second = region.firstElementChild;
     expect(second).toHaveTextContent("Step added");
     expect(second).not.toBe(first);
+  });
+
+  it("an_open_dialog_leaves_the_region_heard", () => {
+    render(
+      <Announcer>
+        <Dialog defaultOpen>
+          <DialogContent>
+            <DialogTitle>Add a step</DialogTitle>
+            <DialogDescription>After Fetch invoices</DialogDescription>
+            <AddStep />
+          </DialogContent>
+        </Dialog>
+      </Announcer>,
+    );
+
+    const region = screen.getByRole("status");
+
+    const hiddenBy = region.closest('[aria-hidden="true"]');
+    expect(hiddenBy).toBeNull();
   });
 
   it("asking_to_announce_outside_the_announcer_is_refused", () => {
