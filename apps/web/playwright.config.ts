@@ -12,7 +12,6 @@ export default defineConfig({
       name: "playground",
       use: {
         ...devices["Desktop Chrome"],
-        channel: "chrome",
         baseURL: PLAYGROUND_URL,
         reducedMotion: "reduce",
       },
