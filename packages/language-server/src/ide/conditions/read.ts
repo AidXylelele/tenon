@@ -17,6 +17,7 @@ import {
   literalSource,
   operandSource,
   pathSource,
+  textSource,
 } from "./patterns.js";
 import { conditionTextOf } from "./write.js";
 
@@ -39,15 +40,21 @@ const operand = `(${operandSource})`;
 
 const literal = `(${literalSource})`;
 
-const contained = String.raw`${path} \| if type == "array" then any\(\.\[\]; \. == ${literal}\) else tostring \| contains\(${literal} \| tostring\) end`;
+const text = `(${textSource})`;
+
+const contained = String.raw`${path} \| if type == "array" then any\(\.\[\]; \. == ${literal}\) elif type == "string" then contains\(${text}\) else false end`;
 
 const rowForms: readonly RowForm[] = [
   {
-    pattern: wholeOf(String.raw`\(${path} \| length\) == 0`),
+    pattern: wholeOf(
+      String.raw`${path} \| \. == null or \. == "" or \. == \[\] or \. == \{\}`,
+    ),
     comparison: "isEmpty",
   },
   {
-    pattern: wholeOf(String.raw`\(${path} \| length\) > 0`),
+    pattern: wholeOf(
+      String.raw`${path} \| \. != null and \. != "" and \. != \[\] and \. != \{\}`,
+    ),
     comparison: "isNotEmpty",
   },
   { pattern: wholeOf(contained), comparison: "contains" },
@@ -58,12 +65,16 @@ const rowForms: readonly RowForm[] = [
   { pattern: wholeOf(`${path} == ${operand}`), comparison: "is" },
   { pattern: wholeOf(`${path} != ${operand}`), comparison: "isNot" },
   {
-    pattern: wholeOf(String.raw`\(${path} \| tonumber\) > ${operand}`),
+    pattern: wholeOf(
+      String.raw`try \(\(${path} \| tonumber\) > ${operand}\) catch false`,
+    ),
     comparison: "isGreaterThan",
   },
   { pattern: wholeOf(`${path} > ${operand}`), comparison: "isGreaterThan" },
   {
-    pattern: wholeOf(String.raw`\(${path} \| tonumber\) < ${operand}`),
+    pattern: wholeOf(
+      String.raw`try \(\(${path} \| tonumber\) < ${operand}\) catch false`,
+    ),
     comparison: "isLessThan",
   },
   { pattern: wholeOf(`${path} < ${operand}`), comparison: "isLessThan" },

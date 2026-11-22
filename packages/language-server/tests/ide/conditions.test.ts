@@ -37,7 +37,7 @@ function oneRow(row: ConditionRow): Condition {
 }
 
 const contained =
-  '.tags | if type == "array" then any(.[]; . == "urgent") else tostring | contains("urgent" | tostring) end';
+  '.tags | if type == "array" then any(.[]; . == "urgent") elif type == "string" then contains("urgent") else false end';
 
 const rows: readonly (readonly [string, ConditionRow, string])[] = [
   [
@@ -89,12 +89,12 @@ const rows: readonly (readonly [string, ConditionRow, string])[] = [
   [
     "is empty",
     { left: ".items", comparison: "isEmpty", right: null },
-    "${ (.items | length) == 0 }",
+    '${ .items | . == null or . == "" or . == [] or . == {} }',
   ],
   [
     "is not empty",
     { left: '.["line items"]', comparison: "isNotEmpty", right: null },
-    '${ (.["line items"] | length) > 0 }',
+    '${ .["line items"] | . != null and . != "" and . != [] and . != {} }',
   ],
   [
     "is greater than a number, read as a number",
@@ -103,7 +103,7 @@ const rows: readonly (readonly [string, ConditionRow, string])[] = [
       comparison: "isGreaterThan",
       right: { kind: "value", value: 10 },
     },
-    "${ (.total | tonumber) > 10 }",
+    "${ try ((.total | tonumber) > 10) catch false }",
   ],
   [
     "is greater than a text, in text order",
@@ -121,7 +121,7 @@ const rows: readonly (readonly [string, ConditionRow, string])[] = [
       comparison: "isLessThan",
       right: { kind: "value", value: 1.5 },
     },
-    "${ (.total | tonumber) < 1.5 }",
+    "${ try ((.total | tonumber) < 1.5) catch false }",
   ],
   [
     "is less than yesterday",
@@ -168,9 +168,13 @@ const joined = [
   [
     "all",
     paidAndFilled,
-    '${ (.status == "paid") and ((.items | length) > 0) }',
+    '${ (.status == "paid") and (.items | . != null and . != "" and . != [] and . != {}) }',
   ],
-  ["any", paidOrFilled, '${ (.status == "paid") or ((.items | length) > 0) }'],
+  [
+    "any",
+    paidOrFilled,
+    '${ (.status == "paid") or (.items | . != null and . != "" and . != [] and . != {}) }',
+  ],
 ] as const;
 
 test.each(joined)(
@@ -231,6 +235,42 @@ test.each<readonly [string, ConditionRow, JsonObject, boolean]>([
     },
     { codes: [3, 7] },
     true,
+  ],
+  [
+    "a number holds no text, and is no match rather than a fault",
+    {
+      left: ".tags",
+      comparison: "contains",
+      right: { kind: "value", value: "urgent" },
+    },
+    { tags: 7 },
+    false,
+  ],
+  [
+    "a number in a text is found as its digits",
+    {
+      left: ".code",
+      comparison: "contains",
+      right: { kind: "value", value: 7 },
+    },
+    { code: "a7b" },
+    true,
+  ],
+  [
+    "zero is not empty",
+    { left: ".items", comparison: "isEmpty", right: null },
+    { items: 0 },
+    false,
+  ],
+  [
+    "a value that is not a number is no match rather than a fault",
+    {
+      left: ".total",
+      comparison: "isGreaterThan",
+      right: { kind: "value", value: 10 },
+    },
+    { total: "many" },
+    false,
   ],
   [
     "a missing value is empty",
@@ -306,7 +346,7 @@ test.each([
   ["a number compared in text order", "${ .total > 10 }"],
   [
     "a contains whose two values differ",
-    '${ .tags | if type == "array" then any(.[]; . == "a") else tostring | contains("b" | tostring) end }',
+    '${ .tags | if type == "array" then any(.[]; . == "a") elif type == "string" then contains("b") else false end }',
   ],
   ["a text with no expression", "true"],
   ["a bare filter", '.status == "paid"'],

@@ -858,14 +858,15 @@ type Literal = string | number | boolean | null;
 - **One form.** A condition is written in one form, and read back only from exactly that form; any other text is `expression`, so the client opens it as jq and it is never rewritten. `left` and a `data` operand are paths: `.`, `.name`, `.["a name"]`, `$name` and their members.
 - **Rows**, with `L` the left path and `R` the second value as jq (a literal as JSON, a time in brackets):
 
-  | Comparison                    | jq                                                                                                                                               |
-  | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-  | `is`, `isNot`                 | `L == R`, `L != R`                                                                                                                               |
-  | `contains`                    | `L \| if type == "array" then any(.[]; . == R) else tostring \| contains(R \| tostring) end`: an item of a list, or a part of a text             |
-  | `doesNotContain`              | the same, then `\| not`                                                                                                                          |
-  | `isEmpty`, `isNotEmpty`       | `(L \| length) == 0`, `(L \| length) > 0`: missing, `""`, `[]` and `{}` are empty                                                                |
-  | `isGreaterThan`, `isLessThan` | `(L \| tonumber) > R` where `R` is a number, since jq orders every text after every number; else `L > R`, as texts and times compare (`<` alike) |
+  | Comparison                    | jq                                                                                                                                                                                                            |
+  | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `is`, `isNot`                 | `L == R`, `L != R`                                                                                                                                                                                            |
+  | `contains`                    | `L \| if type == "array" then any(.[]; . == R) elif type == "string" then contains(T) else false end`, with `T` the value as a JSON string: an item of a list, or a part of a text; anything else is no match |
+  | `doesNotContain`              | the same, then `\| not`                                                                                                                                                                                       |
+  | `isEmpty`, `isNotEmpty`       | `L \| . == null or . == "" or . == [] or . == {}`, and its negation `L \| . != null and . != "" and . != [] and . != {}`: missing, `""`, `[]` and `{}` are empty, `0` and `false` are not                     |
+  | `isGreaterThan`, `isLessThan` | `try ((L \| tonumber) > R) catch false` where `R` is a number, since jq orders every text after every number, a value that is no number being no match; else `L > R` (`<` alike)                              |
 
+- **No faults.** A comparison never fails the run: a value of another kind is no match. Between two data paths, or data and a text, jq orders by kind first (`null`, `false`, `true`, numbers, texts, lists, objects), then by value; times written as ISO 8601 texts compare in time only when both are written in the same form (UTC, the same precision), as `now`, `today` and `yesterday` are.
 - **Joins.** One row is written alone; several are each in brackets, joined by `and` (`all`) or `or` (`any`). The whole is a runtime expression, `${ … }`.
 - **Writing** is `workflow/edit`'s `setCondition`. A condition with no row, or a path that is not one, is refused with its reason.
 - **Errors:** `InvalidParams` (-32602), when the params hold no `text`.
@@ -873,7 +874,9 @@ type Literal = string | number | boolean | null;
 **Example:**
 
 ```json
-{ "text": "${ (.status == \"paid\") and ((.items | length) > 0) }" }
+{
+  "text": "${ (.status == \"paid\") and (.items | . != null and . != \"\" and . != [] and . != {}) }"
+}
 ```
 
 ```json

@@ -78,9 +78,9 @@ function rowTextOf(row: ConditionRow): string {
 
   switch (row.comparison) {
     case "isEmpty":
-      return `(${left} | length) == 0`;
+      return `${left} | . == null or . == "" or . == [] or . == {}`;
     case "isNotEmpty":
-      return `(${left} | length) > 0`;
+      return `${left} | . != null and . != "" and . != [] and . != {}`;
     case "contains":
     case "doesNotContain":
       return containingTextOf(row);
@@ -97,9 +97,11 @@ function rowTextOf(row: ConditionRow): string {
 
 function containingTextOf(row: ContainingRow): string {
   const sought = operandTextOf(row.right);
+  const soughtText = String(row.right.value);
+  const text = JSON.stringify(soughtText);
   const inList = `any(.[]; . == ${sought})`;
-  const inText = `tostring | contains(${sought} | tostring)`;
-  const contained = `${row.left} | if type == "array" then ${inList} else ${inText} end`;
+  const inText = `contains(${text})`;
+  const contained = `${row.left} | if type == "array" then ${inList} elif type == "string" then ${inText} else false end`;
 
   switch (row.comparison) {
     case "contains":
@@ -123,7 +125,8 @@ function orderedTextOf(left: string, order: string, right: Operand): string {
   }
 
   const number = `(${left} | tonumber)`;
-  return comparedTextOf(number, order, right);
+  const compared = comparedTextOf(number, order, right);
+  return `try (${compared}) catch false`;
 }
 
 function operandTextOf(operand: Operand): string {

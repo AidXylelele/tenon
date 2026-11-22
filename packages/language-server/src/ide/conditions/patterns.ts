@@ -8,6 +8,8 @@ const segment = String.raw`(?:\.${name}|${key})`;
 
 export const pathSource = String.raw`(?:\.|\$${name}${segment}*|\.(?:${name}|${key})${segment}*)`;
 
+export const textSource = String.raw`"(?:[^"\\]|\\.)*"`;
+
 export const literalSource = String.raw`(?:"(?:[^"\\]|\\.)*"|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)`;
 
 const timeTexts = Object.values(timeExpressions).map(escapedOf);
