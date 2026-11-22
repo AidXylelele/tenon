@@ -37,7 +37,7 @@ function formattingOf({
   text,
 }: FormattingRequest): Promise<Formatting> {
   switch (language) {
-    case "js":
+    case "javascript":
       return formatJavaScript(text);
     case "python":
       return formatPython(text);

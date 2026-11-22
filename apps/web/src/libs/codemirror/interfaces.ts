@@ -1,1 +1,1 @@
-export type ScriptLanguage = "js" | "python";
+export type ScriptLanguage = "javascript" | "python";

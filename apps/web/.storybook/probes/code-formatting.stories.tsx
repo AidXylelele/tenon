@@ -37,7 +37,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const JavaScript: Story = {
-  args: { language: "js", text: "const total = [1,2].map(n=>n*2)" },
+  args: { language: "javascript", text: "const total = [1,2].map(n=>n*2)" },
 };
 
 export const Python: Story = {

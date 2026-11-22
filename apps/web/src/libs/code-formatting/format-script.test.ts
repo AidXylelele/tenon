@@ -54,14 +54,14 @@ describe("formatting a script off the page's thread", () => {
       { kind: "formatted", text: "b\n" },
     );
 
-    await formatScript("js", "a");
+    await formatScript("javascript", "a");
     await formatScript("python", "b");
 
     expect(started).toHaveLength(1);
     expect(started[0]?.url.pathname).toMatch(/\/formatting\.worker\.ts$/);
     expect(started[0]?.options).toEqual({ type: "module" });
     expect(requests).toEqual([
-      { language: "js", text: "a" },
+      { language: "javascript", text: "a" },
       { language: "python", text: "b" },
     ]);
   });
@@ -97,7 +97,7 @@ describe("formatting a script off the page's thread", () => {
 
   it("a_worker_that_stopped_rejects_the_request", async () => {
     const formatScript = await freshFormatScript();
-    const formatting = formatScript("js", "a");
+    const formatting = formatScript("javascript", "a");
     const stop = new ErrorEvent("error", { message: "Script error." });
 
     workers[0]?.dispatchEvent(stop);
@@ -107,13 +107,13 @@ describe("formatting a script off the page's thread", () => {
 
   it("a_worker_that_stopped_is_replaced_on_the_next_request", async () => {
     const formatScript = await freshFormatScript();
-    const failed = formatScript("js", "a");
+    const failed = formatScript("javascript", "a");
     const stop = new ErrorEvent("error", { message: "Script error." });
     workers[0]?.dispatchEvent(stop);
     await failed.catch(() => undefined);
     answers.push({ kind: "formatted", text: "b\n" });
 
-    const formatting = await formatScript("js", "b");
+    const formatting = await formatScript("javascript", "b");
 
     expect(started).toHaveLength(2);
     expect(formatting).toEqual({ kind: "formatted", text: "b\n" });

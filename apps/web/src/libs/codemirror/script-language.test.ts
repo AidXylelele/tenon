@@ -1,4 +1,8 @@
-import { currentCompletions, startCompletion } from "@codemirror/autocomplete";
+import {
+  autocompletion,
+  currentCompletions,
+  startCompletion,
+} from "@codemirror/autocomplete";
 import { language, syntaxTree } from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
@@ -25,7 +29,7 @@ function highlightsOf(name: ScriptLanguage, doc: string): Highlight[] {
 
 describe("the languages of scripts", () => {
   it.each<[ScriptLanguage, string]>([
-    ["js", "javascript"],
+    ["javascript", "javascript"],
     ["python", "python"],
   ])("a_%s_script_is_read_as_%s", (name, expected) => {
     const extensions = scriptLanguage(name);
@@ -37,7 +41,10 @@ describe("the languages of scripts", () => {
   });
 
   it("javascript_is_highlighted_by_its_grammar", () => {
-    const highlights = highlightsOf("js", 'const greeting = "hi"; // hello');
+    const highlights = highlightsOf(
+      "javascript",
+      'const greeting = "hi"; // hello',
+    );
 
     expect(highlights).toEqual([
       ["const", "tok-keyword"],
@@ -63,12 +70,13 @@ describe("the languages of scripts", () => {
   });
 
   it.each<[ScriptLanguage, string]>([
-    ["js", "const total = 1;\nto"],
+    ["javascript", "const total = 1;\nto"],
     ["python", "total = 1\nto"],
   ])(
-    "completion_in_%s_offers_the_names_the_script_declares",
+    "the_%s_language_completes_the_names_the_script_declares",
     async (name, doc) => {
-      const extensions = scriptLanguage(name);
+      const support = scriptLanguage(name);
+      const extensions = [support, autocompletion()];
       const selection = { anchor: doc.length };
       const view = new EditorView({ doc, selection, extensions });
 
