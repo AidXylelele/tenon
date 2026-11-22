@@ -4,7 +4,10 @@ import { aPasswordAccount, aUser } from "../../../../support/builders.js";
 import {
   InMemoryAccountRepository,
   InMemoryUserRepository,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 describe("ResetPassword", () => {
   it("the_new_hash_replaces_the_password_of_the_existing_account", async () => {
@@ -12,7 +15,7 @@ describe("ResetPassword", () => {
     const account = aPasswordAccount(user, "old-hash");
     const accounts = new InMemoryAccountRepository(account);
     const users = new InMemoryUserRepository();
-    const reset = new ResetPassword(accounts, users);
+    const reset = new ResetPassword(accounts, users, unitOfWork);
 
     await reset.execute({ userId: "user-1", passwordHash: "new-hash" });
 
@@ -24,7 +27,7 @@ describe("ResetPassword", () => {
     const accounts = new InMemoryAccountRepository();
     const admin = aUser({ email: "admin@example.com" });
     const users = new InMemoryUserRepository(admin);
-    const reset = new ResetPassword(accounts, users);
+    const reset = new ResetPassword(accounts, users, unitOfWork);
 
     await reset.execute({ userId: "user-1", passwordHash: "first-hash" });
 
@@ -42,7 +45,7 @@ describe("ResetPassword", () => {
   it("an_unknown_user_is_reported_as_not_found", async () => {
     const accounts = new InMemoryAccountRepository();
     const users = new InMemoryUserRepository();
-    const reset = new ResetPassword(accounts, users);
+    const reset = new ResetPassword(accounts, users, unitOfWork);
 
     const refused = await reset.execute({
       userId: "nobody",

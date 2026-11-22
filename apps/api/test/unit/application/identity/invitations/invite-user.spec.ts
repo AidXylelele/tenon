@@ -9,7 +9,10 @@ import {
   InMemoryInvitationRepository,
   InMemoryUserRepository,
   RecordingInvitationMailer,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 const command = {
   email: "invitee@example.com",
@@ -23,7 +26,7 @@ describe("InviteUser", () => {
     const invitations = new InMemoryInvitationRepository();
     const mailer = new RecordingInvitationMailer();
     const users = new InMemoryUserRepository();
-    const invite = new InviteUser(invitations, users, mailer);
+    const invite = new InviteUser(invitations, users, mailer, unitOfWork);
 
     const invited = await invite.execute(command);
 
@@ -41,7 +44,7 @@ describe("InviteUser", () => {
     const invitations = new InMemoryInvitationRepository();
     const mailer = new RecordingInvitationMailer();
     const users = new InMemoryUserRepository();
-    const invite = new InviteUser(invitations, users, mailer);
+    const invite = new InviteUser(invitations, users, mailer, unitOfWork);
 
     const invited = await invite.execute(command);
 
@@ -60,7 +63,7 @@ describe("InviteUser", () => {
     const invitations = new InMemoryInvitationRepository(previous.invitation);
     const users = new InMemoryUserRepository();
     const mailer = new RecordingInvitationMailer();
-    const invite = new InviteUser(invitations, users, mailer);
+    const invite = new InviteUser(invitations, users, mailer, unitOfWork);
 
     const invited = await invite.execute(command);
 
@@ -75,7 +78,7 @@ describe("InviteUser", () => {
     const mailer = new RecordingInvitationMailer();
     const existing = aUser({ email: "invitee@example.com" });
     const users = new InMemoryUserRepository(existing);
-    const invite = new InviteUser(invitations, users, mailer);
+    const invite = new InviteUser(invitations, users, mailer, unitOfWork);
 
     const refused = await invite.execute(command);
 

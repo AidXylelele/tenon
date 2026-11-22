@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Invitation } from "../../../domain/identity/invitations/invitation.js";
 import { InvitationToken } from "../../../domain/identity/invitations/invitation-token.js";
 import { UserRepository } from "../users/ports.js";
@@ -12,9 +12,9 @@ export class InviteUser {
     private readonly invitations: InvitationRepository,
     private readonly users: UserRepository,
     private readonly mailer: InvitationMailer,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: InviteUserCommand): Promise<InvitationResult> {
     const now = new Date();
     const holder = await this.users.findByEmail(command.email);
@@ -36,13 +36,15 @@ export class InviteUser {
       const revoked = previous.revoke(now);
 
       if (!revoked.ok) return revoked;
-
-      await this.invitations.save(previous);
     }
 
     const invitation = created.value;
-    await this.invitations.save(invitation);
-    await this.mailer.sendInvitation(invitation, token, command.inviterName);
+    await this.unitOfWork.run(async () => {
+      if (previous !== null) await this.invitations.save(previous);
+
+      await this.invitations.save(invitation);
+      await this.mailer.sendInvitation(invitation, token, command.inviterName);
+    });
     const view = {
       id: invitation.id,
       email: invitation.email,
