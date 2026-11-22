@@ -1,5 +1,9 @@
 import type { JsonValue } from "interpreter/front-end";
-import { memberAccessOf, runtimeExpressionOf } from "../jq-text/index.js";
+import {
+  memberAccessOf,
+  runtimeExpressionOf,
+  timeExpressions,
+} from "../jq-text/index.js";
 import { valueAt } from "../pointers/index.js";
 import type { StepNode } from "../steps/index.js";
 import { exportAsPointerOf, exportedNameOf } from "./exports.js";
@@ -45,14 +49,6 @@ const fromSecrets: Origin = {
 };
 
 const fromClock: Origin = { source: "time", step: null, needsExport: false };
-
-const startOfDay = '"%Y-%m-%dT00:00:00Z"';
-
-const times: readonly (readonly [string, string])[] = [
-  ["now", "now | todate"],
-  ["today", `now | strftime(${startOfDay})`],
-  ["yesterday", `now - 86400 | strftime(${startOfDay})`],
-];
 
 export function stepEntriesOf(site: DataSite): readonly DataEntry[] {
   const { flow, node, place } = site;
@@ -105,6 +101,8 @@ export function secretEntriesOf(site: DataSite): readonly DataEntry[] {
 }
 
 export function timeEntriesOf(): readonly DataEntry[] {
+  const times = Object.entries(timeExpressions);
+
   return times.map(([name, expression]) => {
     const member = memberOf(name, expression, textShape);
     return entryOf(member, fromClock);

@@ -15,10 +15,13 @@ import {
   type WrittenScalar,
   yamlOf,
 } from "../yaml-text/index.js";
+import { conditionTextOf } from "../conditions/index.js";
 import type {
   ClearField,
   EditableText,
   Editing,
+  FieldAction,
+  SetCondition,
   SetField,
   ValueText,
   WrittenField,
@@ -32,6 +35,20 @@ import {
   mappingTextOf,
   removalOf,
 } from "./collection-text.js";
+
+export function fieldEditingOf(
+  editable: EditableText,
+  action: FieldAction,
+): Editing {
+  switch (action.kind) {
+    case "setField":
+      return fieldSettingOf(editable, action);
+    case "clearField":
+      return fieldClearingOf(editable, action);
+    case "setCondition":
+      return conditionSettingOf(editable, action);
+  }
+}
 
 export function fieldSettingOf(
   editable: EditableText,
@@ -90,6 +107,26 @@ export function fieldClearingOf(
   const removal = removalOf(collection, span);
   const changes = inTextOrder(removal);
   return { kind: "edited", changes, ids: [] };
+}
+
+function conditionSettingOf(
+  editable: EditableText,
+  action: SetCondition,
+): Editing {
+  const written = conditionTextOf(action.condition);
+
+  switch (written.kind) {
+    case "text": {
+      const setting: SetField = {
+        kind: "setField",
+        pointer: action.pointer,
+        value: written.text,
+      };
+      return fieldSettingOf(editable, setting);
+    }
+    case "refused":
+      return written;
+  }
 }
 
 function replacedFieldOf(

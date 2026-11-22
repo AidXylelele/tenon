@@ -35,6 +35,8 @@ import {
   newDocumentRequest,
   rangesOfHandlerOf,
   rangesOfRequest,
+  readConditionAnswerOf,
+  readConditionRequest,
   stepFormHandlerOf,
   stepFormRequest,
   stepVariantsHandlerOf,
@@ -80,6 +82,9 @@ export function serve(
 
   const answerFromJson = lifecycle.guarded(fromJsonAnswerOf);
   connection.onRequest(fromJsonRequest, answerFromJson);
+
+  const answerCondition = lifecycle.guarded(readConditionAnswerOf);
+  connection.onRequest(readConditionRequest, answerCondition);
 
   const shutdown = lifecycle.guarded(() => {
     lifecycle.shutDown();

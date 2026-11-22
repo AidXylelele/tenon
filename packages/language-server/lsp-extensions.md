@@ -810,6 +810,84 @@ interface DataMember {
 }
 ```
 
+## Read a condition
+
+**Method:** `workflow/readCondition`
+
+The client sends this request to open a condition (a case's `when`, a step's `if`) in the condition builder. It names no document and holds no state: the text is the field's value, as the form gives it.
+
+```typescript
+interface ReadConditionParams {
+  text: string;
+}
+
+type ReadConditionResult =
+  { kind: "condition"; condition: Condition } | { kind: "expression" }; // open the field as jq
+
+interface Condition {
+  join: "all" | "any";
+  rows: ConditionRow[]; // at least one
+}
+
+type ConditionRow =
+  | { left: string; comparison: "isEmpty" | "isNotEmpty"; right: null }
+  | {
+      left: string;
+      comparison: "contains" | "doesNotContain";
+      right: { kind: "value"; value: Literal };
+    }
+  | {
+      left: string;
+      comparison: "is" | "isNot" | "isGreaterThan" | "isLessThan";
+      right: Operand;
+    };
+
+type Operand =
+  | { kind: "data"; path: string } // a workflow/dataAt expression that is a path
+  | { kind: "value"; value: Literal }
+  | { kind: "time"; time: "now" | "today" | "yesterday" };
+
+type Literal = string | number | boolean | null;
+```
+
+- **One form.** A condition is written in one form, and read back only from exactly that form; any other text is `expression`, so the client opens it as jq and it is never rewritten. `left` and a `data` operand are paths: `.`, `.name`, `.["a name"]`, `$name` and their members.
+- **Rows**, with `L` the left path and `R` the second value as jq (a literal as JSON, a time in brackets):
+
+  | Comparison                    | jq                                                                                                                                               |
+  | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `is`, `isNot`                 | `L == R`, `L != R`                                                                                                                               |
+  | `contains`                    | `L \| if type == "array" then any(.[]; . == R) else tostring \| contains(R \| tostring) end`: an item of a list, or a part of a text             |
+  | `doesNotContain`              | the same, then `\| not`                                                                                                                          |
+  | `isEmpty`, `isNotEmpty`       | `(L \| length) == 0`, `(L \| length) > 0`: missing, `""`, `[]` and `{}` are empty                                                                |
+  | `isGreaterThan`, `isLessThan` | `(L \| tonumber) > R` where `R` is a number, since jq orders every text after every number; else `L > R`, as texts and times compare (`<` alike) |
+
+- **Joins.** One row is written alone; several are each in brackets, joined by `and` (`all`) or `or` (`any`). The whole is a runtime expression, `${ … }`.
+- **Writing** is `workflow/edit`'s `setCondition`. A condition with no row, or a path that is not one, is refused with its reason.
+- **Errors:** `InvalidParams` (-32602), when the params hold no `text`.
+
+**Example:**
+
+```json
+{ "text": "${ (.status == \"paid\") and ((.items | length) > 0) }" }
+```
+
+```json
+{
+  "kind": "condition",
+  "condition": {
+    "join": "all",
+    "rows": [
+      {
+        "left": ".status",
+        "comparison": "is",
+        "right": { "kind": "value", "value": "paid" }
+      },
+      { "left": ".items", "comparison": "isNotEmpty", "right": null }
+    ]
+  }
+}
+```
+
 ## Edit
 
 **Method:** `workflow/edit`
@@ -843,6 +921,7 @@ type EditAction =
   | { kind: "duplicateStep"; step: string }
   | { kind: "setField"; pointer: string; value: JsonValue }
   | { kind: "clearField"; pointer: string }
+  | { kind: "setCondition"; pointer: string; condition: Condition }
   | { kind: "setFailure"; step: string; failure: Failure }
   | { kind: "setResult"; step: string; result: ChosenResult }
   | {
@@ -886,10 +965,11 @@ interface EditResult {
   - the `catch` written: `continue` `{}`; `retry` `{ retry: { delay: { seconds }, backoff: { constant: {} } or { exponential: {} } when growing, limit: { attempt: { count: attempts } } } }`; `handle` `{ do: [] }`, an empty list the web fills with `insertStep` into `<id>/catch/do`; a `handle` on a try whose catch already writes `do` changes nothing;
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
 - **The step's result** (`setResult`) writes the members of the chosen result and removes the others: `output.as`, and the `output` that holds nothing else; a script's `run.return`, removed where it would return what the script prints. A result the step does not offer is refused.
+- **Conditions** (`setCondition`) write the condition at the field in its one form (`workflow/readCondition`), as `setField` would its text.
 - **Data** (`useData`) sets the field to the value and, with `export`, writes that step's `export.as: ${ $context + { "<name>": . } }`, the export a `$context.<name>` entry of `workflow/dataAt` reads; a step that already writes it is left as it is, and a step that writes another export is refused.
 - **Errors:**
   - `ContentModified` (-32801), when the version is not the store's;
-  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
+  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a condition with no row or with a path that is not one, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
   - `InvalidParams` (-32602), when the params are of another shape.
 
 **Example:**

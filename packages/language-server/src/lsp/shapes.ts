@@ -5,6 +5,8 @@ import {
   TextDocumentIdentifier,
   VersionedTextDocumentIdentifier,
 } from "vscode-languageserver/browser";
+import { type Comparison, secondValues } from "../ide/conditions/index.js";
+import { timeExpressions } from "../ide/jq-text/index.js";
 import { isChosenResult, stepVariants } from "../ide/variants/index.js";
 import type {
   DataAtParams,
@@ -14,6 +16,7 @@ import type {
   InitializationOptions,
   NewDocumentParams,
   RangesOfParams,
+  ReadConditionParams,
   StepFormParams,
 } from "../protocol/index.js";
 import type { ActionKind } from "./interfaces.js";
@@ -50,6 +53,7 @@ const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
   renameStep: (action) => holdsStrings(action, ["step", "name"]),
   duplicateStep: (action) => holdsStrings(action, ["step"]),
   setField: holdsSetting,
+  setCondition: holdsConditionSetting,
   clearField: (action) => holdsStrings(action, ["pointer"]),
   setFailure: holdsFailureSetting,
   setResult: holdsResultSetting,
@@ -139,6 +143,12 @@ export function holdsDataAtParams(params: unknown): params is DataAtParams {
   );
 }
 
+export function holdsReadConditionParams(
+  params: unknown,
+): params is ReadConditionParams {
+  return holdsStrings(params, ["text"]);
+}
+
 export function holdsEditParams(params: unknown): params is EditParams {
   const action = memberOf(params, "action");
   const kind = memberOf(action, "kind");
@@ -187,6 +197,69 @@ function holdsFailureSetting(action: unknown): boolean {
   }
 
   return holdsStrings(action, ["step"]) && isChoice;
+}
+
+function holdsConditionSetting(action: unknown): boolean {
+  const condition = memberOf(action, "condition");
+  const join = memberOf(condition, "join");
+  const rows = memberOf(condition, "rows");
+  const isJoin = join === "all" || join === "any";
+  const isList = Array.isArray(rows);
+  const isConditional = isJoin && isList && rows.every(holdsRow);
+
+  return holdsStrings(action, ["pointer"]) && isConditional;
+}
+
+function holdsRow(row: unknown): boolean {
+  const comparison = memberOf(row, "comparison");
+  const right = memberOf(row, "right");
+  const isLeft = holdsStrings(row, ["left"]);
+
+  if (!isComparison(comparison) || !isLeft) {
+    return false;
+  }
+
+  switch (secondValues[comparison]) {
+    case "none":
+      return right === null;
+    case "value":
+      return holdsValueOperand(right);
+    case "operand":
+      return holdsOperand(right);
+  }
+}
+
+function holdsOperand(operand: unknown): boolean {
+  const kind = memberOf(operand, "kind");
+  const time = memberOf(operand, "time");
+  const isTime =
+    typeof time === "string" && Object.hasOwn(timeExpressions, time);
+
+  if (kind === "data") {
+    return holdsStrings(operand, ["path"]);
+  }
+
+  if (kind === "time") {
+    return isTime;
+  }
+
+  return holdsValueOperand(operand);
+}
+
+function isComparison(value: unknown): value is Comparison {
+  return typeof value === "string" && Object.hasOwn(secondValues, value);
+}
+
+function holdsValueOperand(operand: unknown): boolean {
+  const kind = memberOf(operand, "kind");
+  const value = memberOf(operand, "value");
+  const isLiteral =
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    Number.isFinite(value);
+
+  return kind === "value" && isLiteral;
 }
 
 function holdsDataUse(action: unknown): boolean {

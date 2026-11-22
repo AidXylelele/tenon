@@ -10,6 +10,10 @@ export {
 export { newDocumentHandlerOf, newDocumentRequest } from "./new-document.js";
 export { rangesOfHandlerOf, rangesOfRequest } from "./ranges-of.js";
 export {
+  readConditionAnswerOf,
+  readConditionRequest,
+} from "./read-condition.js";
+export {
   stepFormHandlerOf,
   stepFormRequest,
   workflowFormHandlerOf,

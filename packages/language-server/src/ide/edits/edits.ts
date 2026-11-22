@@ -11,7 +11,7 @@ import type {
 import { branchInsertionOf } from "./branches.js";
 import { dataUseOf } from "./data-use.js";
 import { failureSettingOf } from "./failures.js";
-import { fieldClearingOf, fieldSettingOf } from "./field-actions.js";
+import { fieldEditingOf } from "./field-actions.js";
 import { resultSettingOf } from "./results.js";
 import {
   stepDuplicateOf,
@@ -35,6 +35,7 @@ export function editsOf(snapshot: Snapshot, action: EditAction): Editing {
   switch (action.kind) {
     case "setField":
     case "clearField":
+    case "setCondition":
       return fieldEditsOf(snapshot, action);
     case "insertStep":
     case "insertStepOnBranch":
@@ -75,12 +76,7 @@ function fieldEditsOf(snapshot: Snapshot, action: FieldAction): Editing {
     return unreadable;
   }
 
-  switch (action.kind) {
-    case "setField":
-      return fieldSettingOf(editable, action);
-    case "clearField":
-      return fieldClearingOf(editable, action);
-  }
+  return fieldEditingOf(editable, action);
 }
 
 function stepEditsOf(snapshot: Snapshot, action: StepAction): Editing {

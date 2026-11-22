@@ -1407,3 +1407,53 @@ test("a step that writes its own export is not exported over it", () => {
     reason: "The step /do/fetch writes its own export; edit it in the text.",
   });
 });
+
+const conditionFlow = `${inlineHeader}do:
+  - route:
+      switch:
+        - paid:
+            when: \${ .paid }
+            then: end
+        - default:
+            then: continue
+`;
+
+test("a condition is written into its field as jq", () => {
+  const action: EditAction = {
+    kind: "setCondition",
+    pointer: "/do/0/route/switch/0/paid/when",
+    condition: {
+      join: "all",
+      rows: [
+        {
+          left: ".status",
+          comparison: "is",
+          right: { kind: "value", value: "paid" },
+        },
+      ],
+    },
+  };
+
+  const outcome = outcomeOf(conditionFlow, action);
+
+  const expected = conditionFlow.replace(
+    "when: ${ .paid }",
+    'when: ${ .status == "paid" }',
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a condition that cannot be written is refused with its reason", () => {
+  const action: EditAction = {
+    kind: "setCondition",
+    pointer: "/do/0/route/switch/0/paid/when",
+    condition: { join: "all", rows: [] },
+  };
+
+  const editing = check(conditionFlow, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "A condition holds at least one row.",
+  });
+});

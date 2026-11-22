@@ -6,6 +6,7 @@ import type {
   TextEdit,
   VersionedTextDocumentIdentifier,
 } from "vscode-languageserver/browser";
+import type { ConditionReading } from "../ide/conditions/index.js";
 import type { DataEntry, DataWarning } from "../ide/data/index.js";
 import type { EditAction, IdChange } from "../ide/edits/index.js";
 import type * as forms from "../ide/forms/index.js";
@@ -54,6 +55,12 @@ export interface FromJsonParams {
 export interface FromJsonResult {
   readonly text: string;
 }
+
+export interface ReadConditionParams {
+  readonly text: string;
+}
+
+export type ReadConditionResult = ConditionReading;
 
 export interface RangesOfParams {
   readonly textDocument: VersionedTextDocumentIdentifier;

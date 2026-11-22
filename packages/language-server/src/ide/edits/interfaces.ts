@@ -6,6 +6,7 @@ import type {
   RangeLocator,
 } from "interpreter/front-end";
 import type { TextChange } from "../text/index.js";
+import type { Condition } from "../conditions/index.js";
 import type { Snapshot } from "../snapshot/index.js";
 import type { ChosenResult, StepVariant } from "../variants/index.js";
 import type {
@@ -61,6 +62,12 @@ export interface SetField {
   readonly value: JsonValue;
 }
 
+export interface SetCondition {
+  readonly kind: "setCondition";
+  readonly pointer: string;
+  readonly condition: Condition;
+}
+
 export interface ClearField {
   readonly kind: "clearField";
   readonly pointer: string;
@@ -98,7 +105,7 @@ export type StepAction =
   | SetResult
   | UseData;
 
-export type FieldAction = SetField | ClearField;
+export type FieldAction = SetField | ClearField | SetCondition;
 
 export type EditAction = StepAction | FieldAction;
 

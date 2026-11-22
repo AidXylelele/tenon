@@ -11,7 +11,7 @@ import {
   variantOf,
 } from "../variants/index.js";
 import { combinedOf } from "./collection-text.js";
-import { fieldClearingOf, fieldSettingOf } from "./field-actions.js";
+import { fieldEditingOf } from "./field-actions.js";
 import type {
   Editable,
   Editing,
@@ -118,15 +118,6 @@ function settingOf(
   }
 
   return [{ kind: "setField", pointer, value }];
-}
-
-function fieldEditingOf(editable: Editable, action: FieldAction): Editing {
-  switch (action.kind) {
-    case "setField":
-      return fieldSettingOf(editable, action);
-    case "clearField":
-      return fieldClearingOf(editable, action);
-  }
 }
 
 function unofferedOf(action: SetResult): string {

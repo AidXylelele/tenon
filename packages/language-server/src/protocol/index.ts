@@ -14,6 +14,8 @@ export type {
   NestedList,
   RangesOfParams,
   RangesOfResult,
+  ReadConditionParams,
+  ReadConditionResult,
   Step,
   StepFormParams,
   StepFormResult,
@@ -30,6 +32,15 @@ export type {
   NewDocumentParams,
   NewDocumentResult,
 } from "../ide/document/index.js";
+export type {
+  Comparison,
+  Condition,
+  ConditionReading,
+  ConditionRow,
+  Join,
+  Literal,
+  Operand,
+} from "../ide/conditions/index.js";
 export type {
   DataEntry,
   DataMember,

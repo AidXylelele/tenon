@@ -221,3 +221,29 @@ test("data used with an export that is not a step id is invalid", async () => {
 
   await expect(refused).rejects.toMatchObject({ code: -32602 });
 });
+
+test("a condition row with a second value it does not take is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: {
+      kind: "setCondition",
+      pointer: "/do/2/route/switch/0/again/when",
+      condition: {
+        join: "all",
+        rows: [
+          {
+            left: ".items",
+            comparison: "isEmpty",
+            right: { kind: "value", value: 1 },
+          },
+        ],
+      },
+    },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});
