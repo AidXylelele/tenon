@@ -6,6 +6,7 @@ import type {
   EffectOutcome,
   EffectResponse,
   Ending,
+  Failure,
   HostEnd,
   HostProfile,
   InputProblem,
@@ -13,6 +14,7 @@ import type {
   JsonValue,
   Manifest,
   ProcessRequest,
+  Resource,
   RoutingFilter,
   RuntimeDescriptor,
   Script,
@@ -243,4 +245,11 @@ export abstract class EffectClient {
     step: StepCall,
   ): Promise<void>;
   abstract sandboxed(effect: Effect): SandboxedProcessRequest;
+}
+
+export type FetchedText =
+  { readonly kind: "text"; readonly text: string } | Failure;
+
+export abstract class ResourceClient {
+  abstract text(resource: Resource, step: StepCall): Promise<FetchedText>;
 }

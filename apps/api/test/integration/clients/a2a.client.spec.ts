@@ -12,6 +12,7 @@ import { A2aClient } from "../../../src/frameworks/a2a/a2a.client.js";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
+import { TransportFailures } from "../../../src/frameworks/http-client/transport-failures.js";
 import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
 import {
   closedPort,
@@ -60,7 +61,11 @@ describe("a call the A2A client performs for a run", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
-    client = new A2aClient(httpClientOf(policy, resilience), resilience);
+    client = new A2aClient(
+      httpClientOf(policy, resilience),
+      new TransportFailures(),
+      resilience,
+    );
     stub = await startStubServer((request, response) => {
       answer(request, response);
     });
@@ -803,6 +808,7 @@ describe("a call the A2A client performs for a run", () => {
         const guarded = new AddressPolicy([]);
         const guardedClient = new A2aClient(
           httpClientOf(guarded, resilience),
+          new TransportFailures(),
           resilience,
         );
         const uri = `http://${host}:${String(stub.port)}`;

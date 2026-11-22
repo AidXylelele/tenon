@@ -21,6 +21,7 @@ import { McpClient } from "../mcp/mcp.client.js";
 import { effectDurationBoundaries } from "../opentelemetry/histogram.presets.js";
 import { PermanentFault } from "../../domain/errors.js";
 import type { CallContext } from "./interfaces.js";
+import { LONGEST_TIMER } from "./longest-timer.js";
 
 @Injectable()
 export class EffectPerformer implements EffectClient {
@@ -115,8 +116,7 @@ export class EffectPerformer implements EffectClient {
   }
 
   #contextOf(step: StepCall, remaining: number | null): CallContext {
-    const longestTimer = 2 ** 31 - 1;
-    const timed = remaining !== null && remaining <= longestTimer;
+    const timed = remaining !== null && remaining <= LONGEST_TIMER;
     const signals = timed
       ? [step.signal, AbortSignal.timeout(Math.ceil(remaining))]
       : [step.signal];

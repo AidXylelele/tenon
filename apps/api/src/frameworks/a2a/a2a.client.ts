@@ -1,10 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  ResilienceError,
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from "@nestjs/resilience";
+import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import { createParser } from "eventsource-parser";
 import type {
   A2aRequest,
@@ -16,6 +11,7 @@ import type {
   RpcOutcome,
 } from "interpreter";
 import { HttpClient } from "../http-client/http.client.js";
+import { TransportFailures } from "../http-client/transport-failures.js";
 import type { CallContext } from "../interpreter/interfaces.js";
 import { AgentCard } from "./agent-card.js";
 import { AGENT_CARD } from "./agent-card.schema.js";
@@ -28,6 +24,7 @@ export class A2aClient {
 
   constructor(
     private readonly http: HttpClient,
+    private readonly failures: TransportFailures,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("a2a-calls");
@@ -48,7 +45,7 @@ export class A2aClient {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, context.signal);
     }
   }
 
@@ -205,18 +202,5 @@ export class A2aClient {
       request.method === "message/stream" ||
       request.method === "tasks/resubscribe"
     );
-  }
-
-  #failureOf(error: unknown, signal: AbortSignal): RpcOutcome {
-    if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return { kind: "expired" };
-
-    if (error instanceof ResilienceError) throw error;
-
-    const failure = this.http.transportFailureOf(error);
-
-    if (failure === null) throw error;
-
-    return failure;
   }
 }

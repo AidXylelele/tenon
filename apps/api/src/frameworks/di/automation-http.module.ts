@@ -13,6 +13,7 @@ import {
   ProcessPlatform,
 } from "../../application/automation/host/queries.js";
 import { FetchImport } from "../../application/automation/imports/fetch-import.js";
+import { ImportFetcher } from "../../application/automation/imports/ports.js";
 import { DeleteInstance } from "../../application/automation/instances/delete-instance.js";
 import { RestartInstance } from "../../application/automation/instances/restart-instance.js";
 import { ResumeInstance } from "../../application/automation/instances/resume-instance.js";
@@ -64,10 +65,15 @@ import { PostgresSubscriptionQueries } from "../../interface-adapters/persistenc
 import { PostgresWebhookQueries } from "../../interface-adapters/persistence/queries/postgres-webhook.queries.js";
 import { PostgresDraftRepository } from "../../interface-adapters/persistence/repositories/postgres-draft.repository.js";
 import { PostgresWebhookRepository } from "../../interface-adapters/persistence/repositories/postgres-webhook.repository.js";
+import { HttpImportGateway } from "../../interface-adapters/workflows/gateways/http-import.gateway.js";
 import { InterpreterCapabilitiesGateway } from "../../interface-adapters/workflows/gateways/interpreter-capabilities.gateway.js";
 import { InterpreterCompilerGateway } from "../../interface-adapters/workflows/gateways/interpreter-compiler.gateway.js";
-import { StructureClient } from "../../interface-adapters/workflows/interfaces.js";
+import {
+  ResourceClient,
+  StructureClient,
+} from "../../interface-adapters/workflows/interfaces.js";
 import { SandboxPlatform } from "../go-judge/sandbox-platform.js";
+import { HttpClient } from "../http-client/http.client.js";
 import { WorkerInterpreterClient } from "../interpreter/worker-interpreter.client.js";
 import { linksConfig } from "./configs.js";
 import { CoreModule } from "./core.module.js";
@@ -112,6 +118,9 @@ import { hostLimits } from "./resilience.presets.js";
     CreateSubscription,
     DeleteSubscription,
     AutomationPolicy,
+    HttpImportGateway,
+    { provide: ImportFetcher, useExisting: HttpImportGateway },
+    { provide: ResourceClient, useExisting: HttpClient },
     InterpreterCompilerGateway,
     { provide: DefinitionCompiler, useExisting: InterpreterCompilerGateway },
     InterpreterCapabilitiesGateway,

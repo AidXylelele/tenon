@@ -7,7 +7,7 @@ import type {
 export class ResponseSizeLimit implements HttpClientInterceptor {
   static readonly EXCEEDED = "ERR_RESPONSE_TOO_LARGE";
 
-  constructor(private readonly bytes: number) {}
+  constructor(readonly bytes: number) {}
 
   async intercept(request: HttpRequest, next: HttpHandler): Promise<Response> {
     const response = await next(request);
@@ -17,6 +17,11 @@ export class ResponseSizeLimit implements HttpClientInterceptor {
       statusText: response.statusText,
       headers: response.headers,
     });
+  }
+
+  inMebibytes(): string {
+    const mebibytes = this.bytes / (1024 * 1024);
+    return `${String(mebibytes)} MiB`;
   }
 
   #counter(): TransformStream<Uint8Array, Uint8Array> {
@@ -36,10 +41,8 @@ export class ResponseSizeLimit implements HttpClientInterceptor {
   }
 
   #exceeded(): Error {
-    const mebibytes = this.bytes / (1024 * 1024);
-    const error = new Error(
-      `The response is larger than ${String(mebibytes)} MiB`,
-    );
+    const size = this.inMebibytes();
+    const error = new Error(`The response is larger than ${size}`);
     return Object.assign(error, { code: ResponseSizeLimit.EXCEEDED });
   }
 }

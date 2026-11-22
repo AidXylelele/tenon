@@ -3,8 +3,11 @@ import {
   type Authentication,
   createSecretPolicies,
   type JsonObject,
+  type ResolvedAuthentication,
+  type RevealedAuthorization,
   type SecretPolicies,
 } from "interpreter";
+import { PermanentFault } from "../../domain/errors.js";
 import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { AuthorizationServer } from "./authorization-server.js";
 import type {
@@ -41,11 +44,6 @@ export class HttpAuthentication {
         const pair = this.#pairOf(credentials);
         return this.#header("Basic", pair);
       }
-      case "digest":
-        return {
-          kind: "misconfigured",
-          detail: "The host does not answer HTTP Digest challenges",
-        };
       case "oauth2":
       case "oidc": {
         const token = await this.server.accessTokenFor(credentials, signal);
@@ -58,6 +56,24 @@ export class HttpAuthentication {
     authentication: Authentication | null,
     secrets: JsonObject,
   ): Credentials | UnusableSecret | null {
+    const resolved = this.#resolvedOf(authentication, secrets);
+
+    if (!this.#performable(resolved))
+      throw new PermanentFault(
+        "The host does not perform 'authentication.digest'; its profile refuses it at publish",
+      );
+
+    return resolved;
+  }
+
+  headerValueOf(authorization: RevealedAuthorization): string {
+    return `${authorization.scheme} ${authorization.parameter}`;
+  }
+
+  #resolvedOf(
+    authentication: Authentication | null,
+    secrets: JsonObject,
+  ): ResolvedAuthentication | UnusableSecret | null {
     if (authentication === null) return null;
 
     if (authentication.kind !== "secret") return authentication;
@@ -81,6 +97,12 @@ export class HttpAuthentication {
       };
 
     return held;
+  }
+
+  #performable(
+    resolved: ResolvedAuthentication | UnusableSecret | null,
+  ): resolved is Credentials | UnusableSecret | null {
+    return resolved?.kind !== "digest";
   }
 
   #header(scheme: string, parameter: string): Authorized {

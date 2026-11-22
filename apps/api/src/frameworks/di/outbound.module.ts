@@ -1,7 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { AddressPolicy } from "../http-client/address-policy.js";
+import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import { outboundConfig } from "./configs.js";
+import { responseSizeLimit } from "./resilience.presets.js";
 
 @Module({
   imports: [ConfigModule.forFeature(outboundConfig)],
@@ -12,7 +14,8 @@ import { outboundConfig } from "./configs.js";
       useFactory: (outbound: ConfigType<typeof outboundConfig>) =>
         new AddressPolicy(outbound.OUTBOUND_ALLOW_LIST),
     },
+    { provide: ResponseSizeLimit, useValue: responseSizeLimit },
   ],
-  exports: [AddressPolicy],
+  exports: [AddressPolicy, ResponseSizeLimit],
 })
 export class OutboundModule {}

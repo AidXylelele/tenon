@@ -19,6 +19,7 @@ import { z } from "zod";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
+import { TransportFailures } from "../../../src/frameworks/http-client/transport-failures.js";
 import type { HttpMcpRequest } from "../../../src/frameworks/mcp/interfaces.js";
 import { McpClient } from "../../../src/frameworks/mcp/mcp.client.js";
 import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
@@ -83,7 +84,12 @@ describe("a call the MCP client performs for a run", () => {
   function mcpClientOf(guard: AddressPolicy): McpClient {
     const authentication = authenticationOf(fetchClientOf(guard.dispatcher));
     const http = httpClientOf(guard, resilience);
-    return new McpClient(authentication, http, resilience);
+    return new McpClient(
+      authentication,
+      http,
+      new TransportFailures(),
+      resilience,
+    );
   }
 
   beforeEach(() => {

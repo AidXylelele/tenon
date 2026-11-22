@@ -12,9 +12,11 @@ import type {
   ResourceRequest,
 } from "interpreter";
 import { ResilienceModule } from "@nestjs/resilience";
+import { PermanentFault } from "../../../src/domain/errors.js";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import type { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
+import { TransportFailures } from "../../../src/frameworks/http-client/transport-failures.js";
 import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
 import {
   closedPort,
@@ -666,19 +668,16 @@ describe("a call the HTTP client performs for a run", () => {
       });
     });
 
-    it("digest_authentication_is_misconfigured_before_any_request", async () => {
+    it("digest_authentication_is_a_permanent_fault_before_any_request", async () => {
       const request = httpOf("/json", {
         kind: "digest",
         username: "Mufasa",
         password: "Circle of Life",
       });
 
-      const outcome = await client.send(request, contextOf());
+      const sent = client.send(request, contextOf());
 
-      expect(outcome).toEqual({
-        kind: "misconfigured",
-        detail: "The host does not answer HTTP Digest challenges",
-      });
+      await expect(sent).rejects.toThrow(PermanentFault);
       expect(stub.received).toHaveLength(0);
     });
 
@@ -1611,7 +1610,7 @@ describe("a call the HTTP client performs for a run", () => {
 
       const failure = await fetched.then(
         () => null,
-        (error: unknown) => client.transportFailureOf(error),
+        (error: unknown) => new TransportFailures().classified(error),
       );
 
       expect(failure).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });

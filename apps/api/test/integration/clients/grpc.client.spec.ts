@@ -17,12 +17,16 @@ import { Test } from "@nestjs/testing";
 import type { Authentication, GrpcRequest, JsonObject } from "interpreter";
 import { common, parse } from "protobufjs";
 import { ResilienceModule } from "@nestjs/resilience";
-import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
+import {
+  resiliencePresets,
+  responseSizeLimit,
+} from "../../../src/frameworks/di/resilience.presets.js";
 import { GrpcClient } from "../../../src/frameworks/grpc/grpc.client.js";
 import { ProtoSchema } from "../../../src/frameworks/grpc/proto-schema.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import type { HttpAuthentication } from "../../../src/frameworks/http-client/http-authentication.js";
 import type { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
+import { TransportFailures } from "../../../src/frameworks/http-client/transport-failures.js";
 import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
 import {
   closedPort,
@@ -123,6 +127,8 @@ describe("a call the gRPC client performs for a run", () => {
       http,
       authentication,
       new ProtoSchema(),
+      new TransportFailures(),
+      responseSizeLimit,
       resilience,
     );
     protos = await startStubServer((request, response) => {
@@ -490,6 +496,8 @@ describe("a call the gRPC client performs for a run", () => {
         http,
         authentication,
         new ProtoSchema(),
+        new TransportFailures(),
+        responseSizeLimit,
         resilience,
       );
       const request = grpcOf(
@@ -679,6 +687,8 @@ describe("a call the gRPC client performs for a run", () => {
           http,
           authentication,
           new ProtoSchema(),
+          new TransportFailures(),
+          responseSizeLimit,
           resilience,
         );
         const request: GrpcRequest = {

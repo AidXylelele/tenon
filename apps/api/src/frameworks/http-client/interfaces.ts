@@ -1,7 +1,8 @@
 import type {
-  Authentication,
+  AuthenticationScheme,
   Failure,
   HttpRequest,
+  ResolvedAuthentication,
   RevealedAuthorization,
 } from "interpreter";
 import type ipaddr from "ipaddr.js";
@@ -30,7 +31,9 @@ export type ResponseOptions = Pick<
   "output" | "revealAuthorization"
 >;
 
-export type Credentials = Exclude<Authentication, { readonly kind: "secret" }>;
+export type Credentials = ResolvedAuthentication & {
+  readonly kind: Exclude<AuthenticationScheme, "digest">;
+};
 
 export type OAuth2Credentials = Extract<
   Credentials,
@@ -52,9 +55,6 @@ export type Authorization =
   | { readonly kind: "header"; readonly header: RevealedAuthorization };
 
 export type Authorized = Authorization | UnusableSecret;
-
-export type FetchedText =
-  { readonly kind: "text"; readonly text: string } | Failure;
 
 export type EndpointFetch = (
   url: string | URL,

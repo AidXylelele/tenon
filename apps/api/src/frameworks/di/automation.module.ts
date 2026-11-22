@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { HttpClientModule } from "@nestjs/http-client";
 import { EventStore } from "../../application/automation/events/ports.js";
-import { ImportFetcher } from "../../application/automation/imports/ports.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import {
   InstanceRuns,
@@ -58,7 +57,9 @@ import { HttpClientName } from "../http-client/enums.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import { HttpClient } from "../http-client/http.client.js";
 import { OpenApiOperations } from "../http-client/openapi-operations.js";
+import { ResponseContent } from "../http-client/response-content.js";
 import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
+import { TransportFailures } from "../http-client/transport-failures.js";
 import { WorkerInterpreterClient } from "../interpreter/worker-interpreter.client.js";
 import { linksConfig, secretsConfig } from "./configs.js";
 import { OutboundModule } from "./outbound.module.js";
@@ -71,10 +72,10 @@ import { OutboundModule } from "./outbound.module.js";
     HttpClientModule.registerAsync({
       name: HttpClientName.Outbound,
       imports: [OutboundModule],
+      interceptors: [ResponseSizeLimit],
       inject: [AddressPolicy],
       useFactory: (policy: AddressPolicy) => ({
         dispatcher: policy.dispatcher,
-        interceptors: [new ResponseSizeLimit(HttpClient.RESPONSE_BYTES)],
       }),
     }),
   ],
@@ -133,8 +134,9 @@ import { OutboundModule } from "./outbound.module.js";
     AuthorizationServer,
     HttpAuthentication,
     OpenApiOperations,
+    TransportFailures,
+    ResponseContent,
     HttpClient,
-    { provide: ImportFetcher, useExisting: HttpClient },
     DeliveryClient,
     { provide: EventDeliveries, useExisting: DeliveryClient },
     EventDeliveryGateway,
@@ -161,8 +163,8 @@ import { OutboundModule } from "./outbound.module.js";
     WorkerInterpreterClient,
     InterpreterClient,
     HttpAuthentication,
+    TransportFailures,
     HttpClient,
-    ImportFetcher,
     EventSender,
   ],
 })

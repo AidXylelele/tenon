@@ -4,7 +4,6 @@ import { isIP, type LookupFunction } from "node:net";
 import type { OnApplicationShutdown } from "@nestjs/common";
 import ipaddr from "ipaddr.js";
 import { Agent, buildConnector } from "undici";
-import { HttpClient } from "./http.client.js";
 import type { AddressRange, AddressRanges, IpAddress } from "./interfaces.js";
 
 const IPV4_COMPATIBLE = "::/96";
@@ -33,10 +32,7 @@ export class AddressPolicy implements OnApplicationShutdown {
     const connect: buildConnector.connector = (options, callback) => {
       this.#connect(connector, options, callback);
     };
-    this.dispatcher = new Agent({
-      connect,
-      maxResponseSize: HttpClient.RESPONSE_BYTES,
-    });
+    this.dispatcher = new Agent({ connect });
   }
 
   onApplicationShutdown(): Promise<void> {
@@ -50,7 +46,12 @@ export class AddressPolicy implements OnApplicationShutdown {
 
     if (this.#listedIn(this.refused, parsed)) return false;
 
-    return parsed.range() === "unicast";
+    return this.#isUnicast(parsed);
+  }
+
+  isPrivate(address: string): boolean {
+    const parsed = ipaddr.process(address);
+    return !this.#isUnicast(parsed);
   }
 
   async admits(hostname: string): Promise<boolean> {
@@ -124,6 +125,10 @@ export class AddressPolicy implements OnApplicationShutdown {
         callback(failure, "", 0);
       },
     );
+  }
+
+  #isUnicast(address: IpAddress): boolean {
+    return address.range() === "unicast";
   }
 
   #listedIn(ranges: AddressRanges, address: IpAddress): boolean {
