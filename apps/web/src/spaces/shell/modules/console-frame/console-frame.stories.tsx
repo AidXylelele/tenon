@@ -3,6 +3,7 @@ import { fn } from "storybook/test";
 import type { Capabilities, User } from "@/libs/data-access/types";
 import { Button } from "@/libs/ui/components/button";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import { PageBody } from "@/libs/ui/composites/page-body";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { AccountMenu } from "./account-menu";
@@ -71,24 +72,29 @@ function FrameStory({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <ConsoleRoot defaultOpen={defaultOpen} lastViewport={null}>
-        <Frame
-          sidebar={sidebar}
-          search={
-            <CommandPalette capabilities={capabilities} keepTheme={keepTheme} />
-          }
-          notice={<OfflineStrip reachable={reachable} />}
-        >
-          <PageBody>
-            <PageHeader
-              title="route-lead"
-              description="Routes a lead to the team that sells in its region."
-              actions={<Button>Run</Button>}
-            />
-            <p>The page&apos;s body stands here, under the top bar.</p>
-          </PageBody>
-        </Frame>
-      </ConsoleRoot>
+      <Announcer>
+        <ConsoleRoot defaultOpen={defaultOpen} lastViewport={null}>
+          <Frame
+            sidebar={sidebar}
+            search={
+              <CommandPalette
+                capabilities={capabilities}
+                keepTheme={keepTheme}
+              />
+            }
+            notice={<OfflineStrip reachable={reachable} />}
+          >
+            <PageBody>
+              <PageHeader
+                title="route-lead"
+                description="Routes a lead to the team that sells in its region."
+                actions={<Button>Run</Button>}
+              />
+              <p>The page&apos;s body stands here, under the top bar.</p>
+            </PageBody>
+          </Frame>
+        </ConsoleRoot>
+      </Announcer>
     </TooltipProvider>
   );
 }

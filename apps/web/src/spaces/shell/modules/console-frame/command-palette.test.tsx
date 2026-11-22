@@ -8,6 +8,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Capabilities } from "@/libs/data-access/types";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import { fakeViewport } from "@/libs/ui/hooks/viewport.test-support";
 import { CommandPalette } from "./command-palette";
 import type { FoundWorkflow } from "./found-workflow";
@@ -51,8 +52,10 @@ async function answer(): Promise<Response> {
 function renderFor(capabilities: Capabilities | null) {
   return render(
     <TooltipProvider>
-      <button type="button">Elsewhere</button>
-      <CommandPalette capabilities={capabilities} keepTheme={keepTheme} />
+      <Announcer>
+        <button type="button">Elsewhere</button>
+        <CommandPalette capabilities={capabilities} keepTheme={keepTheme} />
+      </Announcer>
     </TooltipProvider>,
   );
 }

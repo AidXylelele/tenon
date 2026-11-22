@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/libs/ui/components/dialog";
 import { SidebarTrigger, useSidebar } from "@/libs/ui/components/sidebar";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import { fakeViewport } from "@/libs/ui/hooks/viewport.test-support";
 import { ConsoleRoot } from "./console-root";
 import type { Viewport } from "./viewport";
@@ -293,6 +294,29 @@ describe("the console behind a modal", () => {
 
     const root = rootOf(view);
     expect(root).not.toHaveAttribute("inert");
+  });
+
+  it("announces_from_outside_the_inert_console_while_a_modal_is_open", async () => {
+    const view = render(
+      <Announcer>
+        <Behind open={false} />
+      </Announcer>,
+    );
+
+    view.rerender(
+      <Announcer>
+        <Behind open />
+      </Announcer>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const root = rootOf(view);
+    const status = screen.getByRole("status");
+    const inertAround = status.closest("[inert]");
+    expect(root).toHaveAttribute("inert");
+    expect(inertAround).toBeNull();
   });
 
   it("is_reachable_with_no_modal", () => {

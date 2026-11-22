@@ -1,6 +1,5 @@
 "use client";
 
-import { useCommandState } from "cmdk";
 import {
   ActivityIcon,
   ArrowDownIcon,
@@ -10,7 +9,7 @@ import {
   SearchIcon,
   SunIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Capabilities } from "@/libs/data-access/types";
 import { editorHref, runHref, workflowHref } from "@/libs/routing/routes";
 import {
@@ -20,8 +19,10 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  useCommandState,
 } from "@/libs/ui/components/command";
 import { Kbd } from "@/libs/ui/components/kbd";
+import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { useColorScheme } from "@/libs/ui/hooks/use-color-scheme";
 import { allowedOf, pagesOf, placeOf } from "../../__shared_context/places";
 import type { FoundWorkflow } from "./found-workflow";
@@ -198,7 +199,7 @@ export function PaletteContent({
             </>
           )}
         </CommandList>
-        <ResultCount speaking={settled} />
+        <ResultCountSaid speaking={settled} />
       </Command>
       <p className="flex items-center gap-1.5 border-t px-3 py-2 text-caption text-muted-foreground">
         <Kbd>
@@ -278,16 +279,17 @@ function RunGroup({
   );
 }
 
-function ResultCount({ speaking }: { readonly speaking: boolean }) {
+function ResultCountSaid({ speaking }: { readonly speaking: boolean }) {
+  const announce = useAnnounce();
   const count = useCommandState((state) => state.filtered.count);
   const results = count === 1 ? "1 result" : `${String(count)} results`;
   const said = count === 0 ? "Nothing matches" : results;
 
-  return (
-    <p role="status" className="sr-only">
-      {speaking && said}
-    </p>
-  );
+  useEffect(() => {
+    if (speaking) announce(said);
+  }, [announce, said, speaking]);
+
+  return null;
 }
 
 function labelOf(action: PaletteAction, scheme: Scheme): string {
