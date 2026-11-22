@@ -2,25 +2,43 @@
 
 import { FlagIcon } from "lucide-react";
 import type { StepList, Trigger } from "language-server/protocol";
-import { type KeyboardEvent, useLayoutEffect, useRef } from "react";
+import {
+  type KeyboardEvent,
+  memo,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { FlowCanvas } from "@/libs/flow/flow-canvas";
 import { useRovingFocus } from "@/libs/ui/hooks/use-roving-focus";
 import { cn } from "@/libs/ui/tokens/cn";
 import { Connector, Gap } from "./connector";
-import { FlowContext, useFlow } from "./context";
+import { FlowContext, useFlow, useFlowView, useSelected } from "./context";
 import {
   continuesOf,
   hasStep,
   isReached,
   jumpsOf,
   lineOf,
+  removalFocusOf,
   sourcesOf,
 } from "./flow";
+import { FlowViewStore } from "./flow-view-store";
 import { sideRoomOf } from "./geometry";
-import type { Deletion, FlowState, WorkflowFlowProps } from "./interfaces";
+import type {
+  FlowMode,
+  FlowState,
+  FlowView,
+  Removal,
+  RunView,
+  StepMark,
+  WorkflowFlowProps,
+} from "./interfaces";
 import { END, plusItemOf, START, START_ITEM, stepItemOf } from "./items";
 import { JumpLines } from "./jump-lines";
-import { plusLabelOf, startLookOf } from "./looks";
+import { plusLabelOf, startCardOf } from "./looks";
 import { KindTile, Selectable } from "./parts";
 import { Sequence } from "./sequence";
 
@@ -29,47 +47,79 @@ const FIRST_STEP_HINT = "Add your first step with this +";
 const KEYBOARD =
   "The arrow keys move between the steps and the + buttons; Escape clears the selection.";
 
+const NO_MARKS: ReadonlyMap<string, StepMark> = new Map();
+
 export function WorkflowFlow({
   workflow,
   mode,
   selected = null,
   onSelect,
+  ref,
 }: WorkflowFlowProps) {
   const container = useRef<HTMLDivElement>(null);
-  const deletion = useRef<Deletion | null>(null);
+  const removal = useRef<Removal | null>(null);
   const preferred = selected === null ? START_ITEM : stepItemOf(selected);
   const { itemProps, onFocus, onKeyDown, focus } = useRovingFocus(
     container,
     preferred,
     workflow,
   );
-  const jumps = jumpsOf(workflow.steps);
-  const sources = sourcesOf(jumps);
-  const state: FlowState = {
-    mode,
-    selected,
-    onSelect,
-    itemProps,
-    sources,
-    onDeleting,
-  };
-  const label = mode.kind === "run" ? "The run's flow" : "The workflow's flow";
-  const still = onSelect === undefined && mode.kind !== "edit";
+  const runSteps = mode.kind === "run" ? mode.steps : null;
+  const ended = mode.kind === "run" && mode.ended;
+  const run = useMemo(
+    () => (runSteps === null ? null : { steps: runSteps, ended }),
+    [runSteps, ended],
+  );
+  const shown = viewOf(mode, selected, itemProps, run);
+  const [store] = useState(() => new FlowViewStore(shown));
+  const steps = workflow.steps;
+  const jumps = useMemo(() => jumpsOf(steps), [steps]);
+  const sources = useMemo(() => sourcesOf(jumps), [jumps]);
+  const select = onSelect ?? null;
+  const onInsert = mode.kind === "edit" ? mode.onInsert : null;
+  const onIteration = mode.kind === "run" ? mode.onIteration : null;
+  const start = mode.kind === "run" ? mode.start : null;
+  const kind = mode.kind;
+  const state = useMemo<FlowState>(
+    () => ({
+      kind,
+      onSelect: select,
+      onInsert,
+      onIteration,
+      start,
+      sources,
+      store,
+    }),
+    [kind, select, onInsert, onIteration, start, sources, store],
+  );
+  const label = kind === "run" ? "The run's flow" : "The workflow's flow";
+  const still = select === null && kind !== "edit";
   const description = still ? undefined : KEYBOARD;
   const room = { paddingInline: sideRoomOf(jumps.length) };
 
   useLayoutEffect(() => {
-    const deleted = deletion.current;
+    store.show(shown);
+  });
 
-    if (deleted === null || hasStep(workflow.steps, deleted.step)) return;
+  useLayoutEffect(() => {
+    const removed = removal.current;
 
-    deletion.current = null;
-    focus(deleted.focus);
-  }, [workflow, focus]);
+    if (removed === null || hasStep(steps, removed.step)) return;
 
-  function onDeleting(deleted: Deletion) {
-    deletion.current = deleted;
-  }
+    removal.current = null;
+    focus(removed.focus);
+  }, [steps, focus]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      focusAfterRemoving: (step: string) => {
+        const targets = removalFocusOf(steps, step);
+        removal.current = { step, focus: targets };
+      },
+    }),
+    [steps],
+  );
 
   function press(event: KeyboardEvent<HTMLElement>) {
     const target = event.target;
@@ -79,7 +129,7 @@ export function WorkflowFlow({
 
     if (!inside) return;
 
-    if (clearing) onSelect?.(null);
+    if (clearing) select?.(null);
     else onKeyDown(event);
   }
 
@@ -96,7 +146,7 @@ export function WorkflowFlow({
           <JumpLines jumps={jumps} />
           <div className="relative flex flex-col items-center">
             <StartCard triggers={workflow.triggers} />
-            <TopSequence workflow={workflow} />
+            <TopSequence list={steps} />
             <EndNode />
           </div>
         </div>
@@ -105,12 +155,27 @@ export function WorkflowFlow({
   );
 }
 
-function StartCard({ triggers }: { readonly triggers: readonly Trigger[] }) {
-  const { mode, selected } = useFlow();
-  const look = startLookOf(triggers);
-  const words = mode.kind === "run" ? mode.start : look;
-  const chosen = selected === START;
-  const label = `Start: ${words.title}`;
+function viewOf(
+  mode: FlowMode,
+  selected: string | null,
+  itemProps: FlowView["itemProps"],
+  run: RunView | null,
+): FlowView {
+  const marks = mode.kind === "edit" ? mode.marks : NO_MARKS;
+  const inserting = mode.kind === "edit" ? mode.inserting : null;
+
+  return { selected, itemProps, marks, inserting, run };
+}
+
+const StartCard = memo(function StartCard({
+  triggers,
+}: {
+  readonly triggers: readonly Trigger[];
+}) {
+  const { start } = useFlow();
+  const chosen = useSelected(START);
+  const look = startCardOf(triggers, start);
+  const label = `Start: ${look.title}`;
   const card = cn(
     "w-70 rounded-lg border border-(--flow-node-border) bg-surface transition-[border-color,box-shadow] duration-(--duration-fast) ease-standard",
     chosen &&
@@ -120,9 +185,9 @@ function StartCard({ triggers }: { readonly triggers: readonly Trigger[] }) {
     <>
       <KindTile icon={look.icon} start />
       <span className="flex min-w-0 flex-1 flex-col">
-        <span className="font-semibold">{words.title}</span>
+        <span className="font-semibold">{look.title}</span>
         <span className="text-caption text-muted-foreground">
-          {words.detail}
+          {look.detail}
         </span>
       </span>
     </>
@@ -132,30 +197,33 @@ function StartCard({ triggers }: { readonly triggers: readonly Trigger[] }) {
 
   return (
     <div role="group" aria-label={label} className={card}>
-      {mode.kind === "run" ? (
-        <div className={row}>{content}</div>
-      ) : (
+      {start === null ? (
         <Selectable target={START} className={row}>
           {content}
         </Selectable>
+      ) : (
+        <div className={row}>{content}</div>
       )}
     </div>
   );
-}
+});
 
-function TopSequence({ workflow }: Pick<WorkflowFlowProps, "workflow">) {
-  const { mode } = useFlow();
-  const list = workflow.steps;
+const TopSequence = memo(function TopSequence({
+  list,
+}: {
+  readonly list: StepList;
+}) {
+  const { onInsert } = useFlow();
   const first = list.steps[0];
-  const edit = mode.kind === "edit";
   const below = first?.id ?? END;
-  const line = lineOf(mode, START, below);
+  const line = useFlowView((view) => lineOf(view.run, START, below));
   const firstName = first?.name ?? null;
   const label = plusLabelOf(null, null, firstName);
   const place = { kind: "list", list: list.id, index: 0, above: null } as const;
   const item = plusItemOf(list.id, 0);
-  const plus = edit ? { item, label, place } : null;
-  const fresh = edit && first === undefined;
+  const editing = onInsert !== null;
+  const plus = editing ? { item, label, place } : null;
+  const fresh = editing && first === undefined;
   const firstHint = fresh ? FIRST_STEP_HINT : undefined;
 
   return (
@@ -165,18 +233,19 @@ function TopSequence({ workflow }: Pick<WorkflowFlowProps, "workflow">) {
       <Closing list={list} />
     </>
   );
-}
+});
 
 function Closing({ list }: { readonly list: StepList }) {
-  const { mode } = useFlow();
+  const { onInsert } = useFlow();
   const last = list.steps.at(-1);
+  const from = last?.id ?? START;
+  const line = useFlowView((view) => lineOf(view.run, from, END));
 
   if (last === undefined) return null;
 
   if (!continuesOf(last)) return <Gap />;
 
   const count = list.steps.length;
-  const line = lineOf(mode, last.id, END);
   const label = plusLabelOf(null, last.name, null);
   const item = plusItemOf(list.id, count);
   const place = {
@@ -185,14 +254,15 @@ function Closing({ list }: { readonly list: StepList }) {
     index: count,
     above: last.name,
   } as const;
-  const plus = mode.kind === "edit" ? { item, label, place } : null;
+  const plus = onInsert === null ? null : { item, label, place };
 
   return <Connector line={line} plus={plus} />;
 }
 
-function EndNode() {
-  const { mode } = useFlow();
-  const reached = mode.kind !== "run" || isReached(mode, END);
+const EndNode = memo(function EndNode() {
+  const reached = useFlowView(
+    (view) => view.run === null || isReached(view.run, END),
+  );
   const words = reached ? "End" : "Not reached";
   const pill = cn(
     "flex h-8 w-35 items-center justify-center gap-1.5 rounded-full border border-(--flow-node-border) bg-surface font-semibold text-muted-foreground",
@@ -205,4 +275,4 @@ function EndNode() {
       {words}
     </p>
   );
-}
+});

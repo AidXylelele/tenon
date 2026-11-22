@@ -7,6 +7,7 @@ import {
   type EditMode,
   type FlowMode,
   type RunMode,
+  type RunStart,
   type StepMark,
   type StepRun,
   WorkflowFlow,
@@ -32,6 +33,16 @@ interface FlowStoryProps {
 const EDITOR_CANVAS_AT_1024 = { width: 608, height: 720 };
 
 const SEND = "/do/For each invoice/do/Send the invoice";
+
+const BY_HAND: RunStart = {
+  trigger: "manual",
+  detail: "Administrator · the workflow also runs every day at 09:00 UTC",
+};
+
+const BY_EVENT: RunStart = {
+  trigger: "event",
+  detail: "com.acme.order.paid · order 4182",
+};
 
 const SEND_TIMES = ["140 ms", "151 ms", "150 ms"];
 
@@ -81,7 +92,6 @@ function editing(marks: ReadonlyMap<string, StepMark> = new Map()): EditMode {
     marks,
     inserting: null,
     onInsert: fn(),
-    onEdit: fn(),
   };
 }
 
@@ -89,14 +99,11 @@ function running(
   steps: ReadonlyMap<string, StepRun>,
   ended: boolean,
   onIteration: RunMode["onIteration"] = fn(),
+  start: RunStart = BY_HAND,
 ): RunMode {
   return {
     kind: "run",
-    start: {
-      title: "Started by hand",
-      detail:
-        "Administrator, by hand · the workflow also runs every day at 09:00 UTC",
-    },
+    start,
     steps,
     ended,
     onIteration,
@@ -166,11 +173,16 @@ export const EditWithProblems: Story = {
       new Map<string, StepMark>([
         [
           "/do/Post the items",
-          { kind: "problem", count: 1, message: "the address is missing" },
+          {
+            kind: "problem",
+            count: 1,
+            message: "the address is missing",
+            missing: "address",
+          },
         ],
         [
           "/do/Pause before the next digest",
-          { kind: "fill", what: "how long to wait" },
+          { kind: "fill", missing: "duration" },
         ],
       ]),
     ),
@@ -256,6 +268,8 @@ export const RunInProgress: Story = {
         ["/do/Wait a minute", ranFor("for 41 s", "running")],
       ]),
       false,
+      fn(),
+      BY_EVENT,
     ),
     selected: null,
     selectable: true,

@@ -1,16 +1,16 @@
 import type { LucideIcon } from "lucide-react";
 import type {
-  EditAction,
   Step,
   StepList,
   Transition,
   WorkflowStructure,
 } from "language-server/protocol";
-import type { Phase } from "@/libs/data-access/types";
-import type { RovingItemProps } from "@/libs/ui/hooks/use-roving-focus";
+import type { Ref } from "react";
+import type { Trigger } from "@/libs/data-access/types";
 import type { StatusLook } from "@/libs/ui/composites/status";
-
-export type StepStatus = Phase | "retrying" | "skipped";
+import type { RovingItemProps } from "@/libs/ui/hooks/use-roving-focus";
+import type { StepStatus } from "@/operations/run-progress";
+import type { FlowViewStore } from "./flow-view-store";
 
 export interface Iteration {
   readonly shown: number;
@@ -29,8 +29,9 @@ export type StepMark =
       readonly kind: "problem";
       readonly count: number;
       readonly message: string;
+      readonly missing: string | null;
     }
-  | { readonly kind: "fill"; readonly what: string };
+  | { readonly kind: "fill"; readonly missing: string };
 
 export type InsertPlace =
   | {
@@ -45,13 +46,8 @@ export type InsertPlace =
       readonly case: string;
     };
 
-export type StepEdit = Extract<
-  EditAction,
-  { readonly kind: "duplicateStep" | "moveStep" | "wrapSteps" | "removeStep" }
->;
-
-export interface StartWords {
-  readonly title: string;
+export interface RunStart {
+  readonly trigger: Trigger;
   readonly detail: string;
 }
 
@@ -60,12 +56,11 @@ export interface EditMode {
   readonly marks: ReadonlyMap<string, StepMark>;
   readonly inserting: InsertPlace | null;
   readonly onInsert: (place: InsertPlace) => void;
-  readonly onEdit: (edit: StepEdit) => void;
 }
 
 export interface RunMode {
   readonly kind: "run";
-  readonly start: StartWords;
+  readonly start: RunStart;
   readonly steps: ReadonlyMap<string, StepRun>;
   readonly ended: boolean;
   readonly onIteration: (step: string, iteration: number) => void;
@@ -73,15 +68,25 @@ export interface RunMode {
 
 export type FlowMode = { readonly kind: "read" } | EditMode | RunMode;
 
+export interface FlowHandle {
+  readonly focusAfterRemoving: (step: string) => void;
+}
+
 export interface WorkflowFlowProps {
   readonly workflow: WorkflowStructure;
   readonly mode: FlowMode;
   readonly selected?: string | null;
   readonly onSelect?: (target: string | null) => void;
+  readonly ref?: Ref<FlowHandle>;
 }
 
 export interface KindLook {
   readonly word: string;
+  readonly icon: LucideIcon;
+}
+
+export interface StateLook {
+  readonly tone: StatusLook["tone"];
   readonly icon: LucideIcon;
 }
 
@@ -95,7 +100,9 @@ export interface Lane {
   readonly then: string | null;
 }
 
-export interface StartLook extends StartWords {
+export interface StartLook {
+  readonly title: string;
+  readonly detail: string;
   readonly icon: LucideIcon;
 }
 
@@ -168,16 +175,30 @@ export interface PlusProps {
   readonly place: InsertPlace;
 }
 
-export interface Deletion {
+export interface Removal {
   readonly step: string;
   readonly focus: readonly string[];
 }
 
-export interface FlowState {
-  readonly mode: FlowMode;
+export interface RunView {
+  readonly steps: ReadonlyMap<string, StepRun>;
+  readonly ended: boolean;
+}
+
+export interface FlowView {
   readonly selected: string | null;
-  readonly onSelect: ((target: string | null) => void) | undefined;
   readonly itemProps: (item: string) => RovingItemProps;
+  readonly marks: ReadonlyMap<string, StepMark>;
+  readonly inserting: InsertPlace | null;
+  readonly run: RunView | null;
+}
+
+export interface FlowState {
+  readonly kind: FlowMode["kind"];
+  readonly onSelect: ((target: string | null) => void) | null;
+  readonly onInsert: ((place: InsertPlace) => void) | null;
+  readonly onIteration: ((step: string, iteration: number) => void) | null;
+  readonly start: RunStart | null;
   readonly sources: ReadonlyMap<string, string>;
-  readonly onDeleting: (deletion: Deletion) => void;
+  readonly store: FlowViewStore;
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  lineOf,
+  removalFocusOf,
   branchesOf,
   continuesOf,
   doneExitOf,
@@ -14,6 +16,7 @@ import {
   MONTH_END,
   next,
   ORDER_ROUTER,
+  ranFor,
   stepAt,
   stepNamed,
   whenCase,
@@ -262,5 +265,53 @@ describe("where a jump's target comes from", () => {
         ["/do/Wait a minute", "from Booked? · Not yet"],
       ]),
     );
+  });
+});
+
+describe("where focus goes when a step is removed", () => {
+  it("to_the_plus_above_it_or_else_its_neighbours", () => {
+    const focus = removalFocusOf(top, "/do/Book the courier");
+
+    expect(focus).toEqual([
+      "plus:/do:3",
+      "step:/do/Send the licence",
+      "step:/do/Booked?",
+    ]);
+  });
+
+  it("finds_a_step_inside_a_block", () => {
+    const focus = removalFocusOf(
+      MONTH_END.steps,
+      "/do/Prepare the batch/do/Fetch the invoices",
+    );
+
+    expect(focus).toEqual([
+      "plus:/do/Prepare the batch/do:0",
+      "step:/do/Prepare the batch/do/Add up the totals",
+    ]);
+  });
+
+  it("has_nowhere_to_go_for_a_step_that_is_not_there", () => {
+    const focus = removalFocusOf(top, "/do/Missing");
+
+    expect(focus).toEqual([]);
+  });
+});
+
+describe("the line between two steps", () => {
+  const run = {
+    steps: new Map([["/do/Read the order", ranFor("2 ms")]]),
+    ended: false,
+  };
+
+  it.each([
+    ["is_plain_outside_a_run", null, "/do/Read the order", "plain"],
+    ["is_taken_into_a_reached_step", run, "/do/Read the order", "taken"],
+    ["is_dim_into_a_step_not_reached", run, "/do/Which kind?", "dim"],
+    ["is_dim_into_an_end_not_reached", run, "end", "dim"],
+  ] as const)("%s", (_, shown, to, line) => {
+    const drawn = lineOf(shown, "start", to);
+
+    expect(drawn).toBe(line);
   });
 });

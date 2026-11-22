@@ -1,14 +1,13 @@
 export type {
   EditMode,
+  FlowHandle,
   FlowMode,
   InsertPlace,
   Iteration,
   RunMode,
-  StartWords,
-  StepEdit,
+  RunStart,
   StepMark,
   StepRun,
-  StepStatus,
   WorkflowFlowProps,
 } from "./interfaces";
 export { START } from "./items";

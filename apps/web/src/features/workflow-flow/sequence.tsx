@@ -2,7 +2,7 @@
 
 import { ChevronLeftIcon, ChevronRightIcon, RotateCwIcon } from "lucide-react";
 import type { NestedList, Step, StepList } from "language-server/protocol";
-import { Fragment } from "react";
+import { Fragment, memo } from "react";
 import { Button } from "@/libs/ui/components/button";
 import { IconButton } from "@/libs/ui/composites/icon-button";
 import { cn } from "@/libs/ui/tokens/cn";
@@ -14,7 +14,13 @@ import {
   Gap,
   Placeholder,
 } from "./connector";
-import { useFlow } from "./context";
+import {
+  useFlow,
+  useFlowView,
+  useRovingItem,
+  useRun,
+  useSelected,
+} from "./context";
 import {
   continuesOf,
   doneExitOf,
@@ -69,15 +75,17 @@ function Between({
   readonly index: number;
   readonly owner: string | null;
 }) {
-  const { mode } = useFlow();
+  const { onInsert } = useFlow();
   const before = list.steps[index - 1];
   const step = list.steps[index];
+  const from = before?.id ?? "";
+  const to = step?.id ?? "";
+  const line = useFlowView((view) => lineOf(view.run, from, to));
 
   if (before === undefined || step === undefined) return null;
 
   if (!continuesOf(before)) return <Gap />;
 
-  const line = lineOf(mode, before.id, step.id);
   const label = plusLabelOf(owner, before.name, step.name);
   const item = plusItemOf(list.id, index);
   const place = {
@@ -86,7 +94,7 @@ function Between({
     index,
     above: before.name,
   } as const;
-  const plus = mode.kind === "edit" ? { item, label, place } : null;
+  const plus = onInsert === null ? null : { item, label, place };
 
   return <Connector line={line} plus={plus} />;
 }
@@ -98,7 +106,7 @@ function StepItem({ place }: { readonly place: StepPlace }) {
 }
 
 function NestedSteps({ list, owner }: NestedStepsProps) {
-  const { mode } = useFlow();
+  const { onInsert } = useFlow();
   const count = list.steps.length;
   const last = list.steps.at(-1)?.name ?? null;
   const label = plusLabelOf(owner, last, null);
@@ -113,21 +121,21 @@ function NestedSteps({ list, owner }: NestedStepsProps) {
   return (
     <>
       {count === 0 ? <Placeholder /> : <Sequence list={list} owner={owner} />}
-      {mode.kind === "edit" && (
-        <EndPlus item={item} label={label} place={place} />
-      )}
+      {onInsert !== null && <EndPlus item={item} label={label} place={place} />}
     </>
   );
 }
 
 function Block({ place }: { readonly place: StepPlace }) {
-  const { mode, selected } = useFlow();
+  const { kind } = useFlow();
   const { step, list } = place;
+  const chosen = useSelected(step.id);
+  const reached = useFlowView(
+    (view) => view.run === null || isReached(view.run, step.id),
+  );
   const look = kindLookOf(step.kind);
-  const empty = mode.kind === "edit" && isEmptyBlock(step);
-  const reached = mode.kind !== "run" || isReached(mode, step.id);
+  const empty = kind === "edit" && isEmptyBlock(step);
   const exit = doneExitOf(step, list);
-  const chosen = selected === step.id;
   const label = `${look.word}: ${step.name}`;
   const line = blockLineOf(step);
   const frame = cn(
@@ -164,7 +172,11 @@ function Block({ place }: { readonly place: StepPlace }) {
   );
 }
 
-function BlockInside({ place }: { readonly place: StepPlace }) {
+const BlockInside = memo(function BlockInside({
+  place,
+}: {
+  readonly place: StepPlace;
+}) {
   const { step } = place;
 
   if (step.kind === "fork") return <ForkInside fork={step} />;
@@ -177,7 +189,7 @@ function BlockInside({ place }: { readonly place: StepPlace }) {
       <NestedSteps list={list} owner={step.name} />
     </Fragment>
   ));
-}
+});
 
 function BlockLabel({
   words,
@@ -195,9 +207,8 @@ function BlockLabel({
 }
 
 function ForkInside({ fork }: { readonly fork: Step }) {
-  const { mode } = useFlow();
   const branches = fork.lists.find((list) => list.role === "branches");
-  const line = lineOf(mode, fork.id, fork.id);
+  const line = useFlowView((view) => lineOf(view.run, fork.id, fork.id));
   const stub = cn("h-4 w-0", DOWN[line]);
 
   if (branches === undefined || branches.steps.length === 0)
@@ -222,15 +233,14 @@ function ForkInside({ fork }: { readonly fork: Step }) {
 }
 
 function ForkColumn({ fork, branches, index }: ForkColumnProps) {
-  const { mode } = useFlow();
   const branch = branches.steps[index];
+  const held = branch?.kind === "do" ? branch.lists[0] : undefined;
+  const first = held?.steps[0]?.id ?? branch?.id ?? "";
+  const line = useFlowView((view) => lineOf(view.run, fork.id, first));
 
   if (branch === undefined) return null;
 
   const count = branches.steps.length;
-  const held = branch.kind === "do" ? branch.lists[0] : undefined;
-  const first = held?.steps[0]?.id ?? branch.id;
-  const line = lineOf(mode, fork.id, first);
   const owner = `${fork.name} · ${branch.name}`;
   const across = cn(
     "absolute h-0",
@@ -303,59 +313,53 @@ function TryInside({ place }: { readonly place: StepPlace }) {
 }
 
 function IterationBar({ step }: { readonly step: Step }) {
-  const { mode, itemProps } = useFlow();
+  const { onIteration } = useFlow();
+  const iteration = useRun(step.id)?.iteration;
+  const previous = useRovingItem(iterationItemOf(step.id, "previous"));
+  const following = useRovingItem(iterationItemOf(step.id, "next"));
+  const latest = useRovingItem(iterationItemOf(step.id, "last"));
 
-  if (mode.kind !== "run") return null;
+  if (onIteration === null || iteration === undefined) return null;
 
-  const iteration = mode.steps.get(step.id)?.iteration;
-
-  if (iteration === undefined) return null;
-
-  const { onIteration } = mode;
   const { shown, count } = iteration;
   const first = shown <= 1;
   const last = shown >= count;
 
   function show(to: number, allowed: boolean) {
-    if (allowed) onIteration(step.id, to);
+    if (allowed) onIteration?.(step.id, to);
   }
 
   return (
     <div
       role="group"
       aria-label="Iteration"
-      className="flex items-center gap-1 bg-surface px-3 pb-2 text-caption text-muted-foreground [contain:inline-size]"
+      className="flex items-center gap-0.5 bg-surface px-3 pb-2 text-caption text-muted-foreground [contain:inline-size]"
     >
-      <span>Iteration</span>
+      <span className="pr-1">Iteration</span>
       <IconButton
         label="Previous iteration"
         icon={ChevronLeftIcon}
-        variant="outline"
-        size="icon-xs"
-        {...itemProps(iterationItemOf(step.id, "previous"))}
+        {...previous}
         aria-disabled={first}
         onClick={() => {
           show(shown - 1, !first);
         }}
       />
-      <span aria-live="polite" className="tabular-nums">
+      <span aria-live="polite" className="px-1 tabular-nums">
         <b className="font-semibold text-foreground">{shown}</b> of {count}
       </span>
       <IconButton
         label="Next iteration"
         icon={ChevronRightIcon}
-        variant="outline"
-        size="icon-xs"
-        {...itemProps(iterationItemOf(step.id, "next"))}
+        {...following}
         aria-disabled={last}
         onClick={() => {
           show(shown + 1, !last);
         }}
       />
       <Button
-        variant="outline"
-        size="xs"
-        {...itemProps(iterationItemOf(step.id, "last"))}
+        variant="ghost"
+        {...latest}
         aria-label="Last iteration"
         aria-disabled={last}
         onClick={() => {

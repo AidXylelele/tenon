@@ -1,11 +1,8 @@
 "use client";
 
-import { cn } from "@/libs/ui/tokens/cn";
-import { useFlow } from "./context";
 import type { StepPlace } from "./interfaces";
 import { kindLookOf } from "./looks";
 import { KindTile, Selectable, StateLine } from "./parts";
-import { StepMenu } from "./step-menu";
 
 interface StepHeaderProps {
   readonly place: StepPlace;
@@ -15,17 +12,14 @@ interface StepHeaderProps {
 }
 
 export function StepHeader({ place, line, empty, className }: StepHeaderProps) {
-  const { mode, selected } = useFlow();
   const { step } = place;
   const look = kindLookOf(step.kind);
-  const menu = mode.kind === "edit" && selected === step.id;
-  const row = cn("flex items-center", className);
 
   return (
-    <div className={row}>
+    <div className={className}>
       <Selectable
         target={step.id}
-        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left"
+        className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left"
       >
         <KindTile icon={look.icon} />
         <span className="flex min-w-0 flex-1 flex-col">
@@ -36,11 +30,6 @@ export function StepHeader({ place, line, empty, className }: StepHeaderProps) {
           <StateLine step={step} empty={empty} />
         </span>
       </Selectable>
-      {menu && (
-        <span className="pr-2">
-          <StepMenu place={place} />
-        </span>
-      )}
     </div>
   );
 }

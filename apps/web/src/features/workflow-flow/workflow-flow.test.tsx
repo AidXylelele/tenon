@@ -1,9 +1,11 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { WorkflowStructure } from "language-server/protocol";
+import { createRef, Profiler, type ProfilerOnRenderCallback } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import {
   type EditMode,
+  type FlowHandle,
   type FlowMode,
   type RunMode,
   START,
@@ -13,12 +15,22 @@ import {
 } from ".";
 import {
   DAILY_DIGEST,
+  DRAFT_DIGEST,
   EMPTY_REPEAT,
   MONTH_END,
   NEW_WORKFLOW,
   ORDER_ROUTER,
+  next,
   ranFor,
+  stepAt,
+  workflowOf,
 } from "./workflows.test-support";
+
+interface Commit {
+  readonly phase: string;
+  readonly actual: number;
+  readonly base: number;
+}
 
 const NO_MARKS: ReadonlyMap<string, StepMark> = new Map();
 
@@ -36,7 +48,6 @@ function editing(changes: Partial<EditMode> = {}): EditMode {
     marks: NO_MARKS,
     inserting: null,
     onInsert: vi.fn(),
-    onEdit: vi.fn(),
     ...changes,
   };
 }
@@ -44,7 +55,7 @@ function editing(changes: Partial<EditMode> = {}): EditMode {
 function running(changes: Partial<RunMode> = {}): RunMode {
   return {
     kind: "run",
-    start: { title: "Started by hand", detail: "Administrator, by hand" },
+    start: { trigger: "manual", detail: "Administrator, by hand" },
     steps: new Map(),
     ended: false,
     onIteration: vi.fn(),
@@ -177,6 +188,7 @@ describe("the flow of a draft", () => {
       kind: "problem",
       count,
       message: "the address is missing",
+      missing: "address",
     };
     const marks = new Map([[POST, problem]]);
     const mode = editing({ marks });
@@ -188,14 +200,16 @@ describe("the flow of a draft", () => {
   });
 
   it("asks_to_fill_in_what_a_new_step_needs", () => {
-    const fill: StepMark = { kind: "fill", what: "the address" };
+    const fill: StepMark = { kind: "fill", missing: "address" };
     const marks = new Map([[POST, fill]]);
     const mode = editing({ marks });
-    draw(DAILY_DIGEST, mode);
+    draw(DRAFT_DIGEST, mode);
 
     const post = stepButton("Post the items");
 
-    expect(post).toHaveTextContent("Fill in: the address");
+    expect(post).toHaveTextContent(
+      "Post the itemsPOST · address to fill inFill in: the address",
+    );
   });
 });
 
@@ -501,116 +515,74 @@ describe("the keyboard", () => {
   });
 });
 
-describe("the selected step's menu", () => {
-  async function chosen(item: string): Promise<HTMLElement> {
-    const trigger = button("Step actions");
-    fireEvent.keyDown(trigger, { key: "Enter" });
-
-    return screen.findByRole("menuitem", { name: item });
-  }
-
-  it("moves_the_step_down_its_list", async () => {
+describe("removing a step", () => {
+  it("moves_focus_to_the_plus_above_it_once_the_step_is_gone", () => {
     const mode = editing();
-    draw(DAILY_DIGEST, mode, FETCH);
-    const down = await chosen("Move down");
-
-    fireEvent.click(down);
-
-    expect(mode.onEdit).toHaveBeenCalledWith({
-      kind: "moveStep",
-      step: FETCH,
-      list: "/do",
-      index: 1,
-    });
-  });
-
-  it("moves_the_step_up_its_list", async () => {
-    const mode = editing();
-    draw(DAILY_DIGEST, mode, POST);
-    const up = await chosen("Move up");
-
-    fireEvent.click(up);
-
-    expect(mode.onEdit).toHaveBeenCalledWith({
-      kind: "moveStep",
-      step: POST,
-      list: "/do",
-      index: 1,
-    });
-  });
-
-  it("cannot_move_the_first_step_up", async () => {
-    const mode = editing();
-    draw(DAILY_DIGEST, mode, FETCH);
-
-    const up = await chosen("Move up");
-
-    expect(up).toHaveAttribute("aria-disabled", "true");
-  });
-
-  it.each([
-    ["Wrap in Try (retry if it fails)", "try"],
-    ["Wrap in Repeat for each item", "for"],
-    ["Wrap in a group", "do"],
-  ] as const)("%s_wraps_the_step", async (item, block) => {
-    const mode = editing();
-    draw(DAILY_DIGEST, mode, POST);
-    const wrap = await chosen(item);
-
-    fireEvent.click(wrap);
-
-    expect(mode.onEdit).toHaveBeenCalledWith({
-      kind: "wrapSteps",
-      steps: [POST],
-      block,
-      name: null,
-    });
-  });
-
-  it("duplicates_the_step", async () => {
-    const mode = editing();
-    draw(DAILY_DIGEST, mode, POST);
-    const duplicate = await chosen("Duplicate");
-
-    fireEvent.click(duplicate);
-
-    expect(mode.onEdit).toHaveBeenCalledWith({
-      kind: "duplicateStep",
-      step: POST,
-    });
-  });
-
-  it("deletes_the_step_and_moves_focus_to_the_plus_above_it", async () => {
-    const mode = editing();
-    const { shown } = draw(DAILY_DIGEST, mode, POST);
-    const remove = await chosen("Delete step");
+    const handle = createRef<FlowHandle>();
+    const flow = (
+      <WorkflowFlow
+        ref={handle}
+        workflow={DAILY_DIGEST}
+        mode={mode}
+        selected={POST}
+        onSelect={vi.fn()}
+      />
+    );
+    const shown = render(<TooltipProvider>{flow}</TooltipProvider>);
     const kept = DAILY_DIGEST.steps.steps.slice(0, 2);
     const steps = { ...DAILY_DIGEST.steps, steps: kept };
     const without = { ...DAILY_DIGEST, steps };
     const redrawn = (
       <TooltipProvider>
-        <WorkflowFlow workflow={without} mode={mode} onSelect={vi.fn()} />
+        <WorkflowFlow
+          ref={handle}
+          workflow={without}
+          mode={mode}
+          onSelect={vi.fn()}
+        />
       </TooltipProvider>
     );
 
-    fireEvent.click(remove);
+    act(() => {
+      handle.current?.focusAfterRemoving(POST);
+    });
     shown.rerender(redrawn);
 
     const plus = button("Add a step after Has items?");
-    expect(mode.onEdit).toHaveBeenCalledWith({
-      kind: "removeStep",
-      step: POST,
-    });
     expect(plus).toHaveFocus();
   });
 
-  it("is_only_on_the_selected_step", () => {
+  it("keeps_focus_where_it_is_while_the_step_is_still_there", () => {
+    const mode = editing();
+    const handle = createRef<FlowHandle>();
+    const flow = (
+      <WorkflowFlow
+        ref={handle}
+        workflow={DAILY_DIGEST}
+        mode={mode}
+        selected={POST}
+        onSelect={vi.fn()}
+      />
+    );
+    const shown = render(<TooltipProvider>{flow}</TooltipProvider>);
+    const post = stepButton("Post the items");
+    post.focus();
+
+    act(() => {
+      handle.current?.focusAfterRemoving(POST);
+    });
+    shown.rerender(<TooltipProvider>{flow}</TooltipProvider>);
+
+    expect(post).toHaveFocus();
+  });
+
+  it("offers_no_step_menu_on_the_card", () => {
     const mode = editing();
     draw(DAILY_DIGEST, mode, POST);
 
-    const menus = screen.getAllByRole("button", { name: "Step actions" });
+    const menu = screen.queryByRole("button", { name: "Step actions" });
 
-    expect(menus).toHaveLength(1);
+    expect(menu).not.toBeInTheDocument();
   });
 });
 
@@ -772,5 +744,46 @@ describe("a version read on its own", () => {
     const region = canvas("The workflow's flow");
 
     expect(region).toHaveAttribute("tabindex", "0");
+  });
+});
+
+describe("selecting a step in a large flow", () => {
+  const many = Array.from({ length: 120 }, (_, index) => {
+    const id = `/do/Step ${String(index)}`;
+    const following = `/do/Step ${String(index + 1)}`;
+    return stepAt(id, "set", "total", [next(following)]);
+  });
+  const large = workflowOf("Large", many);
+
+  it("commits_only_the_cards_whose_selection_changes", () => {
+    const commits: Commit[] = [];
+    const record: ProfilerOnRenderCallback = (_, phase, actual, base) => {
+      commits.push({ phase, actual, base });
+    };
+    const mode = editing();
+    const onSelect = vi.fn();
+    const drawnAt = (selected: string) => (
+      <Profiler id="flow" onRender={record}>
+        <TooltipProvider>
+          <WorkflowFlow
+            workflow={large}
+            mode={mode}
+            selected={selected}
+            onSelect={onSelect}
+          />
+        </TooltipProvider>
+      </Profiler>
+    );
+    const shown = render(drawnAt("/do/Step 10"));
+    const mounted = commits.length;
+    const reselected = drawnAt("/do/Step 11");
+
+    shown.rerender(reselected);
+
+    const updates = commits.slice(mounted);
+    const cheap = updates.every((commit) => commit.actual < commit.base / 4);
+    const step = screen.getByRole("button", { name: /^Step 11(?!\d)/ });
+    expect(step).toHaveAttribute("aria-current", "true");
+    expect(cheap).toBe(true);
   });
 });

@@ -12,8 +12,10 @@ import {
   LogOutIcon,
   RotateCwIcon,
   WebhookIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import { describe, expect, it } from "vitest";
+import type { StepMark } from "./interfaces";
 import {
   blockLineOf,
   cardLineOf,
@@ -22,7 +24,7 @@ import {
   laneOf,
   plusLabelOf,
   runLookOf,
-  startLookOf,
+  startCardOf,
 } from "./looks";
 import {
   caught,
@@ -35,6 +37,7 @@ import {
   MONTH_END,
   next,
   ON_EVENT,
+  ORDER_ROUTER,
   ranFor,
   stepAt,
   stepNamed,
@@ -53,7 +56,7 @@ describe("the line under a step's name", () => {
   it("is_what_the_step_writes", () => {
     const fetch = stepNamed(DAILY_DIGEST.steps, "Fetch the digest");
 
-    const line = cardLineOf(fetch);
+    const line = cardLineOf(fetch, undefined);
 
     expect(line).toBe("GET https://httpbin.org/json");
   });
@@ -61,15 +64,46 @@ describe("the line under a step's name", () => {
   it("is_the_kind_where_the_step_writes_nothing_yet", () => {
     const pause = stepAt("/do/Pause", "wait", null, [next(null)]);
 
-    const line = cardLineOf(pause);
+    const line = cardLineOf(pause, undefined);
 
     expect(line).toBe("Wait");
+  });
+
+  it("says_a_fixed_wait_in_words", () => {
+    const wait = stepNamed(ORDER_ROUTER.steps, "Wait a minute");
+
+    const line = cardLineOf(wait, undefined);
+
+    expect(line).toBe("1 minute");
+  });
+
+  it("says_what_is_left_to_fill_in", () => {
+    const post = stepAt("/do/Post", "call", "POST", [next(null)]);
+    const fill: StepMark = { kind: "fill", missing: "address" };
+
+    const line = cardLineOf(post, fill);
+
+    expect(line).toBe("POST · address to fill in");
+  });
+
+  it("says_what_is_missing_beside_a_problem", () => {
+    const post = stepAt("/do/Post", "call", "POST", [next(null)]);
+    const problem: StepMark = {
+      kind: "problem",
+      count: 1,
+      message: "the address is missing",
+      missing: "address",
+    };
+
+    const line = cardLineOf(post, problem);
+
+    expect(line).toBe("POST · address to fill in");
   });
 
   it("names_the_kind_of_a_choice_before_its_cases", () => {
     const choice = stepNamed(DAILY_DIGEST.steps, "Has items?");
 
-    const line = cardLineOf(choice);
+    const line = cardLineOf(choice, undefined);
 
     expect(line).toBe("Choose a path · 2 cases");
   });
@@ -207,9 +241,25 @@ describe("a step's run in words", () => {
   });
 });
 
+describe("how the run started, on its card", () => {
+  it.each([
+    ["manual", "Started by hand", HandIcon],
+    ["schedule", "Started by its schedule", CalendarClockIcon],
+    ["event", "Started by an event", WebhookIcon],
+    ["parent", "Started by a parent run", WorkflowIcon],
+    ["restart", "Run again by hand", RotateCwIcon],
+  ] as const)("%s_reads_%s", (trigger, title, icon) => {
+    const start = { trigger, detail: "Administrator" };
+
+    const look = startCardOf([DAILY], start);
+
+    expect(look).toEqual({ title, detail: "Administrator", icon });
+  });
+});
+
 describe("how the workflow starts, on its card", () => {
   it("by_hand_when_nothing_starts_it_by_itself", () => {
-    const look = startLookOf([]);
+    const look = startCardOf([], null);
 
     expect(look).toEqual({
       title: "Starts by hand",
@@ -219,7 +269,7 @@ describe("how the workflow starts, on its card", () => {
   });
 
   it("on_a_schedule_in_words", () => {
-    const look = startLookOf([DAILY]);
+    const look = startCardOf([DAILY], null);
 
     expect(look).toEqual({
       title: "Every day at 09:00 UTC",
@@ -229,7 +279,7 @@ describe("how the workflow starts, on its card", () => {
   });
 
   it("on_an_event_in_words", () => {
-    const look = startLookOf([ON_EVENT]);
+    const look = startCardOf([ON_EVENT], null);
 
     expect(look).toEqual({
       title: "When an event on com.acme.order.paid arrives",
@@ -239,7 +289,7 @@ describe("how the workflow starts, on its card", () => {
   });
 
   it("names_the_first_start_and_counts_the_others", () => {
-    const look = startLookOf([EVERY_HOUR, DAILY]);
+    const look = startCardOf([EVERY_HOUR, DAILY], null);
 
     expect(look).toEqual({
       title: "Every 1 hour",

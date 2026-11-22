@@ -2,14 +2,13 @@ import type { Step, StepList, Transition } from "language-server/protocol";
 import type {
   Branch,
   Exit,
-  FlowMode,
   InsertPlace,
   Jump,
   JumpTransition,
   Line,
-  RunMode,
+  RunView,
 } from "./interfaces";
-import { END, START } from "./items";
+import { END, plusItemOf, START, stepItemOf } from "./items";
 
 const CONTINUES: Exit = { kind: "next" };
 const ENDS: Exit = { kind: "end" };
@@ -73,6 +72,23 @@ export function jumpsOf(list: StepList): readonly Jump[] {
   return [...own, ...nested];
 }
 
+export function removalFocusOf(list: StepList, id: string): readonly string[] {
+  const index = list.steps.findIndex((step) => step.id === id);
+
+  if (index === -1)
+    return list.steps.flatMap((step) =>
+      step.lists.flatMap((each) => removalFocusOf(each, id)),
+    );
+
+  const above = plusItemOf(list.id, index);
+  const neighbours = [list.steps[index - 1], list.steps[index + 1]];
+  const steps = neighbours.flatMap((step) =>
+    step === undefined ? [] : [stepItemOf(step.id)],
+  );
+
+  return [above, ...steps];
+}
+
 export function hasStep(list: StepList, id: string): boolean {
   return list.steps.some(
     (step) => step.id === id || step.lists.some((each) => hasStep(each, id)),
@@ -100,19 +116,19 @@ export function isSamePlace(
   return false;
 }
 
-export function lineOf(mode: FlowMode, from: string, to: string): Line {
-  if (mode.kind !== "run") return "plain";
+export function lineOf(run: RunView | null, from: string, to: string): Line {
+  if (run === null) return "plain";
 
-  const taken = isReached(mode, from) && isReached(mode, to);
+  const taken = isReached(run, from) && isReached(run, to);
   return taken ? "taken" : "dim";
 }
 
-export function isReached(mode: RunMode, target: string): boolean {
+export function isReached(run: RunView, target: string): boolean {
   if (target === START) return true;
 
-  if (target === END) return mode.ended;
+  if (target === END) return run.ended;
 
-  return mode.steps.has(target);
+  return run.steps.has(target);
 }
 
 export function isEmptyBlock(step: Step): boolean {

@@ -3,7 +3,7 @@
 import type { Step } from "language-server/protocol";
 import { cn } from "@/libs/ui/tokens/cn";
 import { PlusButton } from "./connector";
-import { useFlow } from "./context";
+import { useFlow, useFlowView, useMark, useSelected } from "./context";
 import { branchesOf, doneExitOf, jumpKeyOf } from "./flow";
 import type { Branch, Exit, StepPlace } from "./interfaces";
 import { branchItemOf, branchPlusItemOf } from "./items";
@@ -20,23 +20,25 @@ interface BranchRowProps {
 const NOT_TAKEN = "not taken";
 
 export function StepCard({ place }: { readonly place: StepPlace }) {
-  const { mode, selected } = useFlow();
+  const { kind } = useFlow();
   const { step, list } = place;
+  const chosen = useSelected(step.id);
+  const mark = useMark(step.id);
+  const reached = useFlowView(
+    (view) => view.run === null || view.run.steps.has(step.id),
+  );
   const look = kindLookOf(step.kind);
   const branches = branchesOf(step, list);
   const exit = doneExitOf(step, list);
-  const reached = mode.kind !== "run" || mode.steps.has(step.id);
-  const mark = mode.kind === "edit" ? mode.marks.get(step.id) : undefined;
   const problem = mark?.kind === "problem";
-  const chosen = selected === step.id;
   const label = `${look.word}: ${step.name}`;
-  const line = cardLineOf(step);
+  const line = cardLineOf(step, mark);
   const card = cn(
     "relative rounded-lg border border-(--flow-node-border) bg-surface transition-[border-color,box-shadow] duration-(--duration-fast) ease-standard hover:border-control",
     step.kind === "switch" ? "w-85" : "w-70",
     chosen &&
       "border-(--flow-selected) shadow-[inset_3px_0_0_var(--accent-solid),0_0_0_1px_var(--flow-selected)] hover:border-(--flow-selected)",
-    chosen && mode.kind !== "run" && "bg-accent-soft",
+    chosen && kind !== "run" && "bg-accent-soft",
     problem && "border-2 border-danger hover:border-danger",
     !reached && "border-dashed bg-subtle text-muted-foreground",
   );
@@ -89,9 +91,9 @@ function BranchList({
   readonly step: Step;
   readonly branches: readonly Branch[];
 }) {
-  const { mode } = useFlow();
-  const run = mode.kind === "run" ? mode.steps.get(step.id) : undefined;
-  const taken = run?.branch ?? null;
+  const taken = useFlowView(
+    (view) => view.run?.steps.get(step.id)?.branch ?? null,
+  );
 
   return (
     <ul aria-label="Branches" className="flex flex-col gap-0.5 border-t p-1">
@@ -108,8 +110,8 @@ function BranchList({
 }
 
 function BranchRow({ step, branch, taken }: BranchRowProps) {
-  const { mode } = useFlow();
-  const edit = mode.kind === "edit";
+  const { onInsert } = useFlow();
+  const edit = onInsert !== null;
   const chosen = taken === branch.case;
   const passed = taken !== null && !chosen;
   const look = exitLookOf(branch.exit);
@@ -141,7 +143,7 @@ function BranchRow({ step, branch, taken }: BranchRowProps) {
   return (
     <li
       className={cn(
-        edit && "grid grid-cols-[minmax(0,1fr)_24px] items-center gap-1",
+        edit && "grid grid-cols-[minmax(0,1fr)_32px] items-center gap-0.5",
       )}
     >
       <Selectable

@@ -10,8 +10,13 @@ import type { Step } from "language-server/protocol";
 import type { ReactNode } from "react";
 import { Status } from "@/libs/ui/composites/status";
 import { cn } from "@/libs/ui/tokens/cn";
-import { useFlow } from "./context";
-import type { StepMark } from "./interfaces";
+import {
+  useFlow,
+  useMark,
+  useRovingItem,
+  useRun,
+  useSelected,
+} from "./context";
 import { stepItemOf } from "./items";
 import { runLookOf } from "./looks";
 
@@ -21,6 +26,16 @@ interface SelectableProps {
   readonly marksSelection?: boolean;
   readonly jump?: string;
   readonly className: string;
+  readonly children: ReactNode;
+}
+
+interface SelectButtonProps {
+  readonly target: string;
+  readonly item: string;
+  readonly marksSelection: boolean;
+  readonly jump: string | undefined;
+  readonly className: string;
+  readonly onSelect: (target: string | null) => void;
   readonly children: ReactNode;
 }
 
@@ -44,22 +59,47 @@ export function Selectable({
   className,
   children,
 }: SelectableProps) {
-  const { onSelect, selected, itemProps } = useFlow();
+  const { onSelect } = useFlow();
 
-  if (onSelect === undefined)
+  if (onSelect === null)
     return (
       <div data-jump-source={jump} className={className}>
         {children}
       </div>
     );
 
-  const current = marksSelection && selected === target ? "true" : undefined;
+  return (
+    <SelectButton
+      target={target}
+      item={item}
+      marksSelection={marksSelection}
+      jump={jump}
+      className={className}
+      onSelect={onSelect}
+    >
+      {children}
+    </SelectButton>
+  );
+}
+
+function SelectButton({
+  target,
+  item,
+  marksSelection,
+  jump,
+  className,
+  onSelect,
+  children,
+}: SelectButtonProps) {
+  const roving = useRovingItem(item);
+  const selected = useSelected(target);
+  const current = marksSelection && selected ? "true" : undefined;
   const classes = cn("cursor-pointer", className);
 
   return (
     <button
       type="button"
-      {...itemProps(item)}
+      {...roving}
       data-jump-source={jump}
       aria-current={current}
       onClick={() => {
@@ -100,29 +140,34 @@ export function Caption({ step }: { readonly step: string }) {
 }
 
 export function StateLine({ step, empty }: StateLineProps) {
-  const { mode } = useFlow();
+  const { kind } = useFlow();
 
-  switch (mode.kind) {
+  switch (kind) {
     case "read":
       return null;
-    case "edit": {
-      const mark = mode.marks.get(step.id);
-      return <MarkLine mark={mark} empty={empty} />;
-    }
-    case "run": {
-      const look = runLookOf(mode.steps.get(step.id));
-      return <Status look={look} live={look.live} className={LINE} />;
-    }
+    case "edit":
+      return <MarkLine step={step.id} empty={empty} />;
+    case "run":
+      return <RunLine step={step.id} />;
   }
 }
 
+function RunLine({ step }: { readonly step: string }) {
+  const run = useRun(step);
+  const look = runLookOf(run);
+
+  return <Status look={look} live={look.live} className={LINE} />;
+}
+
 function MarkLine({
-  mark,
+  step,
   empty,
 }: {
-  readonly mark: StepMark | undefined;
+  readonly step: string;
   readonly empty: boolean;
 }) {
+  const mark = useMark(step);
+
   if (empty) return <Problem words="No steps inside yet" />;
 
   if (mark === undefined) return null;
@@ -131,7 +176,7 @@ function MarkLine({
     return (
       <span className={cn(LINE, "text-warning-strong")}>
         <PencilIcon className="text-warning" aria-hidden />
-        Fill in: {mark.what}
+        Fill in: the {mark.missing}
       </span>
     );
 

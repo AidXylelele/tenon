@@ -194,7 +194,7 @@ export const ORDER_ROUTER = workflowOf(
       next(TELL),
     ]),
     stepAt(TELL, "call", "POST https://httpbin.org/anything/tell", [ends()]),
-    stepAt(WAIT, "wait", "PT1M", [goTo(BOOK)]),
+    { ...stepAt(WAIT, "wait", "PT1M", [goTo(BOOK)]), milliseconds: 60_000 },
   ],
   [ON_EVENT],
 );

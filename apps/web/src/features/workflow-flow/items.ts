@@ -20,10 +20,6 @@ export function branchPlusItemOf(step: string, name: string): string {
   return `branch-plus:${step}:${name}`;
 }
 
-export function menuItemOf(step: string): string {
-  return `menu:${step}`;
-}
-
 export function iterationItemOf(step: string, which: string): string {
   return `iteration:${step}:${which}`;
 }

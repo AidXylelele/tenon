@@ -1,16 +1,34 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/libs/ui/tokens/cn";
-import { useFlow } from "./context";
+import { useRunView } from "./context";
 import { isReached } from "./flow";
 import { jumpLineOf } from "./geometry";
-import type { Box, FlowMode, Jump, JumpLine } from "./interfaces";
+import type { Box, Jump, JumpLine, RunView } from "./interfaces";
+
+interface Offset {
+  readonly left: number;
+  readonly top: number;
+}
+
+interface JumpPathProps {
+  readonly line: JumpLine;
+  readonly taken: boolean;
+}
 
 const NO_LINES: readonly JumpLine[] = [];
 
-export function JumpLines({ jumps }: { readonly jumps: readonly Jump[] }) {
-  const { mode } = useFlow();
+const DASHED = "stroke-(--flow-edge) stroke-[1.5] [stroke-dasharray:5_4]";
+
+const SOLID = "stroke-accent-solid stroke-2";
+
+export const JumpLines = memo(function JumpLines({
+  jumps,
+}: {
+  readonly jumps: readonly Jump[];
+}) {
+  const run = useRunView();
   const drawing = useRef<SVGSVGElement>(null);
   const [lines, setLines] = useState(NO_LINES);
 
@@ -40,51 +58,40 @@ export function JumpLines({ jumps }: { readonly jumps: readonly Jump[] }) {
     >
       {lines.map((line) => {
         const jump = jumps.find((each) => each.key === line.key);
-        const taken = jump !== undefined && isTaken(mode, jump);
-        const stroke = cn(
-          "fill-none",
-          taken
-            ? "stroke-accent-solid stroke-2"
-            : "stroke-(--flow-edge) stroke-[1.5] [stroke-dasharray:5_4]",
-        );
+        const taken = jump !== undefined && isTaken(run, jump);
 
-        return (
-          <g key={line.key} data-jump-line={line.key}>
-            <path d={line.path} className={stroke} />
-            <path
-              d={line.arrow}
-              className={cn(stroke, "[stroke-dasharray:none]")}
-            />
-          </g>
-        );
+        return <JumpPath key={line.key} line={line} taken={taken} />;
       })}
     </svg>
   );
+});
+
+function JumpPath({ line, taken }: JumpPathProps) {
+  const stroke = cn("fill-none", taken ? SOLID : DASHED);
+  const arrow = cn(stroke, "[stroke-dasharray:none]");
+
+  return (
+    <g data-jump-line={line.key}>
+      <path d={line.path} className={stroke} />
+      <path d={line.arrow} className={arrow} />
+    </g>
+  );
 }
 
-function isTaken(mode: FlowMode, jump: Jump): boolean {
-  if (mode.kind !== "run") return false;
+function isTaken(run: RunView | null, jump: Jump): boolean {
+  if (run === null) return false;
 
-  if (jump.case !== null)
-    return mode.steps.get(jump.from)?.branch === jump.case;
+  if (jump.case !== null) return run.steps.get(jump.from)?.branch === jump.case;
 
-  return isReached(mode, jump.from) && isReached(mode, jump.to);
+  return isReached(run, jump.from) && isReached(run, jump.to);
 }
 
 function linesOf(
-  root: HTMLElement,
+  area: HTMLElement,
   jumps: readonly Jump[],
 ): readonly JumpLine[] {
-  const origin = root.getBoundingClientRect();
-  const zoom = root.offsetWidth === 0 ? 1 : origin.width / root.offsetWidth;
-  const steps = boxesOf(root, "[data-step-box]", "stepBox", origin, zoom);
-  const sources = boxesOf(
-    root,
-    "[data-jump-source]",
-    "jumpSource",
-    origin,
-    zoom,
-  );
+  const steps = boxesOf(area, "[data-step-box]", "stepBox");
+  const sources = boxesOf(area, "[data-jump-source]", "jumpSource");
 
   return jumps.flatMap((jump) => {
     const card = steps.get(jump.from);
@@ -110,23 +117,30 @@ function linesOf(
 }
 
 function boxesOf(
-  root: HTMLElement,
+  area: HTMLElement,
   selector: string,
   key: "stepBox" | "jumpSource",
-  origin: DOMRect,
-  zoom: number,
 ): ReadonlyMap<string, Box> {
-  const elements = [...root.querySelectorAll<HTMLElement>(selector)];
+  const elements = [...area.querySelectorAll<HTMLElement>(selector)];
   const entries = elements.map((element) => {
-    const rect = element.getBoundingClientRect();
-    const box = {
-      left: (rect.left - origin.left) / zoom,
-      right: (rect.right - origin.left) / zoom,
-      top: (rect.top - origin.top) / zoom,
-      bottom: (rect.bottom - origin.top) / zoom,
-    };
-    return [element.dataset[key] ?? "", box] as const;
+    const { left, top } = offsetIn(area, element);
+    const right = left + element.offsetWidth;
+    const bottom = top + element.offsetHeight;
+    return [element.dataset[key] ?? "", { left, top, right, bottom }] as const;
   });
 
   return new Map(entries);
+}
+
+function offsetIn(area: HTMLElement, element: HTMLElement): Offset {
+  const parent = element.offsetParent;
+  const own = { left: element.offsetLeft, top: element.offsetTop };
+
+  if (parent === area || !(parent instanceof HTMLElement)) return own;
+
+  const above = offsetIn(area, parent);
+  const left = own.left + above.left + parent.clientLeft;
+  const top = own.top + above.top + parent.clientTop;
+
+  return { left, top };
 }

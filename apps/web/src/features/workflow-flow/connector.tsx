@@ -3,7 +3,7 @@
 import { ArrowLeftIcon, PlusIcon } from "lucide-react";
 import { IconButton } from "@/libs/ui/composites/icon-button";
 import { cn } from "@/libs/ui/tokens/cn";
-import { useFlow } from "./context";
+import { useFlow, useFlowView, useRovingItem } from "./context";
 import { isSamePlace } from "./flow";
 import type { Line, PlusProps } from "./interfaces";
 
@@ -25,6 +25,12 @@ export const ACROSS: Readonly<Record<Line, string>> = {
   dim: "border-t-[1.5px] border-dashed border-(--flow-edge)",
 };
 
+const PLUS = cn(
+  "relative rounded-full text-muted-foreground before:absolute before:inset-1 before:rounded-full before:border before:border-control before:bg-surface before:transition-colors before:duration-(--duration-fast) [&_svg]:relative [&_svg]:size-3.5",
+  "hover:bg-transparent hover:text-accent-text hover:before:border-accent-solid hover:before:bg-accent-soft active:bg-transparent",
+  "aria-expanded:bg-transparent aria-expanded:text-on-accent aria-expanded:before:border-accent-solid aria-expanded:before:bg-accent-solid aria-expanded:hover:text-on-accent aria-expanded:hover:before:bg-accent-solid",
+);
+
 const ARROWS: Readonly<Record<Line, string>> = {
   plain: "text-(--flow-edge)",
   taken: "text-accent-solid",
@@ -36,7 +42,7 @@ export function Connector({ line, plus, hint }: ConnectorProps) {
   const arrow = cn("absolute bottom-0 left-1/2 -translate-x-1/2", ARROWS[line]);
 
   return (
-    <div className="relative flex h-14 w-6 shrink-0 justify-center">
+    <div className="relative flex h-14 w-8 shrink-0 justify-center">
       <span className={drawn} aria-hidden />
       <svg
         className={arrow}
@@ -58,7 +64,7 @@ export function Connector({ line, plus, hint }: ConnectorProps) {
         </span>
       )}
       {hint !== undefined && (
-        <span className="absolute top-1/2 left-[calc(50%+24px)] flex -translate-y-1/2 items-center gap-1 rounded-sm bg-canvas px-1 text-caption font-semibold whitespace-nowrap text-accent-text">
+        <span className="absolute top-1/2 left-[calc(50%+28px)] flex -translate-y-1/2 items-center gap-1 rounded-sm bg-canvas px-1 text-caption font-semibold whitespace-nowrap text-accent-text">
           <ArrowLeftIcon className="size-3.5" aria-hidden />
           {hint}
         </span>
@@ -91,25 +97,24 @@ export function Placeholder() {
 }
 
 export function PlusButton({ item, label, place }: PlusProps) {
-  const { mode, itemProps } = useFlow();
+  const { onInsert } = useFlow();
+  const roving = useRovingItem(item);
+  const open = useFlowView((view) => isSamePlace(place, view.inserting));
 
-  if (mode.kind !== "edit") return null;
-
-  const { onInsert } = mode;
-  const open = isSamePlace(place, mode.inserting);
+  if (onInsert === null) return null;
 
   return (
     <IconButton
       label={label}
       icon={PlusIcon}
-      variant="outline"
-      size="icon-xs"
-      {...itemProps(item)}
+      variant="ghost"
+      size="icon"
+      {...roving}
       aria-expanded={open}
       onClick={() => {
         onInsert(place);
       }}
-      className="rounded-full border-control font-normal text-muted-foreground hover:border-accent-solid hover:bg-accent-soft hover:text-accent-text aria-expanded:border-accent-solid aria-expanded:bg-accent-solid aria-expanded:text-on-accent aria-expanded:hover:bg-accent-solid aria-expanded:hover:text-on-accent"
+      className={PLUS}
     />
   );
 }

@@ -1,4 +1,5 @@
 import {
+  type LucideIcon,
   ArrowDownIcon,
   BracesIcon,
   CalendarClockIcon,
@@ -27,10 +28,16 @@ import {
   TerminalIcon,
   TimerIcon,
   WebhookIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import type { Step, StepList, Trigger } from "language-server/protocol";
-import type { StatusLook } from "@/libs/ui/composites/status";
-import { triggerText } from "@/operations/schedule-words";
+import type { Trigger as RunTrigger } from "@/libs/data-access/types";
+import {
+  startedBy,
+  type StepState,
+  stepStateLabel,
+} from "@/operations/run-progress";
+import { spanOf, triggerText } from "@/operations/schedule-words";
 import { exitOf } from "./flow";
 import type {
   Exit,
@@ -38,9 +45,11 @@ import type {
   KindLook,
   Lane,
   RunLook,
+  RunStart,
   StartLook,
+  StateLook,
+  StepMark,
   StepRun,
-  StepStatus,
 } from "./interfaces";
 
 const KINDS: Readonly<Record<Step["kind"], KindLook>> = {
@@ -58,23 +67,26 @@ const KINDS: Readonly<Record<Step["kind"], KindLook>> = {
   raise: { word: "Stop with an error", icon: OctagonXIcon },
 };
 
-const STATUSES: Readonly<Record<StepStatus, StatusLook>> = {
-  pending: { tone: "info", icon: ClockIcon, label: "Queued" },
-  running: { tone: "info", icon: LoaderCircleIcon, label: "Running" },
-  waiting: { tone: "info", icon: HourglassIcon, label: "Waiting" },
-  suspended: { tone: "warning", icon: CirclePauseIcon, label: "Paused" },
-  completed: { tone: "success", icon: CircleCheckIcon, label: "Succeeded" },
-  faulted: { tone: "danger", icon: CircleXIcon, label: "Failed" },
-  cancelled: { tone: "neutral", icon: CircleSlashIcon, label: "Cancelled" },
-  retrying: { tone: "warning", icon: RotateCwIcon, label: "Retrying" },
-  skipped: { tone: "neutral", icon: CircleDashedIcon, label: "Skipped" },
+const STATES: Readonly<Record<StepState, StateLook>> = {
+  pending: { tone: "info", icon: ClockIcon },
+  running: { tone: "info", icon: LoaderCircleIcon },
+  waiting: { tone: "info", icon: HourglassIcon },
+  suspended: { tone: "warning", icon: CirclePauseIcon },
+  completed: { tone: "success", icon: CircleCheckIcon },
+  faulted: { tone: "danger", icon: CircleXIcon },
+  cancelled: { tone: "neutral", icon: CircleSlashIcon },
+  retrying: { tone: "warning", icon: RotateCwIcon },
+  skipped: { tone: "neutral", icon: CircleDashedIcon },
+  "not-reached": { tone: "neutral", icon: CircleDashedIcon },
 };
 
-const NOT_REACHED: RunLook = {
-  tone: "neutral",
-  icon: CircleDashedIcon,
-  label: "Not reached",
-  live: false,
+const STARTED_ICONS: Readonly<Record<RunTrigger, LucideIcon>> = {
+  manual: HandIcon,
+  schedule: CalendarClockIcon,
+  event: WebhookIcon,
+  parent: WorkflowIcon,
+  detached: WorkflowIcon,
+  restart: RotateCwIcon,
 };
 
 const BY_HAND: StartLook = {
@@ -87,10 +99,13 @@ export function kindLookOf(kind: Step["kind"]): KindLook {
   return KINDS[kind];
 }
 
-export function cardLineOf(step: Step): string {
-  if (step.kind === "switch") return blockLineOf(step);
+export function cardLineOf(step: Step, mark: StepMark | undefined): string {
+  const written = writtenLineOf(step);
+  const missing = mark?.missing ?? null;
 
-  return step.summary ?? KINDS[step.kind].word;
+  if (missing === null) return written;
+
+  return `${written} · ${missing} to fill in`;
 }
 
 export function blockLineOf(step: Step): string {
@@ -117,17 +132,33 @@ export function plusLabelOf(
 }
 
 export function runLookOf(run: StepRun | undefined): RunLook {
-  if (run === undefined) return NOT_REACHED;
+  const state = run?.status ?? "not-reached";
+  const look = STATES[state];
+  const word = stepStateLabel(state);
+  const detail = run?.detail ?? null;
+  const label = detail === null ? word : `${word} · ${detail}`;
+  const live = state === "running";
 
-  const status = STATUSES[run.status];
-  const label =
-    run.detail === null ? status.label : `${status.label} · ${run.detail}`;
-  const live = run.status === "running";
-
-  return { tone: status.tone, icon: status.icon, label, live };
+  return { tone: look.tone, icon: look.icon, label, live };
 }
 
-export function startLookOf(triggers: readonly Trigger[]): StartLook {
+export function startCardOf(
+  triggers: readonly Trigger[],
+  start: RunStart | null,
+): StartLook {
+  if (start === null) return startLookOf(triggers);
+
+  return runStartLookOf(start);
+}
+
+function runStartLookOf(start: RunStart): StartLook {
+  const title = startedBy(start.trigger);
+  const icon = STARTED_ICONS[start.trigger];
+
+  return { title, detail: start.detail, icon };
+}
+
+function startLookOf(triggers: readonly Trigger[]): StartLook {
   const [first, ...others] = triggers;
 
   if (first === undefined) return BY_HAND;
@@ -195,6 +226,14 @@ function innerPlusLabelOf(
   if (below === null) return `Add a step at the end of ${owner}`;
 
   return `Add a step inside ${owner}, after ${above}`;
+}
+
+function writtenLineOf(step: Step): string {
+  if (step.kind === "switch") return blockLineOf(step);
+
+  if (step.summary === null) return KINDS[step.kind].word;
+
+  return spanOf(step.milliseconds, step.summary);
 }
 
 function countedStepsOf(step: Step): string | null {
