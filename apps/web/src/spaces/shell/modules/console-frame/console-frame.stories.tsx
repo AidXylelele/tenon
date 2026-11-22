@@ -16,6 +16,7 @@ import { OfflineStrip } from "./offline-strip";
 interface FrameStoryProps {
   readonly capabilities: Capabilities;
   readonly defaultOpen: boolean | null;
+  readonly inProgress: number;
   readonly reachable: boolean;
   readonly loading: boolean;
 }
@@ -51,6 +52,7 @@ const keepTheme = fn((chosen: string) => Promise.resolve(void chosen));
 function FrameStory({
   capabilities,
   defaultOpen,
+  inProgress,
   reachable,
   loading,
 }: FrameStoryProps) {
@@ -60,7 +62,11 @@ function FrameStory({
   const sidebar = loading ? (
     <SidebarLoading />
   ) : (
-    <ConsoleSidebar capabilities={capabilities} account={account} />
+    <ConsoleSidebar
+      capabilities={capabilities}
+      inProgress={inProgress}
+      account={account}
+    />
   );
 
   return (
@@ -108,6 +114,7 @@ const meta = {
   args: {
     capabilities: ADMINISTRATOR,
     defaultOpen: null,
+    inProgress: 10,
     reachable: true,
     loading: false,
   },
@@ -124,7 +131,7 @@ export const CollapsedToIcons: Story = { args: { defaultOpen: false } };
 export const ChosenExpanded: Story = { args: { defaultOpen: true } };
 
 export const Viewer: Story = {
-  args: { capabilities: VIEWER },
+  args: { capabilities: VIEWER, inProgress: 1 },
   parameters: {
     nextjs: { navigation: { pathname: "/runs/7c41e2d0-5b0e-4a13-9f2b" } },
   },

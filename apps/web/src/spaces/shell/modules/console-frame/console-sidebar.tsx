@@ -2,19 +2,21 @@
 
 import { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useEffectEvent } from "react";
+import { useEffect, useEffectEvent, useId } from "react";
 import type { Capabilities } from "@/libs/data-access/types";
 import { Link } from "@/libs/routing/link";
 import { PRODUCT_NAME } from "@/libs/routing/page-title";
-import { HOME_HREF } from "@/libs/routing/routes";
+import { HOME_HREF, RUNS_HREF } from "@/libs/routing/routes";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSkeleton,
@@ -32,10 +34,16 @@ const LOADING_ROWS = ["work-1", "work-2", "work-3", "connect-1", "connect-2"];
 
 interface ConsoleSidebarProps {
   readonly capabilities: Capabilities | null;
+  readonly inProgress: number;
   readonly account: React.ReactNode;
 }
 
-export function ConsoleSidebar({ capabilities, account }: ConsoleSidebarProps) {
+export function ConsoleSidebar({
+  capabilities,
+  inProgress,
+  account,
+}: ConsoleSidebarProps) {
+  const connectLabel = useId();
   const work = placesOf(capabilities, "work");
   const connect = placesOf(capabilities, "connect");
   const settings = placesOf(capabilities, "settings");
@@ -47,20 +55,21 @@ export function ConsoleSidebar({ capabilities, account }: ConsoleSidebarProps) {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <Places places={work} />
+            <Places places={work} inProgress={inProgress} />
           </SidebarGroupContent>
         </SidebarGroup>
         {connect.length > 0 && (
-          <SidebarGroup>
+          <SidebarGroup role="group" aria-labelledby={connectLabel}>
+            <SidebarGroupLabel id={connectLabel}>Connect</SidebarGroupLabel>
             <SidebarSeparator className="mx-0 mb-2 hidden group-data-[collapsible=icon]:block" />
             <SidebarGroupContent>
-              <Places places={connect} />
+              <Places places={connect} inProgress={0} />
             </SidebarGroupContent>
           </SidebarGroup>
         )}
       </SidebarContent>
       <SidebarFooter>
-        <Places places={settings} />
+        <Places places={settings} inProgress={0} />
         {account !== null && (
           <>
             <SidebarSeparator className="mx-0" />
@@ -125,20 +134,34 @@ function Brand() {
   );
 }
 
-function Places({ places }: { readonly places: readonly Place[] }) {
+function Places({
+  places,
+  inProgress,
+}: {
+  readonly places: readonly Place[];
+  readonly inProgress: number;
+}) {
   return (
     <SidebarMenu>
-      {places.map((place) => (
-        <PlaceItem key={place.href} place={place} />
-      ))}
+      {places.map((place) => {
+        const count = place.href === RUNS_HREF ? inProgress : 0;
+        return <PlaceItem key={place.href} place={place} count={count} />;
+      })}
     </SidebarMenu>
   );
 }
 
-function PlaceItem({ place }: { readonly place: Place }) {
+function PlaceItem({
+  place,
+  count,
+}: {
+  readonly place: Place;
+  readonly count: number;
+}) {
   const pathname = usePathname();
   const leave = useLeaveDrawer();
   const current = isCurrent(place, pathname);
+  const counting = count > 0;
   const Icon = place.icon;
 
   return (
@@ -147,11 +170,22 @@ function PlaceItem({ place }: { readonly place: Place }) {
         <Link href={place.href} onClick={leave}>
           <Icon />
           <span>{place.label}</span>
+          <InProgressSaid count={count} />
           <Pending />
         </Link>
       </SidebarMenuButton>
+      {counting && <SidebarMenuBadge aria-hidden>{count}</SidebarMenuBadge>}
     </SidebarMenuItem>
   );
+}
+
+function InProgressSaid({ count }: { readonly count: number }) {
+  if (count === 0) return null;
+
+  const runs = count === 1 ? "run" : "runs";
+  const said = `, ${String(count)} ${runs} in progress now`;
+
+  return <span className="sr-only">{said}</span>;
 }
 
 function Pending() {

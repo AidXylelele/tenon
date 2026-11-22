@@ -6,6 +6,7 @@ import { CommandPalette } from "./command-palette";
 import { ConsoleRoot } from "./console-root";
 import { ConsoleSidebar, SidebarLoading } from "./console-sidebar";
 import { Frame } from "./frame";
+import { inProgressNow } from "./in-progress";
 import { OfflineStrip } from "./offline-strip";
 import { lastViewport, savedSidebarChoice } from "./saved-sidebar";
 import { signedIn } from "./signed-in";
@@ -50,7 +51,10 @@ export async function ConsoleFrame({
 }
 
 async function SignedInSidebar() {
-  const session = await signedIn();
+  const [session, inProgress] = await Promise.all([
+    signedIn(),
+    inProgressNow(),
+  ]);
   const capabilities = session?.capabilities ?? null;
   const account =
     session === null ? null : (
@@ -61,7 +65,13 @@ async function SignedInSidebar() {
       />
     );
 
-  return <ConsoleSidebar capabilities={capabilities} account={account} />;
+  return (
+    <ConsoleSidebar
+      capabilities={capabilities}
+      inProgress={inProgress}
+      account={account}
+    />
+  );
 }
 
 async function SignedInSearch() {

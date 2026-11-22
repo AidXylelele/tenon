@@ -32,6 +32,7 @@ const VIEWER: Capabilities = {
 };
 
 function FrameAt({ capabilities }: { readonly capabilities: Capabilities }) {
+  const inProgress = capabilities.author ? 10 : 0;
   return (
     <TooltipProvider>
       <ConsoleRoot defaultOpen={null} lastViewport={null}>
@@ -39,6 +40,7 @@ function FrameAt({ capabilities }: { readonly capabilities: Capabilities }) {
           sidebar={
             <ConsoleSidebar
               capabilities={capabilities}
+              inProgress={inProgress}
               account={<p>Account</p>}
             />
           }
@@ -111,13 +113,38 @@ describe("the console frame", () => {
       "Tenon",
       "Home",
       "Workflows",
-      "Runs",
+      "Runs, 10 runs in progress now",
       "Webhooks",
       "Notifications",
       "Secrets",
       "Settings",
     ]);
     expect(current).toHaveTextContent("Workflows");
+  });
+
+  it("the_places_to_connect_are_a_group_named_connect", () => {
+    renderFrame(1440, EDITOR);
+
+    const connect = screen.getByRole("group", { name: "Connect" });
+    const names = linkNames(connect);
+
+    expect(names).toEqual(["Webhooks", "Notifications", "Secrets"]);
+  });
+
+  it("runs_say_how_many_are_in_progress_now", () => {
+    renderFrame(1440, EDITOR);
+
+    const runs = screen.getByRole("link", { name: /^Runs/ });
+
+    expect(runs).toHaveAccessibleName("Runs, 10 runs in progress now");
+  });
+
+  it("runs_say_nothing_more_when_none_is_in_progress", () => {
+    renderFrame(1440, VIEWER);
+
+    const runs = screen.getByRole("link", { name: /^Runs/ });
+
+    expect(runs).toHaveAccessibleName("Runs");
   });
 
   it("a_viewer_sees_no_places_to_connect", () => {
@@ -193,7 +220,7 @@ describe("the navigation drawer below 1024 px", () => {
     renderFrame(800, EDITOR);
     openDrawer();
 
-    const runs = screen.getByRole("link", { name: "Runs" });
+    const runs = screen.getByRole("link", { name: /^Runs/ });
     fireEvent.click(runs);
 
     const content = screen.getByRole("main");
