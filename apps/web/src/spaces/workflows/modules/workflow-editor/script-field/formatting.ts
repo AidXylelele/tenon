@@ -1,18 +1,4 @@
-import { formatScript } from "@/libs/code-formatting/format-script";
-import type { FormattingAnswer } from "@/libs/code-formatting/interfaces";
-import type { FormatOutcome, ScriptLanguageSettings } from "./interfaces";
-
-export async function answerOf(
-  settings: ScriptLanguageSettings,
-  text: string,
-): Promise<FormattingAnswer> {
-  try {
-    return await formatScript(settings.library, text);
-  } catch (error) {
-    const message = reasonOf(error);
-    return { kind: "failed", message };
-  }
-}
+import type { FormatOutcome } from "./interfaces";
 
 export function formatWordsOf(
   outcome: FormatOutcome,
@@ -30,10 +16,4 @@ export function formatWordsOf(
     case "outdated":
       return `The code changed while ${formatter} formatted it; press Format again.`;
   }
-}
-
-function reasonOf(error: unknown): string {
-  if (error instanceof Error) return error.message;
-
-  return String(error);
 }

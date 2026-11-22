@@ -1,6 +1,6 @@
 import type { Extension } from "@codemirror/state";
 import type { Diagnostic } from "vscode-languageserver-protocol";
-import type { FormattingAnswer } from "@/libs/code-formatting/interfaces";
+import type { Formatting } from "@/libs/code-formatting/interfaces";
 import type { ScriptLanguage } from "@/libs/codemirror/interfaces";
 
 export type RunScriptLanguage = "js" | "python";
@@ -22,7 +22,7 @@ export interface ScriptLanguageSettings {
   readonly extensions: Extension;
 }
 
-export type FormatOutcome = FormattingAnswer | { readonly kind: "outdated" };
+export type FormatOutcome = Formatting | { readonly kind: "outdated" };
 
 export type FormatState =
   | { readonly kind: "idle" }

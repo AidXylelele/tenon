@@ -30,7 +30,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
-import { answerOf, formatWordsOf } from "./formatting";
+import { formatScript } from "@/libs/code-formatting/format-script";
+import { formatWordsOf } from "./formatting";
 import type {
   FormatOutcome,
   FormatState,
@@ -110,8 +111,9 @@ export function ScriptField({
     if (running) return;
 
     const text = editor.state.doc.toString();
+    const cursor = editor.state.selection.main.head;
     setFormatting(RUNNING);
-    const answer = await answerOf(settings, text);
+    const answer = await formatScript(settings.library, text, cursor);
 
     const current = editor.state.doc.toString();
     const unchanged = current === text;

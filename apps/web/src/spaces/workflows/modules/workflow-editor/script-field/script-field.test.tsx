@@ -16,8 +16,8 @@ import {
   DiagnosticSeverity,
 } from "vscode-languageserver-protocol";
 import type {
-  FormattingAnswer,
-  FormattingRequest,
+  WorkerAnswer,
+  WorkerRequest,
 } from "@/libs/code-formatting/interfaces";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import type { ScriptFieldProps } from "./interfaces";
@@ -62,15 +62,15 @@ const PYTHON: Shown = {
   expanded: false,
 };
 
-const requests: FormattingRequest[] = [];
-const answers: FormattingAnswer[] = [];
+const requests: WorkerRequest[] = [];
+const answers: WorkerAnswer[] = [];
 const held: MessagePort[] = [];
 
 function scriptedWorker(): EventTarget {
   const worker = new EventTarget();
 
   function postMessage(
-    request: FormattingRequest,
+    request: WorkerRequest,
     ports: readonly MessagePort[],
   ): void {
     requests.push(request);
@@ -137,7 +137,7 @@ function format(): void {
   fireEvent.click(button);
 }
 
-function release(answer: FormattingAnswer): void {
+function release(answer: WorkerAnswer): void {
   const port = held.shift();
   port?.postMessage(answer);
 }
@@ -221,13 +221,15 @@ describe("the script field", () => {
 
   it("format_replaces_the_javascript_with_prettiers_and_says_so", async () => {
     const { onChange } = showField(JAVASCRIPT);
-    answers.push({ kind: "formatted", text: JS_FORMATTED });
+    answers.push({ kind: "formatted", text: JS_FORMATTED, cursor: 0 });
 
     format();
 
     const told = await screen.findByText("Formatted with Prettier");
     expect(told).toBeVisible();
-    expect(requests).toEqual([{ language: "javascript", text: JS_RAW }]);
+    expect(requests).toEqual([
+      { kind: "format", language: "javascript", text: JS_RAW, cursor: 0 },
+    ]);
     expect(onChange).toHaveBeenCalledExactlyOnceWith(JS_FORMATTED);
   });
 
@@ -240,19 +242,21 @@ describe("the script field", () => {
       expanded: false,
     };
     const { onChange } = showField(shown);
-    answers.push({ kind: "formatted", text: "x = 1\n" });
+    answers.push({ kind: "formatted", text: "x = 1\n", cursor: 0 });
 
     format();
 
     const told = await screen.findByText("Formatted with Ruff");
     expect(told).toBeVisible();
-    expect(requests).toEqual([{ language: "python", text: "x=1" }]);
+    expect(requests).toEqual([
+      { kind: "format", language: "python", text: "x=1", cursor: 0 },
+    ]);
     expect(onChange).toHaveBeenCalledExactlyOnceWith("x = 1\n");
   });
 
   it("code_already_formatted_is_left_as_it_is", async () => {
     const { onChange } = showField(JAVASCRIPT);
-    answers.push({ kind: "formatted", text: JS_RAW });
+    answers.push({ kind: "formatted", text: JS_RAW, cursor: 0 });
 
     format();
 
@@ -307,7 +311,9 @@ describe("the script field", () => {
 
     format();
 
-    expect(requests).toEqual([{ language: "javascript", text: JS_RAW }]);
+    expect(requests).toEqual([
+      { kind: "format", language: "javascript", text: JS_RAW, cursor: 0 },
+    ]);
   });
 
   it("code_changed_while_formatting_is_kept", async () => {
@@ -318,7 +324,7 @@ describe("the script field", () => {
       view.dispatch({ changes: { from: 0, insert: "// names\n" } });
     });
 
-    release({ kind: "formatted", text: JS_FORMATTED });
+    release({ kind: "formatted", text: JS_FORMATTED, cursor: 0 });
 
     const told = await screen.findByText(
       "The code changed while Prettier formatted it; press Format again.",
@@ -334,7 +340,7 @@ describe("the script field", () => {
     act(() => {
       view.dispatch({ changes: { from: 0, insert: "// names\n" } });
     });
-    answers.push({ kind: "formatted", text: JS_FORMATTED });
+    answers.push({ kind: "formatted", text: JS_FORMATTED, cursor: 0 });
     format();
     await screen.findByText("Formatted with Prettier");
 
@@ -349,7 +355,7 @@ describe("the script field", () => {
 
   it("shift_alt_f_formats", async () => {
     showField(JAVASCRIPT);
-    answers.push({ kind: "formatted", text: JS_FORMATTED });
+    answers.push({ kind: "formatted", text: JS_FORMATTED, cursor: 0 });
     const content = code();
 
     fireEvent.keyDown(content, {
