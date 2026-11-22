@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { EventStore } from "../events/ports.js";
 import type { DeliveryCommand } from "./interfaces.js";
 import { DeliveryLog, SubscriptionRepository } from "./ports.js";
@@ -10,9 +10,9 @@ export class FailDelivery {
     private readonly subscriptions: SubscriptionRepository,
     private readonly events: EventStore,
     private readonly log: DeliveryLog,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: DeliveryCommand): Promise<void> {
     const now = new Date();
     const subscription = await this.subscriptions.findById(
@@ -22,6 +22,6 @@ export class FailDelivery {
 
     if (subscription === null || event === null) return;
 
-    await this.log.failed(subscription, event, now);
+    await this.unitOfWork.run(() => this.log.failed(subscription, event, now));
   }
 }
