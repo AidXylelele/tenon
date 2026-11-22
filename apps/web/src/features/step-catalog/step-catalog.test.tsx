@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, type Mock, vi } from "vitest";
-import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import type { EntryAction } from "@/operations/step-catalog";
 import {
   TENON_VARIANTS,
@@ -9,41 +8,34 @@ import {
 import type { StepCatalogProps } from "./interfaces";
 import { StepCatalog } from "./step-catalog";
 
-type Place = Omit<StepCatalogProps, "onChoose" | "onClose">;
+type Shown = Omit<StepCatalogProps, "onChoose">;
 
 interface Owner {
   readonly onChoose: Mock<(action: EntryAction) => void>;
-  readonly onClose: Mock<() => void>;
 }
 
-const AFTER_FETCH: Place = {
+const AFTER_FETCH: Shown = {
   variants: TENON_VARIANTS,
   stepAbove: "Fetch the digest",
-  place: "after Fetch the digest",
   languageTerms: false,
 };
 
-const AFTER_THE_START: Place = {
+const AFTER_THE_START: Shown = {
   variants: TENON_VARIANTS,
   stepAbove: null,
-  place: "after Every day at 09:00 UTC",
   languageTerms: false,
 };
 
-const HOST_WITHOUT_SHELL: Place = {
+const HOST_WITHOUT_SHELL: Shown = {
   variants: WITHOUT_SHELL,
   stepAbove: "Fetch the digest",
-  place: "after Fetch the digest",
   languageTerms: false,
 };
 
-function openCatalog(place: Place): Owner {
+function openCatalog(shown: Shown): Owner {
   const onChoose = vi.fn<(action: EntryAction) => void>();
-  const onClose = vi.fn<() => void>();
-  render(<StepCatalog {...place} onChoose={onChoose} onClose={onClose} />, {
-    wrapper: TooltipProvider,
-  });
-  return { onChoose, onClose };
+  render(<StepCatalog {...shown} onChoose={onChoose} />);
+  return { onChoose };
 }
 
 function searchBox(): HTMLElement {
@@ -61,14 +53,6 @@ function press(key: string): void {
 }
 
 describe("the step catalog at a plus", () => {
-  it("the_panel_says_where_the_step_will_go", () => {
-    openCatalog(AFTER_FETCH);
-
-    const panel = screen.getByRole("region", { name: "Add a step" });
-    const place = within(panel).getByText("after Fetch the digest");
-    expect(place).toBeVisible();
-  });
-
   it("the_search_takes_focus_as_a_combobox_over_the_kinds_of_step", () => {
     openCatalog(AFTER_FETCH);
 
@@ -274,14 +258,5 @@ describe("the step catalog at a plus", () => {
       name: /^Run a shell command/,
     });
     expect(shell).not.toBeInTheDocument();
-  });
-
-  it("closing_tells_the_owner", () => {
-    const { onClose } = openCatalog(AFTER_FETCH);
-    const close = screen.getByRole("button", { name: "Close" });
-
-    fireEvent.click(close);
-
-    expect(onClose).toHaveBeenCalledOnce();
   });
 });

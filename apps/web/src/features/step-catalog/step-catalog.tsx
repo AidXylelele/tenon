@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDownIcon, XIcon } from "lucide-react";
-import { type JSX, useId, useRef, useState } from "react";
+import { ChevronDownIcon } from "lucide-react";
+import { type JSX, useRef, useState } from "react";
 import { Button } from "@/libs/ui/components/button";
 import {
   Command,
@@ -11,10 +11,11 @@ import {
   CommandList,
 } from "@/libs/ui/components/command";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/libs/ui/components/tooltip";
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@/libs/ui/components/empty";
 import { cn } from "@/libs/ui/tokens/cn";
 import {
   catalogOf,
@@ -30,12 +31,6 @@ import {
 } from "@/operations/step-catalog";
 import { ENTRY_ICONS } from "./entry-icons";
 import type { StepCatalogProps } from "./interfaces";
-
-interface HeaderProps {
-  readonly titleId: string;
-  readonly place: string;
-  readonly onClose: () => void;
-}
 
 interface OptionProps {
   readonly shown: ShownEntry;
@@ -63,15 +58,12 @@ const TERM_ON_HOVER_OR_ACTIVE =
 export function StepCatalog({
   variants,
   stepAbove,
-  place,
   languageTerms,
   onChoose,
-  onClose,
 }: StepCatalogProps): JSX.Element {
   const [query, setQuery] = useState("");
   const [opened, setOpened] = useState(NONE_OPENED);
   const searchBox = useRef<HTMLInputElement>(null);
-  const titleId = useId();
 
   const catalog = catalogOf(variants, stepAbove);
   const groups = shownGroupsOf(catalog, query, opened);
@@ -92,85 +84,56 @@ export function StepCatalog({
   }
 
   return (
-    <section aria-labelledby={titleId} className="flex flex-col">
-      <CatalogHeader titleId={titleId} place={place} onClose={onClose} />
-      <div className="flex flex-col gap-3 p-4">
-        <Command
-          shouldFilter={false}
-          disablePointerSelection
-          label="Find a kind of step"
-          className="size-auto gap-3 overflow-visible rounded-none! bg-transparent p-0"
+    <div className="flex flex-col gap-3">
+      <Command
+        shouldFilter={false}
+        disablePointerSelection
+        label="Find a kind of step"
+        className="size-auto gap-3 overflow-visible rounded-none! bg-transparent p-0"
+      >
+        <CommandInput
+          ref={searchBox}
+          autoFocus
+          value={query}
+          onValueChange={setQuery}
+          placeholder="Find a step: http, slack, if, loop, wait…"
+        />
+        <CommandList
+          label="Kinds of step"
+          hidden={nothingMatches}
+          className="max-h-none overflow-visible *:[[cmdk-list-sizer]]:flex *:[[cmdk-list-sizer]]:flex-col *:[[cmdk-list-sizer]]:gap-2"
         >
-          <CommandInput
-            ref={searchBox}
-            autoFocus
-            value={query}
-            onValueChange={setQuery}
-            placeholder="Find a step: http, slack, if, loop, wait…"
-          />
-          <CommandList
-            label="Kinds of step"
-            hidden={nothingMatches}
-            className="max-h-none overflow-visible *:[[cmdk-list-sizer]]:flex *:[[cmdk-list-sizer]]:flex-col *:[[cmdk-list-sizer]]:gap-2"
-          >
-            {open.map((group) => (
-              <CommandGroup
-                key={group.id}
-                heading={group.title}
-                className="p-0 **:[[cmdk-group-heading]]:px-0 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:tracking-caps **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-items]]:flex **:[[cmdk-group-items]]:flex-col **:[[cmdk-group-items]]:gap-0.5"
-              >
-                {group.entries.map((shown) => (
-                  <CatalogOption
-                    key={shown.entry.id}
-                    shown={shown}
-                    stepAbove={stepAbove}
-                    languageTerms={languageTerms}
-                    onChoose={onChoose}
-                  />
-                ))}
-              </CommandGroup>
-            ))}
-          </CommandList>
-        </Command>
-        {someClosed ? (
-          <div className="flex flex-col gap-0.5">
-            {closed.map((group) => (
-              <ClosedGroup key={group.id} group={group} onOpen={openGroup} />
-            ))}
-          </div>
-        ) : null}
-        {nothingMatches ? <NoMatchNote query={query} /> : null}
-      </div>
+          {open.map((group) => (
+            <CommandGroup
+              key={group.id}
+              heading={group.title}
+              className="p-0 **:[[cmdk-group-heading]]:px-0 **:[[cmdk-group-heading]]:py-1 **:[[cmdk-group-heading]]:tracking-caps **:[[cmdk-group-heading]]:uppercase **:[[cmdk-group-items]]:flex **:[[cmdk-group-items]]:flex-col **:[[cmdk-group-items]]:gap-0.5"
+            >
+              {group.entries.map((shown) => (
+                <CatalogOption
+                  key={shown.entry.id}
+                  shown={shown}
+                  stepAbove={stepAbove}
+                  languageTerms={languageTerms}
+                  onChoose={onChoose}
+                />
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
+      </Command>
+      {someClosed ? (
+        <div className="flex flex-col gap-0.5">
+          {closed.map((group) => (
+            <ClosedGroup key={group.id} group={group} onOpen={openGroup} />
+          ))}
+        </div>
+      ) : null}
+      {nothingMatches ? <NoMatchNote query={query} /> : null}
       <p role="status" className="sr-only">
         {said}
       </p>
-    </section>
-  );
-}
-
-function CatalogHeader({ titleId, place, onClose }: HeaderProps) {
-  return (
-    <header className="flex items-start gap-2 border-b px-4 py-3">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <h2 id={titleId} className="heading-2">
-          Add a step
-        </h2>
-        <p className="text-caption text-muted-foreground">{place}</p>
-      </div>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="Close"
-            onClick={onClose}
-          >
-            <XIcon aria-hidden />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Close</TooltipContent>
-      </Tooltip>
-    </header>
+    </div>
   );
 }
 
@@ -233,19 +196,20 @@ function ClosedGroup({ group, onOpen }: ClosedGroupProps) {
   }
 
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       aria-expanded={false}
       onClick={open}
-      className="flex w-full items-center justify-between py-1.5 caps text-muted-foreground hover:text-foreground"
+      className="h-auto w-full justify-between px-0 py-1.5 caps text-muted-foreground hover:bg-transparent hover:text-foreground active:bg-transparent"
     >
       {group.title}
       <span className="flex items-center gap-1">
         <span aria-hidden>{count}</span>
         <span className="sr-only">{counted}</span>
-        <ChevronDownIcon aria-hidden className="size-4" />
+        <ChevronDownIcon aria-hidden />
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -253,9 +217,13 @@ function NoMatchNote({ query }: NoMatchProps) {
   const note = noMatchOf(query);
 
   return (
-    <div role="note" className="flex flex-col gap-1 px-2 py-6 text-center">
-      <p>{note.message}</p>
-      <p className="text-caption text-muted-foreground">{note.hint}</p>
-    </div>
+    <Empty role="note" className="gap-1 px-2 py-6">
+      <EmptyHeader>
+        <EmptyTitle className="font-normal">{note.message}</EmptyTitle>
+        <EmptyDescription className="text-caption">
+          {note.hint}
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }

@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
-import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import type { EntryAction } from "@/operations/step-catalog";
 import {
   TENON_VARIANTS,
@@ -9,14 +8,9 @@ import {
 import type { StepCatalogProps } from "./interfaces";
 import { StepCatalog } from "./step-catalog";
 
-type PanelProps = Omit<StepCatalogProps, "onChoose" | "onClose">;
+type PanelProps = Omit<StepCatalogProps, "onChoose">;
 
-function CatalogPanel({
-  variants,
-  stepAbove,
-  place,
-  languageTerms,
-}: PanelProps) {
+function CatalogPanel({ variants, stepAbove, languageTerms }: PanelProps) {
   const [told, setTold] = useState("Nothing yet");
 
   function choose(action: EntryAction): void {
@@ -24,31 +18,23 @@ function CatalogPanel({
     setTold(shown);
   }
 
-  function close(): void {
-    setTold("Closed");
-  }
-
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col gap-4">
-        <div className="w-100 rounded-lg border bg-surface">
-          <StepCatalog
-            variants={variants}
-            stepAbove={stepAbove}
-            place={place}
-            languageTerms={languageTerms}
-            onChoose={choose}
-            onClose={close}
-          />
-        </div>
-        <output
-          aria-label="Told the editor"
-          className="font-mono text-caption text-muted-foreground"
-        >
-          {told}
-        </output>
+    <div className="flex flex-col gap-4">
+      <div className="w-100 rounded-lg border bg-surface p-4">
+        <StepCatalog
+          variants={variants}
+          stepAbove={stepAbove}
+          languageTerms={languageTerms}
+          onChoose={choose}
+        />
       </div>
-    </TooltipProvider>
+      <output
+        aria-label="Told the editor"
+        className="font-mono text-caption text-muted-foreground"
+      >
+        {told}
+      </output>
+    </div>
   );
 }
 
@@ -57,7 +43,6 @@ const meta = {
   args: {
     variants: TENON_VARIANTS,
     stepAbove: "Fetch the digest",
-    place: "after Fetch the digest",
     languageTerms: false,
   },
 } satisfies Meta<typeof CatalogPanel>;
@@ -69,18 +54,11 @@ type Story = StoryObj<typeof meta>;
 export const AfterAStep: Story = {};
 
 export const OnABranch: Story = {
-  args: {
-    stepAbove: "Post to the webhook",
-    place: "on the branch “has items” of Has items?",
-  },
-};
-
-export const InsideABlock: Story = {
-  args: { stepAbove: null, place: "inside Prepare the batch" },
+  args: { stepAbove: "Post to the webhook" },
 };
 
 export const WithNoStepAbove: Story = {
-  args: { stepAbove: null, place: "after Every day at 09:00 UTC" },
+  args: { stepAbove: null },
 };
 
 export const HostWithoutShellOrContainer: Story = {
