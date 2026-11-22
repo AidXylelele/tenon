@@ -6,6 +6,7 @@ import type {
 } from "interpreter/front-end";
 import type { StepFamily } from "../families/index.js";
 import type { ListPart, ListRole, StepTree } from "../steps/index.js";
+import type { StepVariant } from "../variants/index.js";
 
 export interface Trigger {
   readonly kind: "every" | "cron" | "after" | "on";
@@ -27,6 +28,7 @@ export interface Step<Place = Range> {
   readonly pointer: string;
   readonly name: string;
   readonly kind: TaskKind;
+  readonly variant: StepVariant | null;
   readonly family: StepFamily;
   readonly summary: string | null;
   readonly milliseconds: number | null;

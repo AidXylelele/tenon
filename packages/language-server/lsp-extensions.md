@@ -300,6 +300,7 @@ interface Step {
   pointer: string;
   name: string;
   kind: TaskKind;
+  variant: StepVariant | null; // its catalog entry (workflow/stepVariants); null for a call of a function
   family: "flow" | "call" | "data" | "event" | "time" | "error";
   summary: string | null; // one line from what the step writes; empty parts left out
   milliseconds: number | null; // a wait's duration, where fixed
@@ -366,6 +367,7 @@ do:
           "pointer": "/do/0/pause",
           "name": "pause",
           "kind": "wait",
+          "variant": "wait",
           "family": "time",
           "summary": "PT1S",
           "milliseconds": 1000,
@@ -406,6 +408,7 @@ do:
           "pointer": "/do/1/greet",
           "name": "greet",
           "kind": "set",
+          "variant": "set",
           "family": "data",
           "summary": "message",
           "milliseconds": null,

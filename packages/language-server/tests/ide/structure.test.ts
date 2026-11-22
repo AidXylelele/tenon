@@ -70,6 +70,7 @@ test("a step is its id, kind, family, summary, ranges and flow", () => {
     pointer: "/do/0/greet",
     name: "greet",
     kind: "set",
+    variant: "set",
     family: "data",
     summary: "message",
     milliseconds: null,
@@ -372,4 +373,35 @@ test("a fork's branches are a list of role branches", () => {
     list.role,
   ]);
   expect(lists).toEqual([["/do/race/fork/branches", "branches", "branches"]]);
+});
+
+test.each([
+  [
+    "an HTTP call",
+    "fetch: { call: http, with: { method: get, endpoint: https://api.test } }",
+    "http",
+  ],
+  [
+    "a JavaScript script",
+    "code: { run: { script: { language: js, code: x } } }",
+    "script-js",
+  ],
+  [
+    "a Python script",
+    "code: { run: { script: { language: python, code: x } } }",
+    "script-python",
+  ],
+  ["a shell command", "list: { run: { shell: { command: ls } } }", "shell"],
+  ["a wait", "pause: { wait: PT1S }", "wait"],
+  ["a call of a function", "hello: { call: greet }", null],
+])("%s carries its catalog variant", (_, step, variant) => {
+  const functions =
+    "use:\n  functions:\n    greet:\n      set:\n        a: 1\n";
+  const text = `${inlineHeader}${functions}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.variant).toBe(variant);
 });

@@ -1,5 +1,6 @@
 import type { ast, RangeLocator, SemanticModel } from "interpreter/front-end";
 import { stepFamilies } from "../families/index.js";
+import { variantOf } from "../variants/index.js";
 import { parentPointerOf } from "../pointers/index.js";
 import { type Basis, type Snapshot, sourceOf } from "../snapshot/index.js";
 import {
@@ -119,6 +120,7 @@ function stepOf(node: StepNode, sources: Sources): Step {
   const task = node.task;
   const document = sources.model.source.document;
   const family = stepFamilies[task.kind];
+  const variant = variantOf(task);
   const summary = summaryOf(task, document);
   const milliseconds = stepMillisecondsOf(task);
   const written = task.metadata.note;
@@ -134,6 +136,7 @@ function stepOf(node: StepNode, sources: Sources): Step {
     pointer: node.pointer,
     name: node.name,
     kind: task.kind,
+    variant,
     family,
     summary,
     milliseconds,
