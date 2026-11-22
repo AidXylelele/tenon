@@ -1209,7 +1209,7 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
   ],
   ["wait", { wait: "PT30M" }, []],
 ])(
-  "a %s step starts with its smallest content, the blanks a person fills named by problems",
+  "a %s step starts with its smallest content, its blanks empty and the problems the analysis names",
   (variant, content, problems) => {
     const started = startOf(variant);
 
