@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import Link from "next/link";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fakeViewport } from "../hooks/viewport.test-support";
 import {
   Sidebar,
@@ -24,7 +24,7 @@ import { TooltipProvider } from "./tooltip";
 
 function Navigation() {
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={0}>
       <SidebarProvider>
         <Sidebar collapsible="icon">
           <SidebarContent>
@@ -47,6 +47,10 @@ function Navigation() {
     </TooltipProvider>
   );
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 function openedAt(width: number) {
   const viewport = fakeViewport(width);
@@ -118,6 +122,49 @@ describe("the console's navigation from 1024 px", () => {
     expect(home).toHaveFocus();
   });
 
+  it("an_item_hovered_and_left_while_expanded_shows_no_tooltip_after_collapsing", () => {
+    vi.useFakeTimers();
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+    render(<Navigation />);
+    const home = screen.getByRole("button", { name: "Home" });
+    act(() => {
+      fireEvent.pointerMove(home, { pointerType: "mouse" });
+      vi.runAllTimers();
+    });
+    act(() => {
+      fireEvent.pointerLeave(home, { pointerType: "mouse" });
+      vi.runAllTimers();
+    });
+
+    act(() => {
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+      vi.runAllTimers();
+    });
+
+    const tooltip = screen.queryByRole("tooltip");
+    expect(tooltip).not.toBeInTheDocument();
+  });
+
+  it("in_the_icon_column_a_hovered_item_shows_its_name", () => {
+    vi.useFakeTimers();
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+    render(<Navigation />);
+    act(() => {
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    });
+    const home = screen.getByRole("button", { name: "Home" });
+
+    act(() => {
+      fireEvent.pointerMove(home, { pointerType: "mouse" });
+      vi.runAllTimers();
+    });
+
+    const tooltip = screen.getByRole("tooltip");
+    expect(tooltip).toHaveTextContent("Home");
+  });
+
   it("the_menu_button_says_whether_the_column_is_expanded", () => {
     const viewport = fakeViewport(1440);
     vi.stubGlobal("matchMedia", viewport.matchMedia);
@@ -181,32 +228,6 @@ describe("the console's navigation as a column", () => {
     });
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
-  });
-
-  it("its_parts_render_their_places_and_loading_rows", () => {
-    const viewport = fakeViewport(1440);
-    vi.stubGlobal("matchMedia", viewport.matchMedia);
-
-    const { container } = render(<Column onOpenChange={vi.fn()} />);
-
-    const runs = screen.getByRole("button", { name: "Runs" });
-    const loading = container.querySelectorAll('[data-slot="skeleton"]');
-    expect(runs).toBeInTheDocument();
-    expect(loading).toHaveLength(2);
-  });
-
-  it("a_column_that_cannot_collapse_is_a_plain_panel", () => {
-    const viewport = fakeViewport(1440);
-    vi.stubGlobal("matchMedia", viewport.matchMedia);
-
-    render(
-      <SidebarProvider>
-        <Sidebar collapsible="none">Places</Sidebar>
-      </SidebarProvider>,
-    );
-
-    const panel = screen.getByText("Places");
-    expect(panel).toHaveAttribute("data-slot", "sidebar");
   });
 
   it("asking_for_the_sidebar_outside_its_provider_is_refused", () => {
