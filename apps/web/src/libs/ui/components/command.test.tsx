@@ -61,3 +61,26 @@ describe("the count of matching commands", () => {
     expect(count).toBeInTheDocument();
   });
 });
+
+describe("the option the search field points at", () => {
+  it("on_open_it_names_the_highlighted_option", () => {
+    render(<Palette />);
+
+    const search = screen.getByRole("combobox");
+    const highlighted = screen.getByRole("option", { selected: true });
+    expect(search).toHaveAttribute("aria-activedescendant", highlighted.id);
+  });
+
+  it("after_typing_it_names_the_option_highlighted_now", () => {
+    render(<Palette />);
+    const search = screen.getByRole("combobox");
+
+    act(() => {
+      fireEvent.change(search, { target: { value: "run" } });
+    });
+
+    const highlighted = screen.getByRole("option", { selected: true });
+    expect(highlighted).toHaveTextContent("Runs");
+    expect(search).toHaveAttribute("aria-activedescendant", highlighted.id);
+  });
+});
