@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Crumb } from "@/libs/ui/composites/crumbs";
-import { trailOf } from "./trail";
+import { type Crumb, trailOf } from "./trail";
 
 describe("the breadcrumb an address shows", () => {
   it.each<[string, Crumb[]]>([

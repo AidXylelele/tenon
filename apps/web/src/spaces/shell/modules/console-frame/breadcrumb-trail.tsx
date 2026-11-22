@@ -11,9 +11,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/libs/ui/components/breadcrumb";
-import type { Crumb } from "@/libs/ui/composites/crumbs";
 import { cn } from "@/libs/ui/tokens/cn";
-import { trailOf } from "../../__shared_context/trail";
+import { type Crumb, trailOf } from "../../__shared_context/trail";
 
 const SHOWN_WHEN_NARROW = 2;
 const HIDDEN_WHEN_NARROW = "max-md:hidden";

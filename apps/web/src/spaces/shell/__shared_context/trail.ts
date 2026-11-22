@@ -6,8 +6,12 @@ import {
   workflowHref,
   WORKFLOWS_HREF,
 } from "@/libs/routing/routes";
-import type { Crumb } from "@/libs/ui/composites/crumbs";
 import { type Place, placeOf, SETTINGS_PAGES } from "./places";
+
+export interface Crumb {
+  readonly label: string;
+  readonly href?: string;
+}
 
 const RUN_ID_SHOWN = 8;
 
