@@ -62,6 +62,7 @@ import { A2aClient } from "../a2a/a2a.client.js";
 import { AmqpBroker } from "../asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../asyncapi/asyncapi-documents.js";
+import { BrokerSpans } from "../asyncapi/broker-spans.js";
 import { KafkaBroker } from "../asyncapi/kafka.broker.js";
 import { MqttBroker } from "../asyncapi/mqtt.broker.js";
 import { NatsBroker } from "../asyncapi/nats.broker.js";
@@ -147,6 +148,7 @@ const sandboxLimits = new SandboxLimits({
     McpClient,
     A2aClient,
     AsyncApiDocuments,
+    BrokerSpans,
     AmqpBroker,
     KafkaBroker,
     MqttBroker,

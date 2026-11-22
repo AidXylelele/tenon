@@ -4,7 +4,6 @@ import type {
 } from "@platformatic/kafka";
 import type { ConnectionOptions as TlsConnection } from "node:tls";
 import type { NodeConnectionOptions } from "@nats-io/transport-node";
-import type { ChannelModel, ConfirmChannel } from "amqplib";
 import type { AsyncApiOutcome, Failure, JsonObject } from "interpreter";
 import type { IClientOptions } from "mqtt";
 import type { RedisClientType } from "redis";
@@ -39,6 +38,8 @@ export interface BrokerTarget {
 export type Targeted =
   BrokerTarget | Extract<Failure, { readonly kind: "misconfigured" }>;
 
+export type Expired = Extract<Failure, { readonly kind: "expired" }>;
+
 export interface BrokerMessage {
   readonly body: Buffer;
   readonly contentType: string;
@@ -66,10 +67,12 @@ export interface BrokerInbox {
 }
 
 export interface BrokerClient {
+  readonly system: string;
   publish(
     target: BrokerTarget,
     message: BrokerMessage,
     credentials: BrokerCredentials,
+    signal: AbortSignal,
   ): Promise<AsyncApiOutcome>;
   subscribe(
     target: BrokerTarget,
@@ -80,14 +83,14 @@ export interface BrokerClient {
 
 export type Lost = () => void;
 
+export interface Opening<C> {
+  readonly server: BrokerServer;
+  open(address: string, lost: Lost): Promise<C>;
+}
+
 export type MqttVersion = NonNullable<IClientOptions["protocolVersion"]>;
 
 export type RedisConnection = RedisClientType;
-
-export interface AmqpConnection {
-  readonly model: ChannelModel;
-  readonly channel: ConfirmChannel;
-}
 
 export type AmqpBinding = z.infer<typeof AMQP_CHANNEL>;
 

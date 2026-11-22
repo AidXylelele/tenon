@@ -19,20 +19,23 @@ import type {
 @Injectable()
 export class RedisBroker implements BrokerClient, OnApplicationShutdown {
   private static readonly PORT = 6379;
+  private static readonly RECONNECT_MS = 1_000;
   private static readonly REFUSED_LOGINS = /^(WRONGPASS|NOAUTH|NOPERM)/;
 
+  readonly system = "redis";
   private readonly connections: BrokerConnections<RedisConnection>;
 
   constructor(addresses: AddressPolicy) {
-    this.connections = new BrokerConnections(addresses, (connection) =>
-      connection.close(),
-    );
+    this.connections = new BrokerConnections(addresses, (connection) => {
+      connection.destroy();
+    });
   }
 
   async publish(
     target: BrokerTarget,
     message: BrokerMessage,
     credentials: BrokerCredentials,
+    signal: AbortSignal,
   ): Promise<AsyncApiOutcome> {
     const headed = Object.keys(message.headers).length > 0;
 
@@ -49,7 +52,8 @@ export class RedisBroker implements BrokerClient, OnApplicationShutdown {
         (address, lost) =>
           this.#connected(target.server, address, credentials, lost),
       );
-      await connection.publish(target.address, message.body);
+      const abortable = connection.withAbortSignal(signal);
+      await abortable.publish(target.address, message.body);
       return { kind: "published" };
     } catch (error) {
       return this.#failureOf(error);
@@ -61,26 +65,33 @@ export class RedisBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
+    const lost = () => {
+      inbox.lost();
+    };
+    const delivered = (message: Buffer) => {
+      this.#delivered(message, inbox);
+    };
+
     try {
       const connection = await this.connections.dedicated(
         target.server,
-        (address) =>
-          this.#connected(target.server, address, credentials, () => {
-            inbox.lost();
-          }),
-      );
-      await connection.subscribe(
-        target.address,
-        (message: Buffer) => {
-          this.#delivered(message, inbox);
-        },
-        true,
+        (address) => this.#connected(target.server, address, credentials, lost),
       );
       const subscription = { close: () => connection.close() };
+      await connection
+        .subscribe(target.address, delivered, true)
+        .catch(async (error: unknown) => {
+          await Promise.allSettled([subscription.close()]);
+          throw error;
+        });
       return { kind: "subscribed", subscription };
     } catch (error) {
       return this.#failureOf(error);
     }
+  }
+
+  onApplicationShutdown(): Promise<void> {
+    return this.connections.close();
   }
 
   #delivered(body: Buffer, inbox: BrokerInbox): void {
@@ -95,10 +106,6 @@ export class RedisBroker implements BrokerClient, OnApplicationShutdown {
     });
   }
 
-  onApplicationShutdown(): Promise<void> {
-    return this.connections.close();
-  }
-
   async #connected(
     server: BrokerServer,
     address: string,
@@ -109,24 +116,48 @@ export class RedisBroker implements BrokerClient, OnApplicationShutdown {
     const database = Number(server.pathname.slice(1)) || 0;
     const port = server.port ?? RedisBroker.PORT;
     const named = isIP(server.hostname) === 0;
+    const connectTimeout = BrokerConnections.CONNECT_MS;
+    const reconnectStrategy = (): number | false =>
+      this.#reconnectionOf(connection);
     const socket = server.secure
       ? {
           tls: true as const,
           host: address,
           port,
           servername: named ? server.hostname : undefined,
-          reconnectStrategy: false as const,
+          connectTimeout,
+          reconnectStrategy,
         }
-      : { host: address, port, reconnectStrategy: false as const };
-    const connection = createClient({
+      : { host: address, port, connectTimeout, reconnectStrategy };
+    const connection: RedisConnection = createClient({
       socket,
       username: login?.username,
       password: login?.password,
       database,
     });
-    connection.on("error", lost);
-    await connection.connect();
+    connection.on("error", () => undefined);
+    connection.on("terminated", lost);
+    await this.#opened(connection);
     return connection;
+  }
+
+  async #opened(connection: RedisConnection): Promise<void> {
+    const destroy = () => {
+      connection.destroy();
+    };
+    const deadline = setTimeout(destroy, BrokerConnections.CONNECT_MS);
+
+    try {
+      await connection.connect();
+    } finally {
+      clearTimeout(deadline);
+    }
+  }
+
+  #reconnectionOf(connection: RedisConnection): number | false {
+    if (connection.socketEpoch === 0) return false;
+
+    return RedisBroker.RECONNECT_MS;
   }
 
   #failureOf(error: unknown): Failure {

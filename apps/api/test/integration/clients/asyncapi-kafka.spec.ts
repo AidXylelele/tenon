@@ -22,6 +22,7 @@ import type {
 import { AmqpBroker } from "../../../src/frameworks/asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../../../src/frameworks/asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../../../src/frameworks/asyncapi/asyncapi-documents.js";
+import { BrokerSpans } from "../../../src/frameworks/asyncapi/broker-spans.js";
 import type { BrokerSubscription } from "../../../src/interface-adapters/messaging/interfaces.js";
 import { KafkaBroker } from "../../../src/frameworks/asyncapi/kafka.broker.js";
 import { MqttBroker } from "../../../src/frameworks/asyncapi/mqtt.broker.js";
@@ -30,6 +31,7 @@ import { RedisBroker } from "../../../src/frameworks/asyncapi/redis.broker.js";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
+import { startTracing, type Tracing } from "../../support/tracing.js";
 import {
   authenticationOf,
   callContextOf,
@@ -42,6 +44,8 @@ const HOST = "127.0.0.1";
 const LOOPBACK = ["127.0.0.1", "::1"];
 const PORT = 9093;
 const PROBE = '{"probe":true}';
+const PRODUCER_SPAN = "00f067aa0ba902b7";
+const PRODUCED = `00-4bf92f3577b34da6a3ce929d0e0e4736-${PRODUCER_SPAN}-01`;
 const REFUSED_ADDRESS =
   "The address is private, loopback or link-local and not allow-listed";
 
@@ -75,6 +79,7 @@ function documentOf(bootstrap: string, topic: string): JsonObject {
 }
 
 describe("the AsyncAPI client on a Kafka cluster a document names", () => {
+  let tracing: Tracing;
   let context: INestApplicationContext;
   let kafka: StartedKafkaContainer;
   let documents: StubServer;
@@ -93,6 +98,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
       httpClientOf(new AddressPolicy([HOST]), resilience),
       authenticationOf(fetchClientOf(policy.dispatcher)),
       new AsyncApiDocuments(),
+      new BrokerSpans(),
       new AmqpBroker(policy),
       kafkaBroker,
       new MqttBroker(policy),
@@ -170,6 +176,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     );
 
   beforeAll(async () => {
+    tracing = startTracing();
     kafka = await new KafkaContainer("confluentinc/cp-kafka:8.1.0").start();
     advertised = kafka.getHost();
     bootstrap = `${HOST}:${String(kafka.getMappedPort(PORT))}`;
@@ -193,7 +200,12 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     const policy = new AddressPolicy(LOOPBACK);
     broker = new KafkaBroker(policy);
     client = clientOn(policy, broker);
-    admin = new Admin({ clientId: "test", bootstrapBrokers: [bootstrap] });
+    admin = new Admin({
+      clientId: "test",
+      bootstrapBrokers: [bootstrap],
+      retries: 20,
+      retryDelay: 500,
+    });
     producer = new Producer({
       clientId: "test",
       bootstrapBrokers: [bootstrap],
@@ -210,6 +222,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     await context.close();
     await documents.close();
     await kafka.stop();
+    await tracing.shutdown();
   });
 
   it("publishes_the_message_and_its_headers_to_the_topic_the_channel_names", async () => {
@@ -240,12 +253,14 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     }
 
     await reader.close(true);
+    const span = tracing.named("send paid").spanContext();
 
     expect(outcome).toEqual({ kind: "published" });
     expect(read[0]?.value).toBe('{"order":1}');
     expect(Object.fromEntries(read[0]?.headers ?? [])).toEqual({
       "content-type": "application/json",
       source: "tenon",
+      traceparent: `00-${span.traceId}-${span.spanId}-01`,
     });
   });
 
@@ -276,6 +291,32 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
       },
       { payload: "not json", headers: {}, correlationId: null },
     ]);
+  });
+
+  it("a_receive_takes_each_message_in_a_span_linked_to_where_it_was_produced", async () => {
+    const request = await topicFor("traced");
+    const inbox: AsyncApiInboundMessage[] = [];
+    await subscribed(request, "receiver-traced", (message) => {
+      inbox.push(message);
+      return Promise.resolve();
+    });
+    await joined("traced", inbox);
+
+    await produced("traced", '{"order":5}', { traceparent: PRODUCED });
+    await vi.waitFor(
+      () => {
+        expect(realOf(inbox)).toHaveLength(1);
+      },
+      { timeout: 10_000, interval: 50 },
+    );
+    const processed = tracing.ended.filter(
+      (span) => span.name === "process traced" && span.links.length > 0,
+    );
+
+    expect(processed.map((span) => span.links[0]?.context.spanId)).toEqual([
+      PRODUCER_SPAN,
+    ]);
+    expect(processed[0]?.attributes["messaging.system"]).toBe("kafka");
   });
 
   it("a_message_whose_delivery_fails_is_not_committed_and_comes_again_to_the_next_subscription", async () => {

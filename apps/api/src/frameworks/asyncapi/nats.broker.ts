@@ -8,6 +8,7 @@ import {
   type MsgHdrs,
   type NatsConnection,
 } from "@nats-io/transport-node";
+import { context, propagation, type TextMapSetter } from "@opentelemetry/api";
 import type { AsyncApiOutcome, Failure } from "interpreter";
 import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
@@ -26,9 +27,15 @@ import type {
 @Injectable()
 export class NatsBroker implements BrokerClient, OnApplicationShutdown {
   private static readonly PORT = 4222;
-  private static readonly MESSAGE_ID = "Nats-Msg-Id";
+  private static readonly RECONNECTS_FOREVER = -1;
 
+  readonly system = "nats";
   private readonly connections: BrokerConnections<NatsConnection>;
+  private readonly setter: TextMapSetter<MsgHdrs> = {
+    set: (sent, name, value) => {
+      sent.set(name, value);
+    },
+  };
 
   constructor(addresses: AddressPolicy) {
     this.connections = new BrokerConnections(addresses, (connection) =>
@@ -62,25 +69,22 @@ export class NatsBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
+    const lost = () => {
+      inbox.lost();
+    };
+
     try {
       const connection = await this.connections.dedicated(
         target.server,
-        (address) =>
-          this.#connected(target.server, address, credentials, () => {
-            inbox.lost();
-          }),
+        (address) => this.#connected(target.server, address, credentials, lost),
       );
-      connection.subscribe(target.address, {
-        callback: (error, message) => {
-          if (error !== null) {
-            inbox.lost();
-            return;
-          }
-
-          this.#delivered(message, inbox);
+      const subscription = { close: () => connection.close() };
+      await this.#consumed(connection, target.address, inbox).catch(
+        async (error: unknown) => {
+          await Promise.allSettled([subscription.close()]);
+          throw error;
         },
-      });
-      const subscription = { close: () => connection.drain() };
+      );
       return { kind: "subscribed", subscription };
     } catch (error) {
       return this.#failureOf(error);
@@ -105,11 +109,32 @@ export class NatsBroker implements BrokerClient, OnApplicationShutdown {
       user: login?.username,
       pass: login?.password,
       tls: server.secure ? this.#tlsOf(server) : undefined,
-      reconnect: false,
+      timeout: BrokerConnections.CONNECT_MS,
+      reconnect: true,
+      maxReconnectAttempts: NatsBroker.RECONNECTS_FOREVER,
+      waitOnFirstConnect: false,
       ignoreClusterUpdates: true,
     });
     void connection.closed().then(lost);
     return connection;
+  }
+
+  async #consumed(
+    connection: NatsConnection,
+    subject: string,
+    inbox: BrokerInbox,
+  ): Promise<void> {
+    connection.subscribe(subject, {
+      callback: (error, message) => {
+        if (error !== null) {
+          inbox.lost();
+          return;
+        }
+
+        this.#delivered(message, inbox);
+      },
+    });
+    await connection.flush();
   }
 
   #delivered(message: Msg, inbox: BrokerInbox): void {
@@ -138,7 +163,8 @@ export class NatsBroker implements BrokerClient, OnApplicationShutdown {
       sent.set(name, text);
     }
 
-    sent.set(NatsBroker.MESSAGE_ID, message.idempotencyKey);
+    const active = context.active();
+    propagation.inject(active, sent, this.setter);
     return sent;
   }
 
