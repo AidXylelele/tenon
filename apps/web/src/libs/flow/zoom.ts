@@ -1,46 +1,65 @@
 import type { Size } from "./interfaces";
 
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 1.5;
+const STEPS: readonly number[] = [0.75, 1, 1.25, 1.5];
+const SMALLEST = 0.75;
+const LARGEST = 1.5;
 const FULL_SIZE = 1;
-const ZOOM_STEP = 1.25;
+const NEAR = 0.001;
 
-export function fitWidthOf(flow: Size, view: Size): number {
-  const across = view.width / flow.width;
+const percent = new Intl.NumberFormat("en-GB", { style: "percent" });
 
-  return zoomWithin(across, FULL_SIZE);
+export function fitWidthOf(content: Size, view: Size): number {
+  const across = view.width / content.width;
+
+  return fittedOf(across);
 }
 
-export function fitOf(flow: Size, view: Size): number {
-  const across = view.width / flow.width;
-  const down = view.height / flow.height;
+export function fitOf(content: Size, view: Size): number {
+  const across = view.width / content.width;
+  const down = view.height / content.height;
   const both = Math.min(across, down);
 
-  return zoomWithin(both, FULL_SIZE);
+  return fittedOf(both);
 }
 
 export function zoomInOf(zoom: number): number {
-  const larger = zoom * ZOOM_STEP;
+  const larger = STEPS.find((step) => step > zoom + NEAR);
 
-  return zoomWithin(larger, MAX_ZOOM);
+  return larger ?? LARGEST;
 }
 
 export function zoomOutOf(zoom: number): number {
-  const smaller = zoom / ZOOM_STEP;
+  const smaller = STEPS.findLast((step) => step < zoom - NEAR);
 
-  return zoomWithin(smaller, MAX_ZOOM);
+  return smaller ?? SMALLEST;
 }
 
 export function isSmallestZoom(zoom: number): boolean {
-  return zoom <= MIN_ZOOM;
+  return zoom <= SMALLEST + NEAR;
 }
 
 export function isLargestZoom(zoom: number): boolean {
-  return zoom >= MAX_ZOOM;
+  return zoom >= LARGEST - NEAR;
 }
 
-function zoomWithin(zoom: number, largest: number): number {
-  const capped = Math.min(zoom, largest);
+export function zoomLevelOf(zoom: number): string {
+  return percent.format(zoom);
+}
 
-  return Math.max(capped, MIN_ZOOM);
+export function centredScrollOf(
+  scroll: number,
+  viewport: number,
+  from: number,
+  to: number,
+): number {
+  const centre = scroll + viewport / 2;
+  const scaled = centre * (to / from);
+
+  return scaled - viewport / 2;
+}
+
+function fittedOf(zoom: number): number {
+  const capped = Math.min(zoom, FULL_SIZE);
+
+  return Math.max(capped, SMALLEST);
 }

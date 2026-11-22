@@ -11,3 +11,12 @@ export interface FlowCanvasProps {
   readonly focusable: boolean;
   readonly children: ReactNode;
 }
+
+export type ScrollAnchor =
+  | { readonly kind: "open" }
+  | {
+      readonly kind: "zoom";
+      readonly left: number;
+      readonly top: number;
+      readonly from: number;
+    };

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { FlowCanvas } from "./flow-canvas";
+import { RecordingResizeObserver } from "./resize-observer.test-support";
 
 interface Layout {
   readonly content: { readonly width: number; readonly height: number };
@@ -18,15 +19,10 @@ const NARROW: Layout = {
   view: { width: 600, height: 600 },
 };
 
-let observed: (() => void) | null = null;
-
-class RecordingResizeObserver {
-  constructor(callback: () => void) {
-    observed = callback;
-  }
-  observe = () => undefined;
-  disconnect = () => undefined;
-}
+const MIDDLE: Layout = {
+  content: { width: 750, height: 1600 },
+  view: { width: 600, height: 600 },
+};
 
 function laidOut(layout: Layout) {
   vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(
@@ -64,6 +60,15 @@ function scaleOf(): string {
   return scaled?.style.transform ?? "";
 }
 
+function scrolledTo(left: number, top: number) {
+  vi.spyOn(Element.prototype, "scrollLeft", "get").mockReturnValue(left);
+  vi.spyOn(Element.prototype, "scrollTop", "get").mockReturnValue(top);
+  const across = vi.spyOn(Element.prototype, "scrollLeft", "set");
+  const down = vi.spyOn(Element.prototype, "scrollTop", "set");
+
+  return { across, down };
+}
+
 function press(name: string) {
   const button = screen.getByRole("button", { name });
   fireEvent.click(button);
@@ -71,7 +76,7 @@ function press(name: string) {
 
 describe("a flow canvas", () => {
   beforeEach(() => {
-    observed = null;
+    RecordingResizeObserver.callbacks.length = 0;
     vi.stubGlobal("ResizeObserver", RecordingResizeObserver);
   });
 
@@ -115,14 +120,25 @@ describe("a flow canvas", () => {
     expect(region).not.toHaveAttribute("tabindex");
   });
 
-  it("opens_fitted_to_its_width_when_the_content_is_wider", () => {
-    laidOut(WIDE);
+  it("opens_fitted_to_its_width_when_the_content_is_a_little_wider", () => {
+    laidOut(MIDDLE);
 
     drawn();
 
     const scale = scaleOf();
 
-    expect(scale).toBe("scale(0.5)");
+    expect(scale).toBe("scale(0.8)");
+  });
+
+  it("opens_no_smaller_than_three_quarters_centred_on_its_top", () => {
+    laidOut(WIDE);
+    const { across } = scrolledTo(0, 0);
+
+    drawn();
+
+    const scale = scaleOf();
+    expect(scale).toBe("scale(0.75)");
+    expect(across).toHaveBeenCalledWith(150);
   });
 
   it("opens_at_full_size_when_the_content_fits", () => {
@@ -142,11 +158,11 @@ describe("a flow canvas", () => {
 
     const scaled = screen.getByText("Inside").parentElement;
     const sizer = scaled?.parentElement;
-    expect(sizer?.style.width).toBe("600px");
-    expect(sizer?.style.height).toBe("800px");
+    expect(sizer?.style.width).toBe("900px");
+    expect(sizer?.style.height).toBe("1200px");
   });
 
-  it("zooms_in_and_out_by_a_quarter", () => {
+  it("zooms_in_and_out_by_steps_of_a_quarter_from_three_quarters", () => {
     laidOut(NARROW);
     drawn();
 
@@ -154,21 +170,58 @@ describe("a flow canvas", () => {
     const zoomedIn = scaleOf();
     press("Zoom out");
     press("Zoom out");
+    press("Zoom out");
 
-    expect(zoomedIn).toBe("scale(1.25)");
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" });
     const scale = scaleOf();
-    expect(scale).toBe("scale(0.8)");
+    expect(zoomedIn).toBe("scale(1.25)");
+    expect(scale).toBe("scale(0.75)");
+    expect(zoomOut).toHaveAttribute("aria-disabled", "true");
   });
 
-  it("fits_all_of_the_content_never_above_full_size", () => {
+  it("snaps_to_the_next_step_from_an_opening_between_steps", () => {
+    laidOut(MIDDLE);
+    drawn();
+
+    press("Zoom in");
+
+    const scale = scaleOf();
+    expect(scale).toBe("scale(1)");
+  });
+
+  it("says_its_level_beside_the_buttons_and_announces_it", () => {
+    laidOut(NARROW);
+    drawn();
+
+    press("Zoom in");
+
+    const zoom = screen.getByRole("group", { name: "Zoom" });
+    const level = screen.getByRole("status");
+    expect(zoom).toContainElement(level);
+    expect(level).toHaveTextContent("125%");
+    expect(level).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("keeps_the_centre_of_the_view_in_place_when_zooming", () => {
+    laidOut(NARROW);
+    drawn();
+    const { across, down } = scrolledTo(100, 400);
+
+    press("Zoom in");
+
+    expect(across).toHaveBeenLastCalledWith(200);
+    expect(down).toHaveBeenLastCalledWith(575);
+  });
+
+  it("fits_all_of_the_content_never_below_three_quarters", () => {
     laidOut(WIDE);
     drawn();
+    press("Zoom in");
 
     press("Fit the flow to the view");
 
     const scale = scaleOf();
-
-    expect(scale).toBe("scale(0.375)");
+    expect(scale).toBe("scale(0.75)");
   });
 
   it("stops_zooming_in_at_one_and_a_half", () => {
@@ -192,7 +245,7 @@ describe("a flow canvas", () => {
     laidOut(WIDE);
 
     act(() => {
-      observed?.();
+      RecordingResizeObserver.callbacks.at(-1)?.();
     });
 
     const scale = scaleOf();

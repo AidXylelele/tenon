@@ -3,13 +3,15 @@
 import { MaximizeIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { IconButton } from "@/libs/ui/composites/icon-button";
-import type { FlowCanvasProps, Size } from "./interfaces";
+import type { FlowCanvasProps, ScrollAnchor, Size } from "./interfaces";
 import {
+  centredScrollOf,
   fitOf,
   fitWidthOf,
   isLargestZoom,
   isSmallestZoom,
   zoomInOf,
+  zoomLevelOf,
   zoomOutOf,
 } from "./zoom";
 
@@ -21,6 +23,8 @@ export function FlowCanvas({
 }: FlowCanvasProps) {
   const canvas = useRef<HTMLElement>(null);
   const content = useRef<HTMLDivElement>(null);
+  const opened = useRef(false);
+  const anchor = useRef<ScrollAnchor | null>(null);
   const describedId = useId();
   const [zoom, setZoom] = useState(1);
   const [size, setSize] = useState<Size | null>(null);
@@ -34,6 +38,7 @@ export function FlowCanvas({
     size === null ? undefined : { transform: `scale(${String(zoom)})` };
   const largest = isLargestZoom(zoom);
   const smallest = isSmallestZoom(zoom);
+  const level = zoomLevelOf(zoom);
 
   useLayoutEffect(() => {
     const view = canvas.current;
@@ -41,7 +46,6 @@ export function FlowCanvas({
 
     if (view === null || drawn === null) return;
 
-    let opened = false;
     const measure = () => {
       const natural = { width: drawn.offsetWidth, height: drawn.offsetHeight };
 
@@ -49,9 +53,10 @@ export function FlowCanvas({
 
       setSize((shown) => (isSameSize(shown, natural) ? shown : natural));
 
-      if (opened) return;
+      if (opened.current) return;
 
-      opened = true;
+      opened.current = true;
+      anchor.current = { kind: "open" };
       const visible = { width: view.clientWidth, height: view.clientHeight };
       const fitted = fitWidthOf(natural, visible);
       setZoom(fitted);
@@ -64,12 +69,56 @@ export function FlowCanvas({
     };
   }, []);
 
+  useLayoutEffect(() => {
+    const view = canvas.current;
+    const pending = anchor.current;
+
+    if (view === null || pending === null || size === null) return;
+
+    anchor.current = null;
+
+    if (pending.kind === "open") {
+      const drawn = size.width * zoom;
+      view.scrollLeft = (drawn - view.clientWidth) / 2;
+      return;
+    }
+
+    view.scrollLeft = centredScrollOf(
+      pending.left,
+      view.clientWidth,
+      pending.from,
+      zoom,
+    );
+    view.scrollTop = centredScrollOf(
+      pending.top,
+      view.clientHeight,
+      pending.from,
+      zoom,
+    );
+  }, [size, zoom]);
+
+  function zoomTo(next: number) {
+    const view = canvas.current;
+
+    if (view === null || next === zoom) return;
+
+    anchor.current = {
+      kind: "zoom",
+      left: view.scrollLeft,
+      top: view.scrollTop,
+      from: zoom,
+    };
+    setZoom(next);
+  }
+
   function zoomIn() {
-    if (!largest) setZoom(zoomInOf);
+    const next = zoomInOf(zoom);
+    zoomTo(next);
   }
 
   function zoomOut() {
-    if (!smallest) setZoom(zoomOutOf);
+    const next = zoomOutOf(zoom);
+    zoomTo(next);
   }
 
   function fit() {
@@ -79,7 +128,7 @@ export function FlowCanvas({
 
     const visible = { width: view.clientWidth, height: view.clientHeight };
     const fitted = fitOf(size, visible);
-    setZoom(fitted);
+    zoomTo(fitted);
   }
 
   return (
@@ -124,6 +173,12 @@ export function FlowCanvas({
           icon={MaximizeIcon}
           onClick={fit}
         />
+        <output
+          aria-live="polite"
+          className="grid min-w-12 place-items-center px-1.5 text-caption text-muted-foreground tabular-nums"
+        >
+          {level}
+        </output>
       </div>
     </div>
   );
