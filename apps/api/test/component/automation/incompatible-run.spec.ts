@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import request from "supertest";
 import { Role } from "../../../src/domain/identity/users/enums.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
+import { aDocument } from "../../support/builders.js";
 import type { TestApp } from "../../support/create-test-app.js";
 import {
   aWaitingDocument,
@@ -10,6 +11,7 @@ import {
   instanceOf,
   publish,
   type RunApp,
+  relay,
   resetRuns,
   start,
   tasksOf,
@@ -38,13 +40,17 @@ describe("a run this build of the interpreter cannot continue", () => {
     await publish(t, editor, aWaitingDocument({ name: "waiter" }));
   });
 
-  async function waitingInstanceOfAnotherBuild(): Promise<string> {
-    const started = await start(t, editor, { input: {} }, "sales/waiter");
+  async function ofAnotherBuild(id: string): Promise<string> {
     await drain(t);
     await t.db.execute(
-      sql`update workflow_instance set program_fingerprint = 'a-program-of-another-build' where id = ${started.id}`,
+      sql`update workflow_instance set program_fingerprint = 'a-program-of-another-build' where id = ${id}`,
     );
-    return started.id;
+    return id;
+  }
+
+  async function waitingInstanceOfAnotherBuild(): Promise<string> {
+    const started = await start(t, editor, { input: {} }, "sales/waiter");
+    return ofAnotherBuild(started.id);
   }
 
   async function nextTurn(): Promise<void> {
@@ -80,6 +86,53 @@ describe("a run this build of the interpreter cannot continue", () => {
     expect(cancelled.waits).toEqual([]);
     expect(cancelled.controls).toEqual(["restart", "delete"]);
     expect(told).toHaveLength(1);
+  });
+
+  it("is_cancelled_with_the_reason_when_it_is_suspended", async () => {
+    const id = await waitingInstanceOfAnotherBuild();
+
+    await request(t.server)
+      .post(`/api/v1/instances/${id}/suspend`)
+      .set(editor)
+      .expect(204);
+    await drain(t);
+    const cancelled = await instanceOf(t, editor, id);
+
+    expect(cancelled.phase).toBe("cancelled");
+    expect(cancelled.cancelReason).toBe(INTERPRETER_CHANGED);
+  });
+
+  it("is_cancelled_with_the_reason_when_an_event_it_listens_for_arrives", async () => {
+    const listening = aDocument({ name: "listener" }, [
+      {
+        awaitOrder: {
+          listen: { to: { one: { with: { type: "order.placed" } } } },
+        },
+      },
+    ]);
+    await publish(t, editor, listening);
+    const started = await start(t, editor, { input: {} }, "sales/listener");
+    const id = await ofAnotherBuild(started.id);
+    const placed = {
+      specversion: "1.0",
+      id: "order-1",
+      source: "/shop",
+      type: "order.placed",
+      data: {},
+    };
+
+    await request(t.server)
+      .post("/api/v1/events")
+      .set(editor)
+      .set("content-type", "application/cloudevents+json")
+      .send(JSON.stringify(placed))
+      .expect(202);
+    await relay(t);
+    await drain(t);
+    const cancelled = await instanceOf(t, editor, id);
+
+    expect(cancelled.phase).toBe("cancelled");
+    expect(cancelled.cancelReason).toBe(INTERPRETER_CHANGED);
   });
 
   it("leaves_the_task_it_waited_in_cancelled_not_running", async () => {

@@ -32,8 +32,6 @@ import {
 import type { Imports } from "interpreter/front-end";
 import { LRUCache } from "lru-cache";
 import { Piscina } from "piscina";
-import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
-import { IncompatibleRun } from "../../interface-adapters/workflows/incompatible-run.error.js";
 import type {
   CompilationData,
   FilterCheck,
@@ -41,6 +39,7 @@ import type {
   NamedFilter,
   ProgramCall,
   ProgramSource,
+  ProgramStep,
   RouteMatch,
   StartedStep,
   StructureClient,
@@ -147,11 +146,7 @@ export class PiscinaInterpreterClient
     try {
       return await this.#called(pool, "compile", source, null);
     } catch (error) {
-      const timedOut =
-        error instanceof PermanentFault &&
-        error.cause instanceof ResilienceTimeoutError;
-
-      if (timedOut) return { kind: "expired" };
+      if (error instanceof ResilienceTimeoutError) return { kind: "expired" };
 
       throw error;
     }
@@ -178,50 +173,82 @@ export class PiscinaInterpreterClient
     }));
   }
 
-  respond(
+  async respond(
     call: ProgramCall,
     state: State,
     response: EffectResponse,
     context: StepContext,
-  ): Promise<Step> {
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "respond", call, (program) => ({
-      program,
-      state,
-      response,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "respond",
+      call,
+      (program) => ({
+        program,
+        state,
+        response,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
-  suspend(
+  async suspend(
     call: ProgramCall,
     state: State,
     context: StepContext,
-  ): Promise<Step> {
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "suspend", call, (program) => ({
-      program,
-      state,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "suspend",
+      call,
+      (program) => ({
+        program,
+        state,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
-  resume(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
+  async resume(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "resume", call, (program) => ({
-      program,
-      state,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "resume",
+      call,
+      (program) => ({
+        program,
+        state,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
-  cancel(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
+  async cancel(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "cancel", call, (program) => ({
-      program,
-      state,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "cancel",
+      call,
+      (program) => ({
+        program,
+        state,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
   route(call: ProgramCall, event: CloudEvent): Promise<readonly RouteMatch[]> {
@@ -342,25 +369,11 @@ export class PiscinaInterpreterClient
   ): Promise<TaskAnswer<TaskValue<N>>> {
     const task = this.#taskOf(pool.name, call);
     const options = signal === null ? {} : { signal };
-
-    try {
-      const answer: unknown = await pool.policy.execute(
-        (attempt) => pool.threads.run(task, { name, signal: attempt.signal }),
-        options,
-      );
-      return answer as TaskAnswer<TaskValue<N>>;
-    } catch (error) {
-      if (signal?.aborted === true) throw error;
-
-      const exhausted = this.#exhausted(error);
-
-      if (exhausted)
-        throw new PermanentFault("The interpreter ran out of time or memory", {
-          cause: error,
-        });
-
-      throw error;
-    }
+    const answer: unknown = await pool.policy.execute(
+      (attempt) => pool.threads.run(task, { name, signal: attempt.signal }),
+      options,
+    );
+    return answer as TaskAnswer<TaskValue<N>>;
   }
 
   #taskOf<C>(pool: PoolName, call: C): ThreadTask<C> {
@@ -369,14 +382,6 @@ export class PiscinaInterpreterClient
     propagation.inject(active, trace);
     const enqueuedAt = Date.now();
     return { call, pool, enqueuedAt, trace };
-  }
-
-  #exhausted(error: unknown): boolean {
-    if (error instanceof ResilienceTimeoutError) return true;
-
-    const code: unknown =
-      error instanceof Error ? Reflect.get(error, "code") : undefined;
-    return code === "ERR_WORKER_OUT_OF_MEMORY";
   }
 
   #runs(): ThreadPool {
@@ -393,18 +398,25 @@ export class PiscinaInterpreterClient
     return this.checks;
   }
 
+  #steppedOf(answer: TaskAnswer<Step>): ProgramStep {
+    if (answer.kind === "incompatible") return { kind: "incompatible" };
+
+    const step = this.#unwrapped(answer);
+    return { kind: "played", step };
+  }
+
   #unwrapped<T>(answer: TaskAnswer<T>): T {
     switch (answer.kind) {
       case "answered":
         return answer.value;
       case "fault":
-        throw new PermanentFault(
+        throw new Error(
           `The interpreter refused the call: ${answer.name}: ${answer.message}`,
         );
       case "missing":
-        throw new PermanentFault("The interpreter did not keep the program");
+        throw new Error("The interpreter did not keep the program");
       case "incompatible":
-        throw new IncompatibleRun();
+        throw new Error("The interpreter does not rebuild the run's program");
     }
   }
 
