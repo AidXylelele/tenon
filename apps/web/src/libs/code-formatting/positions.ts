@@ -23,8 +23,8 @@ function positionOf(text: string, offset: number): Position {
   const preceding = text.slice(0, offset);
   const lines = preceding.split(NEW_LINE);
   const line = lines.length - 1;
-  const current = lines.at(-1) ?? "";
-  return { line, column: current.length };
+  const lineStart = preceding.lastIndexOf(NEW_LINE) + 1;
+  return { line, column: offset - lineStart };
 }
 
 function offsetOf(text: string, position: Position): number {
@@ -36,7 +36,9 @@ function offsetOf(text: string, position: Position): number {
     (sum, earlierLine) => sum + earlierLine.length + 1,
     0,
   );
-  const current = lines[line] ?? "";
-  const column = Math.min(position.column, current.length);
+  const lineBreak = text.indexOf(NEW_LINE, start);
+  const lineEnd = lineBreak === -1 ? text.length : lineBreak;
+  const length = lineEnd - start;
+  const column = Math.min(position.column, length);
   return start + column;
 }

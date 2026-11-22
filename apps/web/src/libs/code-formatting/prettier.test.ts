@@ -63,4 +63,12 @@ describe("javascript formatted by prettier", () => {
       },
     ]);
   });
+
+  it("a_script_too_deeply_nested_for_prettier_fails_its_check_with_its_error", async () => {
+    const nested = `x = ${"[".repeat(50000)}${"]".repeat(50000)}`;
+
+    const problems = checkJavaScript(nested);
+
+    await expect(problems).rejects.toThrow(RangeError);
+  });
 });
