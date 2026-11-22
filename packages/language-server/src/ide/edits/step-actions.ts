@@ -9,7 +9,7 @@ import {
   stepWithId,
 } from "../steps/index.js";
 import { offsetOf } from "../text/index.js";
-import { inlineYamlOf, scalarLike, yamlOf } from "../yaml-text/index.js";
+import { scalarLike } from "../yaml-text/index.js";
 import type {
   Destination,
   DuplicateStep,
@@ -27,6 +27,7 @@ import {
   inTextOrder,
   itemFormsOf,
   listTextOf,
+  newItemFormsOf,
   removalOf,
   withoutItem,
 } from "./collection-text.js";
@@ -64,9 +65,7 @@ export function stepInsertionOf(
 
   const template = templateOf(action.step);
   const item = { [name]: template };
-  const block = yamlOf([item]);
-  const inline = inlineYamlOf(item);
-  const forms = { block, inline };
+  const forms = newItemFormsOf(item);
   const insertion = insertionOf(collection, action.index, forms);
   return { kind: "edited", changes: [insertion], ids: [] };
 }

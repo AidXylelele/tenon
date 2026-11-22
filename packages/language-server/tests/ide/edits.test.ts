@@ -2,6 +2,12 @@ import { expect, test } from "vitest";
 import { editsOf } from "../../src/ide/edits/index.js";
 import { valueAt } from "../../src/ide/pointers/index.js";
 import { sourceOf } from "../../src/ide/snapshot/index.js";
+import {
+  type Step,
+  type StepList,
+  structureReadingOf,
+  type Transition,
+} from "../../src/ide/structure/index.js";
 import { appliedOf } from "../../src/ide/text/index.js";
 import type { EditAction } from "../../src/protocol/index.js";
 import { guardedFlow, inlineHeader } from "../support/documents.js";
@@ -17,6 +23,100 @@ const fetchLines = `        - fetch:
               method: get
               endpoint: https://example.com
 `;
+
+const routeFlow = `${inlineHeader}do:
+  - route:
+      switch:
+        - big:
+            when: \${ .big }
+            then: continue
+        - small:
+            when: \${ .small }
+            then: report
+        - stop:
+            when: \${ .stop }
+            then: end
+        - default:
+            then: continue
+  # the total of the big ones
+  - total:
+      set:
+        total: 1
+  - report:
+      set:
+        reported: true
+`;
+
+const lastRouteFlow = `${inlineHeader}do:
+  - fetch:
+      set:
+        items: []
+  - route:
+      switch:
+        - some:
+            when: \${ .items != [] }
+            then: continue
+        - none:
+            when: \${ .items == [] }
+            then: end
+`;
+
+const nestedRouteFlow = `${inlineHeader}do:
+  - each:
+      for:
+        in: \${ .orders }
+        each: order
+      do:
+        - route:
+            switch:
+              - skip:
+                  when: \${ $order.skip }
+                  then: exit
+              - default:
+                  then: continue
+`;
+
+const undefaultedRouteFlow = `${inlineHeader}do:
+  - route:
+      switch:
+        - big:
+            when: \${ .big }
+            then: end
+  - total:
+      set:
+        total: 1
+`;
+
+const inlineRouteFlow = `${inlineHeader}do: [ { route: { switch: [ { big: { when: '\${ .big }', then: continue } }, { other: { then: continue } } ] } }, { total: { set: { total: 1 } } } ]
+`;
+
+const forkedRouteFlow = `${inlineHeader}do:
+  - alarm:
+      fork:
+        branches:
+          - route:
+              switch:
+                - severe:
+                    when: \${ .severe }
+                    then: continue
+          - nurse:
+              set:
+                called: nurse
+`;
+
+function branchActionOf(
+  routeId: string,
+  branch: string,
+  name: string | null,
+): EditAction {
+  return {
+    kind: "insertStepOnBranch",
+    switch: routeId,
+    case: branch,
+    step: "wait",
+    name,
+  };
+}
 
 function check(text: string, action: EditAction) {
   const snapshot = snapshotOf(text);
@@ -395,6 +495,36 @@ test.each<readonly [string, string, EditAction, string]>([
     { kind: "clearField", pointer: "/do/0/greet/then" },
     "No written field stands at '/do/0/greet/then'.",
   ],
+  [
+    "a step on a branch of a step that is not a switch",
+    routeFlow,
+    branchActionOf("/do/total", "big", null),
+    "The step /do/total is not a switch.",
+  ],
+  [
+    "a step on a branch the switch does not have",
+    routeFlow,
+    branchActionOf("/do/route", "nowhere", null),
+    "The switch /do/route has no branch named 'nowhere'.",
+  ],
+  [
+    "a step on a branch of a switch that is a fork's branch",
+    forkedRouteFlow,
+    branchActionOf("/do/alarm/fork/branches/route", "severe", null),
+    "A switch that is a branch of a fork has no list to add a step to.",
+  ],
+  [
+    "a step on a branch under a sibling's name",
+    routeFlow,
+    branchActionOf("/do/route", "big", "total"),
+    "A step named 'total' already stands in this list.",
+  ],
+  [
+    "a step on a branch of an unknown step",
+    routeFlow,
+    branchActionOf("/do/nowhere", "big", null),
+    "No step with the id /do/nowhere stands in the text.",
+  ],
 ])("%s is refused", (_, text, action, reason) => {
   const editing = check(text, action);
 
@@ -735,3 +865,198 @@ test("a comment on a block's header stays on it", () => {
   );
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
+
+const pause = "  - pause:\n      wait: PT1S\n";
+
+const branchSteps: readonly (readonly [
+  string,
+  string,
+  string,
+  string,
+  string,
+])[] = [
+  [
+    "a branch that continues still continues, into the new step, and another branch that continued names the step after the switch",
+    routeFlow,
+    "/do/route",
+    "big",
+    routeFlow
+      .replace(
+        "        - default:\n            then: continue\n",
+        "        - default:\n            then: total\n",
+      )
+      .replace("  # the total", `${pause}  # the total`),
+  ],
+  [
+    "a branch that names a step names the new step, which names that step, and the branches that continued name the step after the switch",
+    routeFlow,
+    "/do/route",
+    "small",
+    routeFlow
+      .replace("            then: continue\n", "            then: total\n")
+      .replace("then: report", "then: pause")
+      .replace(
+        "        - default:\n            then: continue\n",
+        "        - default:\n            then: total\n",
+      )
+      .replace("  # the total", `${pause}      then: report\n  # the total`),
+  ],
+  [
+    "a branch that ends the run leads to the new step, which ends the run, and the branches that continued name the step after the switch",
+    routeFlow,
+    "/do/route",
+    "stop",
+    routeFlow
+      .replace("            then: continue\n", "            then: total\n")
+      .replace("            then: end\n", "            then: pause\n")
+      .replace(
+        "        - default:\n            then: continue\n",
+        "        - default:\n            then: total\n",
+      )
+      .replace("  # the total", `${pause}      then: end\n  # the total`),
+  ],
+  [
+    "a branch that leaves its block leads to the new step, which leaves it, and another branch that continued leaves it too",
+    nestedRouteFlow,
+    "/do/each/do/route",
+    "skip",
+    nestedRouteFlow
+      .replace("then: exit", "then: pause")
+      .replace("then: continue", "then: exit")
+      .concat(
+        "        - pause:\n            wait: PT1S\n            then: exit\n",
+      ),
+  ],
+  [
+    "a switch that was the workflow's last step ends the run where it fell off the end, its own then included",
+    lastRouteFlow,
+    "/do/route",
+    "some",
+    lastRouteFlow.concat(`      then: end\n${pause}`),
+  ],
+  [
+    "a switch with no default case names the step after it in its own then",
+    undefaultedRouteFlow,
+    "/do/route",
+    "big",
+    undefaultedRouteFlow
+      .replace(
+        "            then: end\n",
+        "            then: pause\n      then: total\n",
+      )
+      .replace("  - total:", `${pause}      then: end\n  - total:`),
+  ],
+  [
+    "a switch written inline gets its step inline",
+    inlineRouteFlow,
+    "/do/route",
+    "big",
+    inlineRouteFlow
+      .replace("{ other: { then: continue } }", "{ other: { then: total } }")
+      .replace(" { total:", " { pause: { wait: PT1S } }, { total:"),
+  ],
+];
+
+type Route = readonly string[];
+
+function editedOf(text: string, action: EditAction): string {
+  const editing = check(text, action);
+
+  if (editing.kind === "refused") {
+    throw new Error(editing.reason);
+  }
+
+  return appliedOf(text, editing.changes);
+}
+
+function routesOf(
+  text: string,
+  switchId: string,
+): Readonly<Record<string, Route>> {
+  const snapshot = snapshotOf(text);
+  const { workflow } = structureReadingOf(snapshot);
+  const list = listHoldingOf(workflow.steps, switchId);
+  const steps = list?.steps ?? [];
+  const isRoot = list === workflow.steps;
+  const route = steps.find((step) => step.id === switchId);
+  const ways = route?.flow ?? [];
+  const cases = ways.filter((way) => way.on === "case");
+  const hasDefault = cases.some((way) => way.when === null);
+  const reachable = hasDefault ? cases : ways;
+  const routes = reachable.map((way) => {
+    const name = way.case ?? "no case matches";
+    return [name, pathOf(steps, way, isRoot)] as const;
+  });
+
+  return Object.fromEntries(routes);
+}
+
+function listHoldingOf(list: StepList, id: string): StepList | null {
+  const holds = list.steps.some((step) => step.id === id);
+
+  if (holds) {
+    return list;
+  }
+
+  const nested = list.steps.flatMap((step) => step.lists);
+  const holders = nested.map((inner) => listHoldingOf(inner, id));
+  return holders.find((holder) => holder !== null) ?? null;
+}
+
+function pathOf(
+  steps: readonly Step[],
+  way: Transition,
+  isRoot: boolean,
+): Route {
+  const leaving = isRoot ? "the run ends" : "the block completes";
+
+  switch (way.kind) {
+    case "end":
+      return ["the run ends"];
+    case "exit":
+      return [leaving];
+    case "next":
+    case "jump":
+      return pathFromOf(steps, way.to, isRoot);
+  }
+}
+
+function pathFromOf(
+  steps: readonly Step[],
+  id: string | null,
+  isRoot: boolean,
+): Route {
+  const leaving = isRoot ? "the run ends" : "the block completes";
+  const step = steps.find((candidate) => candidate.id === id);
+  const done = step?.flow.find((each) => each.on === "done");
+
+  if (step === undefined || done === undefined) {
+    return [leaving];
+  }
+
+  const rest = pathOf(steps, done, isRoot);
+  return [step.name, ...rest];
+}
+
+test.each(branchSteps)("%s", (_, text, switchId, branch, expected) => {
+  const action = branchActionOf(switchId, branch, "pause");
+
+  const outcome = outcomeOf(text, action);
+
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test.each(branchSteps)(
+  "%s: the branch passes the new step and every other way out of the switch keeps its route",
+  (_, text, switchId, branch) => {
+    const action = branchActionOf(switchId, branch, "pause");
+    const before = routesOf(text, switchId);
+
+    const edited = editedOf(text, action);
+
+    const after = routesOf(edited, switchId);
+    const chosen = before[branch] ?? [];
+    const expected = { ...before, [branch]: ["pause", ...chosen] };
+    expect(after).toEqual(expected);
+  },
+);

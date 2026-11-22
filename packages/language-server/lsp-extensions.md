@@ -605,6 +605,13 @@ type EditAction =
       step: TaskKind;
       name: string | null;
     }
+  | {
+      kind: "insertStepOnBranch";
+      switch: string; // the switch's step id
+      case: string; // the branch: a case's name, as Transition.case
+      step: TaskKind;
+      name: string | null;
+    }
   | { kind: "moveStep"; step: string; list: string; index: number }
   | { kind: "removeStep"; step: string }
   | { kind: "renameStep"; step: string; name: string }
@@ -629,6 +636,17 @@ interface EditResult {
 - **Names.** A new step without a name takes its kind's name, then `<kind>-2`, `-3`, …; a duplicate takes the next free `<name>-2`.
 - **Fields.** `setField` and `clearField` act at any member of a step or of the document, such as `/schedule/cron`. `setField` also writes the holders the text lacks, as an author would: a member added to a block mapping is written in block style, so `setField` at `/input/schema` on a workflow with no `input` writes `input:`, then `schema:` and the value below it; one added to a flow mapping stays on its line.
 - **Text with line breaks.** A string with a line break, set in a block mapping or sequence, is written as a literal block scalar indented under its key or dash: `|` when it ends in one line break, `|-` when it ends in none, `|+` when it ends in more, the indentation indicator where its first line starts with a space; a comment after the old value moves to the block's header. A one-line string keeps the style it was written in, a block scalar's included (`code: |-` and the line). In a flow collection a string stays on its line, double-quoted where it holds a line break.
+- **A step on a branch** (`insertStepOnBranch`). The new step goes directly after the switch, in the switch's list, because flow directives name only tasks of their own list (dsl.md, "Task Flow") and the only step that can run into that place is the switch itself. Where the branch led stays where it leads, through the new step:
+
+  | The branch's `then` | Its `then` after                  | The new step's `then`                                                               |
+  | ------------------- | --------------------------------- | ----------------------------------------------------------------------------------- |
+  | `continue`          | `continue`, now into the new step | none: it continues to the step that followed the switch, or off the end of the list |
+  | a step's name       | the new step's name               | that step's name                                                                    |
+  | `end`               | the new step's name               | `end`                                                                               |
+  | `exit`              | the new step's name               | `exit`                                                                              |
+
+  Every other way out of the switch that continued now runs into the new step, so it is written out: each other case whose `then` is `continue`, and the switch's own `then` when it continues and no case is the default (a switch with no matching case follows its own `then`). Each names the step that followed the switch; where the switch was its list's last step, `end` in the workflow's own list and `exit` in a nested one, which complete the run and the block as running off their end does. A switch that is a branch of a fork is refused: a step after it would be another branch. `ids` is empty, as for `insertStep`.
+
 - **If it fails** (`setFailure`: `stop`, `continue`, `retry` or `handle`), on a step's id:
   - on a step no try protects, `continue`, `retry` and `handle` wrap the author's step text, re-indented, in a try of the same name, and move the step's `then` to the try; `stop` changes nothing;
   - on a protecting try (a try whose `try` list holds one step), `continue`, `retry` and `handle` replace its `catch`, and `stop` gives the step its own text back in the try's place, with the try's `then`;
@@ -636,7 +654,7 @@ interface EditResult {
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
 - **Errors:**
   - `ContentModified` (-32801), when the version is not the store's;
-  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
+  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
   - `InvalidParams` (-32602), when the params are of another shape.
 
 **Example:**

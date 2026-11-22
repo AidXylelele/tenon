@@ -8,6 +8,7 @@ import type {
   FieldAction,
   StepAction,
 } from "./interfaces.js";
+import { branchInsertionOf } from "./branches.js";
 import { failureSettingOf } from "./failures.js";
 import { fieldClearingOf, fieldSettingOf } from "./field-actions.js";
 import {
@@ -34,6 +35,7 @@ export function editsOf(snapshot: Snapshot, action: EditAction): Editing {
     case "clearField":
       return fieldEditsOf(snapshot, action);
     case "insertStep":
+    case "insertStepOnBranch":
     case "moveStep":
     case "removeStep":
     case "renameStep":
@@ -87,6 +89,8 @@ function stepEditsOf(snapshot: Snapshot, action: StepAction): Editing {
   switch (action.kind) {
     case "insertStep":
       return stepInsertionOf(editable, action);
+    case "insertStepOnBranch":
+      return branchInsertionOf(editable, action);
     case "moveStep":
       return stepMoveOf(editable, action);
     case "removeStep":

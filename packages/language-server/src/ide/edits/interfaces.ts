@@ -1,4 +1,5 @@
 import type {
+  ast,
   JsonObject,
   JsonValue,
   Range,
@@ -18,6 +19,14 @@ export interface InsertStep {
   readonly kind: "insertStep";
   readonly list: string;
   readonly index: number;
+  readonly step: TaskKind;
+  readonly name: string | null;
+}
+
+export interface InsertStepOnBranch {
+  readonly kind: "insertStepOnBranch";
+  readonly switch: string;
+  readonly case: string;
   readonly step: TaskKind;
   readonly name: string | null;
 }
@@ -72,7 +81,13 @@ export interface SetFailure {
 }
 
 export type StepAction =
-  InsertStep | MoveStep | RemoveStep | RenameStep | DuplicateStep | SetFailure;
+  | InsertStep
+  | InsertStepOnBranch
+  | MoveStep
+  | RemoveStep
+  | RenameStep
+  | DuplicateStep
+  | SetFailure;
 
 export type FieldAction = SetField | ClearField;
 
@@ -152,6 +167,12 @@ export interface WrittenStep {
   readonly list: StepNodeList;
   readonly collection: CollectionText;
   readonly span: Span;
+}
+
+export interface Switching {
+  readonly written: WrittenStep;
+  readonly task: ast.TaskCommon & ast.SwitchTask;
+  readonly chosen: ast.SwitchCase;
 }
 
 export interface Destination {

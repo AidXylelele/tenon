@@ -42,6 +42,7 @@ const plainFailureKinds: ReadonlySet<string> = new Set([
 
 const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
   insertStep: holdsInsertion,
+  insertStepOnBranch: holdsBranchInsertion,
   moveStep: holdsMove,
   removeStep: (action) => holdsStrings(action, ["step"]),
   renameStep: (action) => holdsStrings(action, ["step", "name"]),
@@ -138,16 +139,21 @@ export function holdsEditParams(params: unknown): params is EditParams {
 }
 
 function holdsInsertion(action: unknown): boolean {
+  return (
+    holdsStrings(action, ["list"]) && holdsIndex(action) && holdsNewStep(action)
+  );
+}
+
+function holdsBranchInsertion(action: unknown): boolean {
+  return holdsStrings(action, ["switch", "case"]) && holdsNewStep(action);
+}
+
+function holdsNewStep(action: unknown): boolean {
   const name = memberOf(action, "name");
   const step = memberOf(action, "step");
   const isNamed = name === null || typeof name === "string";
 
-  return (
-    holdsStrings(action, ["list"]) &&
-    holdsIndex(action) &&
-    kindsOfTask.has(step) &&
-    isNamed
-  );
+  return kindsOfTask.has(step) && isNamed;
 }
 
 function holdsMove(action: unknown): boolean {

@@ -1,4 +1,4 @@
-import type { Range } from "interpreter/front-end";
+import type { JsonObject, Range } from "interpreter/front-end";
 import { childPointerOf, parentPointerOf, valueAt } from "../pointers/index.js";
 import type { StepNodeList } from "../steps/index.js";
 import {
@@ -10,7 +10,7 @@ import {
   positionAt,
   type TextChange,
 } from "../text/index.js";
-import { inlineYamlOf } from "../yaml-text/index.js";
+import { inlineYamlOf, yamlOf } from "../yaml-text/index.js";
 import type {
   CollectionText,
   EditableText,
@@ -73,6 +73,13 @@ export function itemFormsOf(
       return { block, inline: item.text };
     }
   }
+}
+
+export function newItemFormsOf(item: JsonObject): ItemText {
+  const block = yamlOf([item]);
+  const inline = inlineYamlOf(item);
+
+  return { block, inline };
 }
 
 export function insertionOf(
