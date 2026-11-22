@@ -2,6 +2,7 @@
 
 This document describes the custom methods of the workflow language server, in the form of rust-analyzer's `lsp-extensions.md`. Each type is declared once, beside the code in `src/ide` that builds it, and `src/protocol` exports it, with the LSP's `Range` and `Diagnostic` where it carries them.
 
+- **Capabilities.** `initialize` answers each custom method's name as a flag under `ServerCapabilities.experimental`, e.g. `"workflow/structure": true`.
 - **Phase.** A custom request is answered by the server's phase, as a standard one is: `ServerNotInitialized` (-32002) before `initialize` is answered, and `InvalidRequest` (-32600) after `shutdown`.
 - **Faults.** A fault inside a request answers `InternalError` (-32603).
 
