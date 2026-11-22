@@ -29,12 +29,15 @@ export const NO_ROWS: ConditionReading = {
   condition: { join: "all", rows: [] },
 };
 
-export const AN_EXPRESSION: ConditionReading = { kind: "expression" };
-
 export const TWO_ROWS_TEXT =
   '${ (.slideshow.slides | . != null and . != "" and . != [] and . != {}) and (.slideshow.title == "Sample Slide Show") }';
 
 export const NON_CANONICAL_TEXT = "${ (.slideshow.slides | length) > 3 }";
+
+export const AN_EXPRESSION = {
+  kind: "expression",
+  text: NON_CANONICAL_TEXT,
+} as const;
 
 export const BEFORE_TODAY: ConditionReading = {
   kind: "condition",
