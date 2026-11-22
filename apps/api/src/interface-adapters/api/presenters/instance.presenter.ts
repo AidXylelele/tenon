@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { EventPage } from "../../../application/automation/events/interfaces.js";
 import type {
+  FailingWorkflows,
   InstanceCounts,
   InstanceDetail,
   InstancePage,
@@ -15,6 +16,7 @@ import type { Person } from "../../../application/identity/users/interfaces.js";
 import { Phase } from "../../../domain/automation/instances/enums.js";
 import {
   type EventPageResponse,
+  type FailingWorkflowsResponse,
   type InstanceCountsResponse,
   type InstancePageResponse,
   type InstanceResponse,
@@ -105,6 +107,25 @@ export class InstancePresenter {
     const items = page.items as ResponseJson[];
     const next = page.next === null ? null : String(page.next);
     return { items, next };
+  }
+
+  failing(failing: FailingWorkflows): FailingWorkflowsResponse {
+    const items = failing.items.map((workflow) => ({
+      namespace: workflow.namespace,
+      name: workflow.name,
+      failed: workflow.failed,
+      runs: workflow.runs,
+      firstFailedAt: workflow.firstFailedAt.toISOString(),
+      lastFailedAt: workflow.lastFailedAt.toISOString(),
+      lastError: {
+        status: workflow.lastError.status,
+        type: workflow.lastError.type,
+        title: workflow.lastError.title,
+        detail: workflow.lastError.detail,
+      },
+      stillFailing: workflow.stillFailing,
+    }));
+    return { items, workflows: failing.workflows, failed: failing.failed };
   }
 
   counts(counted: InstanceCounts): InstanceCountsResponse {

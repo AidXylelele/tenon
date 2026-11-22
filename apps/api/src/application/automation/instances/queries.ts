@@ -1,5 +1,7 @@
 import type {
   CountWindow,
+  FailingWorkflows,
+  FailureWindow,
   InstanceCounts,
   InstanceDetail,
   InstancePage,
@@ -18,6 +20,7 @@ export abstract class InstanceQueries {
     limit: number,
   ): Promise<TaskPage | null>;
   abstract counts(window: CountWindow): Promise<InstanceCounts>;
+  abstract failing(window: FailureWindow): Promise<FailingWorkflows>;
   abstract taskOutput(
     id: string,
     execution: string,

@@ -9,6 +9,7 @@ import {
   Phase,
   WaitKind,
 } from "../../../../../src/domain/automation/instances/enums.js";
+import type { JsonObject } from "../../../../../src/domain/automation/interfaces.js";
 import {
   createPersistenceTest,
   instanceQueries,
@@ -398,5 +399,125 @@ describe("PostgresInstanceQueries listing runs", () => {
       { kind: WaitKind.Timer, until: new Date(until), stream: null },
     ]);
     expect(item?.durationMs).toBe(90_000);
+  });
+});
+
+describe("PostgresInstanceQueries finding failing workflows", () => {
+  let t: PersistenceTest;
+  let queries: InstanceQueries;
+  let routeLead: WorkflowRows;
+  let digest: WorkflowRows;
+  let healthy: WorkflowRows;
+
+  const DAY = {
+    from: at("2026-03-01T00:00:00.000Z"),
+    to: at("2026-03-02T00:00:00.000Z"),
+    limit: 5,
+    tests: false,
+  };
+
+  const NOT_FOUND = {
+    type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication",
+    status: 404,
+    title: "Not found",
+    detail: "GET https://example.com/status answered 404",
+  };
+
+  beforeAll(async () => {
+    t = await createPersistenceTest(instanceQueries);
+    queries = t.module.get(InstanceQueries);
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  beforeEach(async () => {
+    await truncateRuns(t.db);
+    const publisherId = await aPublisher(t.db);
+    routeLead = await aWorkflowRow(t.db, publisherId, { name: "route-lead" });
+    digest = await aWorkflowRow(t.db, publisherId, { name: "digest" });
+    healthy = await aWorkflowRow(t.db, publisherId, { name: "healthy" });
+  });
+
+  const ran = (
+    workflow: WorkflowRows,
+    phase: Phase,
+    startedAt: string,
+    error: JsonObject | null = null,
+    test = false,
+  ) => {
+    const started = at(startedAt);
+    return aRunRow(t.db, workflow, { phase, startedAt: started, error, test });
+  };
+
+  it("ranks_the_workflows_by_failed_runs_with_since_when_the_last_error_and_whether_they_still_fail", async () => {
+    await ran(routeLead, Phase.Faulted, "2026-03-01T01:00:00.000Z", {
+      title: "Old",
+    });
+    await ran(routeLead, Phase.Faulted, "2026-03-01T05:00:00.000Z", NOT_FOUND);
+    await ran(routeLead, Phase.Running, "2026-03-01T06:00:00.000Z");
+    await ran(routeLead, Phase.Completed, "2026-03-01T02:00:00.000Z");
+    await ran(digest, Phase.Faulted, "2026-03-01T03:00:00.000Z");
+    await ran(digest, Phase.Completed, "2026-03-01T04:00:00.000Z");
+    await ran(healthy, Phase.Completed, "2026-03-01T04:00:00.000Z");
+    await ran(healthy, Phase.Faulted, "2026-02-28T23:00:00.000Z");
+
+    const failing = await queries.failing(DAY);
+
+    expect(failing.workflows).toBe(2);
+    expect(failing.failed).toBe(3);
+    expect(failing.items).toEqual([
+      {
+        namespace: "sales",
+        name: "route-lead",
+        failed: 2,
+        runs: 4,
+        firstFailedAt: at("2026-03-01T01:00:00.000Z"),
+        lastFailedAt: at("2026-03-01T05:00:00.000Z"),
+        lastError: {
+          status: 404,
+          type: NOT_FOUND.type,
+          title: "Not found",
+          detail: NOT_FOUND.detail,
+        },
+        stillFailing: true,
+      },
+      {
+        namespace: "sales",
+        name: "digest",
+        failed: 1,
+        runs: 2,
+        firstFailedAt: at("2026-03-01T03:00:00.000Z"),
+        lastFailedAt: at("2026-03-01T03:00:00.000Z"),
+        lastError: { status: null, type: null, title: null, detail: null },
+        stillFailing: false,
+      },
+    ]);
+  });
+
+  it("the_limit_cuts_the_rows_but_not_the_totals_they_add_up_to", async () => {
+    await ran(routeLead, Phase.Faulted, "2026-03-01T01:00:00.000Z");
+    await ran(routeLead, Phase.Faulted, "2026-03-01T02:00:00.000Z");
+    await ran(digest, Phase.Faulted, "2026-03-01T03:00:00.000Z");
+    const top = { ...DAY, limit: 1 };
+
+    const failing = await queries.failing(top);
+
+    const names = failing.items.map((item) => item.name);
+    expect(names).toEqual(["route-lead"]);
+    expect(failing.workflows).toBe(2);
+    expect(failing.failed).toBe(3);
+  });
+
+  it("test_runs_fail_no_workflow_unless_asked_for", async () => {
+    await ran(routeLead, Phase.Faulted, "2026-03-01T01:00:00.000Z", null, true);
+    const withTests = { ...DAY, tests: true };
+
+    const without = await queries.failing(DAY);
+    const including = await queries.failing(withTests);
+
+    expect(without).toEqual({ items: [], workflows: 0, failed: 0 });
+    expect(including.failed).toBe(1);
   });
 });

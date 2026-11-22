@@ -173,6 +173,58 @@ describe("the reads the web console asks for", () => {
       .expect(400);
   });
 
+  it("failing_workflows_are_ranked_with_their_last_error_and_whether_they_still_fail", async () => {
+    const unavailable = {
+      type: "https://example.com/errors/unavailable",
+      status: 503,
+      title: "Unavailable",
+    };
+    await publish(
+      t,
+      editor,
+      aDocument({ name: "broken" }, [
+        { broken: { raise: { error: unavailable } } },
+      ]),
+    );
+    await start(t, editor, { input: {} }, "sales/broken");
+    await drain(t);
+    const window = "from=2025-12-31T00:00:00Z&to=2026-01-02T00:00:00Z";
+
+    const failing = await request(t.server)
+      .get(`/api/v1/failing-workflows?${window}`)
+      .set(viewer)
+      .expect(200);
+    await request(t.server)
+      .get(
+        "/api/v1/failing-workflows?from=2026-01-02T00:00:00Z&to=2026-01-01T00:00:00Z",
+      )
+      .set(viewer)
+      .expect(400);
+    await request(t.server)
+      .get(`/api/v1/failing-workflows?${window}&limit=101`)
+      .set(viewer)
+      .expect(400);
+
+    expect(failing.body).toMatchObject({
+      items: [
+        {
+          namespace: "sales",
+          name: "broken",
+          failed: 1,
+          runs: 1,
+          lastError: {
+            status: 503,
+            type: unavailable.type,
+            title: "Unavailable",
+          },
+          stillFailing: true,
+        },
+      ],
+      workflows: 1,
+      failed: 1,
+    });
+  });
+
   it("the_host_profile_gives_what_the_editor_analyses_against_and_the_limits", async () => {
     const response = await request(t.server)
       .get("/api/v1/host-profile")

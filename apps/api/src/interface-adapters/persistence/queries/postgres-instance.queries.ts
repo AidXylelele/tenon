@@ -10,11 +10,14 @@ import {
   inArray,
   isNotNull,
   lt,
+  notInArray,
   type SQL,
   sql,
 } from "drizzle-orm";
 import type {
   CountWindow,
+  FailingWorkflows,
+  FailureWindow,
   InstanceCounts,
   InstanceDetail,
   InstanceFilter,
@@ -31,6 +34,7 @@ import { InstanceOrder } from "../../../application/automation/instances/enums.j
 import type { InstanceQueries } from "../../../application/automation/instances/queries.js";
 import type { Person } from "../../../application/identity/users/interfaces.js";
 import {
+  Phase,
   TaskValueKind,
   WaitKind,
 } from "../../../domain/automation/instances/enums.js";
@@ -39,6 +43,7 @@ import type { RunWait } from "../../../domain/automation/instances/interfaces.js
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type {
   CountRow,
+  FailingRow,
   LifecycleEventName,
   ListedInstanceRow,
   LifecycleEventRow,
@@ -352,6 +357,118 @@ export class PostgresInstanceQueries implements InstanceQueries {
 
     const counts = this.#previousTotalsOf(rows);
     return { from, counts };
+  }
+
+  async failing(window: FailureWindow): Promise<FailingWorkflows> {
+    const rows = await this.#failingRowsOf(window);
+    const items = rows.map((row) => ({
+      namespace: row.namespace,
+      name: row.name,
+      failed: row.failed,
+      runs: row.runs,
+      firstFailedAt: row.firstFailedAt,
+      lastFailedAt: row.lastFailedAt,
+      lastError: {
+        status: row.status,
+        type: row.type,
+        title: row.title,
+        detail: row.detail,
+      },
+      stillFailing: row.stillFailing,
+    }));
+    const [first] = rows;
+    return {
+      items,
+      workflows: first?.workflows ?? 0,
+      failed: first?.failedRuns ?? 0,
+    };
+  }
+
+  #failingRowsOf(window: FailureWindow): Promise<FailingRow[]> {
+    const tests = this.#tests(window.tests);
+    const inWindow = and(
+      gte(instances.startedAt, window.from),
+      lt(instances.startedAt, window.to),
+      tests,
+    );
+    const faulted = sql`${instances.phase} = ${Phase.Faulted}`;
+    const failed = sql<number>`count(*) filter (where ${faulted})::int`;
+    const runs = sql<number>`count(*)::int`;
+    const firstFailedAt = sql<Date>`min(${instances.startedAt}) filter (where ${faulted})`;
+    const lastFailedAt = sql<Date>`max(${instances.startedAt}) filter (where ${faulted})`;
+    const failing = this.txHost.tx
+      .select({
+        workflowId: instances.workflowId,
+        failed: failed.as("failed"),
+        runs: runs.as("runs"),
+        firstFailedAt: firstFailedAt
+          .mapWith(instances.startedAt)
+          .as("first_failed_at"),
+        lastFailedAt: lastFailedAt
+          .mapWith(instances.startedAt)
+          .as("last_failed_at"),
+      })
+      .from(instances)
+      .where(inWindow)
+      .groupBy(instances.workflowId)
+      .having(sql`count(*) filter (where ${faulted}) > 0`)
+      .as("failing");
+    const ofFailing = sql`${instances.workflowId} = "failing"."workflow_id"`;
+    const lastFailure = this.txHost.tx
+      .select({ error: instances.error })
+      .from(instances)
+      .where(
+        and(
+          ofFailing,
+          eq(instances.phase, Phase.Faulted),
+          sql`${instances.startedAt} = "failing"."last_failed_at"`,
+          tests,
+        ),
+      )
+      .orderBy(desc(instances.id))
+      .limit(1)
+      .as("last_failure");
+    const live = WorkflowInstance.livePhases();
+    const latest = this.txHost.tx
+      .select({ phase: instances.phase })
+      .from(instances)
+      .where(and(ofFailing, notInArray(instances.phase, live), inWindow))
+      .orderBy(desc(instances.startedAt), desc(instances.id))
+      .limit(1)
+      .as("latest");
+    const error = lastFailure.error;
+    const numericStatus = sql`jsonb_typeof(${error} -> 'status') = 'number'`;
+    const status = sql<
+      number | null
+    >`(case when ${numericStatus} then (${error} ->> 'status')::numeric end)::int`;
+    const stillFailing = sql<boolean>`coalesce(${latest.phase} = ${Phase.Faulted}, false)`;
+    return this.txHost.tx
+      .select({
+        namespace: workflows.namespace,
+        name: workflows.name,
+        failed: failing.failed,
+        runs: failing.runs,
+        firstFailedAt: failing.firstFailedAt,
+        lastFailedAt: failing.lastFailedAt,
+        status,
+        type: sql<string | null>`${error} ->> 'type'`,
+        title: sql<string | null>`${error} ->> 'title'`,
+        detail: sql<string | null>`${error} ->> 'detail'`,
+        stillFailing,
+        workflows: sql<number>`(count(*) over ())::int`,
+        failedRuns: sql<number>`(sum(${failing.failed}) over ())::int`,
+      })
+      .from(failing)
+      .innerJoin(workflows, eq(workflows.id, failing.workflowId))
+      .leftJoinLateral(lastFailure, sql`true`)
+      .leftJoinLateral(latest, sql`true`)
+      .orderBy(
+        desc(failing.failed),
+        desc(failing.lastFailedAt),
+        asc(workflows.namespace),
+        asc(workflows.name),
+      )
+      .limit(window.limit);
   }
 
   #bucketed(window: CountWindow): Promise<CountRow[]> {

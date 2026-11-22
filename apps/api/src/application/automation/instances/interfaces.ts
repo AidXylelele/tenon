@@ -148,6 +148,37 @@ export interface InstanceCounts {
   readonly live: readonly PhaseCount[];
 }
 
+export interface FailureWindow {
+  readonly from: Date;
+  readonly to: Date;
+  readonly limit: number;
+  readonly tests: boolean;
+}
+
+export interface FailureCause {
+  readonly status: number | null;
+  readonly type: string | null;
+  readonly title: string | null;
+  readonly detail: string | null;
+}
+
+export interface FailingWorkflow {
+  readonly namespace: string;
+  readonly name: string;
+  readonly failed: number;
+  readonly runs: number;
+  readonly firstFailedAt: Date;
+  readonly lastFailedAt: Date;
+  readonly lastError: FailureCause;
+  readonly stillFailing: boolean;
+}
+
+export interface FailingWorkflows {
+  readonly items: readonly FailingWorkflow[];
+  readonly workflows: number;
+  readonly failed: number;
+}
+
 export interface InstanceFilter {
   readonly namespace: string | null;
   readonly name: string | null;

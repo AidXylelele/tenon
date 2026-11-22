@@ -40,6 +40,8 @@ import { InstancePresenter } from "../presenters/instance.presenter.js";
 import { Missing } from "../../../application/automation/enums.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
 import {
+  FailingWorkflowsQuery,
+  FailingWorkflowsResponse,
   InstanceCountsQuery,
   InstanceCountsResponse,
   InstancePageResponse,
@@ -141,6 +143,21 @@ export class InstancesController {
     };
     const counted = await this.instances.counts(window);
     return this.instancePresenter.counts(counted);
+  }
+
+  @Get("failing-workflows")
+  @Can.Anyone()
+  @ApiOkResponse({ standardSchema: FailingWorkflowsResponse })
+  async failing(
+    @Query({ schema: FailingWorkflowsQuery }) query: FailingWorkflowsQuery,
+  ): Promise<FailingWorkflowsResponse> {
+    const failing = await this.instances.failing({
+      from: query.from,
+      to: query.to,
+      limit: query.limit,
+      tests: query.tests,
+    });
+    return this.instancePresenter.failing(failing);
   }
 
   @Get("instances/:id")

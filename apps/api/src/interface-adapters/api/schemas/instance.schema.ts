@@ -213,3 +213,50 @@ export const InstanceCountsResponse = z.object({
 });
 
 export type InstanceCountsResponse = z.infer<typeof InstanceCountsResponse>;
+
+const MOST_FAILING = 100;
+
+const FEW_FAILING = 5;
+
+export const FailingWorkflowsQuery = z
+  .strictObject({
+    from: Instant,
+    to: Instant,
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MOST_FAILING)
+      .default(FEW_FAILING),
+    tests: Included.default(false),
+  })
+  .refine((window) => window.from < window.to, {
+    message: "from is before to",
+    path: ["to"],
+  });
+
+export type FailingWorkflowsQuery = z.infer<typeof FailingWorkflowsQuery>;
+
+export const FailingWorkflowsResponse = z.object({
+  items: z.array(
+    z.object({
+      namespace: z.string(),
+      name: z.string(),
+      failed: z.number().int(),
+      runs: z.number().int(),
+      firstFailedAt: z.iso.datetime(),
+      lastFailedAt: z.iso.datetime(),
+      lastError: z.object({
+        status: z.number().int().nullable(),
+        type: z.string().nullable(),
+        title: z.string().nullable(),
+        detail: z.string().nullable(),
+      }),
+      stillFailing: z.boolean(),
+    }),
+  ),
+  workflows: z.number().int(),
+  failed: z.number().int(),
+});
+
+export type FailingWorkflowsResponse = z.infer<typeof FailingWorkflowsResponse>;

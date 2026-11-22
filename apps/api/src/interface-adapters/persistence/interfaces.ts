@@ -76,6 +76,22 @@ export interface ListedInstanceRow {
   readonly runWaits: readonly RunWait[];
 }
 
+export interface FailingRow {
+  readonly namespace: string;
+  readonly name: string;
+  readonly failed: number;
+  readonly runs: number;
+  readonly firstFailedAt: Date;
+  readonly lastFailedAt: Date;
+  readonly status: number | null;
+  readonly type: string | null;
+  readonly title: string | null;
+  readonly detail: string | null;
+  readonly stillFailing: boolean;
+  readonly workflows: number;
+  readonly failedRuns: number;
+}
+
 export interface CountRow {
   readonly bucket: number | null;
   readonly current: boolean | null;

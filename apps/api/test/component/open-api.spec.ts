@@ -29,6 +29,7 @@ describe("the OpenAPI document", () => {
         "/api/v1/instance-counts",
         "/api/v1/members",
         "/api/v1/expected-starts",
+        "/api/v1/failing-workflows",
       ]),
     );
   });
