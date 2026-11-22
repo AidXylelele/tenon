@@ -1,0 +1,75 @@
+apiVersion: 1
+
+datasources:
+  - name: Mimir
+    uid: mimir
+    type: prometheus
+    access: proxy
+    url: http://mimir:9009/prometheus
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      prometheusType: Mimir
+      timeInterval: 15s
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      nodeGraph:
+        enabled: true
+      serviceMap:
+        datasourceUid: mimir
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        tags:
+          - key: service.name
+            value: service_name
+      tracesToMetrics:
+        datasourceUid: mimir
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        tags:
+          - key: service.name
+            value: service_name
+        queries:
+          - name: Request rate
+            query: sum(rate(traces_spanmetrics_calls_total{$$__tags, span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER"}[$$__rate_interval]))
+          - name: Error rate
+            query: sum(rate(traces_spanmetrics_calls_total{$$__tags, span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER", status_code="STATUS_CODE_ERROR"}[$$__rate_interval]))
+          - name: Latency p95
+            query: histogram_quantile(0.95, sum(rate(traces_spanmetrics_duration_seconds{$$__tags, span_kind=~"SPAN_KIND_SERVER|SPAN_KIND_CONSUMER"}[$$__rate_interval])))
+      search:
+        hide: false
+      traceQuery:
+        timeShiftEnabled: true
+        spanStartTimeShift: -1h
+        spanEndTimeShift: 1h
+      streamingEnabled:
+        search: true
+        metrics: true
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        - name: Trace
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: $${__value.raw}
+          urlDisplayLabel: Open the trace

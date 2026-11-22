@@ -25,7 +25,33 @@ under the `execution` of its events, for a host that keeps them (the claim check
 
 `interpreter/front-end` — for editors: `createAnalyzer(engine)` gives an `Analyzer`, whose `analyze` gives the
 semantic model and its diagnostics and whose `schemasAt` reads the grammar at a place; `resolutionsOf(model,
-pointer)` gives what the names of the expression at a pointer resolve to; and the standard's catalogues.
+pointer)` gives what the names of the expression at a pointer resolve to; and the standard's catalogues. `analyze`
+models every document whose structure the grammar admits: a value the grammar rejects (a pattern, a format, a length,
+a bound, in the one form of a choice the value takes) and a name or an event attribute left empty are diagnostics of
+that model. A document whose structure breaks, or that fits two forms of a choice at once, is refused. `compile`
+refuses every document with a diagnostic.
+
+## Telemetry
+
+The interpreter speaks the OpenTelemetry API only (`@opentelemetry/api`, a peer dependency), with the scope
+`interpreter`. With no SDK registered it records nothing. A host that wants its telemetry registers the SDK in the
+same thread **before** `createInterpreter()`: the metrics API has no proxy, so instruments taken earlier stay
+no-op. Spans are children of the host's active context. Nothing carries inputs, outputs, task values or secrets.
+
+| Span                                                                       | Attributes                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `interpreter.compile` → `interpreter.analyze`, `interpreter.translate`     | `interpreter.compile.subject` (`workflow`, `filter`), `interpreter.compile.outcome` (`compiled`, `refused`)                                                                                                                                 |
+| `interpreter.start`, `correlate`, `respond`, `suspend`, `resume`, `cancel` | `interpreter.operation`, `interpreter.workflow.namespace`, `.name`, `.version`, `interpreter.instance.id`, `interpreter.run.status`, `interpreter.transitions`, `interpreter.fibers`, `interpreter.effects.requested`, `interpreter.events` |
+
+| Histogram                      | Unit           | Attributes                                                                                                                                        |
+| ------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `interpreter.compile.duration` | s              | subject, `interpreter.compile.phase` (`analyze`, `translate`), outcome or `error.type`                                                            |
+| `interpreter.step.duration`    | s              | `interpreter.operation`, `interpreter.run.status` or `error.type`                                                                                 |
+| `interpreter.step.transitions` | `{transition}` | `interpreter.operation`                                                                                                                           |
+| `interpreter.run.duration`     | s              | `interpreter.run.status` (`completed`, `faulted`, `cancelled`), recorded by the call that ends the run, from the run's start to that call's `now` |
+
+A thrown error marks its span as an error, records the exception and puts `error.type` on the duration; a run
+that faults is an outcome, not an error.
 
 ## Test
 

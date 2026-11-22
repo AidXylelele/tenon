@@ -45,6 +45,7 @@ export interface Setting {
 
 export interface MachineOutcome extends Outputs {
   readonly snapshot: Snapshot;
+  readonly transitions: number;
 }
 
 type Leaving = Exclude<Next, Control>;
@@ -80,6 +81,7 @@ export class Machine implements View {
   #queued: readonly EffectResponse[];
   #result: Snapshot["result"];
   #running: RunningFiber = noneRunning;
+  #transitions = 0;
 
   constructor(snapshot: Snapshot, setting: Setting) {
     this.program = setting.program;
@@ -231,6 +233,7 @@ export class Machine implements View {
     const fiber = this.#runningFiber("no judgment has a fiber to run in");
     const transition = this.#transitionOf(fiber, control);
 
+    this.#transitions += 1;
     this.#applied(fiber, transition);
     return transition.next;
   }
@@ -373,6 +376,7 @@ export class Machine implements View {
       requested: outputs.requested,
       withdrawn: outputs.withdrawn,
       declined: outputs.declined,
+      transitions: this.#transitions,
     };
   }
 }

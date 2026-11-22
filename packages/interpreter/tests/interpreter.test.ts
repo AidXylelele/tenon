@@ -290,6 +290,17 @@ describe("filter", () => {
     expect(filter.accepts(small)).toBe(false);
   });
 
+  test("refuses a filter on an empty type: no event has one", () => {
+    const compilation = interpreter.filter({ with: { type: "" } });
+
+    expect(compilation).toMatchObject({
+      kind: "refused",
+      diagnostics: [
+        { code: "event-attribute", pointer: "/with/type", subject: "type" },
+      ],
+    });
+  });
+
   test("refuses a correlation: a filter outside a run keeps no expectation between events", () => {
     const compilation = interpreter.filter({
       with: { type: "com.example.paid" },
