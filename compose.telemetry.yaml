@@ -1,0 +1,119 @@
+x-telemetry-hardening: &telemetry-hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.165.0@sha256:e40d61f10c9a617cca1ffd1be4d7e2b3a4b0f0001798ff07e58cabe82e618cea
+    configs:
+      - source: otel-collector
+        target: /etc/otelcol-contrib/config.yaml
+    depends_on: [tempo, mimir, loki]
+    networks: [telemetry]
+    ports:
+      - 127.0.0.1:${COLLECTOR_PORT:-54318}:4318
+    mem_limit: 512m
+    restart: unless-stopped
+    <<: *telemetry-hardening
+
+  tempo:
+    image: grafana/tempo:3.1.1@sha256:64e2fbd56d9c2b3412a4b430a58ea59e91a670b1e75f920a0c702213ad145044
+    command: [-config.file=/etc/tempo/config.yaml]
+    configs:
+      - source: tempo
+        target: /etc/tempo/config.yaml
+    volumes:
+      - tempo-data:/var/tempo
+    networks: [telemetry]
+    mem_limit: 1g
+    restart: unless-stopped
+    <<: *telemetry-hardening
+
+  mimir:
+    image: grafana/mimir:3.2.6@sha256:32d79dc873a804d4dbf2724afcbb7b141553b5ed9118f9295972c4bb2982d6fd
+    command: [-config.file=/etc/mimir/config.yaml]
+    configs:
+      - source: mimir
+        target: /etc/mimir/config.yaml
+    environment:
+      GOMEMLIMIT: 900MiB
+    volumes:
+      - mimir-data:/data
+    networks: [telemetry]
+    mem_limit: 1g
+    restart: unless-stopped
+    <<: *telemetry-hardening
+
+  loki:
+    image: grafana/loki:3.7.10@sha256:b43c257ccfc925d4a50b8717cac61a3b51df8c48d01847936057e5c4075a24a7
+    command: [-config.file=/etc/loki/config.yaml]
+    configs:
+      - source: loki
+        target: /etc/loki/config.yaml
+    environment:
+      GOMEMLIMIT: 460MiB
+    volumes:
+      - loki-data:/loki
+    networks: [telemetry]
+    mem_limit: 512m
+    restart: unless-stopped
+    <<: *telemetry-hardening
+
+  grafana:
+    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/overview.json
+    configs:
+      - source: grafana-datasources
+        target: /etc/grafana/provisioning/datasources/datasources.yaml
+      - source: grafana-dashboards
+        target: /etc/grafana/provisioning/dashboards/dashboards.yaml
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/dashboards:ro
+    tmpfs: [/tmp]
+    depends_on: [mimir, tempo, loki]
+    networks: [telemetry]
+    ports:
+      - 127.0.0.1:${GRAFANA_PORT:-58888}:3000
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 60s
+    mem_limit: 512m
+    restart: unless-stopped
+    <<: *telemetry-hardening
+
+networks:
+  telemetry:
+
+volumes:
+  grafana-data:
+  tempo-data:
+  mimir-data:
+  loki-data:
+
+configs:
+  otel-collector:
+    file: docker/otel-collector/config.yaml
+  tempo:
+    file: docker/tempo/config.yaml
+  mimir:
+    file: docker/mimir/config.yaml
+  loki:
+    file: docker/loki/config.yaml
+  grafana-datasources:
+    file: docker/grafana/provisioning/datasources/datasources.yaml
+  grafana-dashboards:
+    file: docker/grafana/provisioning/dashboards/dashboards.yaml
