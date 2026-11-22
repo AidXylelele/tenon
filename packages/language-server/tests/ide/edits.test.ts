@@ -1330,3 +1330,80 @@ test("a result the step does not offer is refused", () => {
     reason: "The step /do/step offers no result 'printedJson'.",
   });
 });
+
+const pickFlow = `${inlineHeader}do:
+  - fetch:
+      call: http
+      with: { method: get, endpoint: https://api.test/orders }
+  - total:
+      set:
+        count: 2
+  - report:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.test/report
+        body: {}
+`;
+
+const fetchExport = `      export:\n        as: '\${ $context + { "fetch": . } }'\n`;
+
+function useOf(value: string, exported: string | null): EditAction {
+  return {
+    kind: "useData",
+    pointer: "/do/2/report/with/body",
+    value,
+    export: exported,
+  };
+}
+
+test("data used where it flows in is written into the field alone", () => {
+  const action = useOf("${ .count }", null);
+
+  const outcome = outcomeOf(pickFlow, action);
+
+  const expected = pickFlow.replace("body: {}", "body: ${ .count }");
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("an earlier step's output used through the context exports it under its name (dsl.md, Data Flow, step 7)", () => {
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const outcome = outcomeOf(pickFlow, action);
+
+  const expected = pickFlow
+    .replace(
+      "      with: { method: get, endpoint: https://api.test/orders }\n",
+      `      with: { method: get, endpoint: https://api.test/orders }\n${fetchExport}`,
+    )
+    .replace("body: {}", "body: ${ $context.fetch }");
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a step already exported under its name is not exported again", () => {
+  const exported = pickFlow.replace(
+    "      with: { method: get, endpoint: https://api.test/orders }\n",
+    `      with: { method: get, endpoint: https://api.test/orders }\n${fetchExport}`,
+  );
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const outcome = outcomeOf(exported, action);
+
+  const expected = exported.replace("body: {}", "body: ${ $context.fetch }");
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a step that writes its own export is not exported over it", () => {
+  const ownExport = pickFlow.replace(
+    "      with: { method: get, endpoint: https://api.test/orders }\n",
+    "      with: { method: get, endpoint: https://api.test/orders }\n      export:\n        as: '${ { kept: true } }'\n",
+  );
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const editing = check(ownExport, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "The step /do/fetch writes its own export; edit it in the text.",
+  });
+});

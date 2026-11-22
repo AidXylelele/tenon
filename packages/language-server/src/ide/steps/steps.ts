@@ -164,7 +164,7 @@ export function stepIdOf(
   return childPointerOf(listId, step.name);
 }
 
-function directivesOf(task: ast.Task): readonly ast.Directive[] {
+export function directivesOf(task: ast.Task): readonly ast.Directive[] {
   switch (task.kind) {
     case "switch": {
       const cases = task.switch.map((switchCase) => switchCase.then);

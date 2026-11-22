@@ -7,6 +7,7 @@ import {
 } from "vscode-languageserver/browser";
 import { isChosenResult, stepVariants } from "../ide/variants/index.js";
 import type {
+  DataAtParams,
   DidFetchImportsParams,
   EditParams,
   FromJsonParams,
@@ -52,6 +53,7 @@ const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
   clearField: (action) => holdsStrings(action, ["pointer"]),
   setFailure: holdsFailureSetting,
   setResult: holdsResultSetting,
+  useData: holdsDataUse,
 };
 
 export function invalidParamsOf(method: string): ResponseError {
@@ -131,6 +133,12 @@ export function holdsStepFormParams(params: unknown): params is StepFormParams {
   return holdsVersionedDocument(params) && holdsStrings(params, ["step"]);
 }
 
+export function holdsDataAtParams(params: unknown): params is DataAtParams {
+  return (
+    holdsVersionedDocument(params) && holdsStrings(params, ["step", "field"])
+  );
+}
+
 export function holdsEditParams(params: unknown): params is EditParams {
   const action = memberOf(params, "action");
   const kind = memberOf(action, "kind");
@@ -179,6 +187,13 @@ function holdsFailureSetting(action: unknown): boolean {
   }
 
   return holdsStrings(action, ["step"]) && isChoice;
+}
+
+function holdsDataUse(action: unknown): boolean {
+  const exported = memberOf(action, "export");
+  const isExport = exported === null || typeof exported === "string";
+
+  return holdsStrings(action, ["pointer", "value"]) && isExport;
 }
 
 function holdsResultSetting(action: unknown): boolean {

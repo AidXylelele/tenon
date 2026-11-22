@@ -9,7 +9,9 @@ export { startingContentOf } from "./contents.js";
 export {
   isChosenResult,
   isReturnedAs,
+  inputAndValuesAs,
   outputAsPointerOf,
+  printedResultOf,
   resultChoicesOf,
   resultMembersOf,
   resultReadingOf,

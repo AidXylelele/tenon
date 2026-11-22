@@ -30,6 +30,24 @@ export function scalarLike(written: string, value: string): string {
   return oneLineOf(value, style);
 }
 
+export function lineInBlockLike(written: string, value: string): string {
+  const style = styleOf(written);
+  const isBlockStyle = blockStyles.has(style);
+  const lineStyle = isBlockStyle ? "PLAIN" : style;
+  const options: ToStringOptions = {
+    lineWidth: 0,
+    defaultStringType: lineStyle,
+  };
+  const text = stringify(value, options).trimEnd();
+  const isOneLine = !text.includes("\n");
+
+  if (isOneLine) {
+    return text;
+  }
+
+  return oneLineOf(value, "QUOTE_DOUBLE");
+}
+
 export function isBlockScalarFor(written: string, value: string): boolean {
   const hasLineBreak = value.includes("\n");
   const style = styleOf(written);

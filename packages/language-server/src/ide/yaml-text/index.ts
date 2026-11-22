@@ -3,6 +3,7 @@ export {
   blockScalarLike,
   inlineYamlOf,
   isBlockScalarFor,
+  lineInBlockLike,
   scalarLike,
   yamlOf,
 } from "./write.js";

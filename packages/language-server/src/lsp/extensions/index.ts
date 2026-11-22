@@ -1,3 +1,4 @@
+export { dataAtHandlerOf, dataAtRequest } from "./data-at.js";
 export { documentHandlerOf, documentRequest } from "./document.js";
 export { editHandlerOf, editRequest } from "./edit.js";
 export { fromJsonAnswerOf, fromJsonRequest } from "./from-json.js";

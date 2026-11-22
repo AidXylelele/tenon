@@ -9,6 +9,7 @@ import type {
   StepAction,
 } from "./interfaces.js";
 import { branchInsertionOf } from "./branches.js";
+import { dataUseOf } from "./data-use.js";
 import { failureSettingOf } from "./failures.js";
 import { fieldClearingOf, fieldSettingOf } from "./field-actions.js";
 import { resultSettingOf } from "./results.js";
@@ -43,6 +44,7 @@ export function editsOf(snapshot: Snapshot, action: EditAction): Editing {
     case "duplicateStep":
     case "setFailure":
     case "setResult":
+    case "useData":
       return stepEditsOf(snapshot, action);
   }
 }
@@ -105,6 +107,8 @@ function stepEditsOf(snapshot: Snapshot, action: StepAction): Editing {
       return failureSettingOf(editable, action);
     case "setResult":
       return resultSettingOf(editable, action);
+    case "useData":
+      return dataUseOf(editable, action);
   }
 }
 

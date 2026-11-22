@@ -10,6 +10,7 @@ import {
   blockScalarLike,
   inlineYamlOf,
   isBlockScalarFor,
+  lineInBlockLike,
   scalarLike,
   type WrittenScalar,
   yamlOf,
@@ -178,6 +179,11 @@ function valueTextOf(
     const block = blockScalarLike(written, value);
     const lineEnd = end + written.trailing.length;
     return { text: block, end: lineEnd };
+  }
+
+  if (isBlock) {
+    const line = lineInBlockLike(written.text, value);
+    return { text: line, end };
   }
 
   const scalar = scalarLike(written.text, value);

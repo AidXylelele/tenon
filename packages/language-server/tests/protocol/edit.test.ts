@@ -203,3 +203,21 @@ test("a result that is none of the step results is invalid", async () => {
 
   await expect(refused).rejects.toMatchObject({ code: -32602 });
 });
+
+test("data used with an export that is not a step id is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: {
+      kind: "useData",
+      pointer: "/do/0/greet/set/message",
+      value: "${ . }",
+      export: 1,
+    },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});

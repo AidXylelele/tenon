@@ -697,6 +697,119 @@ interface StepVariantsResult {
 }
 ```
 
+## Data at a step
+
+**Method:** `workflow/dataAt`
+
+The client sends this request for the data a person can use in one field of a step, to list it in the data picker. Each entry carries the jq expression to insert and the field value that holds only it.
+
+```typescript
+interface DataAtParams {
+  textDocument: VersionedTextDocumentIdentifier;
+  step: string; // a step id of workflow/structure
+  field: string; // the pointer of the field the data goes into, under the step
+}
+
+interface DataAtResult {
+  version: number;
+  entries: DataEntry[];
+  warnings: { kind: "inputNotKnownObject"; step: string }[];
+}
+
+interface DataEntry extends DataMember {
+  source: "step" | "workflowInput" | "variable" | "secret" | "time";
+  step: string | null; // the step id of a step's output
+  needsExport: boolean; // using it writes the step's export (useData)
+}
+
+interface DataMember {
+  name: string;
+  expression: string; // jq, e.g. "$context.fetch.items"
+  value: string; // the field holding only it, e.g. "${ $context.fetch.items }"
+  shape: "object" | "list" | "text" | "number" | "boolean" | "unknown";
+  members: DataMember[]; // where the shape is known before the run
+}
+```
+
+- **Order.** The steps before the field's step, nearest first, then the workflow's input, the variables, the secrets and the times.
+- **The steps before** are the earlier steps of the step's list and of each list holding it; a fork's other branches run beside it and are not before it. A switch passes its input on (it outputs its transformed input), so it is no entry of its own.
+- **What flows in.** The step directly before reaches as `.` (dsl.md, "Data Flow", step 9) only when it is the step's only way in: it continues into it, no `then` names the step, and, in the step's definition, the step has no `input.from` (step 4). In `if` and `input.from` the raw input flows in; in `output` and `export` the step's own output does, and no step before reaches as `.`.
+- **Through the context.** Any other step before reaches only through `$context` (step 7): its entry reads `$context.<name>` and `needsExport` is true until the step writes the export that adds it, `export.as: ${ $context + { "<name>": . } }`. A step that writes another `export.as` is not offered, and neither is any step before a step that does, since that export replaces the context.
+- **Shapes.** An `output.schema` gives a step's output (step 6). Else a `set` gives its values, with its input's members beside them where its `output.as` keeps the input (research D13); a script passes on the text it prints (`text`), its exit code (`number`), or, parsed by `output.as: ${ fromjson }`, JSON whose fields are not known before the run (`unknown`, research D14); everything else is `unknown`. The workflow's input is `$workflow.input`, its raw input (dsl.md, "Workflow Descriptor"), shaped by `input.schema`.
+- **Scope.** The server writes `${ . }` into the field and reads what the interpreter resolves there: the workflow's input needs `$workflow`, the steps through the context `$context`, the secrets `$secrets`, and the variables are the binders in scope (a `for`'s `each` and `at`, a catch's error).
+- **Secrets** are offered only in fields where credentials go: under `authentication` or `headers`, or an address (`endpoint`, `uri`, `server`) (research D16). Each reads `$secrets.<name>`.
+- **Times** are UTC times jq computes from the run's clock: `now` (`now | todate`), `today` and `yesterday` (the start of the day, `now | strftime("%Y-%m-%dT00:00:00Z")`, a day earlier for `yesterday`).
+- **Warnings.** `inputNotKnownObject` on a set that keeps its input (`output.as: ${ $input + . }`) where that input is not known to be an object: jq adds an object only to an object or `null`.
+- **Broken text.** A text the grammar refuses answers from the steps of the last version that analysed.
+- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a field outside the step, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
+
+**Example**, at the first condition of `route` in a document whose `greet` sets a message and whose `guard` then runs a try:
+
+```json
+{
+  "textDocument": { "uri": "file:///flow.yaml", "version": 1 },
+  "step": "/do/route",
+  "field": "/do/2/route/switch/0/again/when"
+}
+```
+
+```json
+{
+  "version": 1,
+  "entries": [
+    {
+      "source": "step",
+      "name": "guard",
+      "step": "/do/guard",
+      "expression": ".",
+      "value": "${ . }",
+      "shape": "unknown",
+      "needsExport": false,
+      "members": []
+    },
+    {
+      "source": "step",
+      "name": "greet",
+      "step": "/do/greet",
+      "expression": "$context.greet",
+      "value": "${ $context.greet }",
+      "shape": "object",
+      "needsExport": true,
+      "members": [
+        {
+          "name": "message",
+          "expression": "$context.greet.message",
+          "value": "${ $context.greet.message }",
+          "shape": "text",
+          "members": []
+        }
+      ]
+    },
+    {
+      "source": "workflowInput",
+      "name": "input",
+      "step": null,
+      "expression": "$workflow.input",
+      "value": "${ $workflow.input }",
+      "shape": "unknown",
+      "needsExport": false,
+      "members": []
+    },
+    {
+      "source": "time",
+      "name": "now",
+      "step": null,
+      "expression": "now | todate",
+      "value": "${ now | todate }",
+      "shape": "text",
+      "needsExport": false,
+      "members": []
+    }
+  ],
+  "warnings": []
+}
+```
+
 ## Edit
 
 **Method:** `workflow/edit`
@@ -731,7 +844,13 @@ type EditAction =
   | { kind: "setField"; pointer: string; value: JsonValue }
   | { kind: "clearField"; pointer: string }
   | { kind: "setFailure"; step: string; failure: Failure }
-  | { kind: "setResult"; step: string; result: ChosenResult };
+  | { kind: "setResult"; step: string; result: ChosenResult }
+  | {
+      kind: "useData";
+      pointer: string; // the field
+      value: string; // what it holds, e.g. a workflow/dataAt entry's value
+      export: string | null; // the step id to export first, where needsExport
+    };
 
 type Failure =
   | { kind: "stop" }
@@ -767,9 +886,10 @@ interface EditResult {
   - the `catch` written: `continue` `{}`; `retry` `{ retry: { delay: { seconds }, backoff: { constant: {} } or { exponential: {} } when growing, limit: { attempt: { count: attempts } } } }`; `handle` `{ do: [] }`, an empty list the web fills with `insertStep` into `<id>/catch/do`; a `handle` on a try whose catch already writes `do` changes nothing;
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
 - **The step's result** (`setResult`) writes the members of the chosen result and removes the others: `output.as`, and the `output` that holds nothing else; a script's `run.return`, removed where it would return what the script prints. A result the step does not offer is refused.
+- **Data** (`useData`) sets the field to the value and, with `export`, writes that step's `export.as: ${ $context + { "<name>": . } }`, the export a `$context.<name>` entry of `workflow/dataAt` reads; a step that already writes it is left as it is, and a step that writes another export is refused.
 - **Errors:**
   - `ContentModified` (-32801), when the version is not the store's;
-  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a result the step does not offer, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
+  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
   - `InvalidParams` (-32602), when the params are of another shape.
 
 **Example:**

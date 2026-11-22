@@ -80,6 +80,13 @@ export interface SetResult {
   readonly result: ChosenResult;
 }
 
+export interface UseData {
+  readonly kind: "useData";
+  readonly pointer: string;
+  readonly value: string;
+  readonly export: string | null;
+}
+
 export type StepAction =
   | InsertStep
   | InsertStepOnBranch
@@ -88,7 +95,8 @@ export type StepAction =
   | RenameStep
   | DuplicateStep
   | SetFailure
-  | SetResult;
+  | SetResult
+  | UseData;
 
 export type FieldAction = SetField | ClearField;
 

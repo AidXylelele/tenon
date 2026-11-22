@@ -1,4 +1,5 @@
 export const methods = {
+  dataAt: "workflow/dataAt",
   document: "workflow/document",
   fromJson: "workflow/fromJson",
   newDocument: "workflow/newDocument",

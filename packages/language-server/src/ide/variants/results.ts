@@ -64,6 +64,12 @@ export function resultReadingOf(
   return { value, choices };
 }
 
+export function printedResultOf(written: WrittenResult): StepResult {
+  const chosen = printedResults.find((choice) => isWrittenAs(written, choice));
+
+  return chosen ?? "written";
+}
+
 export function resultMembersOf(result: ChosenResult): ResultMembers {
   return resultMembers[result];
 }

@@ -9,6 +9,7 @@ export type {
 } from "./interfaces.js";
 export {
   directiveAt,
+  directivesOf,
   failureOf,
   listNamesOf,
   listWithId,
