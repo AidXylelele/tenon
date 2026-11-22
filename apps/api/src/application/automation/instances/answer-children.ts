@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
@@ -12,9 +12,9 @@ export class AnswerChildren {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: RunCommand): Promise<AgendaResult> {
     const parent = await this.instances.find(command.instanceId);
 
@@ -43,7 +43,7 @@ export class AnswerChildren {
       parent.advance(turn, secrets, now);
     }
 
-    await this.instances.save(parent);
+    await this.unitOfWork.run(() => this.instances.save(parent));
     return { ok: true, value: parent.agenda };
   }
 }
