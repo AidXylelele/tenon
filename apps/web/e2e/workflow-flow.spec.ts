@@ -31,6 +31,7 @@ test.describe("the flow view playground", () => {
       name: "Add a step after Post the items",
     });
     const zoomIn = page.getByRole("button", { name: "Zoom in" });
+    await expect(post).toBeVisible();
 
     await page.keyboard.press("Tab");
     await expect(post).toBeFocused();
