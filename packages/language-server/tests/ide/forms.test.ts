@@ -642,12 +642,12 @@ test.each<readonly [string, JsonObject, unknown]>([
     { value: "written", choices: printedChoices },
   ],
   [
-    "a set that adds its values to its input passes on both (research D13)",
+    "a set that adds its values to its input passes on both",
     { set: { value: "" }, output: { as: "${ $input + . }" } },
     { value: "inputAndValues", choices: setChoices },
   ],
   [
-    "a set with no output transformation passes on only its values (dsl.md, Data Flow 5)",
+    "a set with no output transformation passes on only its values",
     { set: { value: "" } },
     { value: "valuesOnly", choices: setChoices },
   ],

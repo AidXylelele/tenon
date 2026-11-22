@@ -962,7 +962,7 @@ const branchSteps: readonly (readonly [
   ],
 ];
 
-type Route = readonly string[];
+type Way = readonly [string | null, Transition["kind"], string | null];
 
 function editedOf(text: string, action: EditAction): string {
   const editing = check(text, action);
@@ -974,73 +974,21 @@ function editedOf(text: string, action: EditAction): string {
   return appliedOf(text, editing.changes);
 }
 
-function routesOf(
-  text: string,
-  switchId: string,
-): Readonly<Record<string, Route>> {
+function stepsOf(list: StepList): readonly Step[] {
+  return list.steps.flatMap((step) => {
+    const nested = step.lists.flatMap(stepsOf);
+    return [step, ...nested];
+  });
+}
+
+function waysOf(text: string, id: string): readonly Way[] {
   const snapshot = snapshotOf(text);
   const { workflow } = structureReadingOf(snapshot);
-  const list = listHoldingOf(workflow.steps, switchId);
-  const steps = list?.steps ?? [];
-  const isRoot = list === workflow.steps;
-  const route = steps.find((step) => step.id === switchId);
-  const ways = route?.flow ?? [];
-  const cases = ways.filter((way) => way.on === "case");
-  const hasDefault = cases.some((way) => way.when === null);
-  const reachable = hasDefault ? cases : ways;
-  const routes = reachable.map((way) => {
-    const name = way.case ?? "no case matches";
-    return [name, pathOf(steps, way, isRoot)] as const;
-  });
+  const steps = stepsOf(workflow.steps);
+  const step = steps.find((each) => each.id === id);
+  const flow = step?.flow ?? [];
 
-  return Object.fromEntries(routes);
-}
-
-function listHoldingOf(list: StepList, id: string): StepList | null {
-  const holds = list.steps.some((step) => step.id === id);
-
-  if (holds) {
-    return list;
-  }
-
-  const nested = list.steps.flatMap((step) => step.lists);
-  const holders = nested.map((inner) => listHoldingOf(inner, id));
-  return holders.find((holder) => holder !== null) ?? null;
-}
-
-function pathOf(
-  steps: readonly Step[],
-  way: Transition,
-  isRoot: boolean,
-): Route {
-  const leaving = isRoot ? "the run ends" : "the block completes";
-
-  switch (way.kind) {
-    case "end":
-      return ["the run ends"];
-    case "exit":
-      return [leaving];
-    case "next":
-    case "jump":
-      return pathFromOf(steps, way.to, isRoot);
-  }
-}
-
-function pathFromOf(
-  steps: readonly Step[],
-  id: string | null,
-  isRoot: boolean,
-): Route {
-  const leaving = isRoot ? "the run ends" : "the block completes";
-  const step = steps.find((candidate) => candidate.id === id);
-  const done = step?.flow.find((each) => each.on === "done");
-
-  if (step === undefined || done === undefined) {
-    return [leaving];
-  }
-
-  const rest = pathOf(steps, done, isRoot);
-  return [step.name, ...rest];
+  return flow.map((way) => [way.case, way.kind, way.to] as const);
 }
 
 test.each(branchSteps)("%s", (_, text, switchId, branch, expected) => {
@@ -1051,18 +999,125 @@ test.each(branchSteps)("%s", (_, text, switchId, branch, expected) => {
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
-test.each(branchSteps)(
-  "%s: the branch passes the new step and every other way out of the switch keeps its route",
-  (_, text, switchId, branch) => {
+test.each<
+  readonly [
+    string,
+    string,
+    string,
+    string,
+    string,
+    readonly Way[],
+    readonly Way[],
+  ]
+>([
+  [
+    "a branch that continued",
+    routeFlow,
+    "/do/route",
+    "big",
+    "/do/pause",
+    [
+      ["big", "next", "/do/pause"],
+      ["small", "jump", "/do/report"],
+      ["stop", "end", null],
+      ["default", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "next", "/do/total"]],
+  ],
+  [
+    "a branch that named a step",
+    routeFlow,
+    "/do/route",
+    "small",
+    "/do/pause",
+    [
+      ["big", "jump", "/do/total"],
+      ["small", "jump", "/do/pause"],
+      ["stop", "end", null],
+      ["default", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "jump", "/do/report"]],
+  ],
+  [
+    "a branch that ended the run",
+    routeFlow,
+    "/do/route",
+    "stop",
+    "/do/pause",
+    [
+      ["big", "jump", "/do/total"],
+      ["small", "jump", "/do/report"],
+      ["stop", "jump", "/do/pause"],
+      ["default", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "end", null]],
+  ],
+  [
+    "a branch that left its block",
+    nestedRouteFlow,
+    "/do/each/do/route",
+    "skip",
+    "/do/each/do/pause",
+    [
+      ["skip", "jump", "/do/each/do/pause"],
+      ["default", "exit", null],
+      [null, "next", "/do/each/do/pause"],
+    ],
+    [[null, "exit", null]],
+  ],
+  [
+    "a branch of the workflow's last step",
+    lastRouteFlow,
+    "/do/route",
+    "some",
+    "/do/pause",
+    [
+      ["some", "next", "/do/pause"],
+      ["none", "end", null],
+      [null, "end", null],
+    ],
+    [[null, "next", null]],
+  ],
+  [
+    "a branch of a switch with no default",
+    undefaultedRouteFlow,
+    "/do/route",
+    "big",
+    "/do/pause",
+    [
+      ["big", "jump", "/do/pause"],
+      [null, "jump", "/do/total"],
+    ],
+    [[null, "end", null]],
+  ],
+  [
+    "a branch of a switch written inline",
+    inlineRouteFlow,
+    "/do/route",
+    "big",
+    "/do/pause",
+    [
+      ["big", "next", "/do/pause"],
+      ["other", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "next", "/do/total"]],
+  ],
+])(
+  "the structure draws the new step on %s and every other way out where it led",
+  (_, text, switchId, branch, pauseId, switchWays, stepWays) => {
     const action = branchActionOf(switchId, branch, "pause");
-    const before = routesOf(text, switchId);
 
     const edited = editedOf(text, action);
 
-    const after = routesOf(edited, switchId);
-    const chosen = before[branch] ?? [];
-    const expected = { ...before, [branch]: ["pause", ...chosen] };
-    expect(after).toEqual(expected);
+    const ways = waysOf(edited, switchId);
+    const paused = waysOf(edited, pauseId);
+
+    expect(ways).toEqual(switchWays);
+    expect(paused).toEqual(stepWays);
   },
 );
 
@@ -1368,7 +1423,7 @@ test("data used where it flows in is written into the field alone", () => {
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
-test("an earlier step's output used through the context exports it under its name (dsl.md, Data Flow, step 7)", () => {
+test("an earlier step's output used through the context exports it under its name", () => {
   const action = useOf("${ $context.fetch }", "/do/fetch");
 
   const outcome = outcomeOf(pickFlow, action);

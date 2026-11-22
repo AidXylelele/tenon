@@ -59,7 +59,7 @@ do:
 
 const body = "/do/2/report/with/body";
 
-test("the step before reaches as the data the step receives, with the values its set writes (dsl.md, Data Flow, steps 5 and 9)", () => {
+test("the step before reaches as the data the step receives, with the values its set writes", () => {
   const total = entryOf(reportFlow, "/do/report", body, "total");
 
   expect(total).toEqual({
@@ -89,7 +89,7 @@ test("the step before reaches as the data the step receives, with the values its
   });
 });
 
-test("a set replaces what flows on, so a step before it reaches only through the context, which picking it exports to (Data Flow, steps 7 and 9; core/desugar/set.ts)", () => {
+test("a set replaces what flows on, so a step before it reaches only through the context, which picking it exports to", () => {
   const fetch = entryOf(reportFlow, "/do/report", body, "fetch");
 
   expect(fetch).toEqual({
@@ -118,7 +118,7 @@ test("the steps before come nearest first, after them the workflow's input and t
   ]);
 });
 
-test("the workflow's raw input is offered with the members its schema describes (dsl.md, Workflow Descriptor: input)", () => {
+test("the workflow's raw input is offered with the members its schema describes", () => {
   const input = entryOf(reportFlow, "/do/report", body, "input");
 
   expect(input).toEqual({
@@ -160,7 +160,7 @@ test.each([
   ],
   ["a body", body, []],
 ])(
-  "secrets are offered only where credentials go: in %s (research D16)",
+  "secrets are offered only where credentials go: in %s",
   (_, field, expected) => {
     const entries = entriesOf(reportFlow, "/do/report", field);
 
@@ -185,7 +185,7 @@ const mergeFlow = `${inlineHeader}do:
         c: true
 `;
 
-test("a set that keeps its input passes the input's members on beside its values (research D13)", () => {
+test("a set that keeps its input passes the input's members on beside its values", () => {
   const second = entryOf(mergeFlow, "/do/third", "/do/2/third/set/c", "second");
 
   const members = second?.members.map((member) => [member.name, member.shape]);
@@ -213,7 +213,7 @@ const scriptFlow = `${inlineHeader}do:
         x: 1
 `;
 
-test("a script's printed result reaches as text, its fields unknown (machine/effects/decoders/process.ts:55-56)", () => {
+test("a script's printed result reaches as text, its fields unknown", () => {
   const entries = entriesOf(
     scriptFlow,
     "/do/parsed",
@@ -228,7 +228,7 @@ test("a script's printed result reaches as text, its fields unknown (machine/eff
   });
 });
 
-test("a script whose output parses what it prints passes on data whose fields are not known before it runs (research D14)", () => {
+test("a script whose output parses what it prints passes on data whose fields are not known before it runs", () => {
   const parsed = entryOf(scriptFlow, "/do/next", "/do/2/next/set/x", "parsed");
 
   expect(parsed).toMatchObject({
@@ -253,7 +253,7 @@ const schemaFlow = `${inlineHeader}do:
         x: 1
 `;
 
-test("an output schema gives the members of a step's output (Data Flow, step 6)", () => {
+test("an output schema gives the members of a step's output", () => {
   const fetch = entryOf(schemaFlow, "/do/post", "/do/1/post/set/x", "fetch");
 
   expect(fetch?.members).toEqual([
@@ -274,15 +274,11 @@ const transformedFlow = schemaFlow.replace(
 
 test.each([
   [
-    "its definition receives what its input.from makes (Data Flow, step 4)",
+    "its definition receives what its input.from makes",
     "/do/1/post/set/x",
     "$context.fetch",
   ],
-  [
-    "its input.from receives the raw input (Data Flow, step 4)",
-    "/do/1/post/input/from",
-    ".",
-  ],
+  ["its input.from receives the raw input", "/do/1/post/input/from", "."],
 ])("a step with its own input: %s", (_, field, expression) => {
   const fetch = entryOf(transformedFlow, "/do/post", field, "fetch");
 
@@ -302,7 +298,7 @@ const jumpedFlow = `${inlineHeader}do:
         c: 3
 `;
 
-test("a step entered by a jump receives data from more than one step, so the step before reaches through the context (dsl.md, Task Flow)", () => {
+test("a step entered by a jump receives data from more than one step, so the step before reaches through the context", () => {
   const middle = entryOf(jumpedFlow, "/do/last", "/do/2/last/set/c", "middle");
 
   expect(middle).toMatchObject({
@@ -327,7 +323,7 @@ const switchedFlow = `${inlineHeader}do:
         x: 1
 `;
 
-test("a step after a switch receives the switch's input, so the step before the switch reaches as its data (switch scenario: a switch outputs its transformed input)", () => {
+test("a step after a switch receives the switch's input, so the step before the switch reaches as its data", () => {
   const entries = entriesOf(switchedFlow, "/do/post", "/do/2/post/set/x");
 
   const steps = entries
@@ -355,7 +351,7 @@ const exportedFlow = `${inlineHeader}do:
         d: 4
 `;
 
-test("an earlier step's own export replaces the context, so it and the steps before it are not offered (Data Flow, step 7)", () => {
+test("an earlier step's own export replaces the context, so it and the steps before it are not offered", () => {
   const entries = entriesOf(exportedFlow, "/do/last", "/do/3/last/set/d");
 
   const steps = entries
@@ -389,7 +385,7 @@ const loopFlow = `${inlineHeader}do:
               x: 1
 `;
 
-test("the variables a loop binds are offered at the steps inside it (dsl-reference, For: each and at)", () => {
+test("the variables a loop binds are offered at the steps inside it", () => {
   const entries = entriesOf(
     loopFlow,
     "/do/each/do/total",
@@ -410,7 +406,7 @@ test.each([
   ["today", "2025-11-23T00:00:00Z"],
   ["yesterday", "2025-11-22T00:00:00Z"],
 ])(
-  "%s is a UTC time jq computes from the run's clock (dsl.md, Runtime Expressions)",
+  "%s is a UTC time jq computes from the run's clock",
   async (name, expected) => {
     const time = entryOf(reportFlow, "/do/report", body, name);
     const expression = time?.expression ?? "";
@@ -433,7 +429,7 @@ const firstMerge = `${inlineHeader}do:
 
 test.each([
   [
-    "warned where its input is not known to be an object, since jq adds an object only to an object or null (research D13)",
+    "warned where its input is not known to be an object, since jq adds an object only to an object or null",
     firstMerge,
     [{ kind: "inputNotKnownObject", step: "/do/keep" }],
   ],

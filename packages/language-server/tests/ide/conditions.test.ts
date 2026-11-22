@@ -257,7 +257,7 @@ test.each<readonly [string, ConditionRow, JsonObject, boolean]>([
     true,
   ],
   [
-    "a number written as text compares as a number (jq orders every text after every number)",
+    "a number written as text compares as a number",
     {
       left: ".total",
       comparison: "isGreaterThan",

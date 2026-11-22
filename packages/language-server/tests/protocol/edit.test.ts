@@ -136,43 +136,6 @@ test("a retry with no attempts is invalid", async () => {
   await expect(refused).rejects.toMatchObject({ code: -32602 });
 });
 
-test("a step on a branch answers the edits that place it", async () => {
-  useFakeClock();
-  const session = await sessionWith(guardedFlow);
-  const params = {
-    textDocument: { uri, version: 1 },
-    action: {
-      kind: "insertStepOnBranch",
-      switch: "/do/route",
-      case: "done",
-      step: "wait",
-      name: null,
-    },
-  } as const;
-
-  const answered = await session.client.sendRequest(editRequest, params);
-
-  expect(answered).toEqual({
-    edits: [
-      {
-        range: {
-          start: { line: 27, character: 17 },
-          end: { line: 27, character: 21 },
-        },
-        newText: " wait",
-      },
-      {
-        range: {
-          start: { line: 28, character: 0 },
-          end: { line: 28, character: 0 },
-        },
-        newText: "  - wait:\n      wait: PT30M\n      then: end\n",
-      },
-    ],
-    ids: [],
-  });
-});
-
 test("a step on a branch that names no case is invalid", async () => {
   useFakeClock();
   const session = await sessionWith(guardedFlow);
