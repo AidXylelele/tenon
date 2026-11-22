@@ -1,5 +1,5 @@
 import type { ErrorObject } from "ajv/dist/2020.js";
-import { tokensOf } from "../json/index.js";
+import { lastTokenOf } from "../json/index.js";
 
 const typeWords: Readonly<Record<string, string>> = {
   object: "an object",
@@ -53,10 +53,9 @@ export function sentenceOf(error: ErrorObject, subject: string): string {
 }
 
 export function pointerNameOf(pointer: string): string {
-  const tokens = tokensOf(pointer);
-  const last = tokens.at(-1);
+  const last = lastTokenOf(pointer);
 
-  if (last === undefined) {
+  if (last === null) {
     return "the value";
   }
 

@@ -8,15 +8,17 @@ import type { JsonObject, JsonValue } from "../../api/index.js";
 import { InterpreterError } from "../faults/index.js";
 import {
   childPointerOf,
-  isJsonArray,
   isJsonObject,
   pointedValueOf,
   rootPointer,
 } from "../json/index.js";
+import { choiceOf, distinctChoicesOf, linkedViolationsOf } from "./choices.js";
 import { schemaLocationsOf } from "./schema-locations.js";
 import { sentenceOf } from "./sentences.js";
 import type {
-  SchemaBranch,
+  Choice,
+  Expansion,
+  Report,
   SchemaCompilation,
   SchemaCompiler,
   SchemaLocation,
@@ -25,15 +27,14 @@ import type {
   Validator,
 } from "./types.js";
 
-const options = {
+const plainOptions = {
   strict: false,
   allErrors: true,
   logger: false,
   addUsedSchema: false,
-  verbose: true,
 } as const;
 
-const choices = new Set(["oneOf", "anyOf"]);
+const tracedOptions = { ...plainOptions, verbose: true } as const;
 
 const notASchema = "A schema must be an object or a boolean.";
 
@@ -48,6 +49,8 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
   readonly #locations: ReadonlyMap<object, SchemaLocation>;
 
   constructor(documents: readonly JsonObject[]) {
+    const isRegistering = documents.length > 0;
+    const options = isRegistering ? tracedOptions : plainOptions;
     const ajv = new Ajv2020(options);
     formats.default(ajv);
 
@@ -100,25 +103,31 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
   }
 
   #validatorOfFunction(validate: ValidateFunction): Validator {
-    return (value) => this.#violationsOf(validate, value, rootPointer);
+    return (value) => {
+      const reports = this.#reportsOf(validate, value, rootPointer);
+      const choices = distinctChoicesOf(reports);
+      const entries = choices.map((choice) => {
+        const expanded = this.#expansionsOf(choice);
+        return [choice.key, expanded] as const;
+      });
+      const expansions = new Map(entries);
+
+      return linkedViolationsOf(reports, expansions);
+    };
   }
 
-  #violationsOf(
+  #reportsOf(
     validate: ValidateFunction,
     value: JsonValue,
     base: string,
-  ): readonly SchemaViolation[] {
+  ): readonly Report[] {
     validate(value);
     const errors = [...(validate.errors ?? [])];
 
-    return errors.map((error) => this.#violationOf(error, value, base));
+    return errors.map((error) => this.#reportOf(error, value, base));
   }
 
-  #violationOf(
-    error: ErrorObject,
-    validated: JsonValue,
-    base: string,
-  ): SchemaViolation {
+  #reportOf(error: ErrorObject, validated: JsonValue, base: string): Report {
     const instance = `${base}${error.instancePath}`;
     const params: Record<string, unknown> = error.params;
     const property = params.unevaluatedProperty ?? params.additionalProperty;
@@ -131,9 +140,7 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
     const parent = this.#locationOf(error);
     const location = parent?.uri ?? null;
     const ambiguous = Array.isArray(params.passingSchemas);
-    const branches = this.#branchesOf(error, value, instance);
-
-    return {
+    const violation: SchemaViolation = {
       pointer,
       instance,
       keyword,
@@ -143,8 +150,11 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
       pattern,
       location,
       ambiguous,
-      branches,
+      branches: [],
     };
+    const choice = choiceOf(violation, parent);
+
+    return { violation, choice };
   }
 
   #locationOf(error: ErrorObject): SchemaLocation | null {
@@ -157,32 +167,12 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
     return this.#locations.get(parent) ?? null;
   }
 
-  #branchesOf(
-    error: ErrorObject,
-    value: JsonValue,
-    instance: string,
-  ): readonly SchemaBranch[] {
-    const isChoice = choices.has(error.keyword);
-
-    if (!isChoice) {
-      return [];
-    }
-
-    const parent = this.#locationOf(error);
-
-    if (parent === null) {
-      return [];
-    }
-
-    const alternatives = parent.node[error.keyword] ?? null;
-    const listed = isJsonArray(alternatives) ? alternatives : [];
-    const choice = `${parent.uri}/${error.keyword}`;
-
-    return listed.map((schema, index) => {
-      const reference = `${choice}/${String(index)}`;
+  #expansionsOf(choice: Choice): readonly Expansion[] {
+    return choice.alternatives.map((schema, index) => {
+      const reference = `${choice.reference}/${String(index)}`;
       const validate = this.#validateFunctionOf(reference);
-      const violations = this.#violationsOf(validate, value, instance);
-      return { schema, violations };
+      const reports = this.#reportsOf(validate, choice.value, choice.instance);
+      return { schema, reports };
     });
   }
 

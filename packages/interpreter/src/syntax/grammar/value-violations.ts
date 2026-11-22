@@ -1,11 +1,11 @@
 import type { JsonValue } from "../../api/index.js";
-import { isJsonObject, tokensOf } from "../../runtime/index.js";
+import { isJsonObject, lastTokenOf } from "../../runtime/index.js";
 import { declaredNamesOf } from "./schemas-at.js";
 import type { Branch, SchemaBreach, Violation } from "./types.js";
 
 interface Resolution {
   readonly choice: SchemaBreach;
-  readonly holder: Branch | null;
+  readonly holder: ReadonlySet<string> | null;
 }
 
 const valueKeywords = new Set([
@@ -22,9 +22,13 @@ const unknownMember = "unevaluatedProperties";
 
 export function isStructureIntact(violations: readonly Violation[]): boolean {
   const choices = violations.filter(isChoice);
-  const nested = choices.flatMap(branchViolationsOf);
-  const nestedKeys = new Set(nested.map(keyOf));
-  const outermost = choices.filter((choice) => isOutermost(choice, nestedKeys));
+  const isPlain = choices.length === 0;
+
+  if (isPlain) {
+    return violations.every(isOfValueOrSummary);
+  }
+
+  const outermost = outermostOf(choices);
   const isAmbiguous = outermost.some((choice) => choice.ambiguous);
 
   if (isAmbiguous) {
@@ -38,8 +42,26 @@ export function isStructureIntact(violations: readonly Violation[]): boolean {
     return false;
   }
 
+  return isRestOfValues(violations, resolutions);
+}
+
+function outermostOf(
+  choices: readonly SchemaBreach[],
+): readonly SchemaBreach[] {
+  const nested = choices.flatMap(nestedChoicesOf);
+  const nestedKeys = new Set(nested.map(keyOf));
+
+  return choices.filter((choice) => isOutermost(choice, nestedKeys));
+}
+
+function isRestOfValues(
+  violations: readonly Violation[],
+  resolutions: readonly Resolution[],
+): boolean {
+  const unknown = violations.filter(isUnknownMember);
+  const unknownAt = Map.groupBy(unknown, ({ instance }) => instance);
   const explained = resolutions.flatMap((resolution) =>
-    explainedOf(resolution, violations),
+    explainedOf(resolution, unknownAt),
   );
   const remaining = remainderOf(violations, explained);
 
@@ -58,11 +80,25 @@ function resolutionOf(choice: SchemaBreach): Resolution {
   const formed = choice.branches.filter((branch) =>
     isStructureIntact(branch.violations),
   );
+  const declarations = formed.map(declaredOf);
   const written = writtenMembersOf(choice.value);
-  const offered = written.filter((member) => isOfferedBy(member, formed));
-  const holder = formed.find((branch) => declaresAll(branch, offered)) ?? null;
+  const offered = written.filter((member) => isOfferedBy(member, declarations));
+  const holder =
+    declarations.find((declared) => declaresAll(declared, offered)) ?? null;
 
   return { choice, holder };
+}
+
+function isOfferedBy(
+  member: string,
+  declarations: readonly ReadonlySet<string>[],
+): boolean {
+  return declarations.some((declared) => declared.has(member));
+}
+
+function declaredOf(branch: Branch): ReadonlySet<string> {
+  const names = declaredNamesOf(branch.schema);
+  return new Set(names);
 }
 
 function writtenMembersOf(value: JsonValue): readonly string[] {
@@ -75,60 +111,46 @@ function writtenMembersOf(value: JsonValue): readonly string[] {
   return Object.keys(value);
 }
 
-function isOfferedBy(member: string, formed: readonly Branch[]): boolean {
-  return formed.some((branch) => isDeclaredBy(member, branch));
-}
-
-function declaresAll(branch: Branch, members: readonly string[]): boolean {
-  return members.every((member) => isDeclaredBy(member, branch));
-}
-
-function isDeclaredBy(member: string | null, branch: Branch): boolean {
-  if (member === null) {
-    return false;
-  }
-
-  const declared = declaredNamesOf(branch.schema);
-  return declared.includes(member);
+function declaresAll(
+  declared: ReadonlySet<string>,
+  members: readonly string[],
+): boolean {
+  return members.every((member) => declared.has(member));
 }
 
 function explainedOf(
   resolution: Resolution,
-  violations: readonly Violation[],
+  unknownAt: ReadonlyMap<string, readonly Violation[]>,
 ): readonly Violation[] {
-  const { choice } = resolution;
+  const { choice, holder } = resolution;
   const inBranches = branchViolationsOf(choice);
-  const dropped = violations.filter((violation) =>
-    isDroppedMember(violation, resolution),
+  const atChoice = unknownAt.get(choice.instance) ?? [];
+  const dropped = atChoice.filter((violation) =>
+    isDroppedMember(violation, holder),
   );
 
   return [choice, ...inBranches, ...dropped];
 }
 
+function isUnknownMember(violation: Violation): boolean {
+  return violation.keyword === unknownMember;
+}
+
 function isDroppedMember(
   violation: Violation,
-  resolution: Resolution,
+  holder: ReadonlySet<string> | null,
 ): boolean {
-  const { choice, holder } = resolution;
-  const isUnknown = violation.keyword === unknownMember;
-  const isAtChoice = violation.instance === choice.instance;
-  const isOfChoice = isUnknown && isAtChoice;
-
-  if (!isOfChoice) {
-    return false;
-  }
+  const member = lastTokenOf(violation.pointer);
 
   if (holder === null) {
     return false;
   }
 
-  const member = memberOf(violation);
-  return isDeclaredBy(member, holder);
-}
+  if (member === null) {
+    return false;
+  }
 
-function memberOf(violation: Violation): string | null {
-  const tokens = tokensOf(violation.pointer);
-  return tokens.at(-1) ?? null;
+  return holder.has(member);
 }
 
 function remainderOf(
@@ -143,6 +165,11 @@ function remainderOf(
     const excused = counts.get(key)?.length ?? 0;
     return group.slice(excused);
   });
+}
+
+function nestedChoicesOf(choice: SchemaBreach): readonly SchemaBreach[] {
+  const inBranches = branchViolationsOf(choice);
+  return inBranches.filter(isChoice);
 }
 
 function branchViolationsOf(choice: SchemaBreach): readonly SchemaBreach[] {
@@ -167,15 +194,13 @@ function isOfValueOrSummary(violation: Violation): boolean {
 
 function keyOf(violation: Violation): string {
   switch (violation.kind) {
-    case "schema":
-      return [
-        violation.keyword,
-        violation.instance,
-        violation.pointer,
-        violation.location,
-        violation.problem,
-      ].join("\n");
-    case "rule":
-      return [violation.keyword, violation.pointer, violation.rule].join("\n");
+    case "schema": {
+      const { keyword, instance, pointer, location } = violation;
+      return `${keyword}\n${instance}\n${pointer}\n${location ?? ""}`;
+    }
+    case "rule": {
+      const { keyword, pointer, rule } = violation;
+      return `${keyword}\n${pointer}\n${rule}`;
+    }
   }
 }

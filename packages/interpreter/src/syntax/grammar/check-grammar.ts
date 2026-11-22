@@ -15,7 +15,7 @@ import { dslVersionFindingsOf } from "./dsl-version.js";
 import { referenceViolationsOf } from "./reference-violations.js";
 import { schemasAlong } from "./schemas-at.js";
 import { standardSchemas } from "./standard-schemas.js";
-import { wordedViolationOf } from "./worded-violations.js";
+import { wordedViolationsOf } from "./worded-violations.js";
 import { definitionsUri, TaskDefinitions } from "./task-definitions.js";
 import type { SchemaAt, SchemaPlace, Verdict, Violation } from "./types.js";
 import { nestedListsOf } from "./task-lists.js";
@@ -97,9 +97,7 @@ export class GrammarCheck {
 
   #findingsOfViolations(violations: readonly Violation[]): readonly Finding[] {
     const chosen = deepestViolationsOf(violations);
-    const worded = chosen.map((violation) =>
-      wordedViolationOf(violation, violations),
-    );
+    const worded = wordedViolationsOf(chosen, violations);
 
     return worded.map(violationFindingOf);
   }

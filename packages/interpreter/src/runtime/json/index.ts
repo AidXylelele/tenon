@@ -4,6 +4,7 @@ export type { JsonOf } from "./json-of.js";
 export {
   childPointerOf,
   isPointerWithin,
+  lastTokenOf,
   pointedValueOf,
   relativePointerOf,
   rootPointer,

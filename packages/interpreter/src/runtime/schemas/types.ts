@@ -23,6 +23,24 @@ export interface SchemaLocation {
   readonly node: JsonObject;
 }
 
+export interface Choice {
+  readonly key: string;
+  readonly reference: string;
+  readonly alternatives: readonly JsonValue[];
+  readonly value: JsonValue;
+  readonly instance: string;
+}
+
+export interface Report {
+  readonly violation: SchemaViolation;
+  readonly choice: Choice | null;
+}
+
+export interface Expansion {
+  readonly schema: JsonValue;
+  readonly reports: readonly Report[];
+}
+
 export type Validator = (value: JsonValue) => readonly SchemaViolation[];
 
 export type SchemaCompilation =
