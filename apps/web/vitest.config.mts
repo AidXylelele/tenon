@@ -51,6 +51,7 @@ const libFloors: [string, Floor][] = [
 
 const featureFloors: [string, Floor][] = [
   ["src/features/step-form/**", FEATURE_FLOOR],
+  ["src/features/data-picker/**", FEATURE_FLOOR],
 ];
 
 const floors = operationFloors.concat(libFloors, featureFloors);
