@@ -58,6 +58,12 @@ const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
     reason:
       "Radix's focus guards are hidden spans that send focus back into the open modal, which traps it.",
   },
+  {
+    rule: "target-size",
+    stories: ["features-workflow-flow--wide-fork-at-1024"],
+    reason:
+      "SC 2.5.8 spacing exception at fitted zoom; Zoom in restores full size.",
+  },
 ];
 
 const indexFile = path.join(__dirname, "../storybook-static/index.json");

@@ -28,6 +28,7 @@ const operationFloors = readdirSync(operations, { withFileTypes: true })
   ]);
 
 const libFloors: [string, Floor][] = [
+  ["src/features/workflow-flow/**", LIB_FLOOR],
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
   ["src/libs/flow/**", LIB_FLOOR],
