@@ -118,7 +118,12 @@ const WORDS: ReadonlyMap<string, WordsEntry> = new Map([
   ["script|run/return", { control: "hidden" }],
   [
     "shell|run/shell/command",
-    { title: "Command", mono: true, placeholder: "date -u" },
+    {
+      title: "Command",
+      mono: true,
+      placeholder: "date -u",
+      fill: "Write the command the step runs.",
+    },
   ],
   ["container|run/container/image", { title: "Image", mono: true }],
   ["container|run/container/command", { title: "Command", mono: true }],
@@ -142,7 +147,10 @@ const WORDS: ReadonlyMap<string, WordsEntry> = new Map([
     },
   ],
   ["for|for/each", { title: "Call each item", mono: true }],
-  ["raise|raise/error/title", { title: "Error title" }],
+  [
+    "raise|raise/error/title",
+    { title: "Error title", fill: "Give the error a title." },
+  ],
   ["raise|raise/error/type", { title: "Kind of error", mono: true }],
   ["set|set", { title: "Values", control: "values" }],
   [

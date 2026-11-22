@@ -600,3 +600,27 @@ export function formWith(
   );
   return { ...form, fields };
 }
+
+export function formChanged(
+  form: StepFormResult,
+  pointer: string,
+  change: Partial<FormField>,
+): StepFormResult {
+  const fields = form.fields.map((field) =>
+    fieldChanged(field, pointer, change),
+  );
+  return { ...form, fields };
+}
+
+function fieldChanged(
+  field: FormField,
+  pointer: string,
+  change: Partial<FormField>,
+): FormField {
+  if (field.pointer === pointer) return { ...field, ...change };
+
+  const fields = field.fields.map((inner) =>
+    fieldChanged(inner, pointer, change),
+  );
+  return { ...field, fields };
+}

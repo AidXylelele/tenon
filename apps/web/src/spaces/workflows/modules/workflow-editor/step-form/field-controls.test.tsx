@@ -10,6 +10,7 @@ import {
   FETCH_FORM,
   FETCH_STEP,
   fieldOf,
+  formChanged,
   formWith,
   protectionOf,
   REPORT_FORM,
@@ -129,6 +130,45 @@ function open(title: string) {
     fireEvent.click(header);
   });
 }
+
+describe("a field the client marks to fill", () => {
+  it("an_empty_error_title_says_fill_in_and_after_leaving_how_to_fill_it", () => {
+    const untitled: StepFormResult = {
+      ...RAISE_FORM,
+      fields: [
+        essential(0, {
+          key: "title",
+          required: true,
+          written: true,
+          value: "",
+        }),
+      ],
+    };
+    shown({ form: untitled });
+    const title = screen.getByRole("textbox", { name: "Error title" });
+    const before = screen.getByText("Fill in");
+    expect(before).toBeInTheDocument();
+
+    leave(title, "");
+
+    const error = screen.getByRole("alert");
+    const fill = screen.queryByText("Fill in");
+    expect(error).toHaveTextContent("Give the error a title.");
+    expect(fill).toBeNull();
+  });
+
+  it("empty_script_code_says_fill_in_and_is_not_optional", () => {
+    const pointer = `${SCRIPT_STEP.pointer}/run/script/code`;
+    const blank = formChanged(SCRIPT_FORM, pointer, { value: "" });
+    shown({ step: SCRIPT_STEP, form: blank });
+
+    const field = screen.getByRole("textbox", { name: "Code" });
+    const description = "Print the result as JSON. Fill in";
+
+    expect(field).toHaveAccessibleDescription(description);
+    expect(field).toHaveAccessibleName("Code");
+  });
+});
 
 describe("a field's value by its kind", () => {
   it("a_text_offers_the_language_server's_suggestions", () => {

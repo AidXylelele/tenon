@@ -13,6 +13,8 @@ import {
 import type { FieldWords } from "../form-fields";
 import { useFormSettings } from "./form-settings";
 
+const NEEDS_VALUE = "This field needs a value.";
+
 export interface ControlWiring {
   readonly id: string;
   readonly labelId: string;
@@ -62,9 +64,12 @@ export function useFieldProblems(
   const [refusal, setRefusal] = useState<string | null>(null);
   const problems = field.diagnostics.map(diagnosticText);
   const isEmpty = isEmptyValue(field.value);
+  const isToFill = field.required || words.fill !== null;
+  const needsValue = isEmpty && isToFill;
+  const missing = needsValue || (isEmpty && problems.length > 0);
   const waiting = !left && !settings.revealProblems;
-  const toFill = problems.length > 0 && isEmpty && waiting;
-  const told = isEmpty && words.fill !== null ? [words.fill] : problems;
+  const toFill = missing && waiting;
+  const told = toldOf(needsValue, words, problems);
   const reported = toFill ? [] : told;
   const errors = refusal === null ? reported : [refusal].concat(reported);
   const invalid = errors.length > 0;
@@ -93,6 +98,20 @@ export function useFieldProblems(
     leave,
     refuse: setRefusal,
   };
+}
+
+function toldOf(
+  needsValue: boolean,
+  words: FieldWords,
+  problems: readonly string[],
+): readonly string[] {
+  if (needsValue && words.fill !== null) return [words.fill];
+
+  if (problems.length > 0) return problems;
+
+  if (needsValue) return [NEEDS_VALUE];
+
+  return [];
 }
 
 export function FieldShell({
@@ -162,11 +181,12 @@ export function FieldTitle({
 }) {
   const settings = useFormSettings();
   const term = path.replaceAll("/", ".");
+  const isOptional = !field.required && words.fill === null;
 
   return (
     <>
       {words.title}
-      {!field.required && (
+      {isOptional && (
         <span className="font-normal text-muted-foreground">optional</span>
       )}
       {settings.languageTerms && (
@@ -178,7 +198,7 @@ export function FieldTitle({
   );
 }
 
-export function isEmptyValue(value: FormField["value"]): boolean {
+function isEmptyValue(value: FormField["value"]): boolean {
   if (value === null) return true;
 
   return typeof value === "string" && value.trim() === "";
