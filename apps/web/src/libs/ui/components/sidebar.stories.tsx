@@ -70,3 +70,12 @@ type Story = StoryObj<typeof meta>;
 export const Expanded: Story = { args: { open: true } };
 
 export const CollapsedToIcons: Story = { args: { open: false } };
+
+export const MobileSheetOpen: Story = {
+  args: { open: true },
+  tags: ["narrow"],
+  play: async ({ canvas, userEvent }) => {
+    const trigger = await canvas.findByRole("button", { name: "Navigation" });
+    await userEvent.click(trigger);
+  },
+};

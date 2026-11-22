@@ -493,9 +493,19 @@ function SidebarMenuButton({
   const content = typeof tooltip === "string" ? { children: tooltip } : tooltip;
   const leavingCloses = !iconsOnly;
 
+  function holdWhileExpanded(event: React.SyntheticEvent) {
+    if (!iconsOnly) event.preventDefault();
+  }
+
   return (
     <Tooltip disableHoverableContent={leavingCloses}>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipTrigger
+        asChild
+        onFocus={holdWhileExpanded}
+        onPointerMove={holdWhileExpanded}
+      >
+        {button}
+      </TooltipTrigger>
       {iconsOnly && <TooltipContent side="right" align="center" {...content} />}
     </Tooltip>
   );

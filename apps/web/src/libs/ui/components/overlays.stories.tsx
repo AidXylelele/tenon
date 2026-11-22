@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { ZoomInIcon } from "lucide-react";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import {
@@ -163,7 +164,7 @@ export const PopoverAndTooltip: Story = {
         <Tooltip defaultOpen>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Zoom in">
-              +
+              <ZoomInIcon />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Zoom in</TooltipContent>

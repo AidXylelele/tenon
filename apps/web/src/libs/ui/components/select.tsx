@@ -5,10 +5,33 @@ import { cn } from "@/libs/ui/tokens/cn";
 import { Select as SelectPrimitive } from "radix-ui";
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react";
 
+const SelectOpenContext = React.createContext(false);
+
 function Select({
+  open,
+  defaultOpen = false,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />;
+  const [opened, setOpened] = React.useState(defaultOpen);
+  const shown = open ?? opened;
+
+  function change(next: boolean) {
+    setOpened(next);
+    onOpenChange?.(next);
+  }
+
+  return (
+    <SelectOpenContext.Provider value={shown}>
+      <SelectPrimitive.Root
+        data-slot="select"
+        open={open}
+        defaultOpen={defaultOpen}
+        onOpenChange={change}
+        {...props}
+      />
+    </SelectOpenContext.Provider>
+  );
 }
 
 function SelectValue({
@@ -21,13 +44,18 @@ function SelectTrigger({
   className,
   size = "default",
   children,
+  tabIndex,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: "sm" | "default";
 }) {
+  const open = React.useContext(SelectOpenContext);
+  const reachable = open ? -1 : tabIndex;
+
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
+      tabIndex={reachable}
       data-size={size}
       className={cn(
         "flex w-fit items-center justify-between gap-1.5 rounded-md border border-control bg-surface py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors outline-none select-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",

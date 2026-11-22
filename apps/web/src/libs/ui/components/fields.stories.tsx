@@ -76,3 +76,69 @@ export const Focused: Story = {
     </div>
   ),
 };
+
+export const SelectOpen: Story = {
+  render: () => (
+    <div className="max-w-sm p-6">
+      <Field>
+        <FieldLabel htmlFor="method-open">Method</FieldLabel>
+        <Select defaultValue="post" defaultOpen>
+          <SelectTrigger id="method-open" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="get">GET</SelectItem>
+            <SelectItem value="post">POST</SelectItem>
+            <SelectItem value="put">PUT</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
+    </div>
+  ),
+};
+
+export const Invalid: Story = {
+  render: () => (
+    <div className="flex max-w-sm flex-col gap-6 p-6">
+      <Field data-invalid>
+        <FieldLabel htmlFor="schedule">Schedule</FieldLabel>
+        <Input
+          id="schedule"
+          aria-invalid
+          aria-describedby="schedule-error"
+          defaultValue="0 9 * *"
+        />
+        <FieldError id="schedule-error">
+          A schedule has five parts: minute, hour, day, month and weekday.
+        </FieldError>
+      </Field>
+      <Field data-invalid>
+        <FieldLabel htmlFor="region">Region</FieldLabel>
+        <Select>
+          <SelectTrigger
+            id="region"
+            aria-invalid
+            aria-describedby="region-error"
+            className="w-full"
+          >
+            <SelectValue placeholder="Choose a region" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="eu">Europe</SelectItem>
+          </SelectContent>
+        </Select>
+        <FieldError id="region-error">Choose where the runs happen.</FieldError>
+      </Field>
+      <Field data-invalid>
+        <FieldLabel htmlFor="payload">Body</FieldLabel>
+        <Textarea
+          id="payload"
+          aria-invalid
+          aria-describedby="payload-error"
+          defaultValue="{ items: }"
+        />
+        <FieldError id="payload-error">The body is not valid JSON.</FieldError>
+      </Field>
+    </div>
+  ),
+};

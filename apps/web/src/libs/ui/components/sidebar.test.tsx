@@ -165,6 +165,19 @@ describe("the console's navigation from 1024 px", () => {
     expect(tooltip).toHaveTextContent("Home");
   });
 
+  it("a_focused_item_of_the_expanded_column_is_not_described_by_a_tooltip", () => {
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+    render(<Navigation />);
+    const home = screen.getByRole("button", { name: "Home" });
+
+    act(() => {
+      home.focus();
+    });
+
+    expect(home).not.toHaveAttribute("aria-describedby");
+  });
+
   it("the_menu_button_says_whether_the_column_is_expanded", () => {
     const viewport = fakeViewport(1440);
     vi.stubGlobal("matchMedia", viewport.matchMedia);

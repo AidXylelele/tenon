@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Command as CommandPrimitive } from "cmdk";
+import { Command as CommandPrimitive, useCommandState } from "cmdk";
 import { cn } from "@/libs/ui/tokens/cn";
 
 import {
@@ -132,10 +132,16 @@ function CommandGroup({
 
 function CommandSeparator({
   className,
+  alwaysRender = false,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
+}: React.ComponentProps<"div"> & { alwaysRender?: boolean }) {
+  const searching = useCommandState((state) => state.search !== "");
+
+  if (searching && !alwaysRender) return null;
+
   return (
-    <CommandPrimitive.Separator
+    <div
+      aria-hidden
       data-slot="command-separator"
       className={cn("-mx-1 h-px bg-border", className)}
       {...props}
