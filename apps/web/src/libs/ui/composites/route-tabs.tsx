@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "cn";
+import { cn } from "../tokens/cn";
 import { usePathname } from "next/navigation";
 import { Link } from "@/libs/routing/link";
 

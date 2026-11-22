@@ -1,4 +1,4 @@
-import { cn } from "cn";
+import { cn } from "../tokens/cn";
 import type { LucideIcon } from "lucide-react";
 
 type Tone = "neutral" | "info" | "success" | "warning" | "danger";

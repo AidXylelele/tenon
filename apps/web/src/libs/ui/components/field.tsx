@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 
 import { Label } from "@/libs/ui/components/label";
 

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { cn } from "cn";
+import { cn } from "./cn";
 
 interface Sample {
   readonly token: string;

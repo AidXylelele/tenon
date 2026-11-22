@@ -1,4 +1,4 @@
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 
 function Kbd({ className, ...props }: React.ComponentProps<"kbd">) {
   return (
