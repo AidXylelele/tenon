@@ -5,7 +5,6 @@ import { Agent } from "undici";
 import type { AsyncApiInbox } from "../../../src/interface-adapters/messaging/interfaces.js";
 import type { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import { AuthorizationServer } from "../../../src/frameworks/http-client/authorization-server.js";
-import { DigestAuthentication } from "../../../src/frameworks/http-client/digest-authentication.js";
 import { HttpAuthentication } from "../../../src/frameworks/http-client/http-authentication.js";
 import { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
 import { OpenApiOperations } from "../../../src/frameworks/http-client/openapi-operations.js";
@@ -58,7 +57,6 @@ export function httpClientOf(
   return new HttpClient(
     fetchClientOf(policy.dispatcher),
     authenticationOf(identity),
-    new DigestAuthentication(),
     new OpenApiOperations(),
     resilience,
   );

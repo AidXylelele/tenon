@@ -37,10 +37,15 @@ export class HttpAuthentication {
         return credentials;
       case "bearer":
         return this.#header("Bearer", credentials.token);
-      case "basic":
-        return this.#header("Basic", this.#pairOf(credentials));
+      case "basic": {
+        const pair = this.#pairOf(credentials);
+        return this.#header("Basic", pair);
+      }
       case "digest":
-        return { kind: "digest", credentials };
+        return {
+          kind: "misconfigured",
+          detail: "The host does not answer HTTP Digest challenges",
+        };
       case "oauth2":
       case "oidc": {
         const token = await this.server.accessTokenFor(credentials, signal);

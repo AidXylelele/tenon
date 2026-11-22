@@ -7,9 +7,7 @@ import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import { DeliveryClient } from "../../../src/frameworks/http-client/delivery.client.js";
-import { Secret } from "../../../src/domain/automation/secrets/secret.js";
-import { DeliveryScheme } from "../../../src/domain/automation/subscriptions/enums.js";
-import { Subscription } from "../../../src/domain/automation/subscriptions/subscription.js";
+import type { EventDelivery } from "../../../src/interface-adapters/messaging/interfaces.js";
 import { fetchClientOf } from "./outbound.js";
 
 describe("a delivery and the outbound address policy", () => {
@@ -18,6 +16,7 @@ describe("a delivery and the outbound address policy", () => {
   let server: Server;
   let received = 0;
   let authorization: string | null = null;
+  let body = "";
   let port = 0;
 
   beforeAll(async () => {
@@ -29,7 +28,13 @@ describe("a delivery and the outbound address policy", () => {
     server = createServer((request, response) => {
       received += 1;
       authorization = request.headers.authorization ?? null;
-      response.writeHead(202).end();
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk: Buffer) => chunks.push(chunk));
+      request.on("end", () => {
+        body = Buffer.concat(chunks).toString("utf8");
+        const status = request.url === "/moved" ? 302 : 202;
+        response.writeHead(status, { location: "/events" }).end();
+      });
     });
     await new Promise<void>((resolve) =>
       server.listen(0, "127.0.0.1", resolve),
@@ -45,46 +50,30 @@ describe("a delivery and the outbound address policy", () => {
   beforeEach(() => {
     received = 0;
     authorization = null;
+    body = "";
   });
 
   const event = { specversion: "1.0", id: "e-1", source: "/s", type: "t" };
-  const accepted = {
-    sequence: 1,
-    eventId: "e-1",
-    type: "t",
-    cloudEvent: event,
-    acceptedAt: new Date(),
-    lifecycleOf: null,
-  };
 
-  function subscriptionTo(
+  function deliveryTo(
     uri: string,
-    scheme: DeliveryScheme | null = null,
-  ): Subscription {
-    const secret = scheme === null ? null : "hook";
-    const endpoint = { uri, scheme, secret };
-    return new Subscription({
-      id: "subscription-1",
-      ownerId: "owner-1",
-      name: "crm",
-      endpoint,
-      filter: {},
-      createdAt: new Date(),
-    });
+    scheme: EventDelivery["scheme"] = null,
+    credential: string | null = null,
+  ): EventDelivery {
+    return { uri, scheme, credential, event };
+  }
+
+  function clientOf(policy: AddressPolicy): DeliveryClient {
+    const outbound = fetchClientOf(policy.dispatcher);
+    return new DeliveryClient(outbound, policy, resilience);
   }
 
   it("a_loopback_destination_is_refused_before_any_connection", async () => {
     const policy = new AddressPolicy([]);
-    const client = new DeliveryClient(
-      fetchClientOf(policy.dispatcher),
-      policy,
-      resilience,
-    );
+    const client = clientOf(policy);
+    const delivery = deliveryTo(`http://localhost:${String(port)}/events`);
 
-    const subscription = subscriptionTo(
-      `http://localhost:${String(port)}/events`,
-    );
-    const error = await client.send(subscription, null, accepted);
+    const error = await client.deliver(delivery);
 
     expect(error).toMatch(/could not be reached/);
     expect(received).toBe(0);
@@ -95,17 +84,19 @@ describe("a delivery and the outbound address policy", () => {
     ["a link-local address", "http://169.254.169.254/latest", false],
     ["a loopback address", "http://[::1]/events", false],
     ["a private address", "http://10.0.0.1/events", false],
+    ["an IPv4-mapped private address", "http://[::ffff:10.0.0.1]/", false],
+    ["an IPv4-compatible address", "http://[::10.0.0.1]/events", false],
+    ["a documentation address", "http://192.0.2.1/events", false],
+    ["a unique-local address", "http://[fd00::1]/events", false],
     ["an allow-listed address", "http://127.0.0.1/events", true],
+    ["an address of an allow-listed network", "http://10.1.2.3/", true],
     ["a public address", "https://93.184.215.14/events", true],
+    ["a public IPv6 address", "https://[2606:4700::1111]/events", true],
   ] as const)(
     "%s_is_admitted_as_an_endpoint_only_when_the_policy_permits_it",
     async (_address, uri, admitted) => {
-      const policy = new AddressPolicy(["127.0.0.1"]);
-      const client = new DeliveryClient(
-        fetchClientOf(policy.dispatcher),
-        policy,
-        resilience,
-      );
+      const policy = new AddressPolicy(["127.0.0.1", "10.1.0.0/16"]);
+      const client = clientOf(policy);
 
       const admits = await client.admits(uri);
 
@@ -114,20 +105,27 @@ describe("a delivery and the outbound address policy", () => {
     },
   );
 
-  it("an_allow_listed_destination_takes_the_delivery", async () => {
+  it("an_allow_listed_destination_takes_the_event_as_a_cloud_event", async () => {
     const policy = new AddressPolicy(["127.0.0.1"]);
-    const client = new DeliveryClient(
-      fetchClientOf(policy.dispatcher),
-      policy,
-      resilience,
-    );
+    const client = clientOf(policy);
+    const delivery = deliveryTo(`http://127.0.0.1:${String(port)}/events`);
 
-    const subscription = subscriptionTo(
-      `http://127.0.0.1:${String(port)}/events`,
-    );
-    const error = await client.send(subscription, null, accepted);
+    const error = await client.deliver(delivery);
 
     expect(error).toBeNull();
+    expect(received).toBe(1);
+    expect(JSON.parse(body)).toEqual(event);
+    await policy.onApplicationShutdown();
+  });
+
+  it("a_destination_that_redirects_is_answered_as_refused_and_not_followed", async () => {
+    const policy = new AddressPolicy(["127.0.0.1"]);
+    const client = clientOf(policy);
+    const delivery = deliveryTo(`http://127.0.0.1:${String(port)}/moved`);
+
+    const error = await client.deliver(delivery);
+
+    expect(error).toBe("The destination answered 302");
     expect(received).toBe(1);
     await policy.onApplicationShutdown();
   });
@@ -135,45 +133,26 @@ describe("a delivery and the outbound address policy", () => {
   it.each([
     [
       "basic credentials",
-      DeliveryScheme.Basic,
+      "basic",
       '{"username":"ada.lovelace","password":"analytical-1"}',
       `Basic ${Buffer.from("ada.lovelace:analytical-1").toString("base64")}`,
     ],
     [
       "a bearer token object",
-      DeliveryScheme.Bearer,
+      "bearer",
       '{"token":"tok-abcdef"}',
       "Bearer tok-abcdef",
     ],
-    [
-      "a bare bearer token",
-      DeliveryScheme.Bearer,
-      "tok-abcdef",
-      "Bearer tok-abcdef",
-    ],
+    ["a bare bearer token", "bearer", "tok-abcdef", "Bearer tok-abcdef"],
   ] as const)(
-    "a_secret_holding_%s_authenticates_the_delivery",
-    async (_holding, scheme, value, expected) => {
+    "a_credential_holding_%s_authenticates_the_delivery",
+    async (_holding, scheme, credential, expected) => {
       const policy = new AddressPolicy(["127.0.0.1"]);
-      const client = new DeliveryClient(
-        fetchClientOf(policy.dispatcher),
-        policy,
-        resilience,
-      );
-      const created = Secret.create({
-        ownerId: "owner-1",
-        name: "hook",
-        value,
-        now: new Date(),
-      });
+      const client = clientOf(policy);
+      const uri = `http://127.0.0.1:${String(port)}/events`;
+      const delivery = deliveryTo(uri, scheme, credential);
 
-      if (!created.ok) throw new TypeError("The secret is refused");
-
-      const subscription = subscriptionTo(
-        `http://127.0.0.1:${String(port)}/events`,
-        scheme,
-      );
-      const error = await client.send(subscription, created.value, accepted);
+      const error = await client.deliver(delivery);
 
       expect(error).toBeNull();
       expect(authorization).toBe(expected);

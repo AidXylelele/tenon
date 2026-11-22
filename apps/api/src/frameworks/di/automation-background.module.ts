@@ -1,12 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
-import {
-  getHttpClientToken,
-  HttpClientModule,
-  type HttpClient as NestHttpClient,
-} from "@nestjs/http-client";
+import { HttpClientModule } from "@nestjs/http-client";
 import { LocksModule } from "@nestjs/locks";
-import { ResilienceService } from "@nestjs/resilience";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
 import { EmitEvent } from "../../application/automation/events/emit-event.js";
 import {
@@ -72,7 +67,6 @@ import { SandboxLimits } from "../go-judge/sandbox-limits.js";
 import { GrpcClient } from "../grpc/grpc.client.js";
 import { ProtoSchema } from "../grpc/proto-schema.js";
 import { HttpClientName } from "../http-client/enums.js";
-import { HttpClient } from "../http-client/http.client.js";
 import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import { EffectPerformer } from "../interpreter/effect-performer.js";
 import { McpClient } from "../mcp/mcp.client.js";
@@ -157,19 +151,8 @@ const sandboxLimits = new SandboxLimits({
     RedisBroker,
     AsyncApiClient,
     { provide: SubscriptionClient, useExisting: AsyncApiClient },
-    {
-      provide: SandboxClient,
-      inject: [
-        getHttpClientToken(HttpClientName.Sandbox),
-        HttpClient,
-        ResilienceService,
-      ],
-      useFactory: (
-        sandbox: NestHttpClient,
-        http: HttpClient,
-        resilience: ResilienceService,
-      ) => new SandboxClient(sandbox, http, sandboxLimits, resilience),
-    },
+    { provide: SandboxLimits, useValue: sandboxLimits },
+    SandboxClient,
   ],
 })
 export class AutomationBackgroundModule {}

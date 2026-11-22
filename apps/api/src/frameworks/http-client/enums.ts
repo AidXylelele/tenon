@@ -1,6 +1,4 @@
 export enum HttpClientName {
-  Effects = "effects",
-  Deliveries = "deliveries",
-  IdentityProvider = "identity-provider",
+  Outbound = "outbound",
   Sandbox = "sandbox",
 }
