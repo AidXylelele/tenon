@@ -23,6 +23,11 @@ import { conditionTextOf } from "./write.js";
 
 const expression: ConditionReading = { kind: "expression" };
 
+const unwritten: ConditionReading = {
+  kind: "condition",
+  condition: { join: "all", rows: [] },
+};
+
 const opening = "${ ";
 
 const closing = " }";
@@ -81,6 +86,10 @@ const rowForms: readonly RowForm[] = [
 ];
 
 export function conditionOf(text: string): ConditionReading {
+  if (text === "") {
+    return unwritten;
+  }
+
   const isWrapped = text.startsWith(opening) && text.endsWith(closing);
 
   if (!isWrapped) {

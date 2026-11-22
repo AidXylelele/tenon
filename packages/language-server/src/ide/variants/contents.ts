@@ -74,7 +74,11 @@ export function startingContentOf(variant: StepVariant): JsonObject {
     case "for":
       return { for: { each: "item", in: "" }, do: [] };
     case "fork":
-      return { fork: { branches: [] } };
+      return {
+        fork: {
+          branches: [{ "branch-1": { do: [] } }, { "branch-2": { do: [] } }],
+        },
+      };
     case "listen":
       return { listen: { to: { one: { with: { type: "" } } } } };
     case "raise":
@@ -84,7 +88,12 @@ export function startingContentOf(variant: StepVariant): JsonObject {
     case "set":
       return { set: { value: "" }, output: { as: inputAndValuesAs } };
     case "switch":
-      return { switch: [{ default: { then: "continue" } }] };
+      return {
+        switch: [
+          { "branch-1": { when: "", then: "continue" } },
+          { default: { then: "end" } },
+        ],
+      };
     case "try": {
       const caught = retryCatchOf(startingRetry);
       return { try: [], catch: caught };

@@ -381,3 +381,12 @@ test.each<readonly [string, Condition, string]>([
 
   expect(written).toEqual({ kind: "refused", reason });
 });
+
+test("an empty condition is read as a condition with no row yet", () => {
+  const read = conditionOf("");
+
+  expect(read).toEqual({
+    kind: "condition",
+    condition: { join: "all", rows: [] },
+  });
+});

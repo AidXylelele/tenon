@@ -1267,7 +1267,15 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
     { for: { each: "item", in: "" }, do: [] },
     [["expression", "/do/0/for/for/in"]],
   ],
-  ["fork", { fork: { branches: [] } }, []],
+  [
+    "fork",
+    {
+      fork: {
+        branches: [{ "branch-1": { do: [] } }, { "branch-2": { do: [] } }],
+      },
+    },
+    [],
+  ],
   [
     "listen",
     { listen: { to: { one: { with: { type: "" } } } } },
@@ -1279,7 +1287,16 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
     [],
   ],
   ["set", { set: { value: "" }, output: { as: "${ $input + . }" } }, []],
-  ["switch", { switch: [{ default: { then: "continue" } }] }, []],
+  [
+    "switch",
+    {
+      switch: [
+        { "branch-1": { when: "", then: "continue" } },
+        { default: { then: "end" } },
+      ],
+    },
+    [["expression", "/do/0/switch/switch/0/branch-1/when"]],
+  ],
   [
     "try",
     {
