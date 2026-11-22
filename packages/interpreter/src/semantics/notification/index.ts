@@ -1,2 +1,2 @@
 export { diagnosticOf, diagnosticsOf } from "./diagnostics.js";
-export { placedAtCallSites } from "./place.js";
+export { atUnflaggedPlaces, placedAtCallSites } from "./place.js";

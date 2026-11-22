@@ -166,6 +166,335 @@ describe("resolutionsOf", () => {
   });
 });
 
+describe("analyze", () => {
+  const unaddressed = `
+document:
+  dsl: '1.1.0'
+  namespace: test
+  name: fetch
+  version: '0.1.0'
+do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: ''
+`;
+
+  function grpcCalled(port: number): JsonObject {
+    return {
+      document: header,
+      do: [
+        {
+          greet: {
+            call: "grpc",
+            with: {
+              proto: { endpoint: "https://example.com/greeter.proto" },
+              service: { name: "Greeter", host: "example.com", port },
+              method: "SayHello",
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  function fetchedAt(endpoint: JsonValue): JsonObject {
+    return {
+      document: header,
+      do: [{ fetch: { call: "http", with: { method: "get", endpoint } } }],
+    };
+  }
+
+  test("models the task whose endpoint is still empty", () => {
+    const analysis = analyzer.analyze(unaddressed, fullOptions);
+
+    expect(analysis).toMatchObject({
+      kind: "analyzed",
+      model: {
+        workflow: {
+          do: {
+            tasks: [
+              {
+                name: "fetch",
+                call: {
+                  kind: "http",
+                  endpoint: { uri: { kind: "literal", value: "" } },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+  });
+
+  test("reports the empty endpoint once, at its range", () => {
+    const analysis = analyzer.analyze(unaddressed, fullOptions);
+
+    expect(analysis.diagnostics).toEqual([
+      {
+        code: "schema",
+        message: "Endpoint is not in the form the standard requires.",
+        pointer: "/do/0/fetch/with/endpoint",
+        range: {
+          start: { line: 12, column: 19 },
+          end: { line: 12, column: 21 },
+        },
+        subject: null,
+        import: null,
+      },
+    ]);
+  });
+
+  test.each([
+    [
+      "pattern",
+      "a workflow name left empty",
+      "analyzed",
+      "/document/name",
+      { document: { ...header, name: "" }, do: [{ a: { set: { x: 1 } } }] },
+    ],
+    [
+      "pattern",
+      "an endpoint in none of its forms",
+      "analyzed",
+      "/do/0/fetch/with/endpoint",
+      fetchedAt(""),
+    ],
+    [
+      "pattern",
+      "the URI of an endpoint written as an object",
+      "analyzed",
+      "/do/0/fetch/with/endpoint/uri",
+      fetchedAt({ uri: "" }),
+    ],
+    [
+      "pattern",
+      "an endpoint expression with nothing inside",
+      "analyzed",
+      "/do/0/fetch/with/endpoint",
+      fetchedAt("${}"),
+    ],
+    [
+      "pattern",
+      "a wait in neither form of a duration",
+      "analyzed",
+      "/do/0/pause/wait",
+      { document: header, do: [{ pause: { wait: "PT1X" } }] },
+    ],
+    [
+      "format",
+      "an event time that is no date and time",
+      "analyzed",
+      "/do/0/tell/emit/event/with/time",
+      {
+        document: header,
+        do: [
+          {
+            tell: {
+              emit: {
+                event: {
+                  with: {
+                    source: "https://example.com",
+                    type: "com.example.event",
+                    time: "yesterday",
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "minimum",
+      "a gRPC port below 0",
+      "analyzed",
+      "/do/0/greet/with/service/port",
+      grpcCalled(-1),
+    ],
+    [
+      "maximum",
+      "a gRPC port above 65535",
+      "analyzed",
+      "/do/0/greet/with/service/port",
+      grpcCalled(65536),
+    ],
+    [
+      "type",
+      "an endpoint that is a number",
+      "refused",
+      "/do/0/fetch/with/endpoint",
+      fetchedAt(42),
+    ],
+    [
+      "type",
+      "a gRPC port that is no integer and below 0",
+      "refused",
+      "/do/0/greet/with/service/port",
+      grpcCalled(-1.5),
+    ],
+    [
+      "required",
+      "an HTTP call with no method beside an empty endpoint",
+      "refused",
+      "/do/0/fetch/with/endpoint",
+      {
+        document: header,
+        do: [{ fetch: { call: "http", with: { endpoint: "" } } }],
+      },
+    ],
+    [
+      "required",
+      "an empty authentication name, whose other schemes each require a member of their own",
+      "refused",
+      "/do/0/fetch/with/endpoint/authentication/use",
+      fetchedAt({
+        uri: "https://example.com",
+        authentication: { use: "" },
+      }),
+    ],
+    [
+      "unevaluatedProperties",
+      "an unknown member beside a container lifetime in neither form of a duration",
+      "refused",
+      "/do/0/start/run/container/lifetime/after",
+      {
+        document: header,
+        do: [
+          {
+            start: {
+              run: {
+                container: {
+                  image: "hello-world",
+                  lifetime: { cleanup: "eventually", after: "PT1X" },
+                },
+                nope: 1,
+              },
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "enum",
+      "an HTTP output outside its enumeration",
+      "refused",
+      "/do/0/fetch/with/output",
+      {
+        document: header,
+        do: [
+          {
+            fetch: {
+              call: "http",
+              with: {
+                method: "get",
+                endpoint: "https://example.com",
+                output: "body",
+              },
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "enum",
+      "a script in a language the standard does not support",
+      "refused",
+      "/do/0/start/run/script/language",
+      {
+        document: header,
+        do: [
+          { start: { run: { script: { language: "ruby", code: "puts 1" } } } },
+        ],
+      },
+    ],
+    [
+      "minProperties",
+      "a set of no values",
+      "refused",
+      "/do/0/a/set",
+      { document: header, do: [{ a: { set: {} } }] },
+    ],
+    [
+      "maxProperties",
+      "two tasks in one item, one with an empty endpoint",
+      "refused",
+      "/do/0/fetch/with/endpoint",
+      {
+        document: header,
+        do: [
+          {
+            fetch: { call: "http", with: { method: "get", endpoint: "" } },
+            greet: { set: { x: 1 } },
+          },
+        ],
+      },
+    ],
+    [
+      "minItems",
+      "a switch of no cases",
+      "refused",
+      "/do/0/pick/switch",
+      { document: header, do: [{ pick: { switch: [] } }] },
+    ],
+    [
+      "dependentRequired",
+      "a schedule read with no events, beside an interval in neither form of a duration",
+      "refused",
+      "/schedule/every",
+      {
+        document: header,
+        schedule: { every: "PT1X", read: "data" },
+        do: [{ a: { set: { x: 1 } } }],
+      },
+    ],
+    [
+      "not",
+      "a container lifetime with a delay but no eventual cleanup, the delay in neither form of a duration",
+      "refused",
+      "/do/0/start/run/container/lifetime/after",
+      {
+        document: header,
+        do: [
+          {
+            start: {
+              run: {
+                container: {
+                  image: "hello-world",
+                  lifetime: { cleanup: "never", after: "PT1X" },
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+  ])(
+    "a violation of %s, %s, leaves the document %s, with its diagnostic at %s",
+    (_, __, kind, pointer, document) => {
+      const analysis = analyzer.analyze(document, fullOptions);
+
+      expect(analysis).toMatchObject({ kind, diagnostics: [{ pointer }] });
+    },
+  );
+
+  test("refuses a document in a DSL version it does not support", () => {
+    const document = {
+      document: { ...header, dsl: "2.0.0" },
+      do: [{ a: { set: { x: 1 } } }],
+    };
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis).toMatchObject({
+      kind: "refused",
+      diagnostics: [{ code: "dsl-version", pointer: "/document/dsl" }],
+    });
+  });
+});
+
 describe("schemasAt", () => {
   const fetched = {
     document: header,

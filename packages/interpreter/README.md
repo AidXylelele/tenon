@@ -25,7 +25,9 @@ under the `execution` of its events, for a host that keeps them (the claim check
 
 `interpreter/front-end` — for editors: `createAnalyzer(engine)` gives an `Analyzer`, whose `analyze` gives the
 semantic model and its diagnostics and whose `schemasAt` reads the grammar at a place; `resolutionsOf(model,
-pointer)` gives what the names of the expression at a pointer resolve to; and the standard's catalogues.
+pointer)` gives what the names of the expression at a pointer resolve to; and the standard's catalogues. A document
+whose grammar breaks only values (a pattern, a format, a length, a bound) is still modelled, with those diagnostics;
+one whose structure breaks is refused; `compile` refuses both.
 
 ## Telemetry
 

@@ -21,6 +21,7 @@ import {
 } from "./filter-document.js";
 import type { Analysis, SemanticModel } from "./model.js";
 import {
+  atUnflaggedPlaces,
   diagnosticOf,
   diagnosticsOf,
   placedAtCallSites,
@@ -129,17 +130,23 @@ export class Analyzer {
   }
 
   #checkedOf(source: SourceDocument, options: AnalysisOptions): Analysis {
-    const findings = this.#grammar.findingsOf(source.document);
+    const verdict = this.#grammar.verdictOf(source.document);
 
-    if (findings.length > 0) {
-      const diagnostics = diagnosticsOf(findings, source, "document");
-      return { kind: "refused", diagnostics, source };
+    switch (verdict.kind) {
+      case "malformed": {
+        const diagnostics = diagnosticsOf(verdict.findings, source, "document");
+        return { kind: "refused", diagnostics, source };
+      }
+      case "formed":
+        return this.#analyzedOf(source, verdict.findings, options);
     }
-
-    return this.#analyzedOf(source, options);
   }
 
-  #analyzedOf(source: SourceDocument, options: AnalysisOptions): Analysis {
+  #analyzedOf(
+    source: SourceDocument,
+    grammarFindings: readonly Finding[],
+    options: AnalysisOptions,
+  ): Analysis {
     const workflow = elaborate(source.document);
     const { symbols, occurrences, findings } = symbolsOf(
       workflow,
@@ -156,7 +163,9 @@ export class Analyzer {
       imports: options.imports,
     };
     const checked = this.#findingsOf(model, options);
-    const found = [...findings, ...checked];
+    const semantic = [...findings, ...checked];
+    const unflagged = atUnflaggedPlaces(semantic, grammarFindings);
+    const found = [...grammarFindings, ...unflagged];
     const placed = placedAtCallSites(found, symbols.components.functions);
 
     const diagnostics = diagnosticsOf(placed, source, "document");
