@@ -103,17 +103,22 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
   }
 
   #validatorOfFunction(validate: ValidateFunction): Validator {
-    return (value) => {
-      const reports = this.#reportsOf(validate, value, rootPointer);
-      const choices = distinctChoicesOf(reports);
-      const entries = choices.map((choice) => {
-        const expanded = this.#expansionsOf(choice);
-        return [choice.key, expanded] as const;
-      });
-      const expansions = new Map(entries);
+    return (value) => this.#violationsOf(validate, value);
+  }
 
-      return linkedViolationsOf(reports, expansions);
-    };
+  #violationsOf(
+    validate: ValidateFunction,
+    value: JsonValue,
+  ): readonly SchemaViolation[] {
+    const reports = this.#reportsOf(validate, value, rootPointer);
+    const choices = distinctChoicesOf(reports);
+    const entries = choices.map((choice) => {
+      const expanded = this.#expansionsOf(choice);
+      return [choice.key, expanded] as const;
+    });
+    const expansions = new Map(entries);
+
+    return linkedViolationsOf(reports, expansions);
   }
 
   #reportsOf(
