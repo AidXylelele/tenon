@@ -3,7 +3,9 @@ import { childPointerOf, isJsonObject, valueAt } from "../pointers/index.js";
 import {
   nameConflictOf,
   protectedStepOf,
-  retryCatchOf,
+  type RetrySetting,
+  retriedWhenOf,
+  retryPolicyOf,
   type StepNode,
 } from "../steps/index.js";
 import { dedentedOf, indentedOf, textIn } from "../text/index.js";
@@ -16,19 +18,43 @@ import {
   mappingTextOf,
   removalOf,
 } from "./collection-text.js";
+import { fieldClearingOf, fieldSettingOf } from "./field-actions.js";
 import { idChangesOf, placedStepOf } from "./ids.js";
 import type {
+  CatchHandling,
+  ClearField,
   Editable,
   Editing,
   Failure,
+  Handling,
   SetFailure,
+  SetField,
   Wrapping,
   WrittenItem,
+  WrittenRetry,
   WrittenStep,
 } from "./interfaces.js";
 import { unknownStepOf, writtenStepOf } from "./step-actions.js";
 
 const unchanged: Editing = { kind: "edited", changes: [], ids: [] };
+
+const defaultBinder = "error";
+
+const stopping: Handling = { kind: "stop" };
+
+const continuing: Handling = {
+  kind: "catch",
+  catch: {},
+  retry: null,
+  isHandling: false,
+};
+
+const handlingAtOnce: Handling = {
+  kind: "catch",
+  catch: { do: [] },
+  retry: null,
+  isHandling: true,
+};
 
 export function failureSettingOf(
   editable: Editable,
@@ -41,30 +67,97 @@ export function failureSettingOf(
   }
 
   const inner = protectedStepOf(written.step);
-  const handling = handlingOf(action.failure);
+  const binder = binderOf(written.step, inner);
+  const handling = handlingOf(action.failure, binder);
+
+  if (handling.kind === "refused") {
+    return handling;
+  }
+
+  if (handling.kind === "stop") {
+    return stoppingOf(editable, written, inner);
+  }
 
   if (inner === null) {
-    return handling === null
-      ? unchanged
-      : protectionOf(editable, written, handling);
+    return protectionOf(editable, written, handling.catch);
   }
 
-  return handling === null
-    ? unprotectionOf(editable, written, inner)
-    : handlingChangeOf(editable, written, handling);
+  return handlingChangeOf(editable, written, handling);
 }
 
-function handlingOf(failure: Failure): JsonObject | null {
+function stoppingOf(
+  editable: Editable,
+  written: WrittenStep,
+  inner: StepNode | null,
+): Editing {
+  if (inner === null) {
+    return unchanged;
+  }
+
+  return unprotectionOf(editable, written, inner);
+}
+
+function binderOf(step: StepNode, inner: StepNode | null): string {
+  const task = step.task;
+
+  if (inner === null || task.kind !== "try") {
+    return defaultBinder;
+  }
+
+  return task.catch.as;
+}
+
+function handlingOf(failure: Failure, binder: string): Handling {
   switch (failure.kind) {
     case "stop":
-      return null;
+      return stopping;
     case "continue":
-      return {};
+      return continuing;
     case "retry":
-      return retryCatchOf(failure);
+      return retryingOf(failure.retry, binder);
     case "handle":
-      return { do: [] };
+      return handlingAfterOf(failure.retry ?? null, binder);
   }
+}
+
+function retryingOf(retry: RetrySetting, binder: string): Handling {
+  const written = writtenRetryOf(retry, binder);
+
+  if (written.kind === "refused") {
+    return written;
+  }
+
+  const policy = written.policy;
+  const caught = { retry: policy };
+  return { kind: "catch", catch: caught, retry: policy, isHandling: false };
+}
+
+function handlingAfterOf(retry: RetrySetting | null, binder: string): Handling {
+  if (retry === null) {
+    return handlingAtOnce;
+  }
+
+  const written = writtenRetryOf(retry, binder);
+
+  if (written.kind === "refused") {
+    return written;
+  }
+
+  const policy = written.policy;
+  const caught = { retry: policy, do: [] };
+  return { kind: "catch", catch: caught, retry: policy, isHandling: true };
+}
+
+function writtenRetryOf(retry: RetrySetting, binder: string): WrittenRetry {
+  const when = retriedWhenOf(retry.on, binder);
+
+  if (when?.kind === "refused") {
+    return when;
+  }
+
+  const text = when?.text ?? null;
+  const policy = retryPolicyOf(retry, text);
+  return { kind: "policy", policy };
 }
 
 function protectionOf(
@@ -133,16 +226,15 @@ function unprotectionOf(
 function handlingChangeOf(
   editable: Editable,
   written: WrittenStep,
-  handling: JsonObject,
+  handling: CatchHandling,
 ): Editing {
   const { step } = written;
   const caughtPointer = childPointerOf(step.pointer, "catch");
   const caught = valueAt(editable.document, caughtPointer);
   const isHandled = isJsonObject(caught) && caught.do !== undefined;
-  const isHandling = handling.do !== undefined;
 
-  if (isHandled && isHandling) {
-    return unchanged;
+  if (isHandled && handling.isHandling) {
+    return retryChangeOf(editable, caughtPointer, handling.retry);
   }
 
   const task = valueAt(editable.document, step.pointer);
@@ -155,14 +247,35 @@ function handlingChangeOf(
     return { kind: "refused", reason: unknownStepOf(step.id) };
   }
 
-  const member = { catch: handling };
+  const member = { catch: handling.catch };
   const replacement =
     mapping.kind === "block"
       ? indentedOf(yamlOf(member), mapping.indent)
-      : `catch: ${inlineYamlOf(handling)}`;
+      : `catch: ${inlineYamlOf(handling.catch)}`;
   const change = changeOf(editable.text, caughtSpan, replacement);
 
   return { kind: "edited", changes: [change], ids: [] };
+}
+
+function retryChangeOf(
+  editable: Editable,
+  caughtPointer: string,
+  retry: JsonObject | null,
+): Editing {
+  const pointer = childPointerOf(caughtPointer, "retry");
+  const isWritten = valueAt(editable.document, pointer) !== undefined;
+
+  if (retry !== null) {
+    const setting: SetField = { kind: "setField", pointer, value: retry };
+    return fieldSettingOf(editable, setting);
+  }
+
+  if (!isWritten) {
+    return unchanged;
+  }
+
+  const clearing: ClearField = { kind: "clearField", pointer };
+  return fieldClearingOf(editable, clearing);
 }
 
 function blockWrapperOf(wrapping: Wrapping, indent: number): string {

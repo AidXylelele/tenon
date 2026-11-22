@@ -1,4 +1,6 @@
-import type { ast, SemanticModel } from "interpreter/front-end";
+import type { ast, JsonValue, SemanticModel } from "interpreter/front-end";
+import { valueAt } from "../pointers/index.js";
+import { retryOnOf } from "../steps/index.js";
 import type {
   Afterward,
   CatchPolicy,
@@ -18,7 +20,8 @@ export function catchPolicyOf(
   const caught = task.catch;
   const errors = caughtErrorsOf(caught.errors);
   const policy = retryPolicyOf(caught.retry, model);
-  const retry = retryPlanOf(policy);
+  const document = model.source.document;
+  const retry = retryPlanOf(policy, caught.as, document);
   const afterward = afterwardOf(caught);
   const when = caught.when?.source ?? null;
   const exceptWhen = caught.exceptWhen?.source ?? null;
@@ -51,7 +54,11 @@ function retryPolicyOf(
   }
 }
 
-function retryPlanOf(policy: ast.RetryPolicy | null): RetryPlan | null {
+function retryPlanOf(
+  policy: ast.RetryPolicy | null,
+  binder: string,
+  document: JsonValue,
+): RetryPlan | null {
   if (policy === null) {
     return null;
   }
@@ -59,6 +66,9 @@ function retryPlanOf(policy: ast.RetryPolicy | null): RetryPlan | null {
   const milliseconds = delayOf(policy.delay);
   const when = policy.when?.source ?? null;
   const exceptWhen = policy.exceptWhen?.source ?? null;
+  const whenText = writtenTextOf(policy.when, document);
+  const exceptWhenText = writtenTextOf(policy.exceptWhen, document);
+  const on = retryOnOf(whenText, exceptWhenText, binder);
 
   return {
     retries: policy.limit.attempt.count,
@@ -66,7 +76,20 @@ function retryPlanOf(policy: ast.RetryPolicy | null): RetryPlan | null {
     backoff: policy.backoff.kind,
     when,
     exceptWhen,
+    on,
   };
+}
+
+function writtenTextOf(
+  expression: ast.Expression | null,
+  document: JsonValue,
+): string | null {
+  if (expression === null) {
+    return null;
+  }
+
+  const written = valueAt(document, expression.pointer);
+  return typeof written === "string" ? written : expression.source;
 }
 
 function delayOf(delay: ast.Duration | null): number | null {

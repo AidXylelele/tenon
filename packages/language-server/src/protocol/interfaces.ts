@@ -115,6 +115,7 @@ export interface StepFormResult {
   readonly version: number;
   readonly step: string;
   readonly failure: FailureKind;
+  readonly retry: structure.RetryPlan | null;
   readonly result: ResultReading | null;
   readonly fields: readonly FormField[];
 }

@@ -1,16 +1,20 @@
 import type { JsonObject } from "interpreter/front-end";
-import { type ListEnd, type Retry, retryCatchOf } from "../steps/index.js";
+import {
+  type ListEnd,
+  type RetrySetting,
+  retryPolicyOf,
+} from "../steps/index.js";
 import { inputAndValuesAs, printedJsonAs } from "./results.js";
 import type { StepVariant } from "./variants.js";
 
 const validationError =
   "https://open-workflow-specification.org/spec/1.0.0/errors/validation";
 
-const startingRetry: Retry = {
-  kind: "retry",
+const startingRetry: RetrySetting = {
   retries: 3,
-  seconds: 2,
-  growing: true,
+  milliseconds: 2000,
+  backoff: "exponential",
+  on: { kind: "any" },
 };
 
 const jsResult = "const result = {};\nconsole.log(JSON.stringify(result));\n";
@@ -98,8 +102,8 @@ export function startingContentOf(
         ],
       };
     case "try": {
-      const caught = retryCatchOf(startingRetry);
-      return { try: [], catch: caught };
+      const retry = retryPolicyOf(startingRetry, null);
+      return { try: [], catch: { retry } };
     }
     case "wait":
       return { wait: "PT30M" };

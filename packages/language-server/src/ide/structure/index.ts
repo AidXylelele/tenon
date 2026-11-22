@@ -10,4 +10,5 @@ export type {
   Trigger,
   WorkflowStructure,
 } from "./interfaces.js";
+export { catchPolicyOf } from "./catches.js";
 export { structureReadingOf, workflowStructureOf } from "./structure.js";

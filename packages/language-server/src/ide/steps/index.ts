@@ -2,8 +2,10 @@ export type {
   FailureKind,
   ListEnd,
   ListPart,
-  Retry,
   ListRole,
+  RetriedErrors,
+  RetryOn,
+  RetrySetting,
   StepNode,
   StepNodeList,
   StepTree,
@@ -17,7 +19,6 @@ export {
   listWithId,
   nameConflictOf,
   protectedStepOf,
-  retryCatchOf,
   stepHolding,
   stepIdOf,
   stepTreeOf,
@@ -25,3 +26,4 @@ export {
   targetOf,
   unwrittenCatchListWithId,
 } from "./steps.js";
+export { retriedWhenOf, retryOnOf, retryPolicyOf } from "./retries.js";

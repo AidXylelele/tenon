@@ -448,6 +448,7 @@ test.each([
         backoff: "exponential",
         when: null,
         exceptWhen: null,
+        on: { kind: "any" },
       },
       afterward: "stop",
     },
@@ -471,6 +472,7 @@ test.each([
         backoff: "exponential",
         when: null,
         exceptWhen: null,
+        on: { kind: "any" },
       },
       afterward: "handle",
     },
@@ -516,6 +518,7 @@ test.each([
         backoff: "exponential",
         when: null,
         exceptWhen: null,
+        on: { kind: "any" },
       },
       afterward: "continue",
     },
@@ -533,6 +536,7 @@ test.each([
         backoff: "constant",
         when: null,
         exceptWhen: null,
+        on: { kind: "any" },
       },
       afterward: "stop",
     },
@@ -561,6 +565,7 @@ test("a retry named among the workflow's components is read from there", () => {
     backoff: "exponential",
     when: null,
     exceptWhen: null,
+    on: { kind: "any" },
   });
 });
 
@@ -606,4 +611,66 @@ test("each case of a switch carries its condition as rows, or its text where the
     ["default", null],
     [null, null],
   ]);
+});
+
+const timeoutType =
+  "https://open-workflow-specification.org/spec/1.0.0/errors/timeout";
+
+test.each([
+  ["no condition retries any error", "retry: {}", { kind: "any" }],
+  [
+    "a status retries that status",
+    "retry: { when: '${ $error.status == 503 }' }",
+    { kind: "statuses", statuses: [503] },
+  ],
+  [
+    "statuses joined by or retry those statuses",
+    "retry: { when: '${ ($error.status == 503) or ($error.status == 429) }' }",
+    { kind: "statuses", statuses: [503, 429] },
+  ],
+  [
+    "the timeout type retries the time-outs",
+    `retry: { when: '\${ $error.type == "${timeoutType}" }' }`,
+    { kind: "timeouts" },
+  ],
+  [
+    "a status the catch names otherwise is read under its name",
+    "as: failure, retry: { when: '${ $failure.status == 503 }' }",
+    { kind: "statuses", statuses: [503] },
+  ],
+  [
+    "statuses joined by and are written conditions",
+    "retry: { when: '${ ($error.status == 503) and ($error.status == 429) }' }",
+    { kind: "written" },
+  ],
+  [
+    "another condition is written",
+    "retry: { when: '${ .attempt < 2 }' }",
+    { kind: "written" },
+  ],
+  [
+    "an exception is written",
+    "retry: { exceptWhen: '${ $error.status == 404 }' }",
+    { kind: "written" },
+  ],
+])("which errors a retry retries: %s", (_, caught, on) => {
+  const step = `guard: { try: ${tried}, catch: { ${caught} } }`;
+  const text = `${inlineHeader}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch?.retry?.on).toEqual(on);
+});
+
+test("an ISO delay is read as its milliseconds", () => {
+  const step = `guard: { try: ${tried}, catch: { retry: { delay: PT2S } } }`;
+  const text = `${inlineHeader}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch?.retry?.milliseconds).toBe(2000);
 });

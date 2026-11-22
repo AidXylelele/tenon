@@ -2,6 +2,7 @@ import type { JsonValue, SchemaMember } from "interpreter/front-end";
 import type { SchemasAt } from "../places/index.js";
 import type { Problem } from "../snapshot/index.js";
 import type { FailureKind } from "../steps/index.js";
+import type { RetryPlan } from "../structure/index.js";
 import type { ResultReading } from "../variants/index.js";
 
 export type FormSection = "settings" | "failure" | "data" | "note";
@@ -61,6 +62,7 @@ export type StepFormReading =
   | {
       readonly kind: "form";
       readonly failure: FailureKind;
+      readonly retry: RetryPlan | null;
       readonly result: ResultReading | null;
       readonly fields: readonly FormField[];
     }

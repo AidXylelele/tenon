@@ -565,9 +565,12 @@ const retried = guardedFlow.replace(
 
 const retry = {
   kind: "retry",
-  retries: 3,
-  seconds: 5,
-  growing: false,
+  retry: {
+    retries: 3,
+    milliseconds: 5000,
+    backoff: "constant",
+    on: { kind: "any" },
+  },
 } as const;
 
 test("a retry wraps the step in a try and maps its ids", () => {
@@ -634,6 +637,185 @@ test("handling a protected step's failure writes an empty list of steps", () => 
     "      catch:\n        do: []\n",
   );
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+const timeoutType =
+  "https://open-workflow-specification.org/spec/1.0.0/errors/timeout";
+
+test.each([
+  [
+    "a retry on statuses, a delay of milliseconds and a linear backoff",
+    {
+      kind: "retry",
+      retry: {
+        retries: 2,
+        milliseconds: 1500,
+        backoff: "linear",
+        on: { kind: "statuses", statuses: [503, 429] },
+      },
+    },
+    `      catch:
+        retry:
+          when: \${ ($error.status == 503) or ($error.status == 429) }
+          delay:
+            milliseconds: 1500
+          backoff:
+            linear: {}
+          limit:
+            attempt:
+              count: 2
+`,
+  ],
+  [
+    "a retry of time-outs at once",
+    {
+      kind: "retry",
+      retry: {
+        retries: 1,
+        milliseconds: 0,
+        backoff: "exponential",
+        on: { kind: "timeouts" },
+      },
+    },
+    `      catch:
+        retry:
+          when: \${ $error.type == "${timeoutType}" }
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 1
+`,
+  ],
+  [
+    "a handling after a retry",
+    {
+      kind: "handle",
+      retry: {
+        retries: 3,
+        milliseconds: 60000,
+        backoff: "constant",
+        on: { kind: "any" },
+      },
+    },
+    `      catch:
+        retry:
+          delay:
+            seconds: 60
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+        do: []
+`,
+  ],
+] as const)("%s protects the step with that catch", (_, failure, caught) => {
+  const action: EditAction = { kind: "setFailure", step: "/do/greet", failure };
+
+  const outcome = outcomeOf(guardedFlow, action);
+
+  const expected = guardedFlow.replace(
+    "  - greet:\n      set:\n        message: hello\n",
+    `  - greet:\n      try:\n        - greet:\n            set:\n              message: hello\n${caught}`,
+  );
+  expect(outcome).toEqual({
+    text: expected,
+    ids: [{ from: "/do/greet", to: "/do/greet/try/greet" }],
+    diagnostics: [],
+  });
+});
+
+const handledGuard = `${inlineHeader}do:
+  - guard:
+      try:
+        - fetch:
+            set:
+              a: 1
+      catch:
+        do:
+          - notify:
+              set:
+                failed: true
+`;
+
+const retriedHandledGuard = `${inlineHeader}do:
+  - guard:
+      try:
+        - fetch:
+            set:
+              a: 1
+      catch:
+        do:
+          - notify:
+              set:
+                failed: true
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+`;
+
+test.each([
+  [
+    "a retry added to a catch that handles the failure keeps its steps",
+    handledGuard,
+    {
+      kind: "handle",
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "exponential",
+        on: { kind: "any" },
+      },
+    },
+    retriedHandledGuard,
+  ],
+  [
+    "handling with no retry removes the retry and keeps the steps",
+    retriedHandledGuard,
+    { kind: "handle" },
+    handledGuard,
+  ],
+  [
+    "handling with no retry where none is written changes nothing",
+    handledGuard,
+    { kind: "handle" },
+    handledGuard,
+  ],
+] as const)("%s", (_, text, failure, expected) => {
+  const action: EditAction = { kind: "setFailure", step: "/do/guard", failure };
+
+  const outcome = outcomeOf(text, action);
+
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a retry on statuses names at least one", () => {
+  const action: EditAction = {
+    kind: "setFailure",
+    step: "/do/greet",
+    failure: {
+      kind: "retry",
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "constant",
+        on: { kind: "statuses", statuses: [] },
+      },
+    },
+  };
+
+  const editing = check(guardedFlow, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "A retry on statuses names at least one status.",
+  });
 });
 
 test("stop on a step with no protection changes nothing", () => {

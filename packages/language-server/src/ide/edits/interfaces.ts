@@ -10,9 +10,8 @@ import type { Condition } from "../conditions/index.js";
 import type { Snapshot } from "../snapshot/index.js";
 import type { ChosenResult, StepVariant } from "../variants/index.js";
 import type {
-  FailureKind,
   ListEnd,
-  Retry,
+  RetrySetting,
   StepNode,
   StepNodeList,
   StepTree,
@@ -74,7 +73,27 @@ export interface ClearField {
   readonly pointer: string;
 }
 
-export type Failure = { readonly kind: Exclude<FailureKind, "retry"> } | Retry;
+export type Failure =
+  | { readonly kind: "stop" }
+  | { readonly kind: "continue" }
+  | { readonly kind: "retry"; readonly retry: RetrySetting }
+  | { readonly kind: "handle"; readonly retry?: RetrySetting };
+
+export interface CatchHandling {
+  readonly kind: "catch";
+  readonly catch: JsonObject;
+  readonly retry: JsonObject | null;
+  readonly isHandling: boolean;
+}
+
+export type Handling =
+  | { readonly kind: "stop" }
+  | CatchHandling
+  | { readonly kind: "refused"; readonly reason: string };
+
+export type WrittenRetry =
+  | { readonly kind: "policy"; readonly policy: JsonObject }
+  | { readonly kind: "refused"; readonly reason: string };
 
 export interface SetFailure {
   readonly kind: "setFailure";

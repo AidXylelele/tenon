@@ -39,10 +39,10 @@ const draftMembers: readonly string[] = ["namespace", "name"];
 
 const variantsOfStep: ReadonlySet<unknown> = new Set(stepVariants);
 
-const plainFailureKinds: ReadonlySet<string> = new Set([
-  "stop",
-  "continue",
-  "handle",
+const backoffKinds: ReadonlySet<unknown> = new Set([
+  "constant",
+  "linear",
+  "exponential",
 ]);
 
 const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
@@ -204,14 +204,20 @@ function holdsSetting(action: unknown): boolean {
 function holdsFailureSetting(action: unknown): boolean {
   const failure = memberOf(action, "failure");
   const kind = memberOf(failure, "kind");
-  const isRetry = kind === "retry";
-  const isChoice = typeof kind === "string" && plainFailureKinds.has(kind);
+  const retry = memberOf(failure, "retry");
+  const isStep = holdsStrings(action, ["step"]);
 
-  if (isRetry) {
-    return holdsStrings(action, ["step"]) && holdsRetry(failure);
+  switch (kind) {
+    case "stop":
+    case "continue":
+      return isStep;
+    case "retry":
+      return isStep && holdsRetry(retry);
+    case "handle":
+      return isStep && (retry === undefined || holdsRetry(retry));
+    default:
+      return false;
   }
-
-  return holdsStrings(action, ["step"]) && isChoice;
 }
 
 function holdsConditionSetting(action: unknown): boolean {
@@ -302,16 +308,31 @@ function holdsResultSetting(action: unknown): boolean {
   return holdsStrings(action, ["step"]) && isChosenResult(result);
 }
 
-function holdsRetry(failure: unknown): boolean {
-  const retries = memberOf(failure, "retries");
-  const seconds = memberOf(failure, "seconds");
-  const growing = memberOf(failure, "growing");
+function holdsRetry(retry: unknown): boolean {
+  const retries = memberOf(retry, "retries");
+  const milliseconds = memberOf(retry, "milliseconds");
+  const backoff = memberOf(retry, "backoff");
+  const on = memberOf(retry, "on");
+  const isCount = Number.isInteger(retries) && Number(retries) >= 0;
+  const isDelay = Number.isInteger(milliseconds) && Number(milliseconds) >= 0;
+  const isBackoff = backoffKinds.has(backoff);
 
-  return (
-    Number.isInteger(retries) &&
-    typeof seconds === "number" &&
-    typeof growing === "boolean"
-  );
+  return isCount && isDelay && isBackoff && holdsRetriedErrors(on);
+}
+
+function holdsRetriedErrors(on: unknown): boolean {
+  const kind = memberOf(on, "kind");
+  const statuses = memberOf(on, "statuses");
+
+  switch (kind) {
+    case "any":
+    case "timeouts":
+      return true;
+    case "statuses":
+      return Array.isArray(statuses) && statuses.every(Number.isInteger);
+    default:
+      return false;
+  }
 }
 
 function holdsIndex(action: unknown): boolean {

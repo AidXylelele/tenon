@@ -43,9 +43,16 @@ export type FailureKind = "stop" | "continue" | "retry" | "handle";
 
 export type ListEnd = "end" | "exit";
 
-export interface Retry {
-  readonly kind: "retry";
+export type RetriedErrors =
+  | { readonly kind: "any" }
+  | { readonly kind: "statuses"; readonly statuses: readonly number[] }
+  | { readonly kind: "timeouts" };
+
+export type RetryOn = RetriedErrors | { readonly kind: "written" };
+
+export interface RetrySetting {
   readonly retries: number;
-  readonly seconds: number;
-  readonly growing: boolean;
+  readonly milliseconds: number;
+  readonly backoff: ast.Backoff["kind"];
+  readonly on: RetriedErrors;
 }
