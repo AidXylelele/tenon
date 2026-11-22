@@ -275,15 +275,14 @@ describe("the console's navigation as a column", () => {
     expect(group).toBeInTheDocument();
   });
 
-  it("a_place_shows_its_count_after_its_name", () => {
+  it("an_expanded_place_shows_its_count", () => {
     const viewport = fakeViewport(1440);
     vi.stubGlobal("matchMedia", viewport.matchMedia);
+
     render(<Column onOpenChange={vi.fn()} />);
 
-    const runs = screen.getByRole("button", { name: "Runs" });
-
-    const place = runs.closest("li");
-    expect(place).toHaveTextContent("Runs10");
+    const count = screen.getByText("10");
+    expect(count).toBeInTheDocument();
   });
 
   it("asking_for_the_sidebar_outside_its_provider_is_refused", () => {

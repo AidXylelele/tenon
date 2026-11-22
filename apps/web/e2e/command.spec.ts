@@ -9,7 +9,7 @@ test.describe("the search of the console", () => {
   }) => {
     await page.goto(STORY);
     const search = page.getByRole("combobox");
-    const field = page.locator('[data-slot="input-group"]', { has: search });
+    const field = page.getByRole("group").filter({ has: search });
 
     await search.focus();
 
@@ -17,22 +17,29 @@ test.describe("the search of the console", () => {
     await expect(search).toHaveCSS("outline-width", "0px");
   });
 
-  test("the_search_names_the_option_enter_takes_on_open_and_after_typing", async ({
+  test("on_open_the_search_names_the_option_enter_takes", async ({ page }) => {
+    await page.goto(STORY);
+    const search = page.getByRole("combobox");
+    const highlighted = page.getByRole("option", { selected: true });
+
+    const first = await highlighted.getAttribute("id");
+
+    const firstId = first ?? "";
+    await expect(search).toHaveAttribute("aria-activedescendant", firstId);
+  });
+
+  test("after_typing_the_search_names_the_option_enter_takes", async ({
     page,
   }) => {
     await page.goto(STORY);
     const search = page.getByRole("combobox");
     const highlighted = page.getByRole("option", { selected: true });
-    const first = await highlighted.getAttribute("id");
-    await expect(search).toHaveAttribute("aria-activedescendant", first ?? "");
 
     await search.fill("run");
 
     await expect(highlighted).toHaveText("Runs");
     const matching = await highlighted.getAttribute("id");
-    await expect(search).toHaveAttribute(
-      "aria-activedescendant",
-      matching ?? "",
-    );
+    const matchingId = matching ?? "";
+    await expect(search).toHaveAttribute("aria-activedescendant", matchingId);
   });
 });
