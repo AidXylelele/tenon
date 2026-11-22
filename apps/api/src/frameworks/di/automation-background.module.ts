@@ -61,7 +61,6 @@ import { DeliveryRun } from "../../interface-adapters/workflows/runners/delivery
 import { OpenWorkflowRun } from "../../interface-adapters/workflows/runners/open-workflow.run.js";
 import { ProcessRun } from "../../interface-adapters/workflows/runners/process.run.js";
 import { ScheduleRun } from "../../interface-adapters/workflows/runners/schedule.run.js";
-import { A2aClient } from "../a2a/a2a.client.js";
 import { AmqpBroker } from "../asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../asyncapi/asyncapi-documents.js";
@@ -149,7 +148,6 @@ import { OutboundModule } from "./outbound.module.js";
     ProtoSchema,
     GrpcClient,
     McpClient,
-    A2aClient,
     AsyncApiDocuments,
     BrokerTracer,
     AmqpBroker,

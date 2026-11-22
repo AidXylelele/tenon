@@ -1,10 +1,13 @@
 import type {
   AuthenticationScheme,
+  Endpoint,
   Failure,
   ResolvedAuthentication,
   RevealedAuthorization,
 } from "interpreter";
+import type { z } from "zod";
 import type { StepCall } from "../interfaces.js";
+import type { AGENT_CARD } from "./agent-card.schema.js";
 
 export interface CallContext extends StepCall {
   readonly remaining: number | null;
@@ -40,4 +43,15 @@ export abstract class AuthorizationServer {
     credentials: OAuth2Credentials,
     signal: AbortSignal,
   ): Promise<string>;
+}
+
+export type AgentCardProperties = z.infer<typeof AGENT_CARD>;
+
+export type Agent =
+  { readonly kind: "agent"; readonly endpoint: Endpoint } | Failure;
+
+export interface AgentOffer {
+  readonly url: string;
+  readonly binding: string;
+  readonly version: string;
 }

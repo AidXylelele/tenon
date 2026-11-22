@@ -8,19 +8,25 @@ import type {
   JsonObject,
   JsonValue,
 } from "interpreter";
-import { A2aClient } from "../../../../src/frameworks/a2a/a2a.client.js";
 import { ResilienceModule } from "@nestjs/resilience";
-import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
-import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import { resiliencePresets } from "../../../../../src/frameworks/di/host.presets.js";
+import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import { A2aGateway } from "../../../../../src/interface-adapters/workflows/effects/a2a.gateway.js";
+import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
   type ReceivedRequest,
   startStubServer,
   type StubServer,
-} from "../../../support/stub-server.js";
-import { callContextOf, httpClientOf } from "../../../support/outbound.js";
+} from "../../../../support/stub-server.js";
+import {
+  authenticationOf,
+  callContextOf,
+  fetchClientOf,
+  httpClientOf,
+  resourcesOf,
+} from "../../../../support/outbound.js";
 
 type A2aMethod = A2aRequest["method"];
 
@@ -45,11 +51,11 @@ interface Envelope {
   readonly params?: JsonObject;
 }
 
-describe("a call the A2A client performs for a run", () => {
+describe("a call the A2A gateway performs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let client: A2aClient;
+  let gateway: A2aGateway;
   let stub: StubServer;
   let elsewhere: StubServer;
   let origin = "";
@@ -61,11 +67,7 @@ describe("a call the A2A client performs for a run", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
-    client = new A2aClient(
-      httpClientOf(policy, resilience),
-      new TransportFailures(),
-      resilience,
-    );
+    gateway = a2aGatewayOf(policy);
     stub = await startStubServer((request, response) => {
       answer(request, response);
     });
@@ -85,6 +87,17 @@ describe("a call the A2A client performs for a run", () => {
   beforeEach(() => {
     stub.received.length = 0;
   });
+
+  function a2aGatewayOf(guard: AddressPolicy): A2aGateway {
+    const authentication = authenticationOf(fetchClientOf(guard.dispatcher));
+    return new A2aGateway(
+      resourcesOf(guard, resilience),
+      httpClientOf(guard, resilience),
+      authentication,
+      new TransportFailures(),
+      resilience,
+    );
+  }
 
   function cardOf(
     path: string,
@@ -384,7 +397,7 @@ describe("a call the A2A client performs for a run", () => {
         null,
       ],
     ])("%s_answers_the_json_rpc_result", async (method, parameters, result) => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf(method, parameters),
         contextOf(),
       );
@@ -393,7 +406,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("agent_get_authenticated_extended_card_answers_the_card", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("agent/getAuthenticatedExtendedCard", null),
         contextOf(),
       );
@@ -416,7 +429,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("message_stream_answers_the_ordered_results_of_the_stream", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("message/stream", MESSAGE),
         contextOf(),
       );
@@ -446,7 +459,7 @@ describe("a call the A2A client performs for a run", () => {
     it("a_stream_answered_with_plain_json_answers_a_list_of_its_one_result", async () => {
       const plain = { ...MESSAGE, metadata: { reply: "plain" } };
 
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("message/stream", plain),
         contextOf(),
       );
@@ -455,7 +468,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("tasks_resubscribe_answers_the_ordered_results_of_the_stream", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("tasks/resubscribe", { id: "task-1" }),
         contextOf(),
       );
@@ -478,7 +491,10 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("the_request_is_one_json_rpc_envelope_keyed_by_the_step", async () => {
-      await client.call(serverOf("tasks/get", { id: "task-1" }), contextOf());
+      await gateway.perform(
+        serverOf("tasks/get", { id: "task-1" }),
+        contextOf(),
+      );
 
       const [received] = stub.received;
       assert.exists(received);
@@ -493,7 +509,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("a_method_without_parameters_sends_none", async () => {
-      await client.call(
+      await gateway.perform(
         serverOf("agent/getAuthenticatedExtendedCard", null),
         contextOf(),
       );
@@ -510,7 +526,7 @@ describe("a call the A2A client performs for a run", () => {
 
   describe("the agent card", () => {
     it("the_agent_is_called_at_the_json_rpc_url_of_its_card", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         cardedOf("tasks/get", { id: "task-1" }),
         contextOf(),
       );
@@ -534,7 +550,7 @@ describe("a call the A2A client performs for a run", () => {
         },
       );
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "answered", result: TASK });
       expect(
@@ -553,7 +569,7 @@ describe("a call the A2A client performs for a run", () => {
         },
       );
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "answered", result: TASK });
       expect(stub.received.map((received) => received.url)).toEqual([
@@ -573,7 +589,7 @@ describe("a call the A2A client performs for a run", () => {
       ],
       ["/broken-card.json", "The agent card cannot be read"],
     ])("the_card_at_%s_is_misconfigured", async (path, detail) => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         cardedOf("tasks/get", { id: "task-1" }, path),
         contextOf(),
       );
@@ -589,7 +605,7 @@ describe("a call the A2A client performs for a run", () => {
         { kind: "bearer", token: TOKEN },
       );
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -600,7 +616,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("a_card_the_server_does_not_have_is_rejected_with_its_status", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         cardedOf("tasks/get", { id: "task-1" }, "/missing-card.json"),
         contextOf(),
       );
@@ -621,7 +637,7 @@ describe("a call the A2A client performs for a run", () => {
         secret: "agent",
       });
 
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         request,
         contextOf({ agent: { token: TOKEN } }),
       );
@@ -635,7 +651,7 @@ describe("a call the A2A client performs for a run", () => {
         token: "wrong",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -651,7 +667,7 @@ describe("a call the A2A client performs for a run", () => {
         secret: "agent",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "forbidden",
@@ -678,7 +694,7 @@ describe("a call the A2A client performs for a run", () => {
         assert.exists(answer);
         const [code, message] = answer;
 
-        const outcome = await client.call(
+        const outcome = await gateway.perform(
           serverOf(method, parameters),
           contextOf(),
         );
@@ -688,7 +704,7 @@ describe("a call the A2A client performs for a run", () => {
     );
 
     it("an_error_inside_a_stream_ends_it_as_an_rpc_error", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("tasks/resubscribe", { id: "broken" }),
         contextOf(),
       );
@@ -702,7 +718,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("an_answer_that_is_not_json_rpc_is_unreachable", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("tasks/get", { id: "task-1" }, "/garbled"),
         contextOf(),
       );
@@ -714,7 +730,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("an_envelope_of_another_json_rpc_version_is_unreachable", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("tasks/get", { id: "task-1" }, "/versionless"),
         contextOf(),
       );
@@ -726,7 +742,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("a_status_without_an_envelope_is_rejected_with_it", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("message/stream", MESSAGE, "/failing"),
         contextOf(),
       );
@@ -739,7 +755,7 @@ describe("a call the A2A client performs for a run", () => {
     });
 
     it("a_status_with_a_json_rpc_error_is_answered_as_the_rpc_error", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         serverOf("tasks/get", { id: "task-1" }, "/denied"),
         contextOf(),
       );
@@ -760,7 +776,7 @@ describe("a call the A2A client performs for a run", () => {
         },
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "unreachable",
@@ -776,7 +792,7 @@ describe("a call the A2A client performs for a run", () => {
         },
       });
 
-      const outcome = await client.call(request, contextOf({}, 200));
+      const outcome = await gateway.perform(request, contextOf({}, 200));
 
       expect(outcome).toEqual({ kind: "expired" });
     });
@@ -794,7 +810,7 @@ describe("a call the A2A client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "unreachable",
@@ -806,11 +822,7 @@ describe("a call the A2A client performs for a run", () => {
       "a_private_card_or_agent_at_%s_is_refused_before_any_connection",
       async (host) => {
         const guarded = new AddressPolicy([]);
-        const guardedClient = new A2aClient(
-          httpClientOf(guarded, resilience),
-          new TransportFailures(),
-          resilience,
-        );
+        const guardedGateway = a2aGatewayOf(guarded);
         const uri = `http://${host}:${String(stub.port)}`;
         const carded: A2aRequest = {
           ...cardedOf("tasks/get", { id: "task-1" }),
@@ -834,8 +846,8 @@ describe("a call the A2A client performs for a run", () => {
         };
 
         const outcomes = [
-          await guardedClient.call(carded, contextOf()),
-          await guardedClient.call(served, contextOf()),
+          await guardedGateway.perform(carded, contextOf()),
+          await guardedGateway.perform(served, contextOf()),
         ];
 
         expect(outcomes).toEqual([
