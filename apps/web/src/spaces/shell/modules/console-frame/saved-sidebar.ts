@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { type Viewport, VIEWPORT_COOKIE, viewportOf } from "./viewport";
 
 const SIDEBAR_COOKIE = "sidebar_state";
 
@@ -12,4 +13,10 @@ export async function savedSidebarChoice(): Promise<boolean | null> {
   if (saved === "false") return false;
 
   return null;
+}
+
+export async function lastViewport(): Promise<Viewport | null> {
+  const store = await cookies();
+  const last = store.get(VIEWPORT_COOKIE)?.value;
+  return viewportOf(last);
 }

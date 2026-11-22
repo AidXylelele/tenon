@@ -7,7 +7,7 @@ import { ConsoleRoot } from "./console-root";
 import { ConsoleSidebar, SidebarLoading } from "./console-sidebar";
 import { Frame } from "./frame";
 import { OfflineStrip } from "./offline-strip";
-import { savedSidebarChoice } from "./saved-sidebar";
+import { lastViewport, savedSidebarChoice } from "./saved-sidebar";
 import { signedIn } from "./signed-in";
 
 export async function ConsoleFrame({
@@ -15,10 +15,13 @@ export async function ConsoleFrame({
 }: {
   readonly children: React.ReactNode;
 }) {
-  const saved = await savedSidebarChoice();
+  const [saved, viewport] = await Promise.all([
+    savedSidebarChoice(),
+    lastViewport(),
+  ]);
 
   return (
-    <ConsoleRoot defaultOpen={saved}>
+    <ConsoleRoot defaultOpen={saved} lastViewport={viewport}>
       <Frame
         sidebar={
           <Suspense fallback={<SidebarLoading />}>

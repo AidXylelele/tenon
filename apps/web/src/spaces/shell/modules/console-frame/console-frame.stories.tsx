@@ -65,7 +65,7 @@ function FrameStory({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <ConsoleRoot defaultOpen={defaultOpen}>
+      <ConsoleRoot defaultOpen={defaultOpen} lastViewport={null}>
         <Frame
           sidebar={sidebar}
           search={

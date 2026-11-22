@@ -35,6 +35,22 @@ function placeOfFocus(page: Page): Promise<string> {
   });
 }
 
+function layoutShiftSoFar(): Promise<number> {
+  return new Promise((resolve) => {
+    let shifted = 0;
+    const observer = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries())
+        if ("value" in entry && typeof entry.value === "number")
+          shifted += entry.value;
+    });
+    observer.observe({ type: "layout-shift", buffered: true });
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(shifted);
+    }, 500);
+  });
+}
+
 async function tabStopsToContent(page: Page): Promise<string[]> {
   const places: string[] = [];
 
@@ -165,6 +181,21 @@ test.describe("the sidebar's width", () => {
 
     const column = page.locator(COLUMN);
     await expect(column).toHaveAttribute("data-state", "collapsed");
+  });
+
+  test("a_reload_at_1100_px_draws_the_icons_without_a_shift", async ({
+    page,
+  }) => {
+    await page.setViewportSize(COMPACT);
+    await open(page, "expanded");
+
+    await page.reload();
+    await page.getByRole("button", { name: "Run" }).waitFor();
+
+    const column = page.locator(COLUMN);
+    const shifted = await page.evaluate(layoutShiftSoFar);
+    await expect(column).toHaveAttribute("data-state", "collapsed");
+    expect(shifted).toBe(0);
   });
 
   test("keeps_the_person's_saved_choice_from_1024_to_1199_px", async ({

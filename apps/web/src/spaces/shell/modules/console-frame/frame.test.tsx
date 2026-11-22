@@ -34,7 +34,7 @@ const VIEWER: Capabilities = {
 function FrameAt({ capabilities }: { readonly capabilities: Capabilities }) {
   return (
     <TooltipProvider>
-      <ConsoleRoot defaultOpen={null}>
+      <ConsoleRoot defaultOpen={null} lastViewport={null}>
         <Frame
           sidebar={
             <ConsoleSidebar
@@ -145,7 +145,7 @@ describe("the console frame", () => {
 
     render(
       <TooltipProvider>
-        <ConsoleRoot defaultOpen={null}>
+        <ConsoleRoot defaultOpen={null} lastViewport={null}>
           <SidebarLoading />
         </ConsoleRoot>
       </TooltipProvider>,

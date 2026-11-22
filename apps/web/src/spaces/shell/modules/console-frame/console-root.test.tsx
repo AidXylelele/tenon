@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   Dialog,
@@ -8,6 +9,7 @@ import {
 import { SidebarTrigger, useSidebar } from "@/libs/ui/components/sidebar";
 import { fakeViewport } from "@/libs/ui/hooks/viewport.test-support";
 import { ConsoleRoot } from "./console-root";
+import type { Viewport } from "./viewport";
 
 const address = vi.hoisted(() => ({ pathname: "/workflows" }));
 
@@ -27,7 +29,7 @@ function renderAt(width: number, defaultOpen: boolean | null) {
   const viewport = fakeViewport(width);
   vi.stubGlobal("matchMedia", viewport.matchMedia);
   return render(
-    <ConsoleRoot defaultOpen={defaultOpen}>
+    <ConsoleRoot defaultOpen={defaultOpen} lastViewport={null}>
       <Sidebar />
     </ConsoleRoot>,
   );
@@ -40,7 +42,7 @@ function rootOf(view: ReturnType<typeof render>): Element | null {
 function revisit(view: ReturnType<typeof render>, pathname: string) {
   address.pathname = pathname;
   view.rerender(
-    <ConsoleRoot defaultOpen={null}>
+    <ConsoleRoot defaultOpen={null} lastViewport={null}>
       <Sidebar />
     </ConsoleRoot>,
   );
@@ -161,6 +163,89 @@ describe("the sidebar's state across the console", () => {
   });
 });
 
+describe("the sidebar drawn by the server before the page runs", () => {
+  beforeEach(() => {
+    address.pathname = "/workflows";
+    document.cookie = "viewport=; max-age=0; path=/";
+  });
+
+  function consoleWith(
+    defaultOpen: boolean | null,
+    lastViewport: Viewport | null,
+  ) {
+    return (
+      <ConsoleRoot defaultOpen={defaultOpen} lastViewport={lastViewport}>
+        <Sidebar />
+      </ConsoleRoot>
+    );
+  }
+
+  function hydrateAt(width: number, root: React.ReactElement) {
+    const viewport = fakeViewport(width);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+    const html = renderToString(root);
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    document.body.append(container);
+    const drawn = container.querySelector("p")?.textContent;
+    render(root, { container, hydrate: true });
+    return { drawn, viewport };
+  }
+
+  it.each<[Viewport | null, string]>([
+    ["narrow", "collapsed"],
+    ["wide", "expanded"],
+    [null, "expanded"],
+  ])("a_last_viewport_of_%s_draws_it_%s", (lastViewport, state) => {
+    const root = consoleWith(null, lastViewport);
+
+    const html = renderToString(root);
+
+    expect(html).toContain(state);
+  });
+
+  it("a_saved_choice_wins_over_the_last_viewport", () => {
+    const root = consoleWith(true, "narrow");
+
+    const html = renderToString(root);
+
+    expect(html).toContain("expanded");
+  });
+
+  it("a_reload_at_1100_px_after_a_first_visit_keeps_the_icons_without_a_shift", () => {
+    const root = consoleWith(null, "narrow");
+
+    const { drawn } = hydrateAt(1100, root);
+
+    const shown = screen.getByText("collapsed");
+    expect(drawn).toBe("collapsed");
+    expect(shown).toBeInTheDocument();
+  });
+
+  it("a_first_visit_at_1100_px_is_drawn_wide_and_then_collapses", () => {
+    const root = consoleWith(null, null);
+
+    const { drawn } = hydrateAt(1100, root);
+
+    const shown = screen.getByText("collapsed");
+    expect(drawn).toBe("expanded");
+    expect(shown).toBeInTheDocument();
+  });
+
+  it("the_viewport_is_told_to_the_server_and_again_across_1200_px", () => {
+    const root = consoleWith(null, null);
+    const { viewport } = hydrateAt(1100, root);
+    const told = document.cookie;
+
+    act(() => {
+      viewport.resize(1300);
+    });
+
+    expect(told).toContain("viewport=narrow");
+    expect(document.cookie).toContain("viewport=wide");
+  });
+});
+
 describe("the console behind a modal", () => {
   beforeEach(() => {
     address.pathname = "/workflows";
@@ -171,7 +256,7 @@ describe("the console behind a modal", () => {
   function Behind({ open }: { readonly open: boolean }) {
     return (
       <>
-        <ConsoleRoot defaultOpen={null}>
+        <ConsoleRoot defaultOpen={null} lastViewport={null}>
           <button type="button">Behind</button>
         </ConsoleRoot>
         <Dialog open={open}>

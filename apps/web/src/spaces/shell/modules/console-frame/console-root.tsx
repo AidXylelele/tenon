@@ -1,23 +1,31 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { NEW_WORKFLOW_HREF } from "@/libs/routing/routes";
 import { SidebarProvider } from "@/libs/ui/components/sidebar";
 import { useModalOpen } from "./modal-open";
+import { type Viewport, VIEWPORT_COOKIE } from "./viewport";
 
 const COMPACT = "(max-width: 1199px)";
+const YEAR_S = 365 * 24 * 60 * 60;
 const EDITOR = /^\/workflows\/[^/]+\/[^/]+\/edit$/;
 
 interface ConsoleRootProps {
   readonly defaultOpen: boolean | null;
+  readonly lastViewport: Viewport | null;
   readonly children: React.ReactNode;
 }
 
-export function ConsoleRoot({ defaultOpen, children }: ConsoleRootProps) {
+export function ConsoleRoot({
+  defaultOpen,
+  lastViewport,
+  children,
+}: ConsoleRootProps) {
   const pathname = usePathname();
   const editing = isEditorAddress(pathname);
-  const compact = useCompactScreen();
+  const lastCompact = lastViewport === "narrow";
+  const compact = useCompactScreen(lastCompact);
   const modalOpen = useModalOpen();
   const [chosen, setChosen] = useState(defaultOpen);
   const [editorOpen, setEditorOpen] = useState(false);
@@ -27,6 +35,11 @@ export function ConsoleRoot({ defaultOpen, children }: ConsoleRootProps) {
     setInEditor(editing);
     setEditorOpen(false);
   }
+
+  useEffect(() => {
+    const viewport = compact ? "narrow" : "wide";
+    document.cookie = `${VIEWPORT_COOKIE}=${viewport}; path=/; max-age=${String(YEAR_S)}; samesite=lax`;
+  }, [compact]);
 
   const columnOpen = chosen ?? !compact;
   const open = editing ? editorOpen : columnOpen;
@@ -47,8 +60,8 @@ function isEditorAddress(pathname: string): boolean {
   return pathname === NEW_WORKFLOW_HREF || EDITOR.test(pathname);
 }
 
-function useCompactScreen(): boolean {
-  return useSyncExternalStore(subscribe, isCompactNow, isCompactOnServer);
+function useCompactScreen(lastCompact: boolean): boolean {
+  return useSyncExternalStore(subscribe, isCompactNow, () => lastCompact);
 }
 
 function subscribe(listener: () => void): () => void {
@@ -61,8 +74,4 @@ function subscribe(listener: () => void): () => void {
 
 function isCompactNow(): boolean {
   return window.matchMedia(COMPACT).matches;
-}
-
-function isCompactOnServer(): boolean {
-  return false;
 }
