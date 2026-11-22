@@ -48,6 +48,10 @@ function SelectionStates() {
           <Switch id="disabled" disabled />
           <Label htmlFor="disabled">Starts automatically</Label>
         </div>
+        <div className="flex items-center gap-2">
+          <Switch id="invalid" aria-invalid />
+          <Label htmlFor="invalid">Accept the terms</Label>
+        </div>
       </section>
       <section className="flex flex-col gap-3">
         <h2 className="heading-2">Radio group</h2>

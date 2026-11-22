@@ -45,7 +45,7 @@ describe("the header of a side panel", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it("back_comes_first_and_takes_its_owner_to_the_previous_view", () => {
+  it("back_takes_its_owner_to_the_previous_view", () => {
     const onBack = vi.fn();
     render(
       <TooltipProvider>
@@ -61,8 +61,23 @@ describe("the header of a side panel", () => {
     fireEvent.click(back);
 
     expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  it("back_comes_before_the_title", () => {
+    render(
+      <TooltipProvider>
+        <PanelHeader
+          title="Send invoice"
+          onBack={vi.fn()}
+          backLabel="Back to the timeline"
+        />
+      </TooltipProvider>,
+    );
+    const back = screen.getByRole("button", { name: "Back to the timeline" });
     const heading = screen.getByRole("heading", { name: "Send invoice" });
+
     const order = back.compareDocumentPosition(heading);
+
     expect(order).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 

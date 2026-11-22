@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const STORIES =
-  "/iframe.html?viewMode=story&id=design-system-components-sidebar";
+function storyOf(name: string): string {
+  return `/iframe.html?viewMode=story&id=design-system-components-sidebar--${name}`;
+}
 
 async function colourOf(page: Page, token: string): Promise<string> {
   return page.evaluate((name) => {
@@ -18,7 +19,8 @@ test.describe("the console's navigation", () => {
   test("expanded_it_shows_its_group_label_and_the_runs_count", async ({
     page,
   }) => {
-    await page.goto(`${STORIES}--expanded`);
+    const story = storyOf("expanded");
+    await page.goto(story);
 
     const label = page.getByText("Connect", { exact: true });
     const count = page.getByText("10", { exact: true });
@@ -29,7 +31,8 @@ test.describe("the console's navigation", () => {
   test("collapsed_to_icons_it_hides_its_group_label_and_the_runs_count", async ({
     page,
   }) => {
-    await page.goto(`${STORIES}--collapsed-to-icons`);
+    const story = storyOf("collapsed-to-icons");
+    await page.goto(story);
 
     const label = page.getByText("Connect", { exact: true });
     const count = page.getByText("10", { exact: true });
@@ -40,7 +43,8 @@ test.describe("the console's navigation", () => {
   test("a_hovered_place_keeps_its_count_readable_on_the_hover_fill", async ({
     page,
   }) => {
-    await page.goto(`${STORIES}--expanded`);
+    const story = storyOf("expanded");
+    await page.goto(story);
     const runs = page.getByRole("link", { name: /^Runs/ });
     const count = page.getByText("10", { exact: true });
 
@@ -53,7 +57,8 @@ test.describe("the console's navigation", () => {
   test("the_mobile_sheet_opens_on_its_first_place", async ({ page }) => {
     await page.setViewportSize({ width: 800, height: 900 });
 
-    await page.goto(`${STORIES}--mobile-sheet-open`);
+    const story = storyOf("mobile-sheet-open");
+    await page.goto(story);
 
     const home = page.getByRole("link", { name: "Home" });
     await expect(home).toBeFocused();

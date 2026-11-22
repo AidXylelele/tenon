@@ -44,15 +44,15 @@ const FEATURES_BELOW_THE_FLOOR = FEATURES_DELETED_IN_M5.concat(
 type Floor = typeof OPERATION_FLOOR;
 
 function floorsOf(
-  layer: string,
+  tier: string,
   floor: Floor,
   exempt: readonly string[],
 ): [string, Floor][] {
-  const folder = new URL(`./src/${layer}/`, import.meta.url);
+  const folder = new URL(`./src/${tier}/`, import.meta.url);
 
   return readdirSync(folder, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !exempt.includes(entry.name))
-    .map((entry): [string, Floor] => [`src/${layer}/${entry.name}/**`, floor]);
+    .map((entry): [string, Floor] => [`src/${tier}/${entry.name}/**`, floor]);
 }
 
 const operationFloors = floorsOf("operations", OPERATION_FLOOR, []);
