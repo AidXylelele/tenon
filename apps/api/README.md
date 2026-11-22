@@ -1,51 +1,33 @@
 # api
 
-Workflow platform API: a NestJS modular monolith (ESM, SWC builder) organised in Clean
-Architecture layers (`domain`, `application`, `interface-adapters`, `frameworks`; see
-[docs/architecture/03-api.md](../../docs/architecture/03-api.md)).
+The Tenon API: a NestJS application that publishes Open Workflow definitions, runs their instances
+on a durable engine, and serves the console, the webhooks and the events that start them.
 
-## Scripts
+## Run
 
-| Command               | Description                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `pnpm dev`            | Start in watch mode (port `3000`)                                                                      |
-| `pnpm build`          | Build to `dist/` with SWC + type check                                                                 |
-| `pnpm start:prod`     | Run the compiled app with the OpenTelemetry preload                                                    |
-| `pnpm db:generate`    | Generate a Drizzle migration from the schema                                                           |
-| `pnpm db:migrate`     | Apply the Drizzle migrations (`DATABASE_URL`)                                                          |
-| `pnpm outbox:migrate` | Apply the `@nestjs/outbox` migrations (`DATABASE_URL`)                                                 |
-| `pnpm test`           | Unit tests (`test/unit`), no containers                                                                |
-| `pnpm test:int`       | Integration (`test/integration`) and component (`test/component`) tests on a Testcontainers PostgreSQL |
-| `pnpm test:e2e`       | End-to-end journeys (`test/e2e`) against the running Compose stack (profile `app`)                     |
-| `pnpm test:cov`       | Unit tests with coverage                                                                               |
-| `pnpm lint`           | ESLint (type-aware, layer boundaries)                                                                  |
-| `pnpm check-types`    | TypeScript type check                                                                                  |
-
-## Local stack
-
-From the repository root (see [`.env.example`](../../.env.example)):
+From the repository root, with Docker and a `.env` copied from `.env.example`:
 
 ```sh
-cp .env.example .env                      # set POSTGRES_PASSWORD
-docker compose up -d                      # PostgreSQL 127.0.0.1:55432, Mailpit SMTP 51025 / UI http://127.0.0.1:58025
+docker compose up --wait postgres mailpit go-judge
 set -a; . ./.env; set +a
-pnpm --filter api db:migrate
-pnpm --filter api outbox:migrate
+pnpm --filter "api^..." run build
+pnpm --filter api migrate
 pnpm --filter api dev
 ```
 
-`docker compose --profile app up -d --build` also runs the API image on `127.0.0.1:53000`.
+The API answers on `http://127.0.0.1:3000/api/v1`, with its OpenAPI document at `/api/v1/docs`.
 
-## Authentication
+## Test
 
-Sessions, password recovery and invitations are application routes under `/api/v1/auth` and
-`/api/v1/invitations` (documented at `/api/v1/docs`), built on `@nestjs/authentication`,
-`@nestjs/authorization` and `@nestjs/mail` (SMTP; `SMTP_STARTTLS=opportunistic` for Mailpit). The session is the HttpOnly cookie `sid`; browser
-requests from another origin must be listed in `TRUSTED_ORIGINS`. Accounts are created only through
-invitations; the migrations seed `admin@example.com`, who sets the first password through recovery.
+```sh
+pnpm --filter api test
+pnpm --filter api exec vitest run --project integration
+pnpm --filter api exec vitest run --project e2e
+```
 
-## Conventions
-
-Generate new modules with the Nest CLI (`pnpm exec nest g resource <name>`) and place the files in
-the layer layout. Do not use `nest g app|library` — it converts the project to Nest's own monorepo
-mode; the repository is a pnpm workspace.
+The unit tests need nothing else, the integration tests start PostgreSQL and the brokers in Docker,
+and the end-to-end tests run against the whole stand, started with `docker compose up --build --wait`.
+They read `API_BASE_URL` (default `http://127.0.0.1:53000`), `MAILPIT_URL` (default `http://127.0.0.1:58025`),
+`E2E_ADMIN_EMAIL` (the stand's `ADMIN_EMAIL`, default `admin@example.com`) and `E2E_ADMIN_PASSWORD` (the password the
+journeys give that administrator). The workflow journey serves its stub at `host.docker.internal`, so the stand's
+`OUTBOUND_ALLOW_LIST` must hold the address that name has inside the api container.

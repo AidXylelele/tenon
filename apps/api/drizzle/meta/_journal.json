@@ -15,6 +15,230 @@
       "when": 1791719951546,
       "tag": "0001_bootstrap_administrator",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791840696837,
+      "tag": "0002_account",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793229524066,
+      "tag": "0003_idempotency_key",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793665595723,
+      "tag": "0004_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793667140642,
+      "tag": "0005_workflow_instance",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793668252872,
+      "tag": "0006_event",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793668492821,
+      "tag": "0007_instance_waiting",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793668977068,
+      "tag": "0008_listener",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793670600947,
+      "tag": "0009_instance_list_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793671149168,
+      "tag": "0010_webhook",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793672093717,
+      "tag": "0011_schedules",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793673098074,
+      "tag": "0012_secrets",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793673824362,
+      "tag": "0013_subscriptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793728966241,
+      "tag": "0014_task_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795062468110,
+      "tag": "0015_listener_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795300324474,
+      "tag": "0016_run_on_the_interpreter",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795305958330,
+      "tag": "0017_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795305959114,
+      "tag": "0018_version_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795307029441,
+      "tag": "0019_run_waits",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795309074630,
+      "tag": "0020_outbox_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795309075327,
+      "tag": "0021_engine_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795314910680,
+      "tag": "0022_version_digest",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795319747092,
+      "tag": "0023_locks",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795323446061,
+      "tag": "0024_listener_execution",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795326298009,
+      "tag": "0025_drop_task_progress",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795330642738,
+      "tag": "0026_receivers",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1795332548206,
+      "tag": "0027_task_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795335528417,
+      "tag": "0028_receive_executions",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795336546224,
+      "tag": "0029_receive_positions",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795341035055,
+      "tag": "0030_password_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795343433292,
+      "tag": "0031_version_imports",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795345994631,
+      "tag": "0032_event_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795350296708,
+      "tag": "0033_on_schedule_types",
+      "breakpoints": true
     }
   ]
 }

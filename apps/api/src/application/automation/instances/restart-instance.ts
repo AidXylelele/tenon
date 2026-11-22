@@ -1,0 +1,45 @@
+import { Injectable } from "@nestjs/common";
+import { Transactional } from "@nestjs-cls/transactional";
+import { Missing } from "../enums.js";
+import { WorkflowRepository } from "../workflows/ports.js";
+import type { RestartInstanceCommand, StartResult } from "./interfaces.js";
+import { InstanceRuns, WorkflowInstanceRepository } from "./ports.js";
+
+@Injectable()
+export class RestartInstance {
+  constructor(
+    private readonly workflows: WorkflowRepository,
+    private readonly instances: WorkflowInstanceRepository,
+    private readonly runs: InstanceRuns,
+  ) {}
+
+  @Transactional()
+  async execute(command: RestartInstanceCommand): Promise<StartResult> {
+    const previous = await this.instances.find(command.instanceId);
+
+    if (previous === null) return { ok: false, failure: Missing.Instance };
+
+    const workflow = await this.workflows.findById(previous.workflowId);
+
+    if (workflow === null) return { ok: false, failure: Missing.Workflow };
+
+    const version = workflow.versionById(previous.versionId);
+
+    if (version === null) return { ok: false, failure: Missing.Version };
+
+    const now = new Date();
+    const restarted = workflow.restartInstance({
+      previous,
+      version,
+      starterId: command.starterId,
+      now,
+    });
+
+    if (!restarted.ok) return restarted;
+
+    const instance = restarted.value;
+    await this.instances.save(instance);
+    await this.runs.start(instance);
+    return { ok: true, value: { instanceId: instance.id } };
+  }
+}

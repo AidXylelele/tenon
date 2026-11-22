@@ -1,0 +1,49 @@
+import type {
+  JsonValue,
+  ProcessOutcome,
+  ProcessRequest,
+  Script,
+  Shell,
+} from "interpreter";
+import type { z } from "zod";
+import type { SANDBOX_RESULTS } from "./sandbox-result.schema.js";
+
+export type SandboxedProcessRequest = ProcessRequest & {
+  readonly process: Script | Shell;
+};
+
+export interface SandboxLimitsProps {
+  readonly time: Temporal.Duration;
+  readonly memoryBytes: number;
+  readonly processes: number;
+  readonly outputBytes: number;
+}
+
+export interface ScriptLanguage {
+  readonly interpreter: string;
+  declares(name: string): boolean;
+  declarationOf(name: string, value: JsonValue): string;
+}
+
+export type SandboxResult = z.infer<typeof SANDBOX_RESULTS>[0];
+
+export interface SandboxFile {
+  readonly content?: string;
+  readonly name?: string;
+  readonly max?: number;
+}
+
+export interface SandboxCommand {
+  readonly args: readonly string[];
+  readonly env: readonly string[];
+  readonly files: readonly SandboxFile[];
+  readonly cpuLimit: number;
+  readonly clockLimit: number;
+  readonly memoryLimit: number;
+  readonly procLimit: number;
+  readonly copyIn: Readonly<Record<string, SandboxFile>>;
+}
+
+export type BuiltCommand =
+  | { readonly kind: "command"; readonly command: SandboxCommand }
+  | ProcessOutcome;

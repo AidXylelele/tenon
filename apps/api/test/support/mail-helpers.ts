@@ -1,30 +1,32 @@
-import type { SentMail } from '@nestjs/mail';
-import type { TestApp } from './create-test-app.js';
+import type { SentMail } from "@nestjs/mail";
+import type { TestApp } from "./create-test-app.js";
 
 export async function invitationTokenFor(
   t: TestApp,
   email: string,
 ): Promise<string> {
-  await t.deliverOutbox();
-  return tokenIn(deliveredTo(t, email), '/invitations/accept');
+  const mail = await t.untilMailDeliveredTo(email);
+
+  return tokenIn(mail, email, "/invitations/accept");
 }
 
 export async function recoveryTokenFor(
   t: TestApp,
   email: string,
 ): Promise<string> {
-  await t.settle();
-  await t.deliverOutbox();
-  return tokenIn(deliveredTo(t, email), '/reset-password');
+  const mail = await t.untilMailDeliveredTo(email);
+
+  return tokenIn(mail, email, "/reset-password");
 }
 
-const deliveredTo = (t: TestApp, email: string): SentMail => {
-  const mail = t.mail.lastTo(email);
+const tokenIn = (mail: SentMail, email: string, path: string): string => {
+  const link = mail.link(path);
+  const token = link.searchParams.get("token");
 
-  if (!mail) throw new Error(`No mail was delivered to ${email}`);
+  if (!token)
+    throw new Error(
+      `The mail to ${email} holds no link to ${path} with a token`,
+    );
 
-  return mail;
+  return token;
 };
-
-const tokenIn = (mail: SentMail, path: string): string =>
-  mail.link(path).searchParams.get('token') ?? '';

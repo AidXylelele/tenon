@@ -1,45 +1,41 @@
-import { Global, Module, type OnApplicationShutdown } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { ClsPluginTransactional } from '@nestjs-cls/transactional';
-import { TransactionalAdapterDrizzleOrm } from '@nestjs-cls/transactional-adapter-drizzle-orm';
-import { ClsModule } from 'nestjs-cls';
-import pg from 'pg';
-import { Database } from '../../interface-adapters/interfaces.js';
-import { createDatabase } from '../drizzle/client.js';
-import type { Env } from './config.module.js';
+import { Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DrizzleModule, getDrizzleToken } from "@nestjs/drizzle";
+import { ClsPluginTransactional } from "@nestjs-cls/transactional";
+import { TransactionalAdapterDrizzleOrm } from "@nestjs-cls/transactional-adapter-drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { ClsModule } from "nestjs-cls";
+import type { Database } from "../../interface-adapters/persistence/interfaces.js";
+import * as schema from "../../interface-adapters/persistence/schema/index.js";
+import type { Env } from "./env.schema.js";
 
-@Global()
 @Module({
   imports: [
+    DrizzleModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Env, true>) => ({
+        drizzle,
+        connection: {
+          connectionString: config.get("DATABASE_URL", { infer: true }),
+          max: config.get("DATABASE_POOL_SIZE", { infer: true }),
+          connectionTimeoutMillis: 10_000,
+          keepAlive: true,
+        },
+        schema,
+        casing: "snake_case" as const,
+      }),
+    }),
     ClsModule.forRoot({
       global: true,
-      middleware: { mount: true, generateId: true },
+      middleware: { mount: true },
       plugins: [
         new ClsPluginTransactional({
           adapter: new TransactionalAdapterDrizzleOrm<Database>({
-            drizzleInstanceToken: Database,
+            drizzleInstanceToken: getDrizzleToken(),
           }),
         }),
       ],
     }),
   ],
-  providers: [
-    {
-      provide: pg.Pool,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) =>
-        new pg.Pool({
-          connectionString: config.get('DATABASE_URL', { infer: true }),
-        }),
-    },
-    { provide: Database, inject: [pg.Pool], useFactory: createDatabase },
-  ],
-  exports: [Database],
 })
-export class DatabaseModule implements OnApplicationShutdown {
-  constructor(private readonly pool: pg.Pool) {}
-
-  onApplicationShutdown(): Promise<void> {
-    return this.pool.end();
-  }
-}
+export class DatabaseModule {}

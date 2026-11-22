@@ -1,21 +1,25 @@
-import request from 'supertest';
+import request from "supertest";
 import {
   authHeaders,
   cookieHeader,
   createUser,
   PASSWORD,
   signIn,
-} from '../support/auth-helpers.js';
-import { createTestApp, type TestApp } from '../support/create-test-app.js';
-import { truncateAll } from '../support/db.js';
+} from "../support/auth-helpers.js";
+import {
+  createTestApp,
+  type TestApp,
+  withoutInterpreter,
+} from "../support/create-test-app.js";
+import { truncateAll } from "../support/db.js";
 
-const NEW_PASSWORD = 'another-long-password-9';
+const NEW_PASSWORD = "another-long-password-9";
 
-describe('change own password over HTTP', () => {
+describe("change own password over HTTP", () => {
   let t: TestApp;
 
   beforeAll(async () => {
-    t = await createTestApp();
+    t = await createTestApp(withoutInterpreter);
   });
 
   afterAll(async () => {
@@ -24,64 +28,81 @@ describe('change own password over HTTP', () => {
 
   beforeEach(async () => {
     await truncateAll(t.db);
-    await createUser(t, { email: 'user@example.com' });
+    await createUser(t, { email: "user@example.com" });
   });
 
-  const change = (
-    cookie: string | undefined,
-    body: Record<string, unknown>,
-  ) => {
-    let req = request(t.server).patch('/api/v1/auth/password');
-
-    if (cookie) req = req.set(authHeaders(cookie));
-
-    return req.send({
+  const change = (cookie: string, body: Record<string, unknown>) => {
+    const sent = {
       currentPassword: PASSWORD,
       newPassword: NEW_PASSWORD,
       ...body,
-    });
+    };
+    const headers = authHeaders(cookie);
+    return request(t.server)
+      .patch("/api/v1/auth/password")
+      .set(headers)
+      .send(sent);
   };
 
-  it('the_correct_current_password_replaces_the_password_keeps_the_caller_signed_in_and_ends_other_sessions', async () => {
-    const caller = await signIn(t.server, 'user@example.com');
-    const other = await signIn(t.server, 'user@example.com');
+  it("the_correct_current_password_replaces_the_password_keeps_the_caller_signed_in_and_ends_other_sessions", async () => {
+    const caller = await signIn(t.server, "user@example.com");
+    const other = await signIn(t.server, "user@example.com");
+
     const response = await change(caller, {}).expect(204);
-    const fresh = cookieHeader(response.headers['set-cookie']);
-    expect(fresh).toContain('sid=');
+
+    const fresh = cookieHeader(response.headers["set-cookie"]);
+    expect(fresh).toContain("sid=");
+    const freshHeaders = authHeaders(fresh);
     await request(t.server)
-      .get('/api/v1/probe/user')
-      .set(authHeaders(fresh))
+      .get("/api/v1/probe/user")
+      .set(freshHeaders)
       .expect(200);
+    const otherHeaders = authHeaders(other);
     await request(t.server)
-      .get('/api/v1/probe/user')
-      .set(authHeaders(other))
+      .get("/api/v1/probe/user")
+      .set(otherHeaders)
       .expect(401);
     await request(t.server)
-      .post('/api/v1/auth/session')
-      .send({ email: 'user@example.com', password: PASSWORD })
+      .post("/api/v1/auth/session")
+      .send({ email: "user@example.com", password: PASSWORD })
       .expect(401);
-    await signIn(t.server, 'user@example.com', NEW_PASSWORD);
+    await signIn(t.server, "user@example.com", NEW_PASSWORD);
   });
 
-  it('a_wrong_current_password_is_refused_and_the_password_stays', async () => {
-    const caller = await signIn(t.server, 'user@example.com');
+  it("a_wrong_current_password_is_refused_and_the_password_stays", async () => {
+    const caller = await signIn(t.server, "user@example.com");
+
     const response = await change(caller, {
-      currentPassword: 'not-the-current-password',
-    }).expect(400);
+      currentPassword: "not-the-current-password",
+    }).expect(422);
+
     expect(response.body).toMatchObject({
-      message: 'The current password is wrong',
+      type: "urn:problem:account.wrong-password",
+      detail: "The current password is wrong",
     });
-    await signIn(t.server, 'user@example.com', PASSWORD);
+    await signIn(t.server, "user@example.com", PASSWORD);
   });
 
-  it('a_new_password_outside_the_policy_is_refused', async () => {
-    const caller = await signIn(t.server, 'user@example.com');
-    await change(caller, { newPassword: 'short1' }).expect(400);
-    await change(caller, { newPassword: 'a'.repeat(129) }).expect(400);
-    await signIn(t.server, 'user@example.com', PASSWORD);
-  });
+  const tooLong = "a".repeat(129);
 
-  it('a_request_without_a_session_is_refused', async () => {
-    await change(undefined, {}).expect(401);
+  it.each([
+    { case: "too short", newPassword: "short1" },
+    { case: "too long", newPassword: tooLong },
+  ])(
+    "a_new_password_outside_the_policy_is_refused ($case)",
+    async ({ newPassword }) => {
+      const caller = await signIn(t.server, "user@example.com");
+
+      await change(caller, { newPassword }).expect(400);
+
+      await signIn(t.server, "user@example.com", PASSWORD);
+    },
+  );
+
+  it("a_request_without_a_session_is_refused", async () => {
+    await request(t.server)
+      .patch("/api/v1/auth/password")
+      .send({ currentPassword: PASSWORD, newPassword: NEW_PASSWORD })
+      .expect(401);
   });
 });

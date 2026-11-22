@@ -1,110 +1,217 @@
-import { AcceptInvitation } from '../../../src/application/use-cases/accept-invitation.js';
-import { VerifyInvitationLink } from '../../../src/application/use-cases/verify-invitation-link.js';
+import { AcceptInvitation } from "../../../src/application/identity/accept-invitation.js";
+import { Missing } from "../../../src/application/identity/enums.js";
+import { VerifyInvitationLink } from "../../../src/application/identity/verify-invitation-link.js";
 import {
-  AccountExistsError,
-  InvitationExpiredError,
-  InvitationNotFoundError,
-  InvitationRevokedError,
-  InvitationUsedError,
-} from '../../../src/domain/errors.js';
-import { InvitationToken } from '../../../src/domain/invitation-token.js';
+  InvitationRefusal,
+  InvitationStatus,
+  Role,
+} from "../../../src/domain/identity/enums.js";
+import { InvitationToken } from "../../../src/domain/identity/invitation-token.js";
 import {
   anInvitation,
+  anInvitee,
   aUser,
   PASSWORD,
   passwords,
-} from '../../support/builders.js';
+} from "../../support/builders.js";
 import {
+  InMemoryAccountRepository,
   InMemoryInvitationRepository,
   InMemoryUserRepository,
-} from '../../support/fakes.js';
+} from "../../support/fakes.js";
 
-const accepting = (
+const now = new Date();
+const eightDays = 8 * 24 * 60 * 60 * 1000;
+const eightDaysAgo = now.getTime() - eightDays;
+const createdEightDaysAgo = new Date(eightDaysAgo);
+
+const aUsedInvitation = () => {
+  const invited = anInvitation();
+  invited.invitation.accept(anInvitee("someone"), null, now);
+  return invited;
+};
+
+const aRevokedInvitation = () => {
+  const invited = anInvitation();
+  invited.invitation.revoke(now);
+  return invited;
+};
+
+const anExpiredInvitation = () => anInvitation({}, createdEightDaysAgo);
+
+const acceptingWith = (
   invitations: InMemoryInvitationRepository,
-  users = new InMemoryUserRepository(),
-) => new AcceptInvitation(invitations, users, passwords);
+  users: InMemoryUserRepository,
+  accounts: InMemoryAccountRepository,
+) => new AcceptInvitation(invitations, users, accounts, passwords);
 
-describe('AcceptInvitation and VerifyInvitationLink', () => {
-  it('the_link_shows_who_is_invited_and_accepting_creates_the_account_with_the_role', async () => {
-    const { invitation, token } = anInvitation({ role: 'editor' });
+describe("VerifyInvitationLink", () => {
+  it("the_link_of_a_pending_invitation_shows_whom_it_invites", async () => {
+    const { invitation, token } = anInvitation({ role: Role.Editor });
     const invitations = new InMemoryInvitationRepository(invitation);
-    const users = new InMemoryUserRepository();
-
-    const verified = await new VerifyInvitationLink(invitations).execute(
-      token.value,
-    );
-    expect(verified.email).toBe('invitee@example.com');
-
-    const accepted = await accepting(invitations, users).execute({
-      token: token.value,
-      name: 'Newcomer',
-      password: PASSWORD,
-    });
-    expect(accepted.user).toMatchObject({
-      email: 'invitee@example.com',
-      name: 'Newcomer',
-      role: 'editor',
-    });
-    expect(await passwords.verify(PASSWORD, accepted.user.passwordHash)).toBe(
-      true,
-    );
-    expect(await users.findByEmail('invitee@example.com')).toBe(accepted.user);
-    expect(invitation.status).toBe('accepted');
-    expect(invitation.acceptedUserId).toBe(accepted.user.id);
-  });
-
-  it('a_used_revoked_or_expired_invitation_is_refused_with_its_reason', async () => {
-    const used = anInvitation();
-    used.invitation.accept('someone');
-    const revoked = anInvitation();
-    revoked.invitation.revoke();
-    const expired = anInvitation();
-    const invitations = new InMemoryInvitationRepository(
-      used.invitation,
-      revoked.invitation,
-      expired.invitation,
-    );
     const verify = new VerifyInvitationLink(invitations);
 
-    await expect(verify.execute(used.token.value)).rejects.toBeInstanceOf(
-      InvitationUsedError,
-    );
-    await expect(verify.execute(revoked.token.value)).rejects.toBeInstanceOf(
-      InvitationRevokedError,
-    );
-    vi.useFakeTimers();
-    vi.setSystemTime(expired.invitation.expiresAt);
-    await expect(verify.execute(expired.token.value)).rejects.toBeInstanceOf(
-      InvitationExpiredError,
-    );
-    vi.useRealTimers();
+    const verified = await verify.execute(token.value);
+
+    expect(verified).toMatchObject({
+      ok: true,
+      value: { email: "invitee@example.com", role: Role.Editor },
+    });
   });
 
-  it('an_unknown_token_is_not_found', async () => {
-    const invitations = new InMemoryInvitationRepository(
-      anInvitation().invitation,
-    );
-    await expect(
-      new VerifyInvitationLink(invitations).execute(
-        InvitationToken.generate().value,
-      ),
-    ).rejects.toBeInstanceOf(InvitationNotFoundError);
+  it.each([
+    {
+      state: "used",
+      invited: aUsedInvitation,
+      refusal: InvitationRefusal.Accepted,
+    },
+    {
+      state: "revoked",
+      invited: aRevokedInvitation,
+      refusal: InvitationRefusal.Revoked,
+    },
+    {
+      state: "expired",
+      invited: anExpiredInvitation,
+      refusal: InvitationRefusal.Expired,
+    },
+  ])(
+    "an_invitation_that_cannot_be_used_is_refused_with_its_reason ($state)",
+    async ({ invited, refusal }) => {
+      const { invitation, token } = invited();
+      const invitations = new InMemoryInvitationRepository(invitation);
+      const verify = new VerifyInvitationLink(invitations);
+
+      const refused = await verify.execute(token.value);
+
+      expect(refused).toEqual({ ok: false, failure: refusal });
+    },
+  );
+
+  it("an_unknown_token_is_not_found", async () => {
+    const { invitation } = anInvitation();
+    const invitations = new InMemoryInvitationRepository(invitation);
+    const verify = new VerifyInvitationLink(invitations);
+    const unknown = InvitationToken.generate();
+
+    const refused = await verify.execute(unknown.value);
+
+    expect(refused).toEqual({ ok: false, failure: Missing.Invitation });
+  });
+});
+
+describe("AcceptInvitation", () => {
+  it("accepting_creates_the_user_with_the_invited_email_and_role_and_the_given_name", async () => {
+    const { invitation, token } = anInvitation({ role: Role.Editor });
+    const invitations = new InMemoryInvitationRepository(invitation);
+    const users = new InMemoryUserRepository();
+    const accounts = new InMemoryAccountRepository();
+    const accept = acceptingWith(invitations, users, accounts);
+
+    const accepted = await accept.execute({
+      token: token.value,
+      name: "Newcomer",
+      password: PASSWORD,
+    });
+
+    const stored = await users.findByEmail("invitee@example.com");
+    expect(accepted).toEqual({
+      ok: true,
+      value: {
+        id: stored?.id,
+        email: "invitee@example.com",
+        name: "Newcomer",
+        role: Role.Editor,
+        isAdmin: false,
+        mayChangeAutomation: true,
+      },
+    });
   });
 
-  it('an_invitation_whose_email_got_an_account_meanwhile_is_refused_and_stays_pending', async () => {
+  it("accepting_gives_the_user_a_password_account_with_the_given_password", async () => {
     const { invitation, token } = anInvitation();
     const invitations = new InMemoryInvitationRepository(invitation);
-    const users = new InMemoryUserRepository(
-      aUser({ email: 'invitee@example.com' }),
-    );
-    await expect(
-      accepting(invitations, users).execute({
-        token: token.value,
-        name: 'Late',
-        password: PASSWORD,
-      }),
-    ).rejects.toBeInstanceOf(AccountExistsError);
-    expect(invitation.status).toBe('pending');
+    const users = new InMemoryUserRepository();
+    const accounts = new InMemoryAccountRepository();
+    const accept = acceptingWith(invitations, users, accounts);
+
+    await accept.execute({
+      token: token.value,
+      name: "Newcomer",
+      password: PASSWORD,
+    });
+
+    const user = await users.findByEmail("invitee@example.com");
+    const account = await accounts.findByEmail("invitee@example.com");
+    expect(account?.userId).toBe(user?.id);
+    const passwordHash = account?.passwordHash ?? null;
+    const verified = await passwords.verify(PASSWORD, passwordHash);
+    expect(verified).toBe(true);
+  });
+
+  it("accepting_marks_the_invitation_accepted_by_the_new_user", async () => {
+    const { invitation, token } = anInvitation();
+    const invitations = new InMemoryInvitationRepository(invitation);
+    const users = new InMemoryUserRepository();
+    const accounts = new InMemoryAccountRepository();
+    const accept = acceptingWith(invitations, users, accounts);
+
+    await accept.execute({
+      token: token.value,
+      name: "Newcomer",
+      password: PASSWORD,
+    });
+
+    const user = await users.findByEmail("invitee@example.com");
+    const settled = {
+      status: invitation.status,
+      acceptedUserId: invitation.acceptedUserId,
+    };
+    expect(settled).toEqual({
+      status: InvitationStatus.Accepted,
+      acceptedUserId: user?.id,
+    });
+  });
+
+  it("an_invitation_whose_email_got_an_account_meanwhile_is_refused_leaving_it_pending_and_adding_no_user", async () => {
+    const { invitation, token } = anInvitation();
+    const invitations = new InMemoryInvitationRepository(invitation);
+    const existing = aUser({ email: "invitee@example.com" });
+    const users = new InMemoryUserRepository(existing);
+    const accounts = new InMemoryAccountRepository();
+    const accept = acceptingWith(invitations, users, accounts);
+
+    const refused = await accept.execute({
+      token: token.value,
+      name: "Late",
+      password: PASSWORD,
+    });
+
+    expect(refused).toEqual({
+      ok: false,
+      failure: InvitationRefusal.EmailTaken,
+    });
+    expect(invitation.status).toBe(InvitationStatus.Pending);
     expect(users.users.size).toBe(1);
+  });
+
+  it("an_invitation_accepted_before_is_refused_as_accepted", async () => {
+    const { invitation, token } = aUsedInvitation();
+    const invitations = new InMemoryInvitationRepository(invitation);
+    const users = new InMemoryUserRepository();
+    const accounts = new InMemoryAccountRepository();
+    const accept = acceptingWith(invitations, users, accounts);
+
+    const refused = await accept.execute({
+      token: token.value,
+      name: "Again",
+      password: PASSWORD,
+    });
+
+    expect(refused).toEqual({
+      ok: false,
+      failure: InvitationRefusal.Accepted,
+    });
+    expect(users.users.size).toBe(0);
   });
 });

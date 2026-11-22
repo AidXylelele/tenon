@@ -1,0 +1,41 @@
+import { Injectable } from "@nestjs/common";
+import { Transactional } from "@nestjs-cls/transactional";
+import { EventStore } from "../events/ports.js";
+import type { MatchSubscriptionsCommand } from "./interfaces.js";
+import {
+  Deliveries,
+  DeliveryLog,
+  SubscriptionFilters,
+  SubscriptionRepository,
+} from "./ports.js";
+
+@Injectable()
+export class MatchSubscriptions {
+  constructor(
+    private readonly events: EventStore,
+    private readonly subscriptions: SubscriptionRepository,
+    private readonly filters: SubscriptionFilters,
+    private readonly deliveries: Deliveries,
+    private readonly log: DeliveryLog,
+  ) {}
+
+  @Transactional()
+  async execute(command: MatchSubscriptionsCommand): Promise<void> {
+    const now = new Date();
+    const event = await this.events.find(command.sequence);
+
+    if (event === null) return;
+
+    const candidates = await this.subscriptions.existingAt(event.acceptedAt);
+    const accepting = await this.filters.matching(
+      candidates,
+      event,
+      command.signal,
+    );
+
+    for (const subscription of accepting) {
+      await this.log.pending(subscription, event, now);
+      await this.deliveries.schedule(subscription, event);
+    }
+  }
+}

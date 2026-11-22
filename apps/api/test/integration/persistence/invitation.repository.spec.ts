@@ -1,24 +1,32 @@
-import { eq } from 'drizzle-orm';
-import { InvitationRepository } from '../../../src/application/interfaces.js';
+import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { InvitationRepository } from "../../../src/application/identity/ports.js";
+import { StaleWriteError } from "../../../src/domain/errors.js";
+import type { Invitation } from "../../../src/domain/identity/invitation.js";
+import { InvitationToken } from "../../../src/domain/identity/invitation-token.js";
+import { invitation as invitationTable } from "../../../src/interface-adapters/persistence/schema/index.js";
+import { Role } from "../../../src/domain/identity/enums.js";
+import { anInvitation, anInvitee } from "../../support/builders.js";
 import {
-  InvitationConflictError,
-  InvitationNotFoundError,
-} from '../../../src/domain/errors.js';
-import { InvitationToken } from '../../../src/domain/invitation-token.js';
-import { invitation as invitationTable } from '../../../src/interface-adapters/persistence/schema/index.js';
-import { createUser } from '../../support/auth-helpers.js';
-import { anInvitation } from '../../support/builders.js';
-import { createTestApp, type TestApp } from '../../support/create-test-app.js';
-import { truncateAll } from '../../support/db.js';
+  addUser,
+  createPersistenceTest,
+  invitationRepository,
+  type PersistenceTest,
+  truncateUsersAndDependents,
+  userRepository,
+} from "../../support/create-persistence-test.js";
 
-describe('DrizzleInvitationRepository', () => {
-  let t: TestApp;
+const now = new Date();
+
+describe("PostgresInvitationRepository", () => {
+  let t: PersistenceTest;
   let repository: InvitationRepository;
   let adminId: string;
 
   beforeAll(async () => {
-    t = await createTestApp();
-    repository = t.app.get(InvitationRepository);
+    const bindings = [...userRepository, ...invitationRepository];
+    t = await createPersistenceTest(bindings);
+    repository = t.module.get(InvitationRepository);
   });
 
   afterAll(async () => {
@@ -26,77 +34,147 @@ describe('DrizzleInvitationRepository', () => {
   });
 
   beforeEach(async () => {
-    await truncateAll(t.db);
-    const admin = await createUser(t, {
-      email: 'admin@example.com',
-      role: 'admin',
+    await truncateUsersAndDependents(t.db);
+    const admin = await addUser(t, {
+      email: "admin@example.com",
+      name: "Admin",
+      role: Role.Admin,
     });
     adminId = admin.id;
   });
 
-  const stored = async (email = 'new@example.com') => {
+  const save = (invitation: Invitation) =>
+    t.inTransaction(() => repository.save(invitation));
+
+  const stored = async (email = "new@example.com") => {
     const issued = anInvitation({ email, invitedBy: adminId });
-    await repository.add(issued.invitation);
+    await save(issued.invitation);
     return issued;
   };
 
-  it('a_stored_invitation_is_read_back_by_id_and_by_the_token_from_its_link', async () => {
-    const { invitation, token } = await stored();
-    const byId = await repository.getById(invitation.id);
-    const byToken = await repository.getByToken(
-      new InvitationToken(token.value),
-    );
-    for (const found of [byId, byToken]) {
-      expect(found.id).toBe(invitation.id);
-      expect(found.email).toBe('new@example.com');
-      expect(found.role).toBe('editor');
-      expect(found.status).toBe('pending');
-      expect(found.invitedBy).toBe(adminId);
-      expect(found.expiresAt).toEqual(invitation.expiresAt);
-    }
+  it("a_stored_invitation_is_read_back_by_its_id", async () => {
+    const { invitation } = await stored();
+
+    const found = await repository.find(invitation.id);
+    assert.exists(found);
+
+    const read = {
+      id: found.id,
+      email: found.email,
+      role: found.role,
+      status: found.status,
+      invitedBy: found.invitedBy,
+      expiresAt: found.expiresAt,
+      version: found.version,
+    };
+    expect(read).toEqual({
+      id: invitation.id,
+      email: "new@example.com",
+      role: "editor",
+      status: "pending",
+      invitedBy: adminId,
+      expiresAt: invitation.expiresAt,
+      version: 1,
+    });
   });
 
-  it('the_token_itself_is_never_stored_only_its_fingerprint', async () => {
+  it("a_stored_invitation_is_read_back_by_the_token_from_its_link", async () => {
     const { invitation, token } = await stored();
+    const fromLink = new InvitationToken(token.value);
+
+    const found = await repository.findByToken(fromLink);
+    assert.exists(found);
+
+    const read = {
+      id: found.id,
+      email: found.email,
+      role: found.role,
+      status: found.status,
+      invitedBy: found.invitedBy,
+      expiresAt: found.expiresAt,
+      version: found.version,
+    };
+    expect(read).toEqual({
+      id: invitation.id,
+      email: "new@example.com",
+      role: "editor",
+      status: "pending",
+      invitedBy: adminId,
+      expiresAt: invitation.expiresAt,
+      version: 1,
+    });
+  });
+
+  it("the_token_itself_is_never_stored_only_its_fingerprint", async () => {
+    const { invitation, token } = await stored();
+
     const [row] = await t.db
       .select()
       .from(invitationTable)
       .where(eq(invitationTable.id, invitation.id));
-    expect(JSON.stringify(row)).not.toContain(token.value);
-    expect(row?.tokenHash).toBe(token.hash);
+    const serialized = JSON.stringify(row);
+    expect(serialized).not.toContain(token.value);
+    const tokenHash = row?.tokenHash;
+    expect(tokenHash).toBe(token.hash);
   });
 
-  it('an_unknown_id_or_token_is_reported_as_not_found', async () => {
-    await expect(
-      repository.getById(crypto.randomUUID()),
-    ).rejects.toBeInstanceOf(InvitationNotFoundError);
-    await expect(
-      repository.getByToken(InvitationToken.generate()),
-    ).rejects.toBeInstanceOf(InvitationNotFoundError);
+  it("an_unknown_id_finds_none", async () => {
+    await stored();
+    const unknownId = randomUUID();
+
+    const found = await repository.find(unknownId);
+
+    expect(found).toBeNull();
   });
 
-  it('a_stale_copy_cannot_overwrite_a_change_made_through_another_copy', async () => {
+  it("an_unknown_token_finds_none", async () => {
+    await stored();
+    const unknown = InvitationToken.generate();
+
+    const found = await repository.findByToken(unknown);
+
+    expect(found).toBeNull();
+  });
+
+  it("a_stale_copy_cannot_overwrite_a_change_made_through_another_copy", async () => {
     const { invitation } = await stored();
-    const first = await repository.getById(invitation.id);
-    const second = await repository.getById(invitation.id);
-    first.accept(adminId);
-    await repository.update(first);
-    second.revoke();
-    await expect(repository.update(second)).rejects.toBeInstanceOf(
-      InvitationConflictError,
-    );
-    const current = await repository.getById(invitation.id);
-    expect(current.status).toBe('accepted');
+    const first = await repository.find(invitation.id);
+    const second = await repository.find(invitation.id);
+    assert.exists(first);
+    assert.exists(second);
+    first.accept(anInvitee(adminId), null, now);
+    await save(first);
+    second.revoke(now);
+
+    const refused = save(second);
+
+    await expect(refused).rejects.toBeInstanceOf(StaleWriteError);
+    const current = await repository.find(invitation.id);
+    expect(current?.status).toBe("accepted");
   });
 
-  it('only_one_pending_invitation_per_email_can_exist_and_a_revoked_one_frees_the_email', async () => {
+  it("a_second_pending_invitation_for_one_email_is_refused_and_the_first_stays_pending", async () => {
     const { invitation } = await stored();
-    await expect(stored()).rejects.toThrow(InvitationConflictError);
-    const pending = await repository.findPendingByEmail('new@example.com');
-    expect(pending?.id).toBe(invitation.id);
-    invitation.revoke();
-    await repository.update(invitation);
-    expect(await repository.findPendingByEmail('new@example.com')).toBeNull();
-    await expect(stored()).resolves.toBeDefined();
+
+    const refused = stored();
+
+    await expect(refused).rejects.toBeInstanceOf(StaleWriteError);
+    const pending = await repository.findPendingByEmail("new@example.com");
+    const pendingId = pending?.id;
+    expect(pendingId).toBe(invitation.id);
+  });
+
+  it("revoking_the_pending_invitation_frees_its_email_for_a_new_one", async () => {
+    const { invitation } = await stored();
+    const current = await repository.find(invitation.id);
+    assert.exists(current);
+    current.revoke(now);
+
+    await save(current);
+
+    const pending = await repository.findPendingByEmail("new@example.com");
+    expect(pending).toBeNull();
+    const reissued = stored();
+    await expect(reissued).resolves.toBeDefined();
   });
 });

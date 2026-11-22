@@ -1,34 +1,35 @@
-import { randomUUID } from 'node:crypto';
-import { DrizzleQueryError } from 'drizzle-orm/errors';
-import type { Params } from 'nestjs-pino';
-import type { SerializedError } from 'pino';
+import { randomUUID } from "node:crypto";
+import { DrizzleQueryError } from "drizzle-orm/errors";
+import type { Params } from "nestjs-pino";
+import type { SerializedError } from "pino";
+import { ApiRoute } from "../../interface-adapters/api/enums.js";
 
 export function createHttpLoggerOptions(
   level: string,
   pretty: boolean,
-): Params['pinoHttp'] {
+): Params["pinoHttp"] {
   return {
     level,
     genReqId: (request, response) => {
-      const incoming = request.headers['x-request-id'];
+      const incoming = request.headers["x-request-id"];
       const id =
-        typeof incoming === 'string' && incoming.length > 0
+        typeof incoming === "string" && incoming.length > 0
           ? incoming
           : randomUUID();
-      response.setHeader('x-request-id', id);
+      response.setHeader("x-request-id", id);
       return id;
     },
     redact: {
       paths: [
-        'req.headers.cookie',
-        'req.headers.authorization',
+        "req.headers.cookie",
+        "req.headers.authorization",
         'res.headers["set-cookie"]',
-        '*.password',
-        '*.token',
-        '*.newPassword',
-        '*.currentPassword',
+        "*.password",
+        "*.token",
+        "*.newPassword",
+        "*.currentPassword",
       ],
-      censor: '[redacted]',
+      censor: "[redacted]",
     },
     serializers: {
       err: (serialized: SerializedError) => {
@@ -41,17 +42,18 @@ export function createHttpLoggerOptions(
         );
         return {
           ...serialized,
-          message: serialized.message.replace(values, ''),
-          stack: serialized.stack.replace(values, ''),
+          message: serialized.message.replace(values, ""),
+          stack: serialized.stack.replace(values, ""),
           params: undefined,
         };
       },
     },
     autoLogging: {
-      ignore: (request) => (request.url ?? '').startsWith('/api/v1/health'),
+      ignore: (request) =>
+        (request.url ?? "").startsWith(`/${ApiRoute.Prefix}/health`),
     },
     transport: pretty
-      ? { target: 'pino-pretty', options: { singleLine: true } }
+      ? { target: "pino-pretty", options: { singleLine: true } }
       : undefined,
   };
 }

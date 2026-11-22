@@ -1,0 +1,456 @@
+{
+  "id": "3174e20a-d4f4-4769-8d75-ea5790319c36",
+  "prevId": "ab94e46b-8a73-417b-98a2-696e6211564d",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.account": {
+      "name": "account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {
+        "account_user_password_idx": {
+          "name": "account_user_password_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"account\".\"type\" = 'password'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "account_user_id_user_id_fk": {
+          "name": "account_user_id_user_id_fk",
+          "tableFrom": "account",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "account_type_identifier_key": {
+          "name": "account_type_identifier_key",
+          "nullsNotDistinct": false,
+          "columns": ["type", "identifier"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "account_type_check": {
+          "name": "account_type_check",
+          "value": "\"account\".\"type\" in ('password', 'oidc')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.email_token": {
+      "name": "email_token",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "email_token_user_id_user_id_fk": {
+          "name": "email_token_user_id_user_id_fk",
+          "tableFrom": "email_token",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.invitation": {
+      "name": "invitation",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "invited_by": {
+          "name": "invited_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accepted_at": {
+          "name": "accepted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accepted_user_id": {
+          "name": "accepted_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {
+        "invitation_pending_email_idx": {
+          "name": "invitation_pending_email_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"invitation\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "invitation_invited_by_user_id_fk": {
+          "name": "invitation_invited_by_user_id_fk",
+          "tableFrom": "invitation",
+          "tableTo": "user",
+          "columnsFrom": ["invited_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "invitation_accepted_user_id_user_id_fk": {
+          "name": "invitation_accepted_user_id_user_id_fk",
+          "tableFrom": "invitation",
+          "tableTo": "user",
+          "columnsFrom": ["accepted_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "invitation_token_hash_unique": {
+          "name": "invitation_token_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": ["token_hash"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "invitation_role_check": {
+          "name": "invitation_role_check",
+          "value": "\"invitation\".\"role\" in ('admin', 'editor', 'viewer')"
+        },
+        "invitation_status_check": {
+          "name": "invitation_status_check",
+          "value": "\"invitation\".\"status\" in ('pending', 'accepted', 'revoked')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.session": {
+      "name": "session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_active_at": {
+          "name": "last_active_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mfa": {
+          "name": "mfa",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "session_user_id_user_id_fk": {
+          "name": "session_user_id_user_id_fk",
+          "tableFrom": "session",
+          "tableTo": "user",
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user": {
+      "name": "user",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_email_unique": {
+          "name": "user_email_unique",
+          "nullsNotDistinct": false,
+          "columns": ["email"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "user_role_check": {
+          "name": "user_role_check",
+          "value": "\"user\".\"role\" in ('admin', 'editor', 'viewer')"
+        },
+        "user_status_check": {
+          "name": "user_status_check",
+          "value": "\"user\".\"status\" in ('active', 'suspended')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

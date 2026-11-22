@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_version" ADD COLUMN "imports" jsonb DEFAULT '{}'::jsonb NOT NULL;

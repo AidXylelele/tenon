@@ -1,13 +1,31 @@
-import { SmtpTransport } from '@nestjs/mail';
-import { OutboxRelay } from '@nestjs/outbox';
-import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test, type TestingModuleBuilder } from '@nestjs/testing';
-import type { App } from 'supertest/types.js';
-import { AppModule } from '../../src/frameworks/di/app.module.js';
-import { Database } from '../../src/interface-adapters/interfaces.js';
-import { queuedMailCount } from './db.js';
-import { Mailbox } from './mailbox.js';
-import { ProbeModule } from './probe.module.js';
+import {
+  type AuthenticationEvent,
+  AuthenticationEvents,
+  type AuthenticationPasswordResetRequestedEvent,
+} from "@nestjs/authentication";
+import { MailTransport, type SentMail } from "@nestjs/mail";
+import { OutboxRelay } from "@nestjs/outbox";
+import type { NestExpressApplication } from "@nestjs/platform-express";
+import { Test, type TestingModuleBuilder } from "@nestjs/testing";
+import { getStorageToken } from "@nestjs/throttler";
+import {
+  filter,
+  firstValueFrom,
+  type Observable,
+  throwError,
+  timeout,
+} from "rxjs";
+import { text } from "express";
+import type { App } from "supertest/types.js";
+import { AppModule } from "../../src/frameworks/di/app.module.js";
+import { WorkerInterpreterClient } from "../../src/frameworks/interpreter/worker-interpreter.client.js";
+import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
+import { getDrizzleToken } from "@nestjs/drizzle";
+import { queuedMailCount } from "./db.js";
+import { Mailbox } from "./mailbox.js";
+import { ProbeController } from "./probe.controller.js";
+import { UncountedRequests } from "./uncounted-requests.js";
+import { ApiRoute } from "../../src/interface-adapters/api/enums.js";
 
 export interface TestApp {
   readonly app: NestExpressApplication;
@@ -15,8 +33,23 @@ export interface TestApp {
   readonly mail: Mailbox;
   readonly db: Database;
   deliverOutbox(): Promise<void>;
-  settle(): Promise<void>;
+  untilMailQueued(): Promise<void>;
+  untilMailDeliveredTo(email: string): Promise<SentMail>;
+  recoveryHandled(email: string): Promise<void>;
   close(): Promise<void>;
+}
+
+const WAIT_MS = 2_000;
+const POLL_MS = 50;
+
+const absentInterpreter = Object.freeze({});
+
+export function withoutInterpreter(
+  builder: TestingModuleBuilder,
+): TestingModuleBuilder {
+  return builder
+    .overrideProvider(WorkerInterpreterClient)
+    .useValue(absentInterpreter);
 }
 
 export async function createTestApp(
@@ -24,38 +57,121 @@ export async function createTestApp(
 ): Promise<TestApp> {
   const mail = new Mailbox();
   const builder = Test.createTestingModule({
-    imports: [AppModule, ProbeModule],
+    imports: [AppModule],
+    controllers: [ProbeController],
   })
-    .overrideProvider(SmtpTransport)
-    .useValue(mail);
-  const moduleRef = await customise(builder).compile();
+    .overrideProvider(MailTransport)
+    .useValue(mail)
+    .overrideProvider(getStorageToken())
+    .useValue(new UncountedRequests());
+  const customised = customise(builder);
+  const moduleRef = await customised.compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     logger: false,
   });
-  app.set('trust proxy', ['127.0.0.1']);
-  app.enableCsrfProtection({ trustedOrigins: ['http://127.0.0.1:3001'] });
-  app.setGlobalPrefix('api/v1');
+  app.useSecurityHeaders({ xFrameOptions: { action: "deny" } });
+  app.set("trust proxy", ["127.0.0.1"]);
+  app.enableCsrfProtection({ trustedOrigins: ["http://127.0.0.1:3001"] });
+  app.setGlobalPrefix(ApiRoute.Prefix);
+  app.useBodyParser("json", {
+    limit: "1mb",
+    type: ["application/json", "application/*+json"],
+  });
+  app.use(
+    ["/api/v1/events", "/api/v1/hooks"],
+    text({ type: () => true, limit: "1mb" }),
+  );
   await app.init();
-  const db = app.get(Database);
+  const db = app.get<Database>(getDrizzleToken());
+  const server = app.getHttpServer() as App;
+  const relay = app.get(OutboxRelay);
+  const events = app.get(AuthenticationEvents);
+  const deliverOutbox = async (): Promise<void> => {
+    await relay.runOnce();
+  };
+  const untilMailDelivered = (email: string): Promise<SentMail> =>
+    untilMailDeliveredTo(deliverOutbox, mail, email);
   return {
     app,
-    server: app.getHttpServer() as App,
+    server,
     mail,
     db,
-    deliverOutbox: async () => {
-      await app.get(OutboxRelay).runOnce();
-    },
-    settle: async () => {
-      const deadline = Date.now() + 2_000;
-
-      while (Date.now() < deadline) {
-        const queued = await queuedMailCount(db);
-
-        if (queued > 0) return;
-
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      }
-    },
+    deliverOutbox,
+    untilMailQueued: () => untilMailQueued(db),
+    untilMailDeliveredTo: untilMailDelivered,
+    recoveryHandled: (email) =>
+      recoveryHandled(events, untilMailDelivered, email),
     close: () => app.close(),
   };
+}
+
+async function untilMailQueued(db: Database): Promise<void> {
+  const started = Date.now();
+
+  for (;;) {
+    const queued = await queuedMailCount(db);
+
+    if (queued >= 1) return;
+
+    const elapsed = Date.now() - started;
+
+    if (elapsed >= WAIT_MS) throw new Error("No mail was queued within 2 s");
+
+    await pause();
+  }
+}
+
+async function untilMailDeliveredTo(
+  deliverOutbox: () => Promise<void>,
+  mail: Mailbox,
+  email: string,
+): Promise<SentMail> {
+  const started = Date.now();
+
+  for (;;) {
+    await deliverOutbox();
+    const delivered = mail.lastTo(email);
+
+    if (delivered) return delivered;
+
+    const elapsed = Date.now() - started;
+
+    if (elapsed >= WAIT_MS)
+      throw new Error(`No mail was delivered to ${email} within 2 s`);
+
+    await pause();
+  }
+}
+
+async function recoveryHandled(
+  events: AuthenticationEvents,
+  untilMailDelivered: (email: string) => Promise<SentMail>,
+  email: string,
+): Promise<void> {
+  const late = new Error(
+    `No password reset request for ${email} was handled within 2 s`,
+  );
+  const requested = filter(
+    (
+      event: AuthenticationEvent,
+    ): event is AuthenticationPasswordResetRequestedEvent =>
+      event.type === "password-reset-requested" && event.email === email,
+  );
+  const bounded = timeout<
+    AuthenticationPasswordResetRequestedEvent,
+    Observable<never>
+  >({
+    first: WAIT_MS,
+    with: () => throwError(() => late),
+  });
+  const handled = events.events$.pipe(requested, bounded);
+  const request = await firstValueFrom(handled);
+
+  if (request.userId === undefined) return;
+
+  await untilMailDelivered(email);
+}
+
+function pause(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, POLL_MS));
 }

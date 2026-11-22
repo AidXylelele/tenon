@@ -1,25 +1,37 @@
-import { eq } from 'drizzle-orm';
+import { eq } from "drizzle-orm";
+import { InvitationRepository } from "../../../src/application/identity/ports.js";
+import { InvitationQueries } from "../../../src/application/identity/queries.js";
+import type { Invitation } from "../../../src/domain/identity/invitation.js";
+import { invitation as invitationTable } from "../../../src/interface-adapters/persistence/schema/index.js";
+import { Role } from "../../../src/domain/identity/enums.js";
+import { anInvitation, anInvitee } from "../../support/builders.js";
 import {
-  InvitationQueries,
-  InvitationRepository,
-} from '../../../src/application/interfaces.js';
-import type { Invitation } from '../../../src/domain/invitation.js';
-import { invitation as invitationTable } from '../../../src/interface-adapters/persistence/schema/index.js';
-import { createUser } from '../../support/auth-helpers.js';
-import { anInvitation } from '../../support/builders.js';
-import { createTestApp, type TestApp } from '../../support/create-test-app.js';
-import { truncateAll } from '../../support/db.js';
+  addUser,
+  createPersistenceTest,
+  invitationQueries,
+  invitationRepository,
+  type PersistenceTest,
+  truncateUsersAndDependents,
+  userRepository,
+} from "../../support/create-persistence-test.js";
 
-describe('DrizzleInvitationQueries', () => {
-  let t: TestApp;
+const now = new Date();
+
+describe("PostgresInvitationQueries", () => {
+  let t: PersistenceTest;
   let queries: InvitationQueries;
   let repository: InvitationRepository;
   let adminId: string;
 
   beforeAll(async () => {
-    t = await createTestApp();
-    queries = t.app.get(InvitationQueries);
-    repository = t.app.get(InvitationRepository);
+    const bindings = [
+      ...userRepository,
+      ...invitationRepository,
+      ...invitationQueries,
+    ];
+    t = await createPersistenceTest(bindings);
+    queries = t.module.get(InvitationQueries);
+    repository = t.module.get(InvitationRepository);
   });
 
   afterAll(async () => {
@@ -27,10 +39,11 @@ describe('DrizzleInvitationQueries', () => {
   });
 
   beforeEach(async () => {
-    await truncateAll(t.db);
-    const admin = await createUser(t, {
-      email: 'admin@example.com',
-      role: 'admin',
+    await truncateUsersAndDependents(t.db);
+    const admin = await addUser(t, {
+      email: "admin@example.com",
+      name: "Admin",
+      role: Role.Admin,
     });
     adminId = admin.id;
   });
@@ -42,43 +55,53 @@ describe('DrizzleInvitationQueries', () => {
   ): Promise<Invitation> => {
     const { invitation } = anInvitation({ email, invitedBy: adminId });
     change(invitation);
-    await repository.add(invitation);
+    await t.inTransaction(() => repository.save(invitation));
+    const created = new Date(createdAt);
     await t.db
       .update(invitationTable)
-      .set({ createdAt: new Date(createdAt) })
+      .set({ createdAt: created })
       .where(eq(invitationTable.id, invitation.id));
     return invitation;
   };
 
-  it('lists_pending_invitations_oldest_first_and_leaves_out_accepted_revoked_and_expired_ones', async () => {
-    const later = await stored('later@example.com', '2026-10-02T00:00:00Z');
-    const earlier = await stored('earlier@example.com', '2026-10-01T00:00:00Z');
-    await stored('accepted@example.com', '2026-10-01T00:00:00Z', (i) => {
-      i.accept(adminId);
+  it("lists_every_invitation_oldest_first_with_what_became_of_it", async () => {
+    const later = await stored("later@example.com", "2026-10-04T00:00:00Z");
+    const earlier = await stored("earlier@example.com", "2026-10-01T00:00:00Z");
+    await stored("accepted@example.com", "2026-10-02T00:00:00Z", (i) => {
+      i.accept(anInvitee(adminId), null, now);
     });
-    await stored('revoked@example.com', '2026-10-01T00:00:00Z', (i) => {
-      i.revoke();
+    await stored("revoked@example.com", "2026-10-03T00:00:00Z", (i) => {
+      i.revoke(now);
     });
-    const expired = await stored('expired@example.com', '2026-10-01T00:00:00Z');
+    const expired = await stored("expired@example.com", "2026-10-05T00:00:00Z");
+    const aSecondAgo = Date.now() - 1_000;
+    const pastItsExpiry = new Date(aSecondAgo);
     await t.db
       .update(invitationTable)
-      .set({ expiresAt: new Date(Date.now() - 1_000) })
+      .set({ expiresAt: pastItsExpiry })
       .where(eq(invitationTable.id, expired.id));
 
-    const pending = await queries.listPending();
-    expect(pending.map((row) => row.email)).toEqual([
-      'earlier@example.com',
-      'later@example.com',
+    const listed = await queries.list();
+
+    const outcomes = listed.map((row) => [row.email, row.outcome]);
+    expect(outcomes).toEqual([
+      ["earlier@example.com", "pending"],
+      ["accepted@example.com", "accepted"],
+      ["revoked@example.com", "revoked"],
+      ["later@example.com", "pending"],
+      ["expired@example.com", "expired"],
     ]);
-    expect(pending[0]).toMatchObject({
+    expect(listed[0]).toMatchObject({
       id: earlier.id,
-      role: 'editor',
+      role: "editor",
       expiresAt: earlier.expiresAt,
     });
-    expect(pending[1]?.id).toBe(later.id);
+    expect(listed[3]?.id).toBe(later.id);
   });
 
-  it('an_empty_table_yields_an_empty_list', async () => {
-    expect(await queries.listPending()).toEqual([]);
+  it("an_empty_table_yields_an_empty_list", async () => {
+    const listed = await queries.list();
+
+    expect(listed).toEqual([]);
   });
 });

@@ -1,46 +1,102 @@
-import { ChangePassword } from '../../../src/application/use-cases/change-password.js';
+import { ChangePassword } from "../../../src/application/identity/change-password.js";
+import { AccountRefusal } from "../../../src/domain/identity/enums.js";
 import {
-  InvalidPasswordError,
-  UserNotFoundError,
-} from '../../../src/domain/errors.js';
-import { aUser, PASSWORD, passwords } from '../../support/builders.js';
-import { InMemoryUserRepository } from '../../support/fakes.js';
+  aPasswordAccount,
+  PASSWORD,
+  passwords,
+} from "../../support/builders.js";
+import {
+  InMemoryAccountRepository,
+  RecordingSessions,
+} from "../../support/fakes.js";
 
-describe('ChangePassword', () => {
-  it('the_correct_current_password_lets_the_new_one_replace_it', async () => {
-    const users = new InMemoryUserRepository(aUser());
-    await new ChangePassword(users, passwords).execute({
-      userId: 'user-1',
+const changingWith = (
+  accounts: InMemoryAccountRepository,
+  sessions: RecordingSessions,
+) => new ChangePassword(accounts, passwords, sessions);
+
+describe("ChangePassword", () => {
+  it("the_correct_current_password_lets_the_new_one_replace_it", async () => {
+    const account = aPasswordAccount();
+    const accounts = new InMemoryAccountRepository(account);
+    const sessions = new RecordingSessions();
+    const change = changingWith(accounts, sessions);
+
+    await change.execute({
+      userId: "user-1",
+      sessionId: "session-1",
       currentPassword: PASSWORD,
-      newPassword: 'another-long-password',
+      newPassword: "another-long-password",
     });
-    const user = await users.getById('user-1');
-    expect(
-      await passwords.verify('another-long-password', user.passwordHash),
-    ).toBe(true);
-    expect(await passwords.verify(PASSWORD, user.passwordHash)).toBe(false);
+
+    const newPasswordVerified = await passwords.verify(
+      "another-long-password",
+      account.passwordHash,
+    );
+    expect(newPasswordVerified).toBe(true);
+    const oldPasswordVerified = await passwords.verify(
+      PASSWORD,
+      account.passwordHash,
+    );
+    expect(oldPasswordVerified).toBe(false);
   });
 
-  it('a_wrong_current_password_is_refused_and_the_password_stays', async () => {
-    const users = new InMemoryUserRepository(aUser());
-    await expect(
-      new ChangePassword(users, passwords).execute({
-        userId: 'user-1',
-        currentPassword: 'not-the-password',
-        newPassword: 'another-long-password',
-      }),
-    ).rejects.toBeInstanceOf(InvalidPasswordError);
-    const user = await users.getById('user-1');
-    expect(await passwords.verify(PASSWORD, user.passwordHash)).toBe(true);
+  it("a_new_password_ends_every_other_session_of_the_user", async () => {
+    const account = aPasswordAccount();
+    const accounts = new InMemoryAccountRepository(account);
+    const sessions = new RecordingSessions();
+    const change = changingWith(accounts, sessions);
+
+    await change.execute({
+      userId: "user-1",
+      sessionId: "session-1",
+      currentPassword: PASSWORD,
+      newPassword: "another-long-password",
+    });
+
+    expect(sessions.ended).toEqual([{ userId: "user-1", except: "session-1" }]);
   });
 
-  it('an_unknown_user_is_reported_as_not_found', async () => {
-    await expect(
-      new ChangePassword(new InMemoryUserRepository(), passwords).execute({
-        userId: 'nobody',
-        currentPassword: PASSWORD,
-        newPassword: 'another-long-password',
-      }),
-    ).rejects.toBeInstanceOf(UserNotFoundError);
+  it("a_wrong_current_password_is_refused_and_the_password_and_sessions_stay", async () => {
+    const account = aPasswordAccount();
+    const accounts = new InMemoryAccountRepository(account);
+    const sessions = new RecordingSessions();
+    const change = changingWith(accounts, sessions);
+
+    const refused = await change.execute({
+      userId: "user-1",
+      sessionId: "session-1",
+      currentPassword: "not-the-password",
+      newPassword: "another-long-password",
+    });
+
+    expect(refused).toEqual({
+      ok: false,
+      failure: AccountRefusal.WrongPassword,
+    });
+    const passwordVerified = await passwords.verify(
+      PASSWORD,
+      account.passwordHash,
+    );
+    expect(passwordVerified).toBe(true);
+    expect(sessions.ended).toEqual([]);
+  });
+
+  it("a_user_without_a_password_account_is_refused_as_a_wrong_password", async () => {
+    const accounts = new InMemoryAccountRepository();
+    const sessions = new RecordingSessions();
+    const change = changingWith(accounts, sessions);
+
+    const refused = await change.execute({
+      userId: "user-1",
+      sessionId: "session-1",
+      currentPassword: PASSWORD,
+      newPassword: "another-long-password",
+    });
+
+    expect(refused).toEqual({
+      ok: false,
+      failure: AccountRefusal.WrongPassword,
+    });
   });
 });

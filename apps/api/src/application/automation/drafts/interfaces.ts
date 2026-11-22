@@ -1,0 +1,50 @@
+import type { DraftRefusal } from "../../../domain/automation/drafts/enums.js";
+import type { DraftAuthor } from "../../../domain/automation/drafts/interfaces.js";
+import type { JsonObject } from "../../../domain/automation/interfaces.js";
+import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
+import type { Result } from "../../../domain/interfaces.js";
+import type { Missing } from "../enums.js";
+import type { NameRefusal } from "./enums.js";
+import type {
+  PublishedVersion,
+  PublishFailure,
+} from "../workflows/interfaces.js";
+
+export interface CreateDraftCommand {
+  readonly name: WorkflowName;
+  readonly source: string;
+  readonly layout: JsonObject;
+  readonly author: DraftAuthor;
+}
+
+export interface SaveDraftCommand extends CreateDraftCommand {
+  readonly expected: string;
+}
+
+export interface PublishDraftCommand {
+  readonly name: WorkflowName;
+  readonly expected: string;
+  readonly publisherId: string;
+}
+
+export interface DraftView {
+  readonly source: string;
+  readonly layout: JsonObject;
+  readonly revision: string;
+  readonly savedBy: DraftAuthor;
+  readonly savedAt: Date;
+}
+
+export interface DraftConflict {
+  readonly refusal: DraftRefusal;
+  readonly current: DraftView | null;
+}
+
+export type CreateDraftResult = Result<DraftView, DraftConflict | NameRefusal>;
+
+export type DraftResult = Result<DraftView, DraftConflict>;
+
+export type PublishDraftResult = Result<
+  PublishedVersion,
+  PublishFailure | DraftConflict | Missing
+>;

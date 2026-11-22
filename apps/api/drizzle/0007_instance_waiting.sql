@@ -1,0 +1,1 @@
+ALTER TABLE "workflow_instance" ADD COLUMN "waiting" boolean DEFAULT false NOT NULL;

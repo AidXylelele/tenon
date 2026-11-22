@@ -1,20 +1,26 @@
-import { UserRepository } from '../../../src/application/interfaces.js';
+import { randomUUID } from "node:crypto";
+import { UserRepository } from "../../../src/application/identity/ports.js";
+import { Role, UserStatus } from "../../../src/domain/identity/enums.js";
+import { StaleWriteError } from "../../../src/domain/errors.js";
+import { User } from "../../../src/domain/identity/user.js";
+import { suspendUser } from "../../support/auth-helpers.js";
 import {
-  AccountExistsError,
-  UserNotFoundError,
-} from '../../../src/domain/errors.js';
-import { User } from '../../../src/domain/user.js';
-import { createUser, suspendUser } from '../../support/auth-helpers.js';
-import { createTestApp, type TestApp } from '../../support/create-test-app.js';
-import { truncateAll } from '../../support/db.js';
+  addUser,
+  createPersistenceTest,
+  type PersistenceTest,
+  truncateUsersAndDependents,
+  userRepository,
+} from "../../support/create-persistence-test.js";
 
-describe('DrizzleUserRepository', () => {
-  let t: TestApp;
+const now = new Date();
+
+describe("PostgresUserRepository", () => {
+  let t: PersistenceTest;
   let repository: UserRepository;
 
   beforeAll(async () => {
-    t = await createTestApp();
-    repository = t.app.get(UserRepository);
+    t = await createPersistenceTest(userRepository);
+    repository = t.module.get(UserRepository);
   });
 
   afterAll(async () => {
@@ -22,58 +28,103 @@ describe('DrizzleUserRepository', () => {
   });
 
   beforeEach(async () => {
-    await truncateAll(t.db);
+    await truncateUsersAndDependents(t.db);
   });
 
-  it('a_user_is_found_by_email_regardless_of_case_and_an_unknown_email_yields_null', async () => {
-    const created = await createUser(t, {
-      email: 'editor@example.com',
-      name: 'Ed Editor',
-      role: 'editor',
+  it("a_user_is_found_by_email_with_its_name_role_and_status", async () => {
+    const created = await addUser(t, {
+      email: "editor@example.com",
+      name: "Ed Editor",
+      role: Role.Editor,
     });
-    const found = await repository.findByEmail('Editor@Example.COM');
-    expect(found?.id).toBe(created.id);
-    expect(found?.name).toBe('Ed Editor');
-    expect(found?.role).toBe('editor');
-    expect(await repository.findByEmail('nobody@example.com')).toBeNull();
+
+    const found = await repository.findByEmail("editor@example.com");
+
+    const read = {
+      id: found?.id,
+      name: found?.name,
+      role: found?.role,
+      status: found?.status,
+    };
+    expect(read).toEqual({
+      id: created.id,
+      name: "Ed Editor",
+      role: Role.Editor,
+      status: UserStatus.Active,
+    });
   });
 
-  it('a_second_account_for_a_taken_email_is_refused_as_an_existing_account', async () => {
-    await createUser(t, { email: 'taken@example.com' });
+  it("an_unknown_email_yields_null", async () => {
+    await addUser(t, {
+      email: "editor@example.com",
+      name: "Ed Editor",
+      role: Role.Editor,
+    });
+
+    const found = await repository.findByEmail("nobody@example.com");
+
+    expect(found).toBeNull();
+  });
+
+  it("a_second_user_for_a_taken_email_is_refused_as_an_existing_account", async () => {
+    await addUser(t, {
+      email: "taken@example.com",
+      name: "taken",
+      role: Role.Viewer,
+    });
     const duplicate = User.create({
-      email: 'taken@example.com',
-      name: 'Second Comer',
-      role: 'viewer',
-      passwordHash: 'not-a-real-hash',
+      email: "taken@example.com",
+      name: "Second Comer",
+      role: Role.Viewer,
+      now,
     });
-    await expect(repository.add(duplicate)).rejects.toThrow(AccountExistsError);
-    expect((await repository.findByEmail('taken@example.com'))?.name).toBe(
-      'taken',
-    );
+
+    const refused = t.inTransaction(() => repository.add(duplicate));
+
+    await expect(refused).rejects.toBeInstanceOf(StaleWriteError);
+    const stored = await repository.findByEmail("taken@example.com");
+    const storedName = stored?.name;
+    expect(storedName).toBe("taken");
   });
 
-  it('active_lookups_leave_out_suspended_users_while_plain_lookups_still_find_them', async () => {
-    const user = await createUser(t, { email: 'user@example.com' });
-    expect((await repository.findActiveById(user.id))?.id).toBe(user.id);
+  it("finding_a_suspended_user_by_id_reads_its_status", async () => {
+    const user = await addUser(t, {
+      email: "user@example.com",
+      name: "User",
+      role: Role.Viewer,
+    });
     await suspendUser(t.db, user.id);
-    expect(await repository.findActiveById(user.id)).toBeNull();
-    expect(await repository.findActiveByEmail('user@example.com')).toBeNull();
-    expect((await repository.findByEmail('user@example.com'))?.suspended).toBe(
-      true,
-    );
-    expect((await repository.getById(user.id)).suspended).toBe(true);
+
+    const found = await repository.find(user.id);
+
+    const status = found?.status;
+    expect(status).toBe(UserStatus.Suspended);
   });
 
-  it('an_unknown_id_is_reported_as_not_found', async () => {
-    await expect(
-      repository.getById(crypto.randomUUID()),
-    ).rejects.toBeInstanceOf(UserNotFoundError);
+  it("finding_a_suspended_user_by_email_reads_its_status", async () => {
+    const user = await addUser(t, {
+      email: "user@example.com",
+      name: "User",
+      role: Role.Viewer,
+    });
+    await suspendUser(t.db, user.id);
+
+    const found = await repository.findByEmail("user@example.com");
+
+    const status = found?.status;
+    expect(status).toBe(UserStatus.Suspended);
   });
 
-  it('a_changed_password_hash_is_read_back', async () => {
-    const user = await createUser(t, { email: 'user@example.com' });
-    user.changePassword('new-hash');
-    await repository.update(user);
-    expect((await repository.getById(user.id)).passwordHash).toBe('new-hash');
+  it("an_unknown_id_finds_nobody", async () => {
+    await addUser(t, {
+      email: "user@example.com",
+      name: "User",
+      role: Role.Viewer,
+    });
+    const unknownId = randomUUID();
+
+    const found = await repository.find(unknownId);
+
+    expect(found).toBeNull();
   });
 });
