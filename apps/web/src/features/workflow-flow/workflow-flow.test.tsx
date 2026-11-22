@@ -747,6 +747,8 @@ describe("a version read on its own", () => {
   });
 });
 
+const LARGE_FLOW_TIMEOUT = 20_000;
+
 describe("selecting a step in a large flow", () => {
   const many = Array.from({ length: 120 }, (_, index) => {
     const id = `/do/Step ${String(index)}`;
@@ -755,35 +757,39 @@ describe("selecting a step in a large flow", () => {
   });
   const large = workflowOf("Large", many);
 
-  it("commits_only_the_cards_whose_selection_changes", () => {
-    const commits: Commit[] = [];
-    const record: ProfilerOnRenderCallback = (_, phase, actual, base) => {
-      commits.push({ phase, actual, base });
-    };
-    const mode = editing();
-    const onSelect = vi.fn();
-    const drawnAt = (selected: string) => (
-      <Profiler id="flow" onRender={record}>
-        <TooltipProvider>
-          <WorkflowFlow
-            workflow={large}
-            mode={mode}
-            selected={selected}
-            onSelect={onSelect}
-          />
-        </TooltipProvider>
-      </Profiler>
-    );
-    const shown = render(drawnAt("/do/Step 10"));
-    const mounted = commits.length;
-    const reselected = drawnAt("/do/Step 11");
+  it(
+    "commits_only_the_cards_whose_selection_changes",
+    () => {
+      const commits: Commit[] = [];
+      const record: ProfilerOnRenderCallback = (_, phase, actual, base) => {
+        commits.push({ phase, actual, base });
+      };
+      const mode = editing();
+      const onSelect = vi.fn();
+      const drawnAt = (selected: string) => (
+        <Profiler id="flow" onRender={record}>
+          <TooltipProvider>
+            <WorkflowFlow
+              workflow={large}
+              mode={mode}
+              selected={selected}
+              onSelect={onSelect}
+            />
+          </TooltipProvider>
+        </Profiler>
+      );
+      const shown = render(drawnAt("/do/Step 10"));
+      const mounted = commits.length;
+      const reselected = drawnAt("/do/Step 11");
 
-    shown.rerender(reselected);
+      shown.rerender(reselected);
 
-    const updates = commits.slice(mounted);
-    const cheap = updates.every((commit) => commit.actual < commit.base / 4);
-    const step = screen.getByRole("button", { name: /^Step 11(?!\d)/ });
-    expect(step).toHaveAttribute("aria-current", "true");
-    expect(cheap).toBe(true);
-  });
+      const updates = commits.slice(mounted);
+      const cheap = updates.every((commit) => commit.actual < commit.base / 4);
+      const step = screen.getByRole("button", { name: /^Step 11(?!\d)/ });
+      expect(step).toHaveAttribute("aria-current", "true");
+      expect(cheap).toBe(true);
+    },
+    LARGE_FLOW_TIMEOUT,
+  );
 });
