@@ -246,18 +246,15 @@ test.describe("the navigation drawer below 1024 px", () => {
     await expect(root).toHaveAttribute("inert");
   });
 
-  test.fail(
-    "opening_it_focuses_the_first_link_fails_until_libs_ui_sets_the_sheet's_open_focus",
-    async ({ page }) => {
-      await page.setViewportSize(NARROW);
-      await open(page, "narrow");
+  test("opening_it_focuses_its_first_link", async ({ page }) => {
+    await page.setViewportSize(NARROW);
+    await open(page, "narrow");
 
-      await page.getByRole("button", { name: "Navigation" }).click();
+    await page.getByRole("button", { name: "Navigation" }).click();
 
-      const brand = page.getByRole("link", { name: "Tenon" });
-      await expect(brand).toBeFocused({ timeout: 1_000 });
-    },
-  );
+    const brand = page.getByRole("link", { name: "Tenon" });
+    await expect(brand).toBeFocused({ timeout: 1_000 });
+  });
 
   test("escape_closes_it_and_returns_focus_to_its_button", async ({ page }) => {
     await page.setViewportSize(NARROW);
