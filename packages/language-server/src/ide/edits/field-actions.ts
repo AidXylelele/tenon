@@ -10,6 +10,7 @@ import {
   blockScalarLike,
   inlineYamlOf,
   isBlockScalarFor,
+  isKeptBlockOf,
   lineInBlockLike,
   scalarLike,
   type WrittenScalar,
@@ -210,21 +211,24 @@ function valueTextOf(
 
   const written = writtenScalarOf(text, field);
   const isBlock = isBlockMember(editable, action.pointer);
-  const isBlockScalar = isBlock && isBlockScalarFor(written.text, value);
+
+  if (!isBlock) {
+    const scalar = scalarLike(written.text, value);
+    return { text: scalar, end };
+  }
+
+  const lineEnd = end + written.trailing.length;
+  const blockEnd = lineEnd + written.kept.length;
+  const isBlockScalar = isBlockScalarFor(written, value);
 
   if (isBlockScalar) {
     const block = blockScalarLike(written, value);
-    const lineEnd = end + written.trailing.length;
-    return { text: block, end: lineEnd };
+    return { text: block, end: blockEnd };
   }
 
-  if (isBlock) {
-    const line = lineInBlockLike(written.text, value);
-    return { text: line, end };
-  }
-
-  const scalar = scalarLike(written.text, value);
-  return { text: scalar, end };
+  const line = lineInBlockLike(written, value);
+  const lineSpanEnd = written.kept === "" ? end : blockEnd;
+  return { text: line, end: lineSpanEnd };
 }
 
 function writtenScalarOf(text: string, field: WrittenField): WrittenScalar {
@@ -234,8 +238,21 @@ function writtenScalarOf(text: string, field: WrittenField): WrittenScalar {
   const valueEnd = item.end.column - 1;
   const trailing = line.slice(valueEnd);
   const indent = item.start.column - 1;
+  const end = offsetOf(text, item.end);
+  const lineEnd = end + trailing.length;
+  const isKept = isKeptBlockOf(written);
+  const kept = isKept ? keptLinesAt(text, lineEnd) : "";
+  const after = text.slice(lineEnd + kept.length + 1);
+  const [following = ""] = after.split("\n", 1);
 
-  return { text: written, indent, trailing };
+  return { text: written, indent, trailing, kept, following };
+}
+
+function keptLinesAt(text: string, lineEnd: number): string {
+  const rest = text.slice(lineEnd);
+  const found = /^(?:\n[ \t]*(?=\n))*/.exec(rest);
+
+  return found?.[0] ?? "";
 }
 
 function unheldOf(pointer: string): string {

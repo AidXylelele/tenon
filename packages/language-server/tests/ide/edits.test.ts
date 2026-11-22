@@ -1693,3 +1693,56 @@ test.each<readonly [string, string, EditAction, string]>([
 
   expect(editing).toEqual({ kind: "refused", reason });
 });
+
+test.each([
+  ["a kept block", "line0\n\n"],
+  ["a kept block written over a kept block", "line1\n\n\n"],
+])("%s set twice reads back as set", (_, code) => {
+  const followed = `${scriptFlow}      then: end\n`;
+  const first = settingOf("line0\n\n");
+  const once = editedOf(followed, first);
+  const action = settingOf(code);
+
+  const read = readBackOf(once, action);
+
+  expect(read).toBe(code);
+});
+
+test("a kept block before an empty line is written quoted, so the empty line stays outside it", () => {
+  const spaced = scriptFlow.replace(quotedCode, `${quotedCode}\n`);
+  const action = settingOf("line0\n\n");
+
+  const outcome = outcomeOf(spaced, action);
+
+  const expected = spaced.replace('"return 1;"', '"line0\\n\\n"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a block before a comment indented under it is written quoted, so the comment stays a comment", () => {
+  const commented = scriptFlow.replace(
+    quotedCode,
+    `${quotedCode}            # under the code\n`,
+  );
+  const action = settingOf("a;\nb;");
+
+  const outcome = outcomeOf(commented, action);
+
+  const expected = commented.replace('"return 1;"', '"a;\\nb;"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a block's header comment stays when its value becomes empty", () => {
+  const block = scriptFlow.replace(
+    quotedCode,
+    "          code: |  # the result\n            return 1;\n",
+  );
+  const action = settingOf("");
+
+  const outcome = outcomeOf(block, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    '          code: ""  # the result\n',
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});

@@ -3,6 +3,7 @@ export {
   blockScalarLike,
   inlineYamlOf,
   isBlockScalarFor,
+  isKeptBlockOf,
   lineInBlockLike,
   scalarLike,
   yamlOf,

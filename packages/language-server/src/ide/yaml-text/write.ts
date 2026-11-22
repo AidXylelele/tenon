@@ -30,8 +30,8 @@ export function scalarLike(written: string, value: string): string {
   return oneLineOf(value, style);
 }
 
-export function lineInBlockLike(written: string, value: string): string {
-  const style = styleOf(written);
+export function lineInBlockLike(written: WrittenScalar, value: string): string {
+  const style = styleOf(written.text);
   const isBlockStyle = blockStyles.has(style);
   const lineStyle = isBlockStyle ? "PLAIN" : style;
   const options: ToStringOptions = {
@@ -40,21 +40,34 @@ export function lineInBlockLike(written: string, value: string): string {
   };
   const text = stringify(value, options).trimEnd();
   const isOneLine = !text.includes("\n");
+  const quoted = oneLineOf(value, "QUOTE_DOUBLE");
+  const line = isOneLine ? text : quoted;
+  const comment = headerCommentOf(written);
 
-  if (isOneLine) {
-    return text;
-  }
-
-  return oneLineOf(value, "QUOTE_DOUBLE");
+  return `${line}${comment}`;
 }
 
-export function isBlockScalarFor(written: string, value: string): boolean {
+export function isBlockScalarFor(
+  written: WrittenScalar,
+  value: string,
+): boolean {
   const hasLineBreak = value.includes("\n");
-  const style = styleOf(written);
+  const style = styleOf(written.text);
   const isWrittenAsBlock = blockStyles.has(style);
   const isKeptAsBlock = isWrittenAsBlock && value !== "";
+  const isWanted = hasLineBreak || isKeptAsBlock;
+  const isAbsorbing = isAbsorbingOf(written, value);
 
-  return hasLineBreak || isKeptAsBlock;
+  return isWanted && !isAbsorbing;
+}
+
+export function isKeptBlockOf(written: string): boolean {
+  const style = styleOf(written);
+  const isWrittenAsBlock = blockStyles.has(style);
+  const [header = ""] = written.split("\n", 1);
+  const [indicators = ""] = header.split(/\s/, 1);
+
+  return isWrittenAsBlock && indicators.includes("+");
 }
 
 export function blockScalarLike(written: WrittenScalar, value: string): string {
@@ -77,8 +90,33 @@ function keptCommentOf(written: WrittenScalar): string {
     return written.trailing;
   }
 
+  return headerCommentOf(written);
+}
+
+function headerCommentOf(written: WrittenScalar): string {
+  const style = styleOf(written.text);
+  const isWrittenAsBlock = blockStyles.has(style);
   const [header = ""] = written.text.split("\n", 1);
+
+  if (!isWrittenAsBlock) {
+    return "";
+  }
+
   return header.replace(/^\S+/, "");
+}
+
+function isAbsorbingOf(written: WrittenScalar, value: string): boolean {
+  const following = written.following;
+  const content = following.trimStart();
+  const depth = following.length - content.length;
+  const keepsLines = value.endsWith("\n\n") || value === "\n";
+  const isEmptyLine = content === "";
+  const isComment = content.startsWith("#");
+  const isUnder = depth >= written.indent + levelIndent;
+  const takesEmptyLine = keepsLines && isEmptyLine;
+  const takesComment = isComment && isUnder;
+
+  return takesEmptyLine || takesComment;
 }
 
 function commentTokensOf(kept: string, indent: number): CST.SourceToken[] {
