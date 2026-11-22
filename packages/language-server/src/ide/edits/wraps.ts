@@ -12,8 +12,7 @@ import { dedentedOf, indentedOf } from "../text/index.js";
 import { startingContentOf } from "../variants/index.js";
 import { inlineYamlOf, yamlOf } from "../yaml-text/index.js";
 import { changeOf, editedSliceOf, listTextOf } from "./collection-text.js";
-import { combinedOf } from "./edits.js";
-import { fieldSettingOf } from "./field-actions.js";
+import { combinedOf, fieldSettingOf } from "./field-actions.js";
 import { idChangesOf, placedStepOf } from "./ids.js";
 import type {
   CollectionText,

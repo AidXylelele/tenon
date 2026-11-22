@@ -37,6 +37,26 @@ import {
   removalOf,
 } from "./collection-text.js";
 
+export function combinedOf(editings: readonly Editing[]): Editing {
+  const refusal = editings.find((editing) => editing.kind === "refused");
+
+  if (refusal !== undefined) {
+    return refusal;
+  }
+
+  const changes = editings.flatMap((editing) => {
+    switch (editing.kind) {
+      case "edited":
+        return editing.changes;
+      case "refused":
+        return [];
+    }
+  });
+  const ordered = inTextOrder(changes);
+
+  return { kind: "edited", changes: ordered, ids: [] };
+}
+
 export function fieldEditingOf(
   editable: EditableText,
   action: FieldAction,

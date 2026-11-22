@@ -10,8 +10,7 @@ import {
   returnPointerOf,
   variantOf,
 } from "../variants/index.js";
-import { combinedOf } from "./edits.js";
-import { fieldEditingOf } from "./field-actions.js";
+import { combinedOf, fieldEditingOf } from "./field-actions.js";
 import type {
   Editable,
   Editing,

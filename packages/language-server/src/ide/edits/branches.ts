@@ -2,8 +2,7 @@ import type { ast, JsonObject } from "interpreter/front-end";
 import { nameConflictOf, type StepTree } from "../steps/index.js";
 import { startingContentOf, type StepVariant } from "../variants/index.js";
 import { insertionOf, newItemFormsOf } from "./collection-text.js";
-import { combinedOf } from "./edits.js";
-import { fieldSettingOf } from "./field-actions.js";
+import { combinedOf, fieldSettingOf } from "./field-actions.js";
 import type {
   Editable,
   Editing,
