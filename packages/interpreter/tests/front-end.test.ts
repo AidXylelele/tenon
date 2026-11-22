@@ -868,17 +868,51 @@ describe("analyze, of a value the standard needs written", () => {
     });
   });
 
-  test("takes a method of spaces alone for an empty one", () => {
-    const document = called("http", {
-      method: "  ",
-      endpoint: "https://example.com",
-    });
-
+  test.each([
+    [
+      "method of an HTTP call",
+      "/do/0/call/with/method",
+      called("http", { method: "  ", endpoint: "https://example.com" }),
+    ],
+    [
+      "method of a gRPC call",
+      "/do/0/call/with/method",
+      grpcWith("  ", "Greeter"),
+    ],
+    [
+      "service of a gRPC call",
+      "/do/0/call/with/service/name",
+      grpcWith("SayHello", "  "),
+    ],
+    [
+      "operation of an OpenAPI call",
+      "/do/0/call/with/operationId",
+      called("openapi", {
+        document: { endpoint: "https://example.com/openapi.json" },
+        operationId: "  ",
+      }),
+    ],
+    [
+      "channel of an AsyncAPI call",
+      "/do/0/call/with/channel",
+      asyncApiWith({ channel: "  " }),
+    ],
+    [
+      "image of a container",
+      "/do/0/start/run/container/image",
+      ran({ container: { image: "  " } }),
+    ],
+    [
+      "name of a workflow to run",
+      "/do/0/start/run/workflow/name",
+      workflowRun({ name: "  " }),
+    ],
+  ])("takes a %s of spaces alone for an empty one", (_, pointer, document) => {
     const analysis = analyzer.analyze(document, fullOptions);
 
     expect(analysis).toMatchObject({
       kind: "analyzed",
-      diagnostics: [{ code: "schema", pointer: "/do/0/call/with/method" }],
+      diagnostics: [{ code: "schema", pointer }],
     });
   });
 

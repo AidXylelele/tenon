@@ -86,14 +86,9 @@ function emptyCallValuesOf(call: Call): readonly Finding[] {
 function emptyMethodOf(call: HttpCall): readonly Finding[] {
   const method = call.method;
   const written = writtenTextOf(method);
+  const isNamed = !isBlank(written);
 
-  if (written === null) {
-    return none;
-  }
-
-  const isBlank = written.trim() === "";
-
-  if (!isBlank) {
+  if (isNamed) {
     return none;
   }
 
@@ -127,7 +122,9 @@ function emptyGrpcMemberOf(
   member: string,
   name: string,
 ): readonly Finding[] {
-  if (name !== "") {
+  const isNamed = !isBlank(name);
+
+  if (isNamed) {
     return none;
   }
 
@@ -144,7 +141,9 @@ function emptyGrpcMemberOf(
 }
 
 function emptyOperationOf(call: OpenApiCall): readonly Finding[] {
-  if (call.operationId !== "") {
+  const isNamed = !isBlank(call.operationId);
+
+  if (isNamed) {
     return none;
   }
 
@@ -165,8 +164,9 @@ function emptyOperationOf(call: OpenApiCall): readonly Finding[] {
 function emptyTargetOf(call: AsyncApiCall): readonly Finding[] {
   const target = call.target;
   const name = targetNameOf(target);
+  const isNamed = !isBlank(name);
 
-  if (name !== "") {
+  if (isNamed) {
     return none;
   }
 
@@ -287,8 +287,9 @@ function emptyProcessValuesOf(process: Process): readonly Finding[] {
 function emptyImageOf(container: ContainerProcess): readonly Finding[] {
   const image = container.image;
   const written = writtenTextOf(image);
+  const isNamed = !isBlank(written);
 
-  if (written !== "") {
+  if (isNamed) {
     return none;
   }
 
@@ -305,7 +306,7 @@ function emptyImageOf(container: ContainerProcess): readonly Finding[] {
 }
 
 function emptyIdentityOf(workflow: WorkflowProcess): readonly Finding[] {
-  const empty = workflowIdentity.filter((member) => workflow[member] === "");
+  const empty = workflowIdentity.filter((member) => isBlank(workflow[member]));
 
   return empty.map((member) => emptyIdentityMemberOf(workflow, member));
 }
@@ -324,4 +325,13 @@ function emptyIdentityMemberOf(
     details: [member],
     import: null,
   };
+}
+
+function isBlank(text: string | null): boolean {
+  if (text === null) {
+    return false;
+  }
+
+  const trimmed = text.trim();
+  return trimmed === "";
 }
