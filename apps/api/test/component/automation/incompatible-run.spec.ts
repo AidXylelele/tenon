@@ -55,6 +55,8 @@ describe("a run this build of the interpreter cannot continue", () => {
   it("is_cancelled_at_its_next_turn_with_the_reason_and_may_be_restarted", async () => {
     const id = await waitingInstanceOfAnotherBuild();
 
+    await drain(t);
+    const beforeItsTurn = await instanceOf(t, editor, id);
     await nextTurn();
     const cancelled = await instanceOf(t, editor, id);
     const events = await request(t.server)
@@ -69,6 +71,8 @@ describe("a run this build of the interpreter cannot continue", () => {
         type === "org.open-workflow-specification.workflow.cancelled.v1",
     );
 
+    expect(beforeItsTurn.phase).toBe("waiting");
+    expect(beforeItsTurn.cancelReason).toBeNull();
     expect(cancelled.phase).toBe("cancelled");
     expect(cancelled.cancelReason).toBe(INTERPRETER_CHANGED);
     expect(cancelled.error).toBeNull();

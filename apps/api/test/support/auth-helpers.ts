@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import type { App } from "supertest/types.js";
 import {
@@ -22,6 +24,10 @@ import { inTransaction } from "./db.js";
 export { PASSWORD };
 
 export const SEED_ADMIN_EMAIL = "first-admin@example.com";
+
+const FIRST_ADMINISTRATOR = fileURLToPath(
+  new URL("../../drizzle/0034_first_administrator.sql", import.meta.url),
+);
 
 export async function createUser(
   t: TestApp,
@@ -98,14 +104,12 @@ export async function suspendUser(db: Database, userId: string): Promise<void> {
 }
 
 export async function seedAdministrator(t: TestApp): Promise<void> {
-  const now = new Date();
-  const administrator = User.create({
-    email: SEED_ADMIN_EMAIL,
-    name: "Administrator",
-    role: Role.Admin,
-    now,
+  const migration = await readFile(FIRST_ADMINISTRATOR, "utf8");
+  const seed = sql.raw(migration);
+  await t.db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select set_config('tenon.admin_email', ${SEED_ADMIN_EMAIL}, true)`,
+    );
+    await tx.execute(seed);
   });
-  await inTransaction(t.app, () =>
-    t.app.get(UserRepository).add(administrator),
-  );
 }

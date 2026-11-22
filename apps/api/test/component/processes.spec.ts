@@ -33,6 +33,8 @@ const WORKER_VARIABLES = [
   "SMTP_FROM",
 ];
 
+const RETENTION_SCHEDULES = ["0 4 * * *", "30 3 * * *"];
+
 const RUNNERS = new Set<unknown>([
   OpenWorkflowRun,
   ProcessRun,
@@ -135,11 +137,21 @@ describe("the worker process, from its root module alone", () => {
     expect(runners).toHaveLength(RUNNERS.size);
   });
 
-  it("runs_the_outbox_relay_and_the_scheduled_jobs", () => {
+  it("runs_the_outbox_relay_and_the_two_retention_jobs", () => {
     const relay = worker.get(OutboxRelay);
     const jobs = worker.get(SchedulerRegistry).getCronJobs();
+    const schedules = Array.from(
+      jobs.values(),
+      (job) => job.cronTime.source,
+    ).toSorted();
 
     expect(relay.running).toBe(true);
-    expect(jobs.size).toBeGreaterThan(0);
+    expect(schedules).toEqual(RETENTION_SCHEDULES);
+  });
+
+  it("leaves_the_idempotency_prune_to_the_api", () => {
+    const intervals = worker.get(SchedulerRegistry).getIntervals();
+
+    expect(intervals).not.toContain(IdempotencyJobs.PRUNE);
   });
 });

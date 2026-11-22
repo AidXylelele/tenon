@@ -15,7 +15,18 @@ const journal = JSON.parse(
 
 const ADMIN_EMAIL = "Owner@Example.COM";
 
-const FIRST_ADMINISTRATOR = "0034_first_administrator.sql";
+const FIRST_ADMINISTRATOR = join(MIGRATIONS, "0034_first_administrator.sql");
+
+const firstAdministrator = readFileSync(FIRST_ADMINISTRATOR, "utf8");
+
+const seed = sql.raw(firstAdministrator);
+
+const REFUSED = {
+  cause: {
+    code: "P0001",
+    message: expect.stringContaining("set ADMIN_EMAIL") as unknown,
+  },
+};
 
 interface Applied {
   readonly platform: number;
@@ -34,6 +45,7 @@ describe("the migrations applied before the API starts", () => {
       options: `-c tenon.admin_email=${ADMIN_EMAIL}`,
     },
   });
+  const unaddressed = drizzle({ connection: url.toString() });
   const migrations = { migrationsFolder: MIGRATIONS };
 
   beforeAll(async () => {
@@ -42,6 +54,7 @@ describe("the migrations applied before the API starts", () => {
 
   afterAll(async () => {
     await db.$client.end();
+    await unaddressed.$client.end();
     await server.execute(sql.raw(`drop database ${name}`));
     await server.$client.end();
   });
@@ -55,6 +68,18 @@ describe("the migrations applied before the API starts", () => {
     `);
     const [row] = result.rows as unknown as Applied[];
     return row ?? { platform: 0, outbox: 0, engine: 0 };
+  }
+
+  async function seedAfresh(address: string): Promise<unknown> {
+    return db.transaction(async (tx) => {
+      await tx.execute(sql`truncate table "user" cascade`);
+      await tx.execute(
+        sql`select set_config('tenon.admin_email', ${address}, true)`,
+      );
+      await tx.execute(seed);
+      const result = await tx.execute(sql`select email from "user"`);
+      return result.rows;
+    });
   }
 
   it("an_empty_database_gets_the_platforms_the_outboxs_and_the_engines_migrations", async () => {
@@ -80,10 +105,7 @@ describe("the migrations applied before the API starts", () => {
 
   it("the_first_administrator_is_seeded_once_from_the_address_the_migration_is_given", async () => {
     await migrate(db, migrations);
-    const file = join(MIGRATIONS, FIRST_ADMINISTRATOR);
-    const seed = readFileSync(file, "utf8");
-    const reseed = sql.raw(seed);
-    await db.execute(reseed);
+    await db.execute(seed);
     const result = await db.execute(
       sql`select email, name, role, status from "user"`,
     );
@@ -96,5 +118,65 @@ describe("the migrations applied before the API starts", () => {
         status: "active",
       },
     ]);
+  });
+
+  it("a_database_with_an_administrator_needs_no_address", async () => {
+    await migrate(db, migrations);
+    await unaddressed.execute(seed);
+    const result = await unaddressed.execute(sql`select email from "user"`);
+
+    expect(result.rows).toEqual([{ email: "owner@example.com" }]);
+  });
+
+  it("an_address_with_spaces_and_capitals_is_stored_trimmed_and_lower_cased", async () => {
+    await migrate(db, migrations);
+    const emails = await seedAfresh("  Owner@Example.COM  ");
+
+    expect(emails).toEqual([{ email: "owner@example.com" }]);
+  });
+
+  it("an_address_that_is_not_an_email_is_refused", async () => {
+    await migrate(db, migrations);
+    const seeding = seedAfresh("owner");
+
+    await expect(seeding).rejects.toMatchObject(REFUSED);
+  });
+});
+
+describe("a new database the migrations are given no administrator for", () => {
+  const name = `first_administrator_${String(Date.now())}`;
+  const server = drizzle({ connection: process.env.DATABASE_URL ?? "" });
+  const url = new URL(process.env.DATABASE_URL ?? "");
+  url.pathname = `/${name}`;
+  const unaddressed = drizzle({ connection: url.toString() });
+  const emptied = drizzle({
+    connection: {
+      connectionString: url.toString(),
+      options: "-c tenon.admin_email=",
+    },
+  });
+  const migrations = { migrationsFolder: MIGRATIONS };
+
+  beforeAll(async () => {
+    await server.execute(sql.raw(`create database ${name}`));
+  });
+
+  afterAll(async () => {
+    await unaddressed.$client.end();
+    await emptied.$client.end();
+    await server.execute(sql.raw(`drop database ${name}`));
+    await server.$client.end();
+  });
+
+  it("is_not_migrated_without_an_address", async () => {
+    const migrating = migrate(unaddressed, migrations);
+
+    await expect(migrating).rejects.toMatchObject(REFUSED);
+  });
+
+  it("is_not_migrated_with_an_empty_address", async () => {
+    const migrating = migrate(emptied, migrations);
+
+    await expect(migrating).rejects.toMatchObject(REFUSED);
   });
 });
