@@ -1,21 +1,8 @@
-import type {
-  Expression,
-  ExternalSchema,
-  Schema,
-  TextTemplate,
-} from "../../syntax/index.js";
+import type { ExternalSchema, Schema } from "../../syntax/index.js";
+import { writtenTextOf } from "../written/index.js";
 import type { ImportPlace } from "./types.js";
 
 const noPlaces: readonly ImportPlace[] = [];
-
-export function writtenTextOf(template: TextTemplate): string | null {
-  switch (template.kind) {
-    case "literal":
-      return template.value;
-    case "expression":
-      return looseTextOf(template);
-  }
-}
 
 export function importedUriOf(schema: ExternalSchema): string | null {
   const written = writtenTextOf(schema.resource.endpoint.uri);
@@ -51,13 +38,4 @@ function externalPlacesOf(schema: ExternalSchema): readonly ImportPlace[] {
   }
 
   return [{ uri, pointer }];
-}
-
-function looseTextOf(expression: Expression): string | null {
-  switch (expression.mode) {
-    case "strict":
-      return null;
-    case "loose":
-      return expression.source;
-  }
 }

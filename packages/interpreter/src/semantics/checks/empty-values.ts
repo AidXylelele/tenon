@@ -14,7 +14,7 @@ import type {
   Task,
   WorkflowProcess,
 } from "../../syntax/index.js";
-import { writtenTextOf } from "../uris/index.js";
+import { writtenTextOf } from "../written/index.js";
 import type { CheckSubject } from "./types.js";
 
 const none: readonly Finding[] = [];
