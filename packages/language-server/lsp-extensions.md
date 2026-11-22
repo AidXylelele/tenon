@@ -640,7 +640,7 @@ interface StepVariantsResult {
 }
 ```
 
-- **Support.** A variant is listed when its starting content, analysed alone under the `profile` of the `initializationOptions`, has no `capability` diagnostic: what a host provides is the interpreter's rule, so `container` is left out where `profile.processes` lacks it, `script-python` where `profile.scriptLanguages` lacks `python`, and `wait` where `profile.effects` lacks `timer`.
+- **Support.** A variant is listed when its starting content, analysed alone under the `profile` of the `initializationOptions`, has no `capability` diagnostic: what a host provides is the interpreter's rule, so `container` is left out where `profile.processes` lacks it, `script-python` where `profile.scriptLanguages` lacks `python`, and `wait` and `try`, whose retry waits between attempts, where `profile.effects` lacks `timer`.
 - **Starting content.** Each variant inserts the smallest document the language accepts for it, with the values a person fills left empty, so that the analysis names them as problems rather than the text holding made-up values:
 
   | Variant                      | Starting content                                                                                                                               | Left to fill                                 |
@@ -662,7 +662,7 @@ interface StepVariantsResult {
   | `raise`                      | `raise.error: { type: …/errors/validation, status: 400, title: "" }`                                                                           | the title                                    |
   | `set`                        | `set: { value: "" }` and `output.as: ${ $input + . }`, which keeps the data that came in beside the values set                                 | the values                                   |
   | `switch`                     | `switch: [ { default: { then: continue } } ]`                                                                                                  | its branches                                 |
-  | `try`                        | `try: []`, `catch: {}`                                                                                                                         | its steps                                    |
+  | `try`                        | `try: []`, `catch` with the retry `setFailure` writes for 3 attempts, 2 s apart, growing                                                       | its steps                                    |
   | `wait`                       | `wait: PT30M`                                                                                                                                  |                                              |
 
 - **An address left empty.** The grammar refuses an empty address (`schema`, "Endpoint is not in the form the standard requires."), so the analysis of a text holding a call step with no address yet is refused: the structure stays that of the last version that analysed, without the new step, until the address is written. For the same reason a call variant's `capability` is not checked, and it is listed whatever the profile.

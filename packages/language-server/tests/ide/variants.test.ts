@@ -56,18 +56,30 @@ test("a host that runs everything supports every variant, in the catalogue's ord
   expect(variants).toEqual(everyVariant);
 });
 
-test.each<readonly [string, HostProfile, string]>([
+test.each<readonly [string, HostProfile, readonly string[]]>([
   [
-    "no container process",
+    "no container process leaves out the container",
     { ...profile, processes: ["script", "shell"] },
-    "container",
+    ["container"],
   ],
-  ["no Python", { ...profile, scriptLanguages: ["js"] }, "script-python"],
-  ["no shell", { ...profile, processes: ["container", "script"] }, "shell"],
-  ["no timer", { ...profile, effects: effectsWithoutTimer }, "wait"],
-])("a host with %s leaves out %s", (_, hostProfile, missing) => {
+  [
+    "no Python leaves out the Python script",
+    { ...profile, scriptLanguages: ["js"] },
+    ["script-python"],
+  ],
+  [
+    "no shell leaves out the shell command",
+    { ...profile, processes: ["container", "script"] },
+    ["shell"],
+  ],
+  [
+    "no timer leaves out the wait and the try, whose retry waits between attempts",
+    { ...profile, effects: effectsWithoutTimer },
+    ["try", "wait"],
+  ],
+])("a host with %s", (_, hostProfile, missing) => {
   const variants = check(hostProfile);
 
-  const expected = everyVariant.filter((variant) => variant !== missing);
+  const expected = everyVariant.filter((variant) => !missing.includes(variant));
   expect(variants).toEqual(expected);
 });

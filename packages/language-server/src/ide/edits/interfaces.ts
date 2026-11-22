@@ -10,6 +10,7 @@ import type { Snapshot } from "../snapshot/index.js";
 import type { ChosenResult, StepVariant } from "../variants/index.js";
 import type {
   FailureKind,
+  Retry,
   StepNode,
   StepNodeList,
   StepTree,
@@ -63,13 +64,6 @@ export interface SetField {
 export interface ClearField {
   readonly kind: "clearField";
   readonly pointer: string;
-}
-
-interface Retry {
-  readonly kind: "retry";
-  readonly attempts: number;
-  readonly seconds: number;
-  readonly growing: boolean;
 }
 
 export type Failure = { readonly kind: Exclude<FailureKind, "retry"> } | Retry;

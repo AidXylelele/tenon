@@ -1,9 +1,14 @@
-import { type ast, flowDirectives } from "interpreter/front-end";
+import {
+  type ast,
+  flowDirectives,
+  type JsonObject,
+} from "interpreter/front-end";
 import { childPointerOf } from "../pointers/index.js";
 import type {
   FailureKind,
   HeldList,
   NamedPlace,
+  Retry,
   StepNode,
   StepNodeList,
   StepTree,
@@ -109,6 +114,17 @@ export function failureOf(step: StepNode): FailureKind {
   }
 
   return task.catch.retry === null ? "continue" : "retry";
+}
+
+export function retryCatchOf(retry: Retry): JsonObject {
+  const backoff = retry.growing ? "exponential" : "constant";
+  const policy = {
+    delay: { seconds: retry.seconds },
+    backoff: { [backoff]: {} },
+    limit: { attempt: { count: retry.attempts } },
+  };
+
+  return { retry: policy };
 }
 
 export function stepWithId(tree: StepTree, id: string): StepNode | null {

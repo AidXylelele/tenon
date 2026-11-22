@@ -3,6 +3,7 @@ import { childPointerOf, isJsonObject, valueAt } from "../pointers/index.js";
 import {
   nameConflictOf,
   protectedStepOf,
+  retryCatchOf,
   type StepNode,
 } from "../steps/index.js";
 import {
@@ -65,15 +66,8 @@ function handlingOf(failure: Failure): JsonObject | null {
       return null;
     case "continue":
       return {};
-    case "retry": {
-      const backoff = failure.growing ? "exponential" : "constant";
-      const retry = {
-        delay: { seconds: failure.seconds },
-        backoff: { [backoff]: {} },
-        limit: { attempt: { count: failure.attempts } },
-      };
-      return { retry };
-    }
+    case "retry":
+      return retryCatchOf(failure);
     case "handle":
       return { do: [] };
   }

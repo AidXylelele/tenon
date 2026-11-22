@@ -1,6 +1,7 @@
 export type {
   FailureKind,
   ListPart,
+  Retry,
   ListRole,
   StepNode,
   StepNodeList,
@@ -13,6 +14,7 @@ export {
   listWithId,
   nameConflictOf,
   protectedStepOf,
+  retryCatchOf,
   stepHolding,
   stepIdOf,
   stepTreeOf,

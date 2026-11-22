@@ -1193,7 +1193,20 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
   ],
   ["set", { set: { value: "" }, output: { as: "${ $input + . }" } }, []],
   ["switch", { switch: [{ default: { then: "continue" } }] }, []],
-  ["try", { try: [], catch: {} }, []],
+  [
+    "try",
+    {
+      try: [],
+      catch: {
+        retry: {
+          delay: { seconds: 2 },
+          backoff: { exponential: {} },
+          limit: { attempt: { count: 3 } },
+        },
+      },
+    },
+    [],
+  ],
   ["wait", { wait: "PT30M" }, []],
 ])(
   "a %s step starts with its smallest content, the blanks a person fills named by problems",
