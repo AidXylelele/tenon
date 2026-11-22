@@ -101,6 +101,85 @@ describe("running sub-workflows and processes as runs of their own", () => {
     expect(child).toMatchObject({ version: "1.1.0", trigger: "parent" });
   });
 
+  it("twenty_parents_each_awaiting_ten_children_in_turn_all_complete", async () => {
+    await publish(
+      t,
+      editor,
+      aChild("1.0.0", [{ price: { set: { line: "${ .i * 2 }" } } }]),
+    );
+    await publish(
+      t,
+      editor,
+      aDocument({}, [
+        {
+          lines: {
+            for: { each: "i", in: "${ [range(10)] }" },
+            do: [
+              {
+                priceLine: {
+                  run: {
+                    workflow: {
+                      namespace: "sales",
+                      name: "child",
+                      version: "1.0.0",
+                      input: { i: "${ $i }" },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ]),
+    );
+    const began = Date.now();
+
+    const parents = await Promise.all(
+      Array.from({ length: 20 }, () => start(t, editor)),
+    );
+    await drain(t);
+    const ended = await Promise.all(
+      parents.map((parent) => instanceOf(t, editor, parent.id)),
+    );
+    const response = await request(t.server)
+      .get("/api/v1/instances?name=child&limit=500")
+      .set(editor)
+      .expect(200);
+    const completed = (response.body as Page<InstanceBody>).items.filter(
+      (child) => child.phase === "completed",
+    );
+    const took = Date.now() - began;
+
+    expect(ended.map((parent) => parent.phase)).toEqual(
+      Array.from({ length: 20 }, () => "completed"),
+    );
+    expect(completed).toHaveLength(200);
+    expect(took).toBeLessThan(30_000);
+  }, 60_000);
+
+  it("a_parent_cancelled_while_it_awaits_a_child_ends_cancelled_and_cancels_its_child", async () => {
+    await publish(
+      t,
+      editor,
+      aChild("1.0.0", [{ pause: { wait: { hours: 1 } } }]),
+    );
+    await publish(t, editor, aParent("1.0.0"));
+    const { id } = await start(t, editor);
+    await drain(t);
+
+    await request(t.server)
+      .post(`/api/v1/instances/${id}/cancel`)
+      .set(editor)
+      .expect(204);
+    await relay(t);
+    await drain(t);
+    const parent = await instanceOf(t, editor, id);
+    const phases = (await children()).map((child) => child.phase);
+
+    expect(parent.phase).toBe("cancelled");
+    expect(phases).toEqual(["cancelled"]);
+  });
+
   it("a_child_that_faults_faults_its_parent_with_the_childs_error", async () => {
     await publish(
       t,
