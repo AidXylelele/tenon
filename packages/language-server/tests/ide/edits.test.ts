@@ -1,6 +1,8 @@
 import { expect, test } from "vitest";
-import { appliedOf } from "../../src/ide/text/index.js";
 import { editsOf } from "../../src/ide/edits/index.js";
+import { valueAt } from "../../src/ide/pointers/index.js";
+import { sourceOf } from "../../src/ide/snapshot/index.js";
+import { appliedOf } from "../../src/ide/text/index.js";
 import type { EditAction } from "../../src/protocol/index.js";
 import { guardedFlow, inlineHeader } from "../support/documents.js";
 import { snapshotOf } from "../support/snapshot.js";
@@ -561,5 +563,175 @@ test("another trigger is chosen by writing the schedule whole", () => {
   const outcome = outcomeOf(every, action);
 
   const expected = `${guardedFlow}schedule: { cron: 0 9 * * * }\n`;
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+const scriptFlow = `${inlineHeader}do:
+  - compute:
+      run:
+        script:
+          language: js
+          code: "return 1;"
+`;
+
+const codePointer = "/do/0/compute/run/script/code";
+
+const quotedCode = '          code: "return 1;"\n';
+
+function settingOf(value: string): EditAction {
+  return { kind: "setField", pointer: codePointer, value };
+}
+
+function readBackOf(text: string, action: EditAction) {
+  const editing = check(text, action);
+
+  if (editing.kind === "refused") {
+    return editing;
+  }
+
+  const edited = appliedOf(text, editing.changes);
+  const snapshot = snapshotOf(edited);
+  const source = sourceOf(snapshot.analysis);
+
+  if (source === null) {
+    return source;
+  }
+
+  return valueAt(source.document, codePointer);
+}
+
+test.each([
+  [
+    "three lines that end in a line break are written with clip chomping",
+    "const a = 1;\nconst b = 2;\nreturn a + b;\n",
+    "          code: |\n            const a = 1;\n            const b = 2;\n            return a + b;\n",
+  ],
+  [
+    "three lines with no final line break are written with strip chomping",
+    "const a = 1;\nconst b = 2;\nreturn a + b;",
+    "          code: |-\n            const a = 1;\n            const b = 2;\n            return a + b;\n",
+  ],
+])("%s, as a literal block under the key", (_, code, lines) => {
+  const action = settingOf(code);
+
+  const outcome = outcomeOf(scriptFlow, action);
+
+  const expected = scriptFlow.replace(quotedCode, lines);
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test.each([
+  ["a final line break", "one\ntwo\n"],
+  ["no final line break", "one\ntwo"],
+  ["an indented first line", "  one\ntwo"],
+  ["trailing empty lines", "one\ntwo\n\n"],
+])("a literal block with %s reads back as the value set", (_, code) => {
+  const action = settingOf(code);
+
+  const read = readBackOf(scriptFlow, action);
+
+  expect(read).toBe(code);
+});
+
+test("a one-line edit of a quoted value stays quoted", () => {
+  const action = settingOf("return 2;");
+
+  const outcome = outcomeOf(scriptFlow, action);
+
+  const expected = scriptFlow.replace('"return 1;"', '"return 2;"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a one-line edit of a literal block keeps it a block", () => {
+  const block = scriptFlow.replace(
+    quotedCode,
+    "          code: |\n            return 1;\n",
+  );
+  const action = settingOf("return 2;");
+
+  const outcome = outcomeOf(block, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-\n            return 2;\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a comment after the value moves to the block's header", () => {
+  const commentedCode = scriptFlow.replace(
+    quotedCode,
+    '          code: "return 1;"  # the result\n    # the next step\n',
+  );
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(commentedCode, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-  # the result\n            a;\n            return 2;\n    # the next step\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a multi-line value in a flow mapping stays on its line, double-quoted", () => {
+  const inline = scriptFlow.replace(
+    '        script:\n          language: js\n          code: "return 1;"\n',
+    "        script: { language: js, code: 'return 1;' }\n",
+  );
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(inline, action);
+
+  const expected = inline.replace("'return 1;'", '"a;\\nreturn 2;"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("an unwritten multi-line field is added as a literal block", () => {
+  const uncoded = scriptFlow.replace(quotedCode, "");
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(uncoded, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-\n            a;\n            return 2;\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a multi-line item of a block sequence is a literal block under its dash", () => {
+  const noted = scriptFlow.replace(
+    "      run:\n",
+    "      metadata:\n        lines:\n          - first\n      run:\n",
+  );
+  const action: EditAction = {
+    kind: "setField",
+    pointer: "/do/0/compute/metadata/lines/0",
+    value: "first\nsecond",
+  };
+
+  const outcome = outcomeOf(noted, action);
+
+  const expected = noted.replace(
+    "          - first\n",
+    "          - |-\n            first\n            second\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a comment on a block's header stays on it", () => {
+  const block = scriptFlow.replace(
+    quotedCode,
+    "          code: |  # the result\n            return 1;\n",
+  );
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(block, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-  # the result\n            a;\n            return 2;\n",
+  );
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });

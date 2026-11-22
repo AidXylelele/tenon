@@ -1,6 +1,7 @@
 import type {
   JsonObject,
   JsonValue,
+  Range,
   RangeLocator,
   TaskKind,
 } from "interpreter/front-end";
@@ -103,6 +104,16 @@ export interface Editable extends EditableText {
 
 export interface Span {
   readonly start: number;
+  readonly end: number;
+}
+
+export interface WrittenField {
+  readonly item: Range;
+  readonly node: Range;
+}
+
+export interface ValueText {
+  readonly text: string;
   readonly end: number;
 }
 

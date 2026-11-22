@@ -191,7 +191,10 @@ function collectionTextOf(
   };
 }
 
-function isBlockMember(editable: EditableText, pointer: string): boolean {
+export function isBlockMember(
+  editable: EditableText,
+  pointer: string,
+): boolean {
   const { text, positions } = editable;
   const parent = parentPointerOf(pointer);
   const parentRange = positions.rangeOf(parent);
