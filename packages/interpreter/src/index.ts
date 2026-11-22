@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { metrics, trace } from "@opentelemetry/api";
 import type { SecretPolicies } from "./api/index.js";
 import { Compiler } from "./compiler.js";
 import { Translator } from "./core/index.js";
@@ -7,6 +8,7 @@ import type { MachineServices } from "./machine/index.js";
 import { jqLanguageOf, JsonSchemas } from "./runtime/index.js";
 import { Analyzer } from "./semantics/index.js";
 import { GrammarCheck, SecretPolicyCheck } from "./syntax/index.js";
+import { Telemetry } from "./telemetry/index.js";
 
 export type {
   A2aRequest,
@@ -79,8 +81,11 @@ export async function createInterpreter(): Promise<Interpreter> {
   const analyzer = new Analyzer(expressions, grammar, schemas);
   const translator = new Translator(expressions, schemas);
   const services: MachineServices = { expressions, schemas };
+  const tracer = trace.getTracer(Telemetry.scope);
+  const meter = metrics.getMeter(Telemetry.scope);
+  const telemetry = new Telemetry(tracer, meter);
 
-  return new Compiler(analyzer, translator, services);
+  return new Compiler(analyzer, translator, services, telemetry);
 }
 
 export function createSecretPolicies(): SecretPolicies {
