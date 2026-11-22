@@ -1,8 +1,14 @@
-import type { ast, RangeLocator, SemanticModel } from "interpreter/front-end";
+import type {
+  ast,
+  JsonValue,
+  RangeLocator,
+  SemanticModel,
+} from "interpreter/front-end";
+import { type ConditionReading, conditionOf } from "../conditions/index.js";
 import { stepFamilies } from "../families/index.js";
 import { catchPolicyOf } from "./catches.js";
 import { variantOf } from "../variants/index.js";
-import { parentPointerOf } from "../pointers/index.js";
+import { parentPointerOf, valueAt } from "../pointers/index.js";
 import { type Basis, type Snapshot, sourceOf } from "../snapshot/index.js";
 import {
   type StepNode,
@@ -158,6 +164,7 @@ function flowOf(node: StepNode, sources: Sources): readonly Transition[] {
     on: "done",
     case: null,
     when: null,
+    condition: null,
     ...destination,
   };
 
@@ -193,8 +200,24 @@ function caseTransitionOf(
 ): Transition {
   const destination = destinationOf(switchCase.then, node, sources);
   const when = switchCase.when?.source ?? null;
+  const document = sources.model.source.document;
+  const condition = caseConditionOf(switchCase.when, document);
+  const name = switchCase.name;
 
-  return { on: "case", case: switchCase.name, when, ...destination };
+  return { on: "case", case: name, when, condition, ...destination };
+}
+
+function caseConditionOf(
+  when: ast.Expression | null,
+  document: JsonValue,
+): ConditionReading | null {
+  if (when === null) {
+    return null;
+  }
+
+  const written = valueAt(document, when.pointer);
+  const text = typeof written === "string" ? written : when.source;
+  return conditionOf(text);
 }
 
 function caughtTransitionsOf(
@@ -209,7 +232,14 @@ function caughtTransitionsOf(
   }
 
   const destination = destinationOf(then, node, sources);
-  return [{ on: "caught", case: null, when: null, ...destination }];
+  const transition: Transition = {
+    on: "caught",
+    case: null,
+    when: null,
+    condition: null,
+    ...destination,
+  };
+  return [transition];
 }
 
 function destinationOf(

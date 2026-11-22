@@ -82,7 +82,14 @@ test("a step is its id, kind, family, summary, ranges and flow", () => {
     },
     lists: [],
     flow: [
-      { on: "done", case: null, when: null, kind: "next", to: "/do/guard" },
+      {
+        on: "done",
+        case: null,
+        when: null,
+        condition: null,
+        kind: "next",
+        to: "/do/guard",
+      },
     ],
     catch: null,
   });
@@ -133,8 +140,22 @@ test("a catch that writes then flows when caught", () => {
 
   const guard = stepNamed(reading.workflow, "guard");
   expect(guard?.flow).toEqual([
-    { on: "done", case: null, when: null, kind: "next", to: "/do/route" },
-    { on: "caught", case: null, when: null, kind: "end", to: null },
+    {
+      on: "done",
+      case: null,
+      when: null,
+      condition: null,
+      kind: "next",
+      to: "/do/route",
+    },
+    {
+      on: "caught",
+      case: null,
+      when: null,
+      condition: null,
+      kind: "end",
+      to: null,
+    },
   ]);
 });
 
@@ -517,4 +538,38 @@ test("a step that is not a try has no catch", () => {
 
   const [first] = reading.workflow.steps.steps;
   expect(first?.catch).toBeNull();
+});
+
+const routes = `route: { switch: [ { paid: { when: '\${ .status == "paid" }', then: continue } }, { odd: { when: '\${ .name | test("x") }', then: continue } }, { fresh: { when: "", then: continue } }, { default: { then: end } } ] }`;
+
+test("each case of a switch carries its condition as rows, or its text where the builder cannot show it", () => {
+  const text = `${inlineHeader}do:\n  - ${routes}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  const conditions = first?.flow.map((way) => [way.case, way.condition]);
+  expect(conditions).toEqual([
+    [
+      "paid",
+      {
+        kind: "condition",
+        condition: {
+          join: "all",
+          rows: [
+            {
+              left: ".status",
+              comparison: "is",
+              right: { kind: "value", value: "paid" },
+            },
+          ],
+        },
+      },
+    ],
+    ["odd", { kind: "expression", text: '${ .name | test("x") }' }],
+    ["fresh", { kind: "condition", condition: { join: "all", rows: [] } }],
+    ["default", null],
+    [null, null],
+  ]);
 });

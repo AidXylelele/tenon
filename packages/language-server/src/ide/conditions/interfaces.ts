@@ -43,7 +43,7 @@ export interface Condition {
 
 export type ConditionReading =
   | { readonly kind: "condition"; readonly condition: Condition }
-  | { readonly kind: "expression" };
+  | { readonly kind: "expression"; readonly text: string };
 
 export type ConditionText =
   | { readonly kind: "text"; readonly text: string }

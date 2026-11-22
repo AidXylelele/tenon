@@ -336,6 +336,7 @@ interface Transition {
   on: "done" | "case" | "caught";
   case: string | null;
   when: string | null; // the case's condition, its source
+  condition: ConditionReading | null; // a case's condition as workflow/readCondition reads it; null for a default case and every other way
   kind: "next" | "jump" | "exit" | "end";
   to: string | null; // the step id it reaches; null where it leaves the list
 }
@@ -344,6 +345,7 @@ interface Transition {
 - **Ids.** A step's id is its pointer with each list index removed (`/do/1/guard/try/0/fetch` becomes `/do/guard/try/fetch`); a list's id is its step's id and the list's pointer below the step. A repeated name's second and later occurrences in one list, and everything below them, take `#` and their full pointer (`#/do/1/greet`). A reorder keeps every id; a rename and a move to another list change the ids of the subtree, which `workflow/edit` reports.
 - **Broken text.** When the version does not analyse, the steps are those of the last version that did, `stale` is `true`, and each range is placed again by pointer in the current text, or `null` where it no longer stands or the text does not read.
 - **Summaries.** A summary joins what the step writes and leaves out what is still empty: an HTTP call with no address yet is `GET`, a container with no image `container`, a loop with no list yet its item's name, and a call that writes none of its parts has no summary.
+- **Conditions.** A case's `condition` is its `when` read as `workflow/readCondition` reads the field's text: rows and a join where the text is in the builder's one form (an empty `when` has no row yet), else `expression` with the text, so the client words the condition or shows it as written.
 - **A try's catch.** `catch` gives the policy the interpreter runs: which errors it catches (`errors`, `when`, `exceptWhen`), the retry, its own or a named one of `use.retries`, and `afterward`, what follows once the retries are spent or at once with no retry: `stop` where a retry has neither `catch.do` nor `catch.then` (the error is raised again), `handle` where `catch.do` runs, else `continue`; a `catch.then` is the step's `caught` transition. So "Retry on 503: 3 times, 2 s apart, growing; then stop" is `{ errors: { status: 503, … }, retry: { retries: 3, milliseconds: 2000, backoff: "exponential" }, afterward: "stop" }`.
 - **Durations.** A trigger's and a wait's `summary` is the duration as written; `milliseconds` is the same duration as a number, whichever form it is written in (`PT1H` and `{ hours: 1 }` both give 3600000), so a client words a number and reads no grammar. It is `null` where the duration is not fixed: a calendar one (`P1M`), an expression, or a mistake.
 - **Published versions.** The API reads the same `WorkflowStructure` from `language-server/structure` for a version it holds, every range `null`.
@@ -420,6 +422,7 @@ do:
               "on": "done",
               "case": null,
               "when": null,
+              "condition": null,
               "kind": "jump",
               "to": "/do/greet"
             }
@@ -462,6 +465,7 @@ do:
               "on": "done",
               "case": null,
               "when": null,
+              "condition": null,
               "kind": "next",
               "to": null
             }
@@ -855,7 +859,8 @@ interface ReadConditionParams {
 }
 
 type ReadConditionResult =
-  { kind: "condition"; condition: Condition } | { kind: "expression" }; // open the field as jq
+  | { kind: "condition"; condition: Condition }
+  | { kind: "expression"; text: string }; // open the field as jq; the text as given
 
 interface Condition {
   join: "all" | "any";

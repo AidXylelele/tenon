@@ -4,6 +4,7 @@ import type {
   SemanticModel,
   TaskKind,
 } from "interpreter/front-end";
+import type { ConditionReading } from "../conditions/index.js";
 import type { StepFamily } from "../families/index.js";
 import type { ListPart, ListRole, StepTree } from "../steps/index.js";
 import type { StepVariant } from "../variants/index.js";
@@ -19,6 +20,7 @@ export interface Transition {
   readonly on: "done" | "case" | "caught";
   readonly case: string | null;
   readonly when: string | null;
+  readonly condition: ConditionReading | null;
   readonly kind: "next" | "jump" | "exit" | "end";
   readonly to: string | null;
 }
