@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import Link from "next/link";
 import { CircleCheckIcon, CirclePlayIcon, CircleXIcon } from "lucide-react";
 import { Status, type StatusLook } from "../composites/status";
 import {
@@ -67,7 +68,9 @@ function RunTable() {
                   <Status look={run.look} />
                 </TableCell>
                 <TableCell className="font-mono text-code">
-                  {run.workflow}
+                  <Link href="/runs" className="hover:underline">
+                    {run.workflow}
+                  </Link>
                 </TableCell>
                 <TableCell>{run.started}</TableCell>
                 <TableCell className="text-right tabular-nums">

@@ -24,6 +24,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./dropdown-menu";
@@ -66,6 +67,7 @@ function DialogOfSize({ size }: { readonly size: "default" | "lg" }) {
 function Toasts() {
   useEffect(() => {
     toast.success("Version 1.2.0 published");
+    toast.error("The run failed: the server answered 502");
     toast("Post the items deleted", {
       action: { label: "Undo", onClick: () => undefined },
       duration: Infinity,
@@ -133,6 +135,7 @@ export const Menu: Story = {
           <Button variant="outline">Actions</Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
+          <DropdownMenuLabel>Daily digest</DropdownMenuLabel>
           <DropdownMenuItem>Rename</DropdownMenuItem>
           <DropdownMenuItem>Duplicate</DropdownMenuItem>
           <DropdownMenuItem disabled>Move</DropdownMenuItem>

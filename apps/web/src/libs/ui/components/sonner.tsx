@@ -9,11 +9,26 @@ import {
 } from "lucide-react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
+const TOAST_OPTIONS: ToasterProps["toastOptions"] = {
+  classNames: {
+    toast: "!gap-2.5 !px-3 !py-2.5 !text-body !shadow-overlay",
+    title: "!font-normal",
+    description: "!text-muted-foreground",
+    actionButton:
+      "!h-7 !rounded-md !border !border-border-strong !bg-surface !px-2 !text-body !font-semibold !text-foreground hover:!bg-hover",
+    success: "[&_[data-icon]]:text-success",
+    error: "[&_[data-icon]]:text-destructive",
+    warning: "[&_[data-icon]]:text-warning",
+    info: "[&_[data-icon]]:text-info",
+  },
+};
+
 function Toaster(props: ToasterProps) {
   return (
     <Sonner
       theme="system"
       duration={5000}
+      toastOptions={TOAST_OPTIONS}
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,
