@@ -3,6 +3,7 @@ import type {
   EditAction,
   Step,
   StepFormResult,
+  StepVariant,
   StructureResult,
   Trigger,
   WorkflowFormResult,
@@ -28,6 +29,7 @@ export interface EditingSession {
   readonly formless: boolean;
   readonly startForm: WorkflowFormResult | null;
   readonly startFormless: boolean;
+  readonly variants: readonly StepVariant[];
   readonly refusal: string | null;
   readonly view: () => EditorView | null;
   readonly onView: (view: EditorView) => void;
