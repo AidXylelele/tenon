@@ -25,11 +25,14 @@ import {
 } from "@nestjs/resilience";
 import type { JsonObject, JsonValue, RpcOutcome } from "interpreter";
 import { $ZodError } from "zod/v4/core";
+import { PermanentFault } from "../../domain/errors.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
+import { TransportFailures } from "../http-client/transport-failures.js";
 import { RELEASE_VERSION } from "../release.js";
 import type { CallContext } from "../interpreter/interfaces.js";
+import { LONGEST_TIMER } from "../interpreter/longest-timer.js";
 import type { HttpMcpRequest, McpMethod } from "./interfaces.js";
 
 const RESULTS = {
@@ -49,8 +52,6 @@ const SESSION_HEADERS: readonly string[] = [
 
 const CLEANUP_TIMEOUT = 2_000;
 
-const LONGEST_TIMEOUT = 2 ** 31 - 1;
-
 @Injectable()
 export class McpClient {
   private readonly policy: ResiliencePolicy;
@@ -58,6 +59,7 @@ export class McpClient {
   constructor(
     private readonly authentication: HttpAuthentication,
     private readonly http: HttpClient,
+    private readonly failures: TransportFailures,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("mcp-calls");
@@ -185,7 +187,7 @@ export class McpClient {
   #optionsOf(remaining: number | null, signal: AbortSignal): RequestOptions {
     if (remaining === null) return { signal };
 
-    const timeout = Math.min(remaining, LONGEST_TIMEOUT);
+    const timeout = Math.min(remaining, LONGEST_TIMER);
     return { signal, timeout };
   }
 
@@ -216,6 +218,8 @@ export class McpClient {
 
     if (error instanceof ResilienceError) throw error;
 
+    if (error instanceof PermanentFault) throw error;
+
     if (error instanceof McpError) return this.#rpcFailureOf(error);
 
     if (error instanceof StreamableHTTPError) return this.#httpFailureOf(error);
@@ -226,7 +230,7 @@ export class McpClient {
         detail: "The MCP server answered other than the protocol describes",
       };
 
-    const failure = this.http.transportFailureOf(error);
+    const failure = this.failures.classified(error);
 
     if (failure !== null) return failure;
 

@@ -9,19 +9,15 @@ import {
   status,
 } from "@grpc/grpc-js";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
-import {
-  ResilienceError,
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from "@nestjs/resilience";
+import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type { GrpcOutcome, GrpcRequest, JsonValue } from "interpreter";
-import ipaddr from "ipaddr.js";
 import { LRUCache } from "lru-cache";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
+import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
+import { TransportFailures } from "../http-client/transport-failures.js";
 import type { CallContext } from "../interpreter/interfaces.js";
 import type { PreparedCall, ServiceAddress } from "./interfaces.js";
 import { ProtoSchema } from "./proto-schema.js";
@@ -51,6 +47,8 @@ export class GrpcClient implements OnApplicationShutdown {
     private readonly http: HttpClient,
     private readonly authentication: HttpAuthentication,
     private readonly schema: ProtoSchema,
+    private readonly failures: TransportFailures,
+    private readonly limit: ResponseSizeLimit,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("grpc-calls");
@@ -71,7 +69,7 @@ export class GrpcClient implements OnApplicationShutdown {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, context.signal);
     }
   }
 
@@ -129,7 +127,7 @@ export class GrpcClient implements OnApplicationShutdown {
     if (resolved === undefined) return null;
 
     const target = this.#targetOf(resolved, port);
-    const plaintext = this.#isPrivate(resolved);
+    const plaintext = this.addresses.isPrivate(resolved.address);
     return { target, host, port, plaintext };
   }
 
@@ -139,11 +137,6 @@ export class GrpcClient implements OnApplicationShutdown {
     if (address.family === 6) return `ipv6:[${address.address}]:${at}`;
 
     return `ipv4:${address.address}:${at}`;
-  }
-
-  #isPrivate(address: LookupAddress): boolean {
-    const parsed = ipaddr.process(address.address);
-    return parsed.range() !== "unicast";
   }
 
   #channelFor(service: ServiceAddress): Client {
@@ -161,7 +154,7 @@ export class GrpcClient implements OnApplicationShutdown {
       "grpc.ssl_target_name_override": service.host,
       "grpc.enable_http_proxy": 0,
       "grpc.enable_retries": 0,
-      "grpc.max_receive_message_length": HttpClient.RESPONSE_BYTES,
+      "grpc.max_receive_message_length": this.limit.bytes,
       "grpc.service_config_disable_resolution": 1,
     });
   }
@@ -174,8 +167,8 @@ export class GrpcClient implements OnApplicationShutdown {
     metadata.set("idempotency-key", idempotencyKey);
 
     if (authorization.kind === "header") {
-      const header = authorization.header;
-      metadata.set("authorization", `${header.scheme} ${header.parameter}`);
+      const value = this.authentication.headerValueOf(authorization.header);
+      metadata.set("authorization", value);
     }
 
     return metadata;
@@ -256,11 +249,12 @@ export class GrpcClient implements OnApplicationShutdown {
         const text = JSON.stringify(json);
         received += Buffer.byteLength(text);
 
-        if (received > HttpClient.RESPONSE_BYTES) {
+        if (received > this.limit.bytes) {
+          const size = this.limit.inMebibytes();
           resolve({
             kind: "status",
             code: status.RESOURCE_EXHAUSTED,
-            message: "The response is larger than 1 MiB",
+            message: `The response is larger than ${size}`,
           });
           stream.cancel();
           return;
@@ -303,18 +297,5 @@ export class GrpcClient implements OnApplicationShutdown {
   #jsonOf(message: object | undefined): JsonValue {
     const text = JSON.stringify(message ?? null);
     return JSON.parse(text) as JsonValue;
-  }
-
-  #failureOf(error: unknown, signal: AbortSignal): GrpcOutcome {
-    if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return { kind: "expired" };
-
-    if (error instanceof ResilienceError) throw error;
-
-    const failure = this.http.transportFailureOf(error);
-
-    if (failure === null) throw error;
-
-    return failure;
   }
 }

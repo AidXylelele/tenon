@@ -3,12 +3,14 @@ import type { ResilienceService } from "@nestjs/resilience";
 import type { AsyncApiInboundMessage, JsonObject } from "interpreter";
 import { Agent } from "undici";
 import type { AsyncApiInbox } from "../../../src/interface-adapters/messaging/interfaces.js";
+import { responseSizeLimit } from "../../../src/frameworks/di/resilience.presets.js";
 import type { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import { AuthorizationServer } from "../../../src/frameworks/http-client/authorization-server.js";
 import { HttpAuthentication } from "../../../src/frameworks/http-client/http-authentication.js";
 import { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
 import { OpenApiOperations } from "../../../src/frameworks/http-client/openapi-operations.js";
-import { ResponseSizeLimit } from "../../../src/frameworks/http-client/response-size-limit.js";
+import { ResponseContent } from "../../../src/frameworks/http-client/response-content.js";
+import { TransportFailures } from "../../../src/frameworks/http-client/transport-failures.js";
 import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
 
 export const SELF_SIGNED = {
@@ -36,7 +38,7 @@ export function fetchClientOf(dispatcher: Agent): NestHttpClient {
     retry: false,
     throwOnHttpError: false,
     redirect: "manual",
-    interceptors: [new ResponseSizeLimit(HttpClient.RESPONSE_BYTES)],
+    interceptors: [responseSizeLimit],
   });
 }
 
@@ -58,6 +60,8 @@ export function httpClientOf(
     fetchClientOf(policy.dispatcher),
     authenticationOf(identity),
     new OpenApiOperations(),
+    new TransportFailures(),
+    new ResponseContent(),
     resilience,
   );
 }

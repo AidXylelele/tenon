@@ -22,7 +22,10 @@ import { KafkaBroker } from "../../../src/frameworks/asyncapi/kafka.broker.js";
 import { MqttBroker } from "../../../src/frameworks/asyncapi/mqtt.broker.js";
 import { NatsBroker } from "../../../src/frameworks/asyncapi/nats.broker.js";
 import { RedisBroker } from "../../../src/frameworks/asyncapi/redis.broker.js";
-import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
+import {
+  resiliencePresets,
+  responseSizeLimit,
+} from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import type { BrokerSubscription } from "../../../src/interface-adapters/messaging/interfaces.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
@@ -130,6 +133,7 @@ describe("the trace context of the messages the AsyncAPI client sends and receiv
       authenticationOf(fetchClientOf(policy.dispatcher)),
       new AsyncApiDocuments(),
       new BrokerSpans(),
+      responseSizeLimit,
       amqp,
       kafka,
       mqtt,

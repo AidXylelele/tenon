@@ -8,7 +8,7 @@ import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import { DeliveryClient } from "../../../src/frameworks/http-client/delivery.client.js";
 import type { EventDelivery } from "../../../src/interface-adapters/messaging/interfaces.js";
-import { fetchClientOf } from "./outbound.js";
+import { authenticationOf, fetchClientOf } from "./outbound.js";
 
 describe("a delivery and the outbound address policy", () => {
   let context: INestApplicationContext;
@@ -65,7 +65,8 @@ describe("a delivery and the outbound address policy", () => {
 
   function clientOf(policy: AddressPolicy): DeliveryClient {
     const outbound = fetchClientOf(policy.dispatcher);
-    return new DeliveryClient(outbound, policy, resilience);
+    const authentication = authenticationOf(outbound);
+    return new DeliveryClient(outbound, policy, authentication, resilience);
   }
 
   it("a_loopback_destination_is_refused_before_any_connection", async () => {
@@ -159,4 +160,17 @@ describe("a delivery and the outbound address policy", () => {
       await policy.onApplicationShutdown();
     },
   );
+
+  it("a_credential_that_is_not_a_basic_policy_is_refused_before_any_connection", async () => {
+    const policy = new AddressPolicy(["127.0.0.1"]);
+    const client = clientOf(policy);
+    const uri = `http://127.0.0.1:${String(port)}/events`;
+    const delivery = deliveryTo(uri, "basic", "ada.lovelace");
+
+    const error = await client.deliver(delivery);
+
+    expect(error).toMatch(/^The secret's basic policy is refused: /);
+    expect(received).toBe(0);
+    await policy.onApplicationShutdown();
+  });
 });

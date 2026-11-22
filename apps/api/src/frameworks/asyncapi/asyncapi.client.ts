@@ -18,6 +18,7 @@ import { PermanentFault } from "../../domain/errors.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import { HttpClient } from "../http-client/http.client.js";
 import type { UnusableSecret } from "../http-client/interfaces.js";
+import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import type {
   AsyncApiInbox,
   Subscribed,
@@ -43,14 +44,9 @@ import { RedisBroker } from "./redis.broker.js";
 
 @Injectable()
 export class AsyncApiClient implements SubscriptionClient {
-  private static readonly MESSAGE_BYTES = 1024 * 1024;
   private static readonly JSON = /^application\/(?:[\w.+-]+\+)?json\b/i;
   private static readonly ANONYMOUS: BrokerCredentials = { kind: "anonymous" };
   private static readonly EXPIRED: Expired = { kind: "expired" };
-  private static readonly OVERSIZED: Failure = {
-    kind: "misconfigured",
-    detail: "A received message is larger than the host's 1 MiB",
-  };
 
   private readonly policy: ResiliencePolicy;
   private readonly brokers: ReadonlyMap<string, BrokerClient>;
@@ -60,6 +56,7 @@ export class AsyncApiClient implements SubscriptionClient {
     private readonly authentication: HttpAuthentication,
     private readonly documents: AsyncApiDocuments,
     private readonly spans: BrokerSpans,
+    private readonly limit: ResponseSizeLimit,
     amqp: AmqpBroker,
     kafka: KafkaBroker,
     mqtt: MqttBroker,
@@ -193,11 +190,13 @@ export class AsyncApiClient implements SubscriptionClient {
 
     const body = this.#bodyOf(message.payload, target.contentType);
 
-    if (body.length > AsyncApiClient.MESSAGE_BYTES)
+    if (body.length > this.limit.bytes) {
+      const size = this.limit.inMebibytes();
       return {
         kind: "misconfigured",
-        detail: "The message is larger than the host's 1 MiB",
+        detail: `The message is larger than the host's ${size}`,
       };
+    }
 
     const sent = {
       body,
@@ -279,7 +278,6 @@ export class AsyncApiClient implements SubscriptionClient {
           password: credentials.password,
         };
       case "bearer":
-      case "digest":
       case "oauth2":
       case "oidc":
         return {
@@ -294,8 +292,13 @@ export class AsyncApiClient implements SubscriptionClient {
     target: BrokerTarget,
     inbox: AsyncApiInbox,
   ): Promise<void> {
-    if (message.body.length > AsyncApiClient.MESSAGE_BYTES) {
-      await inbox.failure(AsyncApiClient.OVERSIZED);
+    if (message.body.length > this.limit.bytes) {
+      const size = this.limit.inMebibytes();
+      const oversized: Failure = {
+        kind: "misconfigured",
+        detail: `A received message is larger than the host's ${size}`,
+      };
+      await inbox.failure(oversized);
       return;
     }
 

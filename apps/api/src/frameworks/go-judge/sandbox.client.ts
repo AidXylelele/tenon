@@ -9,10 +9,12 @@ import {
   ResilienceTimeoutError,
 } from "@nestjs/resilience";
 import type { ProcessOutcome, Script, Shell } from "interpreter";
-import type { SandboxedProcessRequest } from "../../interface-adapters/workflows/interfaces.js";
+import type {
+  FetchedText,
+  SandboxedProcessRequest,
+} from "../../interface-adapters/workflows/interfaces.js";
 import { HttpClientName } from "../http-client/enums.js";
 import { HttpClient } from "../http-client/http.client.js";
-import type { FetchedText } from "../http-client/interfaces.js";
 import type { CallContext } from "../interpreter/interfaces.js";
 import type {
   BuiltCommand,

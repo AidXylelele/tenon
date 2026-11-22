@@ -2,7 +2,7 @@ import type { ResiliencePreset } from "@nestjs/resilience";
 import type { WorkflowRetryOptions } from "@nestjs/workflows";
 import { HostLimits } from "../../application/automation/host/queries.js";
 import { WorkerInterpreterClient } from "../interpreter/worker-interpreter.client.js";
-import { HttpClient } from "../http-client/http.client.js";
+import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 
 const CALL_SECONDS = 30;
 const PROCESS_SECONDS = 35;
@@ -14,11 +14,14 @@ const INTERPRETER_QUEUE_TIMEOUT = 2 * MILLISECONDS;
 const INTERPRETER_TIMEOUT = INTERPRETER_WORK + INTERPRETER_QUEUE_TIMEOUT;
 const RUN_THREADS = WorkerInterpreterClient.RUN_THREADS;
 const CHECK_THREADS = WorkerInterpreterClient.CHECK_THREADS;
+const RESPONSE_BYTES = 1024 * 1024;
+
+export const responseSizeLimit = new ResponseSizeLimit(RESPONSE_BYTES);
 
 export const hostLimits = new HostLimits(
   CALL_SECONDS,
   PROCESS_SECONDS,
-  HttpClient.RESPONSE_BYTES,
+  responseSizeLimit.bytes,
 );
 
 export const workflowRetry: WorkflowRetryOptions = {

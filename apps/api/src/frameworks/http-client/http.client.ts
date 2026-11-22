@@ -1,102 +1,40 @@
-import { isUtf8 } from "node:buffer";
-import { randomUUID } from "node:crypto";
-import { MIMEType } from "node:util";
 import { Injectable } from "@nestjs/common";
 import {
-  HttpNetworkError,
   InjectHttpClient,
   HttpClient as NestHttpClient,
 } from "@nestjs/http-client";
-import {
-  ResilienceError,
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from "@nestjs/resilience";
+import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type {
   Authentication,
-  Failure,
   HttpOutcome,
   HttpRequest,
-  JsonValue,
   OpenApiRequest,
   Resource,
   ResourceOutcome,
   ResourceRequest,
-  RespondedHttpOutcome,
   RevealedAuthorization,
 } from "interpreter";
-import { ImportRefusal } from "../../application/automation/imports/enums.js";
 import type {
-  ImportFailure,
-  ImportResult,
-} from "../../application/automation/imports/interfaces.js";
-import type { ImportFetcher } from "../../application/automation/imports/ports.js";
+  FetchedText,
+  ResourceClient,
+  StepCall,
+} from "../../interface-adapters/workflows/interfaces.js";
 import type { CallContext } from "../interpreter/interfaces.js";
-import { AddressPolicy } from "./address-policy.js";
-import { AuthorizationServer } from "./authorization-server.js";
 import { HttpClientName } from "./enums.js";
 import { HttpAuthentication } from "./http-authentication.js";
 import type {
   Authorization,
   EndpointFetch,
-  FetchedText,
   OutboundRequest,
   ResponseOptions,
   Signed,
 } from "./interfaces.js";
 import { OpenApiOperations } from "./openapi-operations.js";
-import { ResponseSizeLimit } from "./response-size-limit.js";
-
-const INVALID_REQUEST =
-  "The request cannot be sent: its URI, method, headers or body are not valid";
-
-const CERTIFICATE_REFUSED = "The service's TLS certificate was refused";
-
-const CLOSED_EARLY = "The connection closed before the service answered";
-
-const UNRESOLVED = "The host name could not be resolved";
-
-const UNREACHABLE = "The service could not be reached";
-
-const NETWORK_REASONS = new Map<string, string>([
-  ["ENOTFOUND", UNRESOLVED],
-  ["EAI_AGAIN", UNRESOLVED],
-  ["ECONNREFUSED", "The service refused the connection"],
-  ["ECONNRESET", CLOSED_EARLY],
-  ["EPIPE", CLOSED_EARLY],
-  ["UND_ERR_SOCKET", CLOSED_EARLY],
-  ["UND_ERR_CLOSED", CLOSED_EARLY],
-  ["UND_ERR_RES_EXCEEDED_MAX_SIZE", "The response is larger than 1 MiB"],
-  ["ETIMEDOUT", "The connection timed out"],
-  ["UND_ERR_CONNECT_TIMEOUT", "The connection timed out"],
-  ["EHOSTUNREACH", "The host is unreachable"],
-  ["ENETUNREACH", "The network is unreachable"],
-  ["UNABLE_TO_VERIFY_LEAF_SIGNATURE", CERTIFICATE_REFUSED],
-  ["UNABLE_TO_GET_ISSUER_CERT_LOCALLY", CERTIFICATE_REFUSED],
-  ["DEPTH_ZERO_SELF_SIGNED_CERT", CERTIFICATE_REFUSED],
-  ["SELF_SIGNED_CERT_IN_CHAIN", CERTIFICATE_REFUSED],
-  ["ERR_TLS_CERT_ALTNAME_INVALID", CERTIFICATE_REFUSED],
-]);
-
-const IMPORT_EXPIRED =
-  "The import's server did not answer within the time limit";
-
-const CREDENTIAL_HEADERS: readonly string[] = [
-  "authorization",
-  "proxy-authorization",
-];
-
-const TEXT_APPLICATIONS: readonly string[] = [
-  "xml",
-  "javascript",
-  "x-www-form-urlencoded",
-];
+import { ResponseContent } from "./response-content.js";
+import { TransportFailures } from "./transport-failures.js";
 
 @Injectable()
-export class HttpClient implements ImportFetcher {
-  static readonly RESPONSE_BYTES = 1024 * 1024;
-
+export class HttpClient implements ResourceClient {
   private readonly policy: ResiliencePolicy;
 
   constructor(
@@ -104,6 +42,8 @@ export class HttpClient implements ImportFetcher {
     private readonly outbound: NestHttpClient,
     private readonly authentication: HttpAuthentication,
     private readonly operations: OpenApiOperations,
+    private readonly failures: TransportFailures,
+    private readonly content: ResponseContent,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("service-calls");
@@ -116,7 +56,7 @@ export class HttpClient implements ImportFetcher {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, context.signal);
     }
   }
 
@@ -130,7 +70,7 @@ export class HttpClient implements ImportFetcher {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, context.signal);
     }
   }
 
@@ -145,34 +85,19 @@ export class HttpClient implements ImportFetcher {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, context.signal);
     }
   }
 
-  async text(resource: Resource, context: CallContext): Promise<FetchedText> {
+  async text(resource: Resource, step: StepCall): Promise<FetchedText> {
     try {
       return await this.policy.execute(
-        (attempt) => this.#textFetched(resource, context, attempt.signal),
-        { signal: context.signal },
+        (attempt) => this.#textFetched(resource, step, attempt.signal),
+        { signal: step.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, step.signal);
     }
-  }
-
-  async fetch(uri: string): Promise<ImportResult> {
-    const endpoint = { uri, authentication: null };
-    const resource = { name: null, endpoint };
-    const signal = new AbortController().signal;
-    const idempotencyKey = randomUUID();
-    const context = { idempotencyKey, signal, secrets: {}, remaining: null };
-    const fetched = await this.text(resource, context);
-
-    if (fetched.kind === "text")
-      return { ok: true, value: { text: fetched.text } };
-
-    const failure = this.#importFailureOf(fetched);
-    return { ok: false, failure };
   }
 
   exchange(
@@ -187,32 +112,6 @@ export class HttpClient implements ImportFetcher {
 
   fetchFor(authorization: Authorization, signal: AbortSignal): EndpointFetch {
     return (url, init) => this.#fetchedFor(authorization, url, init, signal);
-  }
-
-  transportFailureOf(error: unknown): Failure | null {
-    const cause = this.#causeOf(error);
-
-    if (cause instanceof TypeError)
-      return { kind: "misconfigured", detail: INVALID_REQUEST };
-
-    const code: unknown =
-      cause instanceof Error ? Reflect.get(cause, "code") : undefined;
-    const detail = cause instanceof Error ? cause.message : "";
-
-    switch (code) {
-      case AuthorizationServer.REFUSED:
-        return { kind: "unauthenticated", detail };
-      case AddressPolicy.REFUSED:
-      case ResponseSizeLimit.EXCEEDED:
-        return { kind: "unreachable", detail };
-    }
-
-    if (typeof code === "string") return this.#networkFailureOf(code);
-
-    if (error instanceof HttpNetworkError)
-      return { kind: "unreachable", detail: UNREACHABLE };
-
-    return null;
   }
 
   async #operationCalled(
@@ -252,19 +151,19 @@ export class HttpClient implements ImportFetcher {
 
     if (fetched.kind !== "text") return fetched;
 
-    const document = this.#documentOf(fetched.text);
+    const document = this.content.documentOf(fetched.text);
     return { kind: "fetched", document };
   }
 
   async #textFetched(
     resource: Resource,
-    context: CallContext,
+    step: StepCall,
     signal: AbortSignal,
   ): Promise<FetchedText> {
     const endpoint = resource.endpoint;
     const authorization = await this.authentication.authorizationOf(
       endpoint.authentication,
-      context.secrets,
+      step.secrets,
       signal,
     );
 
@@ -292,9 +191,7 @@ export class HttpClient implements ImportFetcher {
       };
     }
 
-    const body = await this.#bodyOf(response);
-    const media = this.#mediaOf(response);
-    const text = this.#textOf(body, media);
+    const text = await this.content.textOf(response);
     return { kind: "text", text };
   }
 
@@ -317,31 +214,7 @@ export class HttpClient implements ImportFetcher {
 
     const keyed = this.#keyed(outbound, context.idempotencyKey);
     const signed = await this.#signed(keyed, authorization, signal);
-    return this.#respondedOf(keyed, signed, options);
-  }
-
-  async #respondedOf(
-    request: OutboundRequest,
-    signed: Signed,
-    options: ResponseOptions,
-  ): Promise<RespondedHttpOutcome> {
-    const response = signed.response;
-    const body = await this.#bodyOf(response);
-    const content = this.#contentOf(body, response, options.output);
-    const headers = this.#headersOf(response);
-    const authorization = options.revealAuthorization
-      ? signed.authorization
-      : null;
-    const shown = this.#withoutCredentials(request.headers);
-    const sent = { method: request.method, uri: request.uri, headers: shown };
-    return {
-      kind: "responded",
-      request: sent,
-      statusCode: response.status,
-      headers,
-      content,
-      authorization,
-    };
+    return this.content.respondedOf(keyed, signed, options);
   }
 
   #signed(
@@ -370,7 +243,7 @@ export class HttpClient implements ImportFetcher {
     authorization: RevealedAuthorization,
     signal: AbortSignal,
   ): Promise<Signed> {
-    const value = `${authorization.scheme} ${authorization.parameter}`;
+    const value = this.authentication.headerValueOf(authorization);
     const signed = this.#withHeader(request, "authorization", value);
     const response = await this.#sent(signed, signal);
     return { response, authorization };
@@ -408,63 +281,6 @@ export class HttpClient implements ImportFetcher {
     const scoped = AbortSignal.any(signals);
     const signed = await this.#signed(request, authorization, scoped);
     return signed.response;
-  }
-
-  #importFailureOf(failure: Failure): ImportFailure {
-    switch (failure.kind) {
-      case "expired":
-        return { refusal: ImportRefusal.Expired, detail: IMPORT_EXPIRED };
-      case "unreachable":
-        return { refusal: ImportRefusal.Unreachable, detail: failure.detail };
-      case "rejected":
-        return { refusal: ImportRefusal.Rejected, detail: failure.detail };
-      case "unauthenticated":
-        return {
-          refusal: ImportRefusal.Unauthenticated,
-          detail: failure.detail,
-        };
-      case "forbidden":
-      case "misconfigured":
-        return { refusal: ImportRefusal.Misconfigured, detail: failure.detail };
-    }
-  }
-
-  #failureOf(error: unknown, signal: AbortSignal): Failure {
-    if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return { kind: "expired" };
-
-    if (error instanceof ResilienceError) throw error;
-
-    const failure = this.transportFailureOf(error);
-
-    if (failure === null) throw error;
-
-    return failure;
-  }
-
-  #causeOf(error: unknown): unknown {
-    if (error instanceof HttpNetworkError) return error.cause;
-
-    const wrapped = error instanceof TypeError && error.cause !== undefined;
-    return wrapped ? error.cause : error;
-  }
-
-  #networkFailureOf(code: string): Failure {
-    const invalid = [
-      "UND_ERR_INVALID_ARG",
-      "UND_ERR_NOT_SUPPORTED",
-      "ERR_INVALID_URL",
-      "ERR_INVALID_HTTP_TOKEN",
-      "ERR_INVALID_CHAR",
-    ].includes(code);
-
-    if (invalid) return { kind: "misconfigured", detail: INVALID_REQUEST };
-
-    if (code.startsWith("CERT_"))
-      return { kind: "unreachable", detail: CERTIFICATE_REFUSED };
-
-    const detail = NETWORK_REASONS.get(code) ?? UNREACHABLE;
-    return { kind: "unreachable", detail };
   }
 
   #outboundOf(request: HttpRequest): OutboundRequest {
@@ -505,99 +321,5 @@ export class HttpClient implements ImportFetcher {
       body: request.body,
       redirect: request.redirect,
     };
-  }
-
-  #withoutCredentials(headers: Headers): Readonly<Record<string, string>> {
-    const shown = new Headers(headers);
-
-    for (const name of CREDENTIAL_HEADERS) shown.delete(name);
-
-    return Object.fromEntries(shown);
-  }
-
-  #headersOf(response: Response): Readonly<Record<string, string>> {
-    const headers = new Map(response.headers);
-    const cookies = response.headers.getSetCookie().join(", ");
-
-    if (cookies !== "") headers.set("set-cookie", cookies);
-
-    return Object.fromEntries(headers);
-  }
-
-  async #bodyOf(response: Response): Promise<Buffer> {
-    const bytes = await response.arrayBuffer();
-    return Buffer.from(bytes);
-  }
-
-  #contentOf(
-    body: Buffer,
-    response: Response,
-    output: HttpRequest["output"],
-  ): JsonValue {
-    if (body.length === 0) return null;
-
-    if (output === "raw") return body.toString("base64");
-
-    const media = this.#mediaOf(response);
-
-    if (this.#readsAsJson(media, body)) {
-      const text = this.#textOf(body, media);
-      return this.#documentOf(text);
-    }
-
-    if (this.#readsAsText(media)) return this.#textOf(body, media);
-
-    return body.toString("base64");
-  }
-
-  #mediaOf(response: Response): MIMEType | null {
-    const contentType = response.headers.get("content-type");
-
-    if (contentType === null) return null;
-
-    try {
-      return new MIMEType(contentType);
-    } catch {
-      return null;
-    }
-  }
-
-  #readsAsJson(media: MIMEType | null, body: Buffer): boolean {
-    if (media === null) return isUtf8(body);
-
-    if (media.type !== "application") return false;
-
-    return media.subtype === "json" || media.subtype.endsWith("+json");
-  }
-
-  #readsAsText(media: MIMEType | null): boolean {
-    if (media === null) return false;
-
-    if (media.type === "text") return true;
-
-    if (media.type !== "application") return false;
-
-    return (
-      TEXT_APPLICATIONS.includes(media.subtype) ||
-      media.subtype.endsWith("+xml")
-    );
-  }
-
-  #textOf(body: Buffer, media: MIMEType | null): string {
-    const charset = media?.params.get("charset") ?? "utf-8";
-
-    try {
-      return new TextDecoder(charset).decode(body);
-    } catch {
-      return new TextDecoder("utf-8").decode(body);
-    }
-  }
-
-  #documentOf(text: string): JsonValue {
-    try {
-      return JSON.parse(text) as JsonValue;
-    } catch {
-      return text;
-    }
   }
 }

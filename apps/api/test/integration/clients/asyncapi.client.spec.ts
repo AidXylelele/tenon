@@ -26,7 +26,10 @@ import {
   Wait,
 } from "testcontainers";
 import { PermanentFault } from "../../../src/domain/errors.js";
-import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
+import {
+  resiliencePresets,
+  responseSizeLimit,
+} from "../../../src/frameworks/di/resilience.presets.js";
 import { AmqpBroker } from "../../../src/frameworks/asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../../../src/frameworks/asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../../../src/frameworks/asyncapi/asyncapi-documents.js";
@@ -204,6 +207,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       authentication,
       new AsyncApiDocuments(),
       new BrokerSpans(),
+      responseSizeLimit,
       amqp,
       kafka,
       mqtt,
