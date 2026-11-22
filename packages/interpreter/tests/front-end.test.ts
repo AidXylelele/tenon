@@ -700,6 +700,12 @@ describe("analyze, of a value the standard needs written", () => {
       },
     ],
     [
+      "the specversion of an emitted event",
+      "event-attribute",
+      "/do/0/tell/emit/event/with/specversion",
+      emittedWith({ specversion: "" }),
+    ],
+    [
       "the content type of an emitted event",
       "event-attribute",
       "/do/0/tell/emit/event/with/datacontenttype",

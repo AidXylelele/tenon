@@ -1,8 +1,8 @@
 import type { CloudEvent, JsonObject, JsonValue } from "../../api/index.js";
 import {
   type EventPayloadMember,
+  contextEventAttributes,
   isExtensionAttribute,
-  nonEmptyEventAttributes,
   requiredEventAttributes,
 } from "../../standard/index.js";
 import { Raised } from "../errors/index.js";
@@ -54,12 +54,12 @@ function checkRequired(
 }
 
 function checkNonEmpty(attributes: JsonObject): void {
-  const empty = nonEmptyEventAttributes.filter(
+  const empty = contextEventAttributes.filter(
     (attribute) => attributes[attribute] === "",
   );
-  const isWritten = empty.length === 0;
+  const isFilled = empty.length === 0;
 
-  if (isWritten) {
+  if (isFilled) {
     return;
   }
 

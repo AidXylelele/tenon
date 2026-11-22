@@ -1,11 +1,16 @@
-import type { Expression, TextTemplate } from "../../syntax/index.js";
+import type { Expression, ValueTemplate } from "../../syntax/index.js";
 
-export function writtenTextOf(template: TextTemplate): string | null {
+export function writtenTextOf(template: ValueTemplate): string | null {
   switch (template.kind) {
-    case "literal":
-      return template.value;
+    case "literal": {
+      const value = template.value;
+      return typeof value === "string" ? value : null;
+    }
     case "expression":
       return looseTextOf(template);
+    case "object":
+    case "array":
+      return null;
   }
 }
 

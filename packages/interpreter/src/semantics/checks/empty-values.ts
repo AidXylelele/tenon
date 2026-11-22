@@ -1,7 +1,9 @@
 import { childPointerOf } from "../../runtime/index.js";
 import {
-  type NonEmptyEventAttribute,
-  nonEmptyEventAttributes,
+  type ContextEventAttribute,
+  contextEventAttributes,
+  eventAttributes,
+  isMemberOf,
 } from "../../standard/index.js";
 import type {
   Call,
@@ -12,6 +14,7 @@ import type {
   HttpCall,
   Process,
   Task,
+  ValueTemplate,
   WorkflowProcess,
 } from "../../syntax/index.js";
 import { writtenTextOf } from "../written/index.js";
@@ -93,16 +96,16 @@ function emptyMethodOf(call: HttpCall): readonly Finding[] {
 }
 
 function emptyEventAttributesOf(event: EventProperties): readonly Finding[] {
-  return nonEmptyEventAttributes.flatMap((name) =>
+  return contextEventAttributes.flatMap((name) =>
     emptyEventAttributeOf(event, name),
   );
 }
 
 function emptyEventAttributeOf(
   event: EventProperties,
-  name: NonEmptyEventAttribute,
+  name: ContextEventAttribute,
 ): readonly Finding[] {
-  const template = event[name];
+  const template = writtenAttributeOf(event, name);
 
   if (template === null) {
     return none;
@@ -126,15 +129,28 @@ function emptyEventAttributeOf(
   ];
 }
 
+function writtenAttributeOf(
+  event: EventProperties,
+  name: ContextEventAttribute,
+): ValueTemplate | null {
+  const isProperty = isMemberOf(eventAttributes, name);
+
+  if (!isProperty) {
+    return event.additional.get(name) ?? null;
+  }
+
+  return event[name];
+}
+
 function emptyFilterAttributesOf(filter: EventFilter): readonly Finding[] {
-  return nonEmptyEventAttributes.flatMap((name) =>
+  return contextEventAttributes.flatMap((name) =>
     emptyFilterAttributeOf(filter, name),
   );
 }
 
 function emptyFilterAttributeOf(
   filter: EventFilter,
-  name: NonEmptyEventAttribute,
+  name: ContextEventAttribute,
 ): readonly Finding[] {
   const attribute = filter.with.attributes.get(name);
 
