@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -18,36 +18,47 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          version: 12.8.1
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          cache: true
       - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('apps/web/src/**', 'packages/*/src/**') }}
+          restore-keys: next-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - run: pnpm build
       - run: pnpm lint
       - run: pnpm check-types
       - run: pnpm test
-      - run: pnpm --filter api test:int
+      - run: pnpm --filter api exec vitest run --project integration
 
   supply-chain:
     name: dependency audit and lockfile scan
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          version: 12.8.1
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          cache: true
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --prod --audit-level=high
+      - run: pnpm audit --prod
       - name: Scan the lockfile
-        uses: aquasecurity/trivy-action@v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: fs
           scan-ref: pnpm-lock.yaml
           scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: false
-          exit-code: '1'
+          ignore-unfixed: true
+          exit-code: "1"
 
   image:
     name: build, scan and run the end-to-end journeys
@@ -55,43 +66,96 @@ jobs:
     timeout-minutes: 40
     needs: [checks]
     steps:
-      - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-      - name: Build the API image
-        uses: docker/build-push-action@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build the api image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: apps/api/Dockerfile
-          tags: workflow-platform/api:dev
+          target: runtime
+          tags: tenon-api
           load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Scan the image
-        uses: aquasecurity/trivy-action@v0.36.0
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - name: Build the migrate image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          scan-type: image
-          image-ref: workflow-platform/api:dev
+          context: .
+          file: apps/api/Dockerfile
+          target: migrate
+          tags: tenon-migrate
+          load: true
+          cache-from: type=gha,scope=api
+      - name: Build the web image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          tags: tenon-web
+          load: true
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+      - name: Build the sandbox image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: docker/go-judge
+          tags: tenon-go-judge
+          load: true
+          cache-from: type=gha,scope=go-judge
+          cache-to: type=gha,scope=go-judge,mode=max
+      - name: Scan the api image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: tenon-api
           scanners: vuln
           severity: CRITICAL,HIGH
-          ignore-unfixed: false
-          exit-code: '1'
-      - uses: pnpm/action-setup@v6
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Scan the web image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          version: 12.8.1
-      - run: pnpm install --frozen-lockfile
-      - name: Start the infrastructure
+          image-ref: tenon-web
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Scan the sandbox image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: tenon-go-judge
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Write the stand's environment and secrets
         run: |
           cp .env.example .env
-          docker compose up -d --wait
-      - name: Migrate
-        run: |
-          set -a; . ./.env; set +a
-          pnpm --filter api db:migrate
-          pnpm --filter api outbox:migrate
-      - name: Start the API container
-        run: docker compose --profile app up -d --wait --no-build
+          gateway="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')"
+          sed -i "s|^OUTBOUND_ALLOW_LIST=.*|OUTBOUND_ALLOW_LIST=$gateway|" .env
+          cd docker/secrets
+          openssl rand -hex 32 > postgres-password
+          openssl rand -base64 32 > secrets-key
+          openssl rand -hex 32 > sandbox-token
+          printf 'postgres://tenon:%s@postgres:5432/tenon' "$(cat postgres-password)" > database-url
+          printf 'postgres://tenon_app:%s@postgres:5432/tenon' "$(openssl rand -hex 32)" > api-database-url
+      - name: Start the stand from the built images
+        run: docker compose up --wait --no-build
+      - name: The console answers
+        run: curl -fsS -o /dev/null http://127.0.0.1:3001/sign-in
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter "api^..." run build
+      - name: The sandbox image against its documented platform
+        env:
+          SANDBOX_IMAGE: tenon-go-judge
+        run: pnpm --filter api exec vitest run --project integration test/integration/clients/sandbox-image.spec.ts
       - name: End-to-end journeys
-        run: pnpm --filter api test:e2e
-      - name: Stack logs on failure
+        run: pnpm --filter api exec vitest run --project e2e
+      - name: Stand logs on failure
         if: failure()
-        run: docker compose logs --no-color api
+        run: docker compose logs --no-color

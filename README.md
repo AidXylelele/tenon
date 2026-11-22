@@ -1,59 +1,72 @@
-# Workflow Platform
+# Tenon
 
-Platform for building automations (workflows). pnpm workspaces monorepo with
-a strict UI / API split: the apps are fully independent and share no code.
+Tenon is a workflow platform for the Open Workflow standard (DSL 1.1.0): a workflow is a YAML document, checked
+like a program before it is published, and started by hand, through the API, on a schedule (`every`, `cron`, `after`),
+by an event or by a webhook. Its interpreter runs a workflow one step at a time, and the API keeps every run durable
+across restarts.
 
-| App                    | Description                                           |
-| ---------------------- | ----------------------------------------------------- |
-| [`apps/api`](apps/api) | NestJS modular monolith — the application API         |
-| [`apps/web`](apps/web) | Next.js UI; its server is a Backend for Frontend only |
+## Layout
 
-## Requirements
+| Path                                                   | What it is                                                     |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| [`apps/api`](apps/api)                                 | NestJS API: accounts, workflows, triggers and runs             |
+| [`apps/web`](apps/web)                                 | Next.js console; its server is a Backend for Frontend          |
+| [`packages/interpreter`](packages/interpreter)         | The Open Workflow interpreter: compiles a document, runs steps |
+| [`packages/language-server`](packages/language-server) | The workflow language server of the editor, in a web worker    |
 
-- pnpm `12.8.1` (https://pnpm.io/installation); Node.js `24.21.0` is downloaded by pnpm from
-  `devEngines.runtime` (see [`.nvmrc`](.nvmrc))
-- Docker with Compose v2 for the local stack and the integration tests
+## Install
 
-## Getting started
+pnpm `12.8.1` (it downloads Node.js `26.13.1`), then:
 
 ```sh
 pnpm install
-cp .env.example .env      # set POSTGRES_PASSWORD
-docker compose up -d      # PostgreSQL (127.0.0.1:55432) and Mailpit (SMTP 51025, UI http://127.0.0.1:58025)
-set -a; . ./.env; set +a
-pnpm --filter api db:migrate && pnpm --filter api outbox:migrate
-pnpm dev                  # api on :3000, web on :3001
 ```
 
-The Compose project is named `workflow-platform`; its containers, network and volumes carry that
-name and all host ports bind to `127.0.0.1`. `docker compose --profile app up -d --build` adds the
-API container on `127.0.0.1:53000`.
+## Run the stand
 
-## Commands
+Docker with Compose v2. Copy `.env.example` to `.env`, write the secrets once, then start the stand:
 
-Root scripts run the task in every app via `pnpm -r`.
+```sh
+cd docker/secrets
+openssl rand -hex 32 > postgres-password
+openssl rand -base64 32 > secrets-key
+openssl rand -hex 32 > sandbox-token
+printf 'postgres://tenon:%s@postgres:5432/tenon' "$(cat postgres-password)" > database-url
+printf 'postgres://tenon_app:%s@postgres:5432/tenon' "$(openssl rand -hex 32)" > api-database-url
+cd ../..
+docker compose up --build --wait
+```
 
-| Command            | Description                         |
-| ------------------ | ----------------------------------- |
-| `pnpm dev`         | Run all apps in watch mode          |
-| `pnpm build`       | Build all apps                      |
-| `pnpm lint`        | Lint all packages                   |
-| `pnpm check-types` | Type check all packages             |
-| `pnpm test`        | Unit tests (Vitest)                 |
-| `pnpm test:e2e`    | End-to-end tests                    |
-| `pnpm format`      | Format the repository with Prettier |
+The console answers at `http://localhost:3001`, the API at `http://localhost:53000/api/v1`, Mailpit at
+`http://localhost:58025`, and the traces and metrics of both apps with the api's logs at `http://localhost:58888`. The
+api creates the first administrator at `ADMIN_EMAIL` with no password: set one through password recovery, whose mail
+arrives in Mailpit.
+`docker compose down` stops the stand; `--volumes` also deletes its data.
 
-Run a task for a single app with `pnpm --filter api <task>` (or `cd apps/api`).
+The migrations run as the database owner `tenon`; the api connects as `tenon_app`, which may only read and write data.
+A database created before that role existed gets it only when created again (`docker compose down --volumes`).
 
-## Conventions
+In production the console goes behind a proxy that appends `X-Forwarded-For`; the API trusts only the console's address.
 
-- **Commits** follow [Conventional Commits](https://www.conventionalcommits.org),
-  enforced by commitlint in the `commit-msg` hook, e.g. `feat(api): add workflow module`.
-- **Pre-commit**: lint-staged runs ESLint `--fix` and Prettier on staged files.
-- **Dependencies** are pinned to exact versions in the root and the API; `pnpm audit` and Trivy
-  (lockfile and image) run in CI with zero tolerance for critical and high findings.
-- **Apps are self-contained**: each has its own dependencies, `tsconfig`, ESLint
-  and test config. Only repo tooling (Prettier, husky, lint-staged, commitlint)
-  lives in the root.
-- **TypeScript** is pinned to 6.0.x: TypeScript 7 has no stable JS API yet, which
-  typescript-eslint and the Nest CLI depend on.
+## Develop
+
+```sh
+set -a; . ./.env; set +a
+pnpm build
+pnpm dev
+```
+
+`pnpm dev` rebuilds the packages on change and runs the API and the console, both with the root `.env`.
+
+## Test
+
+```sh
+pnpm build
+pnpm lint
+pnpm check-types
+pnpm test
+pnpm format:check
+```
+
+The pre-commit hook formats and lints the staged files and runs the tests they touch. The api's integration tests
+need Docker: `pnpm --filter api exec vitest run --project integration`.
