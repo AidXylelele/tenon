@@ -153,6 +153,7 @@ function ConditionControl(props: ControlProps) {
   const slot: ConditionSlot = {
     pointer: field.pointer,
     text,
+    required: field.required,
     labelledBy: wiring.labelId,
   };
 

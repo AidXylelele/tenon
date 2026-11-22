@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ConditionReading } from "language-server/protocol";
 import { fn } from "storybook/test";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import {
   FETCH_FORM,
   FETCH_STEP,
+  formWith,
   POST_FORM,
   POST_STEP,
   REPORT_FORM,
@@ -18,7 +20,69 @@ import {
   WAIT_FORM,
   WAIT_STEP,
 } from "../form-fields/forms.test-support";
+import { ConditionBuilder } from "../condition-builder";
+import type { PickerSlot } from "../condition-builder";
+import {
+  AN_EXPRESSION,
+  NON_CANONICAL_TEXT,
+} from "../condition-builder/readings.test-support";
+import { DataField, DataPicker } from "../data-picker";
+import {
+  AFTER_FETCH,
+  AT_AN_ADDRESS,
+  SAMPLES,
+} from "../data-picker/data-choices/data.test-support";
+import type { ConditionSlot, DataSlot } from "./interfaces";
 import { StepForm } from "./step-form";
+
+const HAS_ITEMS_READING: ConditionReading = {
+  kind: "condition",
+  condition: {
+    join: "all",
+    rows: [
+      { left: ".slideshow.slides", comparison: "isNotEmpty", right: null },
+    ],
+  },
+};
+
+const ROUTED_BY_AN_EXPRESSION = formWith(SWITCH_FORM, "switch", [
+  { "Has items": { when: NON_CANONICAL_TEXT, then: "continue" } },
+  { default: { then: "end" } },
+]);
+
+function picker({ label, onPick }: PickerSlot) {
+  return (
+    <DataPicker
+      data={AFTER_FETCH}
+      samples={SAMPLES}
+      onlyPaths
+      label={label}
+      onPick={onPick}
+    />
+  );
+}
+
+function builder(slot: ConditionSlot) {
+  const reading =
+    slot.text === NON_CANONICAL_TEXT ? AN_EXPRESSION : HAS_ITEMS_READING;
+  return (
+    <ConditionBuilder
+      pointer={slot.pointer}
+      text={slot.text}
+      required={slot.required}
+      labelledBy={slot.labelledBy}
+      reading={reading}
+      data={AFTER_FETCH}
+      samples={SAMPLES}
+      renderPicker={picker}
+      onEdit={fn()}
+    />
+  );
+}
+
+function dataField(slot: DataSlot) {
+  return <DataField {...slot} data={AT_AN_ADDRESS} />;
+}
 
 const meta = {
   component: StepForm,
@@ -97,5 +161,28 @@ export const FailureWithRetrySettings: Story = {
   play: async ({ canvas, userEvent }) => {
     const failure = await canvas.findByText("If this step fails");
     await userEvent.click(failure);
+  },
+};
+
+export const HttpWithTheDataPicker: Story = {
+  args: { step: POST_STEP, form: POST_FORM, renderData: dataField },
+  play: async ({ canvas, userEvent }) => {
+    const [insert] = await canvas.findAllByRole("button", {
+      name: "Insert data",
+    });
+
+    if (insert !== undefined) await userEvent.click(insert);
+  },
+};
+
+export const SwitchWithTheBuilder: Story = {
+  args: { step: SWITCH_STEP, form: SWITCH_FORM, renderCondition: builder },
+};
+
+export const SwitchWithAnExpression: Story = {
+  args: {
+    step: SWITCH_STEP,
+    form: ROUTED_BY_AN_EXPRESSION,
+    renderCondition: builder,
   },
 };

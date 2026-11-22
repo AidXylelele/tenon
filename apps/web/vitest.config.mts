@@ -51,7 +51,12 @@ const libFloors: [string, Floor][] = [
 
 const EDITOR = "src/spaces/workflows/modules/workflow-editor";
 
-const EDITOR_PARTS = ["step-form", "form-fields", "data-picker"];
+const EDITOR_PARTS = [
+  "step-form",
+  "form-fields",
+  "data-picker",
+  "condition-builder",
+];
 
 const editorFloors = EDITOR_PARTS.map((part): [string, Floor] => [
   `${EDITOR}/${part}/**`,

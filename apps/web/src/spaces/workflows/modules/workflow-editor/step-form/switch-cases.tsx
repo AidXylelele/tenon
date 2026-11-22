@@ -46,6 +46,7 @@ import {
 } from "../form-fields";
 import { FieldShell, ProblemLines, useFieldProblems } from "./field-shell";
 import { useFormSettings } from "./form-settings";
+import type { ConditionSlot } from "./interfaces";
 import { JsonControl } from "./value-controls";
 
 interface SwitchCasesProps {
@@ -136,11 +137,17 @@ function CaseCard({ holder, row, isFirst, isLast }: CaseCardProps) {
   const pointer = whenPointerOf(holder.pointer, row);
   const text = row.when ?? "";
   const conditionLabel = `Condition of ${row.name}`;
+  const slot: ConditionSlot = {
+    pointer,
+    text,
+    required: true,
+    labelledBy: nameId,
+  };
   const condition =
     renderCondition === undefined ? (
       <ExpressionInput pointer={pointer} text={text} label={conditionLabel} />
     ) : (
-      renderCondition({ pointer, text, labelledBy: nameId })
+      renderCondition(slot)
     );
 
   function choose(then: string) {

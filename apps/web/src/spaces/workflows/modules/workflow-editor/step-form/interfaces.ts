@@ -31,6 +31,7 @@ export interface DataSlot {
 export interface ConditionSlot {
   readonly pointer: string;
   readonly text: string;
+  readonly required: boolean;
   readonly labelledBy: string;
 }
 
