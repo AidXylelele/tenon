@@ -50,6 +50,7 @@ const libFloors: [string, Floor][] = [
 ];
 
 const featureFloors: [string, Floor][] = [
+  ["src/features/script-field/**", FEATURE_FLOOR],
   ["src/features/step-catalog/**", FEATURE_FLOOR],
 ];
 
