@@ -94,6 +94,22 @@ describe("the console's navigation from 1024 px", () => {
     expect(current).toHaveAttribute("aria-current", "page");
   });
 
+  it("collapsing_the_column_with_ctrl_b_keeps_focus_on_the_focused_item", () => {
+    const viewport = fakeViewport(1440);
+    vi.stubGlobal("matchMedia", viewport.matchMedia);
+    render(<Navigation />);
+    const home = screen.getByRole("button", { name: "Home" });
+    act(() => {
+      home.focus();
+    });
+
+    act(() => {
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    });
+
+    expect(home).toHaveFocus();
+  });
+
   it("the_menu_button_says_whether_the_column_is_expanded", () => {
     const viewport = fakeViewport(1440);
     vi.stubGlobal("matchMedia", viewport.matchMedia);

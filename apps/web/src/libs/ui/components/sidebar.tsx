@@ -471,6 +471,7 @@ function SidebarMenuButton({
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
   const Comp = asChild ? Slot.Root : "button";
   const { isMobile, state } = useSidebar();
+  const [hinting, setHinting] = React.useState(false);
   const current = isActive ? "page" : undefined;
   const iconsOnly = state === "collapsed" && !isMobile;
 
@@ -486,14 +487,15 @@ function SidebarMenuButton({
     />
   );
 
-  if (!tooltip || !iconsOnly) {
+  if (!tooltip) {
     return button;
   }
 
   const content = typeof tooltip === "string" ? { children: tooltip } : tooltip;
+  const open = iconsOnly && hinting;
 
   return (
-    <Tooltip>
+    <Tooltip open={open} onOpenChange={setHinting}>
       <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent side="right" align="center" {...content} />
     </Tooltip>
