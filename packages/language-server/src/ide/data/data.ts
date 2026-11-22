@@ -9,7 +9,6 @@ import { withValueAt } from "../pointers/index.js";
 import { modelOf, type Snapshot, sourceOf } from "../snapshot/index.js";
 import {
   type StepNode,
-  stepHolding,
   type StepTree,
   stepTreeOf,
   stepWithId,
@@ -23,7 +22,9 @@ import {
   variableEntriesOf,
   workflowInputEntriesOf,
 } from "./entries.js";
-import { definitionShapeOf, startShapeOf } from "./flow.js";
+import { exportersByKeyOf } from "./exports.js";
+import { chainShapesOf, definitionShapeOf, startShapeOf } from "./flow.js";
+import { unknownShape } from "./shapes.js";
 import type {
   DataEntry,
   DataFlow,
@@ -32,6 +33,7 @@ import type {
   DataSite,
   DataWarning,
   FieldPlace,
+  Offered,
 } from "./interfaces.js";
 
 const unread: DataReading = {
@@ -75,9 +77,29 @@ export function dataAtOf(
   const { workflow, symbols } = model;
   const document = source.document;
   const secrets = [...symbols.components.secrets.keys()];
-  const flow = { tree, jumps: symbols.jumps, document, workflow, secrets };
+  const targets = new Set(symbols.jumps.values());
+  const holders = holdersOf(tree);
+  const exporters = exportersByKeyOf(tree, document);
+  const flow = {
+    tree,
+    targets,
+    holders,
+    exporters,
+    document,
+    workflow,
+    secrets,
+  };
 
   return dataInFlowOf(flow, request, speculate);
+}
+
+function holdersOf(tree: StepTree): ReadonlyMap<string, StepNode> {
+  const steps = [...tree.steps.values()];
+  const held = steps.flatMap((step) =>
+    step.lists.map((list) => [list.pointer, step] as const),
+  );
+
+  return new Map(held);
 }
 
 function dataInFlowOf(
@@ -100,34 +122,35 @@ function dataInFlowOf(
 
   const place = placeOf(node, field);
   const scope = scopeAt(flow.document, field, speculate);
-  const site = { flow, node, field, place, scope };
+  const shapes = chainShapesOf(flow, node);
+  const site = { flow, node, field, place, scope, shapes };
 
   return dataOf(site);
 }
 
 function dataOf(site: DataSite): DataReading {
-  const steps = stepEntriesOf(site);
+  const offered = stepEntriesOf(site);
+  const steps = offered.map((each) => each.entry);
   const input = workflowInputEntriesOf(site);
   const variables = variableEntriesOf(site);
   const secrets = secretEntriesOf(site);
   const times = timeEntriesOf();
   const entries = [...steps, ...input, ...variables, ...secrets, ...times];
-  const merging = mergingWarningsOf(site.flow, site.node);
-  const skipped = skippedWarningsOf(site, steps);
+  const merging = mergingWarningsOf(site);
+  const skipped = skippedWarningsOf(site, offered);
   const context = contextWarningsOf(site, steps);
   const warnings = [...merging, ...skipped, ...context];
 
   return { kind: "data", entries, warnings };
 }
 
-function mergingWarningsOf(
-  flow: DataFlow,
-  node: StepNode,
-): readonly DataWarning[] {
+function mergingWarningsOf(site: DataSite): readonly DataWarning[] {
+  const { flow, node, shapes } = site;
   const written = writtenResultOf(node, flow.document);
   const isMerging = written.as === inputAndValuesAs;
-  const incoming = definitionShapeOf(flow, node);
-  const isObject = incoming.kind === "object";
+  const incoming = shapes.get(node.pointer)?.incoming ?? unknownShape;
+  const defined = definitionShapeOf(node, incoming);
+  const isObject = defined.kind === "object";
   const isWarned = node.task.kind === "set" && isMerging && !isObject;
 
   if (!isWarned) {
@@ -139,31 +162,17 @@ function mergingWarningsOf(
 
 function skippedWarningsOf(
   site: DataSite,
-  steps: readonly DataEntry[],
+  offered: readonly Offered[],
 ): readonly DataWarning[] {
-  const contextual = steps.filter((entry) => entry.expression !== ".");
+  const contextual = offered.filter((each) => each.entry.expression !== ".");
+  const guarded = contextual.filter((each) =>
+    isGuardedFor(site.flow, each.step, site.node),
+  );
 
-  return contextual.flatMap((entry) => skippedWarningOf(site, entry.step));
-}
-
-function skippedWarningOf(
-  site: DataSite,
-  id: string | null,
-): readonly DataWarning[] {
-  const tree = site.flow.tree;
-  const step = id === null ? null : stepWithId(tree, id);
-
-  if (step === null) {
-    return [];
-  }
-
-  const isGuarded = isGuardedFor(tree, step, site.node);
-
-  if (!isGuarded) {
-    return [];
-  }
-
-  return [{ kind: "mayHoldNothing", step: step.id }];
+  return guarded.map((each) => ({
+    kind: "mayHoldNothing",
+    step: each.step.id,
+  }));
 }
 
 function contextWarningsOf(
@@ -181,10 +190,10 @@ function contextWarningsOf(
   return [{ kind: "contextNotKnownObject" }];
 }
 
-function isGuardedFor(tree: StepTree, step: StepNode, at: StepNode): boolean {
+function isGuardedFor(flow: DataFlow, step: StepNode, at: StepNode): boolean {
   const holdsAt = at.pointer.startsWith(`${step.pointer}/`);
   const isGuarded = step.task.if !== null;
-  const holder = stepHolding(tree, step.list);
+  const holder = flow.holders.get(step.list) ?? null;
 
   if (holdsAt) {
     return false;
@@ -198,7 +207,7 @@ function isGuardedFor(tree: StepTree, step: StepNode, at: StepNode): boolean {
     return false;
   }
 
-  return isGuardedFor(tree, holder, at);
+  return isGuardedFor(flow, holder, at);
 }
 
 function placeOf(node: StepNode, field: string): FieldPlace {

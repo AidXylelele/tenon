@@ -1,7 +1,7 @@
 import type { ast, JsonValue } from "interpreter/front-end";
 import { jqStringOf, runtimeExpressionOf } from "../jq-text/index.js";
 import { childPointerOf, valueAt } from "../pointers/index.js";
-import type { StepNode, StepTree } from "../steps/index.js";
+import type { StepNode, StepNodeList, StepTree } from "../steps/index.js";
 
 const exportedName = /^\$\{ \$context \+ \{ ("(?:[^"\\]|\\.)*"): \. \} \}$/;
 
@@ -36,14 +36,23 @@ export function exportedNameOf(written: JsonValue | undefined): string | null {
   return isName ? name : null;
 }
 
-export function exportersOf(
+export function exportersByKeyOf(
   tree: StepTree,
   document: JsonValue,
-  name: string,
-): readonly StepNode[] {
+): ReadonlyMap<string | null, readonly StepNode[]> {
   const steps = [...tree.steps.values()];
 
-  return steps.filter((step) => exportedKeyOf(document, step) === name);
+  return Map.groupBy(steps, (step) => exportedKeyOf(document, step));
+}
+
+export function blockReplacesContextOf(
+  document: JsonValue,
+  block: StepNode,
+  list: StepNodeList,
+): boolean {
+  const repeated = repeatedStepsOf(block, list);
+
+  return repeated.some((step) => replacesContextOf(document, step));
 }
 
 export function replacesContextOf(
@@ -97,4 +106,24 @@ function iteratorOf(task: ast.Task): ast.SubscriptionIterator | null {
   }
 
   return call.exchange.foreach;
+}
+
+function repeatedStepsOf(
+  block: StepNode,
+  list: StepNodeList,
+): readonly StepNode[] {
+  switch (list.part) {
+    case "for":
+    case "foreach":
+      return list.steps;
+    case "catch": {
+      const tried = block.lists.filter((each) => each.part === "try");
+      return tried.flatMap((each) => each.steps);
+    }
+    case "do":
+    case "try":
+    case "branches":
+    case null:
+      return [];
+  }
 }

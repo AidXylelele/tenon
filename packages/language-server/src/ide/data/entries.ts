@@ -7,22 +7,24 @@ import {
 import { valueAt } from "../pointers/index.js";
 import type { StepNode } from "../steps/index.js";
 import {
+  blockReplacesContextOf,
   exportAsPointerOf,
   exportedNameOf,
-  exportersOf,
   replacesContextOf,
 } from "./exports.js";
 import {
-  earlierStepsOf,
+  earlierOf,
   isPassingOnOf,
-  outputShapeOf,
   producerOf,
   workflowInputShapeOf,
 } from "./flow.js";
 import type {
   DataEntry,
+  DataFlow,
   DataMember,
   DataSite,
+  Earlier,
+  Offered,
   Origin,
   Reach,
   Shape,
@@ -56,14 +58,20 @@ const fromSecrets: Origin = {
 
 const fromClock: Origin = { source: "time", step: null, needsExport: false };
 
-export function stepEntriesOf(site: DataSite): readonly DataEntry[] {
+export function stepEntriesOf(site: DataSite): readonly Offered[] {
   const { flow, node, place } = site;
-  const earlier = earlierStepsOf(flow.tree, node);
+  const earlier = earlierOf(flow, node);
   const producer = producerOf(flow, node, place);
+  const replacing = earlier.map((each) => isReplacingOf(flow, each));
+  const firstReplacing = replacing.indexOf(true);
 
-  return earlier.flatMap((step, index) => {
-    const between = earlier.slice(0, index);
-    const reach = { step, between, producer };
+  return earlier.flatMap((each, index) => {
+    if (each.kind === "block") {
+      return [];
+    }
+
+    const isReplaced = firstReplacing !== -1 && firstReplacing < index;
+    const reach = { step: each.step, producer, isReplaced };
     return reachedEntriesOf(site, reach);
   });
 }
@@ -115,7 +123,7 @@ export function timeEntriesOf(): readonly DataEntry[] {
   });
 }
 
-function reachedEntriesOf(site: DataSite, reach: Reach): readonly DataEntry[] {
+function reachedEntriesOf(site: DataSite, reach: Reach): readonly Offered[] {
   const { step, producer } = reach;
   const isPassedOn = isPassingOnOf(step);
 
@@ -125,30 +133,26 @@ function reachedEntriesOf(site: DataSite, reach: Reach): readonly DataEntry[] {
 
   if (step === producer) {
     const flowing = flowingEntryOf(site, step);
-    return [flowing];
+    return [{ entry: flowing, step }];
   }
 
   return exportedEntriesOf(site, reach);
 }
 
 function flowingEntryOf(site: DataSite, step: StepNode): DataEntry {
-  const shape = outputShapeOf(site.flow, step);
+  const shape = outputOf(site, step);
   const member = memberOf(step.name, ".", shape);
   const origin = { source: "step", step: step.id, needsExport: false } as const;
 
   return entryOf(member, origin);
 }
 
-function exportedEntriesOf(site: DataSite, reach: Reach): readonly DataEntry[] {
-  const { step, between } = reach;
-  const { tree, document } = site.flow;
+function exportedEntriesOf(site: DataSite, reach: Reach): readonly Offered[] {
+  const { step, isReplaced } = reach;
   const written = exportWrittenOf(site, step);
   const name = exportedNameOf(written);
   const isOwnExport = written !== undefined && name !== step.name;
-  const isReplaced = between.some((later) =>
-    replacesContextOf(document, later),
-  );
-  const exporters = exportersOf(tree, document, step.name);
+  const exporters = site.flow.exporters.get(step.name) ?? [];
   const isShared = exporters.some((exporter) => exporter !== step);
   const isInScope = site.scope.has("context");
   const isUnreachable = isOwnExport || isReplaced || isShared || !isInScope;
@@ -158,11 +162,25 @@ function exportedEntriesOf(site: DataSite, reach: Reach): readonly DataEntry[] {
   }
 
   const expression = memberAccessOf("$context", step.name);
-  const shape = outputShapeOf(site.flow, step);
+  const shape = outputOf(site, step);
   const member = memberOf(step.name, expression, shape);
   const needsExport = written === undefined;
   const origin = { source: "step", step: step.id, needsExport } as const;
-  return [entryOf(member, origin)];
+  const entry = entryOf(member, origin);
+  return [{ entry, step }];
+}
+
+function isReplacingOf(flow: DataFlow, earlier: Earlier): boolean {
+  switch (earlier.kind) {
+    case "step":
+      return replacesContextOf(flow.document, earlier.step);
+    case "block":
+      return blockReplacesContextOf(flow.document, earlier.block, earlier.list);
+  }
+}
+
+function outputOf(site: DataSite, step: StepNode): Shape {
+  return site.shapes.get(step.pointer)?.output ?? unknownShape;
 }
 
 function exportWrittenOf(

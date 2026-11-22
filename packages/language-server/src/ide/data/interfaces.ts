@@ -1,5 +1,5 @@
 import type { ast, Binding, JsonValue } from "interpreter/front-end";
-import type { StepNode, StepTree } from "../steps/index.js";
+import type { StepNode, StepNodeList, StepTree } from "../steps/index.js";
 
 export type DataShape =
   "object" | "list" | "text" | "number" | "boolean" | "unknown";
@@ -50,10 +50,30 @@ export type FieldPlace = "raw" | "definition" | "result";
 
 export interface DataFlow {
   readonly tree: StepTree;
-  readonly jumps: ReadonlyMap<string, string>;
+  readonly targets: ReadonlySet<string>;
+  readonly holders: ReadonlyMap<string, StepNode>;
+  readonly exporters: ReadonlyMap<string | null, readonly StepNode[]>;
   readonly document: JsonValue;
   readonly workflow: ast.Workflow;
   readonly secrets: readonly string[];
+}
+
+export interface StepShapes {
+  readonly incoming: Shape;
+  readonly output: Shape;
+}
+
+export type Earlier =
+  | { readonly kind: "step"; readonly step: StepNode }
+  | {
+      readonly kind: "block";
+      readonly block: StepNode;
+      readonly list: StepNodeList;
+    };
+
+export interface Offered {
+  readonly entry: DataEntry;
+  readonly step: StepNode;
 }
 
 export interface DataSite {
@@ -62,10 +82,11 @@ export interface DataSite {
   readonly field: string;
   readonly place: FieldPlace;
   readonly scope: ReadonlyMap<string, Binding>;
+  readonly shapes: ReadonlyMap<string, StepShapes>;
 }
 
 export interface Reach {
   readonly step: StepNode;
-  readonly between: readonly StepNode[];
   readonly producer: StepNode | null;
+  readonly isReplaced: boolean;
 }

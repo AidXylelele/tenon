@@ -649,3 +649,83 @@ test.each([
 
   expect(reading).toMatchObject({ kind: "data", warnings });
 });
+
+const resetLoopFlow = `${inlineHeader}${objectInput}  - a:
+      set:
+        a: 1
+  - loop:
+      for:
+        in: \${ [ 1, 2 ] }
+        each: item
+      do:
+        - use:
+            set:
+              x: 1
+        - reset:
+            set:
+              y: 2
+            export:
+              as: '\${ { only: . } }'
+`;
+
+test("a loop whose steps replace the context hides the data before it from the second item on", () => {
+  const routes = stepRoutesOf(
+    resetLoopFlow,
+    "/do/loop/do/use",
+    "/do/1/loop/do/0/use/set/x",
+  );
+
+  expect(routes).toEqual([]);
+});
+
+const failingTryFlow = `${inlineHeader}${objectInput}  - a:
+      set:
+        a: 1
+  - guard:
+      try:
+        - wipe:
+            set:
+              b: 2
+            export:
+              as: '\${ { only: . } }'
+      catch:
+        do:
+          - handle:
+              set:
+                x: 1
+`;
+
+test("steps that handle a failure run with the context the tried steps left, so the data before the try is hidden", () => {
+  const routes = stepRoutesOf(
+    failingTryFlow,
+    "/do/guard/catch/do/handle",
+    "/do/1/guard/catch/do/0/handle/set/x",
+  );
+
+  expect(routes).toEqual([]);
+});
+
+const groupFlow = `${inlineHeader}${objectInput}  - a:
+      set:
+        a: 1
+  - group:
+      do:
+        - use:
+            set:
+              x: 1
+        - reset:
+            set:
+              y: 2
+            export:
+              as: '\${ { only: . } }'
+`;
+
+test("a group runs its steps once, so an export after the field's step does not hide the data before the group", () => {
+  const routes = stepRoutesOf(
+    groupFlow,
+    "/do/group/do/use",
+    "/do/1/group/do/0/use/set/x",
+  );
+
+  expect(routes).toEqual([["a", "$context.a"]]);
+});

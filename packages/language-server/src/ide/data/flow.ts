@@ -2,15 +2,20 @@ import type { ast } from "interpreter/front-end";
 import {
   directivesOf,
   type StepNode,
-  stepHolding,
-  type StepTree,
+  type StepNodeList,
 } from "../steps/index.js";
 import {
   inputAndValuesAs,
   printedResultOf,
   writtenResultOf,
 } from "../variants/index.js";
-import type { DataFlow, FieldPlace, Shape } from "./interfaces.js";
+import type {
+  DataFlow,
+  Earlier,
+  FieldPlace,
+  Shape,
+  StepShapes,
+} from "./interfaces.js";
 import {
   mergedShapeOf,
   numberShape,
@@ -20,20 +25,18 @@ import {
   unknownShape,
 } from "./shapes.js";
 
-export function earlierStepsOf(
-  tree: StepTree,
-  node: StepNode,
-): readonly StepNode[] {
-  const list = tree.lists.get(node.list);
-  const outer = outerStepsOf(tree, node);
-  const isConcurrent = list?.role === "branches";
+export function earlierOf(flow: DataFlow, node: StepNode): readonly Earlier[] {
+  const list = flow.tree.lists.get(node.list);
+  const holder = flow.holders.get(node.list) ?? null;
+  const before = beforeOf(list, node);
 
-  if (list === undefined || isConcurrent) {
-    return outer;
+  if (list === undefined || holder === null) {
+    return before;
   }
 
-  const before = list.steps.slice(0, node.index).toReversed();
-  return [...before, ...outer];
+  const leaving: Earlier = { kind: "block", block: holder, list };
+  const outer = earlierOf(flow, holder);
+  return [...before, leaving, ...outer];
 }
 
 export function producerOf(
@@ -56,7 +59,7 @@ export function producerOf(
   }
 
   const fallsThrough = fallsThroughOf(previous.task);
-  const isTarget = isTargetOf(flow, node);
+  const isTarget = flow.targets.has(node.pointer);
   const isGuarded = previous.task.if !== null;
   const isOnlyEntry = fallsThrough && !isTarget && !isGuarded;
 
@@ -73,42 +76,24 @@ export function producerOf(
   return previous;
 }
 
-export function outputShapeOf(flow: DataFlow, node: StepNode): Shape {
-  const task = node.task;
-  const schema = schemaShapeOf(task.output.schema);
+export function chainShapesOf(
+  flow: DataFlow,
+  node: StepNode,
+): ReadonlyMap<string, StepShapes> {
+  const lists = chainListsOf(flow, node);
+  const shapes = lists.flatMap((list) => [...listShapesOf(flow, list)]);
 
-  if (schema !== null) {
-    return schema;
-  }
-
-  switch (task.kind) {
-    case "set":
-      return setShapeOf(flow, node, task);
-    case "run":
-      return runShapeOf(flow, node, task);
-    case "switch":
-      return passedShapeOf(flow, node);
-    case "call":
-    case "do":
-    case "emit":
-    case "for":
-    case "fork":
-    case "listen":
-    case "raise":
-    case "try":
-    case "wait":
-      return unknownShape;
-  }
+  return new Map(shapes);
 }
 
-export function definitionShapeOf(flow: DataFlow, node: StepNode): Shape {
+export function definitionShapeOf(node: StepNode, incoming: Shape): Shape {
   const isTransformed = node.task.input.from !== null;
 
   if (isTransformed) {
     return unknownShape;
   }
 
-  return incomingShapeOf(flow, node);
+  return incoming;
 }
 
 export function workflowInputShapeOf(workflow: ast.Workflow): Shape {
@@ -129,11 +114,57 @@ export function isPassingOnOf(step: StepNode): boolean {
   return step.task.kind === "switch" && step.task.output.as === null;
 }
 
-function incomingShapeOf(flow: DataFlow, node: StepNode): Shape {
+function beforeOf(
+  list: StepNodeList | undefined,
+  node: StepNode,
+): readonly Earlier[] {
+  const isConcurrent = list?.role === "branches";
+
+  if (list === undefined || isConcurrent) {
+    return [];
+  }
+
+  const before = list.steps.slice(0, node.index).toReversed();
+  return before.map((step) => ({ kind: "step", step }));
+}
+
+function chainListsOf(flow: DataFlow, node: StepNode): readonly StepNodeList[] {
+  const list = flow.tree.lists.get(node.list);
+  const holder = flow.holders.get(node.list) ?? null;
+  const own = list === undefined ? [] : [list];
+
+  if (holder === null) {
+    return own;
+  }
+
+  const outer = chainListsOf(flow, holder);
+  return [...own, ...outer];
+}
+
+function listShapesOf(
+  flow: DataFlow,
+  list: StepNodeList,
+): ReadonlyMap<string, StepShapes> {
+  const shapes = new Map<string, StepShapes>();
+
+  for (const step of list.steps) {
+    const incoming = incomingShapeOf(flow, step, shapes);
+    const output = outputShapeOf(flow, step, incoming);
+    shapes.set(step.pointer, { incoming, output });
+  }
+
+  return shapes;
+}
+
+function incomingShapeOf(
+  flow: DataFlow,
+  node: StepNode,
+  shapes: ReadonlyMap<string, StepShapes>,
+): Shape {
   const producer = producerOf(flow, node, "raw");
 
   if (producer !== null) {
-    return outputShapeOf(flow, producer);
+    return shapes.get(producer.pointer)?.output ?? unknownShape;
   }
 
   const isWorkflowStart =
@@ -146,11 +177,41 @@ function incomingShapeOf(flow: DataFlow, node: StepNode): Shape {
   return startShapeOf(flow.workflow);
 }
 
-function setShapeOf(
-  flow: DataFlow,
-  node: StepNode,
-  task: ast.TaskCommon & ast.SetTask,
-): Shape {
+function outputShapeOf(flow: DataFlow, node: StepNode, incoming: Shape): Shape {
+  const task = node.task;
+  const schema = schemaShapeOf(task.output.schema);
+
+  if (schema !== null) {
+    return schema;
+  }
+
+  switch (task.kind) {
+    case "set":
+      return setShapeOf(flow, node, incoming);
+    case "run":
+      return runShapeOf(flow, node, task);
+    case "switch":
+      return passedShapeOf(node, incoming);
+    case "call":
+    case "do":
+    case "emit":
+    case "for":
+    case "fork":
+    case "listen":
+    case "raise":
+    case "try":
+    case "wait":
+      return unknownShape;
+  }
+}
+
+function setShapeOf(flow: DataFlow, node: StepNode, incoming: Shape): Shape {
+  const task = node.task;
+
+  if (task.kind !== "set") {
+    return unknownShape;
+  }
+
   const values = templateShapeOf(task.set);
   const written = writtenResultOf(node, flow.document);
 
@@ -162,8 +223,8 @@ function setShapeOf(
     return unknownShape;
   }
 
-  const incoming = definitionShapeOf(flow, node);
-  return mergedShapeOf(incoming, values);
+  const defined = definitionShapeOf(node, incoming);
+  return mergedShapeOf(defined, values);
 }
 
 function runShapeOf(
@@ -192,24 +253,14 @@ function runShapeOf(
   }
 }
 
-function passedShapeOf(flow: DataFlow, node: StepNode): Shape {
+function passedShapeOf(node: StepNode, incoming: Shape): Shape {
   const isTransformed = node.task.output.as !== null;
 
   if (isTransformed) {
     return unknownShape;
   }
 
-  return definitionShapeOf(flow, node);
-}
-
-function outerStepsOf(tree: StepTree, node: StepNode): readonly StepNode[] {
-  const holder = stepHolding(tree, node.list);
-
-  if (holder === null) {
-    return [];
-  }
-
-  return earlierStepsOf(tree, holder);
+  return definitionShapeOf(node, incoming);
 }
 
 function fallsThroughOf(task: ast.Task): boolean {
@@ -231,10 +282,4 @@ function reachedDirectivesOf(task: ast.Task): readonly ast.Directive[] {
   }
 
   return [...cases, task.then];
-}
-
-function isTargetOf(flow: DataFlow, node: StepNode): boolean {
-  const targets = [...flow.jumps.values()];
-
-  return targets.includes(node.pointer);
 }

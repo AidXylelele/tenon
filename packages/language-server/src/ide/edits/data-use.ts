@@ -1,4 +1,8 @@
-import { exportAsOf, exportAsPointerOf, exportersOf } from "../data/index.js";
+import {
+  exportAsOf,
+  exportAsPointerOf,
+  exportersByKeyOf,
+} from "../data/index.js";
 import { valueAt } from "../pointers/index.js";
 import { type StepNode, stepWithId } from "../steps/index.js";
 import { combinedOf, fieldSettingOf } from "./field-actions.js";
@@ -33,7 +37,8 @@ function exportOf(editable: Editable, id: string): Editing {
   const pointer = exportAsPointerOf(step.pointer);
   const written = valueAt(editable.document, pointer);
   const exportAs = exportAsOf(step.name);
-  const exporters = exportersOf(editable.tree, editable.document, step.name);
+  const keyed = exportersByKeyOf(editable.tree, editable.document);
+  const exporters = keyed.get(step.name) ?? [];
   const other = exporters.find((exporter) => exporter !== step);
 
   if (other !== undefined) {
