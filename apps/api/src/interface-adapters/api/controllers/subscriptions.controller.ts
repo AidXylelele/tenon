@@ -24,7 +24,7 @@ import { Missing } from "../../../application/automation/enums.js";
 import { CreateSubscription } from "../../../application/automation/subscriptions/create-subscription.js";
 import { DeleteSubscription } from "../../../application/automation/subscriptions/delete-subscription.js";
 import { SubscriptionQueries } from "../../../application/automation/subscriptions/queries.js";
-import type { User } from "../../../domain/identity/user.js";
+import type { User } from "../../../domain/identity/users/user.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
 import { SubscriptionEndpointMapper } from "../mappers/subscription-endpoint.mapper.js";
 import { SubscriptionPresenter } from "../presenters/subscription.presenter.js";
@@ -34,7 +34,7 @@ import {
   SubscriptionListResponse,
   SubscriptionParams,
   SubscriptionResponse,
-} from "../schemas/subscription.schemas.js";
+} from "../schemas/subscription.schema.js";
 
 @ApiTags("subscriptions")
 @ApiCookieAuth("sessionCookie")

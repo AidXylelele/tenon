@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-import { makeClientConstructor } from "@grpc/grpc-js";
 import { fromJSON } from "@grpc/proto-loader";
 import { Injectable } from "@nestjs/common";
 import type { GrpcRequest, JsonObject, JsonValue } from "interpreter";
@@ -21,7 +19,8 @@ export class ProtoSchema {
     if (parsed.kind === "misconfigured") return parsed;
 
     const serviceName = request.service.name;
-    const definition = fromJSON(parsed.root.toJSON(), {
+    const json = parsed.root.toJSON();
+    const definition = fromJSON(json, {
       keepCase: true,
       longs: String,
       enums: String,
@@ -50,14 +49,7 @@ export class ProtoSchema {
 
     try {
       const argument = this.#argumentOf(parsed.root, request);
-      return {
-        kind: "call",
-        digest: createHash("sha256").update(text).digest("hex"),
-        service: makeClientConstructor(service, serviceName),
-        method: request.method,
-        streamed: method.responseStream,
-        argument,
-      };
+      return { kind: "call", method, argument };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       return this.#misconfigured(
@@ -69,16 +61,23 @@ export class ProtoSchema {
   #parsedOf(text: string): ParsedProto {
     try {
       const parsed = parse(text, { keepCase: true });
-      const imports = (parsed.imports ?? []).concat(parsed.weakImports ?? []);
-      const unknown = imports.find((imported) => common.get(imported) === null);
+      const strong = parsed.imports ?? [];
+      const weak = parsed.weakImports ?? [];
+      const imports = strong.concat(weak);
+      const unknown = imports.find((imported) => {
+        const known = common.get(imported);
+        return known === null;
+      });
 
       if (unknown !== undefined)
         return this.#misconfigured(
           `The proto imports ${unknown}, which is not a well-known type`,
         );
 
-      for (const imported of imports)
-        parsed.root.addJSON(common.get(imported)?.nested ?? {});
+      for (const imported of imports) {
+        const nested = common.get(imported)?.nested ?? {};
+        parsed.root.addJSON(nested);
+      }
 
       parsed.root.resolveAll();
       return { kind: "root", root: parsed.root };
@@ -125,10 +124,14 @@ export class ProtoSchema {
 
     if (!(message instanceof Type)) return value;
 
-    if (this.#isList(value) && field.repeated)
+    const list = this.#isList(value);
+
+    if (list && field.repeated)
       return value.map((item) => this.#nestedOf(message, item));
 
-    if (field.map && this.#isObject(value)) {
+    const object = this.#isObject(value);
+
+    if (field.map && object) {
       const entries = Object.entries(value).map(
         ([key, item]): [string, JsonValue] => [
           key,
@@ -142,7 +145,8 @@ export class ProtoSchema {
   }
 
   #nestedOf(type: Type, value: JsonValue): JsonValue {
-    return this.#isObject(value) ? this.#namedOf(type, value) : value;
+    const object = this.#isObject(value);
+    return object ? this.#namedOf(type, value) : value;
   }
 
   #isList(value: JsonValue): value is readonly JsonValue[] {
@@ -150,7 +154,8 @@ export class ProtoSchema {
   }
 
   #isObject(value: JsonValue): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    const list = Array.isArray(value);
+    return typeof value === "object" && value !== null && !list;
   }
 
   #misconfigured(detail: string): Misconfigured {

@@ -10,15 +10,12 @@ import type {
   JsonObject as ProtocolObject,
 } from "interpreter";
 import { EmitEvent } from "../../application/automation/events/emit-event.js";
+import { AnswerChildren } from "../../application/automation/instances/answer-children.js";
 import { AnswerReceives } from "../../application/automation/instances/answer-receives.js";
 import { BeginRun } from "../../application/automation/instances/begin-run.js";
-import { CancelStrandedRun } from "../../application/automation/instances/cancel-stranded-run.js";
 import { FailRun } from "../../application/automation/instances/fail-run.js";
 import type { ReceiverView } from "../../application/automation/instances/interfaces.js";
-import {
-  InstanceQueries,
-  ReceiverQueries,
-} from "../../application/automation/instances/queries.js";
+import { ReceiverQueries } from "../../application/automation/instances/queries.js";
 import { ReceiveInbound } from "../../application/automation/instances/receive-inbound.js";
 import { RespondToEffect } from "../../application/automation/instances/respond-to-effect.js";
 import { StartSubWorkflow } from "../../application/automation/instances/start-sub-workflow.js";
@@ -37,11 +34,13 @@ import { WorkflowName } from "../../domain/automation/workflows/workflow-name.js
 import type {
   ChildEffect,
   ChildStart,
+  JsonOf,
   Receiver,
   RunAgendaView,
   TimeAnswer,
   TimedWait,
 } from "./interfaces.js";
+import { ProtocolMapper } from "./mappers/protocol.mapper.js";
 
 @Injectable()
 export class RunController {
@@ -63,11 +62,11 @@ export class RunController {
     private readonly emitEvent: EmitEvent,
     private readonly startSubWorkflow: StartSubWorkflow,
     private readonly answerReceives: AnswerReceives,
+    private readonly answerChildren: AnswerChildren,
     private readonly receiveInbound: ReceiveInbound,
-    private readonly cancelStrandedRun: CancelStrandedRun,
-    private readonly instances: InstanceQueries,
     private readonly receivers: ReceiverQueries,
     private readonly secrets: SecretQueries,
+    private readonly protocol: ProtocolMapper,
   ) {}
 
   async begin(instanceId: string, signal: AbortSignal): Promise<RunAgendaView> {
@@ -84,7 +83,7 @@ export class RunController {
     outcome: EffectOutcome,
     signal: AbortSignal,
   ): Promise<RunAgendaView> {
-    const answered = outcome as unknown as JsonObject;
+    const answered: JsonOf<EffectOutcome> = outcome;
     const answer = { effectId, outcome: answered };
     const responded = await this.respondToEffect.execute({
       instanceId,
@@ -108,6 +107,17 @@ export class RunController {
     return this.#viewOf(answered.value);
   }
 
+  async childrenEnded(
+    instanceId: string,
+    signal: AbortSignal,
+  ): Promise<RunAgendaView> {
+    const answered = await this.answerChildren.execute({ instanceId, signal });
+
+    if (!answered.ok) return RunController.ENDED;
+
+    return this.#viewOf(answered.value);
+  }
+
   async openReceivers(): Promise<readonly Receiver[]> {
     const open = await this.receivers.open();
     return open.map((receiver) => this.#receiverOf(receiver));
@@ -119,7 +129,7 @@ export class RunController {
     message: AsyncApiInboundMessage,
     fence: number,
   ): Promise<boolean> {
-    const received = message as InboundMessage;
+    const received: InboundMessage = message;
     const inbound = { kind: InboundKind.Message as const, message: received };
     const taken = await this.receiveInbound.execute({
       instanceId,
@@ -136,7 +146,7 @@ export class RunController {
     failed: Failure,
     fence: number,
   ): Promise<boolean> {
-    const failure = failed as unknown as JsonObject;
+    const failure: JsonOf<Failure> = failed;
     const inbound = { kind: InboundKind.Failure as const, failure };
     const taken = await this.receiveInbound.execute({
       instanceId,
@@ -151,32 +161,17 @@ export class RunController {
     return this.receivers.demands(instanceId, execution);
   }
 
-  async agendaOf(instanceId: string): Promise<RunAgendaView> {
-    const agenda = await this.instances.agendaOf(instanceId);
-
-    if (agenda === null) return RunController.ENDED;
-
-    return this.#viewOf(agenda);
-  }
-
-  async cutOver(): Promise<void> {
-    const live = await this.instances.liveInstances();
-
-    for (const instanceId of live)
-      await this.cancelStrandedRun.execute({ instanceId });
-  }
-
   fail(instanceId: string): Promise<void> {
     return this.failRun.execute({ instanceId });
   }
 
   async secretsOf(instanceId: string): Promise<ProtocolObject> {
     const secrets = await this.secrets.ofInstance(instanceId);
-    return secrets.values as ProtocolObject;
+    return this.protocol.toObject(secrets.values);
   }
 
   async emit(instanceId: string, event: CloudEvent): Promise<EmitOutcome> {
-    const cloudEvent = event as JsonObject;
+    const cloudEvent: JsonObject = event;
     await this.emitEvent.execute({ instanceId, cloudEvent });
     return { kind: "emitted" };
   }
@@ -239,10 +234,9 @@ export class RunController {
     const deadline = effect.deadline;
     const expiry =
       deadline === null ? [] : [this.#answerAt(deadline, "expired")];
-    return {
-      id: effect.id,
-      answers: expiry.concat(this.#ownAnswersOf(effect)),
-    };
+    const own = this.#ownAnswersOf(effect);
+    const answers = expiry.concat(own);
+    return { id: effect.id, answers };
   }
 
   #ownAnswersOf(effect: Effect): readonly TimeAnswer[] {
@@ -264,7 +258,7 @@ export class RunController {
   }
 
   #receiverOf(view: ReceiverView): Receiver {
-    const request = view.request as unknown as AsyncApiRequest;
+    const request = view.request as JsonOf<AsyncApiRequest>;
     const closesAt = view.closesAt?.getTime() ?? null;
     return {
       instanceId: view.instanceId,
@@ -275,11 +269,11 @@ export class RunController {
   }
 
   #effectOf(request: JsonObject): Effect {
-    return request as unknown as Effect;
+    return request as JsonOf<Effect>;
   }
 
   #childOf(request: JsonObject): ChildEffect {
-    return request as unknown as ChildEffect;
+    return request as JsonOf<ChildEffect>;
   }
 
   #isDetached(effect: Effect): boolean {

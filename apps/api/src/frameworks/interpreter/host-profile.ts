@@ -16,7 +16,7 @@ export const HOST_PROFILE: Required<HostProfile> = {
     "emit",
     "listen",
   ],
-  authentications: ["basic", "bearer", "digest", "oauth2", "oidc"],
+  authentications: ["basic", "bearer", "oauth2", "oidc"],
   processes: ["script", "shell"],
   scriptLanguages: ["js", "python"],
   asyncApiProtocols: Object.values(BrokerProtocol),
@@ -26,7 +26,6 @@ export const HOST_PROFILE: Required<HostProfile> = {
   triggers: "one",
   grants: [
     "client_credentials",
-    "password",
     "urn:ietf:params:oauth:grant-type:token-exchange",
   ],
   secrets: [],

@@ -24,12 +24,12 @@ import {
 import { Transactional } from "@nestjs-cls/transactional";
 import { minutes, Throttle } from "@nestjs/throttler";
 import { InvitationPolicy } from "../auth/invitation.policy.js";
-import { AcceptInvitation } from "../../../application/identity/accept-invitation.js";
-import { InviteUser } from "../../../application/identity/invite-user.js";
-import { InvitationQueries } from "../../../application/identity/queries.js";
-import { RevokeInvitation } from "../../../application/identity/revoke-invitation.js";
-import { VerifyInvitationLink } from "../../../application/identity/verify-invitation-link.js";
-import type { User } from "../../../domain/identity/user.js";
+import { AcceptInvitation } from "../../../application/identity/invitations/accept-invitation.js";
+import { InviteUser } from "../../../application/identity/invitations/invite-user.js";
+import { InvitationQueries } from "../../../application/identity/invitations/queries.js";
+import { RevokeInvitation } from "../../../application/identity/invitations/revoke-invitation.js";
+import { VerifyInvitationLink } from "../../../application/identity/invitations/verify-invitation-link.js";
+import type { User } from "../../../domain/identity/users/user.js";
 import { InvitationPresenter } from "../presenters/invitation.presenter.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
 import {
@@ -40,7 +40,7 @@ import {
   InvitationResponse,
   InvitationTokenBody,
   VerifiedInvitationResponse,
-} from "../schemas/invitation.schemas.js";
+} from "../schemas/invitation.schema.js";
 
 @ApiTags("invitations")
 @Controller("invitations")

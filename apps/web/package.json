@@ -30,6 +30,7 @@
     "@codemirror/view": "6.43.15",
     "@lezer/highlight": "1.2.5",
     "@opentelemetry/api": "1.10.0",
+    "@opentelemetry/instrumentation-host-metrics": "0.8.0",
     "@opentelemetry/instrumentation-undici": "0.35.1",
     "@opentelemetry/sdk-node": "0.301.2",
     "@xyflow/react": "12.12.0",

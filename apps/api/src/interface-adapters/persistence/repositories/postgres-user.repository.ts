@@ -5,13 +5,12 @@ import {
   TransactionHost,
 } from "@nestjs-cls/transactional";
 import { eq, type SQL } from "drizzle-orm";
-import { StaleWriteError } from "../../../domain/errors.js";
-import type { User } from "../../../domain/identity/user.js";
-import type { UserRepository } from "../../../application/identity/ports.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
+import type { User } from "../../../domain/identity/users/user.js";
+import type { UserRepository } from "../../../application/identity/users/ports.js";
 import type { Transaction } from "../interfaces.js";
 import { user as users } from "../schema/index.js";
 import { UserMapper } from "../mappers/user.mapper.js";
-import { Role } from "../../../domain/identity/enums.js";
 
 @Injectable()
 export class PostgresUserRepository implements UserRepository {
@@ -38,15 +37,6 @@ export class PostgresUserRepository implements UserRepository {
 
   findByEmail(email: string): Promise<User | null> {
     return this.findOne(eq(users.email, email));
-  }
-
-  async hasAdministrator(): Promise<boolean> {
-    const [row] = await this.txHost.tx
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.role, Role.Admin))
-      .limit(1);
-    return row !== undefined;
   }
 
   private async findOne(where: SQL | undefined): Promise<User | null> {

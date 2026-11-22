@@ -36,7 +36,7 @@ export class SuspendInstance {
     const turn = await this.runtime.suspend(instance, secrets, now);
     instance.advance(turn, secrets, now);
     await this.instances.save(instance);
-    await this.runs.wake(instance);
+    await this.runs.wakeOnControl(instance, Control.Suspend);
     return { ok: true, value: undefined };
   }
 }

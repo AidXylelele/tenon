@@ -1,16 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { InvitationOutcome } from "../../../application/identity/enums.js";
+import { InvitationOutcome } from "../../../application/identity/invitations/enums.js";
 import type {
   InvitationView,
   ListedInvitation,
-  SignedInUser,
-} from "../../../application/identity/interfaces.js";
+} from "../../../application/identity/invitations/interfaces.js";
+import type { SignedInUser } from "../../../application/identity/users/interfaces.js";
 import type {
   AcceptedInvitationResponse,
   InvitationListResponse,
   InvitationResponse,
   VerifiedInvitationResponse,
-} from "../schemas/invitation.schemas.js";
+} from "../schemas/invitation.schema.js";
 import { UserPresenter } from "./user.presenter.js";
 
 @Injectable()

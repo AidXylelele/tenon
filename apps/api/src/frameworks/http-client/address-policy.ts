@@ -1,44 +1,26 @@
 import type { LookupAddress, LookupOptions } from "node:dns";
 import { lookup } from "node:dns/promises";
-import { BlockList, isIP, type LookupFunction } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import type { OnApplicationShutdown } from "@nestjs/common";
+import ipaddr from "ipaddr.js";
 import { Agent, buildConnector } from "undici";
-
-const REFUSED_NETWORKS: readonly string[] = [
-  "0.0.0.0/8",
-  "10.0.0.0/8",
-  "100.64.0.0/10",
-  "127.0.0.0/8",
-  "169.254.0.0/16",
-  "172.16.0.0/12",
-  "192.0.0.0/24",
-  "192.168.0.0/16",
-  "198.18.0.0/15",
-  "224.0.0.0/4",
-  "240.0.0.0/4",
-  "::/96",
-  "64:ff9b::/96",
-  "64:ff9b:1::/48",
-  "100::/64",
-  "2001::/32",
-  "2002::/16",
-  "fc00::/7",
-  "fe80::/10",
-  "fec0::/10",
-  "ff00::/8",
-];
+import type { AddressRange, AddressRanges, IpAddress } from "./interfaces.js";
 
 export class AddressPolicy implements OnApplicationShutdown {
   static readonly REFUSED = "ERR_ADDRESS_REFUSED";
+  private static readonly IPV4_COMPATIBLE = "::/96";
+  private static readonly UNLISTED = "unlisted";
+  private static readonly HOST_BITS = { ipv4: 32, ipv6: 128 } as const;
 
   readonly dispatcher: Agent;
-  private readonly refused = new BlockList();
-  private readonly allowed = new BlockList();
+  private readonly allowed: AddressRanges;
+  private readonly refused: AddressRanges;
 
   constructor(allowList: readonly string[]) {
-    for (const network of REFUSED_NETWORKS) this.#add(this.refused, network);
-
-    for (const entry of allowList) this.#add(this.allowed, entry);
+    const listed = allowList.map((entry) => this.#rangeOf(entry));
+    const ipv4Compatible = ipaddr.parseCIDR(AddressPolicy.IPV4_COMPATIBLE);
+    this.allowed = { listed };
+    this.refused = { ipv4Compatible };
 
     const checked: LookupFunction = (hostname, options, callback) => {
       this.#lookup(hostname, options, callback);
@@ -55,17 +37,29 @@ export class AddressPolicy implements OnApplicationShutdown {
   }
 
   permits(address: string): boolean {
-    const family = this.#familyOf(address);
+    const parsed = ipaddr.process(address);
+    const allowListed = this.#listedIn(this.allowed, parsed);
 
-    if (this.allowed.check(address, family)) return true;
+    if (allowListed) return true;
 
-    return !this.refused.check(address, family);
+    const refused = this.#listedIn(this.refused, parsed);
+
+    if (refused) return false;
+
+    return this.#isUnicast(parsed);
+  }
+
+  isPrivate(address: string): boolean {
+    const parsed = ipaddr.process(address);
+    const unicast = this.#isUnicast(parsed);
+    return !unicast;
   }
 
   async admits(hostname: string): Promise<boolean> {
     const host = this.#unbracketed(hostname);
+    const literal = isIP(host) !== 0;
 
-    if (isIP(host) !== 0) return this.permits(host);
+    if (literal) return this.permits(host);
 
     try {
       await this.resolve(host, 0);
@@ -82,9 +76,10 @@ export class AddressPolicy implements OnApplicationShutdown {
     family: LookupOptions["family"],
   ): Promise<readonly LookupAddress[]> {
     const addresses = await lookup(hostname, { family, all: true });
-    const refused = addresses.some(
-      (resolved) => !this.permits(resolved.address),
-    );
+    const refused = addresses.some((resolved) => {
+      const permitted = this.permits(resolved.address);
+      return !permitted;
+    });
 
     if (refused) throw this.#refusal();
 
@@ -98,9 +93,11 @@ export class AddressPolicy implements OnApplicationShutdown {
   ): void {
     const host = this.#unbracketed(options.hostname);
     const literal = isIP(host) !== 0;
+    const refused = literal && !this.permits(host);
 
-    if (literal && !this.permits(host)) {
-      callback(this.#refusal(), null);
+    if (refused) {
+      const refusal = this.#refusal();
+      callback(refusal, null);
       return;
     }
 
@@ -115,19 +112,48 @@ export class AddressPolicy implements OnApplicationShutdown {
     this.resolve(hostname, options.family).then(
       (addresses) => {
         if (options.all === true) {
-          callback(null, addresses.slice());
+          const all = addresses.slice();
+          callback(null, all);
           return;
         }
 
         const [first] = addresses;
-        callback(null, first?.address ?? "", first?.family ?? 0);
+        const address = first?.address ?? "";
+        const family = first?.family ?? 0;
+        callback(null, address, family);
       },
       (error: unknown) => {
-        const failure =
-          error instanceof Error ? error : new Error(String(error));
+        if (error instanceof Error) {
+          callback(error, "", 0);
+          return;
+        }
+
+        const message = String(error);
+        const failure = new Error(message);
         callback(failure, "", 0);
       },
     );
+  }
+
+  #isUnicast(address: IpAddress): boolean {
+    const range = address.range();
+    return range === "unicast";
+  }
+
+  #listedIn(ranges: AddressRanges, address: IpAddress): boolean {
+    const range = ipaddr.subnetMatch(address, ranges, AddressPolicy.UNLISTED);
+    return range !== AddressPolicy.UNLISTED;
+  }
+
+  #rangeOf(entry: string): AddressRange {
+    const cidr = ipaddr.isValidCIDR(entry);
+
+    if (cidr) return ipaddr.parseCIDR(entry);
+
+    const address = ipaddr.process(entry);
+    const kind = address.kind();
+    const bits = AddressPolicy.HOST_BITS[kind];
+    return [address, bits];
   }
 
   #unbracketed(hostname: string): string {
@@ -139,28 +165,5 @@ export class AddressPolicy implements OnApplicationShutdown {
       "The address is private, loopback or link-local and not allow-listed",
     );
     return Object.assign(error, { code: AddressPolicy.REFUSED });
-  }
-
-  #add(list: BlockList, entry: string): void {
-    const [network = "", prefix] = entry.split("/");
-    const family = this.#familyOf(network);
-
-    if (prefix === undefined) {
-      list.addAddress(network, family);
-      return;
-    }
-
-    const length = Number(prefix);
-    list.addSubnet(network, length, family);
-  }
-
-  #familyOf(address: string): "ipv4" | "ipv6" {
-    const version = isIP(address);
-
-    if (version === 4) return "ipv4";
-
-    if (version === 6) return "ipv6";
-
-    throw new TypeError(`"${address}" is not an IP address`);
   }
 }

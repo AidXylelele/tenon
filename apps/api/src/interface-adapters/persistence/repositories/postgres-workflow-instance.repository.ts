@@ -5,15 +5,24 @@ import {
   TransactionHost,
 } from "@nestjs-cls/transactional";
 import { Outbox } from "@nestjs/outbox";
-import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 import type { WorkflowInstanceRepository } from "../../../application/automation/instances/ports.js";
 import {
   TriggerKind,
   WaitKind,
 } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { InstanceMessage } from "../../messaging/interfaces.js";
+import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type { Transaction } from "../interfaces.js";
 import { WorkflowInstanceMapper } from "../mappers/workflow-instance.mapper.js";
 import {
@@ -30,6 +39,7 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
     private readonly outbox: Outbox,
     private readonly lifecycle: PostgresLifecycleEventStore,
     private readonly workflowInstanceMapper: WorkflowInstanceMapper,
+    private readonly tracer: OutboxTracer,
   ) {}
 
   async find(id: string): Promise<WorkflowInstance | null> {
@@ -71,6 +81,27 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
           eq(instances.originId, parentId),
           eq(instances.trigger, TriggerKind.Parent),
           isNull(instances.endedAt),
+        ),
+      );
+    return rows.map((row) => this.workflowInstanceMapper.toEntity(row));
+  }
+
+  async findEndedChildren(
+    parent: WorkflowInstance,
+  ): Promise<WorkflowInstance[]> {
+    const awaited = parent.agenda.awaited.map((effect) => effect.id);
+
+    if (awaited.length === 0) return [];
+
+    const rows = await this.txHost.tx
+      .select()
+      .from(instances)
+      .where(
+        and(
+          eq(instances.originId, parent.id),
+          eq(instances.trigger, TriggerKind.Parent),
+          inArray(instances.originEffectId, awaited),
+          isNotNull(instances.endedAt),
         ),
       );
     return rows.map((row) => this.workflowInstanceMapper.toEntity(row));
@@ -206,7 +237,12 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
     const entries = instance.events.map((change) => {
       const payload: InstanceMessage = { instanceId: change.instanceId };
       const key = change.parentId ?? change.instanceId;
-      return { topic: change.kind, key, payload };
+      return {
+        topic: change.kind,
+        key,
+        payload,
+        headers: this.tracer.headers(),
+      };
     });
     await this.lifecycle.record(instance, now);
 

@@ -1,10 +1,20 @@
+import type { CodeProblem, ScriptLanguage } from "@/libs/codemirror/interfaces";
 import type {
-  Formatting,
-  FormattingAnswer,
-  FormattingRequest,
+  Formatted,
+  Refused,
+  WorkerAnswer,
+  WorkerRequest,
 } from "./interfaces";
 
-self.addEventListener("message", (event: MessageEvent<FormattingRequest>) => {
+interface LanguageTools {
+  readonly format: (
+    text: string,
+    cursor: number,
+  ) => Promise<Formatted | Refused>;
+  readonly check: (text: string) => Promise<readonly CodeProblem[]>;
+}
+
+self.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
   const [port] = event.ports;
 
   if (port === undefined) return;
@@ -13,7 +23,7 @@ self.addEventListener("message", (event: MessageEvent<FormattingRequest>) => {
 });
 
 async function answer(
-  request: FormattingRequest,
+  request: WorkerRequest,
   port: MessagePort,
 ): Promise<void> {
   const answered = await answerOf(request);
@@ -21,27 +31,37 @@ async function answer(
   port.close();
 }
 
-async function answerOf(request: FormattingRequest): Promise<FormattingAnswer> {
+async function answerOf(request: WorkerRequest): Promise<WorkerAnswer> {
   try {
-    return await formattingOf(request);
+    return await workOf(request);
   } catch (error) {
     const message = String(error);
     return { kind: "failed", message };
   }
 }
 
-async function formattingOf({
-  language,
-  text,
-}: FormattingRequest): Promise<Formatting> {
+async function workOf(request: WorkerRequest): Promise<WorkerAnswer> {
+  const tools = await toolsOf(request.language);
+
+  switch (request.kind) {
+    case "format":
+      return tools.format(request.text, request.cursor);
+    case "check": {
+      const problems = await tools.check(request.text);
+      return { kind: "checked", problems };
+    }
+  }
+}
+
+async function toolsOf(language: ScriptLanguage): Promise<LanguageTools> {
   switch (language) {
     case "javascript": {
-      const { formatJavaScript } = await import("./prettier");
-      return formatJavaScript(text);
+      const { checkJavaScript, formatJavaScript } = await import("./prettier");
+      return { format: formatJavaScript, check: checkJavaScript };
     }
     case "python": {
-      const { formatPython } = await import("./ruff");
-      return formatPython(text);
+      const { checkPython, formatPython } = await import("./ruff");
+      return { format: formatPython, check: checkPython };
     }
   }
 }

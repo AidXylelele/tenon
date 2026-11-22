@@ -9,8 +9,8 @@ export abstract class HostCapabilities {
   abstract lifecycleEvents(): readonly LifecycleEventKind[];
 }
 
-export abstract class ProcessPlatform {
-  abstract shell(): ShellSupport;
+export class ProcessPlatform {
+  constructor(readonly shell: ShellSupport) {}
 }
 
 export class HostLimits {

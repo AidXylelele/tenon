@@ -11,11 +11,9 @@ import type { InstanceRefusal } from "../../../domain/automation/instances/enums
 import type { SecretRefusal } from "../../../domain/automation/secrets/enums.js";
 import type { SubscriptionRefusal } from "../../../domain/automation/subscriptions/enums.js";
 import type { WorkflowRefusal } from "../../../domain/automation/workflows/enums.js";
-import type {
-  AccountRefusal,
-  InvitationRefusal,
-  UserRefusal,
-} from "../../../domain/identity/enums.js";
+import type { AccountRefusal } from "../../../domain/identity/accounts/enums.js";
+import type { InvitationRefusal } from "../../../domain/identity/invitations/enums.js";
+import type { UserRefusal } from "../../../domain/identity/users/enums.js";
 
 export type Refusal =
   | DefinitionRefusal

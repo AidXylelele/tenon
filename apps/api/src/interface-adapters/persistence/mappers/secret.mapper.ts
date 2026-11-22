@@ -2,8 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { HeldSecret } from "../../../domain/automation/secrets/interfaces.js";
 import { Secret } from "../../../domain/automation/secrets/secret.js";
 import { SecretValue } from "../../../domain/automation/secrets/secret-value.js";
-import type { SealedSecretRow, SecretRow } from "../interfaces.js";
-import { Cipher } from "../ports.js";
+import { Cipher, type SealedSecretRow, type SecretRow } from "../interfaces.js";
 
 @Injectable()
 export class SecretMapper {

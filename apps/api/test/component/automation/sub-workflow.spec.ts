@@ -2,7 +2,7 @@ import request from "supertest";
 import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
 import { getHttpClientToken, HttpClient } from "@nestjs/http-client";
 import { HttpClientName } from "../../../src/frameworks/http-client/enums.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import type { TestApp } from "../../support/create-test-app.js";
@@ -99,6 +99,81 @@ describe("running sub-workflows and processes as runs of their own", () => {
     expect(parent.phase).toBe("completed");
     expect(parent.output).toEqual({ v: 2 });
     expect(child).toMatchObject({ version: "1.1.0", trigger: "parent" });
+  });
+
+  it("twenty_parents_each_awaiting_ten_children_in_turn_all_complete", async () => {
+    await publish(
+      t,
+      editor,
+      aChild("1.0.0", [{ price: { set: { line: "${ .i * 2 }" } } }]),
+    );
+    await publish(
+      t,
+      editor,
+      aDocument({}, [
+        {
+          lines: {
+            for: { each: "i", in: "${ [range(10)] }" },
+            do: [
+              {
+                priceLine: {
+                  run: {
+                    workflow: {
+                      namespace: "sales",
+                      name: "child",
+                      version: "1.0.0",
+                      input: { i: "${ $i }" },
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      ]),
+    );
+    const parents = await Promise.all(
+      Array.from({ length: 20 }, () => start(t, editor)),
+    );
+    await drain(t);
+    const ended = await Promise.all(
+      parents.map((parent) => instanceOf(t, editor, parent.id)),
+    );
+    const response = await request(t.server)
+      .get("/api/v1/instances?name=child&limit=200")
+      .set(editor)
+      .expect(200);
+    const completed = (response.body as Page<InstanceBody>).items.filter(
+      (child) => child.phase === "completed",
+    );
+
+    expect(ended.map((parent) => parent.phase)).toEqual(
+      Array.from({ length: 20 }, () => "completed"),
+    );
+    expect(completed).toHaveLength(200);
+  }, 180_000);
+
+  it("a_parent_cancelled_while_it_awaits_a_child_ends_cancelled_and_cancels_its_child", async () => {
+    await publish(
+      t,
+      editor,
+      aChild("1.0.0", [{ pause: { wait: { hours: 1 } } }]),
+    );
+    await publish(t, editor, aParent("1.0.0"));
+    const { id } = await start(t, editor);
+    await drain(t);
+
+    await request(t.server)
+      .post(`/api/v1/instances/${id}/cancel`)
+      .set(editor)
+      .expect(204);
+    await relay(t);
+    await drain(t);
+    const parent = await instanceOf(t, editor, id);
+    const phases = (await children()).map((child) => child.phase);
+
+    expect(parent.phase).toBe("cancelled");
+    expect(phases).toEqual(["cancelled"]);
   });
 
   it("a_child_that_faults_faults_its_parent_with_the_childs_error", async () => {

@@ -1,16 +1,31 @@
 import type {
   AsyncApiRequest,
+  CloudEvent,
   Diagnostic,
   Effect,
   EffectOutcome,
+  EffectResponse,
+  Ending,
+  Failure,
+  HostEnd,
+  HostProfile,
+  InputProblem,
   JsonObject,
   JsonValue,
   Manifest,
+  ProcessRequest,
+  Resource,
   RoutingFilter,
+  RuntimeDescriptor,
+  Script,
+  Shell,
+  StartContext,
   State,
   Step,
+  StepContext,
   WorkflowRequest,
 } from "interpreter";
+import type { Imports } from "interpreter/front-end";
 import type { WorkflowStructure } from "language-server/structure";
 import type {
   AwaitedEffect,
@@ -18,11 +33,19 @@ import type {
 } from "../../domain/automation/instances/interfaces.js";
 import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
 
+export type JsonOf<T> = T extends JsonValue
+  ? T
+  : T extends readonly (infer Item)[]
+    ? readonly JsonOf<Item>[]
+    : T extends object
+      ? { readonly [Key in keyof T]: JsonOf<T[Key]> }
+      : never;
+
 type CompiledManifest = Omit<Manifest, "filters">;
 
 export type RouteMatch = Omit<RoutingFilter, "accepts">;
 
-interface CompiledData {
+export interface CompiledData {
   readonly kind: "compiled";
   readonly manifest: CompiledManifest;
   readonly fingerprint: string;
@@ -58,7 +81,7 @@ export interface VersionStructure extends WorkflowStructure {
 
 export interface ProgramSource {
   readonly document: JsonObject;
-  readonly imports: ImportTexts;
+  readonly imports: Imports;
   readonly secrets: readonly string[];
 }
 
@@ -94,6 +117,16 @@ export interface Program {
 export type ControlStep = (call: ProgramCall, state: State) => Promise<Step>;
 
 export type ChildEffect = Effect & WorkflowRequest;
+
+export type SandboxedProcessRequest = ProcessRequest & {
+  readonly process: Script | Shell;
+};
+
+export interface StepCall {
+  readonly idempotencyKey: string;
+  readonly signal: AbortSignal;
+  readonly secrets: JsonObject;
+}
 
 export interface TimeAnswer {
   readonly at: number;
@@ -141,4 +174,83 @@ export interface FetchedImportText {
   readonly reference: string;
   readonly text: string | null;
   readonly reason: string | null;
+}
+
+export abstract class InterpreterClient {
+  abstract compile(
+    source: JsonObject | string,
+    secrets: readonly string[],
+    imports: Imports,
+  ): Promise<CompilationData>;
+  abstract start(
+    call: ProgramCall,
+    input: JsonValue,
+    context: StartContext,
+  ): Promise<StartedStep>;
+  abstract correlate(
+    call: ProgramCall,
+    context: StartContext,
+  ): Promise<StartedStep>;
+  abstract respond(
+    call: ProgramCall,
+    state: State,
+    response: EffectResponse,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract suspend(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract resume(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract cancel(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<Step>;
+  abstract route(
+    call: ProgramCall,
+    event: CloudEvent,
+  ): Promise<readonly RouteMatch[]>;
+  abstract filter(filter: JsonValue): Promise<FilterCheck>;
+  abstract accepting(
+    filters: readonly NamedFilter[],
+    event: CloudEvent,
+    signal: AbortSignal | null,
+  ): Promise<readonly string[]>;
+  abstract inputProblemsOf(
+    call: ProgramCall,
+    input: JsonValue,
+  ): Promise<readonly InputProblem[]>;
+  abstract profile(secrets: readonly string[]): Required<HostProfile>;
+  abstract runtime(): RuntimeDescriptor;
+  abstract ending(end: HostEnd): Ending;
+}
+
+export abstract class StructureClient {
+  abstract structureOf(
+    versionId: string,
+    source: ProgramSource,
+  ): Promise<VersionStructure | null>;
+  abstract tagOf(digest: string): string;
+}
+
+export abstract class EffectClient {
+  abstract perform(effect: Effect, step: StepCall): Promise<EffectOutcome>;
+  abstract performDetached(
+    request: SandboxedProcessRequest,
+    step: StepCall,
+  ): Promise<void>;
+  abstract sandboxed(effect: Effect): SandboxedProcessRequest;
+}
+
+export type FetchedText =
+  { readonly kind: "text"; readonly text: string } | Failure;
+
+export abstract class ResourceClient {
+  abstract text(resource: Resource, step: StepCall): Promise<FetchedText>;
 }

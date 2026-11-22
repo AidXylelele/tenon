@@ -1,8 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { TaskValueKind } from "../../../domain/automation/instances/enums.js";
 import type { JsonValue } from "../../../domain/automation/interfaces.js";
-import type { TaskValueRow, TaskValues } from "../interfaces.js";
-import { Cipher } from "../ports.js";
+import { Cipher, type TaskValueRow, type TaskValues } from "../interfaces.js";
 
 @Injectable()
 export class TaskValueMapper {
@@ -25,7 +24,8 @@ export class TaskValueMapper {
   }
 
   valuesOf(rows: readonly TaskValueRow[]): ReadonlyMap<string, TaskValues> {
-    const executions = new Set(rows.map((row) => row.execution));
+    const recorded = rows.map((row) => row.execution);
+    const executions = new Set(recorded);
     const values = Array.from(executions).map((execution) => {
       const own = rows.filter((row) => row.execution === execution);
       const input = this.#kindOf(own, TaskValueKind.Input);

@@ -36,8 +36,8 @@ import type {
 } from "../../../application/automation/workflows/interfaces.js";
 import { WorkflowQueries } from "../../../application/automation/workflows/queries.js";
 import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import type { User } from "../../../domain/identity/user.js";
-import { StaleDraftInterceptor } from "../interceptors/stale-draft.interceptor.js";
+import type { User } from "../../../domain/identity/users/user.js";
+import { StaleDraftInterceptor } from "../pipeline/stale-draft.interceptor.js";
 import { EntityTagMapper } from "../mappers/entity-tag.mapper.js";
 import { DraftPresenter } from "../presenters/draft.presenter.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
@@ -46,12 +46,12 @@ import {
   DraftBody,
   DraftConflictResponse,
   DraftResponse,
-} from "../schemas/draft.schemas.js";
+} from "../schemas/draft.schema.js";
 import {
   DefinitionProblemsResponse,
   VersionResponse,
   WorkflowParams,
-} from "../schemas/workflow.schemas.js";
+} from "../schemas/workflow.schema.js";
 
 @ApiTags("drafts")
 @ApiCookieAuth("sessionCookie")

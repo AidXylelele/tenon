@@ -26,7 +26,7 @@ import {
 } from "@nestjs/swagger";
 import { EventQueries } from "../../../application/automation/events/queries.js";
 import { CancelInstance } from "../../../application/automation/instances/cancel-instance.js";
-import { EventsQuery } from "../schemas/event.schemas.js";
+import { EventsQuery } from "../schemas/event.schema.js";
 import { DeleteInstance } from "../../../application/automation/instances/delete-instance.js";
 import type { InstanceResult } from "../../../application/automation/instances/interfaces.js";
 import { InstanceQueries } from "../../../application/automation/instances/queries.js";
@@ -35,7 +35,7 @@ import { ResumeInstance } from "../../../application/automation/instances/resume
 import { StartInstance } from "../../../application/automation/instances/start-instance.js";
 import { SuspendInstance } from "../../../application/automation/instances/suspend-instance.js";
 import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import type { User } from "../../../domain/identity/user.js";
+import type { User } from "../../../domain/identity/users/user.js";
 import { InstancePresenter } from "../presenters/instance.presenter.js";
 import { Missing } from "../../../application/automation/enums.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
@@ -50,13 +50,13 @@ import {
   ListInstancesQuery,
   ResponseJson,
   EventPageResponse,
+  StartFingerprint,
   StartInstanceBody,
-  startFingerprint,
   TaskOutputParams,
   TaskPageResponse,
   TasksQuery,
-} from "../schemas/instance.schemas.js";
-import { WorkflowParams } from "../schemas/workflow.schemas.js";
+} from "../schemas/instance.schema.js";
+import { WorkflowParams } from "../schemas/workflow.schema.js";
 
 @ApiTags("instances")
 @ApiCookieAuth("sessionCookie")
@@ -77,7 +77,7 @@ export class InstancesController {
 
   @Post("workflows/:namespace/:name/instances")
   @Can(AutomationPolicy, "change")
-  @Idempotent({ fingerprint: startFingerprint })
+  @Idempotent({ fingerprint: (body: unknown) => StartFingerprint.parse(body) })
   @ApiCreatedResponse({ standardSchema: InstanceSummaryResponse })
   @ApiNotFoundResponse()
   @ApiConflictResponse()

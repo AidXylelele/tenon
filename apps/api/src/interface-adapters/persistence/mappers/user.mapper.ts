@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { User } from "../../../domain/identity/user.js";
+import { User } from "../../../domain/identity/users/user.js";
 import type { UserRow } from "../interfaces.js";
 
 @Injectable()

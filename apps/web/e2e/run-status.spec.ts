@@ -9,7 +9,7 @@ test.describe("the run status playground", () => {
 
     const counts = page.getByRole("region", { name: "Last 24 hours" });
     const links = counts.getByRole("link");
-    await expect(links).toHaveText(["Running2", "Completed12", "Faulted1"]);
+    await expect(links).toHaveText(["Running2", "Succeeded12", "Failed1"]);
     const running = links.first();
     await expect(running).toHaveAttribute("href", "/runs?phase=running");
   });

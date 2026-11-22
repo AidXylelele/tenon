@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  type AttemptContext,
   type ResiliencePolicy,
   ResilienceService,
   ResilienceTimeoutError,
@@ -13,20 +14,27 @@ import type {
   JsonObject,
   JsonValue,
 } from "interpreter";
-import { PermanentFault } from "../../domain/errors.js";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import { HttpClient } from "../http-client/http.client.js";
 import type { UnusableSecret } from "../http-client/interfaces.js";
-import type { CallContext } from "../workflows/interfaces.js";
-import { AmqpBroker } from "./amqp.broker.js";
-import { AsyncApiDocuments } from "./asyncapi-documents.js";
+import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import type {
   AsyncApiInbox,
+  Subscribed,
+  SubscriptionClient,
+} from "../../interface-adapters/messaging/interfaces.js";
+import type { StepCall } from "../../interface-adapters/workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
+import { AmqpBroker } from "./amqp.broker.js";
+import { AsyncApiDocuments } from "./asyncapi-documents.js";
+import { BrokerTracer } from "./broker.tracer.js";
+import type {
   BrokerCredentials,
   BrokerClient,
   BrokerTarget,
+  Expired,
   ReceivedBrokerMessage,
-  Subscribed,
 } from "./interfaces.js";
 import { BrokerProtocol } from "./enums.js";
 import { KafkaBroker } from "./kafka.broker.js";
@@ -35,14 +43,10 @@ import { NatsBroker } from "./nats.broker.js";
 import { RedisBroker } from "./redis.broker.js";
 
 @Injectable()
-export class AsyncApiClient {
-  private static readonly MESSAGE_BYTES = 1024 * 1024;
+export class AsyncApiClient implements SubscriptionClient {
   private static readonly JSON = /^application\/(?:[\w.+-]+\+)?json\b/i;
   private static readonly ANONYMOUS: BrokerCredentials = { kind: "anonymous" };
-  private static readonly OVERSIZED: Failure = {
-    kind: "misconfigured",
-    detail: "A received message is larger than the host's 1 MiB",
-  };
+  private static readonly EXPIRED: Expired = { kind: "expired" };
 
   private readonly policy: ResiliencePolicy;
   private readonly brokers: ReadonlyMap<string, BrokerClient>;
@@ -51,6 +55,8 @@ export class AsyncApiClient {
     private readonly http: HttpClient,
     private readonly authentication: HttpAuthentication,
     private readonly documents: AsyncApiDocuments,
+    private readonly tracer: BrokerTracer,
+    private readonly limit: ResponseSizeLimit,
     amqp: AmqpBroker,
     kafka: KafkaBroker,
     mqtt: MqttBroker,
@@ -70,7 +76,8 @@ export class AsyncApiClient {
       [BrokerProtocol.Nats]: nats,
       [BrokerProtocol.Redis]: redis,
     };
-    this.brokers = new Map(Object.entries(brokers));
+    const entries = Object.entries(brokers);
+    this.brokers = new Map(entries);
   }
 
   async publish(
@@ -102,9 +109,15 @@ export class AsyncApiClient {
 
   async subscribe(
     request: AsyncApiRequest,
-    call: CallContext,
+    step: StepCall,
     inbox: AsyncApiInbox,
   ): Promise<Subscribed> {
+    const call: CallContext = {
+      idempotencyKey: step.idempotencyKey,
+      signal: step.signal,
+      secrets: step.secrets,
+      remaining: null,
+    };
     const document = await this.http.text(request.document, call);
 
     if (document.kind !== "text") return document;
@@ -134,13 +147,26 @@ export class AsyncApiClient {
       subscriber: call.idempotencyKey,
       ended: inbox.ended,
       demanded: () => inbox.demanded(),
-      deliver: (message: ReceivedBrokerMessage) =>
-        this.#delivered(message, target, inbox),
+      deliver: (message: ReceivedBrokerMessage) => {
+        const delivering = () => this.#delivered(message, target, inbox);
+        return this.tracer.processing(
+          target,
+          broker.system,
+          message.headers,
+          delivering,
+        );
+      },
       lost: () => {
         inbox.lost();
       },
     };
-    return broker.subscribe(target, credentials, brokerInbox);
+    const subscribing = broker.subscribe(target, credentials, brokerInbox);
+    const subscribed = await this.#within(subscribing, inbox.ended);
+
+    if (subscribed === AsyncApiClient.EXPIRED)
+      void this.#abandoned(subscribing);
+
+    return subscribed;
   }
 
   async #published(
@@ -165,11 +191,13 @@ export class AsyncApiClient {
 
     const body = this.#bodyOf(message.payload, target.contentType);
 
-    if (body.length > AsyncApiClient.MESSAGE_BYTES)
+    if (body.length > this.limit.bytes) {
+      const size = this.limit.inMebibytes();
       return {
         kind: "misconfigured",
-        detail: "The message is larger than the host's 1 MiB",
+        detail: `The message is larger than the host's ${size}`,
       };
+    }
 
     const sent = {
       body,
@@ -177,15 +205,57 @@ export class AsyncApiClient {
       headers: message.headers,
       idempotencyKey: call.idempotencyKey,
     };
+    const publishing = (attempt: AttemptContext) =>
+      publisher.publish(target, sent, credentials, attempt.signal);
+    const bounded = () => this.#bounded(publishing, call.signal);
+    return this.tracer.sending(target, publisher.system, bounded);
+  }
+
+  async #bounded(
+    publishing: (attempt: AttemptContext) => Promise<AsyncApiOutcome>,
+    signal: AbortSignal,
+  ): Promise<AsyncApiOutcome> {
+    const executed = this.policy.execute(publishing, { signal });
 
     try {
-      return await this.policy.execute(
-        () => publisher.publish(target, sent, credentials),
-        { signal: call.signal },
-      );
+      return await this.#within(executed, signal);
     } catch (error) {
-      return this.#failureOf(error, call.signal);
+      return this.#failureOf(error, signal);
     }
+  }
+
+  async #within<T>(
+    work: Promise<T>,
+    signal: AbortSignal,
+  ): Promise<T | Expired> {
+    const settled = new AbortController();
+    const expired = this.#expiredOn(signal, settled.signal);
+
+    try {
+      return await Promise.race([work, expired]);
+    } finally {
+      settled.abort();
+    }
+  }
+
+  async #abandoned(subscribing: Promise<Subscribed>): Promise<void> {
+    const late = await subscribing;
+
+    if (late.kind !== "subscribed") return;
+
+    const closed = late.subscription.close();
+    await Promise.allSettled([closed]);
+  }
+
+  #expiredOn(signal: AbortSignal, settled: AbortSignal): Promise<Expired> {
+    if (signal.aborted) return Promise.resolve(AsyncApiClient.EXPIRED);
+
+    return new Promise((resolve) => {
+      const expire = () => {
+        resolve(AsyncApiClient.EXPIRED);
+      };
+      signal.addEventListener("abort", expire, { once: true, signal: settled });
+    });
   }
 
   #credentialsOf(
@@ -210,7 +280,6 @@ export class AsyncApiClient {
           password: credentials.password,
         };
       case "bearer":
-      case "digest":
       case "oauth2":
       case "oidc":
         return {
@@ -225,8 +294,13 @@ export class AsyncApiClient {
     target: BrokerTarget,
     inbox: AsyncApiInbox,
   ): Promise<void> {
-    if (message.body.length > AsyncApiClient.MESSAGE_BYTES) {
-      await inbox.failure(AsyncApiClient.OVERSIZED);
+    if (message.body.length > this.limit.bytes) {
+      const size = this.limit.inMebibytes();
+      const oversized: Failure = {
+        kind: "misconfigured",
+        detail: `A received message is larger than the host's ${size}`,
+      };
+      await inbox.failure(oversized);
       return;
     }
 
@@ -262,7 +336,7 @@ export class AsyncApiClient {
 
   #failureOf(error: unknown, signal: AbortSignal): AsyncApiOutcome {
     if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return { kind: "expired" };
+      return AsyncApiClient.EXPIRED;
 
     throw error;
   }

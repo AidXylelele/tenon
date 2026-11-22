@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { connectLanguageServer } from "./language-connection";
 
 interface Message {
@@ -49,5 +49,23 @@ describe("a language server reached over a message port", () => {
 
     expect(answer).toEqual({ kind: "text", text: "do: []\n" });
     expect(seen.slice(0, 2)).toEqual(["initialize", "initialized"]);
+  });
+
+  it("closing_stops_listening_and_ends_the_worker", () => {
+    const channel = new MessageChannel();
+    channels.push(channel);
+    const terminate = vi.fn();
+    const worker = Object.assign(channel.port1, { terminate });
+    const removed = vi.spyOn(channel.port1, "removeEventListener");
+    const connection = connectLanguageServer(worker as unknown as Worker, {
+      initializationOptions: null,
+      extensions: [],
+      notificationHandlers: {},
+    });
+
+    connection.close();
+
+    expect(removed).toHaveBeenCalledWith("message", expect.any(Function));
+    expect(terminate).toHaveBeenCalledOnce();
   });
 });

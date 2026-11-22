@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { eq } from "drizzle-orm";
+import { LRUCache } from "lru-cache";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import type {
   InstanceNames,
@@ -19,7 +20,10 @@ import { PostgresTaskValueStore } from "./postgres-task-value.store.js";
 export class PostgresLifecycleEventStore {
   private static readonly MOST_CACHED_NAMES = 10_000;
 
-  private readonly cachedNames = new Map<string, InstanceNames>();
+  private readonly cachedNames = new LRUCache<string, InstanceNames>({
+    max: PostgresLifecycleEventStore.MOST_CACHED_NAMES,
+    fetchMethod: (instanceId) => this.#namesOf(instanceId),
+  });
 
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
@@ -29,9 +33,9 @@ export class PostgresLifecycleEventStore {
   ) {}
 
   async record(instance: WorkflowInstance, at: Date): Promise<void> {
-    const names = await this.#namesOf(instance.id);
+    const names = await this.cachedNames.fetch(instance.id);
 
-    if (names === null) return;
+    if (names === undefined) return;
 
     const outputs = await this.taskValues.keep(instance, at);
 
@@ -57,11 +61,7 @@ export class PostgresLifecycleEventStore {
       await this.events.acceptLifecycle(told, instanceId, execution, at);
   }
 
-  async #namesOf(instanceId: string): Promise<InstanceNames | null> {
-    const known = this.cachedNames.get(instanceId);
-
-    if (known !== undefined) return known;
-
+  async #namesOf(instanceId: string): Promise<InstanceNames | undefined> {
     const [row] = await this.txHost.tx
       .select({
         namespace: workflows.namespace,
@@ -70,13 +70,6 @@ export class PostgresLifecycleEventStore {
       .from(instances)
       .innerJoin(workflows, eq(workflows.id, instances.workflowId))
       .where(eq(instances.id, instanceId));
-
-    if (!row) return null;
-
-    if (this.cachedNames.size >= PostgresLifecycleEventStore.MOST_CACHED_NAMES)
-      this.cachedNames.clear();
-
-    this.cachedNames.set(instanceId, row);
     return row;
   }
 }

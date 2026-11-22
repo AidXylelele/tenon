@@ -102,7 +102,8 @@ export class TaskRecordMapper {
     if (ending === null) return events;
 
     const last = events.indexOf(ending);
-    return events.slice(0, last + 1);
+    const end = last + 1;
+    return events.slice(0, end);
   }
 
   #statusOf(
@@ -129,8 +130,9 @@ export class TaskRecordMapper {
 
   #errorOf(end: LifecycleEventRow | null): JsonObject | null {
     const error = end?.data.error;
+    const object = this.#isObject(error);
 
-    if (!this.#isObject(error)) return null;
+    if (!object) return null;
 
     return error;
   }
@@ -145,11 +147,14 @@ export class TaskRecordMapper {
   }
 
   #nameOf(reference: string): string {
-    const token = reference.slice(reference.lastIndexOf("/") + 1);
+    const slash = reference.lastIndexOf("/");
+    const start = slash + 1;
+    const token = reference.slice(start);
     return token.replaceAll("~1", "/").replaceAll("~0", "~");
   }
 
   #isObject(value: JsonValue | undefined): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    const list = Array.isArray(value);
+    return typeof value === "object" && value !== null && !list;
   }
 }

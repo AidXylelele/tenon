@@ -46,12 +46,13 @@ export class PostgresReceivedMessageStore implements ReceivedMessages {
 
     const position = claimed.next - 1;
     const sealedInbound = this.inboundMapper.sealedOf(inbound);
+    const receivedAt = new Date();
     await this.txHost.tx.insert(messages).values({
       instanceId: instance.id,
       execution,
       position,
       sealedInbound,
-      receivedAt: new Date(),
+      receivedAt,
     });
     return position;
   }

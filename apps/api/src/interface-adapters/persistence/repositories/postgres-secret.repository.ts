@@ -7,7 +7,7 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import type { SecretRepository } from "../../../application/automation/secrets/ports.js";
 import type { Secret } from "../../../domain/automation/secrets/secret.js";
-import { StaleWriteError } from "../../../domain/errors.js";
+import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { Transaction } from "../interfaces.js";
 import { SecretMapper } from "../mappers/secret.mapper.js";
 import {

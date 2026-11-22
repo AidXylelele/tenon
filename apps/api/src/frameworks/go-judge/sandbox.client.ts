@@ -1,38 +1,47 @@
-import type { HttpClient as NestHttpClient } from "@nestjs/http-client";
+import { Injectable } from "@nestjs/common";
+import {
+  InjectHttpClient,
+  HttpClient as NestHttpClient,
+} from "@nestjs/http-client";
 import {
   type ResiliencePolicy,
-  type ResilienceService,
+  ResilienceService,
   ResilienceTimeoutError,
 } from "@nestjs/resilience";
 import type { ProcessOutcome, Script, Shell } from "interpreter";
-import type { ShellSupport } from "../../application/automation/host/interfaces.js";
-import type { ProcessPlatform } from "../../application/automation/host/queries.js";
-import type { FetchedText } from "../http-client/interfaces.js";
-import type { HttpClient } from "../http-client/http.client.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type {
+  FetchedText,
+  SandboxedProcessRequest,
+} from "../../interface-adapters/workflows/interfaces.js";
+import { HttpClientName } from "../http-client/enums.js";
+import { HttpClient } from "../http-client/http.client.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import type {
   BuiltCommand,
   SandboxCommand,
-  SandboxedProcessRequest,
   SandboxFile,
   SandboxResult,
   ScriptLanguage,
 } from "./interfaces.js";
 import { JavaScript } from "./javascript.js";
 import { Python } from "./python.js";
-import type { SandboxLimits } from "./sandbox-limits.js";
+import { SandboxLimits } from "./sandbox-limits.js";
 import { SANDBOX_REFUSAL, SANDBOX_RESULTS } from "./sandbox-result.schema.js";
 import shellPlatform from "./shell-platform.json" with { type: "json" };
 
-const DIRECTORY = "directory";
+@Injectable()
+export class SandboxClient {
+  private static readonly DIRECTORY = "directory";
+  private static readonly ENTER_DIRECTORY =
+    'cd -- "$1" 2>&3 || exit\nexec 3>&-\nshift\n';
 
-export class SandboxClient implements ProcessPlatform {
   private readonly policy: ResiliencePolicy;
   private readonly languages: Readonly<
     Record<Script["language"], ScriptLanguage>
   > = { js: new JavaScript(), python: new Python() };
 
   constructor(
+    @InjectHttpClient(HttpClientName.Sandbox)
     private readonly sandbox: NestHttpClient,
     private readonly http: HttpClient,
     private readonly limits: SandboxLimits,
@@ -59,10 +68,6 @@ export class SandboxClient implements ProcessPlatform {
     }
   }
 
-  shell(): ShellSupport {
-    return shellPlatform;
-  }
-
   async #commandOf(
     process: Script | Shell,
     context: CallContext,
@@ -74,19 +79,19 @@ export class SandboxClient implements ProcessPlatform {
   }
 
   #shellCommandOf(shell: Shell, remaining: number | null): BuiltCommand {
-    const line = this.#shellLineOf(shell);
-    const args = [shellPlatform.shell, "-c", line, "sh"].concat(
-      shell.arguments,
-    );
+    const args = this.#shellArgumentsOf(shell);
     const command = this.#sandboxCommandOf(args, {}, shell, remaining);
     return { kind: "command", command };
   }
 
-  #shellLineOf(shell: Shell): string {
-    if (shell.directory === null) return shell.command;
+  #shellArgumentsOf(shell: Shell): readonly string[] {
+    const invoked = [shellPlatform.shell, "-c"];
 
-    const directory = this.#quoted(shell.directory);
-    return `cd -- ${directory} 2>&3 || exit\nexec 3>&-\n${shell.command}`;
+    if (shell.directory === null)
+      return invoked.concat(shell.command, "sh", shell.arguments);
+
+    const entering = `${SandboxClient.ENTER_DIRECTORY}${shell.command}`;
+    return invoked.concat(entering, "sh", shell.directory, shell.arguments);
   }
 
   async #scriptCommandOf(
@@ -99,17 +104,19 @@ export class SandboxClient implements ProcessPlatform {
 
     const language = this.languages[script.language];
     const names = Object.keys(script.arguments);
+    const declarable = names.every((name) => language.declares(name));
 
-    if (!names.every((name) => language.declares(name)))
+    if (!declarable)
       return {
         kind: "misconfigured",
         detail:
           "An argument of the script is not a variable name of its language",
       };
 
-    const declarations = names.map((name) =>
-      language.declarationOf(name, script.arguments[name] ?? null),
-    );
+    const declarations = names.map((name) => {
+      const value = script.arguments[name] ?? null;
+      return language.declarationOf(name, value);
+    });
     const program = declarations.concat(code.text).join("\n");
     const copyIn = { script: { content: program } };
     const args = [language.interpreter, "script"];
@@ -159,7 +166,7 @@ export class SandboxClient implements ProcessPlatform {
 
     if (!entering) return files;
 
-    return files.concat({ name: DIRECTORY, max: 1024 });
+    return files.concat({ name: SandboxClient.DIRECTORY, max: 1024 });
   }
 
   async #ran(
@@ -172,19 +179,23 @@ export class SandboxClient implements ProcessPlatform {
     });
     const status = response.status;
     const refusal = SANDBOX_REFUSAL.safeParse(response.data);
+    const refused = (status === 400 || status === 404) && refusal.success;
 
-    if ((status === 400 || status === 404) && refusal.success)
+    if (refused)
       return {
         kind: "unstarted",
         detail: `The sandbox refused the process: ${refusal.data}`,
       };
 
     const results = SANDBOX_RESULTS.safeParse(response.data);
+    const answered = response.ok && results.success;
 
-    if (!response.ok || !results.success)
+    if (!answered) {
+      const code = String(status);
       throw new Error(
-        `The sandbox answered other than with a result, status ${String(status)}`,
+        `The sandbox answered other than with a result, status ${code}`,
       );
+    }
 
     return this.#outcomeOf(results.data[0]);
   }
@@ -192,7 +203,7 @@ export class SandboxClient implements ProcessPlatform {
   #outcomeOf(result: SandboxResult): ProcessOutcome {
     const stdout = result.files.stdout ?? "";
     const stderr = result.files.stderr ?? "";
-    const unentered = result.files[DIRECTORY] ?? "";
+    const unentered = result.files[SandboxClient.DIRECTORY] ?? "";
 
     if (unentered !== "")
       return {
@@ -229,10 +240,5 @@ export class SandboxClient implements ProcessPlatform {
       return { kind: "expired" };
 
     throw error;
-  }
-
-  #quoted(text: string): string {
-    const escaped = text.replaceAll("'", `'\\''`);
-    return `'${escaped}'`;
   }
 }

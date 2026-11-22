@@ -4,6 +4,7 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
 } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
   CallToolResultSchema,
   ErrorCode,
@@ -24,30 +25,38 @@ import {
 } from "@nestjs/resilience";
 import type { JsonObject, JsonValue, RpcOutcome } from "interpreter";
 import { $ZodError } from "zod/v4/core";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
+import { TransportFailures } from "../http-client/transport-failures.js";
 import { RELEASE_VERSION } from "../release.js";
-import type { CallContext } from "../workflows/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import type { HttpMcpRequest, McpMethod } from "./interfaces.js";
-
-const RESULTS = {
-  "tools/list": ListToolsResultSchema,
-  "tools/call": CallToolResultSchema,
-  "prompts/list": ListPromptsResultSchema,
-  "prompts/get": GetPromptResultSchema,
-  "resources/list": ListResourcesResultSchema,
-  "resources/read": ReadResourceResultSchema,
-  "resources/templates/list": ListResourceTemplatesResultSchema,
-} as const satisfies Record<McpMethod, unknown>;
 
 @Injectable()
 export class McpClient {
+  private static readonly RESULTS = {
+    "tools/list": ListToolsResultSchema,
+    "tools/call": CallToolResultSchema,
+    "prompts/list": ListPromptsResultSchema,
+    "prompts/get": GetPromptResultSchema,
+    "resources/list": ListResourcesResultSchema,
+    "resources/read": ReadResourceResultSchema,
+    "resources/templates/list": ListResourceTemplatesResultSchema,
+  } as const satisfies Record<McpMethod, unknown>;
+  private static readonly SESSION_HEADERS: readonly string[] = [
+    "mcp-session-id",
+    "mcp-protocol-version",
+  ];
+  private static readonly CLEANUP_TIMEOUT = 2_000;
+
   private readonly policy: ResiliencePolicy;
 
   constructor(
     private readonly authentication: HttpAuthentication,
     private readonly http: HttpClient,
+    private readonly failures: TransportFailures,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("mcp-calls");
@@ -57,7 +66,11 @@ export class McpClient {
     request: HttpMcpRequest,
     context: CallContext,
   ): Promise<RpcOutcome> {
-    if (!SUPPORTED_PROTOCOL_VERSIONS.includes(request.protocolVersion))
+    const spoken = SUPPORTED_PROTOCOL_VERSIONS.includes(
+      request.protocolVersion,
+    );
+
+    if (!spoken)
       return {
         kind: "misconfigured",
         detail:
@@ -65,8 +78,9 @@ export class McpClient {
       };
 
     const parameters = request.parameters;
+    const unfit = parameters !== null && !this.#isObject(parameters);
 
-    if (parameters !== null && !this.#isObject(parameters))
+    if (unfit)
       return {
         kind: "misconfigured",
         detail: "The parameters of an MCP method are an object",
@@ -100,23 +114,30 @@ export class McpClient {
     if (authorization.kind === "misconfigured") return authorization;
 
     const transport = this.#transportOf(request, authorization, signal);
-    const identity = request.client ?? {
-      name: "tenon",
-      version: RELEASE_VERSION,
-    };
-    const client = new Client(identity, { capabilities: {} });
+    const client = this.#clientOf(request);
+    const options = this.#optionsOf(context.remaining, signal);
 
     try {
-      await client.connect(transport, { signal });
+      await client.connect(transport, options);
+      const negotiated = transport.protocolVersion ?? "";
+
+      if (negotiated < request.protocolVersion)
+        return {
+          kind: "misconfigured",
+          detail: `The MCP server speaks a version of the protocol older than ${request.protocolVersion}`,
+        };
+
+      const params = parameters ?? undefined;
       const result = await client.request(
-        { method: request.method, params: parameters ?? undefined },
-        RESULTS[request.method],
-        { signal },
+        { method: request.method, params },
+        McpClient.RESULTS[request.method],
+        options,
       );
-      await Promise.allSettled([transport.terminateSession()]);
-      return { kind: "answered", result: this.#jsonOf(result) };
+      const answer = this.#jsonOf(result);
+      return { kind: "answered", result: answer };
     } finally {
       await client.close();
+      await this.#terminated(transport, request, authorization);
     }
   }
 
@@ -124,18 +145,68 @@ export class McpClient {
     request: HttpMcpRequest,
     authorization: Authorization,
     signal: AbortSignal,
+    sessionId?: string,
   ): StreamableHTTPClientTransport {
     const endpoint = new URL(request.transport.endpoint.uri);
+    const fetch = this.http.fetchFor(authorization, signal);
+    const headers = this.#workflowHeadersOf(request.transport.headers);
     return new StreamableHTTPClientTransport(endpoint, {
-      fetch: this.http.fetchFor(authorization, signal),
-      requestInit: { headers: request.transport.headers, redirect: "manual" },
+      fetch,
+      requestInit: { headers },
       reconnectionOptions: {
         initialReconnectionDelay: 0,
         maxReconnectionDelay: 0,
         reconnectionDelayGrowFactor: 1,
         maxRetries: 0,
       },
+      sessionId,
     });
+  }
+
+  #workflowHeadersOf(
+    headers: Readonly<Record<string, string>>,
+  ): Record<string, string> {
+    const kept = Object.entries(headers).filter(([name]) => {
+      const lowered = name.toLowerCase();
+      const session = McpClient.SESSION_HEADERS.includes(lowered);
+      return !session;
+    });
+    return Object.fromEntries(kept);
+  }
+
+  #clientOf(request: HttpMcpRequest): Client {
+    const identity = request.client ?? {
+      name: "tenon",
+      version: RELEASE_VERSION,
+    };
+    return new Client(identity, { capabilities: {} });
+  }
+
+  #optionsOf(remaining: number | null, signal: AbortSignal): RequestOptions {
+    if (remaining === null) return { signal };
+
+    return { signal, timeout: remaining };
+  }
+
+  async #terminated(
+    session: StreamableHTTPClientTransport,
+    request: HttpMcpRequest,
+    authorization: Authorization,
+  ): Promise<void> {
+    const sessionId = session.sessionId;
+    const version = session.protocolVersion;
+
+    if (sessionId === undefined || version === undefined) return;
+
+    const cleanup = AbortSignal.timeout(McpClient.CLEANUP_TIMEOUT);
+    const ending = this.#transportOf(
+      request,
+      authorization,
+      cleanup,
+      sessionId,
+    );
+    ending.setProtocolVersion(version);
+    await ending.terminateSession().catch(() => undefined);
   }
 
   #failureOf(error: unknown, signal: AbortSignal): RpcOutcome {
@@ -143,6 +214,8 @@ export class McpClient {
       return { kind: "expired" };
 
     if (error instanceof ResilienceError) throw error;
+
+    if (error instanceof PermanentFault) throw error;
 
     if (error instanceof McpError) return this.#rpcFailureOf(error);
 
@@ -154,7 +227,7 @@ export class McpClient {
         detail: "The MCP server answered other than the protocol describes",
       };
 
-    const failure = this.http.transportFailureOf(error);
+    const failure = this.failures.classified(error);
 
     if (failure !== null) return failure;
 
@@ -172,7 +245,8 @@ export class McpClient {
       };
 
     const prefix = `MCP error ${String(error.code)}: `;
-    const message = error.message.startsWith(prefix)
+    const prefixed = error.message.startsWith(prefix);
+    const message = prefixed
       ? error.message.slice(prefix.length)
       : error.message;
     const data = this.#jsonOf(error.data);
@@ -198,11 +272,13 @@ export class McpClient {
   }
 
   #jsonOf(value: unknown): JsonValue {
-    const text = JSON.stringify(value ?? null);
+    const defined = value ?? null;
+    const text = JSON.stringify(defined);
     return JSON.parse(text) as JsonValue;
   }
 
   #isObject(value: JsonValue): value is JsonObject {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    const list = Array.isArray(value);
+    return typeof value === "object" && value !== null && !list;
   }
 }

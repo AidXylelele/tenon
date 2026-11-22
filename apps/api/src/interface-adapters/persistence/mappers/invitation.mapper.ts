@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Invitation } from "../../../domain/identity/invitation.js";
+import { Invitation } from "../../../domain/identity/invitations/invitation.js";
 import type { InvitationRow } from "../interfaces.js";
 
 @Injectable()

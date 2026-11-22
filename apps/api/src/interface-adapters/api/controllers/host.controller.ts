@@ -12,7 +12,7 @@ import {
   ProcessPlatform,
 } from "../../../application/automation/host/queries.js";
 import { HostPresenter } from "../presenters/host.presenter.js";
-import { HostProfileResponse } from "../schemas/host.schemas.js";
+import { HostProfileResponse } from "../schemas/host.schema.js";
 
 @ApiTags("host")
 @ApiCookieAuth("sessionCookie")
@@ -40,7 +40,7 @@ export class HostController {
   @ApiUnauthorizedResponse()
   profile(): HostProfileResponse {
     const analysis = this.capabilities.profile();
-    const shell = this.platform.shell();
+    const shell = this.platform.shell;
     const events = this.capabilities.lifecycleEvents();
     return this.hostPresenter.profile(analysis, shell, this.limits, events);
   }

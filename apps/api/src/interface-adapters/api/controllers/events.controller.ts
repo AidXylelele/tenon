@@ -10,8 +10,8 @@ import {
 import { minutes, Throttle } from "@nestjs/throttler";
 import { AcceptEvent } from "../../../application/automation/events/accept-event.js";
 import { EventOrigin } from "../../../application/automation/events/enums.js";
-import { ReceivedCloudEvent } from "../decorators/received-cloud-event.decorator.js";
-import { CloudEventBody } from "../schemas/event.schemas.js";
+import { ReceivedCloudEvent } from "../pipeline/received-cloud-event.decorator.js";
+import { CloudEventBody } from "../schemas/event.schema.js";
 
 @ApiTags("events")
 @ApiCookieAuth("sessionCookie")

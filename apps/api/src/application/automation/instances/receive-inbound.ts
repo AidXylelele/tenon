@@ -23,8 +23,9 @@ export class ReceiveInbound {
 
     if (instance === null) return { ok: false, failure: Missing.Instance };
 
-    if (!instance.receives(command.execution))
-      return { ok: false, failure: InstanceRefusal.NotReceiving };
+    const receiving = instance.receives(command.execution);
+
+    if (!receiving) return { ok: false, failure: InstanceRefusal.NotReceiving };
 
     const position = await this.messages.append(
       instance,

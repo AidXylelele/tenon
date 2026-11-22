@@ -1,16 +1,17 @@
 import { createHash } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { eq, sql } from "drizzle-orm";
 import request from "supertest";
 import type { App } from "supertest/types.js";
 import {
   AccountRepository,
   PasswordHasher,
-  UserRepository,
-} from "../../src/application/identity/ports.js";
-import { SeedAdministrator } from "../../src/application/identity/seed-administrator.js";
-import { Account } from "../../src/domain/identity/account.js";
-import { Role, UserStatus } from "../../src/domain/identity/enums.js";
-import { User } from "../../src/domain/identity/user.js";
+} from "../../src/application/identity/accounts/ports.js";
+import { UserRepository } from "../../src/application/identity/users/ports.js";
+import { Account } from "../../src/domain/identity/accounts/account.js";
+import { Role, UserStatus } from "../../src/domain/identity/users/enums.js";
+import { User } from "../../src/domain/identity/users/user.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import {
   session,
@@ -23,6 +24,10 @@ import { inTransaction } from "./db.js";
 export { PASSWORD };
 
 export const SEED_ADMIN_EMAIL = "first-admin@example.com";
+
+const FIRST_ADMINISTRATOR = fileURLToPath(
+  new URL("../../drizzle/0034_first_administrator.sql", import.meta.url),
+);
 
 export async function createUser(
   t: TestApp,
@@ -99,5 +104,12 @@ export async function suspendUser(db: Database, userId: string): Promise<void> {
 }
 
 export async function seedAdministrator(t: TestApp): Promise<void> {
-  await t.app.get(SeedAdministrator).execute({ email: SEED_ADMIN_EMAIL });
+  const migration = await readFile(FIRST_ADMINISTRATOR, "utf8");
+  const seed = sql.raw(migration);
+  await t.db.transaction(async (tx) => {
+    await tx.execute(
+      sql`select set_config('tenon.admin_email', ${SEED_ADMIN_EMAIL}, true)`,
+    );
+    await tx.execute(seed);
+  });
 }

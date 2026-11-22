@@ -14,7 +14,7 @@ import { ImportPresenter } from "../presenters/import.presenter.js";
 import {
   FetchImportBody,
   ImportTextResponse,
-} from "../schemas/import.schemas.js";
+} from "../schemas/import.schema.js";
 
 @ApiTags("imports")
 @ApiCookieAuth("sessionCookie")

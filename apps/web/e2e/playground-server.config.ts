@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from "vite";
 import nextConfig from "../next.config";
+import { PLAYGROUND_PORT } from "./playground-port";
 
 const WORKER_CHUNKS = "/_next/static/chunks/:file*";
 
@@ -30,5 +31,8 @@ function workerPolicyOnChunks(policy: string): Plugin {
 export default defineConfig(async () => {
   const policy = await workerPolicy();
   const chunks = workerPolicyOnChunks(policy);
-  return { plugins: [chunks] };
+  return {
+    plugins: [chunks],
+    preview: { port: PLAYGROUND_PORT, strictPort: true },
+  };
 });

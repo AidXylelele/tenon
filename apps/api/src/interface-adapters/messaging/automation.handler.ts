@@ -6,20 +6,22 @@ import {
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
-import { AnswerParent } from "../../application/automation/instances/answer-parent.js";
+
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import { OfferEvent } from "../../application/automation/instances/offer-event.js";
 import { InstanceRuns } from "../../application/automation/instances/ports.js";
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
+import { WakeParent } from "../../application/automation/instances/wake-parent.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
 import { SyncSchedule } from "../../application/automation/schedules/sync-schedule.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
 import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
 import { WorkflowEventKind } from "../../domain/automation/workflows/enums.js";
-import { PermanentFault } from "../../domain/errors.js";
 import type { Transaction } from "../persistence/interfaces.js";
+import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { MessageTopic } from "./enums.js";
+import { OutboxTracer } from "./outbox.tracer.js";
 import type {
   AcceptedEventMessage,
   EventOfferedMessage,
@@ -36,12 +38,13 @@ export class AutomationHandler {
     private readonly offerEvent: OfferEvent,
     private readonly startOnEvent: StartOnEvent,
     private readonly matchSubscriptions: MatchSubscriptions,
-    private readonly answerParent: AnswerParent,
+    private readonly wakeParent: WakeParent,
     private readonly cancelChildren: CancelChildren,
     private readonly cancelInstance: CancelInstance,
     private readonly continueSchedule: ContinueSchedule,
     private readonly syncSchedule: SyncSchedule,
     private readonly runs: InstanceRuns,
+    private readonly tracer: OutboxTracer,
   ) {}
 
   @OnOutboxMessage(MessageTopic.EventAccepted, { consumer: "dispatch" })
@@ -100,15 +103,12 @@ export class AutomationHandler {
   }
 
   @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "parents" })
-  answered(
+  woken(
     message: InstanceMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
     return this.#once(context, () =>
-      this.answerParent.execute({
-        instanceId: message.instanceId,
-        signal: context.signal,
-      }),
+      this.wakeParent.execute({ instanceId: message.instanceId }),
     );
   }
 
@@ -175,7 +175,14 @@ export class AutomationHandler {
     );
   }
 
-  async #once(
+  #once(
+    context: OutboxHandlerContext,
+    work: () => Promise<void>,
+  ): Promise<void> {
+    return this.tracer.processed(context, () => this.#processed(context, work));
+  }
+
+  async #processed(
     context: OutboxHandlerContext,
     work: () => Promise<void>,
   ): Promise<void> {

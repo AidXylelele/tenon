@@ -20,6 +20,7 @@ import type {
   DefinitionSource,
 } from "../../src/application/automation/workflows/interfaces.js";
 import {
+  type Control,
   Phase,
   TriggerKind,
 } from "../../src/domain/automation/instances/enums.js";
@@ -37,18 +38,20 @@ import type { WorkflowVersion } from "../../src/domain/automation/workflows/work
 import type { Result } from "../../src/domain/interfaces.js";
 import {
   AccountRepository,
-  InvitationRepository,
-  Mailing,
   PasswordHasher,
   Sessions,
-  UserRepository,
-} from "../../src/application/identity/ports.js";
-import type { Account } from "../../src/domain/identity/account.js";
-import { InvitationStatus } from "../../src/domain/identity/enums.js";
-import { StaleWriteError } from "../../src/domain/errors.js";
-import type { Invitation } from "../../src/domain/identity/invitation.js";
-import type { InvitationToken } from "../../src/domain/identity/invitation-token.js";
-import type { User } from "../../src/domain/identity/user.js";
+} from "../../src/application/identity/accounts/ports.js";
+import {
+  InvitationMailer,
+  InvitationRepository,
+} from "../../src/application/identity/invitations/ports.js";
+import { UserRepository } from "../../src/application/identity/users/ports.js";
+import type { Account } from "../../src/domain/identity/accounts/account.js";
+import { InvitationStatus } from "../../src/domain/identity/invitations/enums.js";
+import { StaleWriteError } from "../../src/domain/stale-write.error.js";
+import type { Invitation } from "../../src/domain/identity/invitations/invitation.js";
+import type { InvitationToken } from "../../src/domain/identity/invitations/invitation-token.js";
+import type { User } from "../../src/domain/identity/users/user.js";
 
 export class InMemoryUserRepository extends UserRepository {
   readonly users = new Map<string, User>();
@@ -71,10 +74,6 @@ export class InMemoryUserRepository extends UserRepository {
     return Promise.resolve(
       this.all().find((user) => user.email === email) ?? null,
     );
-  }
-
-  hasAdministrator(): Promise<boolean> {
-    return Promise.resolve(this.all().some((user) => user.isAdmin));
   }
 
   private all(): User[] {
@@ -166,7 +165,7 @@ export interface SentInvitation {
   readonly inviterName: string;
 }
 
-export class RecordingMailing extends Mailing {
+export class RecordingInvitationMailer extends InvitationMailer {
   readonly sent: SentInvitation[] = [];
 
   sendInvitation(
@@ -175,10 +174,6 @@ export class RecordingMailing extends Mailing {
     inviterName: string,
   ): Promise<void> {
     this.sent.push({ invitation, token, inviterName });
-    return Promise.resolve();
-  }
-
-  sendPasswordReset(): Promise<void> {
     return Promise.resolve();
   }
 }
@@ -311,6 +306,19 @@ export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository
     return Promise.resolve(rows.map((row) => new WorkflowInstance(row)));
   }
 
+  findEndedChildren(parent: WorkflowInstance): Promise<WorkflowInstance[]> {
+    const awaited = parent.agenda.awaited.map((effect) => effect.id);
+    const rows = [...this.rows.values()].filter(
+      (row) =>
+        row.originId === parent.id &&
+        row.trigger === TriggerKind.Parent &&
+        row.originEffectId !== null &&
+        awaited.includes(row.originEffectId) &&
+        row.endedAt !== null,
+    );
+    return Promise.resolve(rows.map((row) => new WorkflowInstance(row)));
+  }
+
   hasUnendedScheduled(workflowId: string): Promise<boolean> {
     const rows = [...this.rows.values()];
     return Promise.resolve(
@@ -436,6 +444,7 @@ export class RecordingInstanceRuns extends InstanceRuns {
   }
 
   readonly woken: string[] = [];
+  readonly causes: string[] = [];
 
   start(instance: WorkflowInstance): Promise<void> {
     const stored = this.instances.rows.has(instance.id);
@@ -443,13 +452,28 @@ export class RecordingInstanceRuns extends InstanceRuns {
     return Promise.resolve();
   }
 
-  wake(instance: WorkflowInstance): Promise<void> {
-    this.woken.push(instance.id);
-    return Promise.resolve();
+  wakeOnChild(
+    parent: WorkflowInstance,
+    child: WorkflowInstance,
+  ): Promise<void> {
+    return this.#woken(parent, `child:${child.id}`);
+  }
+
+  wakeOnEvent(instance: WorkflowInstance, sequence: number): Promise<void> {
+    return this.#woken(instance, `event:${String(sequence)}`);
+  }
+
+  wakeOnControl(instance: WorkflowInstance, control: Control): Promise<void> {
+    return this.#woken(instance, control);
   }
 
   wakeOnInbound(instance: WorkflowInstance): Promise<void> {
+    return this.#woken(instance, "inbound");
+  }
+
+  #woken(instance: WorkflowInstance, cause: string): Promise<void> {
     this.woken.push(instance.id);
+    this.causes.push(cause);
     return Promise.resolve();
   }
 

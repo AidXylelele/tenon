@@ -1,22 +1,29 @@
 import type {
   CloudEvent,
   EffectResponse,
+  EventFilter,
   HostProfile,
   JsonObject,
   JsonValue,
+  Program,
   StartContext,
   State,
   StepContext,
 } from "interpreter";
-import type { ResiliencePolicy } from "@nestjs/resilience";
+import type { Imports } from "interpreter/front-end";
+import type { BulkheadPolicy, ResiliencePolicy } from "@nestjs/resilience";
 import type { Piscina } from "piscina";
-import type { NamedFilter } from "../../interface-adapters/workflows/interfaces.js";
-import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
+import type {
+  NamedFilter,
+  StepCall,
+  VersionStructure,
+} from "../../interface-adapters/workflows/interfaces.js";
+import type * as thread from "./interpreter.thread.js";
 
 export interface CompileSource {
   readonly document: JsonObject | string;
   readonly profile: HostProfile;
-  readonly imports: ImportTexts;
+  readonly imports: Imports;
 }
 
 export interface ThreadProgram {
@@ -25,83 +32,67 @@ export interface ThreadProgram {
   readonly source: CompileSource | null;
 }
 
-interface CompileCall {
-  readonly kind: "compile";
-  readonly source: CompileSource;
+export interface AcceptingCall {
+  readonly filters: readonly NamedFilter[];
+  readonly event: CloudEvent;
 }
 
-interface StartCall {
-  readonly kind: "start";
+export interface ProgramTaskCall {
   readonly program: ThreadProgram;
+}
+
+export interface StartCall extends ProgramTaskCall {
   readonly input: JsonValue;
   readonly context: StartContext;
 }
 
-interface CorrelateCall {
-  readonly kind: "correlate";
-  readonly program: ThreadProgram;
+export interface CorrelateCall extends ProgramTaskCall {
   readonly context: StartContext;
 }
 
-interface RespondCall {
-  readonly kind: "respond";
-  readonly program: ThreadProgram;
+export interface RespondCall extends ProgramTaskCall {
   readonly state: State;
   readonly response: EffectResponse;
   readonly context: StepContext;
 }
 
-interface ControlCall {
-  readonly kind: "suspend" | "resume" | "cancel";
-  readonly program: ThreadProgram;
+export interface ControlCall extends ProgramTaskCall {
   readonly state: State;
   readonly context: StepContext;
 }
 
-interface RouteCall {
-  readonly kind: "route";
-  readonly program: ThreadProgram;
+export interface RouteCall extends ProgramTaskCall {
   readonly event: CloudEvent;
 }
 
-interface RebuildCall {
-  readonly kind: "rebuild";
-  readonly program: ThreadProgram;
-}
-
-interface InputCall {
-  readonly kind: "input";
-  readonly program: ThreadProgram;
+export interface InputCall extends ProgramTaskCall {
   readonly input: JsonValue;
 }
 
-interface StructureCall {
-  readonly kind: "structure";
-  readonly source: CompileSource;
+type ThreadTasks = typeof thread;
+
+export type TaskName = keyof ThreadTasks;
+
+export type TaskCall<N extends TaskName> = Parameters<
+  ThreadTasks[N]
+>[0]["call"];
+
+export type TaskValue<N extends TaskName> =
+  ReturnType<ThreadTasks[N]> extends TaskAnswer<infer V> ? V : never;
+
+export type PoolName = "runs" | "checks";
+
+export interface TraceCarrier {
+  traceparent?: string;
+  tracestate?: string;
 }
 
-interface FilterCall {
-  readonly kind: "filter";
-  readonly filter: JsonValue;
+export interface ThreadTask<C> {
+  readonly call: C;
+  readonly pool: PoolName;
+  readonly enqueuedAt: number;
+  readonly trace: TraceCarrier;
 }
-
-interface AcceptingCall {
-  readonly kind: "accepting";
-  readonly filters: readonly NamedFilter[];
-  readonly event: CloudEvent;
-}
-
-export type ProgramWorkerCall =
-  | StartCall
-  | CorrelateCall
-  | RespondCall
-  | ControlCall
-  | RouteCall
-  | RebuildCall
-  | InputCall;
-
-export type WorkerCall =
-  CompileCall | StructureCall | FilterCall | AcceptingCall | ProgramWorkerCall;
 
 interface Answered<T> {
   readonly kind: "answered";
@@ -122,10 +113,28 @@ interface Fault {
   readonly message: string;
 }
 
-export type WorkerAnswer<T> =
+export type TaskAnswer<T> =
   Answered<T> | MissingProgram | IncompatibleProgram | Fault;
 
-export interface WorkerPool {
+export interface KeptProgram {
+  readonly program: Program | null;
+}
+
+export interface KeptFilter {
+  readonly filter: EventFilter | null;
+}
+
+export interface KeptStructure {
+  readonly structure: VersionStructure | null;
+}
+
+export interface ThreadPool {
+  readonly name: PoolName;
   readonly threads: Piscina;
   readonly policy: ResiliencePolicy;
+  readonly bulkhead: BulkheadPolicy;
+}
+
+export interface CallContext extends StepCall {
+  readonly remaining: number | null;
 }

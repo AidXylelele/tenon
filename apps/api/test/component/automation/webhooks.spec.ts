@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import request from "supertest";
 import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import type { TestApp } from "../../support/create-test-app.js";

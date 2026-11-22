@@ -5,7 +5,7 @@ import type {
   ShellSupport,
 } from "../../../application/automation/host/interfaces.js";
 import type { HostLimits } from "../../../application/automation/host/queries.js";
-import type { HostProfileResponse } from "../schemas/host.schemas.js";
+import type { HostProfileResponse } from "../schemas/host.schema.js";
 
 @Injectable()
 export class HostPresenter {

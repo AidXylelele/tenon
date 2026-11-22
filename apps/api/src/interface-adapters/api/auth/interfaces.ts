@@ -1,4 +1,4 @@
-import type { User } from "../../../domain/identity/user.js";
+import type { User } from "../../../domain/identity/users/user.js";
 
 declare module "@nestjs/authentication" {
   interface AuthenticationTypes {

@@ -24,9 +24,14 @@ export class EntityTagMapper {
     ifMatch: string | undefined,
     ifNoneMatch: string | undefined,
   ): WritePrecondition {
-    if (ifMatch !== undefined) return this.#matchOf(ifMatch.trim());
+    if (ifMatch !== undefined) {
+      const tags = ifMatch.trim();
+      return this.#matchOf(tags);
+    }
 
-    if (ifNoneMatch?.trim() === EntityTagMapper.ANY) return { kind: "create" };
+    const noneMatch = ifNoneMatch?.trim();
+
+    if (noneMatch === EntityTagMapper.ANY) return { kind: "create" };
 
     return { kind: "required" };
   }
@@ -37,9 +42,10 @@ export class EntityTagMapper {
     const tags = ifNoneMatch
       .split(EntityTagMapper.SEPARATOR)
       .map((tag) => tag.trim());
-    return tags.some(
-      (tag) => tag === EntityTagMapper.ANY || this.#opaqueOf(tag) === revision,
-    );
+    return tags.some((tag) => {
+      const opaque = this.#opaqueOf(tag);
+      return tag === EntityTagMapper.ANY || opaque === revision;
+    });
   }
 
   #matchOf(tag: string): WritePrecondition {
