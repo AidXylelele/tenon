@@ -1,4 +1,5 @@
 import { Missing } from "../../../../src/application/automation/enums.js";
+import { AnswerChildren } from "../../../../src/application/automation/instances/answer-children.js";
 import { AnswerReceives } from "../../../../src/application/automation/instances/answer-receives.js";
 import { BeginRun } from "../../../../src/application/automation/instances/begin-run.js";
 import { CancelInstance } from "../../../../src/application/automation/instances/cancel-instance.js";
@@ -15,10 +16,12 @@ import {
 import { RespondToEffect } from "../../../../src/application/automation/instances/respond-to-effect.js";
 import { ResumeInstance } from "../../../../src/application/automation/instances/resume-instance.js";
 import { SuspendInstance } from "../../../../src/application/automation/instances/suspend-instance.js";
+import { WakeParent } from "../../../../src/application/automation/instances/wake-parent.js";
 import {
   CancelReason,
   InboundKind,
   Phase,
+  TriggerKind,
   TurnStatus,
   WaitKind,
 } from "../../../../src/domain/automation/instances/enums.js";
@@ -162,6 +165,20 @@ const aReceive = (id: string, execution: string): AwaitedEffect => ({
   },
 });
 
+const aChild = (id: string): AwaitedEffect => ({
+  id,
+  request: { id, kind: "workflow", await: true, deadline: null },
+  wait: {
+    effectId: id,
+    kind: WaitKind.Child,
+    until: null,
+    stream: null,
+    retryOf: null,
+    execution: null,
+    position: null,
+  },
+});
+
 const signal = new AbortController().signal;
 
 function awaitedIn(result: AgendaResult): readonly string[] {
@@ -184,6 +201,8 @@ function setUp(instance: WorkflowInstance, turn: PlayedTurn) {
     suspend: new SuspendInstance(instances, runtime, secrets, runs),
     resume: new ResumeInstance(instances, runtime, secrets, runs),
     cancel: new CancelInstance(instances, runtime, secrets, runs),
+    wakeParent: new WakeParent(instances, runs),
+    answerChildren: new AnswerChildren(instances, runtime, secrets),
   };
 }
 
@@ -337,6 +356,72 @@ describe("a run this build of the interpreter cannot continue", () => {
     expect(result.ok).toBe(true);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Cancelled);
     expect(fixture.runs.woken).toEqual([instance.id]);
+  });
+});
+
+describe("children answered by their parent's own run", () => {
+  const CHILD = "/do/2/lines[0]/do/0/price";
+
+  function endedChildOf(parent: WorkflowInstance): WorkflowInstance {
+    return anInstanceIn(Phase.Completed, {
+      id: "child-1",
+      trigger: TriggerKind.Parent,
+      originId: parent.id,
+      originEffectId: CHILD,
+    });
+  }
+
+  it("a_child_that_ends_before_its_parent_awaits_it_wakes_the_parent_and_is_answered_once_it_does", async () => {
+    const parent = await aBegunInstance();
+    const child = endedChildOf(parent);
+    const awaiting = aTurn({ requested: [aChild(CHILD)] });
+    const fixture = setUp(parent, awaiting);
+    fixture.instances.put(child);
+
+    await fixture.wakeParent.execute({ instanceId: child.id });
+    await fixture.respond.execute({
+      instanceId: parent.id,
+      answer: { effectId: "/do/0/fetch", outcome: { kind: "responded" } },
+      signal,
+    });
+    const answered = await fixture.answerChildren.execute({
+      instanceId: parent.id,
+      signal,
+    });
+
+    expect(fixture.runs.causes).toEqual([`child:${child.id}`]);
+    expect(fixture.runs.woken).toEqual([parent.id]);
+    expect(fixture.runtime.calls).toEqual([
+      "respond /do/0/fetch",
+      "answerChild",
+    ]);
+    expect(answered.ok).toBe(true);
+  });
+
+  it("a_parent_whose_awaited_children_have_not_ended_is_read_without_a_write", async () => {
+    const parent = await aBegunInstance();
+    const fixture = setUp(parent, aTurn());
+    const saves = fixture.instances.saves;
+
+    const read = await fixture.answerChildren.execute({
+      instanceId: parent.id,
+      signal,
+    });
+
+    expect(awaitedIn(read)).toEqual(["/do/0/fetch", "/do/1/pause"]);
+    expect(fixture.runtime.calls).toEqual([]);
+    expect(fixture.instances.saves).toBe(saves);
+  });
+
+  it("an_ended_parent_is_not_woken_by_its_child", async () => {
+    const parent = anInstanceIn(Phase.Cancelled);
+    const child = endedChildOf(parent);
+    const fixture = setUp(parent, aTurn());
+    fixture.instances.put(child);
+
+    await fixture.wakeParent.execute({ instanceId: child.id });
+
+    expect(fixture.runs.woken).toEqual([]);
   });
 });
 

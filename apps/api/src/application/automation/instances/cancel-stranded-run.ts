@@ -29,6 +29,6 @@ export class CancelStrandedRun {
     const ending = await this.runtime.cancelledEnding(instance, now);
     instance.cancelStranded(ending, now);
     await this.instances.save(instance);
-    await this.runs.wake(instance);
+    await this.runs.wakeOnCutOver(instance);
   }
 }

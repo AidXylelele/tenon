@@ -6,6 +6,7 @@ import type {
   RunEnding,
   RunTurn,
 } from "../../../domain/automation/instances/interfaces.js";
+import type { Control } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import type { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import type { WorkflowVersion } from "../../../domain/automation/workflows/workflow-version.js";
@@ -20,6 +21,9 @@ export abstract class WorkflowInstanceRepository {
     effectId: string,
   ): Promise<WorkflowInstance | null>;
   abstract findAwaitedChildren(parentId: string): Promise<WorkflowInstance[]>;
+  abstract findEndedChildren(
+    parent: WorkflowInstance,
+  ): Promise<WorkflowInstance[]>;
   abstract hasUnendedScheduled(workflowId: string): Promise<boolean>;
   abstract save(instance: WorkflowInstance): Promise<void>;
   abstract remove(instance: WorkflowInstance): Promise<void>;
@@ -45,7 +49,19 @@ export abstract class ReceivedMessages {
 
 export abstract class InstanceRuns {
   abstract start(instance: WorkflowInstance): Promise<void>;
-  abstract wake(instance: WorkflowInstance): Promise<void>;
+  abstract wakeOnChild(
+    parent: WorkflowInstance,
+    child: WorkflowInstance,
+  ): Promise<void>;
+  abstract wakeOnEvent(
+    instance: WorkflowInstance,
+    sequence: number,
+  ): Promise<void>;
+  abstract wakeOnControl(
+    instance: WorkflowInstance,
+    control: Control,
+  ): Promise<void>;
+  abstract wakeOnCutOver(instance: WorkflowInstance): Promise<void>;
   abstract wakeOnInbound(
     instance: WorkflowInstance,
     execution: string,

@@ -32,10 +32,7 @@ import {
   WaitKind,
 } from "../../../domain/automation/instances/enums.js";
 import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
-import type {
-  RunAgenda,
-  RunWait,
-} from "../../../domain/automation/instances/interfaces.js";
+import type { RunWait } from "../../../domain/automation/instances/interfaces.js";
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type {
   LifecycleEventName,
@@ -255,19 +252,6 @@ export class PostgresInstanceQueries implements InstanceQueries {
         : [[wait.retryOf, new Date(wait.until)] as const],
     );
     return new Map(retrying);
-  }
-
-  async agendaOf(id: string): Promise<RunAgenda | null> {
-    const [row] = await this.txHost.tx
-      .select()
-      .from(instances)
-      .where(eq(instances.id, id));
-
-    if (!row) return null;
-
-    const ended = row.endedAt !== null;
-    const awaited = ended ? [] : this.workflowInstanceMapper.awaitedOf(row);
-    return { instanceId: row.id, ended, awaited };
   }
 
   async countsByPhase(from: Date, to: Date): Promise<readonly PhaseCount[]> {

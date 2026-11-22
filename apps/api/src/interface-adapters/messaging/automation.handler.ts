@@ -6,12 +6,13 @@ import {
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
-import { AnswerParent } from "../../application/automation/instances/answer-parent.js";
+
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import { OfferEvent } from "../../application/automation/instances/offer-event.js";
 import { InstanceRuns } from "../../application/automation/instances/ports.js";
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
+import { WakeParent } from "../../application/automation/instances/wake-parent.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
 import { SyncSchedule } from "../../application/automation/schedules/sync-schedule.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
@@ -36,7 +37,7 @@ export class AutomationHandler {
     private readonly offerEvent: OfferEvent,
     private readonly startOnEvent: StartOnEvent,
     private readonly matchSubscriptions: MatchSubscriptions,
-    private readonly answerParent: AnswerParent,
+    private readonly wakeParent: WakeParent,
     private readonly cancelChildren: CancelChildren,
     private readonly cancelInstance: CancelInstance,
     private readonly continueSchedule: ContinueSchedule,
@@ -100,15 +101,12 @@ export class AutomationHandler {
   }
 
   @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "parents" })
-  answered(
+  woken(
     message: InstanceMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
     return this.#once(context, () =>
-      this.answerParent.execute({
-        instanceId: message.instanceId,
-        signal: context.signal,
-      }),
+      this.wakeParent.execute({ instanceId: message.instanceId }),
     );
   }
 

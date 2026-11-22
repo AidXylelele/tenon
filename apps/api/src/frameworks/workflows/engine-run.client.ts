@@ -6,6 +6,7 @@ import {
 } from "@nestjs-cls/transactional";
 import { WorkflowClient, WorkflowNotFoundError } from "@nestjs/workflows";
 import type { InstanceRuns } from "../../application/automation/instances/ports.js";
+import type { Control } from "../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../domain/automation/instances/workflow-instance.js";
 import type { Transaction } from "../../interface-adapters/persistence/interfaces.js";
 
@@ -13,6 +14,7 @@ import type { Transaction } from "../../interface-adapters/persistence/interface
 export class EngineRunClient implements InstanceRuns {
   static readonly RUN = "open-workflow";
   static readonly WAKE = "wake";
+  private static readonly CUT_OVER = "cut-over";
 
   constructor(
     private readonly client: WorkflowClient,
@@ -30,14 +32,36 @@ export class EngineRunClient implements InstanceRuns {
   }
 
   @Transactional(Propagation.Mandatory)
-  async wake(instance: WorkflowInstance): Promise<void> {
+  async wakeOnChild(
+    parent: WorkflowInstance,
+    child: WorkflowInstance,
+  ): Promise<void> {
+    const cause = `child:${child.id}`;
+    await this.#woken(parent, cause);
+  }
+
+  @Transactional(Propagation.Mandatory)
+  async wakeOnEvent(
+    instance: WorkflowInstance,
+    sequence: number,
+  ): Promise<void> {
+    const cause = `event:${String(sequence)}`;
+    await this.#woken(instance, cause);
+  }
+
+  @Transactional(Propagation.Mandatory)
+  async wakeOnControl(
+    instance: WorkflowInstance,
+    control: Control,
+  ): Promise<void> {
     const saved = instance.version + 1;
-    const id = `${instance.id}:${String(saved)}`;
-    await this.client.signal(EngineRunClient.WAKE, null, {
-      key: instance.id,
-      id,
-      transaction: this.txHost.tx,
-    });
+    const cause = `${control}:${String(saved)}`;
+    await this.#woken(instance, cause);
+  }
+
+  @Transactional(Propagation.Mandatory)
+  async wakeOnCutOver(instance: WorkflowInstance): Promise<void> {
+    await this.#woken(instance, EngineRunClient.CUT_OVER);
   }
 
   @Transactional(Propagation.Mandatory)
@@ -46,7 +70,12 @@ export class EngineRunClient implements InstanceRuns {
     execution: string,
     position: number,
   ): Promise<void> {
-    const id = `${instance.id}:inbound:${execution}:${String(position)}`;
+    const cause = `inbound:${execution}:${String(position)}`;
+    await this.#woken(instance, cause);
+  }
+
+  async #woken(instance: WorkflowInstance, cause: string): Promise<void> {
+    const id = `${instance.id}:${cause}`;
     await this.client.signal(EngineRunClient.WAKE, null, {
       key: instance.id,
       id,

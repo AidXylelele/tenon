@@ -68,7 +68,7 @@ export class OpenWorkflowRun implements WorkflowRunner<
     const begun = await this.#step(
       ctx,
       "begin",
-      (attempt) => this.runs.begin(instanceId, attempt.signal),
+      (attempt) => this.#begun(input, attempt.signal),
       failed,
     );
     const generation = {
@@ -98,6 +98,17 @@ export class OpenWorkflowRun implements WorkflowRunner<
       bytes += played.bytes;
       agenda = played.agenda;
     }
+  }
+
+  #begun(
+    input: OpenWorkflowRunInput,
+    signal: AbortSignal,
+  ): Promise<RunAgendaView> {
+    const instanceId = input.instanceId;
+
+    if (input.generation === 1) return this.runs.begin(instanceId, signal);
+
+    return this.runs.childrenEnded(instanceId, signal);
   }
 
   #turn(
@@ -235,7 +246,7 @@ export class OpenWorkflowRun implements WorkflowRunner<
     const agenda = await this.#step(
       generation.ctx,
       `agenda#${String(turn)}`,
-      () => this.runs.agendaOf(instanceId),
+      (attempt) => this.runs.childrenEnded(instanceId, attempt.signal),
     );
     const bytes = this.#sizeOf(agenda);
     return { agenda, entries: 2, bytes };

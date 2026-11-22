@@ -10,6 +10,7 @@ import type {
   JsonObject as ProtocolObject,
 } from "interpreter";
 import { EmitEvent } from "../../application/automation/events/emit-event.js";
+import { AnswerChildren } from "../../application/automation/instances/answer-children.js";
 import { AnswerReceives } from "../../application/automation/instances/answer-receives.js";
 import { BeginRun } from "../../application/automation/instances/begin-run.js";
 import { CancelStrandedRun } from "../../application/automation/instances/cancel-stranded-run.js";
@@ -63,6 +64,7 @@ export class RunController {
     private readonly emitEvent: EmitEvent,
     private readonly startSubWorkflow: StartSubWorkflow,
     private readonly answerReceives: AnswerReceives,
+    private readonly answerChildren: AnswerChildren,
     private readonly receiveInbound: ReceiveInbound,
     private readonly cancelStrandedRun: CancelStrandedRun,
     private readonly instances: InstanceQueries,
@@ -102,6 +104,17 @@ export class RunController {
     signal: AbortSignal,
   ): Promise<RunAgendaView> {
     const answered = await this.answerReceives.execute({ instanceId, signal });
+
+    if (!answered.ok) return RunController.ENDED;
+
+    return this.#viewOf(answered.value);
+  }
+
+  async childrenEnded(
+    instanceId: string,
+    signal: AbortSignal,
+  ): Promise<RunAgendaView> {
+    const answered = await this.answerChildren.execute({ instanceId, signal });
 
     if (!answered.ok) return RunController.ENDED;
 
@@ -149,14 +162,6 @@ export class RunController {
 
   demands(instanceId: string, execution: string): Promise<boolean> {
     return this.receivers.demands(instanceId, execution);
-  }
-
-  async agendaOf(instanceId: string): Promise<RunAgendaView> {
-    const agenda = await this.instances.agendaOf(instanceId);
-
-    if (agenda === null) return RunController.ENDED;
-
-    return this.#viewOf(agenda);
   }
 
   async cutOver(): Promise<void> {

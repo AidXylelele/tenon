@@ -75,7 +75,7 @@ class ScriptedRuns {
     return Promise.resolve(this.next);
   }
 
-  agendaOf(): Promise<RunAgendaView> {
+  childrenEnded(): Promise<RunAgendaView> {
     this.reads += 1;
     return Promise.resolve(this.next);
   }
@@ -140,6 +140,7 @@ describe("the run of an instance on the engine", () => {
       responded,
     ),
     engine: RecordingEngine = new RecordingEngine(),
+    generation = 1,
   ): Promise<WorkflowWorker> {
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -157,10 +158,9 @@ describe("the run of an instance on the engine", () => {
       ],
     }).compile();
     app = await moduleRef.init();
-    const input = { instanceId: "instance-1", generation: 1 };
-    await app
-      .get(WorkflowClient)
-      .start(EngineRunClient.RUN, input, { id: "run:instance-1:1" });
+    const input = { instanceId: "instance-1", generation };
+    const id = `run:instance-1:${String(generation)}`;
+    await app.get(WorkflowClient).start(EngineRunClient.RUN, input, { id });
     return app.get(WorkflowWorker);
   }
 
@@ -275,6 +275,20 @@ describe("the run of an instance on the engine", () => {
     await worker.drain();
 
     expect(runs.answers).toEqual(["/do/0/heard@event[0]:expired"]);
+  });
+
+  it("a_later_generation_answers_the_children_that_ended_before_it_began", async () => {
+    const runs = new ScriptedRuns(ENDED);
+    const worker = await started(
+      runs,
+      new ScriptedPerformer(responded),
+      new RecordingEngine(),
+      2,
+    );
+
+    await worker.drain();
+
+    expect(runs.reads).toBe(1);
   });
 
   it("reads_its_agenda_again_when_woken_by_a_control_or_an_offered_event", async () => {

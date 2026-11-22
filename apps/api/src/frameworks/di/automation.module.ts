@@ -27,8 +27,9 @@ import {
   EventStore,
 } from "../../application/automation/events/ports.js";
 import { EventQueries } from "../../application/automation/events/queries.js";
-import { AnswerParent } from "../../application/automation/instances/answer-parent.js";
+import { AnswerChildren } from "../../application/automation/instances/answer-children.js";
 import { AnswerReceives } from "../../application/automation/instances/answer-receives.js";
+import { WakeParent } from "../../application/automation/instances/wake-parent.js";
 import { BeginRun } from "../../application/automation/instances/begin-run.js";
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
@@ -284,7 +285,8 @@ const useCases: Provider[] = [
   BeginRun,
   RespondToEffect,
   OfferEvent,
-  AnswerParent,
+  AnswerChildren,
+  WakeParent,
   ReceiveInbound,
   AnswerReceives,
   SuspendInstance,

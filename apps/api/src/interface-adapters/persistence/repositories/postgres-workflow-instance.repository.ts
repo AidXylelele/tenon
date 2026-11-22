@@ -5,7 +5,15 @@ import {
   TransactionHost,
 } from "@nestjs-cls/transactional";
 import { Outbox } from "@nestjs/outbox";
-import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  notInArray,
+  sql,
+} from "drizzle-orm";
 import type { WorkflowInstanceRepository } from "../../../application/automation/instances/ports.js";
 import {
   TriggerKind,
@@ -71,6 +79,27 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
           eq(instances.originId, parentId),
           eq(instances.trigger, TriggerKind.Parent),
           isNull(instances.endedAt),
+        ),
+      );
+    return rows.map((row) => this.workflowInstanceMapper.toEntity(row));
+  }
+
+  async findEndedChildren(
+    parent: WorkflowInstance,
+  ): Promise<WorkflowInstance[]> {
+    const awaited = parent.agenda.awaited.map((effect) => effect.id);
+
+    if (awaited.length === 0) return [];
+
+    const rows = await this.txHost.tx
+      .select()
+      .from(instances)
+      .where(
+        and(
+          eq(instances.originId, parent.id),
+          eq(instances.trigger, TriggerKind.Parent),
+          inArray(instances.originEffectId, awaited),
+          isNotNull(instances.endedAt),
         ),
       );
     return rows.map((row) => this.workflowInstanceMapper.toEntity(row));

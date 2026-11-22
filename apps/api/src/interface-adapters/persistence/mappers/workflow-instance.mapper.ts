@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import type { AwaitedEffect } from "../../../domain/automation/instances/interfaces.js";
 import { Run } from "../../../domain/automation/instances/run.js";
 import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import type { SealedRun, WorkflowInstanceRow } from "../interfaces.js";
@@ -55,11 +54,6 @@ export class WorkflowInstanceMapper {
       run: this.#runOf(row),
       version: row.version,
     });
-  }
-
-  awaitedOf(row: WorkflowInstanceRow): readonly AwaitedEffect[] {
-    const run = this.#runOf(row);
-    return run?.awaited ?? [];
   }
 
   #sealed(run: Run | null): string | null {

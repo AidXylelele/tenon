@@ -48,6 +48,6 @@ export class OfferEvent {
     );
     instance.advance(turn, secrets, now);
     await this.instances.save(instance);
-    await this.runs.wake(instance);
+    await this.runs.wakeOnEvent(instance, command.sequence);
   }
 }
