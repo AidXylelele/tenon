@@ -30,6 +30,7 @@ const operationFloors = readdirSync(operations, { withFileTypes: true })
 const libFloors: [string, Floor][] = [
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
+  ["src/libs/ui/composites/**", LIB_FLOOR],
   ["src/libs/ui/hooks/**", LIB_FLOOR],
   ["src/libs/ui/tokens/**", LIB_FLOOR],
 ];

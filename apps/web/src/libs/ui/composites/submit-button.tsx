@@ -17,8 +17,20 @@ export function SubmitButton({
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" disabled={pending || disabled} {...props}>
-      {pending && <Spinner data-icon="inline-start" />}
+    <Button
+      type="submit"
+      disabled={pending || disabled}
+      aria-busy={pending}
+      {...props}
+    >
+      {pending && (
+        <span
+          data-icon="inline-start"
+          className="inline-flex animate-in fill-mode-backwards fade-in delay-1000"
+        >
+          <Spinner />
+        </span>
+      )}
       {pending ? (pendingLabel ?? children) : children}
     </Button>
   );

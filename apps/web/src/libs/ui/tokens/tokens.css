@@ -152,6 +152,18 @@
   --duration-page: 250ms;
 }
 
+@property --focus-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 2px;
+}
+
+@property --focus-offset {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 2px;
+}
+
 :root[data-theme="light"] {
   color-scheme: light;
 }
@@ -306,8 +318,8 @@
 
   :focus-visible {
     --tw-ring-shadow: 0 0 #0000 !important;
-    outline: 2px solid var(--ring) !important;
-    outline-offset: 2px !important;
+    outline: var(--focus-width) solid var(--ring) !important;
+    outline-offset: var(--focus-offset) !important;
   }
 
   html {

@@ -29,12 +29,14 @@ describe("a form's submit button", () => {
     });
     const sending = screen.getByRole("button", { name: /Signing in…/ });
     const disabled = (sending as HTMLButtonElement).disabled;
+    const busy = sending.getAttribute("aria-busy");
     await act(async () => {
       finish();
       await sent;
     });
 
     expect(disabled).toBe(true);
+    expect(busy).toBe("true");
     expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
   });
 
