@@ -1,0 +1,324 @@
+"use client";
+
+import type { FormField } from "language-server/protocol";
+import { type KeyboardEvent, useState } from "react";
+import { Input } from "@/libs/ui/components/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/libs/ui/components/select";
+import { Switch } from "@/libs/ui/components/switch";
+import { Textarea } from "@/libs/ui/components/textarea";
+import { cn } from "@/libs/ui/tokens/cn";
+import {
+  clearEditsOf,
+  type Commit,
+  type FieldWords,
+  jsonCommitOf,
+  jsonTextOf,
+  numberCommitOf,
+  textEditsOf,
+  valueEditsOf,
+} from "../form-fields";
+import type { ControlWiring } from "./field-shell";
+import { useFormSettings } from "./form-settings";
+
+export interface ControlProps {
+  readonly field: FormField;
+  readonly words: FieldWords;
+  readonly wiring: ControlWiring;
+}
+
+const UNSET = "\u0000unset";
+
+const UNITS_MS: ReadonlyMap<string, number> = new Map([
+  ["days", 86_400_000],
+  ["hours", 3_600_000],
+  ["minutes", 60_000],
+  ["seconds", 1000],
+  ["milliseconds", 1],
+]);
+
+function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
+  if (event.key === "Enter") event.currentTarget.blur();
+}
+
+export function TextControl({
+  field,
+  words,
+  wiring,
+  multiline = false,
+}: ControlProps & { readonly multiline?: boolean }) {
+  const { onEdit } = useFormSettings();
+  const written = typeof field.value === "string" ? field.value : "";
+  const isExpression = written.startsWith("${");
+  const mono = words.mono || isExpression || multiline;
+  const className = cn(mono && "font-mono");
+  const suggestions = field.choices.filter(
+    (choice) => typeof choice === "string",
+  );
+  const listId = `${wiring.id}-choices`;
+  const list = suggestions.length > 0 ? listId : undefined;
+
+  function commit(text: string) {
+    const edits = textEditsOf(field, text);
+
+    onEdit(edits);
+  }
+
+  if (multiline)
+    return (
+      <Textarea
+        key={written}
+        id={wiring.id}
+        rows={6}
+        spellCheck={false}
+        className={className}
+        defaultValue={written}
+        aria-labelledby={wiring.labelId}
+        aria-describedby={wiring.describedBy}
+        aria-invalid={wiring.invalid}
+        onBlur={(event) => {
+          commit(event.currentTarget.value);
+        }}
+      />
+    );
+
+  return (
+    <>
+      <Input
+        key={written}
+        id={wiring.id}
+        list={list}
+        className={className}
+        placeholder={words.placeholder}
+        defaultValue={written}
+        aria-labelledby={wiring.labelId}
+        aria-describedby={wiring.describedBy}
+        aria-invalid={wiring.invalid}
+        onBlur={(event) => {
+          commit(event.currentTarget.value);
+        }}
+        onKeyDown={blurOnEnter}
+      />
+      {list !== undefined && (
+        <datalist id={listId}>
+          {suggestions.map((suggestion) => (
+            <option key={suggestion} value={suggestion} />
+          ))}
+        </datalist>
+      )}
+    </>
+  );
+}
+
+function useCommit(wiring: ControlWiring) {
+  const { onEdit } = useFormSettings();
+
+  return function apply(commit: Commit) {
+    if (commit.kind === "refused") {
+      wiring.onRefuse(commit.reason);
+      return;
+    }
+
+    wiring.onRefuse(null);
+
+    onEdit(commit.edits);
+  };
+}
+
+export function NumberControl({ field, wiring }: ControlProps) {
+  const apply = useCommit(wiring);
+  const written = typeof field.value === "number" ? String(field.value) : "";
+
+  return (
+    <Input
+      key={written}
+      id={wiring.id}
+      inputMode="decimal"
+      className="w-32"
+      defaultValue={written}
+      aria-describedby={wiring.describedBy}
+      aria-invalid={wiring.invalid}
+      onBlur={(event) => {
+        const commit = numberCommitOf(field, event.currentTarget.value);
+        apply(commit);
+      }}
+      onKeyDown={blurOnEnter}
+    />
+  );
+}
+
+export function BooleanControl({ field, wiring }: ControlProps) {
+  const { onEdit } = useFormSettings();
+  const checked = field.value === true;
+
+  return (
+    <Switch
+      id={wiring.id}
+      checked={checked}
+      aria-describedby={wiring.describedBy}
+      aria-invalid={wiring.invalid}
+      onCheckedChange={(next) => {
+        const edits = valueEditsOf(field, next);
+        onEdit(edits);
+      }}
+    />
+  );
+}
+
+export function ChoiceControl({ field, words, wiring }: ControlProps) {
+  const { onEdit } = useFormSettings();
+  const value = field.written ? JSON.stringify(field.value) : UNSET;
+
+  function choose(chosen: string) {
+    const choice = field.choices.find(
+      (each) => JSON.stringify(each) === chosen,
+    );
+    const edits =
+      choice === undefined ? clearEditsOf(field) : valueEditsOf(field, choice);
+
+    onEdit(edits);
+  }
+
+  return (
+    <Select value={value} onValueChange={choose}>
+      <SelectTrigger
+        id={wiring.id}
+        className="w-full"
+        aria-describedby={wiring.describedBy}
+        aria-invalid={wiring.invalid}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {!field.required && <SelectItem value={UNSET}>Usual</SelectItem>}
+        {field.choices.map((choice) => {
+          const key = JSON.stringify(choice);
+          const plain = typeof choice === "string" ? choice : key;
+          const text = words.choices.get(plain) ?? plain;
+          return (
+            <SelectItem key={key} value={key}>
+              {text}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+export function JsonControl({ field, wiring }: ControlProps) {
+  const apply = useCommit(wiring);
+  const written = jsonTextOf(field.value);
+
+  return (
+    <Textarea
+      key={written}
+      id={wiring.id}
+      rows={4}
+      spellCheck={false}
+      className="font-mono text-code"
+      defaultValue={written}
+      aria-describedby={wiring.describedBy}
+      aria-invalid={wiring.invalid}
+      onBlur={(event) => {
+        const commit = jsonCommitOf(field, event.currentTarget.value);
+        apply(commit);
+      }}
+    />
+  );
+}
+
+export function DurationControl({ field, wiring }: ControlProps) {
+  const apply = useCommit(wiring);
+  const total = totalOf(field);
+  const fitting = field.fields.find((unit) => {
+    const scale = UNITS_MS.get(unit.key) ?? 1;
+    return total !== null && total % scale === 0;
+  });
+  const [unit, setUnit] = useState(fitting?.key ?? "minutes");
+  const scale = UNITS_MS.get(unit) ?? 1;
+  const amount = total === null ? "" : String(total / scale);
+  const [typed, setTyped] = useState(amount);
+  const unitLabel = `${wiring.id}-unit`;
+
+  function commit(text: string, chosen: string) {
+    const trimmed = text.trim();
+
+    if (trimmed === "") {
+      const edits = clearEditsOf(field);
+      apply({ kind: "edits", edits });
+      return;
+    }
+
+    const value = Number(trimmed);
+
+    if (Number.isNaN(value)) {
+      apply({ kind: "refused", reason: "Write the amount as a number." });
+      return;
+    }
+
+    const units = { [chosen]: value };
+    const edits = valueEditsOf(field, units);
+    apply({ kind: "edits", edits });
+  }
+
+  return (
+    <div className="flex gap-2">
+      <Input
+        id={wiring.id}
+        inputMode="decimal"
+        className="w-28"
+        value={typed}
+        aria-describedby={wiring.describedBy}
+        aria-invalid={wiring.invalid}
+        onChange={(event) => {
+          setTyped(event.currentTarget.value);
+        }}
+        onBlur={() => {
+          commit(typed, unit);
+        }}
+        onKeyDown={blurOnEnter}
+      />
+      <Select
+        value={unit}
+        onValueChange={(chosen) => {
+          setUnit(chosen);
+          commit(typed, chosen);
+        }}
+      >
+        <SelectTrigger
+          aria-labelledby={`${wiring.labelId} ${unitLabel}`}
+          className="w-36"
+        >
+          <span id={unitLabel} className="sr-only">
+            unit
+          </span>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {field.fields.map((each) => (
+            <SelectItem key={each.key} value={each.key}>
+              {each.title.toLowerCase()}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function totalOf(field: FormField): number | null {
+  const amounts = field.fields.flatMap((unit) => {
+    const scale = UNITS_MS.get(unit.key) ?? 1;
+    return typeof unit.value === "number" ? [unit.value * scale] : [];
+  });
+
+  if (amounts.length === 0) return null;
+
+  return amounts.reduce((sum, each) => sum + each, 0);
+}

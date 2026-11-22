@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 const AFTER_A_TEST =
-  "/iframe.html?id=features-data-picker--fields-after-a-test&viewMode=story";
+  "/iframe.html?id=spaces-workflows-modules-workflow-editor-data-picker--fields-after-a-test&viewMode=story";
 const SECRET_CHIP =
-  "/iframe.html?id=features-data-picker-data-field--secret-reference&viewMode=story";
+  "/iframe.html?id=spaces-workflows-modules-workflow-editor-data-picker-data-field--secret-reference&viewMode=story";
 
 test.describe("the data picker playground", () => {
   test("typing_finds_a_field_of_the_last_test_run", async ({ page }) => {

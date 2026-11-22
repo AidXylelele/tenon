@@ -16,7 +16,7 @@ const LIB_FLOOR = {
   statements: 85,
 };
 
-const FEATURE_FLOOR = {
+const EDITOR_FLOOR = {
   lines: 85,
   branches: 85,
   functions: 85,
@@ -49,12 +49,20 @@ const libFloors: [string, Floor][] = [
   ["src/libs/ui/tokens/**", LIB_FLOOR],
 ];
 
-const featureFloors: [string, Floor][] = [
-  ["src/features/step-form/**", FEATURE_FLOOR],
-  ["src/features/data-picker/**", FEATURE_FLOOR],
-];
+const EDITOR = "src/spaces/workflows/modules/workflow-editor";
 
-const floors = operationFloors.concat(libFloors, featureFloors);
+const EDITOR_PARTS = ["step-form", "form-fields", "data-picker"];
+
+const editorFloors = EDITOR_PARTS.map((part): [string, Floor] => [
+  `${EDITOR}/${part}/**`,
+  EDITOR_FLOOR,
+]);
+
+const editorCovered = EDITOR_PARTS.map(
+  (part) => `${EDITOR}/${part}/**/*.{ts,tsx}`,
+);
+
+const floors = operationFloors.concat(libFloors, editorFloors);
 
 const thresholds = Object.fromEntries(floors);
 
@@ -74,7 +82,9 @@ export default defineConfig({
     },
     coverage: {
       provider: "v8",
-      include: ["src/{operations,features,libs}/**/*.{ts,tsx}"],
+      include: ["src/{operations,features,libs}/**/*.{ts,tsx}"].concat(
+        editorCovered,
+      ),
       exclude: ["src/**/*.stories.tsx", "src/**/*.test-support.ts"],
       thresholds,
     },

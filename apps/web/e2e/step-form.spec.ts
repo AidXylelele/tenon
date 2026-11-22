@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 const TO_FILL =
-  "/iframe.html?id=features-step-form--http-address-to-fill&viewMode=story";
+  "/iframe.html?id=spaces-workflows-modules-workflow-editor-step-form--http-address-to-fill&viewMode=story";
 const SCHEDULE =
-  "/iframe.html?id=features-step-form-start-form--schedule&viewMode=story";
+  "/iframe.html?id=spaces-workflows-modules-workflow-editor-step-form-start-form--schedule&viewMode=story";
 const DARK_SCHEDULE = `${SCHEDULE}&globals=theme:dark`;
 
 test.describe("the step form playground", () => {
