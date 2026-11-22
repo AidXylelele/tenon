@@ -27,6 +27,28 @@ under the `execution` of its events, for a host that keeps them (the claim check
 semantic model and its diagnostics and whose `schemasAt` reads the grammar at a place; `resolutionsOf(model,
 pointer)` gives what the names of the expression at a pointer resolve to; and the standard's catalogues.
 
+## Telemetry
+
+The interpreter speaks the OpenTelemetry API only (`@opentelemetry/api`, a peer dependency), with the scope
+`interpreter`. With no SDK registered it records nothing. A host that wants its telemetry registers the SDK in the
+same thread **before** `createInterpreter()`: the metrics API has no proxy, so instruments taken earlier stay
+no-op. Spans are children of the host's active context. Nothing carries inputs, outputs, task values or secrets.
+
+| Span                                                                       | Attributes                                                                                                                                                                                                                                  |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `interpreter.compile` → `interpreter.analyze`, `interpreter.translate`     | `interpreter.compile.subject` (`workflow`, `filter`), `interpreter.compile.outcome` (`compiled`, `refused`)                                                                                                                                 |
+| `interpreter.start`, `correlate`, `respond`, `suspend`, `resume`, `cancel` | `interpreter.operation`, `interpreter.workflow.namespace`, `.name`, `.version`, `interpreter.instance.id`, `interpreter.run.status`, `interpreter.transitions`, `interpreter.fibers`, `interpreter.effects.requested`, `interpreter.events` |
+
+| Histogram                      | Unit           | Attributes                                                                                                                                        |
+| ------------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `interpreter.compile.duration` | s              | subject, `interpreter.compile.phase` (`analyze`, `translate`), outcome or `error.type`                                                            |
+| `interpreter.step.duration`    | s              | `interpreter.operation`, `interpreter.run.status` or `error.type`                                                                                 |
+| `interpreter.step.transitions` | `{transition}` | `interpreter.operation`                                                                                                                           |
+| `interpreter.run.duration`     | s              | `interpreter.run.status` (`completed`, `faulted`, `cancelled`), recorded by the call that ends the run, from the run's start to that call's `now` |
+
+A thrown error marks its span as an error, records the exception and puts `error.type` on the duration; a run
+that faults is an outcome, not an error.
+
 ## Test
 
 ```sh

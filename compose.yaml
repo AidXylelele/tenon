@@ -1,5 +1,8 @@
 name: tenon
 
+include:
+  - compose.observability.yaml
+
 x-hardening: &hardening
   read_only: true
   cap_drop: [ALL]
@@ -12,6 +15,8 @@ x-api-build: &api-build
 x-telemetry: &telemetry
   OTEL_SDK_DISABLED: "false"
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_METRIC_EXPORT_INTERVAL: "15000"
+  OTEL_RESOURCE_ATTRIBUTES: service.namespace=tenon,deployment.environment.name=local
 
 services:
   postgres:
@@ -75,30 +80,6 @@ services:
       timeout: 3s
       retries: 12
     restart: unless-stopped
-
-  otel-collector:
-    image: otel/opentelemetry-collector:0.165.0@sha256:34b24b740c3c88d3467740e8642a397c13898ef76d7295c5425164c482ed1b73
-    configs:
-      - source: otel-collector
-        target: /etc/otelcol/config.yaml
-    depends_on: [viewer]
-    networks: [telemetry]
-    ports:
-      - 127.0.0.1:${COLLECTOR_PORT:-54318}:4318
-    mem_limit: 256m
-    restart: unless-stopped
-    <<: *hardening
-
-  viewer:
-    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.5@sha256:e2b7cf9a4ead932de46c6fa2a289c7d6159cfcf06a51aa65f38253a8fae75407
-    environment:
-      DASHBOARD__FRONTEND__AUTHMODE: Unsecured
-    networks: [telemetry]
-    ports:
-      - 127.0.0.1:${VIEWER_PORT:-58888}:18888
-    tmpfs: [/tmp]
-    restart: unless-stopped
-    <<: *hardening
 
   migrate:
     build:
@@ -235,7 +216,6 @@ services:
 networks:
   default:
   sandbox:
-  telemetry:
   console:
     ipam:
       config:
@@ -248,8 +228,6 @@ volumes:
 configs:
   postgres-init:
     file: docker/postgres/init.sql
-  otel-collector:
-    file: docker/otel-collector/config.yaml
 
 secrets:
   postgres-password:

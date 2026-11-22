@@ -12,6 +12,7 @@ import type {
 } from "../api/index.js";
 import type { Program as TranslatedProgram, Stream } from "../core/index.js";
 import { InterpreterError } from "../runtime/index.js";
+import type { Operation, Played, Telemetry } from "../telemetry/index.js";
 import {
   admittedAnswerOf,
   answerOf,
@@ -28,7 +29,8 @@ import {
 import { type Frame, triggerK } from "./frames/index.js";
 import { rootPath } from "./identity/index.js";
 import { resumedOf, suspendedOf, workflowBegunOf } from "./lifecycle/index.js";
-import { Machine, type Setting } from "./machine.js";
+import { Machine, type MachineOutcome, type Setting } from "./machine.js";
+import { measureOf } from "./measure.js";
 import {
   type Activation,
   type Address,
@@ -67,14 +69,20 @@ export class Runner implements Program {
   readonly #services: MachineServices;
   readonly #statics: RunnerStatics;
   readonly #seal: Seal;
+  readonly #telemetry: Telemetry;
 
-  constructor(program: TranslatedProgram, services: MachineServices) {
+  constructor(
+    program: TranslatedProgram,
+    services: MachineServices,
+    telemetry: Telemetry,
+  ) {
     const statics = staticsOf(program);
 
     this.#program = program;
     this.#services = services;
     this.#statics = statics;
     this.#seal = { terms: statics.terms, fingerprint: program.fingerprint };
+    this.#telemetry = telemetry;
   }
 
   get manifest(): Manifest {
@@ -104,6 +112,56 @@ export class Runner implements Program {
   }
 
   start(input: JsonValue, context: StartContext): Step {
+    return this.#played("start", context, () => this.#started(input, context));
+  }
+
+  correlate(context: StartContext): Step {
+    return this.#played("correlate", context, () => this.#correlated(context));
+  }
+
+  respond(state: State, response: EffectResponse, context: StepContext): Step {
+    return this.#played("respond", context, () =>
+      this.#responded(state, response, context),
+    );
+  }
+
+  suspend(state: State, context: StepContext): Step {
+    return this.#played("suspend", context, () =>
+      this.#suspended(state, context),
+    );
+  }
+
+  resume(state: State, context: StepContext): Step {
+    return this.#played("resume", context, () => this.#resumed(state, context));
+  }
+
+  cancel(state: State, context: StepContext): Step {
+    return this.#played("cancel", context, () =>
+      this.#cancelled(state, context),
+    );
+  }
+
+  #played(
+    operation: Operation,
+    context: StepContext,
+    play: () => MachineOutcome,
+  ): Step {
+    const identity = this.manifest.identity;
+
+    return this.#telemetry.play(operation, identity, () => {
+      const outcome = play();
+      return this.#reportOf(outcome, context.now);
+    });
+  }
+
+  #reportOf(outcome: MachineOutcome, now: number): Played {
+    const step = stepOf(outcome, this.#seal);
+    const measure = measureOf(outcome, now);
+
+    return { step, measure };
+  }
+
+  #started(input: JsonValue, context: StartContext): MachineOutcome {
     const opened = this.#openedOf(input, context);
     const root = workflowRootOf(this.#program.root, opened.workflow, input);
     const machine = this.#machineOf(opened, root.frame, context);
@@ -114,12 +172,11 @@ export class Runner implements Program {
       control: root.control,
     };
     const agenda = [begun];
-    const outcome = machine.runFibers(prelude, agenda);
 
-    return stepOf(outcome, this.#seal);
+    return machine.runFibers(prelude, agenda);
   }
 
-  correlate(context: StartContext): Step {
+  #correlated(context: StartContext): MachineOutcome {
     const trigger = this.#triggerOf();
     const opened = this.#openedOf(null, context);
     const bottom = triggerK({ activation: opened.workflow });
@@ -129,12 +186,15 @@ export class Runner implements Program {
     const machine = this.#machineOf(opened, bottom, context);
     const correlating: ReadyFiber = { kind: "run", fiber: rootFiber, control };
     const agenda = [correlating];
-    const outcome = machine.runFibers([], agenda);
 
-    return stepOf(outcome, this.#seal);
+    return machine.runFibers([], agenda);
   }
 
-  respond(state: State, response: EffectResponse, context: StepContext): Step {
+  #responded(
+    state: State,
+    response: EffectResponse,
+    context: StepContext,
+  ): MachineOutcome {
     const snapshot = this.#unendedOf(state);
     const setting = this.#settingOf(context);
     const machine = new Machine(snapshot, setting);
@@ -143,27 +203,24 @@ export class Runner implements Program {
       checkAdmitted(snapshot.fibers, response);
       checkUnqueued(snapshot.queued, response.id);
       const queuing = [queued(response)];
-      const outcome = machine.runFibers(queuing, []);
-      return stepOf(outcome, this.#seal);
+      return machine.runFibers(queuing, []);
     }
 
     const answer = admittedAnswerOf(snapshot.fibers, response);
     const agenda = [answer];
-    const outcome = machine.runFibers([], agenda);
-    return stepOf(outcome, this.#seal);
+    return machine.runFibers([], agenda);
   }
 
-  suspend(state: State, context: StepContext): Step {
+  #suspended(state: State, context: StepContext): MachineOutcome {
     const snapshot = this.#unendedIn(state, "running");
     const setting = this.#settingOf(context);
     const machine = new Machine(snapshot, setting);
     const prelude = suspendedOf(snapshot.fibers, machine);
-    const outcome = machine.runFibers(prelude, []);
 
-    return stepOf(outcome, this.#seal);
+    return machine.runFibers(prelude, []);
   }
 
-  resume(state: State, context: StepContext): Step {
+  #resumed(state: State, context: StepContext): MachineOutcome {
     const snapshot = this.#unendedIn(state, "suspended");
     const setting = this.#settingOf(context);
     const machine = new Machine(snapshot, setting);
@@ -172,12 +229,11 @@ export class Runner implements Program {
       answerOf(snapshot.fibers, response),
     );
     const agenda: readonly AgendaItem[] = [...answers, lapsing];
-    const outcome = machine.runFibers(prelude, agenda);
 
-    return stepOf(outcome, this.#seal);
+    return machine.runFibers(prelude, agenda);
   }
 
-  cancel(state: State, context: StepContext): Step {
+  #cancelled(state: State, context: StepContext): MachineOutcome {
     const snapshot = this.#unendedOf(state);
     const setting = this.#settingOf(context);
     const machine = new Machine(snapshot, setting);
@@ -187,9 +243,8 @@ export class Runner implements Program {
       control: cancelling,
     };
     const agenda = [cancel];
-    const outcome = machine.runFibers([], agenda);
 
-    return stepOf(outcome, this.#seal);
+    return machine.runFibers([], agenda);
   }
 
   #unendedOf(state: State): Snapshot {
