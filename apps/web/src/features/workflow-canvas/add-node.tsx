@@ -19,7 +19,7 @@ export function AddNode({ data }: CanvasNodeProps) {
       onClick={() => {
         editing.onInsert(place);
       }}
-      className="flex size-full items-center justify-center gap-1.5 rounded-full border border-dashed border-primary/40 bg-background text-xs font-medium text-primary transition-colors hover:border-primary hover:bg-primary/5"
+      className="flex size-full items-center justify-center gap-1.5 rounded-full border border-dashed border-primary/40 bg-background text-xs font-medium text-accent-text transition-colors hover:border-primary hover:bg-primary/5"
     >
       <PlusIcon className="size-3.5" aria-hidden />
       Add task

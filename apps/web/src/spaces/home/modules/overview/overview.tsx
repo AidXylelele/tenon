@@ -196,7 +196,7 @@ function SectionHead({
       </h2>
       <Link
         href={more.href}
-        className="flex items-center gap-0.5 text-sm text-primary underline-offset-4 hover:underline"
+        className="flex items-center gap-0.5 text-sm text-accent-text underline-offset-4 hover:underline"
       >
         {more.label}
         <ChevronRightIcon className="size-4" aria-hidden />

@@ -89,7 +89,7 @@ export function FlowEdge(props: Props) {
                 onClick={() => {
                   editing.onInsert(insertAt);
                 }}
-                className="flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition hover:scale-110 hover:border-primary hover:text-primary"
+                className="flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition hover:scale-110 hover:border-primary hover:text-accent-text"
               >
                 <PlusIcon className="size-3.5" />
               </button>
