@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: raise-reusable
+    version: '1.0.0'
+  use:
+    errors:
+      notFound:
+        type: https://example.com/errors/not-found
+        status: 404
+        title: Not Found
+  do:
+    - lookup:
+        raise:
+          error: notFound
+input: {}
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/not-found
+      status: 404
+      instance: /do/0/lookup
+      title: Not Found
+      detail: null
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/lookup }
+    - kind: workflow.faulted

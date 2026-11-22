@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-then
+    version: '1.0.0'
+  use:
+    functions:
+      greet:
+        set:
+          message: ${ "Hello, " + .name }
+        then: exit
+  do:
+    - sayHello:
+        call: greet
+        with:
+          name: Ann
+        then: report
+    - skipped:
+        set: { skipped: true }
+    - report:
+        set: ${ . }
+input: {}
+end:
+  completed:
+    output: { message: "Hello, Ann" }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/sayHello }
+    - { kind: task.started, task: /do/0/sayHello }
+    - { kind: task.created, task: /use/functions/greet }
+    - { kind: task.started, task: /use/functions/greet }
+    - { kind: task.completed, task: /use/functions/greet }
+    - { kind: task.completed, task: /do/0/sayHello }
+    - { kind: task.created, task: /do/2/report }
+    - { kind: task.started, task: /do/2/report }
+    - { kind: task.completed, task: /do/2/report }
+    - kind: workflow.completed

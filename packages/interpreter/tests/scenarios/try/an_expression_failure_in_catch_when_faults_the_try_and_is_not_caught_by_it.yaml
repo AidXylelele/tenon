@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-when-fails
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 503
+        catch:
+          when: '${ .status | tonumber | . + "x" }'
+          do:
+            - never:
+                set: { never: true }
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      instance: /do/0/guard
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/fail }
+    - { kind: task.started, task: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, task: /do/0/guard }
+    - kind: workflow.faulted

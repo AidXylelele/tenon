@@ -1,0 +1,59 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-publish
+    version: '1.0.0'
+  do:
+    - publishGreeting:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: greet
+          message:
+            payload:
+              greetings: ${ .greeting }
+              to: [ '${ .name }', team ]
+            headers:
+              traceId: ${ .traceId }
+              source: workflow
+input: { greeting: "Hello, World!", name: Ann, traceId: trace-1 }
+end:
+  waiting:
+    effect:
+      id: /do/0/publishGreeting
+      kind: asyncapi
+      deadline: null
+      document:
+        {
+          name: null,
+          endpoint:
+            {
+              uri: https://example.com/docs/asyncapi.json,
+              authentication: null,
+            },
+        }
+      authentication: null
+      operation: greet
+      channel: null
+      server: null
+      protocol: null
+      exchange:
+        kind: publish
+        message:
+          payload: { greetings: "Hello, World!", to: [Ann, team] }
+          headers: { traceId: trace-1, source: workflow }
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/publishGreeting,
+        execution: /do/0/publishGreeting,
+      }
+    - {
+        kind: task.started,
+        task: /do/0/publishGreeting,
+        execution: /do/0/publishGreeting,
+      }

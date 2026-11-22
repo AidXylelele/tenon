@@ -1,0 +1,81 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-retry
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - notify:
+              emit:
+                event:
+                  with:
+                    type: com.example.order.placed.v1
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      id: "/do/0/guard/try/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: e0f1d70b-10d6-528f-83ad-bcf71322702f
+        source: /test/emit-retry/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+    outcome: { kind: unreachable, detail: broker down }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      id: "/do/0/guard#2/try/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: e9be4508-69b6-592f-81cf-1a1916873178
+        source: /test/emit-retry/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:02.000Z"
+    outcome: { kind: emitted }
+    now: 1767225603000
+end:
+  completed:
+    output:
+      specversion: "1.0"
+      id: e9be4508-69b6-592f-81cf-1a1916873178
+      source: /test/emit-retry/1.0.0
+      type: com.example.order.placed.v1
+      time: "2026-01-01T00:00:02.000Z"
+facts:
+  including:
+    - {
+        kind: task.faulted,
+        task: /do/0/guard/try/0/notify,
+        execution: /do/0/guard/try/0/notify,
+      }
+    - { kind: task.retried, task: /do/0/guard }
+    - {
+        kind: task.completed,
+        task: /do/0/guard/try/0/notify,
+        execution: "/do/0/guard#2/try/0/notify",
+      }
+    - kind: workflow.completed

@@ -1,0 +1,48 @@
+{
+  "name": "interpreter",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./front-end": {
+      "types": "./dist/front-end.d.ts",
+      "default": "./dist/front-end.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "immutable": "5.2.1",
+    "jq-wasm": "3.0.0-jq-1.8.2",
+    "uuid": "14.0.3",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@cucumber/gherkin": "43.0.0",
+    "@cucumber/messages": "35.0.0",
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "eslint": "10.15.0",
+    "eslint-config-prettier": "10.1.8",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "node": ">=26.13.1"
+  }
+}

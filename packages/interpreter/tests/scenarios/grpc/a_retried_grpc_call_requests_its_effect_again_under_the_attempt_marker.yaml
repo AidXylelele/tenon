@@ -1,0 +1,70 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-retry
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - greet:
+              call: grpc
+              with:
+                proto:
+                  endpoint: https://example.com/protos/greet.proto
+                service:
+                  name: GreeterApi.Greeter
+                  host: greeter.example.com
+                method: SayHello
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+              status: 503
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect: { id: /do/0/guard/try/0/greet, kind: grpc, deadline: null }
+    outcome: { kind: status, code: 14, message: unavailable }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/guard#2/try/0/greet",
+        kind: grpc,
+        deadline: null,
+        method: SayHello,
+      }
+    outcome: { kind: replied, message: { message: Hello } }
+    now: 1767225603000
+end:
+  completed:
+    output: { message: Hello }
+facts:
+  including:
+    - {
+        kind: task.faulted,
+        task: /do/0/guard/try/0/greet,
+        execution: /do/0/guard/try/0/greet,
+      }
+    - { kind: task.retried, task: /do/0/guard, execution: /do/0/guard }
+    - {
+        kind: task.completed,
+        task: /do/0/guard/try/0/greet,
+        execution: "/do/0/guard#2/try/0/greet",
+      }
+    - { kind: task.completed, task: /do/0/guard, execution: /do/0/guard }
+    - kind: workflow.completed

@@ -1,0 +1,5 @@
+source: ""
+diagnostics:
+  - code: schema
+    pointer: ""
+    range: { start: { line: 1, column: 1 } }

@@ -1,0 +1,38 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-headers-expression
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/1
+          headers: ${ .headers }
+input: { headers: { accept: application/json } }
+script:
+  - effect:
+      id: /do/0/getPet
+      kind: http
+      deadline: null
+      headers: { accept: application/json }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - kind: workflow.completed

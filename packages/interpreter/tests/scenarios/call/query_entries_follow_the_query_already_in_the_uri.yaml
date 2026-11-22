@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-query-merged
+    version: '1.0.0'
+  do:
+    - searchCharacters:
+        call: http
+        with:
+          method: get
+          endpoint: https://swapi.dev/api/people/?format=json
+          query:
+            search: luke
+input: {}
+script:
+  - effect:
+      id: /do/0/searchCharacters
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://swapi.dev/api/people/?format=json&search=luke
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://swapi.dev/api/people/?format=json&search=luke
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { count: 1 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { count: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/searchCharacters }
+    - kind: workflow.completed

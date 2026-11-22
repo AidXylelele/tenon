@@ -1,0 +1,55 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: list-run-again
+    version: '1.0.0'
+  do:
+    - group:
+        do:
+          - pause:
+              wait: PT1S
+          - count:
+              set: '${ { n: (.n + 1) } }'
+    - again:
+        switch:
+          - more:
+              when: .n < 2
+              then: group
+input: { n: 0 }
+script:
+  - effect:
+      {
+        id: /do/0/group/do/0/pause,
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      {
+        id: /do/0/group~2/do/0/pause,
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  completed:
+    output: { n: 2 }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/group/do/1/count,
+        execution: /do/0/group/do/1/count,
+      }
+    - { kind: task.created, task: /do/0/group, execution: /do/0/group~2 }
+    - {
+        kind: task.completed,
+        task: /do/0/group/do/1/count,
+        execution: /do/0/group~2/do/1/count,
+      }
+    - kind: workflow.completed

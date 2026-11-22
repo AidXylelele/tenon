@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-stdin
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: python
+            code: import sys; print(sys.stdin.read())
+            stdin: ${ .text }
+input: { text: some lines }
+end:
+  waiting:
+    effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: python
+        code: "import sys; print(sys.stdin.read())"
+        source: null
+        stdin: some lines
+        arguments: {}
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runScript }

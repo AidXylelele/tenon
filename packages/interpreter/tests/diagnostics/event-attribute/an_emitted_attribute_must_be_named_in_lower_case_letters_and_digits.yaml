@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emits
+    version: '0.1.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.ping
+              Foo_Bar: 1
+diagnostics:
+  - code: event-attribute
+    pointer: /do/0/notify/emit/event/with/Foo_Bar
+    subject: Foo_Bar
+    range: { start: { line: 12, column: 22 } }
+    message: "Event attribute 'Foo_Bar' must be named in lower-case letters and digits."

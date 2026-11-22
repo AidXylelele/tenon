@@ -1,0 +1,15 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: triggers
+    version: '0.1.0'
+  schedule:
+    every: PT1H
+    cron: '0 0 * * *'
+  do:
+    - greet:
+        set:
+          message: hello
+profile:
+  triggers: many

@@ -1,0 +1,60 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: run-script-with-stdin-and-arguments
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: js
+            stdin: "Hello Workflow"
+            environment:
+              foo: bar
+            arguments:
+              arg: hello
+            code: |
+
+              console.log('stdin > ', readLine()) // Output: stdin > Hello Workflow
+              console.log('arg > ', arg) // Output: arg > hello
+              const foo = process.env.foo;
+              console.log('env > ', foo) // Output: env > bar
+input: {}
+script:
+  - effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: js
+        code: "\nconsole.log('stdin > ', readLine()) // Output: stdin > Hello Workflow\nconsole.log('arg > ', arg) // Output: arg > hello\nconst foo = process.env.foo;\nconsole.log('env > ', foo) // Output: env > bar\n"
+        source: null
+        stdin: Hello Workflow
+        arguments: { arg: hello }
+        environment: { foo: bar }
+      await: true
+    outcome:
+      {
+        kind: exited,
+        code: 0,
+        stdout: "stdin >  Hello Workflow\narg >  hello\nenv >  bar\n",
+        stderr: "",
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: "stdin >  Hello Workflow\narg >  hello\nenv >  bar\n"
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runScript, execution: /do/0/runScript }
+    - { kind: task.started, task: /do/0/runScript, execution: /do/0/runScript }
+    - {
+        kind: task.completed,
+        task: /do/0/runScript,
+        execution: /do/0/runScript,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

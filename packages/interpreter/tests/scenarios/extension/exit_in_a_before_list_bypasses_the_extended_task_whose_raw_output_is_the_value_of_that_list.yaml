@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-bypass
+    version: '1.0.0'
+  use:
+    extensions:
+      - mockService:
+          extend: call
+          before:
+            - intercept:
+                set:
+                  statusCode: 200
+                  content:
+                    foo:
+                      bar: baz
+                then: exit
+  do:
+    - sampleTask:
+        call: http
+        with:
+          method: get
+          endpoint: https://fake.com/sample
+        output:
+          as: '${ .content }'
+input: {}
+end:
+  completed:
+    output: { foo: { bar: baz } }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/sampleTask }
+    - { kind: task.started, task: /do/0/sampleTask }
+    - kind: task.created
+      task: /use/extensions/0/mockService/before/0/intercept
+      execution: "/do/0/sampleTask@before/0/0/intercept"
+    - kind: task.started
+      task: /use/extensions/0/mockService/before/0/intercept
+      execution: "/do/0/sampleTask@before/0/0/intercept"
+    - kind: task.completed
+      task: /use/extensions/0/mockService/before/0/intercept
+      execution: "/do/0/sampleTask@before/0/0/intercept"
+    - { kind: task.completed, task: /do/0/sampleTask }
+    - kind: workflow.completed

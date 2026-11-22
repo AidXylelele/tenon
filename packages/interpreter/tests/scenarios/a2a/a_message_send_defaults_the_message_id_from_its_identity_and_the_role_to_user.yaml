@@ -1,0 +1,56 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-send
+    version: '1.0.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: message/send
+          server: https://agent.example.com/a2a
+          parameters:
+            message:
+              parts:
+                - kind: text
+                  text: ${ .prompt }
+input: { prompt: Generate the Q1 sales report. }
+script:
+  - effect:
+      id: /do/0/askAgent
+      kind: a2a
+      deadline: null
+      method: message/send
+      agent:
+        {
+          kind: server,
+          endpoint:
+            { uri: https://agent.example.com/a2a, authentication: null },
+        }
+      parameters:
+        message:
+          parts: [{ kind: text, text: Generate the Q1 sales report. }]
+          messageId: 6a9aaff6-e581-50b1-97da-71c564c55c57
+          role: user
+    outcome:
+      {
+        kind: answered,
+        result: { kind: task, id: task-1, status: { state: completed } },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: { kind: task, id: task-1, status: { state: completed } }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/askAgent, execution: /do/0/askAgent }
+    - { kind: task.started, task: /do/0/askAgent, execution: /do/0/askAgent }
+    - {
+        kind: task.completed,
+        task: /do/0/askAgent,
+        execution: /do/0/askAgent,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

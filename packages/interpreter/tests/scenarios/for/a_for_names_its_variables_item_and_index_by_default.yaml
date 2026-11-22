@@ -1,0 +1,21 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-default-names
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [a, b]
+        do:
+          - collect:
+              set: '${ . + { seen: (.seen + [[$item, $index]]) } }'
+input: {}
+end:
+  completed:
+    output: { seen: [[a, 0], [b, 1]] }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/loop }
+    - kind: workflow.completed

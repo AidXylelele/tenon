@@ -1,0 +1,48 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-output-export
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.order.placed.v1
+              data: { order: o-1 }
+        output:
+          as: '${ { eventId: .id, eventType: .type } }'
+        export:
+          as: '${ { lastEvent: .eventId } }'
+    - report:
+        set: '${ { result: ., context: $context } }'
+input: {}
+script:
+  - effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: fda1d579-3f69-54e2-affe-94ef3ee98686
+        source: /test/emit-output-export/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        data: { order: o-1 }
+    outcome: { kind: emitted }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      result:
+        {
+          eventId: fda1d579-3f69-54e2-affe-94ef3ee98686,
+          eventType: com.example.order.placed.v1,
+        }
+      context: { lastEvent: fda1d579-3f69-54e2-affe-94ef3ee98686 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/notify }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

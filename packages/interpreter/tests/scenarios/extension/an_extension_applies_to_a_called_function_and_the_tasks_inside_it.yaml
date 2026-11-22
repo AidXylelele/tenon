@@ -1,0 +1,77 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-function
+    version: '1.0.0'
+  use:
+    functions:
+      greetAll:
+        do:
+          - greet:
+              set: { greeting: Hello }
+    extensions:
+      - audit:
+          extend: all
+          before:
+            - note:
+                set: { noted: true }
+  do:
+    - welcome:
+        call: greetAll
+input: {}
+end:
+  completed:
+    output: { greeting: Hello }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/welcome, execution: /do/0/welcome }
+    - { kind: task.started, task: /do/0/welcome, execution: /do/0/welcome }
+    - kind: task.created
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@before/0/0/note"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@before/0/0/note"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@before/0/0/note"
+    - kind: task.created
+      task: /use/functions/greetAll
+      execution: "/do/0/welcome@function"
+    - kind: task.started
+      task: /use/functions/greetAll
+      execution: "/do/0/welcome@function"
+    - kind: task.created
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@function@before/0/0/note"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@function@before/0/0/note"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@function@before/0/0/note"
+    - kind: task.created
+      task: /use/functions/greetAll/do/0/greet
+      execution: "/do/0/welcome@function/do/0/greet"
+    - kind: task.started
+      task: /use/functions/greetAll/do/0/greet
+      execution: "/do/0/welcome@function/do/0/greet"
+    - kind: task.created
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@function/do/0/greet@before/0/0/note"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@function/do/0/greet@before/0/0/note"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/welcome@function/do/0/greet@before/0/0/note"
+    - kind: task.completed
+      task: /use/functions/greetAll/do/0/greet
+      execution: "/do/0/welcome@function/do/0/greet"
+    - kind: task.completed
+      task: /use/functions/greetAll
+      execution: "/do/0/welcome@function"
+    - { kind: task.completed, task: /do/0/welcome, execution: /do/0/welcome }
+    - kind: workflow.completed

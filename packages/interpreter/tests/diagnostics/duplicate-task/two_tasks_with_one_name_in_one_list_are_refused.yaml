@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - check:
+        set:
+          a: 1
+    - check:
+        set:
+          b: 2
+diagnostics:
+  - code: duplicate-task
+    pointer: /do/1/check
+    subject: check
+    range: { start: { line: 11, column: 7 } }
+    message: "Task name 'check' is already used in this list."

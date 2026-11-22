@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-shell-directory
+    version: '1.0.0'
+  do:
+    - runShell:
+        run:
+          shell:
+            command: ls
+            directory: ${ .workdir }
+input: { workdir: /srv/app }
+end:
+  waiting:
+    effect:
+      id: /do/0/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: ls
+        stdin: null
+        arguments: []
+        directory: /srv/app
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runShell }

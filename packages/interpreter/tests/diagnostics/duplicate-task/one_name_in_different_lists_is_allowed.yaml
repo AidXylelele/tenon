@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - check:
+        do:
+          - check:
+              set:
+                a: 1
+diagnostics: []

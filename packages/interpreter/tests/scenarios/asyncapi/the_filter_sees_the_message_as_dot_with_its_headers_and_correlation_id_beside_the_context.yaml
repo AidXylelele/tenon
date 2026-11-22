@@ -1,0 +1,91 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-filter-context
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            filter: '${ .correlationId == $context.userId and .headers.kind == "chat" }'
+            consume:
+              amount: 1
+input: { userId: u-1 }
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          { payload: { text: a }, headers: { kind: chat }, correlationId: u-2 },
+      }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/watch@message[1]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 1,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { text: b },
+            headers: { kind: system },
+            correlationId: u-1,
+          },
+      }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/watch@message[2]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 2,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          { payload: { text: c }, headers: { kind: chat }, correlationId: u-1 },
+      }
+    now: 1767225603000
+end:
+  completed:
+    output:
+      - { payload: { text: c }, headers: { kind: chat }, correlationId: u-1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

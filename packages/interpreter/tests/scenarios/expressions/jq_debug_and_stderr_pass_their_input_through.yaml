@@ -1,0 +1,19 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: jq-debug
+    version: '1.0.0'
+  do:
+    - trace:
+        set:
+          debugged: '${ .x | debug }'
+          printed: '${ .x | stderr }'
+input: { x: 5 }
+end:
+  completed:
+    output: { debugged: 5, printed: 5 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

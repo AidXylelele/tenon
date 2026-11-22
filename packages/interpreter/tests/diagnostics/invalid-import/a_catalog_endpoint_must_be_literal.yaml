@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  use:
+    catalogs:
+      global:
+        endpoint: '${ .catalog }'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: invalid-import
+    pointer: /use/catalogs/global/endpoint
+    range: { start: { line: 9, column: 17 } }

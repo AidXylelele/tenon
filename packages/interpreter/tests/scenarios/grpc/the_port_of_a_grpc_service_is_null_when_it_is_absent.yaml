@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-no-port
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+          method: SayHello
+          arguments:
+            name: Ann
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/greet
+      kind: grpc
+      deadline: null
+      service:
+        { name: GreeterApi.Greeter, host: greeter.example.com, port: null }
+      method: SayHello
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }

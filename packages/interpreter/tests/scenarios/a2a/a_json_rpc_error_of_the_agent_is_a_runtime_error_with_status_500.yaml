@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-rpc-error
+    version: '1.0.0'
+  do:
+    - getTask:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agent.example.com/a2a
+          parameters:
+            id: task-1
+input: {}
+script:
+  - effect: { id: /do/0/getTask, kind: a2a, deadline: null }
+    outcome:
+      {
+        kind: rpcError,
+        code: -32001,
+        message: Task not found,
+        data: { id: task-1 },
+      }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+      status: 500
+      instance: /do/0/getTask
+      title: Runtime Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getTask, execution: /do/0/getTask }
+    - kind: workflow.faulted

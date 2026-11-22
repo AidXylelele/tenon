@@ -1,0 +1,20 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: loose-input-is-data
+    version: '1.0.0'
+  evaluate:
+    mode: loose
+  do:
+    - copy:
+        set:
+          formula: .formula
+input: { formula: .secret, secret: hidden }
+end:
+  completed:
+    output: { formula: .secret }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

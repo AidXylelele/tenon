@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  use:
+    timeouts:
+      patient:
+        after: '${ $input.wait }'
+  do:
+    - pause:
+        timeout: patient
+        wait: PT1S
+diagnostics:
+  - code: unknown-variable
+    pointer: /use/timeouts/patient/after
+    subject: $input
+    range: { start: { line: 9, column: 14 } }

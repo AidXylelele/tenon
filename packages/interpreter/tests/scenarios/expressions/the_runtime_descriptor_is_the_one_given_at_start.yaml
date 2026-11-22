@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: runtime-descriptor
+    version: '1.0.0'
+  do:
+    - describe:
+        set: '${ $runtime }'
+input: {}
+start:
+  runtime:
+    name: stand
+    version: 2.3.4-alpine
+    metadata: { tenant: { id: t-1 }, flags: [fastZip] }
+end:
+  completed:
+    output:
+      name: stand
+      version: 2.3.4-alpine
+      metadata: { tenant: { id: t-1 }, flags: [fastZip] }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

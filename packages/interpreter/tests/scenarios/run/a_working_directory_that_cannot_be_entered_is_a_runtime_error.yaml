@@ -1,0 +1,52 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-shell-bad-directory
+    version: '1.0.0'
+  do:
+    - runShell:
+        run:
+          shell:
+            command: ls
+            directory: /does/not/exist
+input: {}
+script:
+  - effect:
+      id: /do/0/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: ls
+        stdin: null
+        arguments: []
+        directory: /does/not/exist
+        environment: {}
+      await: true
+    outcome:
+      {
+        kind: unstarted,
+        detail: "chdir /does/not/exist: no such file or directory",
+      }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+      status: 500
+      instance: /do/0/runShell
+      title: Runtime Error
+      detail: "chdir /does/not/exist: no such file or directory"
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runShell }
+    - { kind: task.started, task: /do/0/runShell }
+    - {
+        kind: task.faulted,
+        task: /do/0/runShell,
+        execution: /do/0/runShell,
+        faultedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:01.000Z" }

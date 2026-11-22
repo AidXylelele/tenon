@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-names
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          each: color
+          at: position
+          in: .colors
+        do:
+          - collect:
+              set: '${ . + { pairs: (.pairs + [{ color: $color, position: $position }]) } }'
+input: { colors: [red, green] }
+end:
+  completed:
+    output:
+      colors: [red, green]
+      pairs: [{ color: red, position: 0 }, { color: green, position: 1 }]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/loop/do/0/collect,
+        execution: "/do/0/loop[0]/do/0/collect",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/loop/do/0/collect,
+        execution: "/do/0/loop[1]/do/0/collect",
+      }
+    - { kind: task.completed, task: /do/0/loop }
+    - kind: workflow.completed

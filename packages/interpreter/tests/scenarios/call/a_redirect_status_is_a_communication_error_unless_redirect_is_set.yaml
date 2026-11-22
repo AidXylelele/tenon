@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-redirect-refused
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/1
+input: {}
+script:
+  - effect: { id: /do/0/getPet, kind: http, deadline: null }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 300
+      headers: { location: https://petstore.example.com/pet/1 }
+      content: null
+      authorization: null
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 300
+      instance: /do/0/getPet
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

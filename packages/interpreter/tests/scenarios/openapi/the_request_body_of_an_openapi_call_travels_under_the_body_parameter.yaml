@@ -1,0 +1,43 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: openapi-body
+    version: '1.0.0'
+  do:
+    - addPet:
+        call: openapi
+        with:
+          document:
+            endpoint: https://petstore.example.com/openapi.json
+          operationId: addPet
+          parameters:
+            body:
+              name: ${ .name }
+              status: available
+input: { name: Milou }
+script:
+  - effect:
+      id: /do/0/addPet
+      kind: openapi
+      deadline: null
+      parameters:
+        body: { name: Milou, status: available }
+    outcome:
+      kind: responded
+      request:
+        method: POST
+        uri: https://petstore.example.com/v3/pet
+        headers: { content-type: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 1, name: Milou }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/addPet }
+    - kind: workflow.completed

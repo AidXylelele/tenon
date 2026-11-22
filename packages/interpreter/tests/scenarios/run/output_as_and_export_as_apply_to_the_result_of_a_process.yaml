@@ -1,0 +1,49 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-output-export
+    version: '1.0.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: hello-world
+          return: all
+        output:
+          as: '${ { code: .code, said: .stdout } }'
+        export:
+          as: '${ { lastCode: .code } }'
+    - report:
+        set: '${ { result: ., context: $context } }'
+input: {}
+script:
+  - effect:
+      id: /do/0/runContainer
+      kind: process
+      deadline: null
+      process:
+        kind: container
+        image: hello-world
+        command: null
+        stdin: null
+        arguments: []
+        name: null
+        ports: {}
+        volumes: {}
+        environment: {}
+        lifetime: { cleanup: never, after: null }
+        pullPolicy: ifNotPresent
+      await: true
+    outcome: { kind: exited, code: 0, stdout: hi, stderr: warn }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      result: { code: 0, said: hi }
+      context: { lastCode: 0 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/runContainer }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

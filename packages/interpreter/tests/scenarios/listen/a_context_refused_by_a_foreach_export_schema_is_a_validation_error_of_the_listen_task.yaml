@@ -1,0 +1,58 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-foreach-export-schema
+    version: '1.0.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until: '${ length == 2 }'
+        foreach:
+          export:
+            as: '${ { last: $item.n } }'
+            schema:
+              document:
+                type: object
+                properties:
+                  last: { type: string }
+    - never:
+        set: { reached: true }
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/readings@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 1 },
+        }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      instance: /do/0/readings
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/readings }
+    - { kind: task.started, task: /do/0/readings }
+    - { kind: task.faulted, task: /do/0/readings }
+    - kind: workflow.faulted

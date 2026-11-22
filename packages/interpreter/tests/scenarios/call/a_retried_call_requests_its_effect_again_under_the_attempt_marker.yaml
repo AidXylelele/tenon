@@ -1,0 +1,74 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-retry
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - getPet:
+              call: http
+              with:
+                method: get
+                endpoint: https://petstore.swagger.io/v2/pet/1
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+              status: 503
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect: { id: /do/0/guard/try/0/getPet, kind: http, deadline: null }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 503
+      headers: {}
+      content: null
+      authorization: null
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect: { id: "/do/0/guard#2/try/0/getPet", kind: http, deadline: null }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1 }
+      authorization: null
+    now: 1767225603000
+end:
+  completed:
+    output: { id: 1 }
+facts:
+  including:
+    - kind: task.faulted
+      task: /do/0/guard/try/0/getPet
+      execution: /do/0/guard/try/0/getPet
+    - { kind: task.retried, task: /do/0/guard, execution: /do/0/guard }
+    - kind: task.completed
+      task: /do/0/guard/try/0/getPet
+      execution: "/do/0/guard#2/try/0/getPet"
+    - { kind: task.completed, task: /do/0/guard, execution: /do/0/guard }
+    - kind: workflow.completed

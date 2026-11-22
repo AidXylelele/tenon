@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - greet:
+        run:
+          script:
+            language: python
+            code: print("hello")
+profile:
+  scriptLanguages: [js]
+diagnostics:
+  - code: capability
+    pointer: /do/0/greet
+    subject: script.python
+    range: { start: { line: 8, column: 7 } }

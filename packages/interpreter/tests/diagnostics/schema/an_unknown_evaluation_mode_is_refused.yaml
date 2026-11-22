@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: fast-mode
+    version: '0.1.0'
+  evaluate:
+    mode: fast
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: schema
+    pointer: /evaluate/mode
+    range: { start: { line: 7, column: 9 } }

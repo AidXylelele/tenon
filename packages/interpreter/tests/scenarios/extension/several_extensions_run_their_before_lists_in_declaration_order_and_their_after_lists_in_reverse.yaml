@@ -1,0 +1,79 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-order
+    version: '1.0.0'
+  use:
+    extensions:
+      - outer:
+          extend: wait
+          before:
+            - openOuter:
+                set: { step: open-outer }
+          after:
+            - closeOuter:
+                set: { step: close-outer }
+      - inner:
+          extend: wait
+          before:
+            - openInner:
+                set: { step: open-inner }
+          after:
+            - closeInner:
+                set: { step: close-inner }
+  do:
+    - pause:
+        wait: PT1S
+input: {}
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/pause }
+    - { kind: task.started, task: /do/0/pause }
+    - kind: task.created
+      task: /use/extensions/0/outer/before/0/openOuter
+      execution: "/do/0/pause@before/0/0/openOuter"
+    - kind: task.started
+      task: /use/extensions/0/outer/before/0/openOuter
+      execution: "/do/0/pause@before/0/0/openOuter"
+    - kind: task.completed
+      task: /use/extensions/0/outer/before/0/openOuter
+      execution: "/do/0/pause@before/0/0/openOuter"
+    - kind: task.created
+      task: /use/extensions/1/inner/before/0/openInner
+      execution: "/do/0/pause@before/1/0/openInner"
+    - kind: task.started
+      task: /use/extensions/1/inner/before/0/openInner
+      execution: "/do/0/pause@before/1/0/openInner"
+    - kind: task.completed
+      task: /use/extensions/1/inner/before/0/openInner
+      execution: "/do/0/pause@before/1/0/openInner"
+    - kind: task.created
+      task: /use/extensions/1/inner/after/0/closeInner
+      execution: "/do/0/pause@after/1/0/closeInner"
+    - kind: task.started
+      task: /use/extensions/1/inner/after/0/closeInner
+      execution: "/do/0/pause@after/1/0/closeInner"
+    - kind: task.completed
+      task: /use/extensions/1/inner/after/0/closeInner
+      execution: "/do/0/pause@after/1/0/closeInner"
+    - kind: task.created
+      task: /use/extensions/0/outer/after/0/closeOuter
+      execution: "/do/0/pause@after/0/0/closeOuter"
+    - kind: task.started
+      task: /use/extensions/0/outer/after/0/closeOuter
+      execution: "/do/0/pause@after/0/0/closeOuter"
+    - kind: task.completed
+      task: /use/extensions/0/outer/after/0/closeOuter
+      execution: "/do/0/pause@after/0/0/closeOuter"
+    - { kind: task.completed, task: /do/0/pause }
+    - kind: workflow.completed

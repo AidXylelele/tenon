@@ -1,0 +1,76 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-mock
+    version: '1.0.0'
+  use:
+    extensions:
+      - mockService:
+          extend: call
+          when: '$task.definition.call == "http" and (($task.definition.with.endpoint | if type == "object" then .uri else . end) | startswith("https://mocked.service.com"))'
+          before:
+            - mockResponse:
+                set:
+                  statusCode: 200
+                  headers:
+                    Content-Type: application/json
+                  content:
+                    foo:
+                      bar: baz
+                then: exit
+  do:
+    - mockedCall:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://mocked.service.com/sample
+    - realCall:
+        call: http
+        with:
+          method: get
+          endpoint: https://fake.com/sample
+        output:
+          as: '${ { mocked: $input, real: . } }'
+input: {}
+script:
+  - effect: { id: /do/1/realCall, kind: http, deadline: null, method: GET }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://fake.com/sample
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { real: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output:
+      mocked:
+        statusCode: 200
+        headers: { Content-Type: application/json }
+        content: { foo: { bar: baz } }
+      real: { real: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/mockedCall }
+    - { kind: task.started, task: /do/0/mockedCall }
+    - kind: task.created
+      task: /use/extensions/0/mockService/before/0/mockResponse
+      execution: "/do/0/mockedCall@before/0/0/mockResponse"
+    - kind: task.started
+      task: /use/extensions/0/mockService/before/0/mockResponse
+      execution: "/do/0/mockedCall@before/0/0/mockResponse"
+    - kind: task.completed
+      task: /use/extensions/0/mockService/before/0/mockResponse
+      execution: "/do/0/mockedCall@before/0/0/mockResponse"
+    - { kind: task.completed, task: /do/0/mockedCall }
+    - { kind: task.created, task: /do/1/realCall }
+    - { kind: task.started, task: /do/1/realCall }
+    - { kind: task.completed, task: /do/1/realCall }
+    - kind: workflow.completed

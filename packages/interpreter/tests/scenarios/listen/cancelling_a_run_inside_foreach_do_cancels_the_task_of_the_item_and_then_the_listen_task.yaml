@@ -1,0 +1,72 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-foreach-cancel
+    version: '1.0.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until: '${ length == 2 }'
+        foreach:
+          do:
+            - pause:
+                wait: PT1M
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/readings@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { value: a },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/readings[0]/foreach/do/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225661000,
+      }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/readings }
+    - { kind: task.started, task: /do/0/readings }
+    - {
+        kind: task.created,
+        task: "/do/0/readings/foreach/do/0/pause",
+        execution: "/do/0/readings[0]/foreach/do/0/pause",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/readings/foreach/do/0/pause",
+        execution: "/do/0/readings[0]/foreach/do/0/pause",
+      }
+    - {
+        kind: task.cancelled,
+        task: "/do/0/readings/foreach/do/0/pause",
+        execution: "/do/0/readings[0]/foreach/do/0/pause",
+      }
+    - { kind: task.cancelled, task: /do/0/readings, execution: /do/0/readings }
+    - kind: workflow.cancelled

@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  use:
+    retries:
+      onUnavailable:
+        when: '${ .status == }'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: expression
+    pointer: /use/retries/onUnavailable/when
+    range: { start: { line: 9, column: 13 } }

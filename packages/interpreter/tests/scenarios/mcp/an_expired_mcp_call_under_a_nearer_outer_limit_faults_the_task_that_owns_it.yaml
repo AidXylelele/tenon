@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-outer-limit
+    version: '1.0.0'
+  do:
+    - outer:
+        timeout:
+          after: PT5S
+        do:
+        - callTool:
+            call: mcp
+            with:
+              method: tools/list
+              timeout: PT30S
+              transport:
+                http:
+                  endpoint: https://mcp.example.com/mcp
+input: {}
+script:
+  - effect:
+      { id: /do/0/outer/do/0/callTool, kind: mcp, deadline: 1767225605000 }
+    outcome: { kind: expired }
+    now: 1767225605000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/outer
+      title: Timeout
+facts:
+  including:
+    - { kind: task.cancelled, task: /do/0/outer/do/0/callTool }
+    - { kind: task.faulted, task: /do/0/outer }
+    - kind: workflow.faulted

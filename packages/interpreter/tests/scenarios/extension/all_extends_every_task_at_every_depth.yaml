@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-all
+    version: '1.0.0'
+  use:
+    extensions:
+      - everything:
+          extend: all
+          before:
+            - note:
+                set: { noted: true }
+  do:
+    - outer:
+        do:
+          - inner:
+              set: { inner: true }
+input: {}
+end:
+  completed:
+    output: { inner: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - kind: task.created
+      task: /use/extensions/0/everything/before/0/note
+      execution: "/do/0/outer@before/0/0/note"
+    - kind: task.started
+      task: /use/extensions/0/everything/before/0/note
+      execution: "/do/0/outer@before/0/0/note"
+    - kind: task.completed
+      task: /use/extensions/0/everything/before/0/note
+      execution: "/do/0/outer@before/0/0/note"
+    - { kind: task.created, task: /do/0/outer/do/0/inner }
+    - { kind: task.started, task: /do/0/outer/do/0/inner }
+    - kind: task.created
+      task: /use/extensions/0/everything/before/0/note
+      execution: "/do/0/outer/do/0/inner@before/0/0/note"
+    - kind: task.started
+      task: /use/extensions/0/everything/before/0/note
+      execution: "/do/0/outer/do/0/inner@before/0/0/note"
+    - kind: task.completed
+      task: /use/extensions/0/everything/before/0/note
+      execution: "/do/0/outer/do/0/inner@before/0/0/note"
+    - { kind: task.completed, task: /do/0/outer/do/0/inner }
+    - { kind: task.completed, task: /do/0/outer }
+    - kind: workflow.completed

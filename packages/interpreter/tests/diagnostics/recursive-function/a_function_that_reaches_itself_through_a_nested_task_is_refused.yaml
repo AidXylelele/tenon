@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: functions
+    version: '0.1.0'
+  use:
+    functions:
+      loop:
+        do:
+          - again:
+              call: loop
+  do:
+    - start:
+        call: loop
+diagnostics:
+  - code: recursive-function
+    pointer: /use/functions/loop/do/0/again/call
+    subject: loop
+    range: { start: { line: 11, column: 19 } }

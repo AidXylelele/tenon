@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expressions
+    version: '0.1.0'
+  do:
+    - compute:
+        set:
+          a: '${ include "lib"; . }'
+diagnostics:
+  - code: expression
+    pointer: /do/0/compute/set/a
+    range: { start: { line: 9, column: 12 } }

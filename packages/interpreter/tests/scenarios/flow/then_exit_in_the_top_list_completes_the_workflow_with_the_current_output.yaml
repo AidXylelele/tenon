@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: then-exit-top
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        then: exit
+    - second:
+        set: { b: 2 }
+  output:
+    as: '${ { final: . } }'
+input: {}
+end:
+  completed:
+    output: { final: { a: 1 } }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/first }
+    - { kind: task.started, task: /do/0/first }
+    - { kind: task.completed, task: /do/0/first }
+    - kind: workflow.completed

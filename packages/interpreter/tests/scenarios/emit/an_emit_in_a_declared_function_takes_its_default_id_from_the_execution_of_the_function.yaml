@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-function
+    version: '1.0.0'
+  use:
+    functions:
+      notify:
+        emit:
+          event:
+            with:
+              type: com.example.order.placed.v1
+              data:
+                who: ${ .who }
+  do:
+    - announce:
+        call: notify
+        with:
+          who: Ann
+input: {}
+end:
+  waiting:
+    effect:
+      id: "/do/0/announce@function"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: cc1ed2fa-05e7-559c-a08c-887d93285f09
+        source: /test/emit-function/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        data: { who: Ann }
+facts:
+  including:
+    - {
+        kind: task.started,
+        task: /use/functions/notify,
+        execution: /do/0/announce@function,
+      }

@@ -1,0 +1,47 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-rpc-error-detail
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - callTool:
+              call: mcp
+              with:
+                method: tools/call
+                parameters:
+                  name: fetch
+                transport:
+                  http:
+                    endpoint: https://mcp.example.com/mcp
+        catch:
+          as: failure
+          do:
+            - report:
+                set: ${ $failure }
+input: {}
+script:
+  - effect: { id: /do/0/guard/try/0/callTool, kind: mcp, deadline: null }
+    outcome:
+      {
+        kind: rpcError,
+        code: -32602,
+        message: Unknown tool fetch,
+        data: { tools: [search] },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+      status: 500
+      instance: /do/0/guard/try/0/callTool
+      title: Runtime Error
+      detail: "JSON-RPC error -32602: Unknown tool fetch"
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/callTool }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

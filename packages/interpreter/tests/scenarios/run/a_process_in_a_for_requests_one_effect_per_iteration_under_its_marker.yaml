@@ -1,0 +1,64 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-for
+    version: '1.0.0'
+  do:
+    - each:
+        for:
+          in: ${ .words }
+        do:
+          - echo:
+              run:
+                shell:
+                  command: echo
+                  arguments:
+                    - ${ $item }
+input: { words: [one, two] }
+script:
+  - effect:
+      id: "/do/0/each[0]/do/0/echo"
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: echo
+        stdin: null
+        arguments: [one]
+        directory: null
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: "one\n", stderr: "" }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/each[1]/do/0/echo"
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: echo
+        stdin: null
+        arguments: [two]
+        directory: null
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: "two\n", stderr: "" }
+    now: 1767225602000
+end:
+  completed:
+    output: "two\n"
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/echo,
+        execution: "/do/0/each[0]/do/0/echo",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/echo,
+        execution: "/do/0/each[1]/do/0/echo",
+      }
+    - { kind: task.completed, task: /do/0/each, execution: /do/0/each }
+    - kind: workflow.completed

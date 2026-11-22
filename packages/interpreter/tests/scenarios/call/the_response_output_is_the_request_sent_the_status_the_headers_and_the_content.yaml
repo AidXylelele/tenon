@@ -1,0 +1,47 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-response-output
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/1
+          headers:
+            accept: application/json
+          output: response
+input: {}
+script:
+  - effect:
+      id: /do/0/getPet
+      kind: http
+      deadline: null
+      output: response
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json, idempotency-key: k-1 }
+      statusCode: 200
+      headers: { content-type: application/json, x-rate-limit: "10" }
+      content: { id: 1, name: Milou }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output:
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json, idempotency-key: k-1 }
+      statusCode: 200
+      headers: { content-type: application/json, x-rate-limit: "10" }
+      content: { id: 1, name: Milou }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - kind: workflow.completed

@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-zero-set
+    version: '1.0.0'
+  do:
+    - compute:
+        set:
+          a: 1
+        timeout:
+          after: PT0S
+    - never:
+        set:
+          b: 2
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/compute
+      title: Timeout
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/compute }
+    - { kind: task.started, task: /do/0/compute }
+    - { kind: task.faulted, task: /do/0/compute }
+    - kind: workflow.faulted

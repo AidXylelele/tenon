@@ -1,0 +1,47 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-function
+    version: '1.0.0'
+  use:
+    functions:
+      fetchPage:
+        call: mcp
+        with:
+          method: tools/call
+          parameters:
+            name: fetch
+            arguments:
+              url: ${ .url }
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+  do:
+    - callTool:
+        call: fetchPage
+        with:
+          url: https://example.com
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/callTool@function,
+        kind: mcp,
+        deadline: null,
+        parameters: { name: fetch, arguments: { url: https://example.com } },
+      }
+    outcome: { kind: answered, result: { content: [], isError: false } }
+    now: 1767225601000
+end:
+  completed:
+    output: { content: [], isError: false }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /use/functions/fetchPage,
+        execution: /do/0/callTool@function,
+      }
+    - { kind: task.completed, task: /do/0/callTool, execution: /do/0/callTool }
+    - kind: workflow.completed

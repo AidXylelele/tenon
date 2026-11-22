@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: truthiness
+    version: '1.0.0'
+  do:
+    - onNull:
+        if: '${ null }'
+        set: '${ . + { onNull: true } }'
+    - onFalse:
+        if: '${ false }'
+        set: '${ . + { onFalse: true } }'
+    - onZero:
+        if: '${ 0 }'
+        set: '${ . + { onZero: true } }'
+    - onEmptyString:
+        if: '${ "" }'
+        set: '${ . + { onEmptyString: true } }'
+    - onEmptyArray:
+        if: '${ [] }'
+        set: '${ . + { onEmptyArray: true } }'
+input: {}
+end:
+  completed:
+    output: { onZero: true, onEmptyString: true, onEmptyArray: true }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

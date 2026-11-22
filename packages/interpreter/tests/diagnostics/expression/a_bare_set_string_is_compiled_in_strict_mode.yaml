@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expressions
+    version: '0.1.0'
+  do:
+    - compute:
+        set: '.a |'
+diagnostics:
+  - code: expression
+    pointer: /do/0/compute/set
+    range: { start: { line: 8, column: 12 } }

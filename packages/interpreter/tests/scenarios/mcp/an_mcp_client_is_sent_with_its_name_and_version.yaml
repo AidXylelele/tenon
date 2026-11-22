@@ -1,0 +1,28 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-client
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          client:
+            name: synapse
+            version: '1.0.0-alpha5.2'
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/callTool
+      kind: mcp
+      deadline: null
+      client: { name: synapse, version: "1.0.0-alpha5.2" }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/callTool }

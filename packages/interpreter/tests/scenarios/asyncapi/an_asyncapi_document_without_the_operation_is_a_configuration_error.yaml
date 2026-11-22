@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-publish-failure
+    version: '1.0.0'
+  do:
+    - publishGreeting:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: greet
+          message:
+            payload:
+              greetings: ${ .greeting }
+input: { greeting: hello }
+script:
+  - effect: { id: /do/0/publishGreeting, kind: asyncapi, deadline: null }
+    outcome:
+      { kind: misconfigured, detail: the document has no operation greet }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/publishGreeting
+      title: Configuration Error
+facts:
+  including:
+    - {
+        kind: task.faulted,
+        task: /do/0/publishGreeting,
+        execution: /do/0/publishGreeting,
+      }
+    - kind: workflow.faulted

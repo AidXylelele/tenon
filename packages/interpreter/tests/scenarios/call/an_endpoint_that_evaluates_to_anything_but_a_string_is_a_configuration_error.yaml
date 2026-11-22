@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-endpoint-not-a-string
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: ${ .port }
+input: { port: 8080 }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/getPet
+      title: Configuration Error
+      detail: The endpoint 8080 is not a URI.
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

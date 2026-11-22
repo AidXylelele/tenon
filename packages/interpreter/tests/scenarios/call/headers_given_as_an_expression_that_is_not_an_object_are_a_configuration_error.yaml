@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-headers-not-an-object
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/1
+          headers: ${ .headers }
+input: { headers: [a, b] }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/getPet
+      title: Configuration Error
+      detail: '["a","b"] is not a map of names to values.'
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

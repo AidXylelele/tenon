@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    cron: '0 * * * *'
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+  do:
+    - keep:
+        set:
+          input: ${ . }
+input: null
+end:
+  completed:
+    output: { input: null }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/keep }
+    - { kind: task.started, task: /do/0/keep }
+    - { kind: task.completed, task: /do/0/keep }
+    - kind: workflow.completed

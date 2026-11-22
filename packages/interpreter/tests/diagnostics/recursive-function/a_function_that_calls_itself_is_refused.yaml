@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: functions
+    version: '0.1.0'
+  use:
+    functions:
+      countdown:
+        call: countdown
+  do:
+    - start:
+        call: countdown
+diagnostics:
+  - code: recursive-function
+    pointer: /use/functions/countdown/call
+    subject: countdown
+    range: { start: { line: 9, column: 13 } }
+    message: "Function 'countdown' reaches itself."

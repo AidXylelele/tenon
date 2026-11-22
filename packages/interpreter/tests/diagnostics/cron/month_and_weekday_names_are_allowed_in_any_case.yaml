@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cron
+    version: '0.1.0'
+  schedule:
+    cron: '30 6 * jan-MAR Mon,wed,FRI'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics: []

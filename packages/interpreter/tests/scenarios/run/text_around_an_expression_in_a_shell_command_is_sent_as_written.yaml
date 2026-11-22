@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-shell-text
+    version: '1.0.0'
+  do:
+    - runShell:
+        run:
+          shell:
+            command: 'echo "Hello, ${ .user.name }"'
+input: { user: { name: Ann } }
+end:
+  waiting:
+    effect:
+      id: /do/0/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: 'echo "Hello, ${ .user.name }"'
+        stdin: null
+        arguments: []
+        directory: null
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runShell }

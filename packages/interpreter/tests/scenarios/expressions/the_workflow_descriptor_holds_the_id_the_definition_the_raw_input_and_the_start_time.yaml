@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: workflow-descriptor
+    version: '1.0.0'
+  input:
+    from: '${ { b: .a } }'
+  do:
+    - describe:
+        set:
+          id: '${ $workflow.id }'
+          input: '${ $workflow.input }'
+          document: '${ $workflow.definition.document }'
+          tasks: '${ $workflow.definition.do | map(keys[0]) }'
+          epoch: '${ $workflow.startedAt.epoch }'
+          startedOn: '${ $workflow.startedAt.iso8601[0:19] }'
+input: { a: 1 }
+start:
+  instanceId: run-7
+  now: 1767225600123
+end:
+  completed:
+    output:
+      id: run-7
+      input: { a: 1 }
+      document:
+        {
+          dsl: "1.1.0",
+          namespace: test,
+          name: workflow-descriptor,
+          version: "1.0.0",
+        }
+      tasks: [describe]
+      epoch: { seconds: 1767225600, milliseconds: 1767225600123 }
+      startedOn: "2026-01-01T00:00:00"
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

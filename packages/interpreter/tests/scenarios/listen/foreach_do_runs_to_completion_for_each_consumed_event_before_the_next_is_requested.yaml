@@ -1,0 +1,148 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-foreach
+    version: '1.0.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until: '${ length == 2 }'
+        foreach:
+          do:
+            - record:
+                call: http
+                with:
+                  method: post
+                  endpoint: https://audit.example.com/readings
+                  body:
+                    value: ${ $item.value }
+                    at: ${ $index }
+          output:
+            as: ${ $item.value }
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/readings@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { value: a },
+        }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/readings[0]/foreach/do/0/record"
+      kind: http
+      deadline: null
+      method: POST
+      endpoint:
+        { uri: https://audit.example.com/readings, authentication: null }
+      body: { value: a, at: 0 }
+    outcome:
+      kind: responded
+      request:
+        { method: POST, uri: https://audit.example.com/readings, headers: {} }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/readings@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-2,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { value: b },
+        }
+    now: 1767225603000
+  - effect:
+      id: "/do/0/readings[1]/foreach/do/0/record"
+      kind: http
+      deadline: null
+      method: POST
+      endpoint:
+        { uri: https://audit.example.com/readings, authentication: null }
+      body: { value: b, at: 1 }
+    outcome:
+      kind: responded
+      request:
+        { method: POST, uri: https://audit.example.com/readings, headers: {} }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225604000
+end:
+  completed:
+    output: [a, b]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/readings, execution: /do/0/readings }
+    - { kind: task.started, task: /do/0/readings, execution: /do/0/readings }
+    - {
+        kind: task.created,
+        task: "/do/0/readings/foreach/do/0/record",
+        execution: "/do/0/readings[0]/foreach/do/0/record",
+        createdAt: "2026-01-01T00:00:01.000Z",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/readings/foreach/do/0/record",
+        execution: "/do/0/readings[0]/foreach/do/0/record",
+      }
+    - {
+        kind: task.completed,
+        task: "/do/0/readings/foreach/do/0/record",
+        execution: "/do/0/readings[0]/foreach/do/0/record",
+        completedAt: "2026-01-01T00:00:02.000Z",
+      }
+    - {
+        kind: task.created,
+        task: "/do/0/readings/foreach/do/0/record",
+        execution: "/do/0/readings[1]/foreach/do/0/record",
+        createdAt: "2026-01-01T00:00:03.000Z",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/readings/foreach/do/0/record",
+        execution: "/do/0/readings[1]/foreach/do/0/record",
+      }
+    - {
+        kind: task.completed,
+        task: "/do/0/readings/foreach/do/0/record",
+        execution: "/do/0/readings[1]/foreach/do/0/record",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/readings,
+        execution: /do/0/readings,
+        completedAt: "2026-01-01T00:00:04.000Z",
+      }
+    - kind: workflow.completed

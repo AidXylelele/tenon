@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-detail
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 503
+                  title: Broken
+                  detail: Nothing works
+        catch:
+          errors:
+            with:
+              detail: Nothing works
+input: { a: 1 }
+end:
+  completed:
+    output: { a: 1 }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

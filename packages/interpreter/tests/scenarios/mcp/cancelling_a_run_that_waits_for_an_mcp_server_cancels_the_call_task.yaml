@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-cancel
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+input: {}
+script:
+  - effect:
+      { id: /do/0/callTool, kind: mcp, deadline: null, method: tools/list }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/callTool }
+    - { kind: task.started, task: /do/0/callTool }
+    - {
+        kind: task.cancelled,
+        task: /do/0/callTool,
+        execution: /do/0/callTool,
+        cancelledAt: "2026-01-01T00:00:05.000Z",
+      }
+    - kind: workflow.cancelled

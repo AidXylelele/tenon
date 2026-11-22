@@ -1,0 +1,53 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cancel-nested
+    version: '1.0.0'
+  do:
+    - outer:
+        do:
+          - middle:
+              do:
+                - pause:
+                    wait: PT1M
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/outer/do/0/middle/do/0/pause,
+        kind: timer,
+        deadline: null,
+        until: 1767225660000,
+      }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/do/0/middle }
+    - { kind: task.started, task: /do/0/outer/do/0/middle }
+    - { kind: task.created, task: /do/0/outer/do/0/middle/do/0/pause }
+    - { kind: task.started, task: /do/0/outer/do/0/middle/do/0/pause }
+    - kind: task.cancelled
+      workflow: cancel-nested-instance-1.test
+      task: /do/0/outer/do/0/middle/do/0/pause
+      execution: /do/0/outer/do/0/middle/do/0/pause
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: task.cancelled
+      workflow: cancel-nested-instance-1.test
+      task: /do/0/outer/do/0/middle
+      execution: /do/0/outer/do/0/middle
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: task.cancelled
+      workflow: cancel-nested-instance-1.test
+      task: /do/0/outer
+      execution: /do/0/outer
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: workflow.cancelled
+      name: cancel-nested-instance-1.test
+      cancelledAt: "2026-01-01T00:00:05.000Z"

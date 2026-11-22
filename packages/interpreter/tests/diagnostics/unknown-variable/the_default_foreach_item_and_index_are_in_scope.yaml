@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+        foreach:
+          do:
+            - keep:
+                set:
+                  value: '${ $item.data }'
+                  position: '${ $index }'
+diagnostics: []

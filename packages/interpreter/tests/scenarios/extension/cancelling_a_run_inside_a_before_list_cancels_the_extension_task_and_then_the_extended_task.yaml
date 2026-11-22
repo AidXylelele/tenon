@@ -1,0 +1,47 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-cancel
+    version: '1.0.0'
+  use:
+    extensions:
+      - pauses:
+          extend: set
+          before:
+            - hold:
+                wait: PT1M
+  do:
+    - greet:
+        set: { greeting: Hello }
+input: {}
+script:
+  - effect:
+      id: "/do/0/greet@before/0/0/hold"
+      kind: timer
+      deadline: null
+      until: 1767225660000
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/pauses/before/0/hold
+      execution: "/do/0/greet@before/0/0/hold"
+    - kind: task.started
+      task: /use/extensions/0/pauses/before/0/hold
+      execution: "/do/0/greet@before/0/0/hold"
+    - kind: task.cancelled
+      task: /use/extensions/0/pauses/before/0/hold
+      execution: "/do/0/greet@before/0/0/hold"
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: task.cancelled
+      task: /do/0/greet
+      execution: /do/0/greet
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: workflow.cancelled

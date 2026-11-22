@@ -1,0 +1,48 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-output-as-reads-input
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 1
+            foreach:
+              output:
+                as: '${ { text: $item.payload.text, room: $input.room, raw: $task.input.room } }'
+input: { room: general }
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      - { text: a, room: general, raw: general }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

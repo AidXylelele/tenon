@@ -1,0 +1,88 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-to-any
+    version: '0.1.0'
+  do:
+    - callDoctor:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.fake-hospital.vitals.measurements.temperature
+                  data: ${ .temperature > 38 }
+              - with:
+                  type: com.fake-hospital.vitals.measurements.bpm
+                  data: ${ .bpm < 60 or .bpm > 100 }
+            until:
+              one:
+                with:
+                  type: com.fake-hospital.patient.checked-out
+input: {}
+script:
+  - effect:
+      id: "/do/0/callDoctor@event[0]"
+      kind: listen
+      deadline: null
+      subscription: /do/0/callDoctor
+      position: 0
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: t-1,
+          source: https://fake-hospital.com,
+          type: com.fake-hospital.vitals.measurements.temperature,
+          data: { temperature: 39 },
+        }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/callDoctor@event[1]"
+      kind: listen
+      deadline: null
+      subscription: /do/0/callDoctor
+      position: 1
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: b-1,
+          source: https://fake-hospital.com,
+          type: com.fake-hospital.vitals.measurements.bpm,
+          data: { bpm: 50 },
+        }
+    now: 1767225602000
+  - effect:
+      id: "/do/0/callDoctor@event[2]"
+      kind: listen
+      deadline: null
+      subscription: /do/0/callDoctor
+      position: 2
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: c-1,
+          source: https://fake-hospital.com,
+          type: com.fake-hospital.patient.checked-out,
+          data: { patient: p-1 },
+        }
+    now: 1767225603000
+end:
+  completed:
+    output: [{ temperature: 39 }, { bpm: 50 }]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/callDoctor }
+    - { kind: task.started, task: /do/0/callDoctor }
+    - {
+        kind: task.completed,
+        task: /do/0/callDoctor,
+        completedAt: "2026-01-01T00:00:03.000Z",
+      }
+    - kind: workflow.completed

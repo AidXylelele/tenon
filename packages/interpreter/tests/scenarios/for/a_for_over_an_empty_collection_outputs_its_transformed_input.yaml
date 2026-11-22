@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-empty
+    version: '1.0.0'
+  do:
+    - loop:
+        input:
+          from: '${ { items: .items, kept: true } }'
+        for:
+          in: .items
+        do:
+          - never:
+              set: { never: true }
+input: { items: [], noise: 1 }
+end:
+  completed:
+    output: { items: [], kept: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/loop }
+    - { kind: task.started, task: /do/0/loop }
+    - { kind: task.completed, task: /do/0/loop }
+    - kind: workflow.completed

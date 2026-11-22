@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-pattern-open
+    version: '1.0.0'
+  do:
+    - hot:
+        listen:
+          to:
+            one:
+              with:
+                data: '${ .temperature > 38 }'
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: "/do/0/hot@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/hot,
+        position: 0,
+      }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/hot }

@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-no-parameters
+    version: '1.0.0'
+  do:
+    - listTasks:
+        call: a2a
+        with:
+          method: tasks/list
+          server: https://agent.example.com/a2a
+input: { ignored: true }
+end:
+  waiting:
+    effect:
+      id: /do/0/listTasks
+      kind: a2a
+      deadline: null
+      method: tasks/list
+      parameters: null
+facts:
+  including:
+    - { kind: task.started, task: /do/0/listTasks }

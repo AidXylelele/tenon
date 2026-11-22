@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: openapi-document-rejected
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: openapi
+        with:
+          document:
+            endpoint: https://petstore.example.com/missing.json
+          operationId: getPetById
+input: {}
+script:
+  - effect: { id: /do/0/getPet, kind: openapi, deadline: null }
+    outcome:
+      kind: rejected
+      statusCode: 404
+      detail: the document answered 404
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 404
+      instance: /do/0/getPet
+      title: Communication Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

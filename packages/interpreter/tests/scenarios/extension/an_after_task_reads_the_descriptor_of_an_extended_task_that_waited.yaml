@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-after-descriptor
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: wait
+          after:
+            - record:
+                set:
+                  input: '${ $task.input }'
+                  output: '${ $task.output }'
+                export:
+                  as: '${ { recorded: . } }'
+  do:
+    - pause:
+        wait: PT1S
+  output:
+    as: '${ $context }'
+input: { room: 12 }
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: { recorded: { input: { room: 12 }, output: { room: 12 } } }
+facts:
+  including:
+    - kind: task.completed
+      task: /use/extensions/0/audit/after/0/record
+      execution: "/do/0/pause@after/0/0/record"
+    - { kind: task.completed, task: /do/0/pause }

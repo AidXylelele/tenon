@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://catalog.example.com
+  do:
+    - log:
+        call: log:1.0.0@global
+imports:
+  log:1.0.0@global: |
+    call: log:1.0.0@global
+diagnostics:
+  - code: recursive-function
+    pointer: /do/0/log
+    subject: log:1.0.0@global
+    range: { start: { line: 12, column: 7 } }

@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-source
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: js
+            source:
+              endpoint: https://scripts.example.com/greet.js
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: js
+        code: null
+        source:
+          {
+            name: null,
+            endpoint:
+              {
+                uri: https://scripts.example.com/greet.js,
+                authentication: null,
+              },
+          }
+        stdin: null
+        arguments: {}
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runScript }

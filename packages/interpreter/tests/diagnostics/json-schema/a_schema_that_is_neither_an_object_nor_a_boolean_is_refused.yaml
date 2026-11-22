@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schemas
+    version: '0.1.0'
+  do:
+    - compute:
+        set:
+          a: 1
+        output:
+          schema:
+            document: 5
+diagnostics:
+  - code: json-schema
+    pointer: /do/0/compute/output/schema/document
+    range: { start: { line: 12, column: 21 } }

@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-workflow-cancel
+    version: '1.0.0'
+  do:
+    - runChild:
+        run:
+          workflow:
+            namespace: billing
+            name: charge
+            version: '1.0.0'
+            input: {}
+input: {}
+script:
+  - effect:
+      id: /do/0/runChild
+      kind: workflow
+      deadline: null
+      namespace: billing
+      name: charge
+      version: "1.0.0"
+      input: {}
+      await: true
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runChild }
+    - { kind: task.started, task: /do/0/runChild }
+    - {
+        kind: task.cancelled,
+        task: /do/0/runChild,
+        execution: /do/0/runChild,
+        cancelledAt: "2026-01-01T00:00:05.000Z",
+      }
+    - kind: workflow.cancelled

@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-cancel
+    version: '1.0.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.order.placed
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/waitForOrder@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/waitForOrder,
+        position: 0,
+      }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/waitForOrder }
+    - { kind: task.started, task: /do/0/waitForOrder }
+    - {
+        kind: task.cancelled,
+        task: /do/0/waitForOrder,
+        execution: /do/0/waitForOrder,
+        cancelledAt: "2026-01-01T00:00:05.000Z",
+      }
+    - { kind: workflow.cancelled, cancelledAt: "2026-01-01T00:00:05.000Z" }

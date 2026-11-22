@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-container-image-number
+    version: '1.0.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: ${ .image }
+input: { image: 42 }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/runContainer
+      title: Configuration Error
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runContainer }
+    - { kind: task.started, task: /do/0/runContainer }
+    - {
+        kind: task.faulted,
+        task: /do/0/runContainer,
+        execution: /do/0/runContainer,
+        faultedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:00.000Z" }

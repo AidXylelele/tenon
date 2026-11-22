@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-send-text-message
+    version: '1.0.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: message/stream
+          server: https://agent.example.com/a2a
+          parameters:
+            message: ${ .prompt }
+input: { prompt: hello }
+end:
+  waiting:
+    effect:
+      id: /do/0/askAgent
+      kind: a2a
+      deadline: null
+      method: message/stream
+      parameters: { message: hello }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/askAgent }

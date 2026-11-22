@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  do:
+    - attempt:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/failed
+                  status: 503
+        catch:
+          retry: fast
+diagnostics:
+  - code: undeclared-component
+    pointer: /do/0/attempt/catch/retry
+    subject: fast
+    range: { start: { line: 15, column: 16 } }
+    message: "Retry policy 'fast' is not declared in use.retries."

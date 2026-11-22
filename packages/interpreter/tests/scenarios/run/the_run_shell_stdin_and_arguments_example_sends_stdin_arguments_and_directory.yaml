@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: run-shell-with-stdin-and-arguments
+    version: 1.0.0
+  do:
+    - setInput:
+        set:
+          message: Hello World
+    - runShell:
+        input:
+          from: ${ .message }
+        run:
+          shell:
+            stdin: ${ . }
+            command: |
+              input=$(cat)
+              echo "STDIN was: $input"
+              echo "ARGS are $1 $2"
+            arguments:
+              - Foo
+              - Bar
+            directory: /tmp
+input: {}
+script:
+  - effect:
+      id: /do/1/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: "input=$(cat)\necho \"STDIN was: $input\"\necho \"ARGS are $1 $2\"\n"
+        stdin: Hello World
+        arguments: [Foo, Bar]
+        directory: /tmp
+        environment: {}
+      await: true
+    outcome:
+      {
+        kind: exited,
+        code: 0,
+        stdout: "STDIN was: Hello World\nARGS are Foo Bar\n",
+        stderr: "",
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: "STDIN was: Hello World\nARGS are Foo Bar\n"
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/setInput }
+    - { kind: task.completed, task: /do/1/runShell }
+    - kind: workflow.completed

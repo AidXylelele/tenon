@@ -1,0 +1,23 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: if-fails
+    version: '1.0.0'
+  do:
+    - guarded:
+        if: '${ error("boom") }'
+        set: { ran: true }
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      instance: /do/0/guarded
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guarded }
+    - { kind: task.faulted, task: /do/0/guarded }
+    - kind: workflow.faulted

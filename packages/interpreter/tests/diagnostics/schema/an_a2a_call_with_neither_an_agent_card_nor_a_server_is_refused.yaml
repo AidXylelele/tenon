@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-no-agent
+    version: '0.1.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: message/send
+          parameters:
+            message:
+              parts:
+                - kind: text
+                  text: hello
+diagnostics:
+  - code: schema
+    pointer: /do/0/askAgent/with

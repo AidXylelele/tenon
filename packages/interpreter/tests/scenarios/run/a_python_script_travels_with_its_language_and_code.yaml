@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-python
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: python
+            code: print("hello")
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: python
+        code: 'print("hello")'
+        source: null
+        stdin: null
+        arguments: {}
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runScript }

@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+  do:
+    - greet:
+        set:
+          message: hello
+profile:
+  schedules: [every, cron, after]
+diagnostics:
+  - code: capability
+    pointer: /schedule/on
+    subject: schedule.on
+    range: { start: { line: 8, column: 5 } }

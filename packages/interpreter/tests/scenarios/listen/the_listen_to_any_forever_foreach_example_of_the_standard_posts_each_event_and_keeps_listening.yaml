@@ -1,0 +1,114 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-to-any-while-foreach
+    version: '0.1.0'
+  do:
+    - listenToGossips:
+        listen:
+          to:
+            any: []
+            until: '${ false }'
+        foreach:
+          item: event
+          at: i
+          do:
+            - postToChatApi:
+                call: http
+                with:
+                  method: post
+                  endpoint: https://fake-chat-api.com/room/{roomId}
+                  body:
+                    event: ${ $event }
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/listenToGossips@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/listenToGossips,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: g-1,
+          source: https://gossip.example.com,
+          type: com.example.gossip,
+          data: { roomId: r-1, text: hi },
+        }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/listenToGossips[0]/foreach/do/0/postToChatApi"
+      kind: http
+      deadline: null
+      method: POST
+      endpoint:
+        { uri: "https://fake-chat-api.com/room/r-1", authentication: null }
+      body: { event: { roomId: r-1, text: hi } }
+    outcome:
+      kind: responded
+      request:
+        { method: POST, uri: "https://fake-chat-api.com/room/r-1", headers: {} }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { posted: true }
+      authorization: null
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/listenToGossips@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/listenToGossips,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: g-2,
+          source: https://gossip.example.com,
+          type: com.example.rumour,
+          data: { roomId: r-2, text: psst },
+        }
+    now: 1767225603000
+  - effect:
+      id: "/do/0/listenToGossips[1]/foreach/do/0/postToChatApi"
+      kind: http
+      deadline: null
+      method: POST
+      endpoint:
+        { uri: "https://fake-chat-api.com/room/r-2", authentication: null }
+      body: { event: { roomId: r-2, text: psst } }
+    outcome:
+      kind: responded
+      request:
+        { method: POST, uri: "https://fake-chat-api.com/room/r-2", headers: {} }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { posted: true }
+      authorization: null
+    now: 1767225604000
+end:
+  waiting:
+    effect:
+      {
+        id: "/do/0/listenToGossips@event[2]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/listenToGossips,
+        position: 2,
+      }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/listenToGossips/foreach/do/0/postToChatApi,
+        execution: "/do/0/listenToGossips[1]/foreach/do/0/postToChatApi",
+      }

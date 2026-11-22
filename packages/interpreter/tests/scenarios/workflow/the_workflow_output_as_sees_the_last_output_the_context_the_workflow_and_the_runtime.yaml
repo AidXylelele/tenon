@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: workflow-output-arguments
+    version: '1.0.0'
+  do:
+    - produce:
+        set: { b: 2 }
+        export:
+          as: '${ { exported: true } }'
+  output:
+    as: '${ { result: ., context: $context, workflow: $workflow.id, runtime: $runtime.name } }'
+input: { a: 1 }
+end:
+  completed:
+    output:
+      result: { b: 2 }
+      context: { exported: true }
+      workflow: instance-1
+      runtime: interpreter-tests
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

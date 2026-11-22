@@ -1,0 +1,60 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-for
+    version: '1.0.0'
+  do:
+    - each:
+        for:
+          in: [first, second]
+        do:
+          - askAgent:
+              call: a2a
+              with:
+                method: message/send
+                server: https://agent.example.com/a2a
+                parameters:
+                  message:
+                    parts:
+                      - kind: text
+                        text: ${ $item }
+input: {}
+script:
+  - effect:
+      id: "/do/0/each[0]/do/0/askAgent"
+      kind: a2a
+      deadline: null
+      parameters:
+        message:
+          {
+            parts: [{ kind: text, text: first }],
+            messageId: 689572e5-a3d9-5393-b80c-137c2339cf42,
+            role: user,
+          }
+    outcome: { kind: answered, result: { n: 1 } }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/each[1]/do/0/askAgent"
+      kind: a2a
+      deadline: null
+      parameters:
+        message:
+          {
+            parts: [{ kind: text, text: second }],
+            messageId: 836ff1a3-af13-5f3f-ae50-ad0f413b243f,
+            role: user,
+          }
+    outcome: { kind: answered, result: { n: 2 } }
+    now: 1767225602000
+end:
+  completed:
+    output: { n: 2 }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/askAgent,
+        execution: "/do/0/each[1]/do/0/askAgent",
+      }
+    - kind: workflow.completed

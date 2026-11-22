@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-output-export
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+        output:
+          as: '${ .tools | map(.name) }'
+        export:
+          as: '${ { toolNames: . } }'
+    - report:
+        set: '${ { names: ., context: $context } }'
+input: {}
+script:
+  - effect: { id: /do/0/callTool, kind: mcp, deadline: null }
+    outcome:
+      { kind: answered, result: { tools: [{ name: fetch }, { name: search }] } }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      names: [fetch, search]
+      context: { toolNames: [fetch, search] }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/callTool }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

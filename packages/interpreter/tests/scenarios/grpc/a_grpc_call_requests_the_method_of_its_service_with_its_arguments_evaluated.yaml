@@ -1,0 +1,67 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-request
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: SayHello
+          arguments:
+            name: ${ .user.name }
+            times: 2
+input: { user: { name: Ann } }
+script:
+  - effect:
+      id: /do/0/greet
+      kind: grpc
+      deadline: null
+      proto:
+        {
+          name: null,
+          endpoint:
+            {
+              uri: https://example.com/protos/greet.proto,
+              authentication: null,
+            },
+        }
+      service:
+        { name: GreeterApi.Greeter, host: greeter.example.com, port: 5011 }
+      method: SayHello
+      arguments: { name: Ann, times: 2 }
+      authentication: null
+    outcome: { kind: replied, message: { message: "Hello, Ann" } }
+    now: 1767225601000
+end:
+  completed:
+    output: { message: "Hello, Ann" }
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/greet,
+        execution: /do/0/greet,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.started,
+        task: /do/0/greet,
+        execution: /do/0/greet,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/greet,
+        execution: /do/0/greet,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.completed, completedAt: "2026-01-01T00:00:01.000Z" }

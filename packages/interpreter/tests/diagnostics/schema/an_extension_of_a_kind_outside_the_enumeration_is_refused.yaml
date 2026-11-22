@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-kind
+    version: '0.1.0'
+  use:
+    extensions:
+      - forks:
+          extend: fork
+          before:
+            - note:
+                set: { noted: true }
+  do:
+    - greet:
+        set: { greeting: Hello }
+diagnostics:
+  - code: schema
+    pointer: /use/extensions/0/forks/extend

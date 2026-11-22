@@ -1,0 +1,64 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-wait-facts
+    version: '1.0.0'
+  do:
+    - each:
+        for:
+          in: [a]
+        do:
+          - pause:
+              wait: PT1S
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/each[0]/do/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/each,
+        execution: /do/0/each,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.started,
+        task: /do/0/each,
+        execution: /do/0/each,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.created,
+        task: /do/0/each/do/0/pause,
+        execution: "/do/0/each[0]/do/0/pause",
+      }
+    - {
+        kind: task.started,
+        task: /do/0/each/do/0/pause,
+        execution: "/do/0/each[0]/do/0/pause",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/pause,
+        execution: "/do/0/each[0]/do/0/pause",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/each,
+        execution: /do/0/each,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

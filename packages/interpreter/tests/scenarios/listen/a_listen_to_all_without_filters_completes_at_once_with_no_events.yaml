@@ -1,0 +1,22 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-all-empty
+    version: '1.0.0'
+  do:
+    - admit:
+        listen:
+          to:
+            all: []
+input: {}
+end:
+  completed:
+    output: []
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/admit }
+    - { kind: task.started, task: /do/0/admit }
+    - { kind: task.completed, task: /do/0/admit }
+    - kind: workflow.completed

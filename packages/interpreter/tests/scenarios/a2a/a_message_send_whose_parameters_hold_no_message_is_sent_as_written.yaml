@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-send-without-message
+    version: '1.0.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: message/send
+          server: https://agent.example.com/a2a
+          parameters:
+            configuration:
+              blocking: true
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/askAgent
+      kind: a2a
+      deadline: null
+      method: message/send
+      parameters: { configuration: { blocking: true } }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/askAgent }

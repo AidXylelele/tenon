@@ -1,0 +1,30 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - pause:
+        wait: PT1S
+profile:
+  effects:
+    [
+      http,
+      openapi,
+      grpc,
+      asyncapi,
+      a2a,
+      mcp,
+      process,
+      workflow,
+      fork,
+      emit,
+      listen,
+      resource,
+    ]
+diagnostics:
+  - code: capability
+    pointer: /do/0/pause
+    subject: effect.timer
+    range: { start: { line: 8, column: 7 } }

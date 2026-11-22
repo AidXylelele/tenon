@@ -1,0 +1,80 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-foreach-do-output
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+            foreach:
+              do:
+                - keep:
+                    set:
+                      text: ${ $item.payload.text }
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          { payload: { text: a, extra: 1 }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/watch@message[1]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 1,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          { payload: { text: b, extra: 2 }, headers: {}, correlationId: null },
+      }
+    now: 1767225602000
+end:
+  completed:
+    output: [{ text: a }, { text: b }]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: "/do/0/watch/with/subscription/foreach/do/0/keep",
+        execution: "/do/0/watch[0]/with/subscription/foreach/do/0/keep",
+      }
+    - {
+        kind: task.completed,
+        task: "/do/0/watch/with/subscription/foreach/do/0/keep",
+        execution: "/do/0/watch[1]/with/subscription/foreach/do/0/keep",
+      }
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

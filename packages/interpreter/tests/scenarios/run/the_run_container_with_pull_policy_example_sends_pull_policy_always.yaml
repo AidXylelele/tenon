@@ -1,0 +1,56 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-container-with-pull-policy
+    version: '0.1.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: hello-world
+            pullPolicy: always
+input: {}
+script:
+  - effect:
+      id: /do/0/runContainer
+      kind: process
+      deadline: null
+      process:
+        kind: container
+        image: hello-world
+        command: null
+        stdin: null
+        arguments: []
+        name: null
+        ports: {}
+        volumes: {}
+        environment: {}
+        lifetime: { cleanup: never, after: null }
+        pullPolicy: always
+      await: true
+    outcome: { kind: exited, code: 0, stdout: hi, stderr: "" }
+    now: 1767225601000
+end:
+  completed:
+    output: hi
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/runContainer,
+        execution: /do/0/runContainer,
+      }
+    - {
+        kind: task.started,
+        task: /do/0/runContainer,
+        execution: /do/0/runContainer,
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/runContainer,
+        execution: /do/0/runContainer,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

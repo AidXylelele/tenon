@@ -1,0 +1,26 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  do:
+    - first:
+        call: toString
+    - second:
+        call: constructor
+    - third:
+        call: __proto__
+diagnostics:
+  - code: undeclared-component
+    pointer: /do/0/first/call
+    subject: toString
+    range: { start: { line: 8, column: 13 } }
+  - code: undeclared-component
+    pointer: /do/1/second/call
+    subject: constructor
+    range: { start: { line: 10, column: 13 } }
+  - code: undeclared-component
+    pointer: /do/2/third/call
+    subject: __proto__
+    range: { start: { line: 12, column: 13 } }

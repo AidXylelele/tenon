@@ -1,0 +1,43 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cancel-retry-delay
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              minutes: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225660000,
+      }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - kind: task.cancelled
+      task: /do/0/guard
+      execution: /do/0/guard
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: workflow.cancelled
+      cancelledAt: "2026-01-01T00:00:05.000Z"

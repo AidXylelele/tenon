@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-extensions
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.order.placed.v1
+              traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+              tenant: ${ .tenant }
+              priority: 5
+input: { tenant: acme }
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: fda1d579-3f69-54e2-affe-94ef3ee98686
+        source: /test/emit-extensions/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+        tenant: acme
+        priority: 5
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+  do:
+    - keep:
+        set:
+          input: ${ . }
+          raw: ${ $workflow.input }
+          id: ${ $workflow.id }
+          started: ${ $workflow.startedAt.epoch.milliseconds }
+correlate: true
+end:
+  waiting:
+    effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+facts:
+  exactly:
+    - {
+        kind: workflow.correlation-started,
+        name: trigger-instance-1.test,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }

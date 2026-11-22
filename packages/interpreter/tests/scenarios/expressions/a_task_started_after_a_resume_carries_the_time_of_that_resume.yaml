@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: start-times
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT1S
+    - describe:
+        set:
+          task: '${ $task.startedAt.epoch.milliseconds }'
+          workflow: '${ $workflow.startedAt.epoch.milliseconds }'
+input: {}
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225609000
+end:
+  completed:
+    output: { task: 1767225609000, workflow: 1767225600000 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

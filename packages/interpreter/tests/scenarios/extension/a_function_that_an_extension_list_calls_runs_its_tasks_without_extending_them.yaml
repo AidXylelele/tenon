@@ -1,0 +1,48 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-calls-function
+    version: '1.0.0'
+  use:
+    functions:
+      mark:
+        set: { inF: true }
+    extensions:
+      - log:
+          extend: set
+          before:
+            - callMark:
+                call: mark
+  do:
+    - s:
+        set: { a: 1 }
+input: {}
+end:
+  completed:
+    output: { a: 1 }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/s }
+    - { kind: task.started, task: /do/0/s }
+    - kind: task.created
+      task: /use/extensions/0/log/before/0/callMark
+      execution: "/do/0/s@before/0/0/callMark"
+    - kind: task.started
+      task: /use/extensions/0/log/before/0/callMark
+      execution: "/do/0/s@before/0/0/callMark"
+    - kind: task.created
+      task: /use/functions/mark
+      execution: "/do/0/s@before/0/0/callMark@function"
+    - kind: task.started
+      task: /use/functions/mark
+      execution: "/do/0/s@before/0/0/callMark@function"
+    - kind: task.completed
+      task: /use/functions/mark
+      execution: "/do/0/s@before/0/0/callMark@function"
+    - kind: task.completed
+      task: /use/extensions/0/log/before/0/callMark
+      execution: "/do/0/s@before/0/0/callMark"
+    - { kind: task.completed, task: /do/0/s }
+    - kind: workflow.completed

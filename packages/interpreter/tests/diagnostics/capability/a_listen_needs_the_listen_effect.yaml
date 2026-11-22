@@ -1,0 +1,34 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.order.placed
+profile:
+  effects:
+    [
+      http,
+      openapi,
+      grpc,
+      asyncapi,
+      a2a,
+      mcp,
+      process,
+      workflow,
+      fork,
+      timer,
+      emit,
+      resource,
+    ]
+diagnostics:
+  - code: capability
+    pointer: /do/0/waitForOrder
+    subject: effect.listen
+    range: { start: { line: 8, column: 7 } }

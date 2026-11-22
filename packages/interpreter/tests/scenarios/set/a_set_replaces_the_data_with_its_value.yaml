@@ -1,0 +1,17 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: set-replaces
+    version: '1.0.0'
+  do:
+    - replace:
+        set: { b: 2 }
+input: { a: 1 }
+end:
+  completed:
+    output: { b: 2 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/replace }
+    - kind: workflow.completed

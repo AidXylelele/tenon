@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-cancel
+    version: '1.0.0'
+  do:
+    - getTask:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agent.example.com/a2a
+          parameters:
+            id: task-1
+input: {}
+script:
+  - effect: { id: /do/0/getTask, kind: a2a, deadline: null, method: tasks/get }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/getTask }
+    - { kind: task.started, task: /do/0/getTask }
+    - {
+        kind: task.cancelled,
+        task: /do/0/getTask,
+        execution: /do/0/getTask,
+        cancelledAt: "2026-01-01T00:00:05.000Z",
+      }
+    - kind: workflow.cancelled

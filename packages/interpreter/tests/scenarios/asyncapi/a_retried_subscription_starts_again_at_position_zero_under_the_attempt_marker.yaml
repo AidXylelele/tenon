@@ -1,0 +1,92 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-retry
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - watch:
+              call: asyncapi
+              with:
+                document:
+                  endpoint: https://example.com/docs/asyncapi.json
+                operation: chat-inbox
+                subscription:
+                  consume:
+                    amount: 1
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+              status: 503
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard/try/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/guard/try/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome: { kind: unreachable, detail: connection refused }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/guard#2/try/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/guard#2/try/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225603000
+end:
+  completed:
+    output:
+      - { payload: { text: a }, headers: {}, correlationId: null }
+facts:
+  including:
+    - {
+        kind: task.faulted,
+        task: /do/0/guard/try/0/watch,
+        execution: /do/0/guard/try/0/watch,
+      }
+    - { kind: task.retried, task: /do/0/guard }
+    - {
+        kind: task.completed,
+        task: /do/0/guard/try/0/watch,
+        execution: "/do/0/guard#2/try/0/watch",
+      }
+    - kind: workflow.completed

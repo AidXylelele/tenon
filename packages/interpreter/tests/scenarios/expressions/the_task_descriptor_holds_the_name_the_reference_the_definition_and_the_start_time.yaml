@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: task-descriptor
+    version: '1.0.0'
+  do:
+    - outer:
+        do:
+          - inner:
+              set:
+                name: '${ $task.name }'
+                reference: '${ $task.reference }'
+                definition: '${ $task.definition | keys }'
+                epoch: '${ $task.startedAt.epoch }'
+                startedOn: '${ $task.startedAt.iso8601[0:19] }'
+input: {}
+start:
+  now: 1767225600123
+end:
+  completed:
+    output:
+      name: inner
+      reference: /do/0/outer/do/0/inner
+      definition: [set]
+      epoch: { seconds: 1767225600, milliseconds: 1767225600123 }
+      startedOn: "2026-01-01T00:00:00"
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

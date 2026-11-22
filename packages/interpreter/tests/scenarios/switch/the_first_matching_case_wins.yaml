@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: switch-first-match
+    version: '1.0.0'
+  do:
+    - route:
+        switch:
+          - small:
+              when: .n < 10
+              then: markSmall
+          - tiny:
+              when: .n < 5
+              then: markTiny
+    - markTiny:
+        set: { size: tiny }
+        then: exit
+    - markSmall:
+        set: { size: small }
+        then: exit
+input: { n: 1 }
+end:
+  completed:
+    output: { size: small }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/route }
+    - { kind: task.started, task: /do/0/route }
+    - { kind: task.completed, task: /do/0/route }
+    - { kind: task.created, task: /do/2/markSmall }
+    - { kind: task.started, task: /do/2/markSmall }
+    - { kind: task.completed, task: /do/2/markSmall }
+    - kind: workflow.completed

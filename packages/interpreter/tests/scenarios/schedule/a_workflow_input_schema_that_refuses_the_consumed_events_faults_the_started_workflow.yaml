@@ -1,0 +1,69 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  input:
+    schema:
+      format: json
+      document:
+        type: array
+        items:
+          type: object
+          required: [customer]
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+  do:
+    - never:
+        set: { ran: true }
+correlate: true
+script:
+  - effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { order: o-1 },
+        }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      instance: ""
+facts:
+  exactly:
+    - {
+        kind: workflow.correlation-started,
+        name: trigger-instance-1.test,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: workflow.correlation-completed,
+        name: trigger-instance-1.test,
+        completedAt: "2026-01-01T00:00:01.000Z",
+        correlationKeys: {},
+      }
+    - {
+        kind: workflow.started,
+        name: trigger-instance-1.test,
+        definition: { namespace: test, name: trigger, version: "1.0.0" },
+        startedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:01.000Z" }

@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - start:
+        set:
+          a: 1
+        then: inner
+    - outer:
+        do:
+          - inner:
+              set:
+                b: 2
+diagnostics:
+  - code: unknown-task
+    pointer: /do/0/start/then
+    subject: inner
+    range: { start: { line: 10, column: 13 } }

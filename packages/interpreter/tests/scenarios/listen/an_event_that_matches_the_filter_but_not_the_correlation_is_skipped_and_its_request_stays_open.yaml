@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-correlate-constant
+    version: '1.0.0'
+  do:
+    - admit:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.heartbeat.low
+              correlate:
+                patient:
+                  from: '${ .data.patientId }'
+                  expect: p-1
+input: {}
+script:
+  - effect: { id: "/do/0/admit@event[0]", kind: listen, deadline: null }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: e-1,
+          source: https://hospital.example.com,
+          type: com.example.heartbeat.low,
+          data: { patientId: p-2, bpm: 40 },
+        }
+    now: 1767225601000
+  - effect: { id: "/do/0/admit@event[0]", kind: listen, deadline: null }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: e-2,
+          source: https://hospital.example.com,
+          type: com.example.heartbeat.low,
+          data: { patientId: p-1, bpm: 45 },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output: [{ patientId: p-1, bpm: 45 }]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/admit,
+        completedAt: "2026-01-01T00:00:02.000Z",
+      }
+    - kind: workflow.completed

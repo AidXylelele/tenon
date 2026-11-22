@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schemas
+    version: '0.1.0'
+  input:
+    schema:
+      document:
+        type: objekt
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: json-schema
+    pointer: /input/schema/document
+    range: { start: { line: 9, column: 7 } }

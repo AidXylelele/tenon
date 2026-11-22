@@ -1,0 +1,29 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  use:
+    retries:
+      onUnavailable:
+        when: '${ $error.status == 503 }'
+        limit:
+          attempt:
+            count: 2
+  do:
+    - attempt:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/unavailable
+                  status: 503
+        catch:
+          as: failure
+          retry: onUnavailable
+diagnostics:
+  - code: unknown-variable
+    pointer: /use/retries/onUnavailable/when
+    subject: $error
+    range: { start: { line: 9, column: 13 } }

@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: skipped
+    version: '1.0.0'
+  do:
+    - guarded:
+        if: .run
+        input:
+          from: '${ { transformed: true } }'
+        set: { ran: true }
+        output:
+          as: '${ { transformed: true } }'
+input: { run: false }
+end:
+  completed:
+    output: { run: false }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guarded, execution: /do/0/guarded }
+    - { kind: task.completed, task: /do/0/guarded, execution: /do/0/guarded }
+    - kind: workflow.completed

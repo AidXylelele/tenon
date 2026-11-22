@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-arguments
+    version: '1.0.0'
+  do:
+    - remember:
+        set: { owner: Ann }
+        export:
+          as: '${ { owner: .owner } }'
+    - addPet:
+        input:
+          from: '${ { name: "Milou" } }'
+        call: http
+        with:
+          method: post
+          endpoint: https://petstore.swagger.io/v2/pet
+          body: '${ { dot: ., input: $input, context: $context, task: $task.reference, workflow: $workflow.id, runtime: $runtime.name } }'
+input: {}
+script:
+  - effect:
+      id: /do/1/addPet
+      kind: http
+      deadline: null
+      body:
+        dot: { name: Milou }
+        input: { name: Milou }
+        context: { owner: Ann }
+        task: /do/1/addPet
+        workflow: instance-1
+        runtime: interpreter-tests
+    outcome:
+      kind: responded
+      request:
+        method: POST
+        uri: https://petstore.swagger.io/v2/pet
+        headers: { content-type: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/1/addPet }
+    - kind: workflow.completed

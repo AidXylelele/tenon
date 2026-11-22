@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: numbers
+    version: '0.1.0'
+  do:
+    - compute:
+        set:
+          a: .inf
+diagnostics:
+  - code: syntax
+    pointer: ""
+    range: { start: { line: 9, column: 12 } }

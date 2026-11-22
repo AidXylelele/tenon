@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: fork-empty
+    version: '1.0.0'
+  do:
+    - alarm:
+        fork:
+          branches: []
+    - report:
+        set:
+          calls: '${ . }'
+input: { ward: east }
+end:
+  completed:
+    output: { calls: [] }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/alarm }
+    - { kind: task.started, task: /do/0/alarm }
+    - { kind: task.completed, task: /do/0/alarm }
+    - { kind: task.created, task: /do/1/report }
+    - { kind: task.started, task: /do/1/report }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

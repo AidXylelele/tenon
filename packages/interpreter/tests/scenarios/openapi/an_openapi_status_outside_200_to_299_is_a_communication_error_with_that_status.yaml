@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: openapi-not-found
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: openapi
+        with:
+          document:
+            endpoint: https://petstore.swagger.io/v2/swagger.json
+          operationId: getPetById
+          parameters:
+            petId: 404
+input: {}
+script:
+  - effect: { id: /do/0/getPet, kind: openapi, deadline: null }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/404
+        headers: {}
+      statusCode: 404
+      headers: { content-type: application/json }
+      content: { message: Pet not found }
+      authorization: null
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 404
+      instance: /do/0/getPet
+      title: Communication Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

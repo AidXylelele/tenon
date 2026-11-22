@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-uri-expressions
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              source: ${ .base + "/{tenant}" }
+              type: com.example.order.placed.v1
+              dataschema: ${ .base + "/{tenant}/order.json" }
+input: { base: https://shop.example.com, tenant: eu }
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: fda1d579-3f69-54e2-affe-94ef3ee98686
+        source: https://shop.example.com/{tenant}
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        dataschema: https://shop.example.com/{tenant}/order.json
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

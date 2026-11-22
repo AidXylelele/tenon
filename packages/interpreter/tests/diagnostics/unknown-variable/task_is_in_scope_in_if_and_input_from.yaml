@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - compute:
+        if: '${ $task.reference != null }'
+        input:
+          from: '${ { at: $task.reference } }'
+        set:
+          a: 1
+diagnostics: []

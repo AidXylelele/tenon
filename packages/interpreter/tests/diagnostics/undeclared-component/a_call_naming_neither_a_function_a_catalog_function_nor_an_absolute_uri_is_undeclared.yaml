@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  do:
+    - relative:
+        call: ./functions/log.yaml
+    - withoutAuthority:
+        call: urn:example:log
+diagnostics:
+  - code: undeclared-component
+    pointer: /do/0/relative/call
+    subject: ./functions/log.yaml
+    range: { start: { line: 8, column: 13 } }
+  - code: undeclared-component
+    pointer: /do/1/withoutAuthority/call
+    subject: urn:example:log
+    range: { start: { line: 10, column: 13 } }

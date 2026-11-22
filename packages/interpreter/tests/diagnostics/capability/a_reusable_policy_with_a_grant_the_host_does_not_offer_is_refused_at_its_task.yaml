@@ -1,0 +1,29 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  use:
+    authentications:
+      petStore:
+        oauth2:
+          authority: https://auth.example.com
+          grant: password
+          username: alice
+          password: alice-password
+  do:
+    - findPets:
+        call: openapi
+        with:
+          document:
+            endpoint: https://petstore.swagger.io/v2/swagger.json
+          operationId: findPetsByStatus
+          authentication:
+            use: petStore
+profile:
+  grants: [client_credentials]
+diagnostics:
+  - code: capability
+    pointer: /do/0/findPets
+    subject: grant.password

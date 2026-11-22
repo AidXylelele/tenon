@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-schema
+    version: '0.1.0'
+  do:
+    - greet:
+        run:
+          script:
+            language: js
+            code: console.log('hello')
+            source:
+              endpoint: https://scripts.example.com/greet.js
+diagnostics:
+  - code: schema
+    pointer: /do/0/greet/run/script

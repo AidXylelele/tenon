@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-workflow-deadline
+    version: '1.0.0'
+  timeout:
+    after: PT1M
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.order.placed.v1
+input: {}
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: 1767225660000
+      event:
+        specversion: "1.0"
+        id: fda1d579-3f69-54e2-affe-94ef3ee98686
+        source: /test/emit-workflow-deadline/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

@@ -1,0 +1,55 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-status-caught
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - greet:
+              call: grpc
+              with:
+                proto:
+                  endpoint: https://example.com/protos/greet.proto
+                service:
+                  name: GreeterApi.Greeter
+                  host: greeter.example.com
+                method: SayHello
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+              status: 404
+          do:
+            - report:
+                set:
+                  type: ${ $error.type }
+                  status: ${ $error.status }
+                  instance: ${ $error.instance }
+                  title: ${ $error.title }
+input: {}
+script:
+  - effect: { id: /do/0/guard/try/0/greet, kind: grpc, deadline: null }
+    outcome: { kind: status, code: 5, message: no such greeter }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 404
+      instance: /do/0/guard/try/0/greet
+      title: Communication Error
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/greet }
+    - { kind: task.started, task: /do/0/guard/try/0/greet }
+    - { kind: task.faulted, task: /do/0/guard/try/0/greet }
+    - { kind: task.created, task: /do/0/guard/catch/do/0/report }
+    - { kind: task.started, task: /do/0/guard/catch/do/0/report }
+    - { kind: task.completed, task: /do/0/guard/catch/do/0/report }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

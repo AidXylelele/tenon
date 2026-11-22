@@ -1,0 +1,20 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: minimal
+    version: '1.0.0'
+  do:
+    - greet:
+        set:
+          greeting: hello
+input: {}
+end:
+  completed:
+    output: { greeting: hello }
+facts:
+  including:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

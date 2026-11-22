@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: bearer-auth
+    version: '0.1.0'
+  do:
+    - findPet:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://fake.com/docs/asyncapi.json
+          operation: findPetsByStatus
+          server:
+            name: staging
+          message:
+            payload:
+              petId: ${ .pet.id }
+          authentication:
+            bearer:
+              token: ${ .token }
+input: { pet: { id: 7 }, token: example-t0ken }
+script:
+  - effect:
+      id: /do/0/findPet
+      kind: asyncapi
+      deadline: null
+      document:
+        {
+          name: null,
+          endpoint:
+            { uri: https://fake.com/docs/asyncapi.json, authentication: null },
+        }
+      authentication: { kind: bearer, token: example-t0ken }
+      operation: findPetsByStatus
+      channel: null
+      server: { name: staging, variables: {} }
+      protocol: null
+      exchange:
+        kind: publish
+        message: { payload: { petId: 7 }, headers: {} }
+    outcome: { kind: published }
+    now: 1767225601000
+end:
+  completed:
+    output: { payload: { petId: 7 }, headers: {} }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/findPet }
+    - kind: workflow.completed

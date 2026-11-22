@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: filters
+    version: '0.1.0'
+  do:
+    - waitForAlarm:
+        listen:
+          to:
+            one:
+              with:
+                type: '['
+diagnostics:
+  - code: regex
+    pointer: /do/0/waitForAlarm/listen/to/one/with/type
+    range: { start: { line: 12, column: 21 } }

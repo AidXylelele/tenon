@@ -1,0 +1,55 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  timeout:
+    after: PT1M
+  schedule:
+    on:
+      any:
+        - with:
+            type: com.example.reading
+      until: '${ length == 2 }'
+  do:
+    - keep:
+        set: ${ . }
+correlate: true
+script:
+  - effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 1 },
+        }
+    now: 1767229200000
+end:
+  waiting:
+    effect:
+      {
+        id: "@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 1,
+      }
+facts:
+  exactly:
+    - {
+        kind: workflow.correlation-started,
+        name: trigger-instance-1.test,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }

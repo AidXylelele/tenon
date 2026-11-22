@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-options
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+            options:
+              sessionMode: stateless
+              retries: '3'
+profile:
+  mcpTransportOptions: [sessionMode, retries]
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/callTool
+      kind: mcp
+      deadline: null
+      options: { sessionMode: stateless, retries: "3" }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/callTool }

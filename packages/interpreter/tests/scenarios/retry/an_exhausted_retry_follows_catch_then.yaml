@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-exhausted-then
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+          then: finish
+    - skipped:
+        set: '${ . + { skipped: true } }'
+    - finish:
+        set: '${ . + { finished: true } }'
+input: { a: 1 }
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: { a: 1, finished: true }
+facts:
+  including:
+    - { kind: task.faulted, execution: "/do/0/guard#2/try/0/fail" }
+    - { kind: task.completed, task: /do/0/guard, execution: /do/0/guard }
+    - { kind: task.created, task: /do/2/finish }
+    - kind: workflow.completed

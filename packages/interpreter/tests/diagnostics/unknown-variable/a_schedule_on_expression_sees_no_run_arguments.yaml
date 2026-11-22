@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order
+          subject: '${ $workflow.definition.name }'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: unknown-variable
+    pointer: /schedule/on/one/with/subject
+    subject: $workflow
+    range: { start: { line: 11, column: 18 } }

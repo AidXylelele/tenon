@@ -1,0 +1,61 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-workflow-caught
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - runChild:
+              run:
+                workflow:
+                  namespace: billing
+                  name: charge
+                  version: '1.0.0'
+                  input: {}
+        catch:
+          errors:
+            with:
+              instance: /do/0/guard/try/0/runChild
+          as: failure
+          do:
+            - report:
+                set:
+                  type: ${ $failure.type }
+                  status: ${ $failure.status }
+                  instance: ${ $failure.instance }
+input: {}
+script:
+  - effect:
+      id: /do/0/guard/try/0/runChild
+      kind: workflow
+      deadline: null
+      namespace: billing
+      name: charge
+      version: "1.0.0"
+      input: {}
+      await: true
+    outcome:
+      kind: faulted
+      error:
+        type: https://example.com/errors/card-declined
+        status: 402
+        instance: /do/0/declined
+        title: Card Declined
+        detail: insufficient funds
+    now: 1767225601000
+end:
+  completed:
+    output:
+      {
+        type: https://example.com/errors/card-declined,
+        status: 402,
+        instance: /do/0/guard/try/0/runChild,
+      }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/runChild }
+    - { kind: task.completed, task: /do/0/guard/catch/do/0/report }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: tabbed
+    version: '0.1.0'
+  do:
+    - pause:
+  	wait: PT1S
+diagnostics:
+  - code: syntax
+    pointer: ""
+    range: { start: { line: 8, column: 1 } }

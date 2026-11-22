@@ -1,0 +1,28 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-uri
+    version: '1.0.0'
+  do:
+    - validateEmail:
+        call: https://functions.example.com/validate-email/1.0.0/function.yaml
+        with:
+          emailAddress: ${ .userEmail }
+imports:
+  "https://functions.example.com/validate-email/1.0.0/function.yaml": |
+    set:
+      isValid: ${ .emailAddress | test("^[^@]+@[^@]+$") }
+input: { userEmail: ann@example.com }
+end:
+  completed:
+    output: { isValid: true }
+facts:
+  including:
+    - kind: task.started
+      task: https://functions.example.com/validate-email/1.0.0/function.yaml#
+      execution: /do/0/validateEmail@function
+    - kind: task.completed
+      task: https://functions.example.com/validate-email/1.0.0/function.yaml#
+      execution: /do/0/validateEmail@function
+    - kind: workflow.completed

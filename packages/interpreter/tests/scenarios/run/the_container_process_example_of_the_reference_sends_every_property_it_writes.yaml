@@ -1,0 +1,59 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-container-example
+    version: '0.1.0'
+  do:
+    - setInput:
+        set:
+          message: Hello World
+    - runContainer:
+        input:
+          from: ${ .message }
+        run:
+          container:
+            image: alpine
+            stdin: ${ . }
+            command: |
+              input=$(cat)
+              echo "STDIN was: $input"
+              echo "ARGS are $1 $2"
+            arguments:
+            - Foo
+            - Bar
+            pullPolicy: always
+input: {}
+script:
+  - effect:
+      id: /do/1/runContainer
+      kind: process
+      deadline: null
+      process:
+        kind: container
+        image: alpine
+        command: "input=$(cat)\necho \"STDIN was: $input\"\necho \"ARGS are $1 $2\"\n"
+        stdin: Hello World
+        arguments: [Foo, Bar]
+        name: null
+        ports: {}
+        volumes: {}
+        environment: {}
+        lifetime: { cleanup: never, after: null }
+        pullPolicy: always
+      await: true
+    outcome:
+      {
+        kind: exited,
+        code: 0,
+        stdout: "STDIN was: Hello World\nARGS are Foo Bar\n",
+        stderr: "",
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: "STDIN was: Hello World\nARGS are Foo Bar\n"
+facts:
+  including:
+    - { kind: task.completed, task: /do/1/runContainer }
+    - kind: workflow.completed

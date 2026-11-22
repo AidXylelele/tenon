@@ -1,0 +1,19 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: export-default
+    version: '1.0.0'
+  do:
+    - produce:
+        set: { a: 1 }
+    - recall:
+        set: '${ { context: $context } }'
+input: { seed: true }
+end:
+  completed:
+    output: { context: { seed: true } }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-kind
+    version: '1.0.0'
+  use:
+    extensions:
+      - pauses:
+          extend: wait
+          before:
+            - note:
+                set: { noted: true }
+  do:
+    - prepare:
+        set: { prepared: true }
+    - pause:
+        wait: PT1S
+input: {}
+script:
+  - effect:
+      { id: /do/1/pause, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: { prepared: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/prepare }
+    - { kind: task.started, task: /do/0/prepare }
+    - { kind: task.completed, task: /do/0/prepare }
+    - { kind: task.created, task: /do/1/pause }
+    - { kind: task.started, task: /do/1/pause }
+    - kind: task.created
+      task: /use/extensions/0/pauses/before/0/note
+      execution: "/do/1/pause@before/0/0/note"
+    - kind: task.started
+      task: /use/extensions/0/pauses/before/0/note
+      execution: "/do/1/pause@before/0/0/note"
+    - kind: task.completed
+      task: /use/extensions/0/pauses/before/0/note
+      execution: "/do/1/pause@before/0/0/note"
+    - { kind: task.completed, task: /do/1/pause }
+    - kind: workflow.completed

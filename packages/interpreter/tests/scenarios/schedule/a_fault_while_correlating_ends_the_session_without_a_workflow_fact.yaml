@@ -1,0 +1,49 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+          data: '${ .total | error("no total") }'
+  do:
+    - keep:
+        set: ${ . }
+correlate: true
+script:
+  - effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { total: 1 },
+        }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      instance: ""
+facts:
+  exactly:
+    - {
+        kind: workflow.correlation-started,
+        name: trigger-instance-1.test,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }

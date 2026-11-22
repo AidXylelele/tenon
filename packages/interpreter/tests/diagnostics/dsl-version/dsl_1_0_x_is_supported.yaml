@@ -1,0 +1,11 @@
+source: |
+  document:
+    dsl: '1.0.3'
+    namespace: test
+    name: previous-minor
+    version: '0.1.0'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics: []

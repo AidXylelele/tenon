@@ -1,0 +1,25 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - readings:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.reading
+        foreach:
+          do:
+            - keep:
+                set:
+                  value: '${ $item }'
+        output:
+          as: '${ $item }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/readings/output/as
+    subject: $item
+    range: { start: { line: 19, column: 13 } }

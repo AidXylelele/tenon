@@ -1,0 +1,59 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-foreach-export-schema-refused
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - watch:
+              call: asyncapi
+              with:
+                document:
+                  endpoint: https://example.com/docs/asyncapi.json
+                operation: chat-inbox
+                subscription:
+                  consume:
+                    amount: 1
+                  foreach:
+                    export:
+                      as: '${ $context + { last: $item.payload.text } }'
+                      schema:
+                        document:
+                          type: object
+                          properties: { last: { type: number } }
+        catch:
+          do:
+            - c:
+                set:
+                  ctx: '${ $context }'
+input: { start: 1 }
+script:
+  - effect:
+      {
+        id: "/do/0/guard/try/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/guard/try/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: { ctx: { start: 1 } }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/watch }
+    - { kind: task.completed, task: /do/0/guard/catch/do/0/c }
+    - kind: workflow.completed

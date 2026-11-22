@@ -1,0 +1,65 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-constant
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            backoff:
+              constant: {}
+            limit:
+              attempt:
+                count: 3
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#3@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/guard#4@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225603000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225603000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/busy
+      status: 503
+      instance: /do/0/guard/try/0/fail
+      title: null
+      detail: null
+facts:
+  including:
+    - { kind: task.faulted, execution: "/do/0/guard#4/try/0/fail" }
+    - { kind: task.faulted, task: /do/0/guard, execution: /do/0/guard }
+    - kind: workflow.faulted

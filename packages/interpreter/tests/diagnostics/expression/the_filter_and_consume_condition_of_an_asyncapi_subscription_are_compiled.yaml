@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expressions
+    version: '0.1.0'
+  do:
+    - consume:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: onPets
+          subscription:
+            filter: '${ .a | }'
+            consume:
+              while: '${ .b | }'
+diagnostics:
+  - code: expression
+    pointer: /do/0/consume/with/subscription/filter
+  - code: expression
+    pointer: /do/0/consume/with/subscription/consume/while

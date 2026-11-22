@@ -1,0 +1,38 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-body-expression
+    version: '1.0.0'
+  do:
+    - addPet:
+        call: http
+        with:
+          method: post
+          endpoint: https://petstore.swagger.io/v2/pet
+          body: ${ .pet }
+input: { pet: { name: Milou, tags: [dog] } }
+script:
+  - effect:
+      id: /do/0/addPet
+      kind: http
+      deadline: null
+      body: { name: Milou, tags: [dog] }
+    outcome:
+      kind: responded
+      request:
+        method: POST
+        uri: https://petstore.swagger.io/v2/pet
+        headers: { content-type: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/addPet }
+    - kind: workflow.completed

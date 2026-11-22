@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: wait-output
+    version: '1.0.0'
+  do:
+    - pause:
+        input:
+          from: '${ { kept: .a } }'
+        wait: PT1S
+input: { a: 1, b: 2 }
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: { kept: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/pause }
+    - kind: workflow.completed

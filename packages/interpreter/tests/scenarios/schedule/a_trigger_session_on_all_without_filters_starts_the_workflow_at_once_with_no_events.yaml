@@ -1,0 +1,38 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    on:
+      all: []
+  do:
+    - keep:
+        set: ${ . }
+correlate: true
+end:
+  completed:
+    output: []
+facts:
+  exactly:
+    - {
+        kind: workflow.correlation-started,
+        name: trigger-instance-1.test,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: workflow.correlation-completed,
+        name: trigger-instance-1.test,
+        completedAt: "2026-01-01T00:00:00.000Z",
+        correlationKeys: {},
+      }
+    - {
+        kind: workflow.started,
+        name: trigger-instance-1.test,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - { kind: task.created, task: /do/0/keep }
+    - { kind: task.started, task: /do/0/keep }
+    - { kind: task.completed, task: /do/0/keep }
+    - kind: workflow.completed

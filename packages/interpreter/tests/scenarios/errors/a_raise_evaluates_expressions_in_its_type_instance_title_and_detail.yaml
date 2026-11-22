@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: raise-expressions
+    version: '1.0.0'
+  do:
+    - refuse:
+        input:
+          from: '${ { code: .code, item: .item } }'
+        raise:
+          error:
+            type: '${ "https://example.com/errors/" + .code }'
+            status: 422
+            instance: '${ "/items/" + (.item | tostring) }'
+            title: '${ "Refused " + .code }'
+            detail: '${ "Item \(.item) was refused" }'
+input: { code: duplicate, item: 7, noise: true }
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/duplicate
+      status: 422
+      instance: /items/7
+      title: Refused duplicate
+      detail: Item 7 was refused
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/refuse }
+    - kind: workflow.faulted

@@ -1,0 +1,28 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://github.com/open-workflow-specification/catalog/tree/main
+  do:
+    - log:
+        call: log:1.0.0@global
+        with:
+          message: hello
+imports:
+  log:1.0.0@global: |
+    input:
+      schema:
+        document:
+          type: object
+          properties:
+            message:
+              type: string
+          required: [ message ]
+    set:
+      logged: ${ .message }
+diagnostics: []

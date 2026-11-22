@@ -1,0 +1,31 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://petstore.swagger.io/v2/pet/1
+            authentication:
+              oauth2:
+                authority: https://auth.example.com
+                grant: authorization_code
+                client:
+                  id: workflow-runtime
+profile:
+  grants:
+    [
+      client_credentials,
+      password,
+      "urn:ietf:params:oauth:grant-type:token-exchange",
+    ]
+diagnostics:
+  - code: capability
+    pointer: /do/0/getPet
+    subject: grant.authorization_code
+    range: { start: { line: 8, column: 7 } }

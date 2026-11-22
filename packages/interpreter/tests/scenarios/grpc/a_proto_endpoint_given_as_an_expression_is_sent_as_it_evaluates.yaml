@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-proto-expression
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: ${ .protoUri }
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+          method: SayHello
+input:
+  {
+    protoUri: "https://protos.example.com/{service}/greet.proto",
+    service: greeter,
+  }
+end:
+  waiting:
+    effect:
+      id: /do/0/greet
+      kind: grpc
+      deadline: null
+      proto:
+        name: null
+        endpoint:
+          uri: "https://protos.example.com/{service}/greet.proto"
+          authentication: null
+facts:
+  including:
+    - { kind: task.started, task: /do/0/greet }

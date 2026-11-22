@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: javascript
+    version: '0.1.0'
+  evaluate:
+    language: js
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: expression-language
+    pointer: /evaluate/language
+    range: { start: { line: 7, column: 13 } }
+    message: "Expression language 'js' is not supported: expected jq."

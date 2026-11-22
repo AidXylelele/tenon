@@ -1,0 +1,23 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: chat-inbox
+          protocol: ws
+          subscription:
+            consume:
+              amount: 1
+profile:
+  asyncApiProtocols: [amqp, http, kafka]
+diagnostics:
+  - code: capability
+    pointer: /do/0/watch
+    subject: asyncapi.ws

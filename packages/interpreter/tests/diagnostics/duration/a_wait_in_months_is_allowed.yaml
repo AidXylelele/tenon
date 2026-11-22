@@ -1,0 +1,10 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: times
+    version: '0.1.0'
+  do:
+    - pause:
+        wait: P1M
+diagnostics: []

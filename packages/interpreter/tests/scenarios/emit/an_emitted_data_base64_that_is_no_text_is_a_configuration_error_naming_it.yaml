@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-binary
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.notified
+              data_base64: { a: 1 }
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/notify
+      title: Configuration Error
+      detail: "The event needs these payload members as Base64 text: data_base64."
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/notify }
+    - { kind: task.started, task: /do/0/notify }
+    - { kind: task.faulted, task: /do/0/notify }
+    - kind: workflow.faulted

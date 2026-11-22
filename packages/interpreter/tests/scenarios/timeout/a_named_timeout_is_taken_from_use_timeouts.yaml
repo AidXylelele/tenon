@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-named
+    version: '1.0.0'
+  use:
+    timeouts:
+      short:
+        after: PT3S
+  do:
+    - pause:
+        wait: PT1M
+        timeout: short
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: /do/0/pause,
+        kind: timer,
+        deadline: 1767225603000,
+        until: 1767225660000,
+      }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/pause }

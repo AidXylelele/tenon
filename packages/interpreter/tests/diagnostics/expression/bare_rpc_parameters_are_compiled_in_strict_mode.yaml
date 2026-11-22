@@ -1,0 +1,26 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expressions
+    version: '0.1.0'
+  do:
+    - getTask:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agent.example.com
+          parameters: '.a |'
+    - listTools:
+        call: mcp
+        with:
+          method: tools/list
+          parameters: '.b |'
+          transport:
+            http:
+              endpoint: https://mcp.example.com
+diagnostics:
+  - code: expression
+    pointer: /do/0/getTask/with/parameters
+  - code: expression
+    pointer: /do/1/listTools/with/parameters

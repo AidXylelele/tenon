@@ -1,0 +1,47 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-catalog
+    version: '1.0.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://github.com/open-workflow-specification/catalog/tree/main
+  do:
+    - log:
+        call: log:1.0.0@global
+        with:
+          message: ${ .text }
+imports:
+  log:1.0.0@global: |
+    input:
+      schema:
+        document:
+          type: object
+          properties:
+            message:
+              type: string
+          required: [ message ]
+    set:
+      logged: ${ .message }
+input: { text: hello }
+end:
+  completed:
+    output: { logged: hello }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/log, execution: /do/0/log }
+    - { kind: task.started, task: /do/0/log, execution: /do/0/log }
+    - kind: task.created
+      task: log:1.0.0@global#
+      execution: /do/0/log@function
+    - kind: task.started
+      task: log:1.0.0@global#
+      execution: /do/0/log@function
+    - kind: task.completed
+      task: log:1.0.0@global#
+      execution: /do/0/log@function
+    - { kind: task.completed, task: /do/0/log, execution: /do/0/log }
+    - kind: workflow.completed

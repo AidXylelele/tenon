@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-time-after-wait
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT10S
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.order.placed.v1
+input: {}
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225610000 }
+    outcome: { kind: elapsed }
+    now: 1767225610000
+end:
+  waiting:
+    effect:
+      id: "/do/1/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: cdc83c87-0d66-54da-a504-406c7e07c11f
+        source: /test/emit-time-after-wait/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:10.000Z"
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/pause }
+    - {
+        kind: task.started,
+        task: /do/1/notify,
+        startedAt: "2026-01-01T00:00:10.000Z",
+      }

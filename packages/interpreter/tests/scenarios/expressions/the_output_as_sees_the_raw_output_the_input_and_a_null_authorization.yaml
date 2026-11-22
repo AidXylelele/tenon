@@ -1,0 +1,38 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: output-as-arguments
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        export:
+          as: '${ { exported: .a } }'
+    - observe:
+        input:
+          from: '${ { b: .a } }'
+        set: { c: 2 }
+        output:
+          as: '${ { dot: ., input: $input, context: $context, task: ($task | { name, reference, input, output }), workflow: $workflow.id, runtime: $runtime.name, authorization: $authorization } }'
+input: {}
+end:
+  completed:
+    output:
+      dot: { c: 2 }
+      input: { b: 1 }
+      context: { exported: 1 }
+      task:
+        {
+          name: observe,
+          reference: /do/1/observe,
+          input: { a: 1 },
+          output: { c: 2 },
+        }
+      workflow: instance-1
+      runtime: interpreter-tests
+      authorization: null
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

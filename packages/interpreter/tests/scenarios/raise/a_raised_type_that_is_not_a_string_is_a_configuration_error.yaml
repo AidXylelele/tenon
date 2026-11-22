@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: raise-type-not-string
+    version: '1.0.0'
+  do:
+    - refuse:
+        raise:
+          error:
+            type: '${ .code }'
+            status: 422
+input: { code: 7 }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/refuse
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/refuse }
+    - { kind: task.started, task: /do/0/refuse }
+    - { kind: task.faulted, task: /do/0/refuse }
+    - kind: workflow.faulted

@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-do-input
+    version: '1.0.0'
+  do:
+    - guard:
+        input:
+          from: '${ { order: .order } }'
+        try:
+          - change:
+              set: { changed: true }
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 503
+        catch:
+          do:
+            - handle:
+                set: '${ . + { handled: true } }'
+input: { order: 7, noise: true }
+end:
+  completed:
+    output: { order: 7, handled: true }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/1/fail }
+    - { kind: task.completed, task: /do/0/guard/catch/do/0/handle }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

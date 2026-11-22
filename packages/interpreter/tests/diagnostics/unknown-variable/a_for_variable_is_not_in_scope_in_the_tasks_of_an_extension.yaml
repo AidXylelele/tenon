@@ -1,0 +1,25 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - note:
+                set:
+                  item: '${ $item }'
+  do:
+    - each:
+        for:
+          in: '${ [1, 2] }'
+        do:
+          - greet:
+              set: { greeting: Hello }
+diagnostics:
+  - code: unknown-variable
+    pointer: /use/extensions/0/audit/before/0/note/set/item
+    subject: $item

@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-uri-template-missing
+    version: '1.0.0'
+  do:
+    - listPets:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/{petId}
+input: { name: Milou }
+script:
+  - effect:
+      id: /do/0/listPets
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://petstore.swagger.io/v2/pet/
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: []
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: []
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/listPets }
+    - kind: workflow.completed

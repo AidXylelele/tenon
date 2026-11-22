@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-skipped
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - noteBefore:
+                set: { before: true }
+          after:
+            - noteAfter:
+                set: { after: true }
+  do:
+    - greet:
+        if: '${ .enabled }'
+        set: { greeting: Hello }
+input: { enabled: false }
+end:
+  completed:
+    output: { enabled: false }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

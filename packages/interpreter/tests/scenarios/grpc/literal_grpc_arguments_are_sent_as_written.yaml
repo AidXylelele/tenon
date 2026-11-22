@@ -1,0 +1,43 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-literal-arguments
+    version: '1.0.0'
+  do:
+    - search:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: Search
+          arguments:
+            filter:
+              tags: [ warm, short ]
+              active: true
+            limit: 10
+            cursor: null
+input: {}
+script:
+  - effect:
+      id: /do/0/search
+      kind: grpc
+      deadline: null
+      method: Search
+      arguments:
+        filter: { tags: [warm, short], active: true }
+        limit: 10
+        cursor: null
+    outcome: { kind: replied, message: { results: [] } }
+    now: 1767225601000
+end:
+  completed:
+    output: { results: [] }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/search }
+    - kind: workflow.completed

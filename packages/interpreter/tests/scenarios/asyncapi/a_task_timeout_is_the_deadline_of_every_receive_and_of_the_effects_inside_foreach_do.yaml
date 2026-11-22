@@ -1,0 +1,94 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-deadline
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+            foreach:
+              do:
+                - pause:
+                    wait: PT1S
+              output:
+                as: ${ $item.payload.text }
+        timeout:
+          after: PT1M
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: 1767225660000,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/watch[0]/with/subscription/foreach/do/0/pause",
+        kind: timer,
+        deadline: 1767225660000,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/watch@message[1]",
+        kind: asyncapi,
+        deadline: 1767225660000,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 1,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: b }, headers: {}, correlationId: null },
+      }
+    now: 1767225603000
+  - effect:
+      {
+        id: "/do/0/watch[1]/with/subscription/foreach/do/0/pause",
+        kind: timer,
+        deadline: 1767225660000,
+        until: 1767225604000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225604000
+end:
+  completed:
+    output: [a, b]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: "/do/0/watch/with/subscription/foreach/do/0/pause",
+        execution: "/do/0/watch[1]/with/subscription/foreach/do/0/pause",
+      }
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

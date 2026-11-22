@@ -1,0 +1,45 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-then-exit
+    version: '1.0.0'
+  do:
+    - outer:
+        do:
+          - guard:
+              try:
+                - fail:
+                    raise:
+                      error:
+                        type: https://example.com/errors/broken
+                        status: 503
+              catch:
+                then: exit
+              then: last
+          - skipped:
+              set: '${ . + { skipped: true } }'
+          - last:
+              set: '${ . + { last: true } }'
+    - after:
+        set: '${ . + { after: true } }'
+input: { a: 1 }
+end:
+  completed:
+    output: { a: 1, after: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/do/0/guard }
+    - { kind: task.started, task: /do/0/outer/do/0/guard }
+    - { kind: task.created, task: /do/0/outer/do/0/guard/try/0/fail }
+    - { kind: task.started, task: /do/0/outer/do/0/guard/try/0/fail }
+    - { kind: task.faulted, task: /do/0/outer/do/0/guard/try/0/fail }
+    - { kind: task.completed, task: /do/0/outer/do/0/guard }
+    - { kind: task.completed, task: /do/0/outer }
+    - { kind: task.created, task: /do/1/after }
+    - { kind: task.started, task: /do/1/after }
+    - { kind: task.completed, task: /do/1/after }
+    - kind: workflow.completed

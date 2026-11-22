@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  do:
+    - log:
+        call: https://functions.example.com/log.yaml
+        with:
+          message: hello
+imports:
+  https://functions.example.com/log.yaml: |
+    set:
+      logged: ${ frobnicate(.message) }
+diagnostics:
+  - code: expression
+    pointer: /do/0/log
+    range: { start: { line: 8, column: 7 } }

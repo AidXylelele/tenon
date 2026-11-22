@@ -1,0 +1,52 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-function
+    version: '1.0.0'
+  use:
+    functions:
+      sayHello:
+        run:
+          shell:
+            command: echo
+            arguments:
+              - ${ .name }
+  do:
+    - greet:
+        call: sayHello
+        with:
+          name: Ann
+input: {}
+script:
+  - effect:
+      id: /do/0/greet@function
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: echo
+        stdin: null
+        arguments: [Ann]
+        directory: null
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: "Ann\n", stderr: "" }
+    now: 1767225601000
+end:
+  completed:
+    output: "Ann\n"
+facts:
+  including:
+    - {
+        kind: task.started,
+        task: /use/functions/sayHello,
+        execution: /do/0/greet@function,
+      }
+    - {
+        kind: task.completed,
+        task: /use/functions/sayHello,
+        execution: /do/0/greet@function,
+      }
+    - { kind: task.completed, task: /do/0/greet, execution: /do/0/greet }
+    - kind: workflow.completed

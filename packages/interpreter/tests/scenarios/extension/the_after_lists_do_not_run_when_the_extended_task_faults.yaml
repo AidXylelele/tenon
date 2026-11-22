@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-fault
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: raise
+          after:
+            - record:
+                set: { recorded: true }
+  do:
+    - fail:
+        raise:
+          error:
+            type: https://example.com/errors/broken
+            status: 503
+input: {}
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/broken
+      status: 503
+      instance: /do/0/fail
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/fail }
+    - { kind: task.started, task: /do/0/fail }
+    - { kind: task.faulted, task: /do/0/fail }
+    - kind: workflow.faulted

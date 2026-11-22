@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - publish:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: notifyPets
+          protocol: kafka
+          message:
+            payload:
+              petId: 1
+profile:
+  asyncApiProtocols: [amqp, http, mqtt, nats, ws]
+diagnostics:
+  - code: capability
+    pointer: /do/0/publish
+    subject: asyncapi.kafka
+    range: { start: { line: 8, column: 7 } }

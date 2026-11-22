@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: times
+    version: '0.1.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: hello-world
+            lifetime:
+              cleanup: eventually
+              after: P1M
+diagnostics:
+  - code: duration
+    pointer: /do/0/runContainer/run/container/lifetime/after
+    range: { start: { line: 13, column: 20 } }
+    message: "Container lifetime 'P1M' must have a fixed length: no years, months or weeks."

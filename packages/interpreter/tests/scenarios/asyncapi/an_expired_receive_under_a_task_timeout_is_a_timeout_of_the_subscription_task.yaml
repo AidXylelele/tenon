@@ -1,0 +1,69 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-expired
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+        timeout:
+          after: PT10S
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: 1767225610000,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/watch@message[1]",
+        kind: asyncapi,
+        deadline: 1767225610000,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 1,
+            closesAt: null,
+          },
+      }
+    outcome: { kind: expired }
+    now: 1767225610000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/watch
+      title: Timeout
+facts:
+  including:
+    - {
+        kind: task.faulted,
+        task: /do/0/watch,
+        faultedAt: "2026-01-01T00:00:10.000Z",
+      }
+    - kind: workflow.faulted

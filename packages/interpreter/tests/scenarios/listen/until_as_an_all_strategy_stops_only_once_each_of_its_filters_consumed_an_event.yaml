@@ -1,0 +1,108 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-until-all
+    version: '1.0.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until:
+              all:
+                - with:
+                    type: com.example.door.closed
+                - with:
+                    type: com.example.window.closed
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/readings@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 1 },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/readings@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: d-1,
+          source: https://sensors.example.com,
+          type: com.example.door.closed,
+          data: { door: front },
+        }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/readings@event[2]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 2,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-2,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 2 },
+        }
+    now: 1767225603000
+  - effect:
+      {
+        id: "/do/0/readings@event[3]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 3,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: w-1,
+          source: https://sensors.example.com,
+          type: com.example.window.closed,
+          data: { window: left },
+        }
+    now: 1767225604000
+end:
+  completed:
+    output: [{ n: 1 }, { n: 2 }]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/readings,
+        completedAt: "2026-01-01T00:00:04.000Z",
+      }
+    - kind: workflow.completed

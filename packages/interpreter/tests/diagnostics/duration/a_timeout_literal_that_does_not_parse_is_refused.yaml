@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: times
+    version: '0.1.0'
+  do:
+    - greet:
+        set:
+          message: hello
+        timeout:
+          after: PT1.5H30M
+diagnostics:
+  - code: duration
+    pointer: /do/0/greet/timeout/after
+    range: { start: { line: 11, column: 16 } }

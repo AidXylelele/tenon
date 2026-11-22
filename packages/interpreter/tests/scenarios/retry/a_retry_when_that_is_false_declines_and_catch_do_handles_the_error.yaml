@@ -1,0 +1,42 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-when-false
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            when: '${ $error.status == 500 }'
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+          do:
+            - handle:
+                set: { handled: true }
+input: {}
+end:
+  completed:
+    output: { handled: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, execution: /do/0/guard }
+    - { kind: task.started, execution: /do/0/guard }
+    - { kind: task.created, execution: /do/0/guard/try/0/fail }
+    - { kind: task.started, execution: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, execution: /do/0/guard/try/0/fail }
+    - { kind: task.created, execution: /do/0/guard/catch/do/0/handle }
+    - { kind: task.started, execution: /do/0/guard/catch/do/0/handle }
+    - { kind: task.completed, execution: /do/0/guard/catch/do/0/handle }
+    - { kind: task.completed, execution: /do/0/guard }
+    - kind: workflow.completed

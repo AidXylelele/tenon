@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-attempt-duration-failure
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - pause:
+              wait: PT1S
+        catch:
+          retry:
+            limit:
+              attempt:
+                duration: '${ "soon" }'
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/guard
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.faulted, task: /do/0/guard }
+    - kind: workflow.faulted

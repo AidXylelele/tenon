@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-end
+    version: '1.0.0'
+  use:
+    extensions:
+      - stop:
+          extend: set
+          before:
+            - halt:
+                set: { halted: true }
+                then: end
+  do:
+    - greet:
+        set: { greeting: Hello }
+        output:
+          as: '${ { shown: . } }'
+    - never:
+        set: { never: true }
+input: {}
+end:
+  completed:
+    output: { shown: { halted: true } }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/stop/before/0/halt
+      execution: "/do/0/greet@before/0/0/halt"
+    - kind: task.started
+      task: /use/extensions/0/stop/before/0/halt
+      execution: "/do/0/greet@before/0/0/halt"
+    - kind: task.completed
+      task: /use/extensions/0/stop/before/0/halt
+      execution: "/do/0/greet@before/0/0/halt"
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

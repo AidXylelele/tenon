@@ -1,0 +1,65 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-one-foreach
+    version: '1.0.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.order.placed
+        foreach:
+          item: order
+          do:
+            - label:
+                set:
+                  label: '${ "order " + $order.id }'
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/waitForOrder@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/waitForOrder,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { id: o-1 },
+        }
+    now: 1767225601000
+end:
+  completed:
+    output: [{ label: order o-1 }]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/waitForOrder }
+    - { kind: task.started, task: /do/0/waitForOrder }
+    - {
+        kind: task.created,
+        task: /do/0/waitForOrder/foreach/do/0/label,
+        execution: "/do/0/waitForOrder[0]/foreach/do/0/label",
+      }
+    - {
+        kind: task.started,
+        task: /do/0/waitForOrder/foreach/do/0/label,
+        execution: "/do/0/waitForOrder[0]/foreach/do/0/label",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/waitForOrder/foreach/do/0/label,
+        execution: "/do/0/waitForOrder[0]/foreach/do/0/label",
+      }
+    - { kind: task.completed, task: /do/0/waitForOrder }
+    - kind: workflow.completed

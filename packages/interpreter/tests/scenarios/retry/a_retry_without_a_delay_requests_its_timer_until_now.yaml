@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-no-delay
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            limit:
+              attempt:
+                count: 1
+input: {}
+start:
+  now: 1767225600500
+end:
+  waiting:
+    effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225600500,
+      }
+facts:
+  including:
+    - { kind: task.faulted, execution: /do/0/guard/try/0/fail }
+    - kind: task.retried
+      execution: /do/0/guard
+      retriedAt: "2026-01-01T00:00:00.500Z"

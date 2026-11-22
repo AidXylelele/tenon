@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.2.0'
+    namespace: test
+    name: next-minor
+    version: '0.1.0'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: dsl-version
+    pointer: /document/dsl
+    range: { start: { line: 2, column: 8 } }

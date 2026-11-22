@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: run-shell-external-script
+    version: 1.0.0
+  do:
+    - setInput:
+        set:
+          name: World
+    - greet:
+        input:
+          from: ${ .name }
+        run:
+          shell:
+            command: python3 /path/to/greet.py
+            stdin: ${ . }
+            arguments:
+              - --greeting
+              - Hello
+            environment:
+              LOG_LEVEL: info
+input: {}
+script:
+  - effect:
+      id: /do/1/greet
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: python3 /path/to/greet.py
+        stdin: World
+        arguments: [--greeting, Hello]
+        directory: null
+        environment: { LOG_LEVEL: info }
+      await: true
+    outcome: { kind: exited, code: 0, stdout: "Hello, World\n", stderr: "" }
+    now: 1767225601000
+end:
+  completed:
+    output: "Hello, World\n"
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/setInput }
+    - { kind: task.completed, task: /do/1/greet }
+    - kind: workflow.completed

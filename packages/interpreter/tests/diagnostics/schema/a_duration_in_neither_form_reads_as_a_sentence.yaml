@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: sentences
+    version: '1.0.0'
+  do:
+    - first:
+        wait: PT5X
+diagnostics:
+  - code: schema
+    pointer: /do/0/first/wait
+    message: PT5X is not a duration.

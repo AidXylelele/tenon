@@ -1,0 +1,44 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-input
+    version: '1.0.0'
+  do:
+    - guard:
+        input:
+          from: '${ { a: .a } }'
+        try:
+          - record:
+              set: '${ . + { seen: ((.seen // 0) + 1) } }'
+          - fail:
+              if: '${ now < 1767225601 }'
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: { a: 1, noise: true }
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: { a: 1, seen: 1 }
+facts:
+  including:
+    - { kind: task.completed, execution: "/do/0/guard#2/try/0/record" }
+    - kind: workflow.completed

@@ -1,0 +1,25 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/greeter.proto
+          service:
+            name: GreeterApi.Greeter
+            host: example.com
+            authentication:
+              digest:
+                username: admin
+                password: secret
+          method: SayHello
+diagnostics:
+  - code: capability
+    pointer: /do/0/greet
+    subject: authentication.digest
+    range: { start: { line: 8, column: 7 } }

@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schema-default-format
+    version: '1.0.0'
+  do:
+    - check:
+        input:
+          schema:
+            document:
+              type: object
+              properties:
+                count: { type: integer }
+        set: { ran: true }
+input: { count: many }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      instance: /do/0/check
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/check }
+    - kind: workflow.faulted

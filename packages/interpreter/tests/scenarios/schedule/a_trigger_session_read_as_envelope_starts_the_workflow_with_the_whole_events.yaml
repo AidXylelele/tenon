@@ -1,0 +1,53 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+    read: envelope
+  do:
+    - keep:
+        set: ${ . }
+correlate: true
+script:
+  - effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { order: o-1 },
+          subject: order-o-1,
+        }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      - {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { order: o-1 },
+          subject: order-o-1,
+        }
+facts:
+  including:
+    - kind: workflow.correlation-completed
+    - kind: workflow.started
+    - kind: workflow.completed

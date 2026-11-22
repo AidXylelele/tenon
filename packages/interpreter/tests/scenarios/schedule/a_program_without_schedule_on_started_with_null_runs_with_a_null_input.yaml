@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    every: PT1H
+  do:
+    - keep:
+        set:
+          input: ${ . }
+          raw: ${ $workflow.input }
+input: null
+end:
+  completed:
+    output: { input: null, raw: null }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/keep }
+    - { kind: task.started, task: /do/0/keep }
+    - { kind: task.completed, task: /do/0/keep }
+    - kind: workflow.completed

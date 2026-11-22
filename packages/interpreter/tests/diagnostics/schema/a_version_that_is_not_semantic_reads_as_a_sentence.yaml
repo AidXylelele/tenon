@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: sentences
+    version: '1 minute'
+  do:
+    - first:
+        wait: PT5S
+diagnostics:
+  - code: schema
+    pointer: /document/version
+    message: Version must look like 1.0.0.

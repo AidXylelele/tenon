@@ -1,0 +1,43 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: export-as-arguments
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        export:
+          as: '${ { exported: .a } }'
+    - observe:
+        input:
+          from: '${ { b: .a } }'
+        set: { c: 2 }
+        output:
+          as: '${ { d: .c } }'
+        export:
+          as: '${ { dot: ., output: $output, input: $input, context: $context, task: ($task | { name, reference, input, output }), workflow: $workflow.id, runtime: $runtime.name, authorization: $authorization } }'
+    - recall:
+        set: '${ $context }'
+input: {}
+end:
+  completed:
+    output:
+      dot: { d: 2 }
+      output: { d: 2 }
+      input: { b: 1 }
+      context: { exported: 1 }
+      task:
+        {
+          name: observe,
+          reference: /do/1/observe,
+          input: { a: 1 },
+          output: { c: 2 },
+        }
+      workflow: instance-1
+      runtime: interpreter-tests
+      authorization: null
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

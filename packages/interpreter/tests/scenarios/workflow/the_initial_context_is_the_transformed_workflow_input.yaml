@@ -1,0 +1,19 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: initial-context
+    version: '1.0.0'
+  input:
+    from: .order
+  do:
+    - inspect:
+        set: '${ { context: $context } }'
+input: { order: { id: 7 }, noise: true }
+end:
+  completed:
+    output: { context: { id: 7 } }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

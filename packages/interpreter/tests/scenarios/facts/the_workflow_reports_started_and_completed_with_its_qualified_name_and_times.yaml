@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: samples
+    name: order
+    version: '1.2.3'
+  do:
+    - pause:
+        wait:
+          seconds: 2
+input: {}
+start:
+  instanceId: run-42
+  now: 1767225600000
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225602000 }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  completed:
+    output: {}
+facts:
+  exactly:
+    - kind: workflow.started
+      name: order-run-42.samples
+      definition: { namespace: samples, name: order, version: "1.2.3" }
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.created
+      workflow: order-run-42.samples
+      task: /do/0/pause
+      execution: /do/0/pause
+      createdAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.started
+      workflow: order-run-42.samples
+      task: /do/0/pause
+      execution: /do/0/pause
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.completed
+      workflow: order-run-42.samples
+      task: /do/0/pause
+      execution: /do/0/pause
+      completedAt: "2026-01-01T00:00:02.000Z"
+    - kind: workflow.completed
+      name: order-run-42.samples
+      completedAt: "2026-01-01T00:00:02.000Z"

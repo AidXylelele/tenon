@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - greet:
+        run:
+          shell:
+            command: echo hello
+profile:
+  processes: [container, script]
+diagnostics:
+  - code: capability
+    pointer: /do/0/greet
+    subject: process.shell
+    range: { start: { line: 8, column: 7 } }

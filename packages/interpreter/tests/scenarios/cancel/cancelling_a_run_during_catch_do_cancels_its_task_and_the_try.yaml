@@ -1,0 +1,51 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cancel-catch-do
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          do:
+            - recover:
+                wait: PT10S
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/guard/catch/do/0/recover,
+        kind: timer,
+        deadline: null,
+        until: 1767225610000,
+      }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/fail }
+    - { kind: task.started, task: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - { kind: task.created, task: /do/0/guard/catch/do/0/recover }
+    - { kind: task.started, task: /do/0/guard/catch/do/0/recover }
+    - kind: task.cancelled
+      task: /do/0/guard/catch/do/0/recover
+      execution: /do/0/guard/catch/do/0/recover
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: task.cancelled
+      task: /do/0/guard
+      execution: /do/0/guard
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: workflow.cancelled
+      cancelledAt: "2026-01-01T00:00:05.000Z"

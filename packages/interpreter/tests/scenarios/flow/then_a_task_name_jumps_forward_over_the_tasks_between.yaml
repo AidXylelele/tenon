@@ -1,0 +1,28 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: jump-forward
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        then: third
+    - second:
+        set: '${ . + { second: true } }'
+    - third:
+        set: '${ . + { third: true } }'
+input: {}
+end:
+  completed:
+    output: { a: 1, third: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/first }
+    - { kind: task.started, task: /do/0/first }
+    - { kind: task.completed, task: /do/0/first }
+    - { kind: task.created, task: /do/2/third }
+    - { kind: task.started, task: /do/2/third }
+    - { kind: task.completed, task: /do/2/third }
+    - kind: workflow.completed

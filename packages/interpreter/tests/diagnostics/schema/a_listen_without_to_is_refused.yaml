@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-without-to
+    version: '0.1.0'
+  do:
+    - waitForOrder:
+        listen:
+          read: envelope
+diagnostics:
+  - code: schema
+    pointer: /do/0/waitForOrder/listen

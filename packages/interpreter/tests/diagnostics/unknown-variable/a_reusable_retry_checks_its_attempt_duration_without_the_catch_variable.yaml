@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  use:
+    retries:
+      bounded:
+        limit:
+          attempt:
+            duration: '${ $error.detail }'
+  do:
+    - attempt:
+        try:
+          - pause:
+              wait: PT1S
+        catch:
+          retry: bounded
+diagnostics:
+  - code: unknown-variable
+    pointer: /use/retries/bounded/limit/attempt/duration
+    subject: $error
+    range: { start: { line: 11, column: 21 } }

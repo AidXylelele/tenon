@@ -1,0 +1,21 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: jq-halt
+    version: '1.0.0'
+  do:
+    - stop:
+        set:
+          value: '${ halt }'
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      instance: /do/0/stop
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/stop }
+    - kind: workflow.faulted

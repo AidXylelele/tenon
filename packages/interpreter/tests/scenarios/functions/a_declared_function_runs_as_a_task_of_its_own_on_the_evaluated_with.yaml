@@ -1,0 +1,42 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-declared
+    version: '1.0.0'
+  use:
+    functions:
+      greet:
+        set:
+          message: ${ "Hello, " + .name }
+  do:
+    - sayHello:
+        call: greet
+        with:
+          name: ${ .user }
+input: { user: Ann }
+end:
+  completed:
+    output: { message: "Hello, Ann" }
+facts:
+  exactly:
+    - kind: workflow.started
+    - kind: task.created
+      task: /do/0/sayHello
+      execution: /do/0/sayHello
+    - kind: task.started
+      task: /do/0/sayHello
+      execution: /do/0/sayHello
+    - kind: task.created
+      task: /use/functions/greet
+      execution: /do/0/sayHello@function
+    - kind: task.started
+      task: /use/functions/greet
+      execution: /do/0/sayHello@function
+    - kind: task.completed
+      task: /use/functions/greet
+      execution: /do/0/sayHello@function
+    - kind: task.completed
+      task: /do/0/sayHello
+      execution: /do/0/sayHello
+    - kind: workflow.completed

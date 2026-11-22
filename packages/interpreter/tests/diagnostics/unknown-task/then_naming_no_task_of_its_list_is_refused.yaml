@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - start:
+        set:
+          a: 1
+        then: finish
+diagnostics:
+  - code: unknown-task
+    pointer: /do/0/start/then
+    subject: finish
+    range: { start: { line: 10, column: 13 } }
+    message: "Task 'finish' is not declared in this list."

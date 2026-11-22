@@ -1,0 +1,52 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-output
+    version: '1.0.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.order.placed
+        output:
+          as: '${ { count: length, order: .[0].order } }'
+        export:
+          as: '${ { lastOrder: .order } }'
+    - report:
+        set:
+          received: '${ . }'
+          context: '${ $context }'
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/waitForOrder@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/waitForOrder,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { order: o-1 },
+        }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      received: { count: 1, order: o-1 }
+      context: { lastOrder: o-1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/waitForOrder }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

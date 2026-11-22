@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-exit
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [a, b]
+        do:
+          - mark:
+              set: '${ . + { marks: (.marks + [$item]) } }'
+              then: exit
+          - never:
+              set: '${ . + { never: true } }'
+input: {}
+end:
+  completed:
+    output: { marks: [a, b] }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/loop/do/0/mark,
+        execution: "/do/0/loop[0]/do/0/mark",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/loop/do/0/mark,
+        execution: "/do/0/loop[1]/do/0/mark",
+      }
+    - { kind: task.completed, task: /do/0/loop }
+    - kind: workflow.completed

@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-workflow-faulted-custom
+    version: '1.0.0'
+  do:
+    - runChild:
+        run:
+          workflow:
+            namespace: billing
+            name: charge
+            version: '1.0.0'
+            input: {}
+input: {}
+script:
+  - effect:
+      id: /do/0/runChild
+      kind: workflow
+      deadline: null
+      namespace: billing
+      name: charge
+      version: "1.0.0"
+      input: {}
+      await: true
+    outcome:
+      kind: faulted
+      error:
+        type: https://example.com/errors/card-declined
+        status: 402
+        instance: /do/0/declined
+        title: Card Declined
+        detail: insufficient funds
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/card-declined
+      status: 402
+      instance: /do/0/runChild
+      title: Card Declined
+      detail: insufficient funds
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runChild }
+    - { kind: task.started, task: /do/0/runChild }
+    - {
+        kind: task.faulted,
+        task: /do/0/runChild,
+        execution: /do/0/runChild,
+        faultedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:01.000Z" }

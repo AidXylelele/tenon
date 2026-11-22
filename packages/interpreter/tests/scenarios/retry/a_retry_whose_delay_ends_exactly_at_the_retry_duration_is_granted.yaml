@@ -1,0 +1,49 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-duration-boundary
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              duration:
+                seconds: 2
+              attempt:
+                count: 2
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  waiting:
+    effect:
+      {
+        id: "/do/0/guard#3@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+facts:
+  including:
+    - { kind: task.faulted, execution: "/do/0/guard#2/try/0/fail" }
+    - kind: task.retried
+      execution: /do/0/guard
+      retriedAt: "2026-01-01T00:00:01.000Z"

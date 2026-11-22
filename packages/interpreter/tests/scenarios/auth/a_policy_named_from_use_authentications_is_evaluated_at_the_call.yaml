@@ -1,0 +1,47 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: named-policy
+    version: '1.0.0'
+  use:
+    authentications:
+      petStoreAuth:
+        bearer:
+          token: ${ .token }
+  do:
+    - sampleTask:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://secured.example.com/sample
+            authentication:
+              use: petStoreAuth
+input: { token: task-token }
+script:
+  - effect:
+      id: /do/0/sampleTask
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://secured.example.com/sample
+        authentication: { kind: bearer, token: task-token }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://secured.example.com/sample
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { ok: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/sampleTask }
+    - kind: workflow.completed

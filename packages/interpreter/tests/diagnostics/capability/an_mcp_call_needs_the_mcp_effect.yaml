@@ -1,0 +1,34 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - listTools:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+profile:
+  effects:
+    [
+      http,
+      openapi,
+      grpc,
+      asyncapi,
+      a2a,
+      process,
+      workflow,
+      fork,
+      timer,
+      emit,
+      listen,
+      resource,
+    ]
+diagnostics:
+  - code: capability
+    pointer: /do/0/listTools
+    subject: effect.mcp

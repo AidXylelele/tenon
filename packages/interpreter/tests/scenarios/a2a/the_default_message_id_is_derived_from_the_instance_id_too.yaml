@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-send-instance
+    version: '1.0.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: message/send
+          server: https://agent.example.com/a2a
+          parameters:
+            message:
+              parts:
+                - kind: text
+                  text: ${ .prompt }
+input: { prompt: Generate the Q1 sales report. }
+start:
+  instanceId: instance-2
+end:
+  waiting:
+    effect:
+      id: /do/0/askAgent
+      kind: a2a
+      deadline: null
+      parameters:
+        message:
+          parts: [{ kind: text, text: Generate the Q1 sales report. }]
+          messageId: f5923b9e-b88e-505c-af6e-11f1edd5be0b
+          role: user
+facts:
+  including:
+    - { kind: task.started, task: /do/0/askAgent }

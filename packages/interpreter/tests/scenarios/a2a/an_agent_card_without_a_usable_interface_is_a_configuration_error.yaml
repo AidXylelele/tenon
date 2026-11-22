@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-failure
+    version: '1.0.0'
+  do:
+    - getTask:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agent.example.com/a2a
+          parameters:
+            id: task-1
+input: {}
+script:
+  - effect: { id: /do/0/getTask, kind: a2a, deadline: null }
+    outcome:
+      { kind: misconfigured, detail: the card offers no JSON-RPC interface }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/getTask
+      title: Configuration Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getTask, execution: /do/0/getTask }
+    - kind: workflow.faulted

@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-task-timeout-nearer
+    version: '1.0.0'
+  do:
+    - callTool:
+        timeout:
+          after: PT5S
+        call: mcp
+        with:
+          method: tools/list
+          timeout: PT30S
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: /do/0/callTool,
+        kind: mcp,
+        deadline: 1767225605000,
+        method: tools/list,
+      }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/callTool }

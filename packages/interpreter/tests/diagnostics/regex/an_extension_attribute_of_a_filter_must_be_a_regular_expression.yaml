@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: filters
+    version: '0.1.0'
+  do:
+    - admit:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.heartbeat.low
+                patientid: 'p-[0-9'
+diagnostics:
+  - code: regex
+    pointer: /do/0/admit/listen/to/one/with/patientid
+    range: { start: { line: 13, column: 26 } }

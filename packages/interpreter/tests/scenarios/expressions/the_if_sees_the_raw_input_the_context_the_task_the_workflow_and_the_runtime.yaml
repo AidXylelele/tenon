@@ -1,0 +1,22 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: if-arguments
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        export:
+          as: '${ { exported: .a } }'
+    - checked:
+        if: '${ . == { a: 1 } and $context == { exported: 1 } and $task.name == "checked" and $task.reference == "/do/1/checked" and $task.input == { a: 1 } and $workflow.id == "instance-1" and $runtime.name == "interpreter-tests" }'
+        set: { ran: true }
+input: {}
+end:
+  completed:
+    output: { ran: true }
+facts:
+  including:
+    - { kind: task.started, task: /do/1/checked }
+    - kind: workflow.completed

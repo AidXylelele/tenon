@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-uri-template-object
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/{petId}
+input: { petId: { id: 1 } }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      instance: /do/0/getPet
+      title: Expression Error
+facts:
+  including:
+    - { kind: task.started, task: /do/0/getPet }
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

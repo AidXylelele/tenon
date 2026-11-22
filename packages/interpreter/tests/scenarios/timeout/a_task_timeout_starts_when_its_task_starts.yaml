@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-start
+    version: '1.0.0'
+  do:
+    - first:
+        wait: PT10S
+    - second:
+        wait: PT1M
+        timeout:
+          after: PT5S
+input: {}
+script:
+  - effect:
+      { id: /do/0/first, kind: timer, deadline: null, until: 1767225610000 }
+    outcome: { kind: elapsed }
+    now: 1767225610000
+end:
+  waiting:
+    effect:
+      {
+        id: /do/1/second,
+        kind: timer,
+        deadline: 1767225615000,
+        until: 1767225670000,
+      }
+facts:
+  including:
+    - { kind: task.started, task: /do/1/second }

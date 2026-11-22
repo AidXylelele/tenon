@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - compute:
+        if: '${ $input.ready }'
+        set:
+          a: 1
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/compute/if
+    subject: $input
+    range: { start: { line: 8, column: 11 } }

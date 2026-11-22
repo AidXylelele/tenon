@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: wait-calendar
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: P1M
+input: {}
+start:
+  now: 1769817600000
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1772236800000 }
+    outcome: { kind: elapsed }
+    now: 1772236800000
+end:
+  completed:
+    output: {}
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/pause }
+    - kind: workflow.completed

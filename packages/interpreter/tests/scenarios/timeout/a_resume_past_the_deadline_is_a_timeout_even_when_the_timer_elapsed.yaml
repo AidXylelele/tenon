@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-late-resume
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT10S
+        timeout:
+          after: PT5S
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/pause,
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225610000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225610000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/pause
+      title: Timeout
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/pause }
+    - kind: workflow.faulted

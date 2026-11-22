@@ -1,0 +1,60 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit
+    version: '0.1.0'
+  do:
+    - emitEvent:
+        emit:
+          event:
+            with:
+              source: https://petstore.com
+              type: com.petstore.order.placed.v1
+              data:
+                client:
+                  firstName: Cruella
+                  lastName: de Vil
+                items:
+                  - breed: dalmatian
+                    quantity: 101
+input: {}
+script:
+  - effect:
+      id: "/do/0/emitEvent"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: 83f35ae1-0b6f-5a16-8ab1-e5504d102346
+        source: https://petstore.com
+        type: com.petstore.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        data:
+          client: { firstName: Cruella, lastName: de Vil }
+          items: [{ breed: dalmatian, quantity: 101 }]
+    outcome: { kind: emitted }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      specversion: "1.0"
+      id: 83f35ae1-0b6f-5a16-8ab1-e5504d102346
+      source: https://petstore.com
+      type: com.petstore.order.placed.v1
+      time: "2026-01-01T00:00:00.000Z"
+      data:
+        client: { firstName: Cruella, lastName: de Vil }
+        items: [{ breed: dalmatian, quantity: 101 }]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/emitEvent, execution: /do/0/emitEvent }
+    - { kind: task.started, task: /do/0/emitEvent, execution: /do/0/emitEvent }
+    - {
+        kind: task.completed,
+        task: /do/0/emitEvent,
+        execution: /do/0/emitEvent,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

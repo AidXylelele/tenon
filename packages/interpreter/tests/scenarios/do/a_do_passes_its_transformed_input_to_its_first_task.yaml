@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: do-input
+    version: '1.0.0'
+  do:
+    - group:
+        input:
+          from: .inner
+        do:
+          - first:
+              set: '${ { received: . } }'
+input: { inner: { x: 1 }, outer: true }
+end:
+  completed:
+    output: { received: { x: 1 } }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/group/do/0/first,
+        execution: /do/0/group/do/0/first,
+      }
+    - { kind: task.completed, task: /do/0/group, execution: /do/0/group }
+    - kind: workflow.completed

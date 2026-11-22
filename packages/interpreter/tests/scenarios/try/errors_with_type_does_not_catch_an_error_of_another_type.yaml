@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: pass-type
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 503
+                  title: Broken
+                  detail: Nothing works
+        catch:
+          errors:
+            with:
+              type: https://example.com/errors/other
+input: { a: 1 }
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/broken
+      status: 503
+      instance: /do/0/guard/try/0/fail
+      title: Broken
+      detail: Nothing works
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, task: /do/0/guard }
+    - kind: workflow.faulted

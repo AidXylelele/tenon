@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: times
+    version: '0.1.0'
+  do:
+    - pause:
+        wait:
+          days: 1e300
+diagnostics:
+  - code: duration
+    pointer: /do/0/pause/wait
+    range: { start: { line: 9, column: 9 } }

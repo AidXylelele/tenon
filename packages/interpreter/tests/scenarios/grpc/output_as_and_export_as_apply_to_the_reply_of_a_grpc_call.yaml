@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-output-export
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: SayHello
+          arguments:
+            name: ${ .name }
+        output:
+          as: '${ { greeting: .message } }'
+        export:
+          as: '${ { lastGreeting: .greeting } }'
+    - report:
+        set: '${ { greeted: ., context: $context } }'
+input: { name: Ann }
+script:
+  - effect: { id: /do/0/greet, kind: grpc, deadline: null }
+    outcome: { kind: replied, message: { message: "Hello, Ann" } }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      greeted: { greeting: "Hello, Ann" }
+      context: { lastGreeting: "Hello, Ann" }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/greet }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

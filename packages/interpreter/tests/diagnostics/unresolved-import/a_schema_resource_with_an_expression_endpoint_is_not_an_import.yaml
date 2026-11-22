@@ -1,0 +1,15 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  input:
+    schema:
+      resource:
+        endpoint: '${ .schemaUri }'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics: []

@@ -1,0 +1,57 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-retry
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - note:
+                set: { noted: true }
+  do:
+    - guard:
+        try:
+          - step:
+              set: { stepped: true }
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225600000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225600000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/busy
+      status: 503
+      instance: /do/0/guard/try/1/fail
+facts:
+  including:
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/guard/try/0/step@before/0/0/note"
+    - { kind: task.completed, execution: /do/0/guard/try/0/step }
+    - { kind: task.faulted, execution: /do/0/guard/try/1/fail }
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/note
+      execution: "/do/0/guard#2/try/0/step@before/0/0/note"
+    - { kind: task.completed, execution: "/do/0/guard#2/try/0/step" }
+    - { kind: task.faulted, execution: "/do/0/guard#2/try/1/fail" }

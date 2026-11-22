@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-two-strategies
+    version: '0.1.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.order.placed
+            all:
+              - with:
+                  type: com.example.order.paid
+diagnostics:
+  - code: schema
+    pointer: /do/0/waitForOrder/listen/to

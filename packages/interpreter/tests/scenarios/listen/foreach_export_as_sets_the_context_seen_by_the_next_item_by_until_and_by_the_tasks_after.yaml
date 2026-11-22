@@ -1,0 +1,75 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-foreach-export
+    version: '1.0.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until: '${ $context.total >= 5 }'
+        foreach:
+          do:
+            - seen:
+                set:
+                  before: ${ $context.total }
+          export:
+            as: '${ { total: (($context.total // 0) + $item.n) } }'
+    - report:
+        set:
+          items: ${ . }
+          context: ${ $context }
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/readings@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 2 },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/readings@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-2,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 3 },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output:
+      items: [{ before: null }, { before: 2 }]
+      context: { total: 5 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/readings }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

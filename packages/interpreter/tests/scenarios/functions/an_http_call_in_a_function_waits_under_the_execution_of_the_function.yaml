@@ -1,0 +1,60 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-http
+    version: '1.0.0'
+  use:
+    functions:
+      getPetById:
+        input:
+          schema:
+            document:
+              type: object
+              properties:
+                petId:
+                  type: integer
+              required: [ petId ]
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/{petId}
+  do:
+    - getPet:
+        call: getPetById
+        with:
+          petId: 69
+input: {}
+script:
+  - effect:
+      id: /do/0/getPet@function
+      kind: http
+      deadline: null
+      method: GET
+      endpoint:
+        uri: https://petstore.swagger.io/v2/pet/69
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/69
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 69, name: Milou }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 69, name: Milou }
+facts:
+  including:
+    - kind: task.started
+      task: /use/functions/getPetById
+      execution: /do/0/getPet@function
+    - kind: task.completed
+      task: /use/functions/getPetById
+      execution: /do/0/getPet@function
+    - { kind: task.completed, task: /do/0/getPet, execution: /do/0/getPet }
+    - kind: workflow.completed

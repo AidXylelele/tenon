@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-schema
+    version: '0.1.0'
+  do:
+    - greet:
+        run:
+          container:
+            image: hello-world
+            lifetime:
+              cleanup: eventually
+diagnostics:
+  - code: schema
+    pointer: /do/0/greet/run/container/lifetime

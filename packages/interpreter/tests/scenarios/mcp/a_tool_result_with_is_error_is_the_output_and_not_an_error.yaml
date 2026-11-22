@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-tool-error-result
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/call
+          parameters:
+            name: fetch
+            arguments:
+              url: https://unreachable.example.com
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+input: {}
+script:
+  - effect:
+      { id: /do/0/callTool, kind: mcp, deadline: null, method: tools/call }
+    outcome:
+      kind: answered
+      result:
+        { content: [{ type: text, text: "Failed to fetch" }], isError: true }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      { content: [{ type: text, text: "Failed to fetch" }], isError: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/callTool }
+    - kind: workflow.completed

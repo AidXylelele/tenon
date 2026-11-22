@@ -1,0 +1,52 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-example
+    version: '0.1.0'
+  do:
+    - GenerateReport:
+        call: a2a
+        with:
+          method: message/send
+          agentCard:
+            endpoint: https://example.com/.well-known/agent-card.json
+          parameters:
+            message:
+              parts:
+                - kind: text
+                  text: Generate the Q1 sales report.
+input: {}
+script:
+  - effect:
+      id: /do/0/GenerateReport
+      kind: a2a
+      deadline: null
+      method: message/send
+      agent:
+        kind: card
+        card:
+          name: null
+          endpoint:
+            {
+              uri: https://example.com/.well-known/agent-card.json,
+              authentication: null,
+            }
+      parameters:
+        message:
+          parts: [{ kind: text, text: Generate the Q1 sales report. }]
+          messageId: a8cf6a89-44b7-53b0-89a3-c03b1a4f76ef
+          role: user
+    outcome:
+      {
+        kind: answered,
+        result: { kind: task, id: task-1, status: { state: completed } },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: { kind: task, id: task-1, status: { state: completed } }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/GenerateReport }
+    - kind: workflow.completed

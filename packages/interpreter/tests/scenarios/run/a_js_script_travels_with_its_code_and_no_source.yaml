@@ -1,0 +1,45 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-js
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: js
+            code: |
+              console.log('hello');
+input: {}
+script:
+  - effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: js
+        code: "console.log('hello');\n"
+        source: null
+        stdin: null
+        arguments: {}
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: "hello\n", stderr: "" }
+    now: 1767225601000
+end:
+  completed:
+    output: "hello\n"
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runScript, execution: /do/0/runScript }
+    - { kind: task.started, task: /do/0/runScript, execution: /do/0/runScript }
+    - {
+        kind: task.completed,
+        task: /do/0/runScript,
+        execution: /do/0/runScript,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

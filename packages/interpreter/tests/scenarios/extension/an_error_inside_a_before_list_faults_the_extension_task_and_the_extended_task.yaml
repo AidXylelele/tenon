@@ -1,0 +1,60 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-fault
+    version: '1.0.0'
+  use:
+    extensions:
+      - guard:
+          extend: set
+          before:
+            - deny:
+                raise:
+                  error:
+                    type: https://example.com/errors/denied
+                    status: 403
+  do:
+    - greet:
+        set: { greeting: Hello }
+    - never:
+        set: { never: true }
+input: {}
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/denied
+      status: 403
+      instance: /use/extensions/0/guard/before/0/deny
+      title: null
+      detail: null
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/guard/before/0/deny
+      execution: "/do/0/greet@before/0/0/deny"
+    - kind: task.started
+      task: /use/extensions/0/guard/before/0/deny
+      execution: "/do/0/greet@before/0/0/deny"
+    - kind: task.faulted
+      task: /use/extensions/0/guard/before/0/deny
+      execution: "/do/0/greet@before/0/0/deny"
+      error:
+        type: https://example.com/errors/denied
+        status: 403
+        instance: /use/extensions/0/guard/before/0/deny
+        title: null
+        detail: null
+    - kind: task.faulted
+      task: /do/0/greet
+      execution: /do/0/greet
+      error:
+        type: https://example.com/errors/denied
+        status: 403
+        instance: /use/extensions/0/guard/before/0/deny
+        title: null
+        detail: null
+    - kind: workflow.faulted

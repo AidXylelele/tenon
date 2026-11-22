@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-output
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.order.placed.v1
+              data:
+                order: ${ .order }
+input: { order: o-1 }
+script:
+  - effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: fda1d579-3f69-54e2-affe-94ef3ee98686
+        source: /test/emit-output/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        data: { order: o-1 }
+    outcome: { kind: emitted }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      specversion: "1.0"
+      id: fda1d579-3f69-54e2-affe-94ef3ee98686
+      source: /test/emit-output/1.0.0
+      type: com.example.order.placed.v1
+      time: "2026-01-01T00:00:00.000Z"
+      data: { order: o-1 }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/notify, execution: /do/0/notify }
+    - { kind: task.started, task: /do/0/notify, execution: /do/0/notify }
+    - {
+        kind: task.completed,
+        task: /do/0/notify,
+        execution: /do/0/notify,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

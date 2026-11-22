@@ -1,0 +1,202 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-methods
+    version: '1.0.0'
+  do:
+    - send:
+        call: a2a
+        with:
+          method: message/send
+          server: https://agent.example.com/a2a
+          parameters: { message: { messageId: m-1, role: user, parts: [{ kind: text, text: hi }] } }
+    - stream:
+        call: a2a
+        with:
+          method: message/stream
+          server: https://agent.example.com/a2a
+          parameters: { message: { messageId: m-2, role: user, parts: [{ kind: text, text: hi }] } }
+    - get:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agent.example.com/a2a
+          parameters: { id: task-1 }
+    - list:
+        call: a2a
+        with:
+          method: tasks/list
+          server: https://agent.example.com/a2a
+          parameters: { contextId: context-1 }
+    - cancelTask:
+        call: a2a
+        with:
+          method: tasks/cancel
+          server: https://agent.example.com/a2a
+          parameters: { id: task-1 }
+    - resubscribe:
+        call: a2a
+        with:
+          method: tasks/resubscribe
+          server: https://agent.example.com/a2a
+          parameters: { id: task-1 }
+    - setPush:
+        call: a2a
+        with:
+          method: tasks/pushNotificationConfig/set
+          server: https://agent.example.com/a2a
+          parameters: { taskId: task-1, pushNotificationConfig: { url: 'https://hooks.example.com/a2a' } }
+    - getPush:
+        call: a2a
+        with:
+          method: tasks/pushNotificationConfig/get
+          server: https://agent.example.com/a2a
+          parameters: { id: task-1 }
+    - listPush:
+        call: a2a
+        with:
+          method: tasks/pushNotificationConfig/list
+          server: https://agent.example.com/a2a
+          parameters: { id: task-1 }
+    - deletePush:
+        call: a2a
+        with:
+          method: tasks/pushNotificationConfig/delete
+          server: https://agent.example.com/a2a
+          parameters: { id: task-1, pushNotificationConfigId: config-1 }
+    - card:
+        call: a2a
+        with:
+          method: agent/getAuthenticatedExtendedCard
+          server: https://agent.example.com/a2a
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/send,
+        kind: a2a,
+        deadline: null,
+        method: message/send,
+        parameters:
+          {
+            message:
+              { messageId: m-1, role: user, parts: [{ kind: text, text: hi }] },
+          },
+      }
+    outcome: { kind: answered, result: { answeredBy: send } }
+    now: 1767225601000
+  - effect:
+      {
+        id: /do/1/stream,
+        kind: a2a,
+        deadline: null,
+        method: message/stream,
+        parameters:
+          {
+            message:
+              { messageId: m-2, role: user, parts: [{ kind: text, text: hi }] },
+          },
+      }
+    outcome: { kind: answered, result: { answeredBy: stream } }
+    now: 1767225602000
+  - effect:
+      {
+        id: /do/2/get,
+        kind: a2a,
+        deadline: null,
+        method: tasks/get,
+        parameters: { id: task-1 },
+      }
+    outcome: { kind: answered, result: { answeredBy: get } }
+    now: 1767225603000
+  - effect:
+      {
+        id: /do/3/list,
+        kind: a2a,
+        deadline: null,
+        method: tasks/list,
+        parameters: { contextId: context-1 },
+      }
+    outcome: { kind: answered, result: { answeredBy: list } }
+    now: 1767225604000
+  - effect:
+      {
+        id: /do/4/cancelTask,
+        kind: a2a,
+        deadline: null,
+        method: tasks/cancel,
+        parameters: { id: task-1 },
+      }
+    outcome: { kind: answered, result: { answeredBy: cancelTask } }
+    now: 1767225605000
+  - effect:
+      {
+        id: /do/5/resubscribe,
+        kind: a2a,
+        deadline: null,
+        method: tasks/resubscribe,
+        parameters: { id: task-1 },
+      }
+    outcome: { kind: answered, result: { answeredBy: resubscribe } }
+    now: 1767225606000
+  - effect:
+      {
+        id: /do/6/setPush,
+        kind: a2a,
+        deadline: null,
+        method: tasks/pushNotificationConfig/set,
+        parameters:
+          {
+            taskId: task-1,
+            pushNotificationConfig: { url: "https://hooks.example.com/a2a" },
+          },
+      }
+    outcome: { kind: answered, result: { answeredBy: setPush } }
+    now: 1767225607000
+  - effect:
+      {
+        id: /do/7/getPush,
+        kind: a2a,
+        deadline: null,
+        method: tasks/pushNotificationConfig/get,
+        parameters: { id: task-1 },
+      }
+    outcome: { kind: answered, result: { answeredBy: getPush } }
+    now: 1767225608000
+  - effect:
+      {
+        id: /do/8/listPush,
+        kind: a2a,
+        deadline: null,
+        method: tasks/pushNotificationConfig/list,
+        parameters: { id: task-1 },
+      }
+    outcome: { kind: answered, result: { answeredBy: listPush } }
+    now: 1767225609000
+  - effect:
+      {
+        id: /do/9/deletePush,
+        kind: a2a,
+        deadline: null,
+        method: tasks/pushNotificationConfig/delete,
+        parameters: { id: task-1, pushNotificationConfigId: config-1 },
+      }
+    outcome: { kind: answered, result: { answeredBy: deletePush } }
+    now: 1767225610000
+  - effect:
+      {
+        id: /do/10/card,
+        kind: a2a,
+        deadline: null,
+        method: agent/getAuthenticatedExtendedCard,
+      }
+    outcome: { kind: answered, result: { answeredBy: card } }
+    now: 1767225611000
+end:
+  completed:
+    output: { answeredBy: card }
+facts:
+  including:
+    - { kind: task.completed, task: /do/10/card }
+    - kind: workflow.completed

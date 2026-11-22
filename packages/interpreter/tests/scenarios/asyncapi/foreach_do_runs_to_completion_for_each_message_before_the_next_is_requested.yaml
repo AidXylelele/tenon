@@ -1,0 +1,149 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-foreach
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+            foreach:
+              do:
+              - record:
+                  call: http
+                  with:
+                    method: post
+                    endpoint: https://audit.example.com/messages
+                    body:
+                      text: ${ $item.payload.text }
+                      at: ${ $index }
+              output:
+                as: ${ $item.payload.text }
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/watch[0]/with/subscription/foreach/do/0/record"
+      kind: http
+      deadline: null
+      method: POST
+      endpoint:
+        { uri: https://audit.example.com/messages, authentication: null }
+      body: { text: a, at: 0 }
+    outcome:
+      kind: responded
+      request:
+        { method: POST, uri: https://audit.example.com/messages, headers: {} }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/watch@message[1]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 1,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: b }, headers: {}, correlationId: null },
+      }
+    now: 1767225603000
+  - effect:
+      id: "/do/0/watch[1]/with/subscription/foreach/do/0/record"
+      kind: http
+      deadline: null
+      method: POST
+      endpoint:
+        { uri: https://audit.example.com/messages, authentication: null }
+      body: { text: b, at: 1 }
+    outcome:
+      kind: responded
+      request:
+        { method: POST, uri: https://audit.example.com/messages, headers: {} }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225604000
+end:
+  completed:
+    output: [a, b]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/watch, execution: /do/0/watch }
+    - { kind: task.started, task: /do/0/watch, execution: /do/0/watch }
+    - {
+        kind: task.created,
+        task: "/do/0/watch/with/subscription/foreach/do/0/record",
+        execution: "/do/0/watch[0]/with/subscription/foreach/do/0/record",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/watch/with/subscription/foreach/do/0/record",
+        execution: "/do/0/watch[0]/with/subscription/foreach/do/0/record",
+      }
+    - {
+        kind: task.completed,
+        task: "/do/0/watch/with/subscription/foreach/do/0/record",
+        execution: "/do/0/watch[0]/with/subscription/foreach/do/0/record",
+        completedAt: "2026-01-01T00:00:02.000Z",
+      }
+    - {
+        kind: task.created,
+        task: "/do/0/watch/with/subscription/foreach/do/0/record",
+        execution: "/do/0/watch[1]/with/subscription/foreach/do/0/record",
+        createdAt: "2026-01-01T00:00:03.000Z",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/watch/with/subscription/foreach/do/0/record",
+        execution: "/do/0/watch[1]/with/subscription/foreach/do/0/record",
+      }
+    - {
+        kind: task.completed,
+        task: "/do/0/watch/with/subscription/foreach/do/0/record",
+        execution: "/do/0/watch[1]/with/subscription/foreach/do/0/record",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/watch,
+        execution: /do/0/watch,
+        completedAt: "2026-01-01T00:00:04.000Z",
+      }
+    - kind: workflow.completed

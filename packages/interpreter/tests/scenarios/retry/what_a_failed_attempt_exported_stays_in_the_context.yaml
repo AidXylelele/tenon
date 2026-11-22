@@ -1,0 +1,49 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-context
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - record:
+              set:
+                attempt: '${ ($context.attempts // 0) + 1 }'
+              export:
+                as: '${ { attempts: .attempt } }'
+          - fail:
+              if: '${ $context.attempts < 2 }'
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 3
+    - after:
+        set:
+          context: '${ $context }'
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: { context: { attempts: 2 } }
+facts:
+  including:
+    - { kind: task.faulted, execution: /do/0/guard/try/1/fail }
+    - { kind: task.completed, execution: "/do/0/guard#2/try/1/fail" }
+    - kind: workflow.completed

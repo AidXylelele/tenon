@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: then-exit-nested
+    version: '1.0.0'
+  do:
+    - outer:
+        do:
+          - first:
+              set: { a: 1 }
+              then: exit
+          - skipped:
+              set: { b: 2 }
+    - after:
+        set: '${ . + { after: true } }'
+input: {}
+end:
+  completed:
+    output: { a: 1, after: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/do/0/first }
+    - { kind: task.started, task: /do/0/outer/do/0/first }
+    - { kind: task.completed, task: /do/0/outer/do/0/first }
+    - { kind: task.completed, task: /do/0/outer }
+    - { kind: task.created, task: /do/1/after }
+    - { kind: task.started, task: /do/1/after }
+    - { kind: task.completed, task: /do/1/after }
+    - kind: workflow.completed

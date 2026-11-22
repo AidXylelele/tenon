@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: try-in-for
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [1, 2]
+        do:
+          - guard:
+              try:
+                - fail:
+                    raise:
+                      error:
+                        type: https://example.com/errors/broken
+                        status: 503
+              catch:
+                do:
+                  - note:
+                      set:
+                        recovered: '${ $item }'
+input: {}
+end:
+  completed:
+    output: { recovered: 2 }
+facts:
+  including:
+    - kind: task.faulted
+      task: /do/0/loop/do/0/guard/try/0/fail
+      execution: "/do/0/loop[0]/do/0/guard/try/0/fail"
+    - kind: task.completed
+      task: /do/0/loop/do/0/guard
+      execution: "/do/0/loop[0]/do/0/guard"
+    - kind: task.faulted
+      task: /do/0/loop/do/0/guard/try/0/fail
+      execution: "/do/0/loop[1]/do/0/guard/try/0/fail"
+    - kind: task.completed
+      task: /do/0/loop/do/0/guard/catch/do/0/note
+      execution: "/do/0/loop[1]/do/0/guard/catch/do/0/note"
+    - kind: task.completed
+      task: /do/0/loop/do/0/guard
+      execution: "/do/0/loop[1]/do/0/guard"
+    - { kind: task.completed, task: /do/0/loop, execution: /do/0/loop }
+    - kind: workflow.completed

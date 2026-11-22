@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-deadline
+    version: '1.0.0'
+  do:
+    - greet:
+        timeout:
+          after:
+            seconds: 10
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+          method: SayHello
+input: {}
+script:
+  - effect:
+      { id: /do/0/greet, kind: grpc, deadline: 1767225610000, method: SayHello }
+    outcome: { kind: replied, message: { message: Hello } }
+    now: 1767225601000
+end:
+  completed:
+    output: { message: Hello }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

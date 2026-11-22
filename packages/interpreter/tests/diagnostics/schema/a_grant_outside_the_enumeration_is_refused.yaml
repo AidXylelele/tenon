@@ -1,0 +1,31 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: dashed-grant
+    version: '0.1.0'
+  use:
+    authentications:
+      sampleOAuth2:
+        oauth2:
+          authority: http://keycloak/realms/fake-authority
+          endpoints:
+            token: /auth/token
+            introspection: /auth/introspect
+          grant: client-credentials
+          client:
+            id: workflow-runtime-id
+            secret: workflow-runtime-secret
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://petstore.swagger.io/v2/pet/1
+            authentication:
+              use: sampleOAuth2
+diagnostics:
+  - code: schema
+    pointer: /use/authentications/sampleOAuth2/oauth2/grant
+    range: { start: { line: 14, column: 16 } }

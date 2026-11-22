@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - poll:
+        fork:
+          branches:
+            - check:
+                set:
+                  checked: true
+                then: check
+            - other:
+                set:
+                  other: true
+diagnostics: []

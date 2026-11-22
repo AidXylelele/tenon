@@ -1,0 +1,138 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-methods
+    version: '1.0.0'
+  do:
+    - listTools:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+    - callTool:
+        call: mcp
+        with:
+          method: tools/call
+          parameters: { name: fetch, arguments: { url: 'https://example.com' } }
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+    - listPrompts:
+        call: mcp
+        with:
+          method: prompts/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+    - getPrompt:
+        call: mcp
+        with:
+          method: prompts/get
+          parameters: { name: summarize }
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+    - listResources:
+        call: mcp
+        with:
+          method: resources/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+    - readResource:
+        call: mcp
+        with:
+          method: resources/read
+          parameters: { uri: 'file:///notes.txt' }
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+    - listTemplates:
+        call: mcp
+        with:
+          method: resources/templates/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/listTools,
+        kind: mcp,
+        deadline: null,
+        method: tools/list,
+        parameters: null,
+      }
+    outcome: { kind: answered, result: { answeredBy: listTools } }
+    now: 1767225601000
+  - effect:
+      {
+        id: /do/1/callTool,
+        kind: mcp,
+        deadline: null,
+        method: tools/call,
+        parameters: { name: fetch, arguments: { url: "https://example.com" } },
+      }
+    outcome: { kind: answered, result: { answeredBy: callTool } }
+    now: 1767225602000
+  - effect:
+      {
+        id: /do/2/listPrompts,
+        kind: mcp,
+        deadline: null,
+        method: prompts/list,
+        parameters: null,
+      }
+    outcome: { kind: answered, result: { answeredBy: listPrompts } }
+    now: 1767225603000
+  - effect:
+      {
+        id: /do/3/getPrompt,
+        kind: mcp,
+        deadline: null,
+        method: prompts/get,
+        parameters: { name: summarize },
+      }
+    outcome: { kind: answered, result: { answeredBy: getPrompt } }
+    now: 1767225604000
+  - effect:
+      {
+        id: /do/4/listResources,
+        kind: mcp,
+        deadline: null,
+        method: resources/list,
+        parameters: null,
+      }
+    outcome: { kind: answered, result: { answeredBy: listResources } }
+    now: 1767225605000
+  - effect:
+      {
+        id: /do/5/readResource,
+        kind: mcp,
+        deadline: null,
+        method: resources/read,
+        parameters: { uri: "file:///notes.txt" },
+      }
+    outcome: { kind: answered, result: { answeredBy: readResource } }
+    now: 1767225606000
+  - effect:
+      {
+        id: /do/6/listTemplates,
+        kind: mcp,
+        deadline: null,
+        method: resources/templates/list,
+        parameters: null,
+      }
+    outcome: { kind: answered, result: { answeredBy: listTemplates } }
+    now: 1767225607000
+end:
+  completed:
+    output: { answeredBy: listTemplates }
+facts:
+  including:
+    - { kind: task.completed, task: /do/6/listTemplates }
+    - kind: workflow.completed

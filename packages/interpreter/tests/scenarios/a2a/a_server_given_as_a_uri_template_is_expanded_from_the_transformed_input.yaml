@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-server-template
+    version: '1.0.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agents.example.com/{tenant}/a2a
+          parameters:
+            id: task-1
+input: { tenant: acme }
+end:
+  waiting:
+    effect:
+      id: /do/0/askAgent
+      kind: a2a
+      deadline: null
+      agent:
+        {
+          kind: server,
+          endpoint:
+            { uri: https://agents.example.com/acme/a2a, authentication: null },
+        }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/askAgent }

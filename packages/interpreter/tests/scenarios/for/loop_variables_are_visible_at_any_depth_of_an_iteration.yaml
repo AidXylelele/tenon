@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-depth
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [x]
+        do:
+          - nested:
+              do:
+                - deep:
+                    set: '${ { item: $item, index: $index, reference: $task.reference } }'
+input: {}
+end:
+  completed:
+    output: { item: x, index: 0, reference: /do/0/loop/do/0/nested/do/0/deep }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/loop/do/0/nested/do/0/deep,
+        execution: "/do/0/loop[0]/do/0/nested/do/0/deep",
+      }
+    - kind: workflow.completed

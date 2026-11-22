@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-stdio-argument-texts
+    version: '1.0.0'
+  do:
+    - fetchPage:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            stdio:
+              command: uvx
+              arguments: [ mcp-server-fetch, '${ .port }', '${ .flags }' ]
+input: { port: 8080, flags: [a, b] }
+end:
+  waiting:
+    effect:
+      id: /do/0/fetchPage
+      kind: mcp
+      deadline: null
+      transport:
+        kind: stdio
+        command: uvx
+        arguments: [mcp-server-fetch, "8080", '["a","b"]']
+        environment: {}
+facts:
+  including:
+    - { kind: task.started, task: /do/0/fetchPage }

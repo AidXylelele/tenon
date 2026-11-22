@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-until-true
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              until: ${ true }
+input: {}
+end:
+  completed:
+    output: []
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/watch }
+    - { kind: task.started, task: /do/0/watch }
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

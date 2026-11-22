@@ -1,0 +1,45 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-rpc-error-detail
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - getTask:
+              call: a2a
+              with:
+                method: tasks/get
+                server: https://agent.example.com/a2a
+                parameters:
+                  id: task-1
+        catch:
+          as: failure
+          do:
+            - report:
+                set: ${ $failure }
+input: {}
+script:
+  - effect: { id: /do/0/guard/try/0/getTask, kind: a2a, deadline: null }
+    outcome:
+      {
+        kind: rpcError,
+        code: -32001,
+        message: Task not found,
+        data: { id: task-1, trace: agent-internal },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+      status: 500
+      instance: /do/0/guard/try/0/getTask
+      title: Runtime Error
+      detail: "JSON-RPC error -32001: Task not found"
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/getTask }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

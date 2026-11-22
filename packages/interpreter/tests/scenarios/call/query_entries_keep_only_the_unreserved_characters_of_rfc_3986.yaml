@@ -1,0 +1,42 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-query-unreserved
+    version: '1.0.0'
+  do:
+    - searchCharacters:
+        call: http
+        with:
+          method: get
+          endpoint: https://swapi.dev/api/people/
+          query:
+            search: ${ .search }
+            broken: "\ud800"
+input: { search: "a b~!*'()/é_.-" }
+script:
+  - effect:
+      id: /do/0/searchCharacters
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://swapi.dev/api/people/?search=a%20b~%21%2A%27%28%29%2F%C3%A9_.-&broken=%EF%BF%BD
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://swapi.dev/api/people/?search=a%20b~%21%2A%27%28%29%2F%C3%A9_.-&broken=%EF%BF%BD
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { count: 0 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { count: 0 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/searchCharacters }
+    - kind: workflow.completed
