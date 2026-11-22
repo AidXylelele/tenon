@@ -7,12 +7,12 @@ const surface = EditorView.theme({
   "&": {
     color: "var(--foreground)",
     backgroundColor: "var(--card)",
-    fontSize: "13px",
+    fontSize: "var(--text-code)",
     height: "100%",
   },
   ".cm-scroller": {
     fontFamily: "var(--font-mono)",
-    lineHeight: "20px",
+    lineHeight: "var(--text-code--line-height)",
   },
   ".cm-content": { caretColor: "var(--foreground)" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },

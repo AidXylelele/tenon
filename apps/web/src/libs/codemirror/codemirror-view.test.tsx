@@ -1,3 +1,4 @@
+import { lintGutter } from "@codemirror/lint";
 import { EditorState } from "@codemirror/state";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
 import {
@@ -192,6 +193,25 @@ describe("codemirror hosted in react with its state as the text", () => {
     const marked = container.querySelector(".cm-activeLineGutter");
     expect(filled).toBeNull();
     expect(marked).toHaveTextContent("1");
+  });
+
+  it("the_gutters_run_problems_then_line_numbers_then_folds", () => {
+    const markers = lintGutter();
+    const { container } = render(
+      <CodeMirrorView
+        doc={"a:\n  b: 1"}
+        label="Workflow text"
+        extensions={markers}
+      />,
+    );
+
+    const gutters = container.querySelectorAll(".cm-gutter");
+    const order = Array.from(gutters, (gutter) => gutter.className);
+    expect(order).toEqual([
+      "cm-gutter cm-gutter-lint",
+      "cm-gutter cm-lineNumbers",
+      "cm-gutter cm-foldGutter",
+    ]);
   });
 
   it("tab_alone_is_kept_to_indent", () => {

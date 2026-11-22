@@ -1,7 +1,11 @@
 import { history, undo } from "@codemirror/commands";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
-import { isChangedHere, takeOwnersText } from "./owned-text";
+import {
+  isChangedHere,
+  replaceTextAsOneStep,
+  takeOwnersText,
+} from "./owned-text";
 
 const views: EditorView[] = [];
 
@@ -76,5 +80,37 @@ describe("text an owner holds while the person edits it", () => {
 
     const text = view.state.doc.toString();
     expect(text).toBe("b = 2");
+  });
+
+  it("a_replaced_text_puts_the_cursor_where_it_is_told", () => {
+    const view = editorWith("a=1", []);
+
+    replaceTextAsOneStep(view, "a = 1\n", 4);
+
+    const text = view.state.doc.toString();
+    const cursor = view.state.selection.main.head;
+    expect(text).toBe("a = 1\n");
+    expect(cursor).toBe(4);
+  });
+
+  it("a_replaced_text_is_undone_alone_even_right_after_typing", () => {
+    const view = editorWith("a=1", []);
+    view.dispatch({ changes: { from: 0, insert: "# x\n" } });
+    replaceTextAsOneStep(view, "# x\na = 1\n", 0);
+
+    undo(view);
+
+    const text = view.state.doc.toString();
+    expect(text).toBe("# x\na=1");
+  });
+
+  it("a_replaced_text_is_a_change_made_here", () => {
+    const seen: ViewUpdate[] = [];
+    const view = editorWith("a=1", seen);
+
+    replaceTextAsOneStep(view, "a = 1\n", 0);
+
+    const changedHere = seen.some(isChangedHere);
+    expect(changedHere).toBe(true);
   });
 });
