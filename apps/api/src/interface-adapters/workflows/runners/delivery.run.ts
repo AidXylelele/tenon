@@ -7,7 +7,6 @@ import {
 } from "@nestjs/workflows";
 import { DeliverEvent } from "../../../application/automation/subscriptions/deliver-event.js";
 import { FailDelivery } from "../../../application/automation/subscriptions/fail-delivery.js";
-import { DeliveryFailed } from "./delivery-failed.error.js";
 import type { DeliveryRunInput } from "./interfaces.js";
 
 @Workflow("delivery", {
@@ -49,6 +48,6 @@ export class DeliveryRun implements WorkflowRunner<DeliveryRunInput, void> {
   async #delivered(input: DeliveryRunInput): Promise<void> {
     const attempted = await this.deliverEvent.execute(input);
 
-    if (!attempted.ok) throw new DeliveryFailed(attempted.failure);
+    if (!attempted.ok) throw new Error(attempted.failure);
   }
 }

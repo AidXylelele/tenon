@@ -100,7 +100,7 @@ describe("the delivery of an event to a subscriber", () => {
     expect(deliveries.attempts).toBe(ATTEMPTS);
     expect(failures.failed).toEqual(["subscription-1"]);
     expect(deliver?.error).toMatchObject({
-      name: "DeliveryFailed",
+      name: "Error",
       message: REFUSED,
     });
     expect(status?.status).toBe("completed");
