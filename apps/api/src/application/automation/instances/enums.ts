@@ -5,3 +5,8 @@ export enum TaskStatus {
   Cancelled = "cancelled",
   Skipped = "skipped",
 }
+
+export enum InstanceOrder {
+  Started = "started",
+  Duration = "duration",
+}

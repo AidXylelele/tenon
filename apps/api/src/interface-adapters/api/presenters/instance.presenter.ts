@@ -5,15 +5,16 @@ import type {
   InstanceDetail,
   InstancePage,
   InstanceSummary,
+  ListedInstance,
   PhaseCount,
   TaskOutput,
   TaskPage,
   WindowCount,
 } from "../../../application/automation/instances/interfaces.js";
+import type { Person } from "../../../application/identity/users/interfaces.js";
 import { Phase } from "../../../domain/automation/instances/enums.js";
 import {
   type EventPageResponse,
-  InstanceCursor,
   type InstanceCountsResponse,
   type InstancePageResponse,
   type InstanceResponse,
@@ -42,7 +43,7 @@ export class InstancePresenter {
 
   detail(instance: InstanceDetail): InstanceResponse {
     const summary = this.summary(instance);
-    const startedBy = this.#startedByOf(instance);
+    const startedBy = this.#personOf(instance.startedBy);
     const waits = instance.waits.map((wait) => ({
       kind: wait.kind,
       until: wait.until?.toISOString() ?? null,
@@ -63,9 +64,19 @@ export class InstancePresenter {
   }
 
   page(page: InstancePage): InstancePageResponse {
-    const items = page.items.map((item) => this.summary(item));
-    const next = page.next === null ? null : InstanceCursor.encode(page.next);
-    return { items, next };
+    const items = page.items.map((item) => this.#listedOf(item));
+    return { items, total: page.total };
+  }
+
+  #listedOf(item: ListedInstance): InstancePageResponse["items"][number] {
+    const summary = this.summary(item);
+    const startedBy = this.#personOf(item.startedBy);
+    const waits = item.waits.map((wait) => ({
+      kind: wait.kind,
+      until: wait.until?.toISOString() ?? null,
+      stream: wait.stream,
+    }));
+    return { ...summary, startedBy, durationMs: item.durationMs, waits };
   }
 
   output(output: TaskOutput): string {
@@ -139,9 +150,7 @@ export class InstancePresenter {
     return found?.count ?? 0;
   }
 
-  #startedByOf(instance: InstanceDetail): InstanceResponse["startedBy"] {
-    const starter = instance.startedBy;
-
+  #personOf(starter: Person | null): InstanceResponse["startedBy"] {
     if (starter === null) return null;
 
     return { id: starter.id, name: starter.name };

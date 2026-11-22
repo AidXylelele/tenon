@@ -1,6 +1,14 @@
-import type { CountWindow } from "../../../../../src/application/automation/instances/interfaces.js";
+import { InstanceOrder } from "../../../../../src/application/automation/instances/enums.js";
+import type {
+  CountWindow,
+  InstanceFilter,
+  InstancePageRequest,
+} from "../../../../../src/application/automation/instances/interfaces.js";
 import { InstanceQueries } from "../../../../../src/application/automation/instances/queries.js";
-import { Phase } from "../../../../../src/domain/automation/instances/enums.js";
+import {
+  Phase,
+  WaitKind,
+} from "../../../../../src/domain/automation/instances/enums.js";
 import {
   createPersistenceTest,
   instanceQueries,
@@ -32,6 +40,27 @@ const windowOf = (overrides: Partial<CountWindow> = {}): CountWindow => ({
   name: null,
   tests: false,
   ...overrides,
+});
+
+const ANY_RUN: InstanceFilter = {
+  namespace: null,
+  name: null,
+  version: null,
+  phases: [],
+  from: null,
+  to: null,
+  tests: false,
+};
+
+const pageOf = (
+  filter: Partial<InstanceFilter> = {},
+  request: Partial<InstancePageRequest> = {},
+): InstancePageRequest => ({
+  filter: { ...ANY_RUN, ...filter },
+  order: InstanceOrder.Started,
+  page: 1,
+  limit: 50,
+  ...request,
 });
 
 describe("PostgresInstanceQueries counting runs", () => {
@@ -194,5 +223,180 @@ describe("PostgresInstanceQueries counting runs", () => {
         { phase: Phase.Waiting, count: 1 },
       ]),
     );
+  });
+});
+
+describe("PostgresInstanceQueries listing runs", () => {
+  let t: PersistenceTest;
+  let queries: InstanceQueries;
+  let workflow: WorkflowRows;
+  let publisherId: string;
+
+  beforeAll(async () => {
+    t = await createPersistenceTest(instanceQueries);
+    queries = t.module.get(InstanceQueries);
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  beforeEach(async () => {
+    await truncateRuns(t.db);
+    publisherId = await aPublisher(t.db, "Ada");
+    workflow = await aWorkflowRow(t.db, publisherId, { name: "route-lead" });
+  });
+
+  const ran = (
+    phase: Phase,
+    startedAt: string | null,
+    endedAt: string | null = null,
+    test = false,
+  ) => {
+    const started = startedAt === null ? null : at(startedAt);
+    const ended = endedAt === null ? null : at(endedAt);
+    const createdAt = started ?? at("2026-03-02T00:00:00.000Z");
+    return aRunRow(t.db, workflow, {
+      phase,
+      startedAt: started,
+      endedAt: ended,
+      createdAt,
+      test,
+    });
+  };
+
+  it("lists_the_newest_start_first_with_runs_not_yet_begun_on_top_page_by_page", async () => {
+    const older = await ran(
+      Phase.Completed,
+      "2026-03-01T00:00:00.000Z",
+      "2026-03-01T00:00:01.000Z",
+    );
+    const newer = await ran(
+      Phase.Completed,
+      "2026-03-01T01:00:00.000Z",
+      "2026-03-01T01:00:01.000Z",
+    );
+    const pending = await ran(Phase.Pending, null);
+    const firstPage = pageOf({}, { limit: 2 });
+    const secondPage = pageOf({}, { limit: 2, page: 2 });
+
+    const first = await queries.list(firstPage);
+    const second = await queries.list(secondPage);
+
+    const firstIds = first.items.map((item) => item.id);
+    const secondIds = second.items.map((item) => item.id);
+    expect(firstIds).toEqual([pending, newer]);
+    expect(secondIds).toEqual([older]);
+    expect(first.total).toBe(3);
+    expect(second.total).toBe(3);
+  });
+
+  it("filters_by_several_phases_a_half_open_start_window_and_leaves_out_test_runs", async () => {
+    const failed = await ran(
+      Phase.Faulted,
+      "2026-03-01T00:00:00.000Z",
+      "2026-03-01T00:01:00.000Z",
+    );
+    const running = await ran(Phase.Running, "2026-03-01T00:59:59.999Z");
+    await ran(Phase.Waiting, "2026-03-01T01:00:00.000Z");
+    await ran(
+      Phase.Completed,
+      "2026-03-01T00:30:00.000Z",
+      "2026-03-01T00:31:00.000Z",
+    );
+    await ran(
+      Phase.Faulted,
+      "2026-03-01T00:10:00.000Z",
+      "2026-03-01T00:11:00.000Z",
+      true,
+    );
+    const filter = {
+      phases: [Phase.Faulted, Phase.Running, Phase.Waiting],
+      from: at("2026-03-01T00:00:00.000Z"),
+      to: at("2026-03-01T01:00:00.000Z"),
+    };
+    const request = pageOf(filter);
+
+    const listed = await queries.list(request);
+
+    const ids = listed.items.map((item) => item.id);
+    expect(ids).toEqual([running, failed]);
+    expect(listed.total).toBe(2);
+  });
+
+  it("test_runs_are_listed_with_their_mark_when_asked_for", async () => {
+    const test = await ran(
+      Phase.Completed,
+      "2026-03-01T00:10:00.000Z",
+      "2026-03-01T00:11:00.000Z",
+      true,
+    );
+    const request = pageOf({ tests: true });
+
+    const listed = await queries.list(request);
+
+    expect(listed.items[0]?.id).toBe(test);
+    expect(listed.items[0]?.test).toBe(true);
+  });
+
+  it("sorts_by_duration_longest_first_with_live_runs_by_their_elapsed_time", async () => {
+    const minute = await ran(
+      Phase.Completed,
+      "2026-03-01T00:00:00.000Z",
+      "2026-03-01T00:01:00.000Z",
+    );
+    const hour = await ran(
+      Phase.Faulted,
+      "2026-03-01T00:00:00.000Z",
+      "2026-03-01T01:00:00.000Z",
+    );
+    const live = await ran(Phase.Running, "2026-02-01T00:00:00.000Z");
+    const pending = await ran(Phase.Pending, null);
+    const request = pageOf({}, { order: InstanceOrder.Duration });
+
+    const listed = await queries.list(request);
+
+    const ids = listed.items.map((item) => item.id);
+    const durations = listed.items.map((item) => item.durationMs);
+    expect(ids).toEqual([live, hour, minute, pending]);
+    expect(durations.slice(1)).toEqual([3_600_000, 60_000, null]);
+  });
+
+  it("a_live_run_carries_its_elapsed_time_its_waits_and_its_starter", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(at("2026-03-01T01:31:30.000Z"));
+    const startedAt = at("2026-03-01T01:30:00.000Z");
+    const until = Date.parse("2026-03-01T02:00:00.000Z");
+    const id = await aRunRow(t.db, workflow, {
+      phase: Phase.Waiting,
+      startedAt,
+      starterId: publisherId,
+      runWaits: [
+        {
+          effectId: "/do/0/pause",
+          kind: WaitKind.Timer,
+          until,
+          stream: null,
+          retryOf: null,
+          execution: null,
+          position: null,
+        },
+      ],
+    });
+    const request = pageOf();
+
+    const listed = await queries.list(request);
+
+    const [item] = listed.items;
+    expect(item?.id).toBe(id);
+    expect(item?.startedBy).toEqual({ id: publisherId, name: "Ada" });
+    expect(item?.waits).toEqual([
+      { kind: WaitKind.Timer, until: new Date(until), stream: null },
+    ]);
+    expect(item?.durationMs).toBe(90_000);
   });
 });

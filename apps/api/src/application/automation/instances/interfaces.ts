@@ -20,7 +20,7 @@ import type { WorkflowName } from "../../../domain/automation/workflows/workflow
 import type { Result } from "../../../domain/interfaces.js";
 import type { Person } from "../../identity/users/interfaces.js";
 import type { Missing } from "../enums.js";
-import type { TaskStatus } from "./enums.js";
+import type { InstanceOrder, TaskStatus } from "./enums.js";
 
 export interface StartInstanceCommand {
   readonly name: WorkflowName;
@@ -152,19 +152,34 @@ export interface InstanceFilter {
   readonly namespace: string | null;
   readonly name: string | null;
   readonly version: string | null;
-  readonly phase: Phase | null;
-  readonly startedFrom: Date | null;
-  readonly startedTo: Date | null;
+  readonly phases: readonly Phase[];
+  readonly from: Date | null;
+  readonly to: Date | null;
+  readonly tests: boolean;
 }
 
-export interface InstancePosition {
-  readonly createdAt: Date;
-  readonly id: string;
+export interface InstancePageRequest {
+  readonly filter: InstanceFilter;
+  readonly order: InstanceOrder;
+  readonly page: number;
+  readonly limit: number;
+}
+
+export interface ListedWait {
+  readonly kind: WaitKind;
+  readonly until: Date | null;
+  readonly stream: string | null;
+}
+
+export interface ListedInstance extends InstanceSummary {
+  readonly startedBy: Person | null;
+  readonly durationMs: number | null;
+  readonly waits: readonly ListedWait[];
 }
 
 export interface InstancePage {
-  readonly items: readonly InstanceSummary[];
-  readonly next: InstancePosition | null;
+  readonly items: readonly ListedInstance[];
+  readonly total: number;
 }
 
 export interface TaskRecordView {

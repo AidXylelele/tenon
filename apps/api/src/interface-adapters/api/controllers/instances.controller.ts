@@ -107,20 +107,21 @@ export class InstancesController {
   async list(
     @Query({ schema: ListInstancesQuery }) query: ListInstancesQuery,
   ): Promise<InstancePageResponse> {
-    const startedFrom =
-      query.startedFrom === undefined ? null : new Date(query.startedFrom);
-    const startedTo =
-      query.startedTo === undefined ? null : new Date(query.startedTo);
     const filter = {
       namespace: query.namespace ?? null,
       name: query.name ?? null,
       version: query.version ?? null,
-      phase: query.phase ?? null,
-      startedFrom,
-      startedTo,
+      phases: query.phase ?? [],
+      from: query.from ?? null,
+      to: query.to ?? null,
+      tests: query.tests,
     };
-    const after = query.cursor ?? null;
-    const page = await this.instances.list(filter, after, query.limit);
+    const page = await this.instances.list({
+      filter,
+      order: query.sort,
+      page: query.page,
+      limit: query.limit,
+    });
     return this.instancePresenter.page(page);
   }
 

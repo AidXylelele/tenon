@@ -4,6 +4,7 @@ import {
   type Phase,
   TriggerKind,
 } from "../../src/domain/automation/instances/enums.js";
+import type { RunWait } from "../../src/domain/automation/instances/interfaces.js";
 import type { JsonObject } from "../../src/domain/automation/interfaces.js";
 import { WorkflowStatus } from "../../src/domain/automation/workflows/enums.js";
 import type { Schedule } from "../../src/domain/automation/workflows/interfaces.js";
@@ -37,6 +38,7 @@ export interface NewRunRow {
   readonly trigger?: TriggerKind;
   readonly error?: JsonObject | null;
   readonly starterId?: string | null;
+  readonly runWaits?: readonly RunWait[];
 }
 
 export async function aPublisher(db: Database, name = "Ada"): Promise<string> {
@@ -100,6 +102,7 @@ export async function aRunRow(
     startedAt: run.startedAt,
     endedAt: run.endedAt ?? null,
     test: run.test ?? false,
+    runWaits: run.runWaits ?? [],
   });
   return id;
 }

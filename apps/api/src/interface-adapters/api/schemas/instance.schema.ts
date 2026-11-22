@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { TaskStatus } from "../../../application/automation/instances/enums.js";
+import {
+  InstanceOrder,
+  TaskStatus,
+} from "../../../application/automation/instances/enums.js";
 import {
   Control,
   Phase,
@@ -33,43 +36,6 @@ export const TaskOutputParams = z.strictObject({
 
 export type TaskOutputParams = z.infer<typeof TaskOutputParams>;
 
-const INSTANCE_CURSOR = /^\d+_[^_]+$/;
-
-const CURSOR_SEPARATOR = "_";
-
-const InstancePosition = z.object({ createdAt: z.date(), id: z.uuid() });
-
-export const InstanceCursor = z.codec(
-  z.string().regex(INSTANCE_CURSOR),
-  InstancePosition,
-  {
-    decode: (cursor) => {
-      const [epoch = "", id = ""] = cursor.split(CURSOR_SEPARATOR);
-      const milliseconds = Number(epoch);
-      const createdAt = new Date(milliseconds);
-      return { createdAt, id };
-    },
-    encode: (position) => {
-      const epoch = position.createdAt.getTime();
-      const milliseconds = String(epoch);
-      return `${milliseconds}${CURSOR_SEPARATOR}${position.id}`;
-    },
-  },
-);
-
-export const ListInstancesQuery = z.strictObject({
-  namespace: z.string().optional(),
-  name: z.string().optional(),
-  version: z.string().min(1).optional(),
-  phase: z.enum(Phase).optional(),
-  startedFrom: z.iso.datetime({ offset: true }).optional(),
-  startedTo: z.iso.datetime({ offset: true }).optional(),
-  cursor: InstanceCursor.optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
-
-export type ListInstancesQuery = z.infer<typeof ListInstancesQuery>;
-
 export const TasksQuery = z.strictObject({
   cursor: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
@@ -92,12 +58,14 @@ export const InstanceSummaryResponse = z.object({
 
 export type InstanceSummaryResponse = z.infer<typeof InstanceSummaryResponse>;
 
+const StarterResponse = z.object({ id: z.uuid(), name: z.string() });
+
 export const InstanceResponse = InstanceSummaryResponse.extend({
   input: z.json(),
   output: z.json().nullable(),
   error: z.json().nullable(),
   originId: z.uuid().nullable(),
-  startedBy: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+  startedBy: StarterResponse.nullable(),
   controls: z.array(z.enum(Control)),
   cancelReason: z.string().nullable(),
   waits: z.array(
@@ -112,9 +80,21 @@ export const InstanceResponse = InstanceSummaryResponse.extend({
 
 export type InstanceResponse = z.infer<typeof InstanceResponse>;
 
+const ListedInstanceResponse = InstanceSummaryResponse.extend({
+  startedBy: StarterResponse.nullable(),
+  durationMs: z.number().int().nullable(),
+  waits: z.array(
+    z.object({
+      kind: z.enum(WaitKind),
+      until: z.iso.datetime().nullable(),
+      stream: z.string().nullable(),
+    }),
+  ),
+});
+
 export const InstancePageResponse = z.object({
-  items: z.array(InstanceSummaryResponse),
-  next: z.string().nullable(),
+  items: z.array(ListedInstanceResponse),
+  total: z.number().int(),
 });
 
 export type InstancePageResponse = z.infer<typeof InstancePageResponse>;
@@ -147,7 +127,7 @@ export const EventPageResponse = z.object({
 
 export type EventPageResponse = z.infer<typeof EventPageResponse>;
 
-const Instant = z.codec(z.iso.datetime({ offset: true }), z.date(), {
+export const Instant = z.codec(z.iso.datetime({ offset: true }), z.date(), {
   decode: (text) => new Date(text),
   encode: (date) => date.toISOString(),
 });
@@ -161,6 +141,25 @@ const Buckets = z
 const Included = z
   .enum(["true", "false"])
   .transform((value) => value === "true");
+
+const Phases = z
+  .union([z.enum(Phase), z.array(z.enum(Phase))])
+  .transform((value) => [value].flat());
+
+export const ListInstancesQuery = z.strictObject({
+  namespace: z.string().optional(),
+  name: z.string().optional(),
+  version: z.string().min(1).optional(),
+  phase: Phases.optional(),
+  from: Instant.optional(),
+  to: Instant.optional(),
+  tests: Included.default(false),
+  sort: z.enum(InstanceOrder).default(InstanceOrder.Started),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export type ListInstancesQuery = z.infer<typeof ListInstancesQuery>;
 
 export const InstanceCountsQuery = z
   .strictObject({

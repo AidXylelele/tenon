@@ -2,20 +2,15 @@ import type {
   CountWindow,
   InstanceCounts,
   InstanceDetail,
-  InstanceFilter,
   InstancePage,
-  InstancePosition,
+  InstancePageRequest,
   ReceiverView,
   TaskOutput,
   TaskPage,
 } from "./interfaces.js";
 
 export abstract class InstanceQueries {
-  abstract list(
-    filter: InstanceFilter,
-    after: InstancePosition | null,
-    limit: number,
-  ): Promise<InstancePage>;
+  abstract list(request: InstancePageRequest): Promise<InstancePage>;
   abstract get(id: string): Promise<InstanceDetail | null>;
   abstract tasks(
     id: string,

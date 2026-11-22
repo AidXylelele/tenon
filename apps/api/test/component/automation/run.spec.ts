@@ -24,6 +24,11 @@ import type { Created, Page, Problem } from "../../support/bodies.js";
 const PROBLEM = "application/problem+json";
 const ERRORS = "https://open-workflow-specification.org/spec/1.0.0/errors/";
 const STRUCTURED = "application/cloudevents+json";
+interface RunPage {
+  readonly items: { readonly id: string }[];
+  readonly total: number;
+}
+
 const SUMMARY_KEYS = [
   "createdAt",
   "endedAt",
@@ -36,6 +41,13 @@ const SUMMARY_KEYS = [
   "trigger",
   "version",
 ];
+
+const LISTED_KEYS = [
+  ...SUMMARY_KEYS,
+  "durationMs",
+  "startedBy",
+  "waits",
+].sort();
 
 interface LifecycleEvent {
   readonly type: string;
@@ -1006,7 +1018,7 @@ describe("running a workflow and following its execution over HTTP", () => {
     const idsOf = (body: { items: { id: string }[] }) =>
       body.items.map((item) => item.id);
 
-    it("instances_list_newest_first_page_by_page", async () => {
+    it("instances_list_by_newest_start_page_by_page_with_the_total", async () => {
       const ids = await seed();
 
       const first = await request(t.server)
@@ -1014,21 +1026,24 @@ describe("running a workflow and following its execution over HTTP", () => {
         .set(viewer)
         .expect(200);
       const second = await request(t.server)
-        .get(
-          `/api/v1/instances?limit=3&cursor=${String((first.body as Page<unknown>).next)}`,
-        )
+        .get("/api/v1/instances?limit=3&page=2")
         .set(viewer)
         .expect(200);
 
-      expect(idsOf(first.body as Page<Created>)).toEqual([
-        ids.o1,
-        ids.b1,
-        ids.a2,
-      ]);
-      expect(idsOf(second.body as Page<Created>)).toEqual([ids.a1]);
-      expect((second.body as Page<unknown>).next).toBeNull();
-      const [summary] = (first.body as Page<object>).items;
-      expect(Object.keys(summary ?? {}).sort()).toEqual(SUMMARY_KEYS);
+      const firstPage = first.body as RunPage;
+      const secondPage = second.body as RunPage;
+      expect(idsOf(firstPage)).toEqual([ids.o1, ids.b1, ids.a2]);
+      expect(idsOf(secondPage)).toEqual([ids.a1]);
+      expect(firstPage.total).toBe(4);
+      expect(secondPage.total).toBe(4);
+      const [summary] = firstPage.items;
+      const keys = Object.keys(summary ?? {}).sort();
+      expect(keys).toEqual(LISTED_KEYS);
+      expect(secondPage.items[0]).toMatchObject({
+        startedBy: { id: editorId },
+        durationMs: 0,
+        waits: [],
+      });
     });
 
     it("instances_with_one_creation_time_still_page_without_loss_or_repeat", async () => {
@@ -1038,33 +1053,28 @@ describe("running a workflow and following its execution over HTTP", () => {
       for (let index = 0; index < 5; index += 1)
         started.push((await start(t, editor)).id);
 
+      const pages = ["1", "2", "3"];
       const seen: string[] = [];
-      let cursor: string | null = null;
 
-      for (let page = 0; page < 10; page += 1) {
-        const query: string =
-          cursor === null ? "?limit=2" : `?limit=2&cursor=${cursor}`;
+      for (const page of pages) {
         const response = await request(t.server)
-          .get(`/api/v1/instances${query}`)
+          .get(`/api/v1/instances?limit=2&page=${page}`)
           .set(viewer)
           .expect(200);
-        seen.push(...idsOf(response.body as Page<Created>));
-        cursor = (response.body as Page<unknown>).next;
-
-        if (cursor === null) break;
+        seen.push(...idsOf(response.body as RunPage));
       }
 
       expect(seen.slice().sort()).toEqual(started.slice().sort());
     });
 
-    it("instances_filter_by_namespace_name_and_phase", async () => {
+    it("instances_filter_by_namespace_name_and_one_or_several_phases", async () => {
       const ids = await seed();
       const list = async (query: string) => {
         const response = await request(t.server)
           .get(`/api/v1/instances?${query}`)
           .set(viewer)
           .expect(200);
-        return idsOf(response.body as Page<Created>);
+        return idsOf(response.body as RunPage);
       };
 
       expect(await list("name=alpha")).toEqual([ids.o1, ids.a2, ids.a1]);
@@ -1075,38 +1085,55 @@ describe("running a workflow and following its execution over HTTP", () => {
       ]);
       expect(await list("phase=completed")).toEqual([ids.a1]);
       expect(await list("phase=pending&name=alpha")).toEqual([ids.o1, ids.a2]);
+      expect(
+        await list("phase=pending&phase=completed&namespace=sales"),
+      ).toEqual([ids.b1, ids.a2, ids.a1]);
       expect(await list("namespace=none")).toEqual([]);
     });
 
-    it("a_malformed_filter_cursor_or_limit_is_a_bad_request", async () => {
-      const bad = [
-        "phase=sleeping",
-        "limit=0",
-        "limit=201",
-        "limit=ten",
-        "cursor=garbage",
-        "unknown=1",
-      ];
-
-      for (const query of bad)
-        await request(t.server)
-          .get(`/api/v1/instances?${query}`)
-          .set(viewer)
-          .expect(400);
+    it.each([
+      ["an unknown phase", "phase=sleeping"],
+      ["a limit of none", "limit=0"],
+      ["a limit over a hundred", "limit=101"],
+      ["a limit in words", "limit=ten"],
+      ["page zero", "page=0"],
+      ["an unknown order", "sort=name"],
+      ["a cursor", "cursor=garbage"],
+      ["a start in words", "from=yesterday"],
+      ["an unknown field", "unknown=1"],
+    ])("a_list_with_%s_is_a_bad_request", async (_case, query) => {
+      await request(t.server)
+        .get(`/api/v1/instances?${query}`)
+        .set(viewer)
+        .expect(400);
     });
 
-    it("instances_filter_by_version_and_start_time_as_the_contract_lists", async () => {
+    it("instances_filter_by_version_and_a_start_window_and_sort_by_duration", async () => {
       await publish(t, editor, aVersion("1.0.0"));
-      await start(t, editor);
+      const started = await start(t, editor);
+      await drain(t);
+      const now = Date.now();
+      const aSecondBefore = new Date(now - 1_000).toISOString();
+      const justAfter = new Date(now + 1).toISOString();
+      const startTime = new Date(now).toISOString();
+      const window = `from=${aSecondBefore}&to=${justAfter}&sort=duration`;
 
-      await request(t.server)
+      const byVersion = await request(t.server)
         .get("/api/v1/instances?version=1.0.0")
         .set(viewer)
         .expect(200);
-      await request(t.server)
-        .get("/api/v1/instances?startedFrom=2020-01-01T00:00:00Z")
+      const inWindow = await request(t.server)
+        .get(`/api/v1/instances?${window}`)
         .set(viewer)
         .expect(200);
+      const before = await request(t.server)
+        .get(`/api/v1/instances?to=${startTime}`)
+        .set(viewer)
+        .expect(200);
+
+      expect(idsOf(byVersion.body as RunPage)).toEqual([started.id]);
+      expect(idsOf(inWindow.body as RunPage)).toEqual([started.id]);
+      expect(idsOf(before.body as RunPage)).toEqual([]);
     });
   });
 

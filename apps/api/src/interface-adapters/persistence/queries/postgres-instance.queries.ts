@@ -10,7 +10,6 @@ import {
   inArray,
   isNotNull,
   lt,
-  lte,
   type SQL,
   sql,
 } from "drizzle-orm";
@@ -20,13 +19,15 @@ import type {
   InstanceDetail,
   InstanceFilter,
   InstancePage,
-  InstancePosition,
+  InstancePageRequest,
   InstanceWait,
+  ListedInstance,
   PhaseCount,
   TaskOutput,
   TaskPage,
   WindowCount,
 } from "../../../application/automation/instances/interfaces.js";
+import { InstanceOrder } from "../../../application/automation/instances/enums.js";
 import type { InstanceQueries } from "../../../application/automation/instances/queries.js";
 import type { Person } from "../../../application/identity/users/interfaces.js";
 import {
@@ -39,6 +40,7 @@ import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type {
   CountRow,
   LifecycleEventName,
+  ListedInstanceRow,
   LifecycleEventRow,
   TaskEventRow,
   TaskPosition,
@@ -81,41 +83,36 @@ export class PostgresInstanceQueries implements InstanceQueries {
     private readonly taskValueMapper: TaskValueMapper,
   ) {}
 
-  async list(
-    filter: InstanceFilter,
-    after: InstancePosition | null,
-    limit: number,
-  ): Promise<InstancePage> {
-    const position = this.#after(after);
-    const namespace =
-      filter.namespace === null
-        ? undefined
-        : eq(workflows.namespace, filter.namespace);
-    const name =
-      filter.name === null ? undefined : eq(workflows.name, filter.name);
-    const version =
-      filter.version === null ? undefined : eq(versions.semver, filter.version);
-    const phase =
-      filter.phase === null ? undefined : eq(instances.phase, filter.phase);
-    const startedFrom =
-      filter.startedFrom === null
-        ? undefined
-        : gte(instances.startedAt, filter.startedFrom);
-    const startedTo =
-      filter.startedTo === null
-        ? undefined
-        : lte(instances.startedAt, filter.startedTo);
-    const conditions = and(
-      position,
-      namespace,
-      name,
-      version,
-      phase,
-      startedFrom,
-      startedTo,
-    );
-    const fetched = limit + 1;
-    const rows = await this.txHost.tx
+  async list(request: InstancePageRequest): Promise<InstancePage> {
+    const now = new Date();
+    const filtered = this.#filtered(request.filter);
+    const [rows, total] = await Promise.all([
+      this.#listedRowsOf(request, filtered, now),
+      this.#totalOf(filtered),
+    ]);
+    const items = rows.map((row) => this.#listedOf(row));
+    return { items, total };
+  }
+
+  #listedRowsOf(
+    request: InstancePageRequest,
+    filtered: SQL | undefined,
+    now: Date,
+  ): Promise<ListedInstanceRow[]> {
+    const duration = sql`coalesce(${instances.endedAt}, ${now}) - ${instances.startedAt}`;
+    const durationMs = sql<
+      number | null
+    >`floor(extract(epoch from ${duration}) * 1000)`;
+    const byStart = [
+      desc(instances.startedAt),
+      desc(instances.createdAt),
+      desc(instances.id),
+    ];
+    const byDuration = [sql`${duration} desc nulls last`, desc(instances.id)];
+    const order =
+      request.order === InstanceOrder.Duration ? byDuration : byStart;
+    const skipped = (request.page - 1) * request.limit;
+    return this.txHost.tx
       .select({
         id: instances.id,
         namespace: workflows.namespace,
@@ -127,17 +124,76 @@ export class PostgresInstanceQueries implements InstanceQueries {
         createdAt: instances.createdAt,
         startedAt: instances.startedAt,
         endedAt: instances.endedAt,
+        starterId: instances.starterId,
+        starterName: users.name,
+        durationMs: durationMs.mapWith(Number),
+        runWaits: instances.runWaits,
       })
       .from(instances)
       .innerJoin(workflows, eq(workflows.id, instances.workflowId))
       .innerJoin(versions, eq(versions.id, instances.versionId))
-      .where(conditions)
-      .orderBy(desc(instances.createdAt), desc(instances.id))
-      .limit(fetched);
-    return this.#pageOf(rows, limit, (last) => ({
-      createdAt: last.createdAt,
-      id: last.id,
+      .leftJoin(users, eq(users.id, instances.starterId))
+      .where(filtered)
+      .orderBy(...order)
+      .limit(request.limit)
+      .offset(skipped);
+  }
+
+  async #totalOf(filtered: SQL | undefined): Promise<number> {
+    const count = sql<number>`count(*)::int`;
+    const [row] = await this.txHost.tx
+      .select({ count })
+      .from(instances)
+      .where(filtered);
+    return row?.count ?? 0;
+  }
+
+  #filtered(filter: InstanceFilter): SQL | undefined {
+    const workflow = this.#ofWorkflow(filter.namespace, filter.name);
+    const version = this.#ofVersion(filter.version);
+    const phases =
+      filter.phases.length === 0
+        ? undefined
+        : inArray(instances.phase, filter.phases);
+    const from =
+      filter.from === null ? undefined : gte(instances.startedAt, filter.from);
+    const to =
+      filter.to === null ? undefined : lt(instances.startedAt, filter.to);
+    const tests = this.#tests(filter.tests);
+    return and(workflow, version, phases, from, to, tests);
+  }
+
+  #ofVersion(semver: string | null): SQL | undefined {
+    if (semver === null) return undefined;
+
+    const ids = this.txHost.tx
+      .select({ id: versions.id })
+      .from(versions)
+      .where(eq(versions.semver, semver));
+    return inArray(instances.versionId, ids);
+  }
+
+  #listedOf(row: ListedInstanceRow): ListedInstance {
+    const waits = row.runWaits.map((wait) => ({
+      kind: wait.kind,
+      until: wait.until === null ? null : new Date(wait.until),
+      stream: wait.stream,
     }));
+    return {
+      id: row.id,
+      namespace: row.namespace,
+      name: row.name,
+      version: row.version,
+      phase: row.phase,
+      trigger: row.trigger,
+      test: row.test,
+      createdAt: row.createdAt,
+      startedAt: row.startedAt,
+      endedAt: row.endedAt,
+      startedBy: this.#starterOf(row.starterId, row.starterName),
+      durationMs: row.durationMs,
+      waits,
+    };
   }
 
   async get(id: string): Promise<InstanceDetail | null> {
@@ -503,12 +559,6 @@ export class PostgresInstanceQueries implements InstanceQueries {
     if (id === null || name === null) return null;
 
     return { id, name };
-  }
-
-  #after(position: InstancePosition | null): SQL | undefined {
-    if (position === null) return undefined;
-
-    return sql`(${instances.createdAt}, ${instances.id}) < (${position.createdAt}, ${position.id})`;
   }
 
   #pageOf<R, P>(
