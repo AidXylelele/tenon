@@ -208,6 +208,7 @@ function WayDetails({
     case "schedule":
       return start.timed === null ? (
         <ScheduleBuilder
+          key={start.cron}
           schedule={schedule}
           cron={start.cron ?? ""}
           now={now}

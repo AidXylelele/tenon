@@ -508,6 +508,15 @@ describe("a duration's amount and unit", () => {
     ]);
   });
 
+  it("leaving_the_amount_as_shown_sends_nothing", () => {
+    const { onEdit } = shown({ step: WAIT_STEP, form: WAIT_FORM });
+    const amount = screen.getByRole("textbox", { name: /Wait for/ });
+
+    leave(amount, "30");
+
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
   it("an_amount_that_is_no_number_is_refused_and_an_empty_one_clears", () => {
     const { onEdit } = shown({ step: WAIT_STEP, form: WAIT_FORM });
     const amount = screen.getByRole("textbox", { name: /Wait for/ });

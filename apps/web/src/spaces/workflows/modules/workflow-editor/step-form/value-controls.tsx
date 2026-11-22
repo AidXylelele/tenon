@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormField } from "language-server/protocol";
-import { type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useRef, useState } from "react";
 import { Input } from "@/libs/ui/components/input";
 import {
   Select,
@@ -33,6 +33,8 @@ export interface ControlProps {
 }
 
 const UNSET = "\u0000unset";
+
+const FIRST_UNIT = "minutes";
 
 const UNITS_MS: ReadonlyMap<string, number> = new Map([
   ["days", 86_400_000],
@@ -233,21 +235,32 @@ export function JsonControl({ field, wiring }: ControlProps) {
   );
 }
 
-export function DurationControl({ field, wiring }: ControlProps) {
+export function DurationControl(props: ControlProps) {
+  const shown = JSON.stringify(props.field.value);
+
+  return <DurationAmount key={shown} {...props} />;
+}
+
+function DurationAmount({ field, wiring }: ControlProps) {
   const apply = useCommit(wiring);
+  const typed = useRef<HTMLInputElement>(null);
   const total = totalOf(field);
   const fitting = field.fields.find((unit) => {
     const scale = UNITS_MS.get(unit.key) ?? 1;
     return total !== null && total % scale === 0;
   });
-  const [unit, setUnit] = useState(fitting?.key ?? "minutes");
-  const scale = UNITS_MS.get(unit) ?? 1;
+  const shownUnit = fitting?.key ?? FIRST_UNIT;
+  const [unit, setUnit] = useState(shownUnit);
+  const scale = UNITS_MS.get(shownUnit) ?? 1;
   const amount = total === null ? "" : String(total / scale);
-  const [typed, setTyped] = useState(amount);
   const unitLabel = `${wiring.id}-unit`;
+  const unitLabelledBy = `${wiring.labelId} ${unitLabel}`;
 
   function commit(text: string, chosen: string) {
     const trimmed = text.trim();
+    const isShown = trimmed === amount && chosen === shownUnit;
+
+    if (isShown) return;
 
     if (trimmed === "") {
       const edits = clearEditsOf(field);
@@ -257,7 +270,7 @@ export function DurationControl({ field, wiring }: ControlProps) {
 
     const value = Number(trimmed);
 
-    if (Number.isNaN(value)) {
+    if (!Number.isFinite(value)) {
       apply({ kind: "refused", reason: "Write the amount as a number." });
       return;
     }
@@ -270,31 +283,27 @@ export function DurationControl({ field, wiring }: ControlProps) {
   return (
     <div className="flex gap-2">
       <Input
+        ref={typed}
         id={wiring.id}
         inputMode="decimal"
         className="w-28"
-        value={typed}
+        defaultValue={amount}
         aria-describedby={wiring.describedBy}
         aria-invalid={wiring.invalid}
-        onChange={(event) => {
-          setTyped(event.currentTarget.value);
-        }}
-        onBlur={() => {
-          commit(typed, unit);
+        onBlur={(event) => {
+          commit(event.currentTarget.value, unit);
         }}
         onKeyDown={blurOnEnter}
       />
       <Select
         value={unit}
         onValueChange={(chosen) => {
+          const text = typed.current?.value ?? amount;
           setUnit(chosen);
-          commit(typed, chosen);
+          commit(text, chosen);
         }}
       >
-        <SelectTrigger
-          aria-labelledby={`${wiring.labelId} ${unitLabel}`}
-          className="w-36"
-        >
+        <SelectTrigger aria-labelledby={unitLabelledBy} className="w-36">
           <span id={unitLabel} className="sr-only">
             unit
           </span>

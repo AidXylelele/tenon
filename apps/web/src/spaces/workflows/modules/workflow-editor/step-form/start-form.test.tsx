@@ -34,8 +34,14 @@ function shown(props: Partial<StartFormProps> = {}) {
     onEdit,
     ...props,
   };
-  render(<StartForm {...all} />);
-  return { onEdit };
+  const view = render(<StartForm {...all} />);
+
+  function rerender(next: Partial<StartFormProps>) {
+    const changed = { ...all, ...next };
+    view.rerender(<StartForm {...changed} />);
+  }
+
+  return { onEdit, rerender };
 }
 
 function leave(element: HTMLElement, text: string) {
@@ -139,6 +145,20 @@ describe("how the workflow starts", () => {
     expect(onEdit).toHaveBeenCalledWith([
       { kind: "setField", pointer: "/schedule", value: { cron: "0 2 1 * *" } },
     ]);
+  });
+
+  it("a_cron_written_elsewhere_shows_its_own_repeat", () => {
+    const { rerender } = shown({
+      form: workflowFormOf({ cron: "0 2 1 * *" }),
+    });
+    const daily = workflowFormOf({ cron: "0 10 * * *" });
+
+    rerender({ form: daily });
+
+    const repeat = screen.getByRole("combobox", { name: "Repeat" });
+    const time = screen.getByLabelText("At, in UTC");
+    expect(repeat).toHaveTextContent("Every day");
+    expect(time).toHaveValue("10:00");
   });
 
   it("weekly_starts_pick_their_days", () => {
