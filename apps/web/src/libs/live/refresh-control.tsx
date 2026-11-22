@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { ChevronDownIcon, RefreshCwIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {

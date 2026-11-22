@@ -1,7 +1,7 @@
 "use client";
 
 import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { PlusIcon } from "lucide-react";
 import type { EdgeKind, PlacedLabel, Point } from "@/operations/workflow-graph";
 import { useCanvas } from "./canvas-context";
