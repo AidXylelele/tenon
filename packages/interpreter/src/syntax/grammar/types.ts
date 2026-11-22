@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from "../../api/index.js";
 import type { Validator } from "../../runtime/index.js";
+import type { Finding } from "../findings.js";
 import type { JsonType } from "./json-types.js";
 
 type ReferenceRule =
@@ -19,6 +20,14 @@ export interface SchemaBreach extends Located {
   readonly problem: string;
   readonly value: JsonValue;
   readonly pattern: string | null;
+  readonly location: string | null;
+  readonly ambiguous: boolean;
+  readonly branches: readonly Branch[];
+}
+
+export interface Branch {
+  readonly schema: JsonValue;
+  readonly violations: readonly SchemaBreach[];
 }
 
 export interface RuleBreach extends Located {
@@ -27,6 +36,18 @@ export interface RuleBreach extends Located {
 }
 
 export type Violation = SchemaBreach | RuleBreach;
+
+interface Malformed {
+  readonly kind: "malformed";
+  readonly findings: readonly Finding[];
+}
+
+interface Formed {
+  readonly kind: "formed";
+  readonly findings: readonly Finding[];
+}
+
+export type Verdict = Malformed | Formed;
 
 export interface SchemaMember {
   readonly name: string;

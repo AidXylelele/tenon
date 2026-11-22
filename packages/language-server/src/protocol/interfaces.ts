@@ -6,15 +6,30 @@ import type {
   TextEdit,
   VersionedTextDocumentIdentifier,
 } from "vscode-languageserver/browser";
+import type { ConditionReading } from "../ide/conditions/index.js";
+import type { DataEntry, DataWarning } from "../ide/data/index.js";
 import type { EditAction, IdChange } from "../ide/edits/index.js";
 import type * as forms from "../ide/forms/index.js";
 import type { DraftAddress } from "../ide/snapshot/index.js";
 import type { FailureKind } from "../ide/steps/index.js";
+import type { ResultReading, StepVariant } from "../ide/variants/index.js";
 import type * as structure from "../ide/structure/index.js";
 
 export interface InitializationOptions {
   readonly profile: HostProfile;
   readonly draft?: DraftAddress;
+}
+
+export interface DataAtParams {
+  readonly textDocument: VersionedTextDocumentIdentifier;
+  readonly step: string;
+  readonly field: string;
+}
+
+export interface DataAtResult {
+  readonly version: number;
+  readonly entries: readonly DataEntry[];
+  readonly warnings: readonly DataWarning[];
 }
 
 export interface DocumentParams {
@@ -40,6 +55,12 @@ export interface FromJsonParams {
 export interface FromJsonResult {
   readonly text: string;
 }
+
+export interface ReadConditionParams {
+  readonly text: string;
+}
+
+export type ReadConditionResult = ConditionReading;
 
 export interface RangesOfParams {
   readonly textDocument: VersionedTextDocumentIdentifier;
@@ -92,7 +113,12 @@ export interface StepFormResult {
   readonly version: number;
   readonly step: string;
   readonly failure: FailureKind;
+  readonly result: ResultReading | null;
   readonly fields: readonly FormField[];
+}
+
+export interface StepVariantsResult {
+  readonly variants: readonly StepVariant[];
 }
 
 export interface WorkflowFormParams {

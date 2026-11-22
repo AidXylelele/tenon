@@ -1,0 +1,13 @@
+export type {
+  Comparison,
+  Condition,
+  ConditionReading,
+  ConditionRow,
+  ConditionText,
+  Join,
+  Literal,
+  Operand,
+  SecondValue,
+} from "./interfaces.js";
+export { conditionOf } from "./read.js";
+export { conditionTextOf, secondValues } from "./write.js";

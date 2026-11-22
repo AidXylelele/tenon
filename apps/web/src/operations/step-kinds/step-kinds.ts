@@ -1,4 +1,8 @@
-import { type StepFamily, stepFamilies } from "language-server/protocol";
+import {
+  type StepFamily,
+  stepFamilies,
+  type StepVariant,
+} from "language-server/protocol";
 import type { FamilyInfo, KindInfo, KindWords, StepKind } from "./interfaces";
 
 const KIND_WORDS: Readonly<Record<StepKind, KindWords>> = {
@@ -52,6 +56,21 @@ const KIND_WORDS: Readonly<Record<StepKind, KindWords>> = {
   },
 };
 
+const STARTING_VARIANTS: Readonly<Record<StepKind, StepVariant>> = {
+  call: "http",
+  run: "shell",
+  set: "set",
+  emit: "emit",
+  listen: "listen",
+  wait: "wait",
+  switch: "switch",
+  for: "for",
+  fork: "fork",
+  try: "try",
+  do: "do",
+  raise: "raise",
+};
+
 const FAMILY_WORDS: Readonly<Record<StepFamily, string>> = {
   call: "Call a service",
   data: "Set data",
@@ -66,13 +85,23 @@ export function kindInfoOf(kind: StepKind): KindInfo {
   return { kind, label: words.label, description: words.description };
 }
 
-export function familiesOfKinds(): readonly FamilyInfo[] {
+export function startingVariantOf(kind: StepKind): StepVariant {
+  return STARTING_VARIANTS[kind];
+}
+
+export function familiesOfKinds(
+  variants: readonly StepVariant[],
+): readonly FamilyInfo[] {
   const kinds = Object.keys(KIND_WORDS).filter(isKind);
+  const offered = kinds.filter((kind) =>
+    variants.includes(STARTING_VARIANTS[kind]),
+  );
   const families = Object.keys(FAMILY_WORDS).filter(isFamily);
-  return families.map((family) => {
-    const held = kinds.filter((kind) => stepFamilies[kind] === family);
+  const listed = families.map((family) => {
+    const held = offered.filter((kind) => stepFamilies[kind] === family);
     return { family, label: FAMILY_WORDS[family], kinds: held.map(kindInfoOf) };
   });
+  return listed.filter((family) => family.kinds.length > 0);
 }
 
 function isKind(key: string): key is StepKind {

@@ -3,7 +3,7 @@
 import type { LSPClient } from "@codemirror/lsp-client";
 import { Transaction } from "@codemirror/state";
 import type { ViewUpdate } from "@codemirror/view";
-import type { Trigger } from "language-server/protocol";
+import type { StepVariant, Trigger } from "language-server/protocol";
 import { type LayoutStorage, useDefaultLayout } from "react-resizable-panels";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -30,7 +30,6 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/libs/ui/components/toggle-group";
-import type { StepKind } from "@/operations/step-kinds";
 import { type Place, placeOf, START } from "@/operations/workflow-graph";
 import { textFromJson } from "@/operations/workflow-language";
 import { CodeEditor } from "@/features/code-editor";
@@ -259,7 +258,7 @@ export function EditingSurface({
     setPane("text");
   }
 
-  function pick(kind: StepKind) {
+  function pick(variant: StepVariant) {
     const at = inserting;
     setInserting(null);
 
@@ -269,7 +268,7 @@ export function EditingSurface({
       kind: "insertStep",
       list: at.list,
       index: at.index,
-      step: kind,
+      step: variant,
       name: null,
     });
   }
@@ -466,6 +465,7 @@ export function EditingSurface({
         onOpenChange={(open) => {
           if (!open) setInserting(null);
         }}
+        variants={editing.variants}
         onPick={pick}
       />
       <DraftGuard keeper={keeper} />

@@ -15,10 +15,11 @@ import { dslVersionFindingsOf } from "./dsl-version.js";
 import { referenceViolationsOf } from "./reference-violations.js";
 import { schemasAlong } from "./schemas-at.js";
 import { standardSchemas } from "./standard-schemas.js";
-import { wordedViolationOf } from "./worded-violations.js";
+import { wordedViolationsOf } from "./worded-violations.js";
 import { definitionsUri, TaskDefinitions } from "./task-definitions.js";
-import type { SchemaAt, SchemaPlace, Violation } from "./types.js";
+import type { SchemaAt, SchemaPlace, Verdict, Violation } from "./types.js";
 import { nestedListsOf } from "./task-lists.js";
+import { isStructureIntact } from "./value-violations.js";
 import {
   prefixedViolationOf,
   schemaBreachOf,
@@ -52,7 +53,7 @@ export class GrammarCheck {
     this.#definitions = new TaskDefinitions(schemas);
   }
 
-  findingsOf(document: JsonValue): readonly Finding[] {
+  verdictOf(document: JsonValue): Verdict {
     const root: Place = { value: document, pointer: rootPointer };
     const violations = [
       ...this.#workflow(document).map(schemaBreachOf),
@@ -62,7 +63,17 @@ export class GrammarCheck {
     ];
 
     const schema = this.#findingsOfViolations(violations);
-    return [...schema, ...dslVersionFindingsOf(document)];
+    const versions = dslVersionFindingsOf(document);
+    const findings = [...schema, ...versions];
+    const isSupported = versions.length === 0;
+    const isIntact = isStructureIntact(violations);
+    const isFormed = isSupported && isIntact;
+
+    if (!isFormed) {
+      return { kind: "malformed", findings };
+    }
+
+    return { kind: "formed", findings };
   }
 
   taskFindingsOf(definition: JsonValue, pointer: string): readonly Finding[] {
@@ -86,9 +97,7 @@ export class GrammarCheck {
 
   #findingsOfViolations(violations: readonly Violation[]): readonly Finding[] {
     const chosen = deepestViolationsOf(violations);
-    const worded = chosen.map((violation) =>
-      wordedViolationOf(violation, violations),
-    );
+    const worded = wordedViolationsOf(chosen, violations);
 
     return worded.map(violationFindingOf);
   }

@@ -3,6 +3,13 @@ import {
   type ServerCapabilities,
   TextDocumentSyncKind,
 } from "vscode-languageserver/browser";
+import { methods } from "../protocol/index.js";
+
+const customMethods = Object.values(methods);
+
+const experimental = Object.fromEntries(
+  customMethods.map((method) => [method, true] as const),
+);
 
 export const serverCapabilities: ServerCapabilities = {
   textDocumentSync: {
@@ -15,4 +22,5 @@ export const serverCapabilities: ServerCapabilities = {
   definitionProvider: true,
   referencesProvider: true,
   renameProvider: true,
+  experimental,
 };

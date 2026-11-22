@@ -1,9 +1,30 @@
+import type { JsonObject } from "interpreter/front-end";
 import { expect, test } from "vitest";
-import { appliedOf } from "../../src/ide/text/index.js";
 import { editsOf } from "../../src/ide/edits/index.js";
-import type { EditAction } from "../../src/protocol/index.js";
+import { formOf } from "../../src/ide/forms/index.js";
+import type { SchemasAt } from "../../src/ide/places/index.js";
+import { valueAt } from "../../src/ide/pointers/index.js";
+import { sourceOf } from "../../src/ide/snapshot/index.js";
+import {
+  type Step,
+  type StepList,
+  structureReadingOf,
+  type Transition,
+} from "../../src/ide/structure/index.js";
+import { appliedOf } from "../../src/ide/text/index.js";
+import type {
+  ChosenResult,
+  EditAction,
+  StepVariant,
+} from "../../src/protocol/index.js";
 import { guardedFlow, inlineHeader } from "../support/documents.js";
+import { analyzer } from "../support/analyzer.js";
 import { snapshotOf } from "../support/snapshot.js";
+
+const created = await analyzer;
+
+const formSchemasAt: SchemasAt = (document, pointer) =>
+  created.schemasAt(document, pointer);
 
 const commented = guardedFlow
   .replace("  - guard:", "  # the fetch, guarded\n  - guard:")
@@ -15,6 +36,100 @@ const fetchLines = `        - fetch:
               method: get
               endpoint: https://example.com
 `;
+
+const routeFlow = `${inlineHeader}do:
+  - route:
+      switch:
+        - big:
+            when: \${ .big }
+            then: continue
+        - small:
+            when: \${ .small }
+            then: report
+        - stop:
+            when: \${ .stop }
+            then: end
+        - default:
+            then: continue
+  # the total of the big ones
+  - total:
+      set:
+        total: 1
+  - report:
+      set:
+        reported: true
+`;
+
+const lastRouteFlow = `${inlineHeader}do:
+  - fetch:
+      set:
+        items: []
+  - route:
+      switch:
+        - some:
+            when: \${ .items != [] }
+            then: continue
+        - none:
+            when: \${ .items == [] }
+            then: end
+`;
+
+const nestedRouteFlow = `${inlineHeader}do:
+  - each:
+      for:
+        in: \${ .orders }
+        each: order
+      do:
+        - route:
+            switch:
+              - skip:
+                  when: \${ $order.skip }
+                  then: exit
+              - default:
+                  then: continue
+`;
+
+const undefaultedRouteFlow = `${inlineHeader}do:
+  - route:
+      switch:
+        - big:
+            when: \${ .big }
+            then: end
+  - total:
+      set:
+        total: 1
+`;
+
+const inlineRouteFlow = `${inlineHeader}do: [ { route: { switch: [ { big: { when: '\${ .big }', then: continue } }, { other: { then: continue } } ] } }, { total: { set: { total: 1 } } } ]
+`;
+
+const forkedRouteFlow = `${inlineHeader}do:
+  - alarm:
+      fork:
+        branches:
+          - route:
+              switch:
+                - severe:
+                    when: \${ .severe }
+                    then: continue
+          - nurse:
+              set:
+                called: nurse
+`;
+
+function branchActionOf(
+  routeId: string,
+  branch: string,
+  name: string | null,
+): EditAction {
+  return {
+    kind: "insertStepOnBranch",
+    switch: routeId,
+    case: branch,
+    step: "wait",
+    name,
+  };
+}
 
 function check(text: string, action: EditAction) {
   const snapshot = snapshotOf(text);
@@ -47,7 +162,7 @@ test("a new step goes between two, before the comment of the second", () => {
 
   const expected = commented.replace(
     "  # the fetch, guarded\n",
-    "  - wait:\n      wait: PT1S\n  # the fetch, guarded\n",
+    "  - wait:\n      wait: PT30M\n  # the fetch, guarded\n",
   );
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
@@ -64,7 +179,7 @@ test("a new step in a flow list is written inline", () => {
 
   const outcome = outcomeOf(text, action);
 
-  const expected = `${inlineHeader}do: [ { a: { set: { x: 1 } } }, { wait: { wait: PT1S } } ]\n`;
+  const expected = `${inlineHeader}do: [ { a: { set: { x: 1 } } }, { wait: { wait: PT30M } } ]\n`;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
@@ -80,7 +195,7 @@ test("a step inserted into a new try is written as block text", () => {
 
   const outcome = outcomeOf(text, action);
 
-  const expected = `${inlineHeader}do:\n  - guard:\n      try:\n        - wait:\n            wait: PT1S\n      catch: {}\n`;
+  const expected = `${inlineHeader}do:\n  - guard:\n      try:\n        - wait:\n            wait: PT30M\n      catch: {}\n`;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
@@ -96,7 +211,7 @@ test("a second wait takes the next free name", () => {
 
   const outcome = outcomeOf(text, action);
 
-  const expected = `${inlineHeader}do: [ { wait: { wait: PT1S } }, { wait-2: { wait: PT1S } } ]\n`;
+  const expected = `${inlineHeader}do: [ { wait: { wait: PT1S } }, { wait-2: { wait: PT30M } } ]\n`;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
@@ -291,7 +406,7 @@ test("a document that does not analyse is not edited", () => {
   });
 });
 
-test("a field is set in a text the grammar refuses, so the form can mend it", () => {
+test("a field whose value is not of its form is set in place, so the form can mend it", () => {
   const broken = `${guardedFlow}schedule:\n  every: 1 minute\n`;
   const action: EditAction = {
     kind: "setField",
@@ -393,6 +508,36 @@ test.each<readonly [string, string, EditAction, string]>([
     { kind: "clearField", pointer: "/do/0/greet/then" },
     "No written field stands at '/do/0/greet/then'.",
   ],
+  [
+    "a step on a branch of a step that is not a switch",
+    routeFlow,
+    branchActionOf("/do/total", "big", null),
+    "The step /do/total is not a switch.",
+  ],
+  [
+    "a step on a branch the switch does not have",
+    routeFlow,
+    branchActionOf("/do/route", "nowhere", null),
+    "The switch /do/route has no branch named 'nowhere'.",
+  ],
+  [
+    "a step on a branch of a switch that is a fork's branch",
+    forkedRouteFlow,
+    branchActionOf("/do/alarm/fork/branches/route", "severe", null),
+    "A switch that is a branch of a fork has no list to add a step to.",
+  ],
+  [
+    "a step on a branch under a sibling's name",
+    routeFlow,
+    branchActionOf("/do/route", "big", "total"),
+    "A step named 'total' already stands in this list.",
+  ],
+  [
+    "a step on a branch of an unknown step",
+    routeFlow,
+    branchActionOf("/do/nowhere", "big", null),
+    "No step with the id /do/nowhere stands in the text.",
+  ],
 ])("%s is refused", (_, text, action, reason) => {
   const editing = check(text, action);
 
@@ -420,7 +565,7 @@ const retried = guardedFlow.replace(
 
 const retry = {
   kind: "retry",
-  attempts: 3,
+  retries: 3,
   seconds: 5,
   growing: false,
 } as const;
@@ -562,4 +707,1228 @@ test("another trigger is chosen by writing the schedule whole", () => {
 
   const expected = `${guardedFlow}schedule: { cron: 0 9 * * * }\n`;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+const scriptFlow = `${inlineHeader}do:
+  - compute:
+      run:
+        script:
+          language: js
+          code: "return 1;"
+`;
+
+const codePointer = "/do/0/compute/run/script/code";
+
+const quotedCode = '          code: "return 1;"\n';
+
+function settingOf(value: string): EditAction {
+  return { kind: "setField", pointer: codePointer, value };
+}
+
+function readBackOf(text: string, action: EditAction) {
+  const editing = check(text, action);
+
+  if (editing.kind === "refused") {
+    return editing;
+  }
+
+  const edited = appliedOf(text, editing.changes);
+  const snapshot = snapshotOf(edited);
+  const source = sourceOf(snapshot.analysis);
+
+  if (source === null) {
+    return source;
+  }
+
+  return valueAt(source.document, codePointer);
+}
+
+test.each([
+  [
+    "three lines that end in a line break are written with clip chomping",
+    "const a = 1;\nconst b = 2;\nreturn a + b;\n",
+    "          code: |\n            const a = 1;\n            const b = 2;\n            return a + b;\n",
+  ],
+  [
+    "three lines with no final line break are written with strip chomping",
+    "const a = 1;\nconst b = 2;\nreturn a + b;",
+    "          code: |-\n            const a = 1;\n            const b = 2;\n            return a + b;\n",
+  ],
+])("%s, as a literal block under the key", (_, code, lines) => {
+  const action = settingOf(code);
+
+  const outcome = outcomeOf(scriptFlow, action);
+
+  const expected = scriptFlow.replace(quotedCode, lines);
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test.each([
+  ["a final line break", "one\ntwo\n"],
+  ["no final line break", "one\ntwo"],
+  ["an indented first line", "  one\ntwo"],
+  ["trailing empty lines", "one\ntwo\n\n"],
+])("a literal block with %s reads back as the value set", (_, code) => {
+  const action = settingOf(code);
+
+  const read = readBackOf(scriptFlow, action);
+
+  expect(read).toBe(code);
+});
+
+test("a one-line edit of a quoted value stays quoted", () => {
+  const action = settingOf("return 2;");
+
+  const outcome = outcomeOf(scriptFlow, action);
+
+  const expected = scriptFlow.replace('"return 1;"', '"return 2;"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a one-line edit of a literal block keeps it a block", () => {
+  const block = scriptFlow.replace(
+    quotedCode,
+    "          code: |\n            return 1;\n",
+  );
+  const action = settingOf("return 2;");
+
+  const outcome = outcomeOf(block, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-\n            return 2;\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a comment after the value moves to the block's header", () => {
+  const commentedCode = scriptFlow.replace(
+    quotedCode,
+    '          code: "return 1;"  # the result\n    # the next step\n',
+  );
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(commentedCode, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-  # the result\n            a;\n            return 2;\n    # the next step\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a multi-line value in a flow mapping stays on its line, double-quoted", () => {
+  const inline = scriptFlow.replace(
+    '        script:\n          language: js\n          code: "return 1;"\n',
+    "        script: { language: js, code: 'return 1;' }\n",
+  );
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(inline, action);
+
+  const expected = inline.replace("'return 1;'", '"a;\\nreturn 2;"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("an unwritten multi-line field is added as a literal block", () => {
+  const uncoded = scriptFlow.replace(quotedCode, "");
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(uncoded, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-\n            a;\n            return 2;\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a multi-line item of a block sequence is a literal block under its dash", () => {
+  const noted = scriptFlow.replace(
+    "      run:\n",
+    "      metadata:\n        lines:\n          - first\n      run:\n",
+  );
+  const action: EditAction = {
+    kind: "setField",
+    pointer: "/do/0/compute/metadata/lines/0",
+    value: "first\nsecond",
+  };
+
+  const outcome = outcomeOf(noted, action);
+
+  const expected = noted.replace(
+    "          - first\n",
+    "          - |-\n            first\n            second\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a comment on a block's header stays on it", () => {
+  const block = scriptFlow.replace(
+    quotedCode,
+    "          code: |  # the result\n            return 1;\n",
+  );
+  const action = settingOf("a;\nreturn 2;");
+
+  const outcome = outcomeOf(block, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    "          code: |-  # the result\n            a;\n            return 2;\n",
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+const pause = "  - pause:\n      wait: PT30M\n";
+
+const branchSteps: readonly (readonly [
+  string,
+  string,
+  string,
+  string,
+  string,
+])[] = [
+  [
+    "a branch that continues still continues, into the new step, and another branch that continued names the step after the switch",
+    routeFlow,
+    "/do/route",
+    "big",
+    routeFlow
+      .replace(
+        "        - default:\n            then: continue\n",
+        "        - default:\n            then: total\n",
+      )
+      .replace("  # the total", `${pause}  # the total`),
+  ],
+  [
+    "a branch that names a step names the new step, which names that step, and the branches that continued name the step after the switch",
+    routeFlow,
+    "/do/route",
+    "small",
+    routeFlow
+      .replace("            then: continue\n", "            then: total\n")
+      .replace("then: report", "then: pause")
+      .replace(
+        "        - default:\n            then: continue\n",
+        "        - default:\n            then: total\n",
+      )
+      .replace("  # the total", `${pause}      then: report\n  # the total`),
+  ],
+  [
+    "a branch that ends the run leads to the new step, which ends the run, and the branches that continued name the step after the switch",
+    routeFlow,
+    "/do/route",
+    "stop",
+    routeFlow
+      .replace("            then: continue\n", "            then: total\n")
+      .replace("            then: end\n", "            then: pause\n")
+      .replace(
+        "        - default:\n            then: continue\n",
+        "        - default:\n            then: total\n",
+      )
+      .replace("  # the total", `${pause}      then: end\n  # the total`),
+  ],
+  [
+    "a branch that leaves its block leads to the new step, which leaves it, and another branch that continued leaves it too",
+    nestedRouteFlow,
+    "/do/each/do/route",
+    "skip",
+    nestedRouteFlow
+      .replace("then: exit", "then: pause")
+      .replace("then: continue", "then: exit")
+      .concat(
+        "        - pause:\n            wait: PT30M\n            then: exit\n",
+      ),
+  ],
+  [
+    "a switch that was the workflow's last step ends the run where it fell off the end, its own then included",
+    lastRouteFlow,
+    "/do/route",
+    "some",
+    lastRouteFlow.concat(`      then: end\n${pause}`),
+  ],
+  [
+    "a switch with no default case names the step after it in its own then",
+    undefaultedRouteFlow,
+    "/do/route",
+    "big",
+    undefaultedRouteFlow
+      .replace(
+        "            then: end\n",
+        "            then: pause\n      then: total\n",
+      )
+      .replace("  - total:", `${pause}      then: end\n  - total:`),
+  ],
+  [
+    "a switch written inline gets its step inline",
+    inlineRouteFlow,
+    "/do/route",
+    "big",
+    inlineRouteFlow
+      .replace("{ other: { then: continue } }", "{ other: { then: total } }")
+      .replace(" { total:", " { pause: { wait: PT30M } }, { total:"),
+  ],
+];
+
+type Way = readonly [string | null, Transition["kind"], string | null];
+
+function editedOf(text: string, action: EditAction): string {
+  const editing = check(text, action);
+
+  if (editing.kind === "refused") {
+    throw new Error(editing.reason);
+  }
+
+  return appliedOf(text, editing.changes);
+}
+
+function stepsOf(list: StepList): readonly Step[] {
+  return list.steps.flatMap((step) => {
+    const nested = step.lists.flatMap(stepsOf);
+    return [step, ...nested];
+  });
+}
+
+function waysOf(text: string, id: string): readonly Way[] {
+  const snapshot = snapshotOf(text);
+  const { workflow } = structureReadingOf(snapshot);
+  const steps = stepsOf(workflow.steps);
+  const step = steps.find((each) => each.id === id);
+  const flow = step?.flow ?? [];
+
+  return flow.map((way) => [way.case, way.kind, way.to] as const);
+}
+
+test.each(branchSteps)("%s", (_, text, switchId, branch, expected) => {
+  const action = branchActionOf(switchId, branch, "pause");
+
+  const outcome = outcomeOf(text, action);
+
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test.each<
+  readonly [
+    string,
+    string,
+    string,
+    string,
+    string,
+    readonly Way[],
+    readonly Way[],
+  ]
+>([
+  [
+    "a branch that continued",
+    routeFlow,
+    "/do/route",
+    "big",
+    "/do/pause",
+    [
+      ["big", "next", "/do/pause"],
+      ["small", "jump", "/do/report"],
+      ["stop", "end", null],
+      ["default", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "next", "/do/total"]],
+  ],
+  [
+    "a branch that named a step",
+    routeFlow,
+    "/do/route",
+    "small",
+    "/do/pause",
+    [
+      ["big", "jump", "/do/total"],
+      ["small", "jump", "/do/pause"],
+      ["stop", "end", null],
+      ["default", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "jump", "/do/report"]],
+  ],
+  [
+    "a branch that ended the run",
+    routeFlow,
+    "/do/route",
+    "stop",
+    "/do/pause",
+    [
+      ["big", "jump", "/do/total"],
+      ["small", "jump", "/do/report"],
+      ["stop", "jump", "/do/pause"],
+      ["default", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "end", null]],
+  ],
+  [
+    "a branch that left its block",
+    nestedRouteFlow,
+    "/do/each/do/route",
+    "skip",
+    "/do/each/do/pause",
+    [
+      ["skip", "jump", "/do/each/do/pause"],
+      ["default", "exit", null],
+      [null, "next", "/do/each/do/pause"],
+    ],
+    [[null, "exit", null]],
+  ],
+  [
+    "a branch of the workflow's last step",
+    lastRouteFlow,
+    "/do/route",
+    "some",
+    "/do/pause",
+    [
+      ["some", "next", "/do/pause"],
+      ["none", "end", null],
+      [null, "end", null],
+    ],
+    [[null, "next", null]],
+  ],
+  [
+    "a branch of a switch with no default",
+    undefaultedRouteFlow,
+    "/do/route",
+    "big",
+    "/do/pause",
+    [
+      ["big", "jump", "/do/pause"],
+      [null, "jump", "/do/total"],
+    ],
+    [[null, "end", null]],
+  ],
+  [
+    "a branch of a switch written inline",
+    inlineRouteFlow,
+    "/do/route",
+    "big",
+    "/do/pause",
+    [
+      ["big", "next", "/do/pause"],
+      ["other", "jump", "/do/total"],
+      [null, "next", "/do/pause"],
+    ],
+    [[null, "next", "/do/total"]],
+  ],
+])(
+  "the structure draws the new step on %s and every other way out where it led",
+  (_, text, switchId, branch, pauseId, switchWays, stepWays) => {
+    const action = branchActionOf(switchId, branch, "pause");
+
+    const edited = editedOf(text, action);
+
+    const ways = waysOf(edited, switchId);
+    const paused = waysOf(edited, pauseId);
+
+    expect(ways).toEqual(switchWays);
+    expect(paused).toEqual(stepWays);
+  },
+);
+
+const emptyFlow = `${inlineHeader}do: []\n`;
+
+const validationError =
+  "https://open-workflow-specification.org/spec/1.0.0/errors/validation";
+
+function startOf(variant: StepVariant) {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: variant,
+    name: variant,
+  };
+  const edited = editedOf(emptyFlow, action);
+  const snapshot = snapshotOf(edited);
+  const source = sourceOf(snapshot.analysis);
+  const pointer = `/do/0/${variant}`;
+  const document = source?.document ?? null;
+  const content = valueAt(document, pointer);
+  const problems = snapshot.analysis.diagnostics.map((diagnostic) => [
+    diagnostic.code,
+    diagnostic.pointer,
+  ]);
+
+  return { content, problems };
+}
+
+test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
+  [
+    "http",
+    { call: "http", with: { method: "get", endpoint: "" } },
+    [["schema", "/do/0/http/with/endpoint"]],
+  ],
+  [
+    "openapi",
+    { call: "openapi", with: { document: { endpoint: "" }, operationId: "" } },
+    [
+      ["schema", "/do/0/openapi/with/document/endpoint"],
+      ["schema", "/do/0/openapi/with/operationId"],
+    ],
+  ],
+  [
+    "grpc",
+    {
+      call: "grpc",
+      with: {
+        proto: { endpoint: "" },
+        service: { name: "", host: "" },
+        method: "",
+      },
+    },
+    [
+      ["schema", "/do/0/grpc/with/proto/endpoint"],
+      ["schema", "/do/0/grpc/with/service/name"],
+      ["schema", "/do/0/grpc/with/service/host"],
+      ["schema", "/do/0/grpc/with/method"],
+    ],
+  ],
+  [
+    "asyncapi",
+    {
+      call: "asyncapi",
+      with: { document: { endpoint: "" }, operation: "", message: {} },
+    },
+    [
+      ["schema", "/do/0/asyncapi/with/document/endpoint"],
+      ["schema", "/do/0/asyncapi/with/operation"],
+    ],
+  ],
+  [
+    "mcp",
+    {
+      call: "mcp",
+      with: {
+        method: "tools/call",
+        parameters: { name: "" },
+        transport: { http: { endpoint: "" } },
+      },
+    },
+    [["schema", "/do/0/mcp/with/transport/http/endpoint"]],
+  ],
+  [
+    "a2a",
+    { call: "a2a", with: { method: "message/send", server: "" } },
+    [["schema", "/do/0/a2a/with/server"]],
+  ],
+  [
+    "script-js",
+    {
+      run: {
+        script: {
+          language: "js",
+          code: "const result = {};\nconsole.log(JSON.stringify(result));\n",
+        },
+      },
+      output: { as: "${ fromjson }" },
+    },
+    [],
+  ],
+  [
+    "script-python",
+    {
+      run: {
+        script: {
+          language: "python",
+          code: "import json\n\nresult = {}\nprint(json.dumps(result))\n",
+        },
+      },
+      output: { as: "${ fromjson }" },
+    },
+    [],
+  ],
+  ["shell", { run: { shell: { command: "" } } }, []],
+  [
+    "container",
+    { run: { container: { image: "" } } },
+    [["schema", "/do/0/container/run/container/image"]],
+  ],
+  [
+    "workflow",
+    { run: { workflow: { namespace: "", name: "", version: "" } } },
+    [
+      ["schema", "/do/0/workflow/run/workflow/namespace"],
+      ["schema", "/do/0/workflow/run/workflow/name"],
+      ["schema", "/do/0/workflow/run/workflow/version"],
+    ],
+  ],
+  ["do", { do: [] }, []],
+  [
+    "emit",
+    { emit: { event: { with: { type: "" } } } },
+    [["event-attribute", "/do/0/emit/emit/event/with/type"]],
+  ],
+  [
+    "for",
+    { for: { each: "item", in: "" }, do: [] },
+    [["expression", "/do/0/for/for/in"]],
+  ],
+  [
+    "fork",
+    {
+      fork: {
+        branches: [{ "branch-1": { do: [] } }, { "branch-2": { do: [] } }],
+      },
+    },
+    [],
+  ],
+  [
+    "listen",
+    { listen: { to: { one: { with: { type: "" } } } } },
+    [["event-attribute", "/do/0/listen/listen/to/one/with/type"]],
+  ],
+  [
+    "raise",
+    { raise: { error: { type: validationError, status: 400, title: "" } } },
+    [],
+  ],
+  ["set", { set: { value: "" }, output: { as: "${ $input + . }" } }, []],
+  [
+    "switch",
+    {
+      switch: [
+        { "branch-1": { when: "", then: "continue" } },
+        { default: { then: "end" } },
+      ],
+    },
+    [["expression", "/do/0/switch/switch/0/branch-1/when"]],
+  ],
+  [
+    "try",
+    {
+      try: [],
+      catch: {
+        retry: {
+          delay: { seconds: 2 },
+          backoff: { exponential: {} },
+          limit: { attempt: { count: 3 } },
+        },
+      },
+    },
+    [],
+  ],
+  ["wait", { wait: "PT30M" }, []],
+])(
+  "a %s step starts with its smallest content, its blanks empty and the problems the analysis names",
+  (variant, content, problems) => {
+    const started = startOf(variant);
+
+    expect(started).toEqual({ content, problems });
+  },
+);
+
+test("a JavaScript step starts with code that prints its result as JSON and an output that parses it", () => {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: "script-js",
+    name: null,
+  };
+
+  const outcome = outcomeOf(emptyFlow, action);
+
+  const expected = `${inlineHeader}do:
+  - run:
+      run:
+        script:
+          language: js
+          code: |
+            const result = {};
+            console.log(JSON.stringify(result));
+      output:
+        as: \${ fromjson }
+`;
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+const resultHeader = `${inlineHeader}do:\n  - step:\n`;
+
+const jsonScript = `${resultHeader}      run:
+        script:
+          language: js
+          code: ""
+      output:
+        as: \${ fromjson }
+`;
+
+const textScript = `${resultHeader}      run:
+        script:
+          language: js
+          code: ""
+`;
+
+const codeScript = `${textScript}        return: code
+`;
+
+const mergingSet = `${resultHeader}      set:
+        total: 1
+      output:
+        as: \${ $input + . }
+`;
+
+const plainSet = `${resultHeader}      set:
+        total: 1
+`;
+
+const schemedScript = jsonScript.replace(
+  "      output:\n",
+  "      output:\n        schema:\n          document:\n            type: object\n",
+);
+
+test.each<readonly [string, string, ChosenResult, string]>([
+  [
+    "a script's printed text drops the output that parsed it",
+    jsonScript,
+    "printedText",
+    textScript,
+  ],
+  ["a script's exit code returns its code", textScript, "exitCode", codeScript],
+  [
+    "a script's printed JSON parses what it prints and returns what it prints",
+    codeScript,
+    "printedJson",
+    codeScript
+      .replace("return: code", "return: stdout")
+      .concat("      output:\n        as: ${ fromjson }\n"),
+  ],
+  [
+    "a set's values alone drop the output that added its input",
+    mergingSet,
+    "valuesOnly",
+    plainSet,
+  ],
+  [
+    "a set's values beside its input add the input in its output",
+    plainSet,
+    "inputAndValues",
+    mergingSet,
+  ],
+  [
+    "an output that holds more than the parse keeps the rest",
+    schemedScript,
+    "printedText",
+    schemedScript.replace("        as: ${ fromjson }\n", ""),
+  ],
+])("%s", (_, text, result, expected) => {
+  const action: EditAction = { kind: "setResult", step: "/do/step", result };
+
+  const outcome = outcomeOf(text, action);
+
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a result the step does not offer is refused", () => {
+  const action: EditAction = {
+    kind: "setResult",
+    step: "/do/step",
+    result: "printedJson",
+  };
+
+  const editing = check(plainSet, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "The step /do/step offers no result 'printedJson'.",
+  });
+});
+
+const pickFlow = `${inlineHeader}do:
+  - fetch:
+      call: http
+      with: { method: get, endpoint: https://api.test/orders }
+  - total:
+      set:
+        count: 2
+  - report:
+      call: http
+      with:
+        method: post
+        endpoint: https://api.test/report
+        body: {}
+`;
+
+const fetchExport = `      export:\n        as: '\${ $context + { "fetch": . } }'\n`;
+
+function useOf(value: string, exported: string | null): EditAction {
+  return {
+    kind: "useData",
+    pointer: "/do/2/report/with/body",
+    value,
+    export: exported,
+  };
+}
+
+test("data used where it flows in is written into the field alone", () => {
+  const action = useOf("${ .count }", null);
+
+  const outcome = outcomeOf(pickFlow, action);
+
+  const expected = pickFlow.replace("body: {}", "body: ${ .count }");
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("an earlier step's output used through the context exports it under its name", () => {
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const outcome = outcomeOf(pickFlow, action);
+
+  const expected = pickFlow
+    .replace(
+      "      with: { method: get, endpoint: https://api.test/orders }\n",
+      `      with: { method: get, endpoint: https://api.test/orders }\n${fetchExport}`,
+    )
+    .replace("body: {}", "body: ${ $context.fetch }");
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a step already exported under its name is not exported again", () => {
+  const exported = pickFlow.replace(
+    "      with: { method: get, endpoint: https://api.test/orders }\n",
+    `      with: { method: get, endpoint: https://api.test/orders }\n${fetchExport}`,
+  );
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const outcome = outcomeOf(exported, action);
+
+  const expected = exported.replace("body: {}", "body: ${ $context.fetch }");
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a step that writes its own export is not exported over it", () => {
+  const ownExport = pickFlow.replace(
+    "      with: { method: get, endpoint: https://api.test/orders }\n",
+    "      with: { method: get, endpoint: https://api.test/orders }\n      export:\n        as: '${ { kept: true } }'\n",
+  );
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const editing = check(ownExport, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "The step /do/fetch writes its own export; edit it in the text.",
+  });
+});
+
+const conditionFlow = `${inlineHeader}do:
+  - route:
+      switch:
+        - paid:
+            when: \${ .paid }
+            then: end
+        - default:
+            then: continue
+`;
+
+test("a condition is written into its field as jq", () => {
+  const action: EditAction = {
+    kind: "setCondition",
+    pointer: "/do/0/route/switch/0/paid/when",
+    condition: {
+      join: "all",
+      rows: [
+        {
+          left: ".status",
+          comparison: "is",
+          right: { kind: "value", value: "paid" },
+        },
+      ],
+    },
+  };
+
+  const outcome = outcomeOf(conditionFlow, action);
+
+  const expected = conditionFlow.replace(
+    "when: ${ .paid }",
+    'when: ${ .status == "paid" }',
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a condition that cannot be written is refused with its reason", () => {
+  const action: EditAction = {
+    kind: "setCondition",
+    pointer: "/do/0/route/switch/0/paid/when",
+    condition: { join: "all", rows: [] },
+  };
+
+  const editing = check(conditionFlow, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "A condition holds at least one row.",
+  });
+});
+
+const wrapFlow = `${inlineHeader}do:
+  - start:
+      set:
+        a: 1
+      then: fetch
+  - fetch:
+      call: http
+      with: { method: get, endpoint: https://api.test/a }
+  - check:
+      set:
+        b: 2
+  - report:
+      set:
+        c: 3
+`;
+
+const fetchItem = `  - fetch:
+      call: http
+      with: { method: get, endpoint: https://api.test/a }
+`;
+
+const checkItem = `  - check:
+      set:
+        b: 2
+`;
+
+function wrappingOf(
+  steps: readonly string[],
+  block: "try" | "for" | "do",
+  name: string | null,
+): EditAction {
+  return { kind: "wrapSteps", steps, block, name };
+}
+
+function nestedOf(item: string): string {
+  const lines = item.split("\n");
+  const indented = lines.map((line) => (line === "" ? line : `      ${line}`));
+
+  return indented.join("\n");
+}
+
+test("a step wrapped in a group gives the group its name, so a jump to it lands on the group", () => {
+  const action = wrappingOf(["/do/fetch"], "do", null);
+
+  const outcome = outcomeOf(wrapFlow, action);
+
+  const nested = nestedOf(fetchItem);
+  const expected = wrapFlow.replace(
+    fetchItem,
+    `  - fetch:\n      do:\n${nested}`,
+  );
+  expect(outcome).toEqual({
+    text: expected,
+    ids: [{ from: "/do/fetch", to: "/do/fetch/do/fetch" }],
+    diagnostics: [],
+  });
+});
+
+test("a run of steps wrapped in a named try retries them, and a jump to its first step names the try", () => {
+  const action = wrappingOf(["/do/fetch", "/do/check"], "try", "guarded");
+
+  const outcome = outcomeOf(wrapFlow, action);
+
+  const nested = nestedOf(fetchItem + checkItem);
+  const retry = `      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+`;
+  const expected = wrapFlow
+    .replace("then: fetch", "then: guarded")
+    .replace(
+      fetchItem + checkItem,
+      `  - guarded:\n      try:\n${nested}${retry}`,
+    );
+  expect(outcome).toEqual({
+    text: expected,
+    ids: [
+      { from: "/do/fetch", to: "/do/guarded/try/fetch" },
+      { from: "/do/check", to: "/do/guarded/try/check" },
+    ],
+    diagnostics: [],
+  });
+});
+
+test("a step wrapped in a repeat leaves the list it repeats over to fill", () => {
+  const action = wrappingOf(["/do/check"], "for", null);
+
+  const edited = editedOf(wrapFlow, action);
+
+  const nested = nestedOf(checkItem);
+  const expected = wrapFlow.replace(
+    checkItem,
+    `  - check:\n      for:\n        each: item\n        in: ""\n      do:\n${nested}`,
+  );
+  const problems = snapshotOf(edited).analysis.diagnostics.map((each) => [
+    each.code,
+    each.pointer,
+  ]);
+  expect(edited).toBe(expected);
+  expect(problems).toEqual([["expression", "/do/2/check/for/in"]]);
+});
+
+const wrapRetry = `      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+`;
+
+function checkWith(then: string): string {
+  return `${checkItem}      ${then}\n`;
+}
+
+test.each<readonly [string, string, EditAction, string, string]>([
+  [
+    "a jump from the run to the step right after it leaves the group",
+    checkWith("then: report"),
+    wrappingOf(["/do/check"], "do", "inner"),
+    `  - inner:\n      do:\n${nestedOf(checkWith("then: exit"))}`,
+    "/do/inner/do/check",
+  ],
+  [
+    "a jump from the run to the step right after it leaves the try",
+    checkWith("then: report"),
+    wrappingOf(["/do/check"], "try", "inner"),
+    `  - inner:\n      try:\n${nestedOf(checkWith("then: exit"))}${wrapRetry}`,
+    "/do/inner/try/check",
+  ],
+  [
+    "leaving the workflow's list from the run ends the run",
+    checkWith("then: exit"),
+    wrappingOf(["/do/check"], "do", "inner"),
+    `  - inner:\n      do:\n${nestedOf(checkWith("then: end"))}`,
+    "/do/inner/do/check",
+  ],
+  [
+    "ending the run from the run still ends it",
+    checkWith("then: end"),
+    wrappingOf(["/do/check"], "do", "inner"),
+    `  - inner:\n      do:\n${nestedOf(checkWith("then: end"))}`,
+    "/do/inner/do/check",
+  ],
+])("%s", (_, item, action, block, moved) => {
+  const text = wrapFlow.replace(checkItem, item);
+
+  const outcome = outcomeOf(text, action);
+
+  const expected = wrapFlow.replace(checkItem, block);
+  expect(outcome).toEqual({
+    text: expected,
+    ids: [{ from: "/do/check", to: moved }],
+    diagnostics: [],
+  });
+});
+
+const nestedWrapFlow = `${inlineHeader}do:
+  - outer:
+      do:
+        - first:
+            set:
+              a: 1
+            then: exit
+        - second:
+            set:
+              b: 2
+`;
+
+test.each<readonly [string, string, EditAction, string]>([
+  [
+    "a jump from outside to a step that is not the run's first",
+    wrapFlow.replace("then: fetch", "then: check"),
+    wrappingOf(["/do/fetch", "/do/check"], "do", "group"),
+    "The step /do/start goes to 'check', which would stand inside the block; only its first step can be gone to.",
+  ],
+  [
+    "a jump from the run to a step before it",
+    wrapFlow.replace("        b: 2\n", "        b: 2\n      then: start\n"),
+    wrappingOf(["/do/check"], "do", "group"),
+    "The step /do/check goes to 'start', outside the block, which a step inside it cannot do.",
+  ],
+  [
+    "a repeat whose steps jump to the step after the run",
+    wrapFlow.replace("        b: 2\n", "        b: 2\n      then: report\n"),
+    wrappingOf(["/do/check"], "for", "each"),
+    "The step /do/check goes to 'report', outside the block, which a step inside it cannot do.",
+  ],
+  [
+    "leaving a nested list from the run",
+    nestedWrapFlow,
+    wrappingOf(["/do/outer/do/first"], "do", "group"),
+    "The step /do/outer/do/first leaves its list, which inside the block would leave only the block.",
+  ],
+  [
+    "steps that are not next to each other",
+    wrapFlow,
+    wrappingOf(["/do/fetch", "/do/report"], "do", "group"),
+    "The steps to wrap do not stand next to each other in one list.",
+  ],
+  [
+    "no step",
+    wrapFlow,
+    wrappingOf([], "do", "group"),
+    "Choose at least one step to wrap.",
+  ],
+  [
+    "a block under a sibling's name",
+    wrapFlow,
+    wrappingOf(["/do/fetch"], "do", "report"),
+    "A step named 'report' already stands in this list.",
+  ],
+  [
+    "several branches of a fork",
+    `${inlineHeader}do:\n  - both:\n      fork:\n        branches:\n          - a: { set: { a: 1 } }\n          - b: { set: { b: 2 } }\n`,
+    wrappingOf(
+      ["/do/both/fork/branches/a", "/do/both/fork/branches/b"],
+      "do",
+      "group",
+    ),
+    "Branches of a fork run at once; wrap one branch at a time.",
+  ],
+])("wrapping %s is refused", (_, text, action, reason) => {
+  const editing = check(text, action);
+
+  expect(editing).toEqual({ kind: "refused", reason });
+});
+
+test.each([
+  ["a kept block", "line0\n\n"],
+  ["a kept block written over a kept block", "line1\n\n\n"],
+])("%s set twice reads back as set", (_, code) => {
+  const followed = `${scriptFlow}      then: end\n`;
+  const first = settingOf("line0\n\n");
+  const once = editedOf(followed, first);
+  const action = settingOf(code);
+
+  const read = readBackOf(once, action);
+
+  expect(read).toBe(code);
+});
+
+test("a kept block before an empty line is written quoted, so the empty line stays outside it", () => {
+  const spaced = scriptFlow.replace(quotedCode, `${quotedCode}\n`);
+  const action = settingOf("line0\n\n");
+
+  const outcome = outcomeOf(spaced, action);
+
+  const expected = spaced.replace('"return 1;"', '"line0\\n\\n"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a block before a comment indented under it is written quoted, so the comment stays a comment", () => {
+  const commented = scriptFlow.replace(
+    quotedCode,
+    `${quotedCode}            # under the code\n`,
+  );
+  const action = settingOf("a;\nb;");
+
+  const outcome = outcomeOf(commented, action);
+
+  const expected = commented.replace('"return 1;"', '"a;\\nb;"');
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a block's header comment stays when its value becomes empty", () => {
+  const block = scriptFlow.replace(
+    quotedCode,
+    "          code: |  # the result\n            return 1;\n",
+  );
+  const action = settingOf("");
+
+  const outcome = outcomeOf(block, action);
+
+  const expected = scriptFlow.replace(
+    quotedCode,
+    '          code: ""  # the result\n',
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("an export whose key another step of the same name already writes is refused", () => {
+  const twoFetches = pickFlow.replace(
+    "  - total:\n      set:\n        count: 2\n",
+    `  - total:\n      do:\n        - fetch:\n            set:\n              count: 2\n            export:\n              as: '\${ $context + { "fetch": . } }'\n`,
+  );
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const editing = check(twoFetches, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason:
+      "Rename one of the two steps named 'fetch' (/do/fetch and /do/total/do/fetch): both would export it to the context.",
+  });
+});
+
+test("a new HTTP step with its address to fill is in the structure and has its form at once", () => {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: "http",
+    name: null,
+  };
+  const edited = editedOf(emptyFlow, action);
+  const snapshot = snapshotOf(edited);
+
+  const reading = structureReadingOf(snapshot);
+  const form = formOf(snapshot, "/do/call", formSchemasAt);
+
+  const ids = reading.workflow.steps.steps.map((step) => step.id);
+  expect(reading.stale).toBe(false);
+  expect(ids).toEqual(["/do/call"]);
+  expect(form).toMatchObject({ kind: "form" });
+});
+
+test("a new choice in a loop leaves only the item when no branch matches", () => {
+  const loop = `${inlineHeader}do:\n  - each:\n      for:\n        in: \${ .orders }\n        each: order\n      do: []\n`;
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do/each/do",
+    index: 0,
+    step: "switch",
+    name: null,
+  };
+
+  const outcome = outcomeOf(loop, action);
+
+  const expected = loop.replace(
+    "      do: []\n",
+    `      do:\n        - switch:\n            switch:\n              - branch-1:\n                  when: ""\n                  then: continue\n              - default:\n                  then: exit\n`,
+  );
+  expect(outcome).toMatchObject({ text: expected });
+});
+
+test.each<readonly [StepVariant, string]>([
+  ["http", "call"],
+  ["mcp", "call"],
+  ["script-js", "run"],
+  ["shell", "run"],
+  ["workflow", "run"],
+  ["switch", "switch"],
+  ["wait", "wait"],
+])("a new %s step with no name takes its kind's name, %s", (variant, name) => {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: variant,
+    name: null,
+  };
+
+  const edited = editedOf(emptyFlow, action);
+
+  const snapshot = snapshotOf(edited);
+  const { workflow } = structureReadingOf(snapshot);
+  const names = workflow.steps.steps.map((step) => step.name);
+  expect(names).toEqual([name]);
 });

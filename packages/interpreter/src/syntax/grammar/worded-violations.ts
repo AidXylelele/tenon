@@ -15,13 +15,24 @@ const unknownMembers = new Set([
   "additionalProperties",
 ]);
 
-export function wordedViolationOf(
-  violation: Violation,
+type Around = ReadonlyMap<string, readonly SchemaBreach[]>;
+
+export function wordedViolationsOf(
+  chosen: readonly Violation[],
   violations: readonly Violation[],
-): Violation {
+): readonly Violation[] {
+  const breaches = violations.filter(
+    (violation): violation is SchemaBreach => violation.kind === "schema",
+  );
+  const around = Map.groupBy(breaches, ({ instance }) => instance);
+
+  return chosen.map((violation) => wordedViolationOf(violation, around));
+}
+
+function wordedViolationOf(violation: Violation, around: Around): Violation {
   switch (violation.kind) {
     case "schema": {
-      const problem = problemOf(violation, violations);
+      const problem = problemOf(violation, around);
       return { ...violation, problem };
     }
     case "rule":
@@ -29,14 +40,8 @@ export function wordedViolationOf(
   }
 }
 
-function problemOf(
-  breach: SchemaBreach,
-  violations: readonly Violation[],
-): string {
-  const around = violations.filter(
-    (violation): violation is SchemaBreach =>
-      violation.kind === "schema" && violation.instance === breach.instance,
-  );
+function problemOf(breach: SchemaBreach, nearby: Around): string {
+  const around = nearby.get(breach.instance) ?? [];
   const isDuration = around.some(({ pattern }) => pattern === durationPattern);
   const value = breach.value;
 

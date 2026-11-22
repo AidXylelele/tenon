@@ -1,5 +1,40 @@
+import { readdirSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+
+const OPERATION_FLOOR = {
+  lines: 75,
+  branches: 75,
+  functions: 75,
+  statements: 75,
+};
+
+const LIB_FLOOR = {
+  lines: 85,
+  branches: 85,
+  functions: 85,
+  statements: 85,
+};
+
+type Floor = typeof OPERATION_FLOOR;
+
+const operations = new URL("./src/operations/", import.meta.url);
+
+const operationFloors = readdirSync(operations, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry): [string, Floor] => [
+    `src/operations/${entry.name}/**`,
+    OPERATION_FLOOR,
+  ]);
+
+const libFloors: [string, Floor][] = [
+  ["src/libs/code-formatting/**", LIB_FLOOR],
+  ["src/libs/codemirror/**", LIB_FLOOR],
+];
+
+const floors = operationFloors.concat(libFloors);
+
+const thresholds = Object.fromEntries(floors);
 
 export default defineConfig({
   plugins: [react()],
@@ -10,5 +45,20 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
+    server: {
+      deps: {
+        inline: ["@astral-sh/ruff-wasm-web"],
+      },
+    },
+    coverage: {
+      provider: "v8",
+      include: ["src/{operations,features,libs}/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.stories.tsx",
+        "src/**/*.test-support.ts",
+        "src/libs/ui/components/**",
+      ],
+      thresholds,
+    },
   },
 });
