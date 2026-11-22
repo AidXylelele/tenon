@@ -25,16 +25,8 @@ function SelectionStates() {
       </section>
       <section className="flex flex-col gap-3">
         <h2 className="heading-2">Tabs</h2>
-        <Tabs defaultValue="output">
-          <TabsList>
-            <TabsTrigger value="input">Input</TabsTrigger>
-            <TabsTrigger value="output">Output</TabsTrigger>
-            <TabsTrigger value="error">Error</TabsTrigger>
-          </TabsList>
-          <TabsContent value="output">The answer of the step.</TabsContent>
-        </Tabs>
         <Tabs defaultValue="runs">
-          <TabsList variant="line">
+          <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="runs">Runs</TabsTrigger>
             <TabsTrigger value="versions">Versions</TabsTrigger>

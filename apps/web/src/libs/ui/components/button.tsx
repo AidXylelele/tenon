@@ -12,8 +12,6 @@ const buttonVariants = cva(
           "bg-accent-solid text-on-accent hover:bg-accent-solid-hover active:bg-accent-solid-hover disabled:bg-hover aria-disabled:bg-hover aria-disabled:hover:bg-hover",
         outline:
           "border-border-strong bg-surface text-foreground hover:bg-hover active:bg-selected aria-expanded:bg-hover aria-disabled:hover:bg-surface",
-        secondary:
-          "bg-hover text-foreground hover:bg-selected active:bg-selected aria-expanded:bg-selected aria-disabled:hover:bg-hover",
         ghost:
           "text-foreground hover:bg-hover active:bg-selected aria-expanded:bg-hover aria-disabled:hover:bg-transparent",
         destructive:

@@ -8,7 +8,7 @@ const alertVariants = cva(
     variants: {
       variant: {
         default:
-          "border-info-border bg-info-soft text-info-strong *:[svg]:text-info",
+          "border-info-border bg-info-soft text-info-strong *:data-[slot=alert-description]:text-info-strong *:[svg]:text-info",
         destructive:
           "border-danger-border bg-danger-soft text-danger-strong *:data-[slot=alert-description]:text-danger-strong *:[svg]:text-danger",
         warning:
@@ -59,7 +59,7 @@ function AlertDescription({
     <div
       data-slot="alert-description"
       className={cn(
-        "text-sm text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+        "text-body text-balance text-muted-foreground md:text-pretty [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
         className,
       )}
       {...props}

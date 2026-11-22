@@ -6,7 +6,6 @@ import { Spinner } from "./spinner";
 const VARIANTS = [
   "default",
   "outline",
-  "secondary",
   "ghost",
   "destructive",
   "link",
