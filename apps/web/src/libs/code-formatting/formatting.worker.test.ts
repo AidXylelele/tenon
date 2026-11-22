@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { FormattingAnswer, FormattingRequest } from "./interfaces";
 import "./formatting.worker";
+import { missing } from "./wasm-fetch.test-support";
 
 function answerTo(request: FormattingRequest): Promise<FormattingAnswer> {
   const { port1, port2 } = new MessageChannel();
@@ -16,11 +17,6 @@ function answerTo(request: FormattingRequest): Promise<FormattingAnswer> {
   });
   self.dispatchEvent(message);
   return answered;
-}
-
-function missing(): Promise<Response> {
-  const response = new Response(null, { status: 404 });
-  return Promise.resolve(response);
 }
 
 describe("the formatting worker answering through each request's port", () => {

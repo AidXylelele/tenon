@@ -8,6 +8,7 @@ const OPTIONS = { parser: "babel", plugins: [babel, estree] };
 
 const PARSE_ERROR = z.object({
   message: z.string(),
+  codeFrame: z.string(),
   loc: z.object({ start: z.object({ line: z.number() }) }),
 });
 
@@ -20,8 +21,10 @@ export async function formatJavaScript(text: string): Promise<Formatting> {
 
     if (!parsed.success) throw error;
 
-    const { message, loc } = parsed.data;
-    const withoutCodeFrame = message.replace(/\n[\s\S]*$/, "");
+    const { message, codeFrame, loc } = parsed.data;
+    const appended = `\n${codeFrame}`;
+    const end = message.length - appended.length;
+    const withoutCodeFrame = message.slice(0, end);
     return { kind: "refused", message: withoutCodeFrame, line: loc.start.line };
   }
 }

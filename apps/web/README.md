@@ -8,9 +8,9 @@ It reads `API_URL` and `SESSION_COOKIE_SECURE` from the root `.env` (see the roo
 
 ## Test
 
-`pnpm test`, `pnpm lint` and `pnpm check-types`. `pnpm test:coverage` measures coverage against a floor per folder (`vitest.config.mts`): 75 % for each operation, 85 % for the libs that have one.
+`pnpm test`, `pnpm lint` and `pnpm check-types`. `pnpm test:coverage` measures coverage against a floor per folder (`vitest.config.mts`): 75 % for each operation; every folder of `libs/` or `features/` gets its 85 % floor in the slice that touches it (the board tracks the list).
 
-`pnpm test:e2e` builds the Playground and runs the Playwright smoke tests against it in Playwright's own Chromium. Install it once with `pnpm exec playwright install chromium --only-shell`; on CI, `pnpm exec playwright install chromium --with-deps --only-shell`.
+`pnpm test:e2e` builds the Playground and runs the Playwright smoke tests against it in Playwright's own Chromium. Install it once with `pnpm exec playwright install chromium --only-shell`; a CI job that runs these tests needs `pnpm exec playwright install chromium --with-deps --only-shell`.
 
 ## Playground
 

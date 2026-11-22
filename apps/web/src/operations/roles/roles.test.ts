@@ -14,10 +14,16 @@ describe("the words for a person's role", () => {
     ["viewer", "Viewer", "a viewer", "reads workflows and runs"],
   ])(
     "an_%s_is_named_and_described_in_plain_words",
-    (role, label, noun, duties) => {
-      const words = [roleLabel(role), roleNoun(role), roleDuties(role)];
+    (role, expectedLabel, expectedNoun, expectedDuties) => {
+      const label = roleLabel(role);
+      const noun = roleNoun(role);
+      const duties = roleDuties(role);
 
-      expect(words).toEqual([label, noun, duties]);
+      expect({ label, noun, duties }).toEqual({
+        label: expectedLabel,
+        noun: expectedNoun,
+        duties: expectedDuties,
+      });
     },
   );
 });

@@ -16,18 +16,25 @@ const LIB_FLOOR = {
   statements: 85,
 };
 
+type Floor = typeof OPERATION_FLOOR;
+
 const operations = new URL("./src/operations/", import.meta.url);
 
 const operationFloors = readdirSync(operations, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
-  .map((entry) => [`src/operations/${entry.name}/**`, OPERATION_FLOOR]);
+  .map((entry): [string, Floor] => [
+    `src/operations/${entry.name}/**`,
+    OPERATION_FLOOR,
+  ]);
 
-const libFloors = [
+const libFloors: [string, Floor][] = [
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
 ];
 
 const floors = operationFloors.concat(libFloors);
+
+const thresholds = Object.fromEntries(floors);
 
 export default defineConfig({
   plugins: [react()],
@@ -38,11 +45,20 @@ export default defineConfig({
     environment: "jsdom",
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./vitest.setup.ts"],
+    server: {
+      deps: {
+        inline: ["@astral-sh/ruff-wasm-web"],
+      },
+    },
     coverage: {
       provider: "v8",
-      include: ["src/operations/**", "src/features/**", "src/libs/**"],
-      exclude: ["src/**/*.stories.tsx", "src/libs/ui/components/**"],
-      thresholds: Object.fromEntries(floors),
+      include: ["src/{operations,features,libs}/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.stories.tsx",
+        "src/**/*.test-support.ts",
+        "src/libs/ui/components/**",
+      ],
+      thresholds,
     },
   },
 });
