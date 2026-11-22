@@ -175,7 +175,7 @@ function stepResultOf(
 ): ResultReading | null {
   const variant = variantOf(node.task);
   const choices = resultChoicesOf(variant);
-  const written = writtenResultOf(node.pointer, document);
+  const written = writtenResultOf(node, document);
 
   return resultReadingOf(choices, written);
 }

@@ -138,7 +138,7 @@ function setShapeOf(
   task: ast.TaskCommon & ast.SetTask,
 ): Shape {
   const values = templateShapeOf(task.set);
-  const written = writtenResultOf(node.pointer, flow.document);
+  const written = writtenResultOf(node, flow.document);
 
   if (written.as === undefined) {
     return values;
@@ -158,7 +158,7 @@ function runShapeOf(
   task: ast.TaskCommon & ast.RunTask,
 ): Shape {
   const isWorkflow = task.process.kind === "workflow";
-  const written = writtenResultOf(node.pointer, flow.document);
+  const written = writtenResultOf(node, flow.document);
   const result = printedResultOf(written);
 
   if (isWorkflow) {

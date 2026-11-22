@@ -1,5 +1,6 @@
 import type { JsonValue } from "interpreter/front-end";
 import { childPointerOf, valueAt } from "../pointers/index.js";
+import type { StepNode } from "../steps/index.js";
 import type {
   ChosenResult,
   ResultMembers,
@@ -12,8 +13,6 @@ import type { StepVariant } from "./variants.js";
 export const printedJsonAs = "${ fromjson }";
 
 export const inputAndValuesAs = "${ $input + . }";
-
-const printedReturn = "stdout";
 
 const printedResults: readonly ChosenResult[] = [
   "printedJson",
@@ -31,8 +30,8 @@ const resultChoices: ReadonlyMap<StepVariant, readonly ChosenResult[]> =
   ]);
 
 const resultMembers: Readonly<Record<ChosenResult, ResultMembers>> = {
-  printedJson: { as: printedJsonAs, return: null },
-  printedText: { as: null, return: null },
+  printedJson: { as: printedJsonAs, return: "stdout" },
+  printedText: { as: null, return: "stdout" },
   exitCode: { as: null, return: "code" },
   inputAndValues: { as: inputAndValuesAs, return: null },
   valuesOnly: { as: null, return: null },
@@ -78,25 +77,14 @@ export function isChosenResult(value: unknown): value is ChosenResult {
   return typeof value === "string" && Object.hasOwn(resultMembers, value);
 }
 
-export function isReturnedAs(
-  written: unknown,
-  returned: string | null,
-): boolean {
-  if (returned !== null) {
-    return written === returned;
-  }
-
-  return written === undefined || written === printedReturn;
-}
-
 export function writtenResultOf(
-  pointer: string,
+  node: StepNode,
   document: JsonValue,
 ): WrittenResult {
-  const asPointer = outputAsPointerOf(pointer);
-  const returnPointer = returnPointerOf(pointer);
+  const asPointer = outputAsPointerOf(node.pointer);
   const as = valueAt(document, asPointer);
-  const returned = valueAt(document, returnPointer);
+  const task = node.task;
+  const returned = task.kind === "run" ? task.return : null;
 
   return { as, return: returned };
 }
@@ -116,12 +104,15 @@ export function returnPointerOf(pointer: string): string {
 function isWrittenAs(written: WrittenResult, result: ChosenResult): boolean {
   const members = resultMembersOf(result);
   const isAs = isOutputAs(written.as, members.as);
-  const isReturned = isReturnedAs(written.return, members.return);
+  const isReturned = written.return === members.return;
 
   return isAs && isReturned;
 }
 
-function isOutputAs(written: unknown, as: string | null): boolean {
+function isOutputAs(
+  written: JsonValue | undefined,
+  as: string | null,
+): boolean {
   if (as !== null) {
     return written === as;
   }

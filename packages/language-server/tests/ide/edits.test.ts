@@ -1288,7 +1288,9 @@ test.each<readonly [string, string, ChosenResult, string]>([
     "a script's printed JSON parses what it prints and returns what it prints",
     codeScript,
     "printedJson",
-    jsonScript,
+    codeScript
+      .replace("return: code", "return: stdout")
+      .concat("      output:\n        as: ${ fromjson }\n"),
   ],
   [
     "a set's values alone drop the output that added its input",

@@ -2,13 +2,13 @@ export type {
   ChosenResult,
   ResultMembers,
   ResultReading,
+  ReturnMode,
   StepResult,
   WrittenResult,
 } from "./interfaces.js";
 export { startingContentOf } from "./contents.js";
 export {
   isChosenResult,
-  isReturnedAs,
   inputAndValuesAs,
   outputAsPointerOf,
   printedResultOf,

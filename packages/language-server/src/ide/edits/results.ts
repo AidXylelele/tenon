@@ -2,11 +2,11 @@ import type { JsonValue } from "interpreter/front-end";
 import { isJsonObject, parentPointerOf, valueAt } from "../pointers/index.js";
 import { type StepNode, stepWithId } from "../steps/index.js";
 import {
-  isReturnedAs,
   outputAsPointerOf,
   resultChoicesOf,
   type ResultMembers,
   resultMembersOf,
+  type ReturnMode,
   returnPointerOf,
   variantOf,
 } from "../variants/index.js";
@@ -52,14 +52,14 @@ function resultActionsOf(
 ): readonly FieldAction[] {
   const outputAs = outputAsPointerOf(step.pointer);
   const asActions = outputAsActionsOf(document, outputAs, members.as);
-  const isRun = step.task.kind === "run";
+  const task = step.task;
 
-  if (!isRun) {
+  if (task.kind !== "run") {
     return asActions;
   }
 
-  const returned = returnPointerOf(step.pointer);
-  const returnActions = returnActionsOf(document, returned, members.return);
+  const returned = { pointer: step.pointer, mode: task.return };
+  const returnActions = returnActionsOf(returned, members.return);
   return [...asActions, ...returnActions];
 }
 
@@ -88,22 +88,17 @@ function outputAsActionsOf(
 }
 
 function returnActionsOf(
-  document: JsonValue,
-  pointer: string,
-  returned: string | null,
+  returned: { readonly pointer: string; readonly mode: ReturnMode },
+  required: ReturnMode | null,
 ): readonly FieldAction[] {
-  const written = valueAt(document, pointer);
-  const isReturned = isReturnedAs(written, returned);
+  const isReturned = required === null || required === returned.mode;
 
   if (isReturned) {
     return [];
   }
 
-  if (returned !== null) {
-    return settingOf(written, pointer, returned);
-  }
-
-  return [{ kind: "clearField", pointer }];
+  const pointer = returnPointerOf(returned.pointer);
+  return [{ kind: "setField", pointer, value: required }];
 }
 
 function settingOf(

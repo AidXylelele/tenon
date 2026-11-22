@@ -1,3 +1,5 @@
+import type { ast, JsonValue } from "interpreter/front-end";
+
 export type ChosenResult =
   "printedJson" | "printedText" | "exitCode" | "inputAndValues" | "valuesOnly";
 
@@ -8,12 +10,14 @@ export interface ResultReading {
   readonly choices: readonly ChosenResult[];
 }
 
+export type ReturnMode = ast.RunTask["return"];
+
 export interface ResultMembers {
   readonly as: string | null;
-  readonly return: string | null;
+  readonly return: ReturnMode | null;
 }
 
 export interface WrittenResult {
-  readonly as: unknown;
-  readonly return: unknown;
+  readonly as: JsonValue | undefined;
+  readonly return: ReturnMode | null;
 }

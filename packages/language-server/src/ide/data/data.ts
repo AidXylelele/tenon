@@ -111,7 +111,7 @@ function dataOf(site: DataSite): DataReading {
 }
 
 function warningsOf(flow: DataFlow, node: StepNode): readonly DataWarning[] {
-  const written = writtenResultOf(node.pointer, flow.document);
+  const written = writtenResultOf(node, flow.document);
   const isMerging = written.as === inputAndValuesAs;
   const incoming = definitionShapeOf(flow, node);
   const isObject = incoming.kind === "object";
