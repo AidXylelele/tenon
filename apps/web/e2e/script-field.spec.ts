@@ -65,6 +65,8 @@ test.describe("the script field playground", () => {
 
     await page.keyboard.type(line);
 
+    const typed = line.trim();
+    await expect(code).toContainText(typed);
     const field = page.getByRole("group", { name: "Code" });
     const fieldBox = await field.boundingBox();
     const codeBox = await code.boundingBox();
