@@ -23,11 +23,11 @@ import {
 } from "../../../../src/frameworks/di/host.presets.js";
 import { GrpcClient } from "../../../../src/frameworks/grpc/grpc.client.js";
 import { ProtoSchema } from "../../../../src/frameworks/grpc/proto-schema.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
-import type { HttpAuthentication } from "../../../../src/frameworks/http-client/http-authentication.js";
-import type { HttpClient } from "../../../../src/frameworks/http-client/http.client.js";
-import { TransportFailures } from "../../../../src/frameworks/http-client/transport-failures.js";
-import type { CallContext } from "../../../../src/frameworks/interpreter/interfaces.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+import type { Authenticator } from "../../../../src/interface-adapters/workflows/effects/authenticator.js";
+import type { ResourceClient } from "../../../../src/interface-adapters/workflows/interfaces.js";
+import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
   startStubServer,
@@ -37,7 +37,7 @@ import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
-  httpClientOf,
+  resourcesOf,
 } from "../../../support/outbound.js";
 
 const TOKEN = "token-1";
@@ -105,8 +105,8 @@ describe("a call the gRPC client performs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let http: HttpClient;
-  let authentication: HttpAuthentication;
+  let resources: ResourceClient;
+  let authentication: Authenticator;
   let client: GrpcClient;
   let protos: StubServer;
   let server: Server;
@@ -120,11 +120,11 @@ describe("a call the gRPC client performs for a run", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
-    http = httpClientOf(policy, resilience);
+    resources = resourcesOf(policy, resilience);
     authentication = authenticationOf(fetchClientOf(policy.dispatcher));
     client = new GrpcClient(
       policy,
-      http,
+      resources,
       authentication,
       new ProtoSchema(),
       new TransportFailures(),
@@ -493,7 +493,7 @@ describe("a call the gRPC client performs for a run", () => {
       const addresses = new PublicAddresses([]);
       const tls = new GrpcClient(
         addresses,
-        http,
+        resources,
         authentication,
         new ProtoSchema(),
         new TransportFailures(),
@@ -695,7 +695,7 @@ describe("a call the gRPC client performs for a run", () => {
       async (host) => {
         const guarded = new GrpcClient(
           new AddressPolicy([]),
-          http,
+          resources,
           authentication,
           new ProtoSchema(),
           new TransportFailures(),

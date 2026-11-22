@@ -10,10 +10,10 @@ import type {
   EventDeliveries,
   EventDelivery,
 } from "../../interface-adapters/messaging/interfaces.js";
-import { AddressPolicy } from "./address-policy.js";
-import { HttpClientName } from "./enums.js";
-import { HttpAuthentication } from "./http-authentication.js";
-import type { Authorization } from "./interfaces.js";
+import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
+import type { Authorization } from "../../interface-adapters/workflows/effects/interfaces.js";
+import { AddressPolicy } from "../network/address-policy.js";
+import { HttpClientName } from "../network/enums.js";
 
 @Injectable()
 export class DeliveryClient implements EventDeliveries {
@@ -25,7 +25,7 @@ export class DeliveryClient implements EventDeliveries {
     @InjectHttpClient(HttpClientName.Outbound)
     private readonly outbound: NestHttpClient,
     private readonly addresses: AddressPolicy,
-    private readonly authentication: HttpAuthentication,
+    private readonly authentication: Authenticator,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("service-calls");

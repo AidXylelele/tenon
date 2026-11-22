@@ -4,7 +4,7 @@ import type {
   BrokerServer,
   Lost,
 } from "../../../../src/frameworks/asyncapi/interfaces.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
 
 interface Connection {
   readonly address: string;

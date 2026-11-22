@@ -11,17 +11,17 @@ import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
 import { SandboxClient } from "../../../../src/frameworks/go-judge/sandbox.client.js";
 import { SandboxLimits } from "../../../../src/frameworks/go-judge/sandbox-limits.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
-import type { HttpClient } from "../../../../src/frameworks/http-client/http.client.js";
-import { ResponseSizeLimit } from "../../../../src/frameworks/http-client/response-size-limit.js";
-import type { CallContext } from "../../../../src/frameworks/interpreter/interfaces.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+import type { ResourceClient } from "../../../../src/interface-adapters/workflows/interfaces.js";
+import { ResponseSizeLimit } from "../../../../src/frameworks/network/response-size-limit.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import type { SandboxedProcessRequest } from "../../../../src/interface-adapters/workflows/interfaces.js";
 import {
   closedPort,
   startStubServer,
   type StubServer,
 } from "../../../support/stub-server.js";
-import { callContextOf, httpClientOf } from "../../../support/outbound.js";
+import { callContextOf, resourcesOf } from "../../../support/outbound.js";
 
 const SANDBOX_TOKEN = "sandbox-token";
 const LIMITS = new SandboxLimits({
@@ -42,7 +42,7 @@ describe("a process the sandbox runs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let http: HttpClient;
+  let resources: ResourceClient;
   let sandbox: StubServer;
   let sources: StubServer;
   let client: SandboxClient;
@@ -55,7 +55,7 @@ describe("a process the sandbox runs for a run", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
-    http = httpClientOf(policy, resilience);
+    resources = resourcesOf(policy, resilience);
     sandbox = await startStubServer((request, response) => {
       const authorized =
         request.headers.authorization === `Bearer ${SANDBOX_TOKEN}`;
@@ -98,7 +98,7 @@ describe("a process the sandbox runs for a run", () => {
       redirect: "manual",
       interceptors: [new ResponseSizeLimit(LIMITS.responseBytes())],
     });
-    return new SandboxClient(runs, http, LIMITS, resilience);
+    return new SandboxClient(runs, resources, LIMITS, resilience);
   }
 
   beforeEach(() => {

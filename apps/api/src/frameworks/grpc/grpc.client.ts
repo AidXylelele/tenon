@@ -12,13 +12,15 @@ import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type { GrpcOutcome, GrpcRequest, JsonValue } from "interpreter";
 import { LRUCache } from "lru-cache";
-import { AddressPolicy } from "../http-client/address-policy.js";
-import { HttpAuthentication } from "../http-client/http-authentication.js";
-import type { Authorization } from "../http-client/interfaces.js";
-import { HttpClient } from "../http-client/http.client.js";
-import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
-import { TransportFailures } from "../http-client/transport-failures.js";
-import type { CallContext } from "../interpreter/interfaces.js";
+import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
+import type {
+  Authorization,
+  CallContext,
+} from "../../interface-adapters/workflows/effects/interfaces.js";
+import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
+import { ResourceClient } from "../../interface-adapters/workflows/interfaces.js";
+import { AddressPolicy } from "../network/address-policy.js";
+import { ResponseSizeLimit } from "../network/response-size-limit.js";
 import type { PreparedCall, ServiceAddress } from "./interfaces.js";
 import { ProtoSchema } from "./proto-schema.js";
 
@@ -42,8 +44,8 @@ export class GrpcClient implements OnApplicationShutdown {
 
   constructor(
     private readonly addresses: AddressPolicy,
-    private readonly http: HttpClient,
-    private readonly authentication: HttpAuthentication,
+    private readonly resources: ResourceClient,
+    private readonly authentication: Authenticator,
     private readonly schema: ProtoSchema,
     private readonly failures: TransportFailures,
     private readonly limit: ResponseSizeLimit,
@@ -53,7 +55,7 @@ export class GrpcClient implements OnApplicationShutdown {
   }
 
   async call(request: GrpcRequest, context: CallContext): Promise<GrpcOutcome> {
-    const proto = await this.http.text(request.proto, context);
+    const proto = await this.resources.text(request.proto, context);
 
     if (proto.kind !== "text") return proto;
 

@@ -12,7 +12,7 @@ import {
 } from "amqplib";
 import type { AsyncApiOutcome, Failure } from "interpreter";
 import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
-import { AddressPolicy } from "../http-client/address-policy.js";
+import { AddressPolicy } from "../network/address-policy.js";
 import { AmqpPublisher } from "./amqp-publisher.js";
 import { AMQP_CHANNEL } from "./bindings.schema.js";
 import { BrokerConnections } from "./broker-connections.js";

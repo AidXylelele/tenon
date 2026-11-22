@@ -25,13 +25,15 @@ import {
 } from "@nestjs/resilience";
 import type { JsonObject, JsonValue, RpcOutcome } from "interpreter";
 import { $ZodError } from "zod/v4/core";
+import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
+import type {
+  Authorization,
+  CallContext,
+} from "../../interface-adapters/workflows/effects/interfaces.js";
+import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
 import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
-import { HttpAuthentication } from "../http-client/http-authentication.js";
-import type { Authorization } from "../http-client/interfaces.js";
 import { HttpClient } from "../http-client/http.client.js";
-import { TransportFailures } from "../http-client/transport-failures.js";
 import { RELEASE_VERSION } from "../release.js";
-import type { CallContext } from "../interpreter/interfaces.js";
 import type { HttpMcpRequest, McpMethod } from "./interfaces.js";
 
 @Injectable()
@@ -54,7 +56,7 @@ export class McpClient {
   private readonly policy: ResiliencePolicy;
 
   constructor(
-    private readonly authentication: HttpAuthentication,
+    private readonly authentication: Authenticator,
     private readonly http: HttpClient,
     private readonly failures: TransportFailures,
     resilience: ResilienceService,

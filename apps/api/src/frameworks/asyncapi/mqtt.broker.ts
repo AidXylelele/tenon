@@ -10,7 +10,7 @@ import {
   type MqttClient,
 } from "mqtt";
 import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
-import { AddressPolicy } from "../http-client/address-policy.js";
+import { AddressPolicy } from "../network/address-policy.js";
 import { MQTT_OPERATION } from "./bindings.schema.js";
 import { BrokerConnections } from "./broker-connections.js";
 import type {

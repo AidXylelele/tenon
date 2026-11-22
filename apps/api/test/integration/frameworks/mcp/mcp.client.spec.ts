@@ -18,11 +18,11 @@ import type { Authentication, JsonObject, JsonValue } from "interpreter";
 import { z } from "zod";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
-import { TransportFailures } from "../../../../src/frameworks/http-client/transport-failures.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
 import type { HttpMcpRequest } from "../../../../src/frameworks/mcp/interfaces.js";
 import { McpClient } from "../../../../src/frameworks/mcp/mcp.client.js";
-import type { CallContext } from "../../../../src/frameworks/interpreter/interfaces.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import { closedPort } from "../../../support/stub-server.js";
 import {
   authenticationOf,

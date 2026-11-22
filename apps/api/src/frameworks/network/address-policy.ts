@@ -4,10 +4,10 @@ import { isIP, type LookupFunction } from "node:net";
 import type { OnApplicationShutdown } from "@nestjs/common";
 import ipaddr from "ipaddr.js";
 import { Agent, buildConnector } from "undici";
+import { RefusalCode } from "../../interface-adapters/workflows/effects/enums.js";
 import type { AddressRange, AddressRanges, IpAddress } from "./interfaces.js";
 
 export class AddressPolicy implements OnApplicationShutdown {
-  static readonly REFUSED = "ERR_ADDRESS_REFUSED";
   private static readonly IPV4_COMPATIBLE = "::/96";
   private static readonly UNLISTED = "unlisted";
   private static readonly HOST_BITS = { ipv4: 32, ipv6: 128 } as const;
@@ -67,7 +67,7 @@ export class AddressPolicy implements OnApplicationShutdown {
     } catch (error) {
       const code: unknown =
         error instanceof Error ? Reflect.get(error, "code") : undefined;
-      return code !== AddressPolicy.REFUSED;
+      return code !== RefusalCode.Address;
     }
   }
 
@@ -164,6 +164,6 @@ export class AddressPolicy implements OnApplicationShutdown {
     const error = new Error(
       "The address is private, loopback or link-local and not allow-listed",
     );
-    return Object.assign(error, { code: AddressPolicy.REFUSED });
+    return Object.assign(error, { code: RefusalCode.Address });
   }
 }

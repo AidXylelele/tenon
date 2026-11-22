@@ -2,9 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { HttpNetworkError } from "@nestjs/http-client";
 import { ResilienceError, ResilienceTimeoutError } from "@nestjs/resilience";
 import type { Failure } from "interpreter";
-import { AddressPolicy } from "./address-policy.js";
-import { AuthorizationServer } from "./authorization-server.js";
-import { ResponseSizeLimit } from "./response-size-limit.js";
+import { RefusalCode } from "./enums.js";
 
 @Injectable()
 export class TransportFailures {
@@ -65,10 +63,10 @@ export class TransportFailures {
     const detail = cause instanceof Error ? cause.message : "";
 
     switch (code) {
-      case AuthorizationServer.REFUSED:
+      case RefusalCode.Token:
         return { kind: "unauthenticated", detail };
-      case AddressPolicy.REFUSED:
-      case ResponseSizeLimit.EXCEEDED:
+      case RefusalCode.Address:
+      case RefusalCode.ResponseSize:
         return { kind: "unreachable", detail };
     }
 

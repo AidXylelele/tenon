@@ -32,7 +32,7 @@ import {
   resiliencePresets,
   responseSizeLimit,
 } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
 import {
   startStubServer,
   type StubServer,
@@ -43,7 +43,7 @@ import {
   callContextOf,
   fetchClientOf,
   inboxOf,
-  httpClientOf,
+  resourcesOf,
 } from "../../../support/outbound.js";
 
 const HOST = "127.0.0.1";
@@ -101,7 +101,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
 
   const clientOn = (policy: AddressPolicy, kafkaBroker: KafkaBroker) =>
     new AsyncApiClient(
-      httpClientOf(new AddressPolicy([HOST]), resilience),
+      resourcesOf(new AddressPolicy([HOST]), resilience),
       authenticationOf(fetchClientOf(policy.dispatcher)),
       new AsyncApiDocuments(),
       new BrokerTracer(),

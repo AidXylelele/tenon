@@ -39,7 +39,7 @@ import { KafkaBroker } from "../../../../src/frameworks/asyncapi/kafka.broker.js
 import { MqttBroker } from "../../../../src/frameworks/asyncapi/mqtt.broker.js";
 import { NatsBroker } from "../../../../src/frameworks/asyncapi/nats.broker.js";
 import { RedisBroker } from "../../../../src/frameworks/asyncapi/redis.broker.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
 import {
   closedPort,
   startStubServer,
@@ -50,7 +50,7 @@ import {
   callContextOf,
   fetchClientOf,
   inboxOf,
-  httpClientOf,
+  resourcesOf,
 } from "../../../support/outbound.js";
 
 const HOST = "127.0.0.1";
@@ -194,7 +194,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
     context = await moduleRef.init();
     const resilience = context.get(ResilienceService);
     const policy = new AddressPolicy([HOST]);
-    const http = httpClientOf(policy, resilience);
+    const resources = resourcesOf(policy, resilience);
     const authentication = authenticationOf(fetchClientOf(policy.dispatcher));
     const amqp = new AmqpBroker(policy);
     const kafka = new KafkaBroker(policy);
@@ -203,7 +203,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
     const redisPublisher = new RedisBroker(policy);
     publishers = [amqp, kafka, mqtt, natsPublisher, redisPublisher];
     client = new AsyncApiClient(
-      http,
+      resources,
       authentication,
       new AsyncApiDocuments(),
       new BrokerTracer(),

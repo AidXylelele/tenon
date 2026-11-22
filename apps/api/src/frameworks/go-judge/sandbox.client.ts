@@ -9,13 +9,13 @@ import {
   ResilienceTimeoutError,
 } from "@nestjs/resilience";
 import type { ProcessOutcome, Script, Shell } from "interpreter";
-import type {
-  FetchedText,
-  SandboxedProcessRequest,
+import type { CallContext } from "../../interface-adapters/workflows/effects/interfaces.js";
+import {
+  type FetchedText,
+  ResourceClient,
+  type SandboxedProcessRequest,
 } from "../../interface-adapters/workflows/interfaces.js";
-import { HttpClientName } from "../http-client/enums.js";
-import { HttpClient } from "../http-client/http.client.js";
-import type { CallContext } from "../interpreter/interfaces.js";
+import { HttpClientName } from "../network/enums.js";
 import type {
   BuiltCommand,
   SandboxCommand,
@@ -43,7 +43,7 @@ export class SandboxClient {
   constructor(
     @InjectHttpClient(HttpClientName.Sandbox)
     private readonly sandbox: NestHttpClient,
-    private readonly http: HttpClient,
+    private readonly resources: ResourceClient,
     private readonly limits: SandboxLimits,
     resilience: ResilienceService,
   ) {
@@ -129,7 +129,7 @@ export class SandboxClient {
     if (script.source === null)
       return { kind: "text", text: script.code ?? "" };
 
-    return this.http.text(script.source, context);
+    return this.resources.text(script.source, context);
   }
 
   #sandboxCommandOf(

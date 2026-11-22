@@ -2,26 +2,28 @@ import { Injectable } from "@nestjs/common";
 import {
   type Authentication,
   createSecretPolicies,
+  type HostProfile,
   type JsonObject,
   type ResolvedAuthentication,
   type RevealedAuthorization,
   type SecretPolicies,
 } from "interpreter";
-import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
-import { HOST_PROFILE } from "../interpreter/host-profile.js";
-import { AuthorizationServer } from "./authorization-server.js";
-import type {
-  Authorized,
-  Credentials,
-  PasswordCredentials,
-  UnusableSecret,
+import {
+  AuthorizationServer,
+  type Authorized,
+  type Credentials,
+  type PasswordCredentials,
+  type UnusableSecret,
 } from "./interfaces.js";
 
 @Injectable()
-export class HttpAuthentication {
+export class Authenticator {
   private readonly policies: SecretPolicies;
 
-  constructor(private readonly server: AuthorizationServer) {
+  constructor(
+    private readonly server: AuthorizationServer,
+    private readonly profile: HostProfile,
+  ) {
     this.policies = createSecretPolicies();
   }
 
@@ -60,7 +62,7 @@ export class HttpAuthentication {
     const performable = this.#performable(resolved);
 
     if (!performable)
-      throw new PermanentFault(
+      throw new Error(
         "The host does not perform 'authentication.digest'; its profile refuses it at publish",
       );
 
@@ -90,7 +92,7 @@ export class HttpAuthentication {
 
     const scheme = authentication.scheme;
     const value = secrets[name] ?? null;
-    const held = this.policies.authenticationOf(scheme, value, HOST_PROFILE);
+    const held = this.policies.authenticationOf(scheme, value, this.profile);
 
     if (held.kind === "refused")
       return {
