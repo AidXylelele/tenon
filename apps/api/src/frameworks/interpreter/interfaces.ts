@@ -10,7 +10,7 @@ import type {
   State,
   StepContext,
 } from "interpreter";
-import type { ResiliencePolicy } from "@nestjs/resilience";
+import type { BulkheadPolicy, ResiliencePolicy } from "@nestjs/resilience";
 import type { Piscina } from "piscina";
 import type {
   NamedFilter,
@@ -132,6 +132,7 @@ export interface WorkerPool {
   readonly name: PoolName;
   readonly threads: Piscina;
   readonly policy: ResiliencePolicy;
+  readonly bulkhead: BulkheadPolicy;
 }
 
 export interface CallContext extends StepCall {

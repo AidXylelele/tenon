@@ -96,6 +96,7 @@ export class WorkerInterpreterClient
         WorkerInterpreterClient.IDLE_RUN_THREAD_MS,
       ),
       policy: this.resilience.preset("interpreter"),
+      bulkhead: this.resilience.bulkhead("interpreter"),
     };
     this.checks = {
       name: "checks",
@@ -105,6 +106,7 @@ export class WorkerInterpreterClient
         0,
       ),
       policy: this.resilience.preset("interpreter-checks"),
+      bulkhead: this.resilience.bulkhead("interpreter-checks"),
     };
     const queues = this.#queuesGauge();
     queues.addCallback((result) => this.#queuesObserved(result));
@@ -390,7 +392,7 @@ export class WorkerInterpreterClient
     const meter = metrics.getMeter("tenon-api");
     return meter.createObservableGauge("tenon.interpreter.pool.queue.length", {
       unit: "{task}",
-      description: "The tasks waiting in an interpreter pool's queue.",
+      description: "The tasks waiting for a thread of an interpreter pool.",
     });
   }
 
@@ -398,7 +400,7 @@ export class WorkerInterpreterClient
     const pools = [this.#runs(), this.#checks()];
 
     for (const pool of pools) {
-      const length = pool.threads.queueSize;
+      const length = pool.bulkhead.queued + pool.threads.queueSize;
       const attributes = { "tenon.interpreter.pool": pool.name };
       result.observe(length, attributes);
     }
