@@ -1,6 +1,7 @@
 import { renameAt } from "../names/index.js";
 import { parentPointerOf, valueAt } from "../pointers/index.js";
 import {
+  listEndOf,
   listWithId,
   nameConflictOf,
   type StepNode,
@@ -64,7 +65,8 @@ export function stepInsertionOf(
     return { kind: "refused", reason: conflict };
   }
 
-  const content = startingContentOf(action.step);
+  const otherwise = listEndOf(editable.tree, list);
+  const content = startingContentOf(action.step, otherwise);
   const item = { [name]: content };
   const forms = newItemFormsOf(item);
   const insertion = insertionOf(collection, action.index, forms);

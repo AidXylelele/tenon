@@ -1,6 +1,6 @@
 import type { ast, JsonObject } from "interpreter/front-end";
-import { nameConflictOf, type StepTree } from "../steps/index.js";
-import { startingContentOf, type StepVariant } from "../variants/index.js";
+import { listEndOf, nameConflictOf, type StepTree } from "../steps/index.js";
+import { startingContentOf } from "../variants/index.js";
 import { insertionOf, newItemFormsOf } from "./collection-text.js";
 import { combinedOf, fieldSettingOf } from "./field-actions.js";
 import type {
@@ -64,7 +64,9 @@ function newBranchStepOf(
 
   const settings = directiveSettingsOf(editable.tree, switching, name);
   const editings = settings.map((setting) => fieldSettingOf(editable, setting));
-  const item = newStepOf(switching.chosen, name, action.step);
+  const otherwise = listEndOf(editable.tree, list);
+  const content = startingContentOf(action.step, otherwise);
+  const item = newStepOf(switching.chosen, name, content);
   const forms = newItemFormsOf(item);
   const after = step.index + 1;
   const insertion = insertionOf(collection, after, forms);
@@ -111,21 +113,19 @@ function fallThroughsOf(switching: Switching): readonly string[] {
 function onwardOf(tree: StepTree, written: WrittenStep): string {
   const { step, list } = written;
   const next = list.steps[step.index + 1];
-  const isWorkflowList = list === tree.root;
 
   if (next !== undefined) {
     return next.name;
   }
 
-  return isWorkflowList ? "end" : "exit";
+  return listEndOf(tree, list);
 }
 
 function newStepOf(
   chosen: ast.SwitchCase,
   name: string,
-  variant: StepVariant,
+  content: JsonObject,
 ): JsonObject {
-  const content = startingContentOf(variant);
   const then = writtenDirectiveOf(chosen.then);
 
   if (then === null) {

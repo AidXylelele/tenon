@@ -238,6 +238,16 @@ test.each([
     'box: { run: { container: { image: "" } } }',
     "container",
   ],
+  [
+    "an emitted event with no type yet",
+    'send: { emit: { event: { with: { type: "" } } } }',
+    null,
+  ],
+  [
+    "a listen with no event type yet",
+    'hear: { listen: { to: { one: { with: { type: "" } } } } }',
+    null,
+  ],
 ])("%s is summed up as written", (_, step, summary) => {
   const text = `${inlineHeader}do:\n  - ${step}\n`;
   const snapshot = snapshotOf(text);

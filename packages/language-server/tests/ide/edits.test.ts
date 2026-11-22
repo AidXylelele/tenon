@@ -1888,3 +1888,22 @@ test("a new HTTP step with its address to fill is in the structure and has its f
   expect(ids).toEqual(["/do/http"]);
   expect(form).toMatchObject({ kind: "form" });
 });
+
+test("a new choice in a loop leaves only the item when no branch matches", () => {
+  const loop = `${inlineHeader}do:\n  - each:\n      for:\n        in: \${ .orders }\n        each: order\n      do: []\n`;
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do/each/do",
+    index: 0,
+    step: "switch",
+    name: null,
+  };
+
+  const outcome = outcomeOf(loop, action);
+
+  const expected = loop.replace(
+    "      do: []\n",
+    `      do:\n        - switch:\n            switch:\n              - branch-1:\n                  when: ""\n                  then: continue\n              - default:\n                  then: exit\n`,
+  );
+  expect(outcome).toMatchObject({ text: expected });
+});

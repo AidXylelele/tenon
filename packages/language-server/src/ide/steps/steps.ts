@@ -7,6 +7,7 @@ import { childPointerOf } from "../pointers/index.js";
 import type {
   FailureKind,
   HeldList,
+  ListEnd,
   NamedPlace,
   Retry,
   StepNode,
@@ -114,6 +115,12 @@ export function failureOf(step: StepNode): FailureKind {
   }
 
   return task.catch.retry === null ? "continue" : "retry";
+}
+
+export function listEndOf(tree: StepTree, list: StepNodeList): ListEnd {
+  const isWorkflowList = list === tree.root;
+
+  return isWorkflowList ? "end" : "exit";
 }
 
 export function retryCatchOf(retry: Retry): JsonObject {

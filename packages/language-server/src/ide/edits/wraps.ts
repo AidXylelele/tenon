@@ -3,6 +3,7 @@ import { childPointerOf } from "../pointers/index.js";
 import { modelOf } from "../snapshot/index.js";
 import {
   directivesOf,
+  listEndOf,
   nameConflictOf,
   type StepNode,
   type StepNodeList,
@@ -117,9 +118,9 @@ function runWrappingFor(
   const jumps = model?.symbols.jumps ?? noJumps;
   const last = run.steps.at(-1);
   const after = last === undefined ? null : run.list.steps[last.index + 1];
-  const isWorkflowList = run.list === editable.tree.root;
+  const listEnd = listEndOf(editable.tree, run.list);
 
-  return { run, block, jumps, after: after ?? null, isWorkflowList };
+  return { run, block, jumps, after: after ?? null, listEnd };
 }
 
 function wrappedOf(
@@ -188,7 +189,7 @@ function exitRedirectionOf(
   step: StepNode,
   directive: ast.Directive,
 ): Redirection {
-  if (!wrapping.isWorkflowList) {
+  if (wrapping.listEnd === "exit") {
     const reason = `The step ${step.id} leaves its list, which inside the block would leave only the block.`;
     return { kind: "refused", reason };
   }
@@ -288,7 +289,7 @@ function blockTextOf(
   items: string,
 ): string {
   const { block, run } = wrapping;
-  const content = startingContentOf(block);
+  const content = startingContentOf(block, wrapping.listEnd);
   const member = blockLists[block];
   const emptied = { ...content, [member]: [] };
   const holder = { [run.name]: emptied };

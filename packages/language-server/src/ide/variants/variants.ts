@@ -58,7 +58,7 @@ function isSupported(
 }
 
 function probeOf(variant: StepVariant): string {
-  const content = startingContentOf(variant);
+  const content = startingContentOf(variant, "end");
   const step = { [variant]: content };
   const document = { document: probeHeader, do: [step] };
 

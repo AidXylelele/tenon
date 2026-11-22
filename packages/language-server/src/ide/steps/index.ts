@@ -1,5 +1,6 @@
 export type {
   FailureKind,
+  ListEnd,
   ListPart,
   Retry,
   ListRole,
@@ -11,6 +12,7 @@ export {
   directiveAt,
   directivesOf,
   failureOf,
+  listEndOf,
   listNamesOf,
   listWithId,
   nameConflictOf,

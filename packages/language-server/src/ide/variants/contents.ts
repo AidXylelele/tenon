@@ -1,5 +1,5 @@
 import type { JsonObject } from "interpreter/front-end";
-import { type Retry, retryCatchOf } from "../steps/index.js";
+import { type ListEnd, type Retry, retryCatchOf } from "../steps/index.js";
 import { inputAndValuesAs, printedJsonAs } from "./results.js";
 import type { StepVariant } from "./variants.js";
 
@@ -17,7 +17,10 @@ const jsResult = "const result = {};\nconsole.log(JSON.stringify(result));\n";
 
 const pythonResult = "import json\n\nresult = {}\nprint(json.dumps(result))\n";
 
-export function startingContentOf(variant: StepVariant): JsonObject {
+export function startingContentOf(
+  variant: StepVariant,
+  otherwise: ListEnd,
+): JsonObject {
   switch (variant) {
     case "http":
       return { call: "http", with: { method: "get", endpoint: "" } };
@@ -91,7 +94,7 @@ export function startingContentOf(variant: StepVariant): JsonObject {
       return {
         switch: [
           { "branch-1": { when: "", then: "continue" } },
-          { default: { then: "end" } },
+          { default: { then: otherwise } },
         ],
       };
     case "try": {

@@ -164,7 +164,8 @@ function emittedTypeOf(
     return null;
   }
 
-  return writtenAt(document, type.pointer);
+  const written = writtenAt(document, type.pointer);
+  return writtenPartsOf([written], "");
 }
 
 function eventTypesOf(
@@ -177,11 +178,7 @@ function eventTypesOf(
     return type === undefined ? [] : [writtenAt(document, type.pointer)];
   });
 
-  if (types.length === 0) {
-    return null;
-  }
-
-  return types.join(", ");
+  return writtenPartsOf(types, ", ");
 }
 
 function filtersOf(

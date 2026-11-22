@@ -11,6 +11,7 @@ import type { Snapshot } from "../snapshot/index.js";
 import type { ChosenResult, StepVariant } from "../variants/index.js";
 import type {
   FailureKind,
+  ListEnd,
   Retry,
   StepNode,
   StepNodeList,
@@ -119,7 +120,7 @@ export interface RunWrapping {
   readonly block: WrapBlock;
   readonly jumps: ReadonlyMap<string, string>;
   readonly after: StepNode | null;
-  readonly isWorkflowList: boolean;
+  readonly listEnd: ListEnd;
 }
 
 export type Redirection =
