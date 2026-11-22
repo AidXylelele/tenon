@@ -9,7 +9,7 @@ import type { SchemasAt } from "../../src/ide/places/index.js";
 import { yamlOf } from "../../src/ide/yaml-text/index.js";
 import { analyzer, profile } from "../support/analyzer.js";
 import { inlineHeader } from "../support/documents.js";
-import { snapshotAfter, snapshotOf } from "../support/snapshot.js";
+import { snapshotOf } from "../support/snapshot.js";
 
 const created = await analyzer;
 
@@ -200,9 +200,9 @@ test("a document that never analysed has no step form", () => {
   });
 });
 
-test("a value that is not a duration is a diagnostic at its field", () => {
+test("a value that is not a duration is a diagnostic at its field of the version it reads", () => {
   const text = paused.replace("wait: PT1S", "wait: 1 minute");
-  const snapshot = snapshotAfter(paused, text);
+  const snapshot = snapshotOf(text);
 
   const reading = formOf(snapshot, "/do/pause", schemasAt);
   const fields = reading.kind === "form" ? reading.fields : [];
@@ -384,7 +384,7 @@ test("how events are read is offered only where events start the workflow", () =
   expect(unoffered).not.toContain("/schedule/read");
 });
 
-test("the Start form stands when a trigger's duration is not one", () => {
+test("a trigger's duration that is not one is a diagnostic at its field", () => {
   const text = startedFlow.replace("every: PT1H", "every: 1 minute");
   const fields = workflowFieldsOf(text);
   const every = fieldOf(fields, "schedule")?.fields[0];

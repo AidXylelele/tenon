@@ -398,7 +398,7 @@ test("a document that does not analyse is not edited", () => {
   });
 });
 
-test("a field is set in a text the grammar refuses, so the form can mend it", () => {
+test("a field whose value is not of its form is set in place, so the form can mend it", () => {
   const broken = `${guardedFlow}schedule:\n  every: 1 minute\n`;
   const action: EditAction = {
     kind: "setField",
@@ -1157,7 +1157,10 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
   [
     "openapi",
     { call: "openapi", with: { document: { endpoint: "" }, operationId: "" } },
-    [["schema", "/do/0/openapi/with/document/endpoint"]],
+    [
+      ["schema", "/do/0/openapi/with/document/endpoint"],
+      ["schema", "/do/0/openapi/with/operationId"],
+    ],
   ],
   [
     "grpc",
@@ -1171,7 +1174,9 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
     },
     [
       ["schema", "/do/0/grpc/with/proto/endpoint"],
+      ["schema", "/do/0/grpc/with/service/name"],
       ["schema", "/do/0/grpc/with/service/host"],
+      ["schema", "/do/0/grpc/with/method"],
     ],
   ],
   [
@@ -1180,7 +1185,10 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
       call: "asyncapi",
       with: { document: { endpoint: "" }, operation: "", message: {} },
     },
-    [["schema", "/do/0/asyncapi/with/document/endpoint"]],
+    [
+      ["schema", "/do/0/asyncapi/with/document/endpoint"],
+      ["schema", "/do/0/asyncapi/with/operation"],
+    ],
   ],
   [
     "mcp",
@@ -1226,21 +1234,37 @@ test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
     [],
   ],
   ["shell", { run: { shell: { command: "" } } }, []],
-  ["container", { run: { container: { image: "" } } }, []],
+  [
+    "container",
+    { run: { container: { image: "" } } },
+    [["schema", "/do/0/container/run/container/image"]],
+  ],
   [
     "workflow",
     { run: { workflow: { namespace: "", name: "", version: "" } } },
-    [],
+    [
+      ["schema", "/do/0/workflow/run/workflow/namespace"],
+      ["schema", "/do/0/workflow/run/workflow/name"],
+      ["schema", "/do/0/workflow/run/workflow/version"],
+    ],
   ],
   ["do", { do: [] }, []],
-  ["emit", { emit: { event: { with: { type: "" } } } }, []],
+  [
+    "emit",
+    { emit: { event: { with: { type: "" } } } },
+    [["event-attribute", "/do/0/emit/emit/event/with/type"]],
+  ],
   [
     "for",
     { for: { each: "item", in: "" }, do: [] },
     [["expression", "/do/0/for/for/in"]],
   ],
   ["fork", { fork: { branches: [] } }, []],
-  ["listen", { listen: { to: { one: { with: { type: "" } } } } }, []],
+  [
+    "listen",
+    { listen: { to: { one: { with: { type: "" } } } } },
+    [["event-attribute", "/do/0/listen/listen/to/one/with/type"]],
+  ],
   [
     "raise",
     { raise: { error: { type: validationError, status: 400, title: "" } } },

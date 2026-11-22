@@ -510,7 +510,7 @@ interface FormField {
 - **If it fails.** `failure` is the choice in force for the step: `stop` for a step no try protects; for a protecting try (a try whose `try` list holds one step), `handle` where its `catch` writes `do`, `retry` where it writes `retry`, else `continue`. The web shows it and changes it with `workflow/edit`'s `setFailure`; the retry's own values are the `catch` group's fields.
 - **Input.** `choice` where the grammar admits only the values it lists (its `closed` places, such as an HTTP call's `with.output`), with those values as `choices`; else `boolean` or `number` where that is the only type; `text` where a string is admitted and the written value is one or nothing is written, with the grammar's values as suggestions in `choices` (a `then` suggests the flow directives and the names of the step's list); `duration` for the standard's duration, an ISO 8601 text or an object of units, with its `fields` the units `days`, `hours`, `minutes`, `seconds` and `milliseconds`, each a `number` whose `value` is the amount the text gives, whichever form it is written in (`PT1H30M` gives `hours` 1 and `minutes` 30), and `null` where it gives none or what is written is not a duration the units hold (an expression, or a mistake, which the field's diagnostics name); `group` for an object with named members; `oneOf` for an object whose members are alternatives, its `fields` being those alternatives (the workflow form's schedule where the host runs one trigger, below); `structured` otherwise, for the text editor.
 - **Duration edits.** A duration is set whole, as an object of units, by `setField` at its pointer, e.g. `{ "minutes": 15 }`, whatever form it was written in.
-- **Broken text.** A form stands while the grammar refuses the text, so a mistake is a diagnostic at its field, never a refused form: the fields are read from the text as it stands, and a step is found by the steps of the last version that analysed, where the text still holds it. `setField` and `clearField` act on such a text; the step actions and `setFailure` need a version that analyses.
+- **Broken text.** A form stands while the text is wrong, so a mistake is a diagnostic at its field, never a refused form: a value the grammar does not admit is a diagnostic of a version that still analyses; where the grammar refuses the text's structure, the fields are read from the text as it stands and a step is found by the steps of the last version that analysed, where the text still holds it. `setField` and `clearField` act on such a text; the step actions and `setFailure` need a version that analyses.
 - **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
 
 **Example**, on the same document; of the eight fields, `then` and `wait` are shown, and of `wait`'s five units, `seconds`:
@@ -604,7 +604,7 @@ interface WorkflowFormResult {
   - `/input`, section `data`: a `group` of `schema` and `from`.
 - Namespace and name are the draft's address and are not in the form; the structure carries them.
 - **Edits.** Each field is written through `workflow/edit` like a step's: `setField` and `clearField` at its pointer, e.g. `setField` at `/schedule/cron` with `"0 9 * * *"`, which writes the schedule too when the text has none. Under a `oneOf`, a trigger the text does not write replaces the one it does: `setField` at `/schedule` with an object of that one member, e.g. `{ "cron": "0 9 * * *" }`, and `clearField` at `/schedule` leaves the workflow to start by hand. A second trigger written under `"one"` is the analysis's `capability` diagnostic at `/schedule`.
-- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for a text that does not read; `InvalidParams` (-32602). A text the grammar refuses still has its form, as the step form's.
+- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for a text that does not read; `InvalidParams` (-32602). A text whose structure the grammar refuses still has its form, as the step form's.
 
 ## Step variants
 
@@ -642,7 +642,7 @@ interface StepVariantsResult {
 ```
 
 - **Support.** A variant is listed when its starting content, analysed alone under the `profile` of the `initializationOptions`, has no `capability` diagnostic: what a host provides is the interpreter's rule, so `container` is left out where `profile.processes` lacks it, `script-python` where `profile.scriptLanguages` lacks `python`, and `wait` and `try`, whose retry waits between attempts, where `profile.effects` lacks `timer`.
-- **Starting content.** Each variant inserts the smallest document the language accepts for it, with the values a person fills left empty rather than made up. The analysis names only some of them: an empty address (`schema`) and an empty `for.in` (`expression`); an empty command, image, workflow, event type or error title is accepted as written, and the client marks those fields to fill:
+- **Starting content.** Each variant inserts the smallest document the language accepts for it, with the values a person fills left empty rather than made up. The analysis names most of them on a model it still builds, so the new step is in the structure and its form at once: an empty address, operation, service, method, image or workflow (`schema`), an empty event type (`event-attribute`) and an empty `for.in` or condition (`expression`); an empty shell command, script code or error title is accepted as written, and the client marks those fields to fill:
 
   | Variant                      | Starting content                                                                                                                               | Left to fill                                 |
   | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
@@ -666,7 +666,6 @@ interface StepVariantsResult {
   | `try`                        | `try: []`, `catch` with the retry `setFailure` writes for 3 retries, 2 s apart, growing (waits of 2, 4 and 8 s)                                | its steps                                    |
   | `wait`                       | `wait: PT30M`                                                                                                                                  |                                              |
 
-- **An address left empty.** The grammar refuses an empty address (`schema`, "Endpoint is not in the form the standard requires."), so the analysis of a text holding a call step with no address yet is refused: the structure stays that of the last version that analysed, without the new step, until the address is written. For the same reason a call variant's `capability` is not checked, and it is listed whatever the profile.
 - **Errors:** none of its own; the phase errors of every custom request.
 
 **Example:**
@@ -745,7 +744,7 @@ interface DataMember {
 - **Secrets** are offered only in fields where credentials go: under `authentication` or `headers`, or an address (`endpoint`, `uri`, `server`) (research D16). Each reads `$secrets.<name>`.
 - **Times** are UTC times jq computes from the run's clock: `now` (`now | todate`), `today` and `yesterday` (the start of the day, `now | strftime("%Y-%m-%dT00:00:00Z")`, a day earlier for `yesterday`).
 - **Warnings.** `inputNotKnownObject` on a set that keeps its input (`output.as: ${ $input + . }`) where that input is not known to be an object: jq adds an object only to an object or `null`. `mayHoldNothing` for a step offered through the context that has an `if`, or sits in a block that has one apart from the field's step: when it is skipped it exports nothing, and inside a loop the previous item's value stays. A step a jump passes over reads `null` too; no warning names it. `contextNotKnownObject` where data is read through the context and the workflow's transformed input is not known to be an object.
-- **Broken text.** A text the grammar refuses answers from the steps of the last version that analysed.
+- **Broken text.** A text whose structure the grammar refuses answers from the steps of the last version that analysed.
 - **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a field outside the step, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
 
 **Example**, at the first condition of `route` in a document whose `greet` sets a message and whose `guard` then runs a try:
