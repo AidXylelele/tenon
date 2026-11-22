@@ -305,7 +305,7 @@ function Versions({
           <div className="min-w-0">
             <Link
               href={versionHref(namespace, name, version.version)}
-              className="font-medium tabular-nums text-primary underline-offset-4 hover:underline"
+              className="font-medium tabular-nums text-accent-text underline-offset-4 hover:underline"
             >
               {version.version}
             </Link>

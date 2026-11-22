@@ -141,7 +141,7 @@ export function StartDialog({
           Start
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Start {name}</DialogTitle>

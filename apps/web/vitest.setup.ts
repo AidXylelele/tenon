@@ -10,6 +10,8 @@ class SilentResizeObserver {
 
 globalThis.ResizeObserver = SilentResizeObserver;
 
+if ("Element" in globalThis) Element.prototype.scrollIntoView = () => undefined;
+
 afterEach(() => {
   cleanup();
 });

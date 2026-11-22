@@ -137,7 +137,7 @@ function Resolve({
         if (!next) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Your text against {savedBy}&apos;s</DialogTitle>
           <DialogDescription>

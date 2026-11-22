@@ -2,7 +2,7 @@
 
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import {
   type JSX,
   useEffect,

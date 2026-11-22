@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { usePathname } from "next/navigation";
 import type { Session } from "@/libs/data-access/types";
 import { Link } from "@/libs/routing/link";

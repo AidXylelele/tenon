@@ -2,4 +2,4 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@xyflow/react/dist/base.css";
-@import "../libs/ui/tokens.css";
+@import "../libs/ui/tokens/tokens.css";

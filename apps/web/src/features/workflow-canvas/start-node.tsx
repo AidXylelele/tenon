@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { CalendarClockIcon, HandIcon, RadioIcon } from "lucide-react";
 import { triggerText } from "@/operations/schedule-words";
 import { OUT, START } from "@/operations/workflow-graph";

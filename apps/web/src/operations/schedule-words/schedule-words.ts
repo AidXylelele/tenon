@@ -1,5 +1,6 @@
 import type { Trigger } from "language-server/protocol";
 import type { Schedule } from "@/libs/data-access/types";
+import { cronText } from "./repeats";
 
 const UNITS: readonly (readonly [string, number])[] = [
   ["day", 86_400_000],
@@ -10,12 +11,16 @@ const UNITS: readonly (readonly [string, number])[] = [
 
 export function scheduleText(schedule: Schedule): string {
   switch (schedule.kind) {
-    case "every":
-      return everyText(durationWords(schedule.interval));
+    case "every": {
+      const duration = durationWords(schedule.interval);
+      return everyText(duration);
+    }
     case "cron":
       return cronText(schedule.cron);
-    case "after":
-      return afterText(durationWords(schedule.delay));
+    case "after": {
+      const duration = durationWords(schedule.delay);
+      return afterText(duration);
+    }
     case "on":
       return onText(schedule.stream);
   }
@@ -23,27 +28,29 @@ export function scheduleText(schedule: Schedule): string {
 
 export function triggerText(trigger: Trigger): string {
   switch (trigger.kind) {
-    case "every":
-      return everyText(spanOf(trigger.milliseconds, trigger.summary));
+    case "every": {
+      const duration = spanOf(trigger.milliseconds, trigger.summary);
+      return everyText(duration);
+    }
     case "cron":
       return cronText(trigger.summary);
-    case "after":
-      return afterText(spanOf(trigger.milliseconds, trigger.summary));
+    case "after": {
+      const duration = spanOf(trigger.milliseconds, trigger.summary);
+      return afterText(duration);
+    }
     case "on":
       return onText(trigger.summary);
   }
 }
 
 export function spanOf(milliseconds: number | null, written: string): string {
-  return milliseconds === null ? written : durationWords(milliseconds);
+  if (milliseconds === null) return written;
+
+  return durationWords(milliseconds);
 }
 
 function everyText(duration: string): string {
   return `Every ${duration}`;
-}
-
-function cronText(cron: string): string {
-  return `On the schedule ${cron} (UTC)`;
 }
 
 function afterText(duration: string): string {
@@ -58,6 +65,7 @@ function durationWords(milliseconds: number): string {
   const fitting = UNITS.find(([, size]) => milliseconds % size === 0);
   const [unit, size] = fitting ?? ["millisecond", 1];
   const count = milliseconds / size;
-  const plural = count === 1 ? unit : `${unit}s`;
-  return `${String(count)} ${plural}`;
+  const plural = `${unit}s`;
+  const named = count === 1 ? unit : plural;
+  return `${String(count)} ${named}`;
 }

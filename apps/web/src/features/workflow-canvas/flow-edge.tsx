@@ -1,7 +1,7 @@
 "use client";
 
 import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from "@xyflow/react";
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { PlusIcon } from "lucide-react";
 import type { EdgeKind, PlacedLabel, Point } from "@/operations/workflow-graph";
 import { useCanvas } from "./canvas-context";
@@ -89,7 +89,7 @@ export function FlowEdge(props: Props) {
                 onClick={() => {
                   editing.onInsert(insertAt);
                 }}
-                className="flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition hover:scale-110 hover:border-primary hover:text-primary"
+                className="flex size-6 items-center justify-center rounded-full border bg-background text-muted-foreground shadow-xs transition hover:scale-110 hover:border-primary hover:text-accent-text"
               >
                 <PlusIcon className="size-3.5" />
               </button>

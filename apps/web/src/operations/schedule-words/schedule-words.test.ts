@@ -6,7 +6,8 @@ describe("how a workflow starts on its own, in words", () => {
   it.each([
     [{ kind: "every", interval: 900_000 }, "Every 15 minutes"],
     [{ kind: "every", interval: 3_600_000 }, "Every 1 hour"],
-    [{ kind: "cron", cron: "0 2 * * *" }, "On the schedule 0 2 * * * (UTC)"],
+    [{ kind: "cron", cron: "0 2 * * *" }, "Every day at 02:00 UTC"],
+    [{ kind: "cron", cron: "0 2 1 * *" }, "On the schedule 0 2 1 * * (UTC)"],
     [
       { kind: "after", delay: 30_000 },
       "30 seconds after the previous run ends",
@@ -23,6 +24,7 @@ describe("how a workflow starts on its own, in words", () => {
     ["every", "PT1M", 60_000, "Every 1 minute"],
     ["after", "{ minutes: 1 }", 60_000, "1 minute after the previous run ends"],
     ["every", "${ .interval }", null, "Every ${ .interval }"],
+    ["cron", "30 6 * * 1-5", null, "Every weekday at 06:30 UTC"],
   ] as const)(
     "a_%s_of_%s_reads_in_words",
     (kind, summary, milliseconds, text) => {

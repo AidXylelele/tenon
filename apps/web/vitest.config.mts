@@ -30,6 +30,16 @@ const operationFloors = readdirSync(operations, { withFileTypes: true })
 const libFloors: [string, Floor][] = [
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
+  ["src/libs/ui/components/**", LIB_FLOOR],
+  ["src/libs/ui/components/dialog.tsx", LIB_FLOOR],
+  ["src/libs/ui/components/dropdown-menu.tsx", LIB_FLOOR],
+  ["src/libs/ui/components/field.tsx", LIB_FLOOR],
+  ["src/libs/ui/components/input-group.tsx", LIB_FLOOR],
+  ["src/libs/ui/components/sidebar.tsx", LIB_FLOOR],
+  ["src/libs/ui/components/toggle-group.tsx", LIB_FLOOR],
+  ["src/libs/ui/composites/**", LIB_FLOOR],
+  ["src/libs/ui/hooks/**", LIB_FLOOR],
+  ["src/libs/ui/tokens/**", LIB_FLOOR],
 ];
 
 const floors = operationFloors.concat(libFloors);
@@ -53,11 +63,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/{operations,features,libs}/**/*.{ts,tsx}"],
-      exclude: [
-        "src/**/*.stories.tsx",
-        "src/**/*.test-support.ts",
-        "src/libs/ui/components/**",
-      ],
+      exclude: ["src/**/*.stories.tsx", "src/**/*.test-support.ts"],
       thresholds,
     },
   },

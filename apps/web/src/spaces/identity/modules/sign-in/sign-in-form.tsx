@@ -35,7 +35,7 @@ export function SignInForm({ next }: { readonly next: string }) {
             <FieldLabel htmlFor="password">Password</FieldLabel>
             <Link
               href={FORGOT_PASSWORD_HREF}
-              className="text-sm text-primary underline-offset-4 hover:underline"
+              className="text-sm text-accent-text underline-offset-4 hover:underline"
             >
               Forgot password?
             </Link>
