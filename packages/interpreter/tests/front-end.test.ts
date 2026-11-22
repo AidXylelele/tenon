@@ -495,6 +495,197 @@ do:
   });
 });
 
+describe("analyze, of a value the standard needs written", () => {
+  function emittedWith(attributes: JsonObject): JsonObject {
+    const event = { type: "com.example.event", ...attributes };
+
+    return {
+      document: header,
+      do: [{ tell: { emit: { event: { with: event } } } }],
+    };
+  }
+
+  function awaited(type: string): JsonObject {
+    return {
+      document: header,
+      do: [{ await: { listen: { to: { one: { with: { type } } } } } }],
+    };
+  }
+
+  function ran(process: JsonObject): JsonObject {
+    return { document: header, do: [{ start: { run: process } }] };
+  }
+
+  function workflowRun(identity: JsonObject): JsonObject {
+    const workflow = {
+      namespace: "test",
+      name: "greeter",
+      version: "1.0.0",
+      ...identity,
+    };
+
+    return ran({ workflow });
+  }
+
+  test.each([
+    [
+      "the type of an emitted event",
+      "event-attribute",
+      "/do/0/tell/emit/event/with/type",
+      emittedWith({ type: "" }),
+    ],
+    [
+      "the id of an emitted event",
+      "event-attribute",
+      "/do/0/tell/emit/event/with/id",
+      emittedWith({ id: "" }),
+    ],
+    [
+      "the subject of an emitted event",
+      "event-attribute",
+      "/do/0/tell/emit/event/with/subject",
+      emittedWith({ subject: "" }),
+    ],
+    [
+      "the type an event filter awaits",
+      "event-attribute",
+      "/do/0/await/listen/to/one/with/type",
+      awaited(""),
+    ],
+    [
+      "the type a schedule's event filter awaits",
+      "event-attribute",
+      "/schedule/on/one/with/type",
+      {
+        document: header,
+        schedule: { on: { one: { with: { type: "" } } } },
+        do: [{ a: { set: { x: 1 } } }],
+      },
+    ],
+    [
+      "the image of a container",
+      "schema",
+      "/do/0/start/run/container/image",
+      ran({ container: { image: "" } }),
+    ],
+    [
+      "the namespace of a workflow to run",
+      "schema",
+      "/do/0/start/run/workflow/namespace",
+      workflowRun({ namespace: "" }),
+    ],
+    [
+      "the name of a workflow to run",
+      "schema",
+      "/do/0/start/run/workflow/name",
+      workflowRun({ name: "" }),
+    ],
+    [
+      "the version of a workflow to run",
+      "schema",
+      "/do/0/start/run/workflow/version",
+      workflowRun({ version: "" }),
+    ],
+  ])(
+    "models a document where %s is empty, with the %s diagnostic at %s",
+    (_, code, pointer, document) => {
+      const analysis = analyzer.analyze(document, fullOptions);
+
+      expect(analysis).toMatchObject({
+        kind: "analyzed",
+        diagnostics: [{ code, pointer }],
+      });
+    },
+  );
+
+  test("words the empty type of an emitted event", () => {
+    const document = emittedWith({ type: "" });
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis.diagnostics).toMatchObject([
+      { message: "Event attribute 'type' must not be empty.", subject: "type" },
+    ]);
+  });
+
+  test("words the empty type an event filter awaits", () => {
+    const document = awaited("");
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis.diagnostics).toMatchObject([
+      {
+        message: "An event filter on an empty 'type' matches no event.",
+        subject: "type",
+      },
+    ]);
+  });
+
+  test("words the empty image of a container", () => {
+    const document = ran({ container: { image: "" } });
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis.diagnostics).toMatchObject([
+      { message: "A container must name its image.", subject: null },
+    ]);
+  });
+
+  test("words the empty name of a workflow to run", () => {
+    const document = workflowRun({ name: "" });
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis.diagnostics).toMatchObject([
+      { message: "The workflow to run must have a name.", subject: null },
+    ]);
+  });
+
+  test("reads an empty type in the loose mode as written", () => {
+    const document = {
+      ...emittedWith({ type: "" }),
+      evaluate: { mode: "loose" },
+    };
+
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis).toMatchObject({
+      kind: "analyzed",
+      diagnostics: [{ pointer: "/do/0/tell/emit/event/with/type" }],
+    });
+  });
+
+  test.each([
+    ["the command of a shell process", ran({ shell: { command: "" } })],
+    [
+      "the title of a raised error",
+      {
+        document: header,
+        do: [
+          {
+            fail: {
+              raise: {
+                error: {
+                  type: "https://example.com/errors/failed",
+                  status: 500,
+                  title: "",
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+  ])(
+    "leaves %s empty with no diagnostic: the standard allows it",
+    (_, document) => {
+      const analysis = analyzer.analyze(document, fullOptions);
+
+      expect(analysis).toMatchObject({ kind: "analyzed", diagnostics: [] });
+    },
+  );
+});
+
 describe("schemasAt", () => {
   const fetched = {
     document: header,

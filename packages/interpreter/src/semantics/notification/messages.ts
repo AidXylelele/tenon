@@ -73,6 +73,12 @@ const texts: Texts = {
   unknownSecret: (name) => `Secret '${name}' is not held by the host.`,
   misnamedAttribute: (name) =>
     `Event attribute '${name}' must be named in lower-case letters and digits.`,
+  emptyEventAttribute: (name) => `Event attribute '${name}' must not be empty.`,
+  emptyFilterAttribute: (name) =>
+    `An event filter on an empty '${name}' matches no event.`,
+  emptyImage: () => "A container must name its image.",
+  emptyWorkflowIdentity: (member) =>
+    `The workflow to run must have a ${member}.`,
   invalidDuration: (text) => `Duration '${text}' is not an ISO 8601 duration.`,
   dynamicSchedule: (text) => `Schedule duration '${text}' must be a literal.`,
   calendarSchedule: (text) =>

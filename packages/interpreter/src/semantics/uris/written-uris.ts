@@ -8,17 +8,17 @@ import type { ImportPlace } from "./types.js";
 
 const noPlaces: readonly ImportPlace[] = [];
 
-export function writtenUriOf(uri: TextTemplate): string | null {
-  switch (uri.kind) {
+export function writtenTextOf(template: TextTemplate): string | null {
+  switch (template.kind) {
     case "literal":
-      return uri.value;
+      return template.value;
     case "expression":
-      return looseTextOf(uri);
+      return looseTextOf(template);
   }
 }
 
 export function importedUriOf(schema: ExternalSchema): string | null {
-  const written = writtenUriOf(schema.resource.endpoint.uri);
+  const written = writtenTextOf(schema.resource.endpoint.uri);
 
   if (written === null) {
     return null;
