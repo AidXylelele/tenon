@@ -72,6 +72,12 @@ describe("the console's navigation below 1024 px", () => {
     expect(trigger).toHaveAttribute("aria-controls", sheet.id);
   });
 
+  it("while_the_sheet_is_open_its_menu_button_leaves_the_tab_order", () => {
+    const trigger = openedAt(800);
+
+    expect(trigger).toHaveAttribute("tabindex", "-1");
+  });
+
   it("the_sheet_has_its_close_button", () => {
     openedAt(800);
 

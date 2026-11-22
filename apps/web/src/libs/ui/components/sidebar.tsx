@@ -276,12 +276,14 @@ function SidebarTrigger({
   const { toggleSidebar, isMobile, open, openMobile, sidebarId, triggerRef } =
     useSidebar();
   const expanded = isMobile ? openMobile : open;
+  const reachable = isMobile && openMobile ? -1 : undefined;
 
   return (
     <Button
       ref={triggerRef}
       aria-expanded={expanded}
       aria-controls={sidebarId}
+      tabIndex={reachable}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
@@ -473,6 +475,13 @@ function SidebarMenuButton({
   const { isMobile, state } = useSidebar();
   const current = isActive ? "page" : undefined;
   const iconsOnly = state === "collapsed" && !isMobile;
+  const [hinting, setHinting] = React.useState(false);
+  const [hintedIconsOnly, setHintedIconsOnly] = React.useState(iconsOnly);
+
+  if (hintedIconsOnly !== iconsOnly) {
+    setHintedIconsOnly(iconsOnly);
+    setHinting(false);
+  }
 
   const button = (
     <Comp
@@ -491,22 +500,12 @@ function SidebarMenuButton({
   }
 
   const content = typeof tooltip === "string" ? { children: tooltip } : tooltip;
-  const leavingCloses = !iconsOnly;
-
-  function holdWhileExpanded(event: React.SyntheticEvent) {
-    if (!iconsOnly) event.preventDefault();
-  }
+  const open = iconsOnly && hinting;
 
   return (
-    <Tooltip disableHoverableContent={leavingCloses}>
-      <TooltipTrigger
-        asChild
-        onFocus={holdWhileExpanded}
-        onPointerMove={holdWhileExpanded}
-      >
-        {button}
-      </TooltipTrigger>
-      {iconsOnly && <TooltipContent side="right" align="center" {...content} />}
+    <Tooltip open={open} onOpenChange={setHinting}>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="right" align="center" {...content} />
     </Tooltip>
   );
 }
