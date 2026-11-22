@@ -1,7 +1,8 @@
 import type { ast, JsonObject } from "interpreter/front-end";
 import { nameConflictOf, type StepTree } from "../steps/index.js";
 import { startingContentOf, type StepVariant } from "../variants/index.js";
-import { combinedOf, insertionOf, newItemFormsOf } from "./collection-text.js";
+import { insertionOf, newItemFormsOf } from "./collection-text.js";
+import { combinedOf } from "./edits.js";
 import { fieldSettingOf } from "./field-actions.js";
 import type {
   Editable,
@@ -125,14 +126,14 @@ function newStepOf(
   name: string,
   variant: StepVariant,
 ): JsonObject {
-  const template = startingContentOf(variant);
+  const content = startingContentOf(variant);
   const then = writtenDirectiveOf(chosen.then);
 
   if (then === null) {
-    return { [name]: template };
+    return { [name]: content };
   }
 
-  return { [name]: { ...template, then } };
+  return { [name]: { ...content, then } };
 }
 
 function writtenDirectiveOf(directive: ast.Directive): string | null {

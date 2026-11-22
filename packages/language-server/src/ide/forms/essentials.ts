@@ -119,7 +119,12 @@ function isShownOf(path: Path, node: StepNode, document: JsonValue): boolean {
   const method = valueAt(document, methodPointer);
   const isText = typeof method === "string";
 
-  return isText && sendingMethods.has(method.toLowerCase());
+  if (!isText) {
+    return false;
+  }
+
+  const lowered = method.toLowerCase();
+  return sendingMethods.has(lowered);
 }
 
 function pointerOf(node: StepNode, path: Path): string {

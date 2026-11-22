@@ -1,7 +1,7 @@
 import { exportAsOf, exportAsPointerOf } from "../data/index.js";
 import { valueAt } from "../pointers/index.js";
 import { stepWithId } from "../steps/index.js";
-import { combinedOf } from "./collection-text.js";
+import { combinedOf } from "./edits.js";
 import { fieldSettingOf } from "./field-actions.js";
 import type { Editable, Editing, SetField, UseData } from "./interfaces.js";
 import { unknownStepOf } from "./step-actions.js";

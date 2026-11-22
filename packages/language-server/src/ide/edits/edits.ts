@@ -9,6 +9,7 @@ import type {
   StepAction,
 } from "./interfaces.js";
 import { branchInsertionOf } from "./branches.js";
+import { inTextOrder } from "./collection-text.js";
 import { dataUseOf } from "./data-use.js";
 import { failureSettingOf } from "./failures.js";
 import { fieldEditingOf } from "./field-actions.js";
@@ -50,6 +51,26 @@ export function editsOf(snapshot: Snapshot, action: EditAction): Editing {
     case "wrapSteps":
       return stepEditsOf(snapshot, action);
   }
+}
+
+export function combinedOf(editings: readonly Editing[]): Editing {
+  const refusal = editings.find((editing) => editing.kind === "refused");
+
+  if (refusal !== undefined) {
+    return refusal;
+  }
+
+  const changes = editings.flatMap((editing) => {
+    switch (editing.kind) {
+      case "edited":
+        return editing.changes;
+      case "refused":
+        return [];
+    }
+  });
+  const ordered = inTextOrder(changes);
+
+  return { kind: "edited", changes: ordered, ids: [] };
 }
 
 export function editableOf(snapshot: Snapshot): Editable | null {

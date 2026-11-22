@@ -10,7 +10,7 @@ import {
   returnPointerOf,
   variantOf,
 } from "../variants/index.js";
-import { combinedOf } from "./collection-text.js";
+import { combinedOf } from "./edits.js";
 import { fieldEditingOf } from "./field-actions.js";
 import type {
   Editable,
@@ -71,7 +71,7 @@ function outputAsActionsOf(
   const written = valueAt(document, pointer);
 
   if (as !== null) {
-    return settingOf(written, pointer, as);
+    return settingUnlessWrittenOf(written, pointer, as);
   }
 
   if (written === undefined) {
@@ -101,7 +101,7 @@ function returnActionsOf(
   return [{ kind: "setField", pointer, value: required }];
 }
 
-function settingOf(
+function settingUnlessWrittenOf(
   written: JsonValue | undefined,
   pointer: string,
   value: string,

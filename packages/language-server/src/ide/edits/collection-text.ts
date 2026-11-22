@@ -15,7 +15,6 @@ import { inlineYamlOf, yamlOf } from "../yaml-text/index.js";
 import type {
   CollectionText,
   EditableText,
-  Editing,
   ItemText,
   Span,
   WrittenItem,
@@ -130,26 +129,6 @@ export function inTextOrder(
     const ends = comparedPositions(one.range.end, other.range.end);
     return starts === 0 ? ends : starts;
   });
-}
-
-export function combinedOf(editings: readonly Editing[]): Editing {
-  const refusal = editings.find((editing) => editing.kind === "refused");
-
-  if (refusal !== undefined) {
-    return refusal;
-  }
-
-  const changes = editings.flatMap((editing) => {
-    switch (editing.kind) {
-      case "edited":
-        return editing.changes;
-      case "refused":
-        return [];
-    }
-  });
-  const ordered = inTextOrder(changes);
-
-  return { kind: "edited", changes: ordered, ids: [] };
 }
 
 export function editedSliceOf(

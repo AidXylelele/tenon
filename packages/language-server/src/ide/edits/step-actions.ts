@@ -64,8 +64,8 @@ export function stepInsertionOf(
     return { kind: "refused", reason: conflict };
   }
 
-  const template = startingContentOf(action.step);
-  const item = { [name]: template };
+  const content = startingContentOf(action.step);
+  const item = { [name]: content };
   const forms = newItemFormsOf(item);
   const insertion = insertionOf(collection, action.index, forms);
   return { kind: "edited", changes: [insertion], ids: [] };

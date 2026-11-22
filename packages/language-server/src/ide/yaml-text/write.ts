@@ -72,7 +72,8 @@ export function isKeptBlockOf(written: string): boolean {
 
 export function blockScalarLike(written: WrittenScalar, value: string): string {
   const hasLineBreak = value.includes("\n");
-  const type = hasLineBreak ? "BLOCK_LITERAL" : styleOf(written.text);
+  const writtenStyle = styleOf(written.text);
+  const type = hasLineBreak ? "BLOCK_LITERAL" : writtenStyle;
   const indent = written.indent + levelIndent;
   const kept = keptCommentOf(written);
   const end = commentTokensOf(kept, indent);
