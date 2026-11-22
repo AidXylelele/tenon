@@ -4,6 +4,7 @@ import { Outbox } from "@nestjs/outbox";
 import type { Mailing } from "../../application/identity/ports.js";
 import type { Invitation } from "../../domain/identity/invitation.js";
 import type { InvitationToken } from "../../domain/identity/invitation-token.js";
+import { OutboxTracer } from "../messaging/outbox.tracer.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { MailTopic } from "./enums.js";
 import type {
@@ -17,6 +18,7 @@ export class MailGateway implements Mailing {
   constructor(
     private readonly outbox: Outbox,
     private readonly txHost: TransactionHost<Transaction>,
+    private readonly tracer: OutboxTracer,
   ) {}
 
   async sendInvitation(
@@ -52,7 +54,11 @@ export class MailGateway implements Mailing {
 
   async #queue<T>(topic: MailTopic, payload: QueuedMail<T>): Promise<void> {
     await this.txHost.withTransaction(async () => {
-      await this.outbox.add(this.txHost.tx, { topic, payload });
+      await this.outbox.add(this.txHost.tx, {
+        topic,
+        payload,
+        headers: this.tracer.headers(),
+      });
     });
   }
 }

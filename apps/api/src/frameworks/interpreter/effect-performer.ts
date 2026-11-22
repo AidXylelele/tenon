@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { type Histogram, metrics, trace } from "@opentelemetry/api";
 import type {
   Effect,
   EffectOutcome,
@@ -17,11 +18,17 @@ import { GrpcClient } from "../grpc/grpc.client.js";
 import { HttpClient } from "../http-client/http.client.js";
 import type { HttpMcpRequest } from "../mcp/interfaces.js";
 import { McpClient } from "../mcp/mcp.client.js";
+import { effectDurationBoundaries } from "../opentelemetry/histogram.presets.js";
 import { PermanentFault } from "../../domain/errors.js";
 import type { CallContext } from "./interfaces.js";
 
 @Injectable()
 export class EffectPerformer implements EffectClient {
+  private static readonly SCOPE = "tenon-api";
+  private static readonly OTHER_ERROR = "_OTHER";
+
+  readonly #duration: Histogram;
+
   constructor(
     private readonly http: HttpClient,
     private readonly grpc: GrpcClient,
@@ -29,7 +36,14 @@ export class EffectPerformer implements EffectClient {
     private readonly a2a: A2aClient,
     private readonly asyncApi: AsyncApiClient,
     private readonly sandbox: SandboxClient,
-  ) {}
+  ) {
+    const meter = metrics.getMeter(EffectPerformer.SCOPE);
+    this.#duration = meter.createHistogram("tenon.effect.duration", {
+      unit: "s",
+      description: "The time an effect takes to perform.",
+      advice: { explicitBucketBoundaries: effectDurationBoundaries },
+    });
+  }
 
   async perform(effect: Effect, step: StepCall): Promise<EffectOutcome> {
     const remaining =
@@ -38,7 +52,9 @@ export class EffectPerformer implements EffectClient {
     if (remaining !== null && remaining <= 0) return { kind: "expired" };
 
     const context = this.#contextOf(step, remaining);
-    const outcome = await this.#performed(effect, context);
+    const outcome = await this.#measured(effect.kind, () =>
+      this.#performed(effect, context),
+    );
     step.signal.throwIfAborted();
     return outcome;
   }
@@ -48,8 +64,54 @@ export class EffectPerformer implements EffectClient {
     step: StepCall,
   ): Promise<void> {
     const context = this.#contextOf(step, null);
-    await this.sandbox.run(request, context);
+    await this.#measured(request.kind, () =>
+      this.sandbox.run(request, context),
+    );
     step.signal.throwIfAborted();
+  }
+
+  sandboxed(effect: Effect): SandboxedProcessRequest {
+    if (!this.#isSandboxed(effect))
+      throw this.#unperformable("process.container");
+
+    return effect;
+  }
+
+  async #measured(
+    kind: string,
+    work: () => Promise<EffectOutcome>,
+  ): Promise<EffectOutcome> {
+    const active = trace.getActiveSpan();
+    active?.setAttribute("tenon.effect.kind", kind);
+    const started = performance.now();
+
+    try {
+      const outcome = await work();
+      const attributes = {
+        "tenon.effect.kind": kind,
+        "tenon.effect.outcome": outcome.kind,
+      };
+      this.#recorded(started, attributes);
+      return outcome;
+    } catch (error) {
+      const attributes = {
+        "tenon.effect.kind": kind,
+        "error.type": this.#errorTypeOf(error),
+      };
+      this.#recorded(started, attributes);
+      throw error;
+    }
+  }
+
+  #recorded(started: number, attributes: Record<string, string>): void {
+    const seconds = (performance.now() - started) / 1000;
+    this.#duration.record(seconds, attributes);
+  }
+
+  #errorTypeOf(error: unknown): string {
+    if (error instanceof Error) return error.name;
+
+    return EffectPerformer.OTHER_ERROR;
   }
 
   #contextOf(step: StepCall, remaining: number | null): CallContext {
@@ -106,10 +168,8 @@ export class EffectPerformer implements EffectClient {
     effect: Effect & ProcessRequest,
     context: CallContext,
   ): Promise<EffectOutcome> {
-    if (!this.#isSandboxed(effect))
-      throw this.#unperformable("process.container");
-
-    return this.sandbox.run(effect, context);
+    const request = this.sandboxed(effect);
+    return this.sandbox.run(request, context);
   }
 
   #unperformable(capability: string): PermanentFault {

@@ -15,6 +15,7 @@ import type { EventStore } from "../../../application/automation/events/ports.js
 import type { WebhookEvent } from "../../../domain/automation/webhooks/interfaces.js";
 import { MessageTopic } from "../../messaging/enums.js";
 import type { AcceptedEventMessage } from "../../messaging/interfaces.js";
+import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type {
   EventRow,
   LifecycleCloudEvent,
@@ -34,6 +35,7 @@ export class PostgresEventStore implements EventStore {
     private readonly txHost: TransactionHost<Transaction>,
     private readonly outbox: Outbox,
     private readonly webhookEventMapper: WebhookEventMapper,
+    private readonly tracer: OutboxTracer,
   ) {}
 
   @Transactional(Propagation.Required)
@@ -105,6 +107,7 @@ export class PostgresEventStore implements EventStore {
         topic: MessageTopic.EventAccepted,
         key: PostgresEventStore.KEY,
         payload,
+        headers: this.tracer.headers(),
       },
     ]);
     return sequence;

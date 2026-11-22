@@ -3,8 +3,12 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import { LoggerModule } from "nestjs-pino";
-import type { SerializedError } from "pino";
-import { ApiRoute } from "../../interface-adapters/api/enums.js";
+import type {
+  SerializedError,
+  SerializedRequest,
+  SerializedResponse,
+} from "pino";
+import { RequestPath } from "../opentelemetry/request-path.js";
 import { loggingConfig } from "./configs.js";
 
 @Module({
@@ -28,9 +32,6 @@ import { loggingConfig } from "./configs.js";
             },
             redact: {
               paths: [
-                "req.headers.cookie",
-                "req.headers.authorization",
-                'res.headers["set-cookie"]',
                 "*.password",
                 "*.token",
                 "*.newPassword",
@@ -39,6 +40,18 @@ import { loggingConfig } from "./configs.js";
               censor: "[redacted]",
             },
             serializers: {
+              req: (request: SerializedRequest) => {
+                const path = new RequestPath(request.url);
+                return {
+                  id: request.id,
+                  method: request.method,
+                  url: path.redacted(),
+                  remoteAddress: request.remoteAddress,
+                };
+              },
+              res: (response: SerializedResponse) => ({
+                statusCode: response.statusCode,
+              }),
               err: (serialized: SerializedError) => {
                 const error = serialized.raw;
 
@@ -56,8 +69,10 @@ import { loggingConfig } from "./configs.js";
               },
             },
             autoLogging: {
-              ignore: (request) =>
-                (request.url ?? "").startsWith(`/${ApiRoute.Prefix}/health`),
+              ignore: (request) => {
+                const path = new RequestPath(request.url);
+                return path.isHealth();
+              },
             },
             transport: pretty
               ? { target: "pino-pretty", options: { singleLine: true } }

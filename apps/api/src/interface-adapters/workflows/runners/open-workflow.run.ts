@@ -20,7 +20,6 @@ import {
   type ChildEffect,
   EffectClient,
   type RunAgendaView,
-  type SandboxedProcessRequest,
   type StepCall,
   type TimedWait,
 } from "../interfaces.js";
@@ -32,6 +31,7 @@ import type {
   Turn,
 } from "./interfaces.js";
 import { ProcessRun } from "./process.run.js";
+import { RunTracer } from "./run.tracer.js";
 
 @Workflow(EngineRunGateway.RUN, { version: EngineRunGateway.VERSION })
 export class OpenWorkflowRun implements WorkflowRunner<
@@ -42,16 +42,30 @@ export class OpenWorkflowRun implements WorkflowRunner<
   private static readonly PROCESS_TIMEOUT: Duration = "45s";
   private static readonly ENTRIES = 5_000;
   private static readonly BYTES = 5_000_000;
-  private static readonly CONTAINERS =
-    "The host does not perform 'process.container'; its profile refuses it at publish";
 
   constructor(
     private readonly runs: RunController,
     private readonly performer: EffectClient,
     private readonly engine: EngineRunGateway,
+    private readonly tracer: RunTracer,
   ) {}
 
-  async run(ctx: WorkflowContext, input: OpenWorkflowRunInput): Promise<void> {
+  run(ctx: WorkflowContext, input: OpenWorkflowRunInput): Promise<void> {
+    const attributes = {
+      "tenon.instance.id": input.instanceId,
+      "tenon.workflow.generation": input.generation,
+    };
+    return this.tracer.execution(
+      ctx,
+      () => this.#executed(ctx, input),
+      attributes,
+    );
+  }
+
+  async #executed(
+    ctx: WorkflowContext,
+    input: OpenWorkflowRunInput,
+  ): Promise<void> {
     const instanceId = input.instanceId;
 
     try {
@@ -296,7 +310,7 @@ export class OpenWorkflowRun implements WorkflowRunner<
     const answers: EffectResponse[] = [];
 
     for (const effect of effects) {
-      const request = this.#sandboxed(effect);
+      const request = this.performer.sandboxed(effect);
       const input = { request, secrets: generation.secrets };
       const id = `${ctx.workflowId}/${effect.id}`;
       await ctx.startChild(ProcessRun, input, { id, parentClose: "abandon" });
@@ -356,10 +370,6 @@ export class OpenWorkflowRun implements WorkflowRunner<
     effect: Effect,
     step: StepCall,
   ): Promise<EffectOutcome> {
-    const expired = effect.deadline !== null && effect.deadline <= Date.now();
-
-    if (expired) return { kind: "expired" };
-
     if (effect.kind === "emit") return this.runs.emit(instanceId, effect.event);
 
     if (effect.kind === "workflow") return this.#started(instanceId, effect);
@@ -378,17 +388,6 @@ export class OpenWorkflowRun implements WorkflowRunner<
     return { kind: "started" };
   }
 
-  #sandboxed(effect: Effect): SandboxedProcessRequest {
-    if (!this.#isSandboxed(effect))
-      throw new PermanentFault(OpenWorkflowRun.CONTAINERS);
-
-    return effect;
-  }
-
-  #isSandboxed(effect: Effect): effect is Effect & SandboxedProcessRequest {
-    return effect.kind === "process" && effect.process.kind !== "container";
-  }
-
   async #step<T>(
     ctx: WorkflowContext,
     name: string,
@@ -397,19 +396,27 @@ export class OpenWorkflowRun implements WorkflowRunner<
   ): Promise<T> {
     const result: unknown = await ctx.step<T>(
       name,
-      async (attempt) => {
-        try {
-          return await work(attempt);
-        } catch (error) {
-          if (error instanceof PermanentFault)
-            throw new NonRetryableStepError(error.message, { cause: error });
-
-          throw error;
-        }
-      },
+      (attempt) =>
+        this.tracer.attempt(name, attempt, () =>
+          this.#attempted(work, attempt),
+        ),
       options,
     );
     return result as T;
+  }
+
+  async #attempted<T>(
+    work: (attempt: WorkflowStepContext) => Promise<T>,
+    attempt: WorkflowStepContext,
+  ): Promise<T> {
+    try {
+      return await work(attempt);
+    } catch (error) {
+      if (error instanceof PermanentFault)
+        throw new NonRetryableStepError(error.message, { cause: error });
+
+      throw error;
+    }
   }
 
   #sizeOf(value: unknown): number {

@@ -42,6 +42,33 @@ tick (`@OnOneInstance`), and each AsyncAPI receiver is held by one worker under 
   move to the other workers then.
 - A run whose program this build of the interpreter cannot rebuild is cancelled at its next turn.
 
+## Observability
+
+Both processes start the OpenTelemetry `NodeSDK` from `--import ./dist/frameworks/instrumentation.js` and send
+traces, metrics and logs only by OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT`; the SDK reads every other setting from
+the standard `OTEL_*` variables. The main thread loads the Node auto-instrumentations without the NestJS, router, DNS
+and net ones; each interpreter thread starts its own SDK with only the runtime metrics, under its own
+`service.instance.id`. The SDK shuts down last, after every other module has stopped.
+
+- **Traces.** HTTP server spans carry `http.route`; a hook call shows `/api/v1/hooks/:token` as its `url.path`, and
+  the health checks are not traced. Each engine execution is a root span `execute <workflow>` (consumer) with
+  `tenon.workflow` and, for a run, `tenon.instance.id` and `tenon.workflow.generation`; each real step attempt is a
+  span `step <kind>` inside it with `tenon.step.kind` and `tenon.step.attempt`, and an effect's step span names its
+  `tenon.effect.kind`. The engine's journal writes are the PostgreSQL spans beside the step spans. A replay opens no
+  span. An outbox message is processed in a root span `process <topic>` (consumer) linked to the span that added it,
+  and a scheduled job's run is a span `job <name>`. A query outside any span, such as a poll, is not traced.
+- **Metrics.** `tenon.workflow.executions`, `tenon.workflow.step.duration`, `tenon.workflow.compensation.failures`,
+  `tenon.effect.duration`, `tenon.outbox.publish.duration`, `tenon.outbox.lag`, `tenon.outbox.failures` and
+  `tenon.lock.losses`, beside the runtime, HTTP, database and interpreter metrics.
+- **Logs.** Every pino record goes to stdout and by OTLP, with `trace_id` and `span_id`. A request is logged by its
+  id, method, path (without the query, a hook by its route) and remote address, and its response by its status code.
+
+Limits: a step attempt that fails carries no duration in the engine's events, so `tenon.workflow.step.duration` holds
+the completed attempts and the failed ones show as error spans. An interpreter thread that is terminated, by a
+cancelled task or a closing pool, loses the spans of its last batch (up to `OTEL_BSP_SCHEDULE_DELAY`, 5 s by
+default) and the metric points since its last export (`OTEL_METRIC_EXPORT_INTERVAL`), since no hook runs before it
+ends.
+
 ## Run
 
 From the repository root, with Docker and a `.env` copied from `.env.example`, start the services and migrate:

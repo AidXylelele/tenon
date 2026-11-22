@@ -20,9 +20,11 @@ import { CoreModule } from "./core.module.js";
 import { HttpModule } from "./http.module.js";
 import { IdentityHttpModule } from "./identity-http.module.js";
 import { workflowRetry } from "./resilience.presets.js";
+import { TelemetryModule } from "./telemetry.module.js";
 
 @Module({
   imports: [
+    TelemetryModule,
     CoreModule,
     WorkflowsModule.forRootAsync({
       imports: [CoreModule],

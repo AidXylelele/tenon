@@ -11,6 +11,7 @@ import type { WorkflowName } from "../../../domain/automation/workflows/workflow
 import type { Workflow } from "../../../domain/automation/workflows/workflow.js";
 import { StaleWriteError } from "../../../domain/errors.js";
 import type { WorkflowMessage } from "../../messaging/interfaces.js";
+import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type { Transaction, WorkflowRow } from "../interfaces.js";
 import { WorkflowMapper } from "../mappers/workflow.mapper.js";
 import { WorkflowVersionMapper } from "../mappers/workflow-version.mapper.js";
@@ -26,6 +27,7 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
     private readonly outbox: Outbox,
     private readonly workflowMapper: WorkflowMapper,
     private readonly workflowVersionMapper: WorkflowVersionMapper,
+    private readonly tracer: OutboxTracer,
   ) {}
 
   async findByName(name: WorkflowName): Promise<Workflow | null> {
@@ -122,7 +124,12 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
   async #publishEvents(workflow: Workflow): Promise<void> {
     const entries = workflow.events.map((change) => {
       const payload: WorkflowMessage = { workflowId: change.workflowId };
-      return { topic: change.kind, key: change.workflowId, payload };
+      return {
+        topic: change.kind,
+        key: change.workflowId,
+        payload,
+        headers: this.tracer.headers(),
+      };
     });
     workflow.clearEvents();
 

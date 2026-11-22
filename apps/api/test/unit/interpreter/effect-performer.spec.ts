@@ -1,4 +1,5 @@
 import { Test } from "@nestjs/testing";
+import { trace } from "@opentelemetry/api";
 import type {
   Effect,
   HttpOutcome,
@@ -13,10 +14,13 @@ import { HttpClient } from "../../../src/frameworks/http-client/http.client.js";
 import { McpClient } from "../../../src/frameworks/mcp/mcp.client.js";
 import { EffectPerformer } from "../../../src/frameworks/interpreter/effect-performer.js";
 import type { CallContext } from "../../../src/frameworks/interpreter/interfaces.js";
+import { PermanentFault } from "../../../src/domain/errors.js";
 import type {
   SandboxedProcessRequest,
   StepCall,
 } from "../../../src/interface-adapters/workflows/interfaces.js";
+import { RecordedMetrics } from "../../support/recorded-metrics.js";
+import { RecordedSpans } from "../../support/recorded-spans.js";
 
 const RESPONDED: HttpOutcome = {
   kind: "responded",
@@ -84,8 +88,10 @@ class ExpiringClient {
 describe("the performer every effect passes through", () => {
   let performer: EffectPerformer;
   let client: ExpiringClient;
+  let recorded: RecordedMetrics;
 
   beforeEach(async () => {
+    recorded = new RecordedMetrics();
     client = new ExpiringClient();
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -99,6 +105,10 @@ describe("the performer every effect passes through", () => {
       ],
     }).compile();
     performer = moduleRef.get(EffectPerformer);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   function httpOf(deadline: number | null): Effect {
@@ -184,5 +194,80 @@ describe("the performer every effect passes through", () => {
     const pending = performer.performDetached(SHELL, stepOf(controller.signal));
 
     await expect(pending).rejects.toBe(reason);
+  });
+
+  it("measures_an_effect_by_its_kind_and_outcome_and_names_its_kind_on_the_step_span", async () => {
+    const spans = new RecordedSpans();
+    const tracer = trace.getTracer("test");
+
+    await tracer.startActiveSpan("step effect", async (span) => {
+      await performer.perform(httpOf(null), stepOf());
+      span.end();
+    });
+    await spans.stop();
+
+    const [step] = spans.named("step effect");
+    const [measured] = recorded.pointsOf("tenon.effect.duration");
+    expect(step?.attributes).toEqual({ "tenon.effect.kind": "http" });
+    expect(measured?.attributes).toEqual({
+      "tenon.effect.kind": "http",
+      "tenon.effect.outcome": "responded",
+    });
+    const options = recorded.optionsOf("tenon.effect.duration");
+    const longest = options?.advice?.explicitBucketBoundaries?.slice(-2);
+    expect(measured?.value).toBeGreaterThanOrEqual(0);
+    expect(options?.unit).toBe("s");
+    expect(longest).toEqual([30, 60]);
+  });
+
+  it("measures_an_effect_that_threw_by_its_error_type", async () => {
+    const terminated = new TypeError("terminated");
+    vi.spyOn(client, "send").mockRejectedValue(terminated);
+
+    await expect(performer.perform(httpOf(null), stepOf())).rejects.toBe(
+      terminated,
+    );
+
+    const [measured] = recorded.pointsOf("tenon.effect.duration");
+    expect(measured?.attributes).toEqual({
+      "tenon.effect.kind": "http",
+      "error.type": "TypeError",
+    });
+  });
+
+  it("a_container_process_is_refused_as_one_the_host_does_not_perform", () => {
+    const container: Effect = {
+      id: "/do/0/build",
+      deadline: null,
+      kind: "process",
+      process: {
+        kind: "container",
+        image: "alpine:3.22",
+        name: null,
+        command: null,
+        ports: {},
+        volumes: {},
+        environment: {},
+        lifetime: { cleanup: "always", after: null },
+        pullPolicy: "ifNotPresent",
+        stdin: null,
+        arguments: [],
+      },
+      await: true,
+    };
+
+    expect(() => performer.sandboxed(container)).toThrow(PermanentFault);
+  });
+
+  it("a_sandboxed_process_is_handed_on_as_it_is", () => {
+    const shell: Effect = {
+      id: "/do/0/run",
+      deadline: null,
+      kind: "process",
+      process: SHELL.process,
+      await: false,
+    };
+
+    expect(performer.sandboxed(shell)).toBe(shell);
   });
 });
