@@ -37,6 +37,33 @@ export interface Step<Place = Range> {
   readonly selectionRange: Place | null;
   readonly lists: readonly NestedList<Place>[];
   readonly flow: readonly Transition[];
+  readonly catch: CatchPolicy | null;
+}
+
+export interface CaughtErrors {
+  readonly type: string | null;
+  readonly status: number | null;
+  readonly instance: string | null;
+  readonly title: string | null;
+  readonly detail: string | null;
+}
+
+export interface RetryPlan {
+  readonly retries: number | null;
+  readonly milliseconds: number | null;
+  readonly backoff: "constant" | "linear" | "exponential";
+  readonly when: string | null;
+  readonly exceptWhen: string | null;
+}
+
+export type Afterward = "stop" | "continue" | "handle";
+
+export interface CatchPolicy {
+  readonly errors: CaughtErrors | null;
+  readonly when: string | null;
+  readonly exceptWhen: string | null;
+  readonly retry: RetryPlan | null;
+  readonly afterward: Afterward;
 }
 
 export interface StepList<Place = Range> {

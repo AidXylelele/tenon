@@ -1,5 +1,9 @@
 export type {
+  Afterward,
+  CatchPolicy,
+  CaughtErrors,
   NestedList,
+  RetryPlan,
   Step,
   StepList,
   Transition,

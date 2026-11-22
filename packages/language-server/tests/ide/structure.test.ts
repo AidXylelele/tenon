@@ -84,6 +84,7 @@ test("a step is its id, kind, family, summary, ranges and flow", () => {
     flow: [
       { on: "done", case: null, when: null, kind: "next", to: "/do/guard" },
     ],
+    catch: null,
   });
 });
 
@@ -404,4 +405,116 @@ test.each([
 
   const [first] = reading.workflow.steps.steps;
   expect(first?.variant).toBe(variant);
+});
+
+const tried =
+  "[ { fetch: { call: http, with: { method: get, endpoint: https://api.test } } } ]";
+
+const growingRetry =
+  "{ delay: { seconds: 2 }, backoff: { exponential: {} }, limit: { attempt: { count: 3 } } }";
+
+test.each([
+  [
+    "a retry with nothing after it retries, then stops",
+    `guard: { try: ${tried}, catch: { retry: ${growingRetry} } }`,
+    {
+      errors: null,
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "exponential",
+        when: null,
+        exceptWhen: null,
+      },
+      afterward: "stop",
+    },
+  ],
+  [
+    "a retry on one status with steps after it runs them when the retries are spent",
+    `guard: { try: ${tried}, catch: { errors: { with: { status: 503 } }, retry: ${growingRetry}, do: [ { note: { set: { failed: true } } } ] } }`,
+    {
+      errors: {
+        type: null,
+        status: 503,
+        instance: null,
+        title: null,
+        detail: null,
+      },
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "exponential",
+        when: null,
+        exceptWhen: null,
+      },
+      afterward: "handle",
+    },
+  ],
+  [
+    "a catch of one error type with no retry goes on",
+    `guard: { try: ${tried}, catch: { errors: { with: { type: https://open-workflow-specification.org/spec/1.0.0/errors/communication } } } }`,
+    {
+      errors: {
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication",
+        status: null,
+        instance: null,
+        title: null,
+        detail: null,
+      },
+      when: null,
+      exceptWhen: null,
+      retry: null,
+      afterward: "continue",
+    },
+  ],
+  [
+    "a catch with steps and no retry runs them at once",
+    `guard: { try: ${tried}, catch: { when: '\${ .status > 499 }', do: [ { note: { set: { failed: true } } } ] } }`,
+    {
+      errors: null,
+      when: ".status > 499",
+      exceptWhen: null,
+      retry: null,
+      afterward: "handle",
+    },
+  ],
+])("a try's catch is data: %s", (_, step, policy) => {
+  const text = `${inlineHeader}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch).toEqual(policy);
+});
+
+test("a retry named among the workflow's components is read from there", () => {
+  const retries = `use:\n  retries:\n    patient: ${growingRetry}\n`;
+  const text = `${inlineHeader}${retries}do:\n  - guard: { try: ${tried}, catch: { retry: patient } }\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch?.retry).toEqual({
+    retries: 3,
+    milliseconds: 2000,
+    backoff: "exponential",
+    when: null,
+    exceptWhen: null,
+  });
+});
+
+test("a step that is not a try has no catch", () => {
+  const text = `${inlineHeader}do:\n  - pause: { wait: PT1S }\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch).toBeNull();
 });
