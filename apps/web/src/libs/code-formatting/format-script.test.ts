@@ -95,14 +95,16 @@ describe("formatting a script off the page's thread", () => {
     );
   });
 
-  it("a_worker_that_stopped_rejects_the_request", async () => {
+  it("every_pending_request_is_rejected_when_the_worker_stops", async () => {
     const formatScript = await freshFormatScript();
-    const formatting = formatScript("javascript", "a");
+    const first = formatScript("javascript", "a");
+    const second = formatScript("python", "b");
     const stop = new ErrorEvent("error", { message: "Script error." });
 
     workers[0]?.dispatchEvent(stop);
 
-    await expect(formatting).rejects.toThrow("The formatting worker stopped.");
+    await expect(first).rejects.toThrow("The formatting worker stopped.");
+    await expect(second).rejects.toThrow("The formatting worker stopped.");
   });
 
   it("a_worker_that_stopped_is_replaced_on_the_next_request", async () => {

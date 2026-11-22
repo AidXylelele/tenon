@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 function storyOf(name: string): string {
-  return `/iframe.html?id=probes-code-formatting--${name}&viewMode=story`;
+  return `/iframe.html?id=libs-code-formatting--${name}&viewMode=story`;
 }
 
 test.describe("scripts formatted in a worker under the worker policy", () => {

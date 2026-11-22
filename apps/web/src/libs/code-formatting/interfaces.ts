@@ -13,7 +13,7 @@ export interface Formatted {
 export interface Refused {
   readonly kind: "refused";
   readonly message: string;
-  readonly line?: number;
+  readonly line: number;
 }
 
 export interface Failed {

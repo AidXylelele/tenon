@@ -35,6 +35,12 @@ function ruffWorkspace(): Promise<Workspace> {
 }
 
 async function load(): Promise<Workspace> {
-  await init();
+  try {
+    await init();
+  } catch (error) {
+    workspace = null;
+    throw error;
+  }
+
   return new Workspace(SETTINGS, PositionEncoding.Utf16);
 }

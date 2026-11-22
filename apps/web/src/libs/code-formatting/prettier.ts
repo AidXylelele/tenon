@@ -21,7 +21,7 @@ export async function formatJavaScript(text: string): Promise<Formatting> {
     if (!parsed.success) throw error;
 
     const { message, loc } = parsed.data;
-    const [withoutCodeFrame = message] = message.split("\n", 1);
+    const withoutCodeFrame = message.replace(/\n[\s\S]*$/, "");
     return { kind: "refused", message: withoutCodeFrame, line: loc.start.line };
   }
 }

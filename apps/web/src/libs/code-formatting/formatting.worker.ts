@@ -3,8 +3,6 @@ import type {
   FormattingAnswer,
   FormattingRequest,
 } from "./interfaces";
-import { formatJavaScript } from "./prettier";
-import { formatPython } from "./ruff";
 
 self.addEventListener("message", (event: MessageEvent<FormattingRequest>) => {
   const [port] = event.ports;
@@ -32,14 +30,18 @@ async function answerOf(request: FormattingRequest): Promise<FormattingAnswer> {
   }
 }
 
-function formattingOf({
+async function formattingOf({
   language,
   text,
 }: FormattingRequest): Promise<Formatting> {
   switch (language) {
-    case "javascript":
+    case "javascript": {
+      const { formatJavaScript } = await import("./prettier");
       return formatJavaScript(text);
-    case "python":
+    }
+    case "python": {
+      const { formatPython } = await import("./ruff");
       return formatPython(text);
+    }
   }
 }

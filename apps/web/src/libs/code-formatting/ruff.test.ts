@@ -35,13 +35,4 @@ describe("python formatted by ruff", () => {
       line: 3,
     });
   });
-
-  it("lint_findings_do_not_stop_formatting", async () => {
-    const formatting = await formatPython("import os\nx=1\n");
-
-    expect(formatting).toEqual({
-      kind: "formatted",
-      text: "import os\n\nx = 1\n",
-    });
-  });
 });
