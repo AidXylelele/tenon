@@ -5,7 +5,6 @@ import {
   TransactionHost,
 } from "@nestjs-cls/transactional";
 import { WorkflowClient, WorkflowNotFoundError } from "@nestjs/workflows";
-import { stateFormatVersion } from "interpreter";
 import type { InstanceRuns } from "../../../application/automation/instances/ports.js";
 import type { Control } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
@@ -14,6 +13,7 @@ import type { Transaction } from "../../persistence/interfaces.js";
 @Injectable()
 export class EngineRunGateway implements InstanceRuns {
   static readonly RUN = "open-workflow";
+  static readonly VERSION = 1;
   static readonly WAKE = "wake";
 
   constructor(
@@ -27,7 +27,7 @@ export class EngineRunGateway implements InstanceRuns {
     const id = this.#runIdOf(instance.id, 1);
     await this.client.start(EngineRunGateway.RUN, input, {
       id,
-      version: stateFormatVersion,
+      version: EngineRunGateway.VERSION,
       transaction: this.txHost.tx,
     });
   }
@@ -84,7 +84,7 @@ export class EngineRunGateway implements InstanceRuns {
     const id = this.#runIdOf(instanceId, generation);
     await this.client.start(EngineRunGateway.RUN, input, {
       id,
-      version: stateFormatVersion,
+      version: EngineRunGateway.VERSION,
     });
   }
 

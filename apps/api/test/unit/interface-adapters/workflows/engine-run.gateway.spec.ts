@@ -1,6 +1,5 @@
 import type { TransactionHost } from "@nestjs-cls/transactional";
 import type { WorkflowClient } from "@nestjs/workflows";
-import { stateFormatVersion } from "interpreter";
 import {
   Control,
   Phase,
@@ -56,11 +55,14 @@ describe("the starts and wakes of a run on the engine", () => {
     log.versions.length = 0;
   });
 
-  it("a_run_starts_and_continues_at_the_state_format_of_this_build", async () => {
+  it("a_run_starts_and_continues_at_the_version_of_the_run_workflow", async () => {
     await gateway.start(parent);
     await gateway.continueIn(parent.id, 2);
 
-    expect(log.versions).toEqual([stateFormatVersion, stateFormatVersion]);
+    expect(log.versions).toEqual([
+      EngineRunGateway.VERSION,
+      EngineRunGateway.VERSION,
+    ]);
   });
 
   it("two_children_that_end_while_their_parent_keeps_one_state_wake_it_twice", async () => {

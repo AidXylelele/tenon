@@ -31,11 +31,19 @@ import type {
 } from "../../domain/automation/instances/interfaces.js";
 import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
 
+export type JsonOf<T> = T extends JsonValue
+  ? T
+  : T extends readonly (infer Item)[]
+    ? readonly JsonOf<Item>[]
+    : T extends object
+      ? { readonly [Key in keyof T]: JsonOf<T[Key]> }
+      : never;
+
 type CompiledManifest = Omit<Manifest, "filters">;
 
 export type RouteMatch = Omit<RoutingFilter, "accepts">;
 
-interface CompiledData {
+export interface CompiledData {
   readonly kind: "compiled";
   readonly manifest: CompiledManifest;
   readonly fingerprint: string;

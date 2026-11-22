@@ -51,8 +51,8 @@ import { PostgresEventOfferStore } from "../../interface-adapters/persistence/st
 import { PostgresLockStore } from "../../interface-adapters/persistence/stores/postgres-lock.store.js";
 import { PostgresReceivedMessageStore } from "../../interface-adapters/persistence/stores/postgres-received-message.store.js";
 import { EngineDeliveryGateway } from "../../interface-adapters/workflows/gateways/engine-delivery.gateway.js";
+import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
 import { EffectClient } from "../../interface-adapters/workflows/interfaces.js";
-import { InterpreterGateway } from "../../interface-adapters/workflows/interpreter.gateway.js";
 import { RunController } from "../../interface-adapters/workflows/run.controller.js";
 import { DeliveryRun } from "../../interface-adapters/workflows/runners/delivery.run.js";
 import { OpenWorkflowRun } from "../../interface-adapters/workflows/runners/open-workflow.run.js";
@@ -129,7 +129,8 @@ const sandboxLimits = new SandboxLimits({
     DeliveryRun,
     EngineDeliveryGateway,
     { provide: Deliveries, useExisting: EngineDeliveryGateway },
-    { provide: EventRouting, useExisting: InterpreterGateway },
+    InterpreterRoutingGateway,
+    { provide: EventRouting, useExisting: InterpreterRoutingGateway },
     AutomationHandler,
     AsyncApiHandler,
     RetentionJobs,

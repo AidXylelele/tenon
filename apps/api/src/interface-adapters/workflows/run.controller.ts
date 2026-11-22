@@ -34,11 +34,13 @@ import { WorkflowName } from "../../domain/automation/workflows/workflow-name.js
 import type {
   ChildEffect,
   ChildStart,
+  JsonOf,
   Receiver,
   RunAgendaView,
   TimeAnswer,
   TimedWait,
 } from "./interfaces.js";
+import { ProtocolMapper } from "./mappers/protocol.mapper.js";
 
 @Injectable()
 export class RunController {
@@ -64,6 +66,7 @@ export class RunController {
     private readonly receiveInbound: ReceiveInbound,
     private readonly receivers: ReceiverQueries,
     private readonly secrets: SecretQueries,
+    private readonly protocol: ProtocolMapper,
   ) {}
 
   async begin(instanceId: string, signal: AbortSignal): Promise<RunAgendaView> {
@@ -80,7 +83,7 @@ export class RunController {
     outcome: EffectOutcome,
     signal: AbortSignal,
   ): Promise<RunAgendaView> {
-    const answered = outcome as unknown as JsonObject;
+    const answered: JsonOf<EffectOutcome> = outcome;
     const answer = { effectId, outcome: answered };
     const responded = await this.respondToEffect.execute({
       instanceId,
@@ -126,7 +129,7 @@ export class RunController {
     message: AsyncApiInboundMessage,
     fence: number,
   ): Promise<boolean> {
-    const received = message as InboundMessage;
+    const received: InboundMessage = message;
     const inbound = { kind: InboundKind.Message as const, message: received };
     const taken = await this.receiveInbound.execute({
       instanceId,
@@ -143,7 +146,7 @@ export class RunController {
     failed: Failure,
     fence: number,
   ): Promise<boolean> {
-    const failure = failed as unknown as JsonObject;
+    const failure: JsonOf<Failure> = failed;
     const inbound = { kind: InboundKind.Failure as const, failure };
     const taken = await this.receiveInbound.execute({
       instanceId,
@@ -164,11 +167,11 @@ export class RunController {
 
   async secretsOf(instanceId: string): Promise<ProtocolObject> {
     const secrets = await this.secrets.ofInstance(instanceId);
-    return secrets.values as ProtocolObject;
+    return this.protocol.toObject(secrets.values);
   }
 
   async emit(instanceId: string, event: CloudEvent): Promise<EmitOutcome> {
-    const cloudEvent = event as JsonObject;
+    const cloudEvent: JsonObject = event;
     await this.emitEvent.execute({ instanceId, cloudEvent });
     return { kind: "emitted" };
   }
@@ -256,7 +259,7 @@ export class RunController {
   }
 
   #receiverOf(view: ReceiverView): Receiver {
-    const request = view.request as unknown as AsyncApiRequest;
+    const request = view.request as JsonOf<AsyncApiRequest>;
     const closesAt = view.closesAt?.getTime() ?? null;
     return {
       instanceId: view.instanceId,
@@ -267,11 +270,11 @@ export class RunController {
   }
 
   #effectOf(request: JsonObject): Effect {
-    return request as unknown as Effect;
+    return request as JsonOf<Effect>;
   }
 
   #childOf(request: JsonObject): ChildEffect {
-    return request as unknown as ChildEffect;
+    return request as JsonOf<ChildEffect>;
   }
 
   #isDetached(effect: Effect): boolean {

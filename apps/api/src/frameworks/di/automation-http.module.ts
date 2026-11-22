@@ -64,8 +64,9 @@ import { PostgresSubscriptionQueries } from "../../interface-adapters/persistenc
 import { PostgresWebhookQueries } from "../../interface-adapters/persistence/queries/postgres-webhook.queries.js";
 import { PostgresDraftRepository } from "../../interface-adapters/persistence/repositories/postgres-draft.repository.js";
 import { PostgresWebhookRepository } from "../../interface-adapters/persistence/repositories/postgres-webhook.repository.js";
+import { InterpreterCapabilitiesGateway } from "../../interface-adapters/workflows/gateways/interpreter-capabilities.gateway.js";
+import { InterpreterCompilerGateway } from "../../interface-adapters/workflows/gateways/interpreter-compiler.gateway.js";
 import { StructureClient } from "../../interface-adapters/workflows/interfaces.js";
-import { InterpreterGateway } from "../../interface-adapters/workflows/interpreter.gateway.js";
 import { SandboxPlatform } from "../go-judge/sandbox-platform.js";
 import { WorkerInterpreterClient } from "../interpreter/worker-interpreter.client.js";
 import { linksConfig } from "./configs.js";
@@ -111,8 +112,10 @@ import { hostLimits } from "./resilience.presets.js";
     CreateSubscription,
     DeleteSubscription,
     AutomationPolicy,
-    { provide: DefinitionCompiler, useExisting: InterpreterGateway },
-    { provide: HostCapabilities, useExisting: InterpreterGateway },
+    InterpreterCompilerGateway,
+    { provide: DefinitionCompiler, useExisting: InterpreterCompilerGateway },
+    InterpreterCapabilitiesGateway,
+    { provide: HostCapabilities, useExisting: InterpreterCapabilitiesGateway },
     DraftMapper,
     WebhookMapper,
     { provide: DraftRepository, useClass: PostgresDraftRepository },
