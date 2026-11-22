@@ -8,7 +8,7 @@ import {
 import type { AsyncApiOutcome } from "interpreter";
 import { BrokerSpans } from "../../../src/frameworks/asyncapi/broker-spans.js";
 import type { BrokerTarget } from "../../../src/frameworks/asyncapi/interfaces.js";
-import { startTracing, type Tracing } from "../../support/tracing.js";
+import { RecordedSpans } from "../../support/recorded-spans.js";
 
 const TARGET: BrokerTarget = {
   kind: "target",
@@ -30,19 +30,19 @@ const PRODUCER_SPAN = "00f067aa0ba902b7";
 const PRODUCED = { traceparent: `00-${PRODUCER_TRACE}-${PRODUCER_SPAN}-01` };
 
 describe("the spans of the messages a host sends and processes", () => {
-  let tracing: Tracing;
+  let recorded: RecordedSpans;
   const spans = new BrokerSpans();
 
   beforeAll(() => {
-    tracing = startTracing();
+    recorded = new RecordedSpans();
   });
 
   afterAll(async () => {
-    await tracing.shutdown();
+    await recorded.stop();
   });
 
   beforeEach(() => {
-    tracing.ended.length = 0;
+    recorded.clear();
   });
 
   it("a_send_is_a_producer_span_whose_context_the_message_carries", async () => {
@@ -54,7 +54,7 @@ describe("the spans of the messages a host sends and processes", () => {
     };
 
     const outcome = await spans.sending(TARGET, "kafka", publish);
-    const span = tracing.named("send orders");
+    const span = recorded.only("send orders");
 
     expect(outcome).toEqual({ kind: "published" });
     expect(span.kind).toBe(SpanKind.PRODUCER);
@@ -76,7 +76,7 @@ describe("the spans of the messages a host sends and processes", () => {
     const publish = () => Promise.resolve<AsyncApiOutcome>(refused);
 
     const outcome = await spans.sending(TARGET, "kafka", publish);
-    const span = tracing.named("send orders");
+    const span = recorded.only("send orders");
 
     expect(outcome).toEqual(refused);
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
@@ -89,7 +89,7 @@ describe("the spans of the messages a host sends and processes", () => {
     const sending = spans.sending(TARGET, "kafka", publish);
 
     await expect(sending).rejects.toThrow("The step was cancelled");
-    const span = tracing.named("send orders");
+    const span = recorded.only("send orders");
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
     expect(span.events.map((event) => event.name)).toEqual(["exception"]);
   });
@@ -102,7 +102,7 @@ describe("the spans of the messages a host sends and processes", () => {
     };
 
     await spans.processing(TARGET, "kafka", PRODUCED, deliver);
-    const span = tracing.named("process orders");
+    const span = recorded.only("process orders");
 
     expect(span.kind).toBe(SpanKind.CONSUMER);
     expect(span.attributes).toEqual({
@@ -122,7 +122,7 @@ describe("the spans of the messages a host sends and processes", () => {
     const deliver = () => Promise.resolve();
 
     await spans.processing(TARGET, "redis", {}, deliver);
-    const span = tracing.named("process orders");
+    const span = recorded.only("process orders");
 
     expect(span.links).toEqual([]);
   });
@@ -133,7 +133,7 @@ describe("the spans of the messages a host sends and processes", () => {
     const processing = spans.processing(TARGET, "kafka", PRODUCED, deliver);
 
     await expect(processing).rejects.toThrow("The store is down");
-    const span = tracing.named("process orders");
+    const span = recorded.only("process orders");
     expect(span.status.code).toBe(SpanStatusCode.ERROR);
   });
 });

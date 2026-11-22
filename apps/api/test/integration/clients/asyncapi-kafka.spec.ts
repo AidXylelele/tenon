@@ -31,7 +31,7 @@ import { RedisBroker } from "../../../src/frameworks/asyncapi/redis.broker.js";
 import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets.js";
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
-import { startTracing, type Tracing } from "../../support/tracing.js";
+import { RecordedSpans } from "../../support/recorded-spans.js";
 import {
   authenticationOf,
   callContextOf,
@@ -79,7 +79,7 @@ function documentOf(bootstrap: string, topic: string): JsonObject {
 }
 
 describe("the AsyncAPI client on a Kafka cluster a document names", () => {
-  let tracing: Tracing;
+  let spans: RecordedSpans;
   let context: INestApplicationContext;
   let kafka: StartedKafkaContainer;
   let documents: StubServer;
@@ -176,7 +176,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     );
 
   beforeAll(async () => {
-    tracing = startTracing();
+    spans = new RecordedSpans();
     kafka = await new KafkaContainer("confluentinc/cp-kafka:8.1.0").start();
     advertised = kafka.getHost();
     bootstrap = `${HOST}:${String(kafka.getMappedPort(PORT))}`;
@@ -222,7 +222,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     await context.close();
     await documents.close();
     await kafka.stop();
-    await tracing.shutdown();
+    await spans.stop();
   });
 
   it("publishes_the_message_and_its_headers_to_the_topic_the_channel_names", async () => {
@@ -253,7 +253,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     }
 
     await reader.close(true);
-    const span = tracing.named("send paid").spanContext();
+    const span = spans.only("send paid").spanContext();
 
     expect(outcome).toEqual({ kind: "published" });
     expect(read[0]?.value).toBe('{"order":1}');
@@ -309,9 +309,11 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
       },
       { timeout: 10_000, interval: 50 },
     );
-    const processed = tracing.ended.filter(
-      (span) => span.name === "process traced" && span.links.length > 0,
-    );
+    const processed = spans
+      .all()
+      .filter(
+        (span) => span.name === "process traced" && span.links.length > 0,
+      );
 
     expect(processed.map((span) => span.links[0]?.context.spanId)).toEqual([
       PRODUCER_SPAN,

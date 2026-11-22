@@ -26,7 +26,7 @@ import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets
 import { AddressPolicy } from "../../../src/frameworks/http-client/address-policy.js";
 import type { BrokerSubscription } from "../../../src/interface-adapters/messaging/interfaces.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
-import { startTracing, type Tracing } from "../../support/tracing.js";
+import { RecordedSpans } from "../../support/recorded-spans.js";
 import {
   authenticationOf,
   callContextOf,
@@ -52,7 +52,7 @@ function documentOf(protocol: string, host: string, address: string) {
 }
 
 describe("the trace context of the messages the AsyncAPI client sends and receives", () => {
-  let tracing: Tracing;
+  let spans: RecordedSpans;
   let context: INestApplicationContext;
   let client: AsyncApiClient;
   let brokers: readonly { onApplicationShutdown(): Promise<void> }[];
@@ -89,7 +89,7 @@ describe("the trace context of the messages the AsyncAPI client sends and receiv
   };
 
   beforeAll(async () => {
-    tracing = startTracing();
+    spans = new RecordedSpans();
     [mosquitto, nats] = await Promise.all([
       new GenericContainer("eclipse-mosquitto:2.0.22")
         .withCommand(["mosquitto", "-c", "/mosquitto-no-auth.conf"])
@@ -146,7 +146,7 @@ describe("the trace context of the messages the AsyncAPI client sends and receiv
     await context.close();
     await documents.close();
     await Promise.all([mosquitto.stop(), nats.stop()]);
-    await tracing.shutdown();
+    await spans.stop();
   });
 
   it("an_mqtt_5_publish_carries_the_context_of_its_send_span_in_its_user_properties", async () => {
@@ -172,7 +172,7 @@ describe("the trace context of the messages the AsyncAPI client sends and receiv
       expect(received).toHaveLength(1);
     });
     await subscriber.endAsync();
-    const span = tracing.named("send orders/a").spanContext();
+    const span = spans.only("send orders/a").spanContext();
 
     expect(outcome).toEqual({ kind: "published" });
     expect(received[0]).toEqual({
@@ -202,7 +202,7 @@ describe("the trace context of the messages the AsyncAPI client sends and receiv
       expect(received).toHaveLength(1);
     });
     await subscriber.close();
-    const span = tracing.named("send orders.a").spanContext();
+    const span = spans.only("send orders.a").spanContext();
 
     expect(outcome).toEqual({ kind: "published" });
     expect(received[0]?.headers?.get("source")).toBe("tenon");
@@ -245,7 +245,7 @@ describe("the trace context of the messages the AsyncAPI client sends and receiv
     await vi.waitFor(() => {
       expect(active).toHaveLength(1);
     });
-    const span = tracing.named("process orders.in");
+    const span = spans.only("process orders.in");
 
     expect(span.links.map((link) => link.context.spanId)).toEqual([
       PRODUCER_SPAN,

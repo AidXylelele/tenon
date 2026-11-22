@@ -29,13 +29,30 @@ export class RecordedSpans {
     this.#sdk.start();
   }
 
+  all(): readonly RecordedSpan[] {
+    return this.#ended;
+  }
+
   named(name: string): readonly RecordedSpan[] {
     return this.#ended.filter((span) => span.name === name);
+  }
+
+  only(name: string): RecordedSpan {
+    const [span, other] = this.named(name);
+
+    if (span === undefined || other !== undefined)
+      throw new Error(`Not exactly one span is named '${name}'`);
+
+    return span;
   }
 
   childrenOf(parent: RecordedSpan): readonly RecordedSpan[] {
     const id = parent.spanContext().spanId;
     return this.#ended.filter((span) => span.parentSpanContext?.spanId === id);
+  }
+
+  clear(): void {
+    this.#ended.length = 0;
   }
 
   async stop(): Promise<void> {
