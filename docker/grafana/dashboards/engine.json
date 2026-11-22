@@ -847,7 +847,7 @@
     {
       "type": "stat",
       "title": "Journal writes per attempt",
-      "description": "For the whole time range: every step attempt writes the journal twice, pending before and completed or failed after. The database spans directly under the executions over the journal inserts among them, times two.",
+      "description": "For the whole time range: every step attempt writes the journal twice, pending before and completed or failed after. The database spans directly under the executions over the journal inserts among them, times two. Read it on workflows without child runs or waits: their engine writes also sit under the execution.",
       "id": 17,
       "datasource": {
         "type": "tempo",
@@ -943,7 +943,7 @@
     {
       "type": "stat",
       "title": "Journaling share of an effect step",
-      "description": "Thesis \u04134, for the whole time range: the two journal writes of an attempt over the mean effect-step attempt, which excludes them. Takes a journal write to cost the same whatever the step; red above 10 %.",
+      "description": "Thesis \u04134, for the whole time range: the two journal writes of an attempt over the mean effect-step attempt, which excludes them. Takes a journal write to cost the same whatever the step; read it on workflows without child runs or waits; red above 10 %.",
       "id": 18,
       "datasource": {
         "type": "tempo",
