@@ -35,17 +35,14 @@ export class AsyncApiHandler implements OnModuleDestroy {
   ) {}
 
   @Interval(AsyncApiHandler.SYNC_MS)
-  async tick(): Promise<void> {
-    await this.sync();
-  }
-
   async sync(): Promise<void> {
     if (this.#closing) return;
 
     const receivers = await this.runs.openReceivers();
-    const open = new Map(
-      receivers.map((receiver) => [this.#keyOf(receiver), receiver]),
+    const keyed = receivers.map(
+      (receiver) => [this.#keyOf(receiver), receiver] as const,
     );
+    const open = new Map(keyed);
 
     for (const [key, consumer] of this.#consumers)
       if (!open.has(key)) consumer.stopped.abort();
@@ -58,7 +55,8 @@ export class AsyncApiHandler implements OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     this.#closing = true;
-    const consumers = Array.from(this.#consumers.values());
+    const running = this.#consumers.values();
+    const consumers = Array.from(running);
 
     for (const consumer of consumers) consumer.stopped.abort();
 
@@ -220,7 +218,9 @@ export class AsyncApiHandler implements OnModuleDestroy {
       },
       "A receiver could not reach its broker and tries again later",
     );
-    await this.#until(AbortSignal.any([held, this.#retry()]));
+    const retry = this.#retry();
+    const wake = AbortSignal.any([held, retry]);
+    await this.#until(wake);
   }
 
   async #failed(
@@ -238,7 +238,9 @@ export class AsyncApiHandler implements OnModuleDestroy {
       },
       "A receiver failed and subscribes again later",
     );
-    await this.#until(AbortSignal.any([stopped, this.#retry()]));
+    const retry = this.#retry();
+    const wake = AbortSignal.any([stopped, retry]);
+    await this.#until(wake);
   }
 
   #lost(receiver: Receiver, held: AbortSignal): void {

@@ -11,7 +11,8 @@ export class ResponseSizeLimit implements HttpClientInterceptor {
 
   async intercept(request: HttpRequest, next: HttpHandler): Promise<Response> {
     const response = await next(request);
-    const counted = response.body?.pipeThrough(this.#counter()) ?? null;
+    const counter = this.#counter();
+    const counted = response.body?.pipeThrough(counter) ?? null;
     return new Response(counted, {
       status: response.status,
       statusText: response.statusText,
@@ -31,7 +32,8 @@ export class ResponseSizeLimit implements HttpClientInterceptor {
         received += chunk.byteLength;
 
         if (received > this.bytes) {
-          controller.error(this.#exceeded());
+          const exceeded = this.#exceeded();
+          controller.error(exceeded);
           return;
         }
 

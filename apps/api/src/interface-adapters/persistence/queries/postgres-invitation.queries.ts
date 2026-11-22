@@ -13,12 +13,13 @@ export class PostgresInvitationQueries implements InvitationQueries {
   constructor(private readonly txHost: TransactionHost<Transaction>) {}
 
   list(): Promise<ListedInvitation[]> {
+    const outcome = this.#outcomeOf();
     return this.txHost.tx
       .select({
         id: invitations.id,
         email: invitations.email,
         role: invitations.role,
-        outcome: this.#outcomeOf(),
+        outcome,
         expiresAt: invitations.expiresAt,
         createdAt: invitations.createdAt,
       })

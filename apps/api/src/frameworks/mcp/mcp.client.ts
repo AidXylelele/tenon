@@ -34,25 +34,23 @@ import { RELEASE_VERSION } from "../release.js";
 import type { CallContext } from "../interpreter/interfaces.js";
 import type { HttpMcpRequest, McpMethod } from "./interfaces.js";
 
-const RESULTS = {
-  "tools/list": ListToolsResultSchema,
-  "tools/call": CallToolResultSchema,
-  "prompts/list": ListPromptsResultSchema,
-  "prompts/get": GetPromptResultSchema,
-  "resources/list": ListResourcesResultSchema,
-  "resources/read": ReadResourceResultSchema,
-  "resources/templates/list": ListResourceTemplatesResultSchema,
-} as const satisfies Record<McpMethod, unknown>;
-
-const SESSION_HEADERS: readonly string[] = [
-  "mcp-session-id",
-  "mcp-protocol-version",
-];
-
-const CLEANUP_TIMEOUT = 2_000;
-
 @Injectable()
 export class McpClient {
+  private static readonly RESULTS = {
+    "tools/list": ListToolsResultSchema,
+    "tools/call": CallToolResultSchema,
+    "prompts/list": ListPromptsResultSchema,
+    "prompts/get": GetPromptResultSchema,
+    "resources/list": ListResourcesResultSchema,
+    "resources/read": ReadResourceResultSchema,
+    "resources/templates/list": ListResourceTemplatesResultSchema,
+  } as const satisfies Record<McpMethod, unknown>;
+  private static readonly SESSION_HEADERS: readonly string[] = [
+    "mcp-session-id",
+    "mcp-protocol-version",
+  ];
+  private static readonly CLEANUP_TIMEOUT = 2_000;
+
   private readonly policy: ResiliencePolicy;
 
   constructor(
@@ -132,7 +130,7 @@ export class McpClient {
       const params = parameters ?? undefined;
       const result = await client.request(
         { method: request.method, params },
-        RESULTS[request.method],
+        McpClient.RESULTS[request.method],
         options,
       );
       const answer = this.#jsonOf(result);
@@ -170,7 +168,7 @@ export class McpClient {
   ): Record<string, string> {
     const kept = Object.entries(headers).filter(([name]) => {
       const lowered = name.toLowerCase();
-      return !SESSION_HEADERS.includes(lowered);
+      return !McpClient.SESSION_HEADERS.includes(lowered);
     });
     return Object.fromEntries(kept);
   }
@@ -199,7 +197,7 @@ export class McpClient {
 
     if (sessionId === undefined || version === undefined) return;
 
-    const cleanup = AbortSignal.timeout(CLEANUP_TIMEOUT);
+    const cleanup = AbortSignal.timeout(McpClient.CLEANUP_TIMEOUT);
     const ending = this.#transportOf(
       request,
       authorization,
@@ -272,7 +270,8 @@ export class McpClient {
   }
 
   #jsonOf(value: unknown): JsonValue {
-    const text = JSON.stringify(value ?? null);
+    const defined = value ?? null;
+    const text = JSON.stringify(defined);
     return JSON.parse(text) as JsonValue;
   }
 

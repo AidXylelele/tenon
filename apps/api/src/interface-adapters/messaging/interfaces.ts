@@ -4,7 +4,6 @@ import type {
   Failure,
   JsonObject,
 } from "interpreter";
-import type { CloudEvent } from "../../application/automation/events/interfaces.js";
 import type { StepCall } from "../workflows/interfaces.js";
 
 export interface AcceptedEventMessage {
@@ -66,7 +65,7 @@ export interface EventDelivery {
   readonly uri: string;
   readonly scheme: "basic" | "bearer" | null;
   readonly credential: JsonObject | null;
-  readonly event: CloudEvent;
+  readonly event: JsonObject;
 }
 
 export abstract class EventDeliveries {

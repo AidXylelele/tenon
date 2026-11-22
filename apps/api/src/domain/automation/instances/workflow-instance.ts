@@ -289,7 +289,7 @@ export class WorkflowInstance {
     if (this.ended || this.#run === null) return;
 
     if (turn.status === TurnStatus.Stranded) {
-      this.cancelStranded(turn.ending, now);
+      this.#cancelStranded(turn.ending, now);
       return;
     }
 
@@ -300,14 +300,6 @@ export class WorkflowInstance {
   cancel(now: Date): void {
     if (this.ended) return;
 
-    this.#end(Phase.Cancelled, now);
-  }
-
-  cancelStranded(ending: RunEnding, now: Date): void {
-    if (this.ended || this.#run === null) return;
-
-    this.#cancelReason = CancelReason.InterpreterChanged;
-    this.#tell(ending);
     this.#end(Phase.Cancelled, now);
   }
 
@@ -331,6 +323,12 @@ export class WorkflowInstance {
     if (!told) this.#raise(InstanceEventKind.Deleted);
 
     return admitted;
+  }
+
+  #cancelStranded(ending: RunEnding, now: Date): void {
+    this.#cancelReason = CancelReason.InterpreterChanged;
+    this.#tell(ending);
+    this.#end(Phase.Cancelled, now);
   }
 
   #take(turn: RunTurn, secrets: RunSecrets, run: Run, now: Date): void {
@@ -371,10 +369,12 @@ export class WorkflowInstance {
         this.#output = secrets.mask(turn.output, past);
         this.#end(Phase.Completed, now);
         return;
-      case TurnStatus.Faulted:
-        this.#error = secrets.maskObject(turn.error ?? {}, past);
+      case TurnStatus.Faulted: {
+        const error = turn.error ?? {};
+        this.#error = secrets.maskObject(error, past);
         this.#end(Phase.Faulted, now);
         return;
+      }
       case TurnStatus.Cancelled:
         this.#end(Phase.Cancelled, now);
         return;

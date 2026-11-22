@@ -24,7 +24,10 @@ export class EntityTagMapper {
     ifMatch: string | undefined,
     ifNoneMatch: string | undefined,
   ): WritePrecondition {
-    if (ifMatch !== undefined) return this.#matchOf(ifMatch.trim());
+    if (ifMatch !== undefined) {
+      const tags = ifMatch.trim();
+      return this.#matchOf(tags);
+    }
 
     if (ifNoneMatch?.trim() === EntityTagMapper.ANY) return { kind: "create" };
 

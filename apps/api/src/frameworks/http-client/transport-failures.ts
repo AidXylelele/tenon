@@ -6,38 +6,38 @@ import { AddressPolicy } from "./address-policy.js";
 import { AuthorizationServer } from "./authorization-server.js";
 import { ResponseSizeLimit } from "./response-size-limit.js";
 
-const INVALID_REQUEST =
-  "The request cannot be sent: its URI, method, headers or body are not valid";
-
-const CERTIFICATE_REFUSED = "The service's TLS certificate was refused";
-
-const CLOSED_EARLY = "The connection closed before the service answered";
-
-const UNRESOLVED = "The host name could not be resolved";
-
-const UNREACHABLE = "The service could not be reached";
-
-const NETWORK_REASONS = new Map<string, string>([
-  ["ENOTFOUND", UNRESOLVED],
-  ["EAI_AGAIN", UNRESOLVED],
-  ["ECONNREFUSED", "The service refused the connection"],
-  ["ECONNRESET", CLOSED_EARLY],
-  ["EPIPE", CLOSED_EARLY],
-  ["UND_ERR_SOCKET", CLOSED_EARLY],
-  ["UND_ERR_CLOSED", CLOSED_EARLY],
-  ["ETIMEDOUT", "The connection timed out"],
-  ["UND_ERR_CONNECT_TIMEOUT", "The connection timed out"],
-  ["EHOSTUNREACH", "The host is unreachable"],
-  ["ENETUNREACH", "The network is unreachable"],
-  ["UNABLE_TO_VERIFY_LEAF_SIGNATURE", CERTIFICATE_REFUSED],
-  ["UNABLE_TO_GET_ISSUER_CERT_LOCALLY", CERTIFICATE_REFUSED],
-  ["DEPTH_ZERO_SELF_SIGNED_CERT", CERTIFICATE_REFUSED],
-  ["SELF_SIGNED_CERT_IN_CHAIN", CERTIFICATE_REFUSED],
-  ["ERR_TLS_CERT_ALTNAME_INVALID", CERTIFICATE_REFUSED],
-]);
-
 @Injectable()
 export class TransportFailures {
+  private static readonly INVALID_REQUEST =
+    "The request cannot be sent: its URI, method, headers or body are not valid";
+  private static readonly CERTIFICATE_REFUSED =
+    "The service's TLS certificate was refused";
+  private static readonly CLOSED_EARLY =
+    "The connection closed before the service answered";
+  private static readonly UNRESOLVED = "The host name could not be resolved";
+  private static readonly UNREACHABLE = "The service could not be reached";
+  private static readonly NETWORK_REASONS = new Map<string, string>([
+    ["ENOTFOUND", TransportFailures.UNRESOLVED],
+    ["EAI_AGAIN", TransportFailures.UNRESOLVED],
+    ["ECONNREFUSED", "The service refused the connection"],
+    ["ECONNRESET", TransportFailures.CLOSED_EARLY],
+    ["EPIPE", TransportFailures.CLOSED_EARLY],
+    ["UND_ERR_SOCKET", TransportFailures.CLOSED_EARLY],
+    ["UND_ERR_CLOSED", TransportFailures.CLOSED_EARLY],
+    ["ETIMEDOUT", "The connection timed out"],
+    ["UND_ERR_CONNECT_TIMEOUT", "The connection timed out"],
+    ["EHOSTUNREACH", "The host is unreachable"],
+    ["ENETUNREACH", "The network is unreachable"],
+    ["UNABLE_TO_VERIFY_LEAF_SIGNATURE", TransportFailures.CERTIFICATE_REFUSED],
+    [
+      "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+      TransportFailures.CERTIFICATE_REFUSED,
+    ],
+    ["DEPTH_ZERO_SELF_SIGNED_CERT", TransportFailures.CERTIFICATE_REFUSED],
+    ["SELF_SIGNED_CERT_IN_CHAIN", TransportFailures.CERTIFICATE_REFUSED],
+    ["ERR_TLS_CERT_ALTNAME_INVALID", TransportFailures.CERTIFICATE_REFUSED],
+  ]);
+
   of(error: unknown, signal: AbortSignal): Failure {
     if (signal.aborted || error instanceof ResilienceTimeoutError)
       return { kind: "expired" };
@@ -55,7 +55,10 @@ export class TransportFailures {
     const cause = this.#causeOf(error);
 
     if (cause instanceof TypeError)
-      return { kind: "misconfigured", detail: INVALID_REQUEST };
+      return {
+        kind: "misconfigured",
+        detail: TransportFailures.INVALID_REQUEST,
+      };
 
     const code: unknown =
       cause instanceof Error ? Reflect.get(cause, "code") : undefined;
@@ -72,7 +75,7 @@ export class TransportFailures {
     if (typeof code === "string") return this.#networkFailureOf(code);
 
     if (error instanceof HttpNetworkError)
-      return { kind: "unreachable", detail: UNREACHABLE };
+      return { kind: "unreachable", detail: TransportFailures.UNREACHABLE };
 
     return null;
   }
@@ -93,12 +96,21 @@ export class TransportFailures {
       "ERR_INVALID_CHAR",
     ].includes(code);
 
-    if (invalid) return { kind: "misconfigured", detail: INVALID_REQUEST };
+    if (invalid)
+      return {
+        kind: "misconfigured",
+        detail: TransportFailures.INVALID_REQUEST,
+      };
 
     if (code.startsWith("CERT_"))
-      return { kind: "unreachable", detail: CERTIFICATE_REFUSED };
+      return {
+        kind: "unreachable",
+        detail: TransportFailures.CERTIFICATE_REFUSED,
+      };
 
-    const detail = NETWORK_REASONS.get(code) ?? UNREACHABLE;
+    const detail =
+      TransportFailures.NETWORK_REASONS.get(code) ??
+      TransportFailures.UNREACHABLE;
     return { kind: "unreachable", detail };
   }
 }

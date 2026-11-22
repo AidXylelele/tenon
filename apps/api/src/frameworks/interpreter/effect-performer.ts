@@ -117,17 +117,21 @@ export class EffectPerformer implements EffectClient {
   #contextOf(step: StepCall, left: number | null): CallContext {
     const remaining =
       left === null ? null : Math.min(left, EffectPerformer.LONGEST_TIMER);
-    const signals =
-      remaining === null
-        ? [step.signal]
-        : [step.signal, AbortSignal.timeout(Math.ceil(remaining))];
-    const signal = AbortSignal.any(signals);
+    const signal = this.#signalOf(step.signal, remaining);
     return {
       idempotencyKey: step.idempotencyKey,
       signal,
       secrets: step.secrets,
       remaining,
     };
+  }
+
+  #signalOf(stepped: AbortSignal, remaining: number | null): AbortSignal {
+    if (remaining === null) return stepped;
+
+    const milliseconds = Math.ceil(remaining);
+    const expired = AbortSignal.timeout(milliseconds);
+    return AbortSignal.any([stepped, expired]);
   }
 
   #performed(effect: Effect, context: CallContext): Promise<EffectOutcome> {

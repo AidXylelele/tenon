@@ -27,6 +27,7 @@ import type {
 @Injectable()
 export class NatsBroker implements BrokerClient, OnApplicationShutdown {
   private static readonly PORT = 4222;
+  private static readonly MESSAGE_ID = "Nats-Msg-Id";
   private static readonly RECONNECTS_FOREVER = -1;
 
   readonly system = "nats";
@@ -81,7 +82,8 @@ export class NatsBroker implements BrokerClient, OnApplicationShutdown {
       const subscription = { close: () => connection.close() };
       await this.#consumed(connection, target.address, inbox).catch(
         async (error: unknown) => {
-          await Promise.allSettled([subscription.close()]);
+          const closed = subscription.close();
+          await Promise.allSettled([closed]);
           throw error;
         },
       );
@@ -104,11 +106,13 @@ export class NatsBroker implements BrokerClient, OnApplicationShutdown {
     const host = isIP(address) === 6 ? `[${address}]` : address;
     const port = server.port ?? NatsBroker.PORT;
     const login = credentials.kind === "password" ? credentials : null;
+    const servers = `${host}:${String(port)}`;
+    const tls = server.secure ? this.#tlsOf(server) : undefined;
     const connection = await connect({
-      servers: `${host}:${String(port)}`,
+      servers,
       user: login?.username,
       pass: login?.password,
-      tls: server.secure ? this.#tlsOf(server) : undefined,
+      tls,
       timeout: BrokerConnections.CONNECT_MS,
       reconnect: true,
       maxReconnectAttempts: NatsBroker.RECONNECTS_FOREVER,
@@ -163,6 +167,7 @@ export class NatsBroker implements BrokerClient, OnApplicationShutdown {
       sent.set(name, text);
     }
 
+    sent.set(NatsBroker.MESSAGE_ID, message.idempotencyKey);
     const active = context.active();
     propagation.inject(active, sent, this.setter);
     return sent;

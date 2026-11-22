@@ -10,21 +10,20 @@ import type {
 } from "./interfaces.js";
 import { OPENAPI_DOCUMENT } from "./openapi-document.schema.js";
 
-const METHODS = [
-  "get",
-  "put",
-  "post",
-  "delete",
-  "options",
-  "head",
-  "patch",
-  "trace",
-] as const;
-
-const BODY = "body";
-
 @Injectable()
 export class OpenApiOperations {
+  private static readonly METHODS = [
+    "get",
+    "put",
+    "post",
+    "delete",
+    "options",
+    "head",
+    "patch",
+    "trace",
+  ] as const;
+  private static readonly BODY = "body";
+
   async requestOf(
     text: string,
     documentUri: string,
@@ -80,7 +79,7 @@ export class OpenApiOperations {
     operationId: string,
   ): LocatedOperation | null {
     for (const item of Object.values(document.paths))
-      for (const method of METHODS) {
+      for (const method of OpenApiOperations.METHODS) {
         const operation = item[method];
 
         if (operation?.operationId === operationId) return { item, operation };
@@ -100,17 +99,22 @@ export class OpenApiOperations {
       .map((parameter) => parameter.name);
     const swagger = document.swagger !== undefined;
 
-    if (!swagger && declared.includes(BODY))
-      return `The operation "${operationId}" declares a parameter named "${BODY}", the name of its request body`;
+    if (!swagger && declared.includes(OpenApiOperations.BODY))
+      return `The operation "${operationId}" declares a parameter named "${OpenApiOperations.BODY}", the name of its request body`;
 
     const requestBody = located.operation.requestBody;
 
-    if (requestBody?.required === true && parameters[BODY] === undefined)
+    if (
+      requestBody?.required === true &&
+      parameters[OpenApiOperations.BODY] === undefined
+    )
       return `The operation "${operationId}" requires a request body`;
 
     const placesBody = requestBody !== undefined;
     const unknown = Object.keys(parameters).find(
-      (name) => !declared.includes(name) && !(name === BODY && placesBody),
+      (name) =>
+        !declared.includes(name) &&
+        !(name === OpenApiOperations.BODY && placesBody),
     );
 
     if (unknown !== undefined)
@@ -126,7 +130,9 @@ export class OpenApiOperations {
     parameters: JsonObject,
   ): OperationRequest {
     const swagger = document.swagger !== undefined;
-    const requestBody = swagger ? undefined : parameters[BODY];
+    const requestBody = swagger
+      ? undefined
+      : parameters[OpenApiOperations.BODY];
 
     try {
       const built = SwaggerClient.buildRequest({

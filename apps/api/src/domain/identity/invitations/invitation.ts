@@ -44,8 +44,9 @@ export class Invitation {
     const created = Temporal.Instant.fromEpochMilliseconds(now);
     const expiry = created.toZonedDateTimeISO("UTC").add(Invitation.#LIFETIME);
     const expiresAt = new Date(expiry.epochMilliseconds);
+    const id = randomUUID();
     const invitation = new Invitation({
-      id: randomUUID(),
+      id,
       email: input.email,
       role: input.role,
       tokenHash: input.token.hash,

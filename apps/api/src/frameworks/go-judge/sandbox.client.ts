@@ -29,12 +29,12 @@ import { SandboxLimits } from "./sandbox-limits.js";
 import { SANDBOX_REFUSAL, SANDBOX_RESULTS } from "./sandbox-result.schema.js";
 import shellPlatform from "./shell-platform.json" with { type: "json" };
 
-const DIRECTORY = "directory";
-
-const ENTER_DIRECTORY = 'cd -- "$1" 2>&3 || exit\nexec 3>&-\nshift\n';
-
 @Injectable()
 export class SandboxClient {
+  private static readonly DIRECTORY = "directory";
+  private static readonly ENTER_DIRECTORY =
+    'cd -- "$1" 2>&3 || exit\nexec 3>&-\nshift\n';
+
   private readonly policy: ResiliencePolicy;
   private readonly languages: Readonly<
     Record<Script["language"], ScriptLanguage>
@@ -90,7 +90,7 @@ export class SandboxClient {
     if (shell.directory === null)
       return invoked.concat(shell.command, "sh", shell.arguments);
 
-    const entering = `${ENTER_DIRECTORY}${shell.command}`;
+    const entering = `${SandboxClient.ENTER_DIRECTORY}${shell.command}`;
     return invoked.concat(entering, "sh", shell.directory, shell.arguments);
   }
 
@@ -166,7 +166,7 @@ export class SandboxClient {
 
     if (!entering) return files;
 
-    return files.concat({ name: DIRECTORY, max: 1024 });
+    return files.concat({ name: SandboxClient.DIRECTORY, max: 1024 });
   }
 
   async #ran(
@@ -190,10 +190,12 @@ export class SandboxClient {
     const results = SANDBOX_RESULTS.safeParse(response.data);
     const answered = response.ok && results.success;
 
-    if (!answered)
+    if (!answered) {
+      const code = String(status);
       throw new Error(
-        `The sandbox answered other than with a result, status ${String(status)}`,
+        `The sandbox answered other than with a result, status ${code}`,
       );
+    }
 
     return this.#outcomeOf(results.data[0]);
   }
@@ -201,7 +203,7 @@ export class SandboxClient {
   #outcomeOf(result: SandboxResult): ProcessOutcome {
     const stdout = result.files.stdout ?? "";
     const stderr = result.files.stderr ?? "";
-    const unentered = result.files[DIRECTORY] ?? "";
+    const unentered = result.files[SandboxClient.DIRECTORY] ?? "";
 
     if (unentered !== "")
       return {

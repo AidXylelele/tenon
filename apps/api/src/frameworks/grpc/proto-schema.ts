@@ -61,7 +61,9 @@ export class ProtoSchema {
   #parsedOf(text: string): ParsedProto {
     try {
       const parsed = parse(text, { keepCase: true });
-      const imports = (parsed.imports ?? []).concat(parsed.weakImports ?? []);
+      const strong = parsed.imports ?? [];
+      const weak = parsed.weakImports ?? [];
+      const imports = strong.concat(weak);
       const unknown = imports.find((imported) => common.get(imported) === null);
 
       if (unknown !== undefined)
@@ -69,8 +71,10 @@ export class ProtoSchema {
           `The proto imports ${unknown}, which is not a well-known type`,
         );
 
-      for (const imported of imports)
-        parsed.root.addJSON(common.get(imported)?.nested ?? {});
+      for (const imported of imports) {
+        const nested = common.get(imported)?.nested ?? {};
+        parsed.root.addJSON(nested);
+      }
 
       parsed.root.resolveAll();
       return { kind: "root", root: parsed.root };

@@ -57,7 +57,8 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
     message: BrokerMessage,
     credentials: BrokerCredentials,
   ): Promise<AsyncApiOutcome> {
-    const binding = AMQP_CHANNEL.safeParse(target.bindings.channel.amqp ?? {});
+    const declared = target.bindings.channel.amqp ?? {};
+    const binding = AMQP_CHANNEL.safeParse(declared);
 
     if (!binding.success) return AmqpBroker.UNREAD_BINDING;
 
@@ -82,7 +83,8 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
-    const binding = AMQP_CHANNEL.safeParse(target.bindings.channel.amqp ?? {});
+    const declared = target.bindings.channel.amqp ?? {};
+    const binding = AMQP_CHANNEL.safeParse(declared);
 
     if (!binding.success) return AmqpBroker.UNREAD_BINDING;
 
@@ -130,27 +132,27 @@ export class AmqpBroker implements BrokerClient, OnApplicationShutdown {
     const port = server.secure ? AmqpBroker.SECURE_PORT : AmqpBroker.PORT;
     const login = credentials.kind === "password" ? credentials : null;
     const named = isIP(server.hostname) === 0;
+    const vhost = this.#vhostOf(server);
     const recovery = {
       waitForConnect: false,
       initialMaxRetries: 0,
       maxRetries: Infinity,
       setup,
     };
-    const model = await connect(
-      {
-        protocol: server.secure ? "amqps" : "amqp",
-        hostname: address,
-        port: server.port ?? port,
-        username: login?.username,
-        password: login?.password,
-        vhost: this.#vhostOf(server),
-      },
-      {
-        servername: named ? server.hostname : undefined,
-        timeout: BrokerConnections.CONNECT_MS,
-        recovery,
-      },
-    );
+    const endpoint: Options.Connect = {
+      protocol: server.secure ? "amqps" : "amqp",
+      hostname: address,
+      port: server.port ?? port,
+      username: login?.username,
+      password: login?.password,
+      vhost,
+    };
+    const socket = {
+      servername: named ? server.hostname : undefined,
+      timeout: BrokerConnections.CONNECT_MS,
+      recovery,
+    };
+    const model = await connect(endpoint, socket);
     model.on("error", () => undefined);
     model.on("reconnect-failed", lost);
     return model;

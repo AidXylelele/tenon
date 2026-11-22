@@ -4,19 +4,18 @@ import { Injectable } from "@nestjs/common";
 import type { HttpRequest, JsonValue, RespondedHttpOutcome } from "interpreter";
 import type { OutboundRequest, ResponseOptions, Signed } from "./interfaces.js";
 
-const CREDENTIAL_HEADERS: readonly string[] = [
-  "authorization",
-  "proxy-authorization",
-];
-
-const TEXT_APPLICATIONS: readonly string[] = [
-  "xml",
-  "javascript",
-  "x-www-form-urlencoded",
-];
-
 @Injectable()
 export class ResponseContent {
+  private static readonly CREDENTIAL_HEADERS: readonly string[] = [
+    "authorization",
+    "proxy-authorization",
+  ];
+  private static readonly TEXT_APPLICATIONS: readonly string[] = [
+    "xml",
+    "javascript",
+    "x-www-form-urlencoded",
+  ];
+
   async respondedOf(
     request: OutboundRequest,
     signed: Signed,
@@ -58,7 +57,7 @@ export class ResponseContent {
   #withoutCredentials(headers: Headers): Readonly<Record<string, string>> {
     const shown = new Headers(headers);
 
-    for (const name of CREDENTIAL_HEADERS) shown.delete(name);
+    for (const name of ResponseContent.CREDENTIAL_HEADERS) shown.delete(name);
 
     return Object.fromEntries(shown);
   }
@@ -126,7 +125,7 @@ export class ResponseContent {
     if (media.type !== "application") return false;
 
     return (
-      TEXT_APPLICATIONS.includes(media.subtype) ||
+      ResponseContent.TEXT_APPLICATIONS.includes(media.subtype) ||
       media.subtype.endsWith("+xml")
     );
   }

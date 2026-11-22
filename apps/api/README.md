@@ -41,6 +41,13 @@ tick (`@OnOneInstance`), and each AsyncAPI receiver is held by one worker under 
 - A worker has no health check: a worker that hangs without exiting is restarted only when it dies, and its leases
   move to the other workers then.
 - A run whose program this build of the interpreter cannot rebuild is cancelled at its next turn.
+- Effects are at-least-once: a worker that dies after its request reached the server but before the step's result
+  is journaled repeats the effect with the same `Idempotency-Key`, and receivers deduplicate by it.
+- After a worker crashes, its instances are taken over by another worker when their lease expires (120 s).
+- A broker publish that timed out may still be delivered after the SDK reconnects: the MQTT and NATS clients buffer
+  the publishes made while offline.
+- Telemetry from a run of the sources needs `start` or `start:worker`: the `dev` scripts do not preload the
+  instrumentation.
 
 ## Structure
 
@@ -119,11 +126,12 @@ src/
 
 Each kind of file has one suffix: `*.controller.ts`, `*.presenter.ts`, `*.schema.ts`, `*.mapper.ts`, `*.policy.ts`,
 `*.gateway.ts`, `*.handler.ts`, `*.run.ts`, `*.jobs.ts`, `*.tracer.ts`, `*.repository.ts`, `*.queries.ts`, `*.store.ts`,
-`*.client.ts`, `*.broker.ts`, `*.metrics.ts`, `*.mail.ts`, `*.error.ts`, `*.module.ts`, `*.presets.ts`, and Nest's own
-`*.middleware.ts`, `*.guard.ts`, `*.interceptor.ts`, `*.filter.ts`, `*.decorator.ts`, `*.provider.ts`. A use case is
-named for its action (`publish-draft.ts`), an aggregate or value object for itself (`workflow.ts`). Each folder keeps
-its types in `interfaces.ts` and its enums in `enums.ts`; an application folder keeps its ports in `ports.ts` and its
-query ports in `queries.ts`.
+`*.client.ts`, `*.broker.ts`, `*.metrics.ts`, `*.mail.ts`, `*.error.ts`, `*.module.ts`, `*.presets.ts`, `*.sdk.ts`,
+`*.shutdown.ts`, `*.cipher.ts`, `*.tasks.ts`, `*.thread.ts`, and Nest's own `*.middleware.ts`, `*.guard.ts`,
+`*.interceptor.ts`, `*.filter.ts`, `*.decorator.ts`, `*.provider.ts`. A use case is named for its action
+(`publish-draft.ts`), an aggregate or value object for itself (`workflow.ts`). Each folder keeps its types in
+`interfaces.ts` and its enums in `enums.ts`; an application folder keeps its ports in `ports.ts` and its query ports in
+`queries.ts`.
 
 `test/` mirrors `src/`: `unit/` and `integration/` by `<layer>/<group>/…` (integration against PostgreSQL, the brokers
 and stub servers in Docker); `component/` the composed `ApiModule` with the worker's background modules, by context

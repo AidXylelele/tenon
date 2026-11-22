@@ -315,7 +315,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       await subscriber.close();
     });
 
-    it("publishes_to_the_subject_a_version_2_channel_names", async () => {
+    it("publishes_to_the_subject_a_version_2_channel_names_keyed_by_the_step", async () => {
       served["nats.json"] = {
         asyncapi: "2.6.0",
         info: infoOf("nats orders"),
@@ -336,7 +336,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       expect(message).toEqual({
         topic: "orders.paid",
         body: '{"order":8}',
-        headers: {},
+        headers: { "Nats-Msg-Id": "step-2" },
       });
     });
 

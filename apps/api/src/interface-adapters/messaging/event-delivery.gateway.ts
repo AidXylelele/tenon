@@ -31,11 +31,12 @@ export class EventDeliveryGateway implements EventSender {
   ): Promise<string | null> {
     const endpoint = subscription.endpoint;
     const credential = this.#credentialOf(secret);
+    const cloudEvent = this.protocol.toObject(event.cloudEvent);
     const delivery: EventDelivery = {
       uri: endpoint.uri,
       scheme: endpoint.scheme,
       credential,
-      event: event.cloudEvent,
+      event: cloudEvent,
     };
     const failure = await this.deliveries.deliver(delivery);
 

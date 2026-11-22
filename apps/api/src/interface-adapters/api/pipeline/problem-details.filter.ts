@@ -150,7 +150,9 @@ export class ProblemDetailsFilter implements ExceptionFilter {
 
     if (this.#isShed(shed)) {
       const after = shed.retryAfterMs ?? ProblemDetailsFilter.SOON_MS;
-      const seconds = String(Math.ceil(after / 1_000));
+      const exact = after / 1_000;
+      const whole = Math.ceil(exact);
+      const seconds = String(whole);
       return { [ProblemDetailsFilter.RETRY_AFTER]: seconds };
     }
 

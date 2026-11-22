@@ -21,10 +21,8 @@ export class PostgresDraftRepository implements DraftRepository {
   ) {}
 
   async findByName(name: WorkflowName): Promise<Draft | null> {
-    const [row] = await this.txHost.tx
-      .select()
-      .from(drafts)
-      .where(this.named(name));
+    const named = this.named(name);
+    const [row] = await this.txHost.tx.select().from(drafts).where(named);
 
     if (!row) return null;
 
@@ -40,6 +38,7 @@ export class PostgresDraftRepository implements DraftRepository {
       return;
     }
 
+    const named = this.named(draft.name);
     const saved = await this.txHost.tx
       .update(drafts)
       .set({
@@ -50,7 +49,7 @@ export class PostgresDraftRepository implements DraftRepository {
         savedByName: row.savedByName,
         savedAt: row.savedAt,
       })
-      .where(and(this.named(draft.name), eq(drafts.revision, draft.basis)))
+      .where(and(named, eq(drafts.revision, draft.basis)))
       .returning({ revision: drafts.revision });
 
     if (saved.length === 0) throw new StaleWriteError();

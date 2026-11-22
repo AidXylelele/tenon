@@ -50,7 +50,8 @@ export const InstanceCursor = z.codec(
       return { createdAt, id };
     },
     encode: (position) => {
-      const milliseconds = String(position.createdAt.getTime());
+      const epoch = position.createdAt.getTime();
+      const milliseconds = String(epoch);
       return `${milliseconds}${CURSOR_SEPARATOR}${position.id}`;
     },
   },

@@ -24,7 +24,8 @@ export class TaskValueMapper {
   }
 
   valuesOf(rows: readonly TaskValueRow[]): ReadonlyMap<string, TaskValues> {
-    const executions = new Set(rows.map((row) => row.execution));
+    const recorded = rows.map((row) => row.execution);
+    const executions = new Set(recorded);
     const values = Array.from(executions).map((execution) => {
       const own = rows.filter((row) => row.execution === execution);
       const input = this.#kindOf(own, TaskValueKind.Input);

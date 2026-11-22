@@ -21,8 +21,9 @@ export class User {
   }
 
   static create(input: NewUser): User {
+    const id = randomUUID();
     return new User({
-      id: randomUUID(),
+      id,
       email: input.email,
       name: input.name,
       role: input.role,

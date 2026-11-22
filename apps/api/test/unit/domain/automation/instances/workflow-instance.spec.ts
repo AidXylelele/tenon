@@ -242,12 +242,17 @@ describe("an awaited child", () => {
 });
 
 describe("a run the platform's interpreter no longer continues", () => {
+  function strandedBy(ending = aCancelledEnding()) {
+    return { status: TurnStatus.Stranded, ending } as const;
+  }
+
   it("is_cancelled_with_the_reason_that_the_interpreter_changed_and_ends_once", () => {
     const instance = begun();
     const ending = aCancelledEnding();
+    const stranded = strandedBy(ending);
 
-    instance.cancelStranded(ending, later);
-    instance.cancelStranded(ending, later);
+    instance.advance(stranded, noSecrets, later);
+    instance.advance(stranded, noSecrets, later);
 
     expect(instance.phase).toBe(Phase.Cancelled);
     expect(instance.cancelReason).toBe(CancelReason.InterpreterChanged);
@@ -261,31 +266,20 @@ describe("a run the platform's interpreter no longer continues", () => {
 
   it("awaits_nothing_once_cancelled", () => {
     const instance = begun();
+    const stranded = strandedBy();
 
-    instance.cancelStranded(aCancelledEnding(), later);
+    instance.advance(stranded, noSecrets, later);
 
     expect(instance.agenda.awaited).toEqual([]);
     expect(instance.waits).toEqual([]);
     expect(instance.listening).toEqual([]);
   });
 
-  it("is_cancelled_the_same_way_by_a_turn_that_found_it_stranded", () => {
-    const instance = begun();
-
-    const ending = aCancelledEnding();
-    const stranded = { status: TurnStatus.Stranded, ending } as const;
-
-    instance.advance(stranded, noSecrets, later);
-
-    expect(instance.phase).toBe(Phase.Cancelled);
-    expect(instance.cancelReason).toBe(CancelReason.InterpreterChanged);
-    expect(instance.lifecycle).toEqual(ending.events);
-  });
-
   it("leaves_a_pending_instance_to_begin_on_this_build", () => {
     const instance = anInstanceIn(Phase.Pending);
+    const stranded = strandedBy();
 
-    instance.cancelStranded(aCancelledEnding(), later);
+    instance.advance(stranded, noSecrets, later);
 
     expect(instance.phase).toBe(Phase.Pending);
     expect(instance.cancelReason).toBeNull();
@@ -296,8 +290,9 @@ describe("a run the platform's interpreter no longer continues", () => {
     const instance = begun();
     instance.advance(aTurn({ status: TurnStatus.Completed }), noSecrets, T0);
     instance.clearEvents();
+    const stranded = strandedBy();
 
-    instance.cancelStranded(aCancelledEnding(), later);
+    instance.advance(stranded, noSecrets, later);
 
     expect(instance.phase).toBe(Phase.Completed);
     expect(instance.cancelReason).toBeNull();

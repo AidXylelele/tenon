@@ -76,7 +76,8 @@ export class AsyncApiClient implements SubscriptionClient {
       [BrokerProtocol.Nats]: nats,
       [BrokerProtocol.Redis]: redis,
     };
-    this.brokers = new Map(Object.entries(brokers));
+    const entries = Object.entries(brokers);
+    this.brokers = new Map(entries);
   }
 
   async publish(
@@ -242,7 +243,8 @@ export class AsyncApiClient implements SubscriptionClient {
 
     if (late.kind !== "subscribed") return;
 
-    await Promise.allSettled([late.subscription.close()]);
+    const closed = late.subscription.close();
+    await Promise.allSettled([closed]);
   }
 
   #expiredOn(signal: AbortSignal, settled: AbortSignal): Promise<Expired> {

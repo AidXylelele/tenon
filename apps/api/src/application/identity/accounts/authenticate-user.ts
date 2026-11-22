@@ -15,10 +15,8 @@ export class AuthenticateUser {
 
   async execute(command: AuthenticateUserCommand): Promise<SignInResult> {
     const account = await this.accounts.findByEmail(command.email);
-    const matches = await this.passwords.verify(
-      command.password,
-      account?.passwordHash ?? null,
-    );
+    const stored = account?.passwordHash ?? null;
+    const matches = await this.passwords.verify(command.password, stored);
 
     if (account === null || !matches)
       return { ok: false, failure: AccountRefusal.InvalidCredentials };

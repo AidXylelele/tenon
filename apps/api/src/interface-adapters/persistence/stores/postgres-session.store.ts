@@ -30,14 +30,16 @@ export class PostgresSessionStore implements SessionStore {
   }
 
   async createSession(record: SessionRecord): Promise<void> {
+    const mfa = record.mfa ?? null;
+    const metadata = record.metadata ?? null;
     await this.txHost.tx.insert(sessions).values({
       id: record.id,
       userId: record.userId,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,
       lastActiveAt: record.lastActiveAt,
-      mfa: record.mfa ?? null,
-      metadata: record.metadata ?? null,
+      mfa,
+      metadata,
     });
     await this.txHost.tx
       .delete(sessions)

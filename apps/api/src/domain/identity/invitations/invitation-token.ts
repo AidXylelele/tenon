@@ -8,7 +8,9 @@ export class InvitationToken {
   }
 
   static generate(): InvitationToken {
-    return new InvitationToken(randomBytes(32).toString("base64url"));
+    const bytes = randomBytes(32);
+    const value = bytes.toString("base64url");
+    return new InvitationToken(value);
   }
 
   get value(): string {

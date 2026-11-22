@@ -530,9 +530,20 @@ describe("a call the gRPC client performs for a run", () => {
       expect(opened).toHaveBeenCalledTimes(2);
     });
 
-    it("a_private_service_on_the_tls_port_is_called_in_plaintext", async () => {
-      const plain = vi
-        .spyOn(credentials, "createInsecure")
+    it("a_private_service_on_another_port_is_called_in_plaintext", async () => {
+      client.onApplicationShutdown();
+      const plain = vi.spyOn(credentials, "createInsecure");
+      const request = grpcOf("SayHello", { name: "Ada" });
+
+      const outcome = await client.call(request, contextOf());
+
+      expect(outcome).toMatchObject({ kind: "replied" });
+      expect(plain).toHaveBeenCalledOnce();
+    });
+
+    it("a_private_service_on_the_tls_port_is_called_over_tls", async () => {
+      const secure = vi
+        .spyOn(credentials, "createSsl")
         .mockImplementation(() => {
           throw chosen;
         });
@@ -544,7 +555,7 @@ describe("a call the gRPC client performs for a run", () => {
       const called = client.call(request, contextOf());
 
       await expect(called).rejects.toBe(chosen);
-      expect(plain).toHaveBeenCalledOnce();
+      expect(secure).toHaveBeenCalledOnce();
     });
   });
 

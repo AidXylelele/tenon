@@ -30,6 +30,15 @@ const REFUSED = {
   },
 };
 
+const TAKEN = {
+  cause: {
+    code: "P0001",
+    message: expect.stringContaining(
+      "belongs to a user who is not an administrator",
+    ) as unknown,
+  },
+};
+
 interface Applied {
   readonly platform: number;
   readonly outbox: number;
@@ -72,9 +81,18 @@ describe("the migrations applied before the API starts", () => {
     return row ?? { platform: 0, outbox: 0, engine: 0 };
   }
 
-  async function seedAfresh(address: string): Promise<unknown> {
+  async function seedAfresh(
+    address: string,
+    editor: string | null = null,
+  ): Promise<unknown> {
     return db.transaction(async (tx) => {
       await tx.execute(sql`truncate table "user" cascade`);
+
+      if (editor !== null)
+        await tx.execute(
+          sql`insert into "user" (id, email, name, role) values (gen_random_uuid(), ${editor}, 'Editor', 'editor')`,
+        );
+
       await tx.execute(
         sql`select set_config('tenon.admin_email', ${address}, true)`,
       );
@@ -135,6 +153,20 @@ describe("the migrations applied before the API starts", () => {
     const emails = await seedAfresh("  Owner@Example.COM  ");
 
     expect(emails).toEqual([{ email: "owner@example.com" }]);
+  });
+
+  it("an_address_is_stored_in_its_composed_form_as_the_sign_in_key_is", async () => {
+    await migrate(db, migrations);
+    const emails = await seedAfresh("Ame\u0301lie@Example.com");
+
+    expect(emails).toEqual([{ email: "am\u00e9lie@example.com" }]);
+  });
+
+  it("an_address_that_belongs_to_a_user_who_is_not_an_administrator_is_refused", async () => {
+    await migrate(db, migrations);
+    const seeding = seedAfresh(" Owner@Example.COM ", "owner@example.com");
+
+    await expect(seeding).rejects.toMatchObject(TAKEN);
   });
 
   it("an_address_that_is_not_an_email_is_refused", async () => {

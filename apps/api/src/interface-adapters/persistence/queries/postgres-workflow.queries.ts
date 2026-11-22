@@ -51,7 +51,8 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
   }
 
   async get(name: WorkflowName): Promise<WorkflowSummary | null> {
-    const [row] = await this.#summaries().where(this.#named(name));
+    const named = this.#named(name);
+    const [row] = await this.#summaries().where(named);
 
     if (!row) return null;
 
@@ -62,8 +63,9 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     name: WorkflowName,
     version: string,
   ): Promise<VersionSummary | null> {
+    const named = this.#named(name);
     const [row] = await this.#versions().where(
-      and(this.#named(name), eq(versions.semver, version)),
+      and(named, eq(versions.semver, version)),
     );
 
     if (!row) return null;
@@ -72,10 +74,11 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
   }
 
   async versions(name: WorkflowName): Promise<VersionSummary[] | null> {
+    const named = this.#named(name);
     const [found] = await this.txHost.tx
       .select({ id: workflows.id })
       .from(workflows)
-      .where(this.#named(name));
+      .where(named);
 
     if (!found) return null;
 

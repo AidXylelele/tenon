@@ -14,21 +14,19 @@ const app = await NestFactory.create<NestExpressApplication>(ApiModule, {
 });
 app.useSecurityHeaders({ xFrameOptions: { action: "deny" } });
 const http = app.get<ConfigType<typeof httpConfig>>(httpConfig.KEY);
-app.useLogger(app.get(Logger));
+const logger = app.get(Logger);
+app.useLogger(logger);
 
 app.set("trust proxy", http.TRUSTED_PROXIES);
-app.enableCsrfProtection({
-  trustedOrigins: http.TRUSTED_ORIGINS.slice(),
-});
+const trustedOrigins = http.TRUSTED_ORIGINS.slice();
+app.enableCsrfProtection({ trustedOrigins });
 app.setGlobalPrefix(ApiRoute.Prefix);
 app.useBodyParser("json", {
   limit: "1mb",
   type: ["application/json", "application/*+json"],
 });
-app.use(
-  [`/${ApiRoute.Prefix}/events`, `/${ApiRoute.Prefix}/hooks`],
-  text({ type: () => true, limit: "1mb" }),
-);
+const texts = text({ type: () => true, limit: "1mb" });
+app.use([`/${ApiRoute.Prefix}/events`, `/${ApiRoute.Prefix}/hooks`], texts);
 app.enableShutdownHooks();
 
 const openApi = new DocumentBuilder()

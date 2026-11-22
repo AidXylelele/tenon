@@ -22,12 +22,13 @@ export class PostgresEmailTokenStore implements EmailTokenStore {
   }
 
   async saveEmailToken(record: EmailTokenRecord): Promise<void> {
+    const fingerprint = record.fingerprint ?? null;
     await this.txHost.tx.insert(tokens).values({
       id: record.id,
       purpose: record.purpose,
       userId: record.userId,
       email: record.email,
-      fingerprint: record.fingerprint ?? null,
+      fingerprint,
       createdAt: record.createdAt,
       expiresAt: record.expiresAt,
     });

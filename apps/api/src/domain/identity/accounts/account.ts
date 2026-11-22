@@ -22,8 +22,9 @@ export class Account {
   }
 
   static password(user: User, passwordHash: string, now: Date): Account {
+    const id = randomUUID();
     return new Account({
-      id: randomUUID(),
+      id,
       userId: user.id,
       identifier: user.email,
       passwordHash,

@@ -64,10 +64,11 @@ export class PostgresDeliveryLogStore implements DeliveryLog {
     event: AcceptedEvent,
     at: Date,
   ): Promise<void> {
+    const open = this.#open(subscription, event);
     await this.txHost.tx
       .update(deliveries)
       .set({ status: DeliveryStatus.Failed, lastAttemptAt: at })
-      .where(this.#open(subscription, event));
+      .where(open);
   }
 
   async #attempted(
@@ -77,6 +78,7 @@ export class PostgresDeliveryLogStore implements DeliveryLog {
     error: string | null,
     at: Date,
   ): Promise<void> {
+    const open = this.#open(subscription, event);
     await this.txHost.tx
       .update(deliveries)
       .set({
@@ -86,7 +88,7 @@ export class PostgresDeliveryLogStore implements DeliveryLog {
         firstAttemptAt: sql`coalesce(${deliveries.firstAttemptAt}, ${at})`,
         lastAttemptAt: at,
       })
-      .where(this.#open(subscription, event));
+      .where(open);
   }
 
   #open(subscription: Subscription, event: AcceptedEvent) {

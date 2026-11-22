@@ -79,9 +79,8 @@ export class InterpreterCompilerGateway implements DefinitionCompiler {
     if (needed.length === 0 || count > InterpreterCompilerGateway.MOST_IMPORTS)
       return settled;
 
-    const fetched = await Promise.all(
-      needed.map((wanted) => this.#fetchedOf(wanted)),
-    );
+    const fetching = needed.map((wanted) => this.#fetchedOf(wanted));
+    const fetched = await Promise.all(fetching);
     const texts = fetched.flatMap((each) =>
       each.text === null ? [] : [[each.reference, each.text] as const],
     );

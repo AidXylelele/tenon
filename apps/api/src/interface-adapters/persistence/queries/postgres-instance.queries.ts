@@ -82,20 +82,33 @@ export class PostgresInstanceQueries implements InstanceQueries {
     after: InstancePosition | null,
     limit: number,
   ): Promise<InstancePage> {
-    const conditions = and(
-      this.#after(after),
+    const position = this.#after(after);
+    const namespace =
       filter.namespace === null
         ? undefined
-        : eq(workflows.namespace, filter.namespace),
-      filter.name === null ? undefined : eq(workflows.name, filter.name),
-      filter.version === null ? undefined : eq(versions.semver, filter.version),
-      filter.phase === null ? undefined : eq(instances.phase, filter.phase),
+        : eq(workflows.namespace, filter.namespace);
+    const name =
+      filter.name === null ? undefined : eq(workflows.name, filter.name);
+    const version =
+      filter.version === null ? undefined : eq(versions.semver, filter.version);
+    const phase =
+      filter.phase === null ? undefined : eq(instances.phase, filter.phase);
+    const startedFrom =
       filter.startedFrom === null
         ? undefined
-        : gte(instances.startedAt, filter.startedFrom),
+        : gte(instances.startedAt, filter.startedFrom);
+    const startedTo =
       filter.startedTo === null
         ? undefined
-        : lte(instances.startedAt, filter.startedTo),
+        : lte(instances.startedAt, filter.startedTo);
+    const conditions = and(
+      position,
+      namespace,
+      name,
+      version,
+      phase,
+      startedFrom,
+      startedTo,
     );
     const fetched = limit + 1;
     const rows = await this.txHost.tx
@@ -239,7 +252,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
       .where(
         and(
           eq(taskValues.instanceId, id),
-          inArray(taskValues.execution, executions.slice()),
+          inArray(taskValues.execution, executions),
         ),
       );
   }
@@ -293,18 +306,15 @@ export class PostgresInstanceQueries implements InstanceQueries {
     if (executions.length === 0) return [];
 
     const execution = sql<string>`${events.execution}`;
+    const name = this.#nameOf();
+    const data = this.#dataOf();
     return this.txHost.tx
-      .select({
-        execution,
-        name: this.#nameOf(),
-        data: this.#dataOf(),
-        acceptedAt: events.acceptedAt,
-      })
+      .select({ execution, name, data, acceptedAt: events.acceptedAt })
       .from(events)
       .where(
         and(
           eq(events.instanceId, id),
-          inArray(events.execution, executions.slice()),
+          inArray(events.execution, executions),
           inArray(events.lifecycle, PostgresInstanceQueries.TASK_EVENTS),
         ),
       )
@@ -312,12 +322,10 @@ export class PostgresInstanceQueries implements InstanceQueries {
   }
 
   async #finishOf(id: string): Promise<LifecycleEventRow | null> {
+    const name = this.#nameOf();
+    const data = this.#dataOf();
     const [finish] = await this.txHost.tx
-      .select({
-        name: this.#nameOf(),
-        data: this.#dataOf(),
-        acceptedAt: events.acceptedAt,
-      })
+      .select({ name, data, acceptedAt: events.acceptedAt })
       .from(events)
       .where(
         and(
@@ -366,10 +374,11 @@ export class PostgresInstanceQueries implements InstanceQueries {
       .where(
         and(
           eq(instances.originId, id),
-          inArray(instances.originEffectId, effectIds.slice()),
+          inArray(instances.originEffectId, effectIds),
         ),
       );
-    return new Map(rows.map((row) => [row.effectId ?? "", row.id]));
+    const entries = rows.map((row) => [row.effectId ?? "", row.id] as const);
+    return new Map(entries);
   }
 
   #starterOf(id: string | null, name: string | null): Person | null {

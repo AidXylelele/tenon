@@ -55,11 +55,8 @@ export class MailGateway implements InvitationMailer, RecoveryMailer {
 
   async #queue<T>(topic: MailTopic, payload: QueuedMail<T>): Promise<void> {
     await this.txHost.withTransaction(async () => {
-      await this.outbox.add(this.txHost.tx, {
-        topic,
-        payload,
-        headers: this.tracer.headers(),
-      });
+      const headers = this.tracer.headers();
+      await this.outbox.add(this.txHost.tx, { topic, payload, headers });
     });
   }
 }

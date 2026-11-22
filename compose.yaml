@@ -186,7 +186,7 @@ services:
     tmpfs: [/tmp]
     init: true
     restart: unless-stopped
-    # Shutdown lets the engine finish a round (90 s), then drains the outbox (60 s).
+    # On SIGTERM the engine stops claiming, aborts running steps and hands their instances back (it waits up to 90 s for steps that ignore the abort), then the relay drains (up to 60 s).
     stop_grace_period: 170s
     <<: *hardening
 

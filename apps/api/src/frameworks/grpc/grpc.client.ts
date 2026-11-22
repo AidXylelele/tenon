@@ -22,18 +22,16 @@ import type { CallContext } from "../interpreter/interfaces.js";
 import type { PreparedCall, ServiceAddress } from "./interfaces.js";
 import { ProtoSchema } from "./proto-schema.js";
 
-const DEFAULT_PORT = 443;
-
-const CHANNEL_LIMIT = 64;
-
-const CHANNEL_IDLE_TIMEOUT = 5 * 60 * 1_000;
-
 @Injectable()
 export class GrpcClient implements OnApplicationShutdown {
+  private static readonly DEFAULT_PORT = 443;
+  private static readonly CHANNEL_LIMIT = 64;
+  private static readonly CHANNEL_IDLE_TIMEOUT = 5 * 60 * 1_000;
+
   private readonly policy: ResiliencePolicy;
   private readonly channels = new LRUCache<string, Client, ServiceAddress>({
-    max: CHANNEL_LIMIT,
-    ttl: CHANNEL_IDLE_TIMEOUT,
+    max: GrpcClient.CHANNEL_LIMIT,
+    ttl: GrpcClient.CHANNEL_IDLE_TIMEOUT,
     ttlAutopurge: true,
     updateAgeOnGet: true,
     memoMethod: (_key, _stale, { context }) => this.#channelOf(context),
@@ -121,13 +119,15 @@ export class GrpcClient implements OnApplicationShutdown {
 
   async #serviceOf(request: GrpcRequest): Promise<ServiceAddress | null> {
     const host = request.service.host;
-    const port = request.service.port ?? DEFAULT_PORT;
+    const port = request.service.port ?? GrpcClient.DEFAULT_PORT;
     const [resolved] = await this.addresses.resolve(host, 0);
 
     if (resolved === undefined) return null;
 
     const target = this.#targetOf(resolved, port);
-    const plaintext = this.addresses.isPrivate(resolved.address);
+    const privateAddress = this.addresses.isPrivate(resolved.address);
+    const tlsPort = port === GrpcClient.DEFAULT_PORT;
+    const plaintext = privateAddress && !tlsPort;
     return { target, host, port, plaintext };
   }
 
@@ -295,7 +295,8 @@ export class GrpcClient implements OnApplicationShutdown {
   }
 
   #jsonOf(message: object | undefined): JsonValue {
-    const text = JSON.stringify(message ?? null);
+    const defined = message ?? null;
+    const text = JSON.stringify(defined);
     return JSON.parse(text) as JsonValue;
   }
 }

@@ -58,9 +58,8 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
   ): Promise<AsyncApiOutcome> {
     const version = this.#versionOf(target.server);
     const headed = Object.keys(message.headers).length > 0;
-    const binding = MQTT_OPERATION.safeParse(
-      target.bindings.operation.mqtt ?? {},
-    );
+    const declared = target.bindings.operation.mqtt ?? {};
+    const binding = MQTT_OPERATION.safeParse(declared);
 
     if (headed && version !== MqttBroker.VERSION_5)
       return {
@@ -90,9 +89,8 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
-    const binding = MQTT_OPERATION.safeParse(
-      target.bindings.operation.mqtt ?? {},
-    );
+    const declared = target.bindings.operation.mqtt ?? {};
+    const binding = MQTT_OPERATION.safeParse(declared);
 
     if (!binding.success) return MqttBroker.UNREAD_BINDING;
 
@@ -123,7 +121,8 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
       await client
         .subscribeAsync(target.address, { qos: binding.data.qos })
         .catch(async (error: unknown) => {
-          await Promise.allSettled([subscription.close()]);
+          const closed = subscription.close();
+          await Promise.allSettled([closed]);
           throw error;
         });
       return { kind: "subscribed", subscription };
@@ -185,8 +184,11 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
   ): Promise<MqttClient> {
     const scheme = server.secure ? "mqtts" : "mqtt";
     const host = isIP(address) === 6 ? `[${address}]` : address;
-    const port = server.secure ? MqttBroker.SECURE_PORT : MqttBroker.PORT;
-    const url = `${scheme}://${host}:${String(server.port ?? port)}`;
+    const defaultPort = server.secure
+      ? MqttBroker.SECURE_PORT
+      : MqttBroker.PORT;
+    const port = server.port ?? defaultPort;
+    const url = `${scheme}://${host}:${String(port)}`;
     const login = credentials.kind === "password" ? credentials : null;
     const named = isIP(server.hostname) === 0;
     const options = {
@@ -230,9 +232,10 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
   #headersOf(
     properties: Readonly<Record<string, string | string[]>> | undefined,
   ): Record<string, string> {
+    const received = properties ?? {};
     const headers: Record<string, string> = {};
 
-    for (const [name, value] of Object.entries(properties ?? {}))
+    for (const [name, value] of Object.entries(received))
       headers[name] = Array.isArray(value) ? value.join(",") : value;
 
     return headers;

@@ -20,6 +20,9 @@ const INTERPRETER_TIMEOUT = INTERPRETER_WORK + INTERPRETER_QUEUE_TIMEOUT;
 const RUN_THREADS = PiscinaInterpreterClient.RUN_THREADS;
 const CHECK_THREADS = PiscinaInterpreterClient.CHECK_THREADS;
 const RESPONSE_BYTES = 1024 * 1024;
+const SANDBOX_TIME = Temporal.Duration.from({ seconds: 30 });
+const SANDBOX_MEMORY_BYTES = 256 * 1024 * 1024;
+const SANDBOX_OUTPUT_BYTES = 1024 * 1024;
 
 export const responseSizeLimit = new ResponseSizeLimit(RESPONSE_BYTES);
 
@@ -32,10 +35,10 @@ export const hostLimits = new HostLimits(
 export const processPlatform = new ProcessPlatform(shellPlatform);
 
 export const sandboxLimits = new SandboxLimits({
-  time: Temporal.Duration.from({ seconds: 30 }),
-  memoryBytes: 256 * 1024 * 1024,
+  time: SANDBOX_TIME,
+  memoryBytes: SANDBOX_MEMORY_BYTES,
   processes: 50,
-  outputBytes: 1024 * 1024,
+  outputBytes: SANDBOX_OUTPUT_BYTES,
 });
 
 export const workflowRetry: WorkflowRetryOptions = {

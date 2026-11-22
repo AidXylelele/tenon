@@ -81,7 +81,8 @@ export class RedisBroker implements BrokerClient, OnApplicationShutdown {
       await connection
         .subscribe(target.address, delivered, true)
         .catch(async (error: unknown) => {
-          await Promise.allSettled([subscription.close()]);
+          const closed = subscription.close();
+          await Promise.allSettled([closed]);
           throw error;
         });
       return { kind: "subscribed", subscription };
@@ -113,7 +114,8 @@ export class RedisBroker implements BrokerClient, OnApplicationShutdown {
     lost: Lost,
   ): Promise<RedisConnection> {
     const login = credentials.kind === "password" ? credentials : null;
-    const database = Number(server.pathname.slice(1)) || 0;
+    const path = server.pathname.slice(1);
+    const database = Number(path) || 0;
     const port = server.port ?? RedisBroker.PORT;
     const named = isIP(server.hostname) === 0;
     const connectTimeout = BrokerConnections.CONNECT_MS;

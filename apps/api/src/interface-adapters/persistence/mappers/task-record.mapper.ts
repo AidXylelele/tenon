@@ -102,7 +102,8 @@ export class TaskRecordMapper {
     if (ending === null) return events;
 
     const last = events.indexOf(ending);
-    return events.slice(0, last + 1);
+    const end = last + 1;
+    return events.slice(0, end);
   }
 
   #statusOf(
@@ -145,7 +146,9 @@ export class TaskRecordMapper {
   }
 
   #nameOf(reference: string): string {
-    const token = reference.slice(reference.lastIndexOf("/") + 1);
+    const slash = reference.lastIndexOf("/");
+    const start = slash + 1;
+    const token = reference.slice(start);
     return token.replaceAll("~1", "/").replaceAll("~0", "~");
   }
 

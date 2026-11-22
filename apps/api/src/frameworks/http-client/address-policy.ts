@@ -6,14 +6,11 @@ import ipaddr from "ipaddr.js";
 import { Agent, buildConnector } from "undici";
 import type { AddressRange, AddressRanges, IpAddress } from "./interfaces.js";
 
-const IPV4_COMPATIBLE = "::/96";
-
-const UNLISTED = "unlisted";
-
-const HOST_BITS = { ipv4: 32, ipv6: 128 } as const;
-
 export class AddressPolicy implements OnApplicationShutdown {
   static readonly REFUSED = "ERR_ADDRESS_REFUSED";
+  private static readonly IPV4_COMPATIBLE = "::/96";
+  private static readonly UNLISTED = "unlisted";
+  private static readonly HOST_BITS = { ipv4: 32, ipv6: 128 } as const;
 
   readonly dispatcher: Agent;
   private readonly allowed: AddressRanges;
@@ -21,7 +18,7 @@ export class AddressPolicy implements OnApplicationShutdown {
 
   constructor(allowList: readonly string[]) {
     const listed = allowList.map((entry) => this.#rangeOf(entry));
-    const ipv4Compatible = ipaddr.parseCIDR(IPV4_COMPATIBLE);
+    const ipv4Compatible = ipaddr.parseCIDR(AddressPolicy.IPV4_COMPATIBLE);
     this.allowed = { listed };
     this.refused = { ipv4Compatible };
 
@@ -120,8 +117,13 @@ export class AddressPolicy implements OnApplicationShutdown {
         callback(null, address, family);
       },
       (error: unknown) => {
-        const failure =
-          error instanceof Error ? error : new Error(String(error));
+        if (error instanceof Error) {
+          callback(error, "", 0);
+          return;
+        }
+
+        const message = String(error);
+        const failure = new Error(message);
         callback(failure, "", 0);
       },
     );
@@ -132,14 +134,16 @@ export class AddressPolicy implements OnApplicationShutdown {
   }
 
   #listedIn(ranges: AddressRanges, address: IpAddress): boolean {
-    return ipaddr.subnetMatch(address, ranges, UNLISTED) !== UNLISTED;
+    const range = ipaddr.subnetMatch(address, ranges, AddressPolicy.UNLISTED);
+    return range !== AddressPolicy.UNLISTED;
   }
 
   #rangeOf(entry: string): AddressRange {
     if (ipaddr.isValidCIDR(entry)) return ipaddr.parseCIDR(entry);
 
     const address = ipaddr.process(entry);
-    const bits = HOST_BITS[address.kind()];
+    const kind = address.kind();
+    const bits = AddressPolicy.HOST_BITS[kind];
     return [address, bits];
   }
 

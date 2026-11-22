@@ -63,8 +63,6 @@ import { Instrumentation } from "../opentelemetry/enums.js";
 import { RELEASE_VERSION } from "../release.js";
 import { HOST_PROFILE } from "./host-profile.js";
 
-const NOT_STARTED = "The interpreter has not started its threads";
-
 @Injectable()
 export class PiscinaInterpreterClient
   implements
@@ -77,6 +75,8 @@ export class PiscinaInterpreterClient
   static readonly CHECK_THREADS = 2;
   private static readonly IDLE_RUN_THREAD_MS = 60_000;
   private static readonly MOST_KEPT_STRUCTURES = 1_000;
+  private static readonly NOT_STARTED =
+    "The interpreter has not started its threads";
 
   readonly #structures = new LRUCache<string, KeptStructure, ProgramSource>({
     max: PiscinaInterpreterClient.MOST_KEPT_STRUCTURES,
@@ -142,8 +142,10 @@ export class PiscinaInterpreterClient
     const profile = this.profile(secrets);
     const source = { document, profile, imports };
 
+    const pool = this.#checks();
+
     try {
-      return await this.#called(this.#checks(), "compile", source, null);
+      return await this.#called(pool, "compile", source, null);
     } catch (error) {
       const timedOut =
         error instanceof PermanentFault &&
@@ -160,7 +162,8 @@ export class PiscinaInterpreterClient
     input: JsonValue,
     context: StartContext,
   ): Promise<StartedStep> {
-    return this.#program(this.#runs(), "start", call, (program) => ({
+    const pool = this.#runs();
+    return this.#program(pool, "start", call, (program) => ({
       program,
       input,
       context,
@@ -168,7 +171,8 @@ export class PiscinaInterpreterClient
   }
 
   correlate(call: ProgramCall, context: StartContext): Promise<StartedStep> {
-    return this.#program(this.#runs(), "correlate", call, (program) => ({
+    const pool = this.#runs();
+    return this.#program(pool, "correlate", call, (program) => ({
       program,
       context,
     }));
@@ -180,7 +184,8 @@ export class PiscinaInterpreterClient
     response: EffectResponse,
     context: StepContext,
   ): Promise<Step> {
-    return this.#program(this.#runs(), "respond", call, (program) => ({
+    const pool = this.#runs();
+    return this.#program(pool, "respond", call, (program) => ({
       program,
       state,
       response,
@@ -193,7 +198,8 @@ export class PiscinaInterpreterClient
     state: State,
     context: StepContext,
   ): Promise<Step> {
-    return this.#program(this.#runs(), "suspend", call, (program) => ({
+    const pool = this.#runs();
+    return this.#program(pool, "suspend", call, (program) => ({
       program,
       state,
       context,
@@ -201,7 +207,8 @@ export class PiscinaInterpreterClient
   }
 
   resume(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
-    return this.#program(this.#runs(), "resume", call, (program) => ({
+    const pool = this.#runs();
+    return this.#program(pool, "resume", call, (program) => ({
       program,
       state,
       context,
@@ -209,7 +216,8 @@ export class PiscinaInterpreterClient
   }
 
   cancel(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
-    return this.#program(this.#runs(), "cancel", call, (program) => ({
+    const pool = this.#runs();
+    return this.#program(pool, "cancel", call, (program) => ({
       program,
       state,
       context,
@@ -217,7 +225,8 @@ export class PiscinaInterpreterClient
   }
 
   route(call: ProgramCall, event: CloudEvent): Promise<readonly RouteMatch[]> {
-    return this.#program(this.#checks(), "route", call, (program) => ({
+    const pool = this.#checks();
+    return this.#program(pool, "route", call, (program) => ({
       program,
       event,
     }));
@@ -227,14 +236,16 @@ export class PiscinaInterpreterClient
     call: ProgramCall,
     input: JsonValue,
   ): Promise<readonly InputProblem[]> {
-    return this.#program(this.#checks(), "input", call, (program) => ({
+    const pool = this.#checks();
+    return this.#program(pool, "input", call, (program) => ({
       program,
       input,
     }));
   }
 
   filter(filter: JsonValue): Promise<FilterCheck> {
-    return this.#called(this.#checks(), "filter", filter, null);
+    const pool = this.#checks();
+    return this.#called(pool, "filter", filter, null);
   }
 
   accepting(
@@ -242,8 +253,9 @@ export class PiscinaInterpreterClient
     event: CloudEvent,
     signal: AbortSignal | null,
   ): Promise<readonly string[]> {
+    const pool = this.#checks();
     const call = { filters, event };
-    return this.#called(this.#checks(), "accepting", call, signal);
+    return this.#called(pool, "accepting", call, signal);
   }
 
   profile(secrets: readonly string[]): Required<HostProfile> {
@@ -296,9 +308,10 @@ export class PiscinaInterpreterClient
   }
 
   async #keptStructureOf(source: ProgramSource): Promise<KeptStructure> {
+    const pool = this.#checks();
     const compileSource = this.#compileSourceOf(source);
     const structure = await this.#called(
-      this.#checks(),
+      pool,
       "structure",
       compileSource,
       null,
@@ -365,13 +378,15 @@ export class PiscinaInterpreterClient
   }
 
   #runs(): ThreadPool {
-    if (this.runs === null) throw new TypeError(NOT_STARTED);
+    if (this.runs === null)
+      throw new TypeError(PiscinaInterpreterClient.NOT_STARTED);
 
     return this.runs;
   }
 
   #checks(): ThreadPool {
-    if (this.checks === null) throw new TypeError(NOT_STARTED);
+    if (this.checks === null)
+      throw new TypeError(PiscinaInterpreterClient.NOT_STARTED);
 
     return this.checks;
   }
@@ -414,7 +429,8 @@ export class PiscinaInterpreterClient
   }
 
   #threadsOf(least: number, most: number, idleMs: number): Piscina {
-    const extension = extname(fileURLToPath(import.meta.url));
+    const path = fileURLToPath(import.meta.url);
+    const extension = extname(path);
     const thread = `./interpreter.thread${extension}`;
     const filename = new URL(thread, import.meta.url).href;
     return new Piscina({

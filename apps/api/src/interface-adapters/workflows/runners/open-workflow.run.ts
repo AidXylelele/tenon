@@ -167,25 +167,27 @@ export class OpenWorkflowRun implements WorkflowRunner<
   ): Promise<Turn> {
     const unstarted = this.#unstartedOf(generation, agenda);
     const detached = await this.#detached(generation, agenda.detached);
-    const children = await Promise.all(
-      unstarted.map((effect) => this.#child(generation, effect)),
-    );
+    const starting = unstarted.map((effect) => this.#child(generation, effect));
+    const children = await Promise.all(starting);
     const called = agenda.calls.map((effect, order) =>
       this.#call(generation, effect, order, OpenWorkflowRun.CALL_TIMEOUT),
     );
-    const processed = agenda.processes.map((effect, index) =>
-      this.#call(
+    const processed = agenda.processes.map((effect, index) => {
+      const order = agenda.calls.length + index;
+      return this.#call(
         generation,
         effect,
-        agenda.calls.length + index,
+        order,
         OpenWorkflowRun.PROCESS_TIMEOUT,
-      ),
-    );
-    const performed = await Promise.all(called.concat(processed));
+      );
+    });
+    const calling = called.concat(processed);
+    const performed = await Promise.all(calling);
     const completed = performed.toSorted((left, right) =>
       this.#byCompletion(left, right),
     );
-    const answers = detached.concat(children.flat(), completed);
+    const started = children.flat();
+    const answers = detached.concat(started, completed);
     const answered = await this.#answered(generation, agenda, answers);
     const entries = detached.length + children.length + performed.length;
     const bytes = this.#sizeOf(children) + this.#sizeOf(performed);
@@ -221,7 +223,8 @@ export class OpenWorkflowRun implements WorkflowRunner<
 
   #received(generation: Generation, turn: number): Promise<RunAgendaView> {
     const instanceId = generation.instanceId;
-    return this.#step(generation.ctx, `received#${String(turn)}`, (attempt) =>
+    const name = `received#${String(turn)}`;
+    return this.#step(generation.ctx, name, (attempt) =>
       this.runs.received(instanceId, attempt.signal),
     );
   }
@@ -266,10 +269,9 @@ export class OpenWorkflowRun implements WorkflowRunner<
 
   async #reread(generation: Generation, turn: number): Promise<Turn> {
     const instanceId = generation.instanceId;
-    const agenda = await this.#step(
-      generation.ctx,
-      `agenda#${String(turn)}`,
-      (attempt) => this.runs.childrenEnded(instanceId, attempt.signal),
+    const name = `agenda#${String(turn)}`;
+    const agenda = await this.#step(generation.ctx, name, (attempt) =>
+      this.runs.childrenEnded(instanceId, attempt.signal),
     );
     const bytes = this.#sizeOf(agenda);
     return { agenda, entries: 2, bytes };

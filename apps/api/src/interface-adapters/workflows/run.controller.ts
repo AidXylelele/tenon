@@ -234,10 +234,9 @@ export class RunController {
     const deadline = effect.deadline;
     const expiry =
       deadline === null ? [] : [this.#answerAt(deadline, "expired")];
-    return {
-      id: effect.id,
-      answers: expiry.concat(this.#ownAnswersOf(effect)),
-    };
+    const own = this.#ownAnswersOf(effect);
+    const answers = expiry.concat(own);
+    return { id: effect.id, answers };
   }
 
   #ownAnswersOf(effect: Effect): readonly TimeAnswer[] {

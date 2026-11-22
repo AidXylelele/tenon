@@ -32,7 +32,8 @@ function withSecretFiles(
 ): unknown {
   if (typeof input !== "object" || input === null) return input;
 
-  const env = new Map<string, unknown>(Object.entries(input));
+  const entries = Object.entries(input);
+  const env = new Map<string, unknown>(entries);
 
   for (const name of secrets) {
     const variable = `${name}_FILE`;
@@ -53,7 +54,8 @@ function withSecretFiles(
 
     try {
       const text = readFileSync(file, "utf8");
-      env.set(name, text.replace(TRAILING_LINE_BREAKS, ""));
+      const trimmed = text.replace(TRAILING_LINE_BREAKS, "");
+      env.set(name, trimmed);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       context.addIssue({

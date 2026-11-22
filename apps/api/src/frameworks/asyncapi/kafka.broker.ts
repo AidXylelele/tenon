@@ -58,9 +58,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     message: BrokerMessage,
     credentials: BrokerCredentials,
   ): Promise<AsyncApiOutcome> {
-    const binding = KAFKA_CHANNEL.safeParse(
-      target.bindings.channel.kafka ?? {},
-    );
+    const declared = target.bindings.channel.kafka ?? {};
+    const binding = KAFKA_CHANNEL.safeParse(declared);
 
     if (!binding.success) return KafkaBroker.UNREAD_BINDING;
 
@@ -88,9 +87,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
-    const binding = KAFKA_CHANNEL.safeParse(
-      target.bindings.channel.kafka ?? {},
-    );
+    const declared = target.bindings.channel.kafka ?? {};
+    const binding = KAFKA_CHANNEL.safeParse(declared);
 
     if (!binding.success) return KafkaBroker.UNREAD_BINDING;
 
@@ -104,7 +102,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
       const subscription = { close: () => consumer.close(true) };
       const stream = await this.#streamOf(consumer, topic).catch(
         async (error: unknown) => {
-          await Promise.allSettled([subscription.close()]);
+          const closed = subscription.close();
+          await Promise.allSettled([closed]);
           throw error;
         },
       );
@@ -128,12 +127,16 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     lost: Lost,
   ): Promise<KafkaProducer> {
+    const bootstrap = this.#bootstrapOf(server, address);
+    const tls = server.secure ? {} : undefined;
+    const tlsServerName = this.#serverNameOf(server);
+    const sasl = this.#saslOf(credentials);
     const producer = new Producer({
       clientId: KafkaBroker.CLIENT_ID,
-      bootstrapBrokers: [this.#bootstrapOf(server, address)],
-      tls: server.secure ? {} : undefined,
-      tlsServerName: this.#serverNameOf(server),
-      sasl: this.#saslOf(credentials),
+      bootstrapBrokers: [bootstrap],
+      tls,
+      tlsServerName,
+      sasl,
       connectTimeout: BrokerConnections.CONNECT_MS,
       retries: false,
       serializers: {
@@ -156,13 +159,17 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     credentials: BrokerCredentials,
     inbox: BrokerInbox,
   ): Promise<KafkaConsumer> {
+    const bootstrap = this.#bootstrapOf(server, address);
+    const tls = server.secure ? {} : undefined;
+    const tlsServerName = this.#serverNameOf(server);
+    const sasl = this.#saslOf(credentials);
     const consumer = new Consumer({
       clientId: KafkaBroker.CLIENT_ID,
       groupId: inbox.subscriber,
-      bootstrapBrokers: [this.#bootstrapOf(server, address)],
-      tls: server.secure ? {} : undefined,
-      tlsServerName: this.#serverNameOf(server),
-      sasl: this.#saslOf(credentials),
+      bootstrapBrokers: [bootstrap],
+      tls,
+      tlsServerName,
+      sasl,
       connectTimeout: BrokerConnections.CONNECT_MS,
       deserializers: {
         headerKey: stringDeserializer,

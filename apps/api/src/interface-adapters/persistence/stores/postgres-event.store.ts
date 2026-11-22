@@ -102,12 +102,13 @@ export class PostgresEventStore implements EventStore {
 
     const sequence = accepted.sequence;
     const payload: AcceptedEventMessage = { sequence };
+    const headers = this.tracer.headers();
     await this.outbox.add(this.txHost.tx, [
       {
         topic: MessageTopic.EventAccepted,
         key: PostgresEventStore.KEY,
         payload,
-        headers: this.tracer.headers(),
+        headers,
       },
     ]);
     return sequence;

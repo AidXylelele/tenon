@@ -15,9 +15,10 @@ export class ChangePassword {
   @Transactional()
   async execute(command: ChangePasswordCommand): Promise<PasswordResult> {
     const account = await this.accounts.findByUserId(command.userId);
+    const stored = account?.passwordHash ?? null;
     const matches = await this.passwords.verify(
       command.currentPassword,
-      account?.passwordHash ?? null,
+      stored,
     );
 
     if (account === null || !matches)

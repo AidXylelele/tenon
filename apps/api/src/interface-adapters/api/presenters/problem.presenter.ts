@@ -472,8 +472,10 @@ export class ProblemPresenter {
   #exceptionOf(problem: ProblemDetails): HttpException {
     const Exception = ProblemPresenter.EXCEPTIONS.get(problem.status);
 
-    if (Exception === undefined)
-      throw new TypeError(`No exception answers ${String(problem.status)}`);
+    if (Exception === undefined) {
+      const status = String(problem.status);
+      throw new TypeError(`No exception answers ${status}`);
+    }
 
     return new Exception(problem);
   }
