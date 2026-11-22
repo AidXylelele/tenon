@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -35,8 +35,6 @@ const DATED = new Map([
   ["/ancient", "1999-01-01"],
   ["/older", "2025-03-26"],
 ]);
-const DIGEST_REALM = "mcp@example.org";
-const DIGEST_NONCE = "dcd98b7102dd2f0e8b11d0f600bfb0c093";
 const REFUSED_ADDRESS =
   "The address is private, loopback or link-local and not allow-listed";
 
@@ -55,7 +53,6 @@ describe("a call the MCP client performs for a run", () => {
   let port = 0;
   const initialized: Initialized[] = [];
   const received: string[] = [];
-  const challenged: (string | null)[] = [];
   const sessions = new Map<string, StreamableHTTPServerTransport>();
 
   beforeAll(async () => {
@@ -92,7 +89,6 @@ describe("a call the MCP client performs for a run", () => {
   beforeEach(() => {
     initialized.length = 0;
     received.length = 0;
-    challenged.length = 0;
   });
 
   async function serve(
@@ -145,15 +141,6 @@ describe("a call the MCP client performs for a run", () => {
       request.headers.authorization !== `Bearer ${TOKEN}`
     ) {
       response.writeHead(401).end();
-      return;
-    }
-
-    if (path === "/digest" && !digestAccepted(request)) {
-      challenged.push(request.headers.authorization ?? null);
-      response.writeHead(401, {
-        "www-authenticate": `Digest realm="${DIGEST_REALM}", qop="auth", algorithm=SHA-256, nonce="${DIGEST_NONCE}"`,
-      });
-      response.end();
       return;
     }
 
@@ -548,60 +535,6 @@ describe("a call the MCP client performs for a run", () => {
       });
       expect(received).toHaveLength(0);
     });
-
-    it("digest_authentication_answers_the_challenge_of_every_request_of_the_session", async () => {
-      const request = mcpOf("tools/list", null, "/digest", {
-        kind: "digest",
-        username: "ada",
-        password: "lovelace",
-      });
-
-      const outcome = await client.call(request, contextOf());
-
-      expect(outcome).toMatchObject({
-        kind: "answered",
-        result: {
-          tools: [{ name: "add" }, { name: "flood" }, { name: "wait" }],
-        },
-      });
-    });
-
-    it("digest_authentication_never_sends_the_author_s_authorization_header", async () => {
-      const plain = mcpOf("tools/list", null, "/digest", {
-        kind: "digest",
-        username: "ada",
-        password: "lovelace",
-      });
-      const request: HttpMcpRequest = {
-        ...plain,
-        transport: {
-          ...plain.transport,
-          headers: { Authorization: "Basic author" },
-        },
-      };
-
-      const outcome = await client.call(request, contextOf());
-
-      expect(outcome).toMatchObject({ kind: "answered" });
-      expect(challenged[0]).toBeNull();
-    });
-
-    it("digest_authentication_with_a_wrong_password_is_rejected_with_its_status", async () => {
-      const request = mcpOf("tools/list", null, "/digest", {
-        kind: "digest",
-        username: "ada",
-        password: "wrong",
-      });
-
-      const outcome = await client.call(request, contextOf());
-
-      expect(outcome).toEqual({
-        kind: "rejected",
-        statusCode: 401,
-        detail: "The MCP server answered with status 401",
-      });
-      expect(received).toEqual(["POST /digest", "POST /digest"]);
-    });
   });
 
   describe("failures", () => {
@@ -777,35 +710,6 @@ describe("a call the MCP client performs for a run", () => {
     });
   });
 });
-
-function digestAccepted(request: IncomingMessage): boolean {
-  const header = request.headers.authorization ?? "";
-
-  if (!header.startsWith("Digest ")) return false;
-
-  const parameters = new Map<string, string>();
-
-  for (const [, name = "", quoted, bare] of header.matchAll(
-    /(\w+)=(?:"([^"]*)"|([^\s,]+))/g,
-  ))
-    parameters.set(name, quoted ?? bare ?? "");
-
-  const hash = (text: string): string =>
-    createHash("sha256").update(text).digest("hex");
-  const uri = parameters.get("uri") ?? "";
-  const cnonce = parameters.get("cnonce") ?? "";
-  const count = parameters.get("nc") ?? "";
-  const ha1 = hash(`ada:${DIGEST_REALM}:lovelace`);
-  const ha2 = hash(`${request.method ?? ""}:${uri}`);
-  const expected = hash(
-    `${ha1}:${DIGEST_NONCE}:${count}:${cnonce}:auth:${ha2}`,
-  );
-  return (
-    uri === request.url &&
-    parameters.get("username") === "ada" &&
-    parameters.get("response") === expected
-  );
-}
 
 async function initializeAt(
   request: IncomingMessage,

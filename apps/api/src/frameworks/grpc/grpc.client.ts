@@ -110,13 +110,6 @@ export class GrpcClient implements OnApplicationShutdown {
 
     if (authorization.kind === "misconfigured") return authorization;
 
-    if (authorization.kind === "digest")
-      return {
-        kind: "unauthenticated",
-        detail:
-          "Digest authentication answers an HTTP challenge, which a gRPC call never receives",
-      };
-
     signal.throwIfAborted();
     const channel = this.#channelFor(service);
     const metadata = this.#metadataOf(context.idempotencyKey, authorization);
