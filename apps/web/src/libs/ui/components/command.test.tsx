@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
   Command,
@@ -7,12 +7,20 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
+  useCommandState,
 } from "./command";
+
+function Matches() {
+  const count = useCommandState((state) => state.filtered.count);
+
+  return <p>{count} matching</p>;
+}
 
 function Palette() {
   return (
     <Command>
       <CommandInput placeholder="Search" />
+      <Matches />
       <CommandList>
         <CommandGroup heading="Actions">
           <CommandItem>New workflow</CommandItem>
@@ -37,5 +45,19 @@ describe("the line between groups of commands", () => {
 
     const line = container.querySelector('[data-slot="command-separator"]');
     expect(line).toBeNull();
+  });
+});
+
+describe("the count of matching commands", () => {
+  it("a_search_tells_how_many_commands_still_match", () => {
+    render(<Palette />);
+    const search = screen.getByPlaceholderText("Search");
+
+    act(() => {
+      fireEvent.change(search, { target: { value: "run" } });
+    });
+
+    const count = screen.getByText("1 matching");
+    expect(count).toBeInTheDocument();
   });
 });
