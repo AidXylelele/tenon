@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import type { StepVariant } from "language-server/protocol";
 import { type ChangeEvent, type KeyboardEvent, useState } from "react";
 import { TENON_VARIANTS, WITHOUT_SHELL } from "./hosts.test-support";

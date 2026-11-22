@@ -64,13 +64,39 @@ const surface = EditorView.theme({
 });
 
 const highlights = HighlightStyle.define([
-  { tag: tags.propertyName, color: "var(--accent-foreground)" },
-  { tag: [tags.string, tags.special(tags.string)], color: "var(--success)" },
-  { tag: [tags.number, tags.integer, tags.float], color: "var(--info)" },
-  { tag: [tags.bool, tags.null, tags.atom], color: "var(--warning)" },
-  { tag: [tags.comment, tags.lineComment], color: "var(--muted-foreground)" },
-  { tag: [tags.keyword, tags.operator], color: "var(--primary)" },
-  { tag: tags.invalid, color: "var(--destructive)" },
+  {
+    tag: [tags.keyword, tags.operator, tags.definition(tags.propertyName)],
+    color: "var(--code-keyword)",
+  },
+  {
+    tag: [
+      tags.propertyName,
+      tags.function(tags.variableName),
+      tags.function(tags.propertyName),
+    ],
+    color: "var(--code-property)",
+  },
+  {
+    tag: [tags.string, tags.special(tags.string)],
+    color: "var(--code-string)",
+  },
+  {
+    tag: [
+      tags.number,
+      tags.integer,
+      tags.float,
+      tags.bool,
+      tags.null,
+      tags.atom,
+    ],
+    color: "var(--code-number)",
+  },
+  {
+    tag: [tags.comment, tags.lineComment, tags.blockComment],
+    color: "var(--code-comment)",
+    fontStyle: "italic",
+  },
+  { tag: tags.invalid, color: "var(--danger-text)" },
 ]);
 
 export function tokenTheme(): Extension {

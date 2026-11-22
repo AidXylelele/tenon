@@ -1,5 +1,5 @@
 import * as React from "react";
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { Slot } from "radix-ui";
 import { ChevronRightIcon } from "lucide-react";
 

@@ -78,7 +78,6 @@ export function CreateWebhook() {
         </Button>
       </DialogTrigger>
       <DialogContent
-        className="sm:max-w-xl"
         showCloseButton={!shown}
         onEscapeKeyDown={holdWhileShown}
         onPointerDownOutside={holdWhileShown}

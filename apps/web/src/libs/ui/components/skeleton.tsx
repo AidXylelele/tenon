@@ -1,4 +1,4 @@
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (

@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Command as CommandPrimitive } from "cmdk";
-import { cn } from "cn";
+import { Command as CommandPrimitive, useCommandState } from "cmdk";
+import { cn } from "@/libs/ui/tokens/cn";
 
 import {
   Dialog,
@@ -68,7 +68,7 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+      <InputGroup className="h-8! rounded-md! border-control bg-surface shadow-none! *:data-[slot=input-group-addon]:pl-2!">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
@@ -122,7 +122,7 @@ function CommandGroup({
     <CommandPrimitive.Group
       data-slot="command-group"
       className={cn(
-        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:font-medium **:[[cmdk-group-heading]]:text-muted-foreground",
+        "overflow-hidden p-1 text-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-1.5 **:[[cmdk-group-heading]]:text-caption **:[[cmdk-group-heading]]:font-semibold **:[[cmdk-group-heading]]:text-muted-foreground",
         className,
       )}
       {...props}
@@ -132,10 +132,16 @@ function CommandGroup({
 
 function CommandSeparator({
   className,
+  alwaysRender = false,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
+}: React.ComponentProps<"div"> & { alwaysRender?: boolean }) {
+  const searching = useCommandState((state) => state.search !== "");
+
+  if (searching && !alwaysRender) return null;
+
   return (
-    <CommandPrimitive.Separator
+    <div
+      aria-hidden
       data-slot="command-separator"
       className={cn("-mx-1 h-px bg-border", className)}
       {...props}

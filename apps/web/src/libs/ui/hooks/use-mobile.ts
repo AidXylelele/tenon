@@ -1,6 +1,6 @@
 import * as React from "react";
 
-const MOBILE_BREAKPOINT = 768;
+const MOBILE_BREAKPOINT = 1024;
 const WIDEST_MOBILE = MOBILE_BREAKPOINT - 1;
 const QUERY = `(max-width: ${String(WIDEST_MOBILE)}px)`;
 

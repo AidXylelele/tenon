@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { FAILURE, IN, OUT } from "@/operations/workflow-graph";
 import type { CanvasNodeProps } from "./interfaces";
 import {

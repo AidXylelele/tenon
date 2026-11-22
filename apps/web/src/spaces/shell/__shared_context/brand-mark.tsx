@@ -1,4 +1,4 @@
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import { PRODUCT_NAME } from "@/libs/routing/page-title";
 
 function BrandMark() {

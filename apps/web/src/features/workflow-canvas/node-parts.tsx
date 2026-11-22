@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position } from "@xyflow/react";
-import { cn } from "cn";
+import { cn } from "@/libs/ui/tokens/cn";
 import {
   ChevronDownIcon,
   ChevronUpIcon,

@@ -82,7 +82,7 @@ export function SecretValueDialog({ name }: { readonly name?: string }) {
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent>
         <form action={submit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
