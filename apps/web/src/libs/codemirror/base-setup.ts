@@ -22,7 +22,6 @@ import {
   type EditorView,
   drawSelection,
   dropCursor,
-  highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
   keymap,
@@ -52,7 +51,6 @@ export function baseSetup(): Extension {
     closeBrackets(),
     rectangularSelection(),
     crosshairCursor(),
-    highlightActiveLine(),
     highlightSelectionMatches(),
     search(),
     keymap.of([

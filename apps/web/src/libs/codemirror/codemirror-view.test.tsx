@@ -175,6 +175,25 @@ describe("codemirror hosted in react with its state as the text", () => {
     );
   });
 
+  it("read_only_text_is_still_reached_by_tab", () => {
+    render(<CodeMirrorView doc="a: 1" label="Workflow text" readOnly />);
+
+    const content = screen.getByRole("textbox", { name: "Workflow text" });
+
+    expect(content).toHaveAttribute("tabindex", "0");
+  });
+
+  it("the_line_with_the_cursor_is_marked_in_the_gutter_with_no_fill", () => {
+    const { container } = render(
+      <CodeMirrorView doc={"a: 1\nb: 2"} label="Workflow text" />,
+    );
+
+    const filled = container.querySelector(".cm-activeLine");
+    const marked = container.querySelector(".cm-activeLineGutter");
+    expect(filled).toBeNull();
+    expect(marked).toHaveTextContent("1");
+  });
+
   it("tab_alone_is_kept_to_indent", () => {
     const onView = vi.fn<(view: EditorView) => void>();
     render(<CodeMirrorView doc="a: 1" label="Workflow text" onView={onView} />);

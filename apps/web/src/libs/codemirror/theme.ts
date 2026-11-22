@@ -19,7 +19,6 @@ const surface = EditorView.theme({
   "&.cm-focused": { outline: "none" },
   "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection":
     { backgroundColor: "var(--accent)" },
-  ".cm-activeLine": { backgroundColor: "var(--muted)" },
   ".cm-gutters": {
     backgroundColor: "var(--card)",
     color: "var(--muted-foreground)",
@@ -39,6 +38,28 @@ const surface = EditorView.theme({
     backgroundColor: "var(--accent)",
     color: "var(--accent-foreground)",
   },
+  ".cm-lintRange-error, .cm-lintRange-warning, .cm-lintRange-info, .cm-lintRange-hint":
+    {
+      backgroundImage: "none",
+      textDecorationLine: "underline",
+      textDecorationStyle: "wavy",
+      textUnderlineOffset: "4px",
+    },
+  ".cm-lintRange-error": { textDecorationColor: "var(--danger-text)" },
+  ".cm-lintRange-warning": { textDecorationColor: "var(--warning-text)" },
+  ".cm-lintRange-info, .cm-lintRange-hint": {
+    textDecorationColor: "var(--info-text)",
+  },
+  ".cm-lint-marker": {
+    content: "normal",
+    width: "8px",
+    height: "8px",
+    borderRadius: "9999px",
+    margin: "6px 4px",
+  },
+  ".cm-lint-marker-error": { backgroundColor: "var(--danger-text)" },
+  ".cm-lint-marker-warning": { backgroundColor: "var(--warning-text)" },
+  ".cm-lint-marker-info": { backgroundColor: "var(--info-text)" },
   ".cm-diagnostic-error": { borderLeftColor: "var(--destructive)" },
   ".cm-diagnostic-warning": { borderLeftColor: "var(--warning)" },
   ".cm-diagnostic-info": { borderLeftColor: "var(--info)" },
