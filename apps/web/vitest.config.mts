@@ -68,6 +68,7 @@ const libFloors: [string, Floor][] = [
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
   ["src/libs/flow/**", LIB_FLOOR],
+  ["src/libs/language-client/**", LIB_FLOOR],
   ["src/libs/ui/components/**", LIB_FLOOR],
   ["src/libs/ui/components/dialog.tsx", LIB_FLOOR],
   ["src/libs/ui/components/dropdown-menu.tsx", LIB_FLOOR],
@@ -80,7 +81,22 @@ const libFloors: [string, Floor][] = [
   ["src/libs/ui/tokens/**", LIB_FLOOR],
 ];
 
-const floors = operationFloors.concat(libFloors, featureFloors);
+const modulePartFloors: [string, Floor][] = [
+  [
+    "src/spaces/workflows/modules/workflow-editor/script-field/**",
+    FEATURE_FLOOR,
+  ],
+  [
+    "src/spaces/workflows/modules/workflow-editor/step-catalog/**",
+    FEATURE_FLOOR,
+  ],
+];
+
+const floors = operationFloors.concat(
+  libFloors,
+  featureFloors,
+  modulePartFloors,
+);
 
 const thresholds = Object.fromEntries(floors);
 
@@ -100,7 +116,10 @@ export default defineConfig({
     },
     coverage: {
       provider: "v8",
-      include: ["src/{operations,features,libs}/**/*.{ts,tsx}"],
+      include: [
+        "src/{operations,features,libs}/**/*.{ts,tsx}",
+        "src/spaces/workflows/modules/workflow-editor/**/*.{ts,tsx}",
+      ],
       exclude: ["src/**/*.stories.tsx", "src/**/*.test-support.ts"],
       thresholds,
     },

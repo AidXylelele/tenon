@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FormattingAnswer, FormattingRequest } from "./interfaces";
+import type { WorkerAnswer, WorkerRequest } from "./interfaces";
 import "./formatting.worker";
 import { missing } from "./wasm-fetch.test-support";
 
-function answerTo(request: FormattingRequest): Promise<FormattingAnswer> {
+function answerTo(request: WorkerRequest): Promise<WorkerAnswer> {
   const { port1, port2 } = new MessageChannel();
-  const answered = new Promise<FormattingAnswer>((resolve) => {
-    port1.onmessage = (event: MessageEvent<FormattingAnswer>) => {
+  const answered = new Promise<WorkerAnswer>((resolve) => {
+    port1.onmessage = (event: MessageEvent<WorkerAnswer>) => {
       port1.close();
       resolve(event.data);
     };
@@ -21,15 +21,25 @@ function answerTo(request: FormattingRequest): Promise<FormattingAnswer> {
 
 describe("the formatting worker answering through each request's port", () => {
   it("a_javascript_request_is_answered_with_prettiers_formatting", async () => {
-    const answer = await answerTo({ language: "javascript", text: "a=1" });
+    const answer = await answerTo({
+      kind: "format",
+      language: "javascript",
+      text: "a=1",
+      cursor: 0,
+    });
 
-    expect(answer).toEqual({ kind: "formatted", text: "a = 1;\n" });
+    expect(answer).toEqual({ kind: "formatted", text: "a = 1;\n", cursor: 0 });
   });
 
   it("a_python_request_is_answered_failed_with_the_reason_ruff_cannot_start", async () => {
     vi.stubGlobal("fetch", missing);
 
-    const answer = await answerTo({ language: "python", text: "a=1" });
+    const answer = await answerTo({
+      kind: "format",
+      language: "python",
+      text: "a=1",
+      cursor: 0,
+    });
 
     const reason: unknown = expect.any(String);
     expect(answer).toEqual({ kind: "failed", message: reason });
@@ -37,12 +47,36 @@ describe("the formatting worker answering through each request's port", () => {
 
   it("a_request_without_a_port_is_dropped_and_the_next_is_answered", async () => {
     const portless = new MessageEvent("message", {
-      data: { language: "javascript", text: "a=1" },
+      data: { kind: "format", language: "javascript", text: "a=1", cursor: 0 },
     });
     self.dispatchEvent(portless);
 
-    const answer = await answerTo({ language: "javascript", text: "b=2" });
+    const answer = await answerTo({
+      kind: "format",
+      language: "javascript",
+      text: "b=2",
+      cursor: 0,
+    });
 
-    expect(answer).toEqual({ kind: "formatted", text: "b = 2;\n" });
+    expect(answer).toEqual({ kind: "formatted", text: "b = 2;\n", cursor: 0 });
+  });
+
+  it("a_check_request_is_answered_with_the_problems_by_line", async () => {
+    const answer = await answerTo({
+      kind: "check",
+      language: "javascript",
+      text: "const a = (1;",
+    });
+
+    expect(answer).toEqual({
+      kind: "checked",
+      problems: [
+        {
+          line: 1,
+          message: 'Unexpected token, expected "," (1:13)',
+          severity: "error",
+        },
+      ],
+    });
   });
 });

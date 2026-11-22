@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useEffect, useState } from "react";
 import type { ScriptLanguage } from "@/libs/codemirror/interfaces";
-import { formatScript } from "./format-script";
+import { checkScript, formatScript } from "./format-script";
 
 interface FormattingProbeProps {
   readonly language: ScriptLanguage;
@@ -18,9 +18,32 @@ function FormattingProbe({ language, text }: FormattingProbeProps) {
       if (current) setOutcome(shown);
     }
 
-    formatScript(language, text).then(
-      (formatting) => {
-        const shown = JSON.stringify(formatting);
+    void formatScript(language, text, 0).then((formatting) => {
+      const shown = JSON.stringify(formatting);
+      show(shown);
+    });
+
+    return () => {
+      current = false;
+    };
+  }, [language, text]);
+
+  return <output aria-label="Formatting">{outcome}</output>;
+}
+
+function CheckingProbe({ language, text }: FormattingProbeProps) {
+  const [outcome, setOutcome] = useState("Checking");
+
+  useEffect(() => {
+    let current = true;
+
+    function show(shown: string): void {
+      if (current) setOutcome(shown);
+    }
+
+    checkScript(language, text).then(
+      (problems) => {
+        const shown = JSON.stringify(problems);
         show(shown);
       },
       (failure: unknown) => {
@@ -34,7 +57,7 @@ function FormattingProbe({ language, text }: FormattingProbeProps) {
     };
   }, [language, text]);
 
-  return <output aria-label="Formatting">{outcome}</output>;
+  return <output aria-label="Checking">{outcome}</output>;
 }
 
 const meta = {
@@ -61,4 +84,12 @@ export const PythonThatDoesNotParse: Story = {
     language: "python",
     text: 'import json\nscore = 1\nprint(json.dumps({"score": score})',
   },
+};
+
+export const PythonChecked: Story = {
+  args: {
+    language: "python",
+    text: 'import json\nscore = 1\nprint(json.dumps({"score": score})',
+  },
+  render: CheckingProbe,
 };

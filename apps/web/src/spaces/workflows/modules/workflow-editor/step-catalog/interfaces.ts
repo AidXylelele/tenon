@@ -69,3 +69,10 @@ export interface NoMatch {
   readonly message: string;
   readonly hint: string;
 }
+
+export interface StepCatalogProps {
+  readonly variants: readonly StepVariant[];
+  readonly stepAbove: string | null;
+  readonly languageTerms: boolean;
+  readonly onChoose: (action: EntryAction) => void;
+}
