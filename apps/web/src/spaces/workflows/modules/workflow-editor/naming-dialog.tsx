@@ -146,7 +146,7 @@ export function NamingDialog({
         if (!open) router.push(WORKFLOWS_HREF);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <form action={submit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>New workflow</DialogTitle>
