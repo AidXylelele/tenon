@@ -2,9 +2,21 @@ import type { StepVariant } from "language-server/protocol";
 import { describe, expect, it } from "vitest";
 import { catalogOf, entryWordsOf } from "./catalog";
 import { TENON_VARIANTS, WITHOUT_SHELL } from "./hosts.test-support";
-import type { CatalogEntry, CatalogGroup, EntryId } from "./interfaces";
+import type {
+  CatalogEntry,
+  CatalogGroup,
+  EntryId,
+  GroupId,
+} from "./interfaces";
 
-function outlineOf(catalog: readonly CatalogGroup[]) {
+interface Outline {
+  readonly id: GroupId;
+  readonly listed: readonly EntryId[];
+}
+
+const STEP_ABOVE = "Fetch the digest";
+
+function outlineOf(catalog: readonly CatalogGroup[]): readonly Outline[] {
   return catalog.map(({ id, entries }) => {
     const listed = entries.map((entry) => entry.id);
     return { id, listed };
@@ -20,7 +32,7 @@ function entryOf(catalog: readonly CatalogGroup[], id: EntryId): CatalogEntry {
 
 describe("the step catalog of a host", () => {
   it("tenons_entries_stand_in_their_groups_with_common_first", () => {
-    const catalog = catalogOf(TENON_VARIANTS);
+    const catalog = catalogOf(TENON_VARIANTS, STEP_ABOVE);
 
     const outline = outlineOf(catalog);
     expect(outline).toEqual([
@@ -48,7 +60,7 @@ describe("the step catalog of a host", () => {
   });
 
   it("an_entry_carries_its_words_example_synonyms_language_term_icon_and_variant", () => {
-    const catalog = catalogOf(TENON_VARIANTS);
+    const catalog = catalogOf(TENON_VARIANTS, STEP_ABOVE);
 
     const fetch = entryOf(catalog, "http");
     expect(fetch).toEqual({
@@ -85,7 +97,7 @@ describe("the step catalog of a host", () => {
   });
 
   it("the_groups_are_titled_in_plain_words", () => {
-    const catalog = catalogOf(TENON_VARIANTS);
+    const catalog = catalogOf(TENON_VARIANTS, STEP_ABOVE);
 
     const titles = catalog.map((group) => group.title);
     expect(titles).toEqual([
@@ -104,7 +116,7 @@ describe("the step catalog of a host", () => {
       "container",
     ];
 
-    const catalog = catalogOf(variants);
+    const catalog = catalogOf(variants, STEP_ABOVE);
 
     const outline = outlineOf(catalog);
     expect(outline).toEqual([
@@ -114,7 +126,7 @@ describe("the step catalog of a host", () => {
   });
 
   it("running_a_container_runs_an_image_and_uses_its_output", () => {
-    const catalog = catalogOf(["container"]);
+    const catalog = catalogOf(["container"], STEP_ABOVE);
 
     const container = entryOf(catalog, "container");
     expect(container).toEqual({
@@ -130,7 +142,7 @@ describe("the step catalog of a host", () => {
   });
 
   it("an_entry_whose_variant_the_host_does_not_run_is_absent", () => {
-    const catalog = catalogOf(WITHOUT_SHELL);
+    const catalog = catalogOf(WITHOUT_SHELL, STEP_ABOVE);
 
     const outline = outlineOf(catalog);
     expect(outline).toContainEqual({
@@ -140,7 +152,7 @@ describe("the step catalog of a host", () => {
   });
 
   it("a_group_left_empty_is_absent", () => {
-    const catalog = catalogOf(["http", "fork"]);
+    const catalog = catalogOf(["http", "fork"], STEP_ABOVE);
 
     const outline = outlineOf(catalog);
     expect(outline).toEqual([
@@ -150,14 +162,14 @@ describe("the step catalog of a host", () => {
   });
 
   it("changing_the_start_is_offered_on_a_host_that_runs_no_step", () => {
-    const catalog = catalogOf([]);
+    const catalog = catalogOf([], STEP_ABOVE);
 
     const outline = outlineOf(catalog);
     expect(outline).toEqual([{ id: "common", listed: ["start"] }]);
   });
 
   it("changing_the_start_opens_the_start_form", () => {
-    const catalog = catalogOf([]);
+    const catalog = catalogOf([], STEP_ABOVE);
 
     const start = entryOf(catalog, "start");
     expect(start).toEqual({
@@ -183,7 +195,7 @@ describe("the step catalog of a host", () => {
   });
 
   it("retrying_a_step_sets_its_failure_to_three_growing_retries_two_seconds_apart", () => {
-    const catalog = catalogOf(["try"]);
+    const catalog = catalogOf(["try"], STEP_ABOVE);
 
     const retry = entryOf(catalog, "retry");
     expect(retry).toEqual({
@@ -201,16 +213,37 @@ describe("the step catalog of a host", () => {
     });
   });
 
-  it("retrying_is_absent_where_the_host_does_not_run_try", () => {
-    const catalog = catalogOf(["http"]);
+  it.each<[string | null, readonly StepVariant[], readonly Outline[]]>([
+    [
+      STEP_ABOVE,
+      ["try"],
+      [
+        { id: "common", listed: ["retry", "start"] },
+        { id: "decide", listed: ["try"] },
+      ],
+    ],
+    [
+      null,
+      ["try"],
+      [
+        { id: "common", listed: ["start"] },
+        { id: "decide", listed: ["try"] },
+      ],
+    ],
+    [STEP_ABOVE, ["http"], [{ id: "common", listed: ["http", "start"] }]],
+  ])(
+    "retrying_is_offered_only_below_a_step_on_a_host_that_runs_try_%j_%j",
+    (stepAbove, variants, expected) => {
+      const catalog = catalogOf(variants, stepAbove);
 
-    const outline = outlineOf(catalog);
-    expect(outline).toEqual([{ id: "common", listed: ["http", "start"] }]);
-  });
+      const outline = outlineOf(catalog);
+      expect(outline).toEqual(expected);
+    },
+  );
 });
 
 describe("the words of an entry at a plus", () => {
-  const catalog = catalogOf(TENON_VARIANTS);
+  const catalog = catalogOf(TENON_VARIANTS, STEP_ABOVE);
 
   it("the_retry_entry_names_the_step_above_the_plus", () => {
     const retry = entryOf(catalog, "retry");
@@ -223,15 +256,12 @@ describe("the words of an entry at a plus", () => {
     });
   });
 
-  it("the_retry_entry_keeps_its_own_words_where_no_step_is_above_the_plus", () => {
-    const retry = entryOf(catalog, "retry");
+  it("an_entry_keeps_its_own_words_where_no_step_is_above_the_plus", () => {
+    const wait = entryOf(catalog, "wait");
 
-    const words = entryWordsOf(retry, null);
+    const words = entryWordsOf(wait, null);
 
-    expect(words).toEqual({
-      title: "Retry a step if it fails",
-      description: "Try the step before this one again when it fails",
-    });
+    expect(words).toEqual({ title: "Wait", description: "Pause for a while" });
   });
 
   it("another_entry_keeps_its_own_words_below_a_step", () => {

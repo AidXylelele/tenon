@@ -1,3 +1,4 @@
+import { HTTP_ENTRY } from "./catalog";
 import type {
   CatalogEntry,
   CatalogGroup,
@@ -17,8 +18,7 @@ const MESSAGING_WORDS: readonly string[] = [
   "chat",
 ];
 
-const MESSAGING_HINT =
-  "Tenon has no Slack or email step: post to their incoming-webhook address with “Fetch or send to a URL”.";
+const MESSAGING_HINT = `Tenon has no Slack or email step: post to their incoming-webhook address with “${HTTP_ENTRY.title}”.`;
 
 const SEARCH_HINT = "Try “http”, “if”, “loop”, “wait” or “script”.";
 

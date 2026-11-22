@@ -50,7 +50,7 @@ function CatalogProbe({ variants, stepAbove }: CatalogProbeProps) {
   const [terms, setTerms] = useState(false);
   const [chosen, setChosen] = useState("Nothing chosen yet");
 
-  const catalog = catalogOf(variants);
+  const catalog = catalogOf(variants, stepAbove);
   const groups = shownGroupsOf(catalog, query, opened);
   const order = keyboardOrderOf(groups);
   const last = Math.max(order.length - 1, 0);

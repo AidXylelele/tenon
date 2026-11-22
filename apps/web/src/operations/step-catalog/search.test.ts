@@ -4,7 +4,9 @@ import { TENON_VARIANTS } from "./hosts.test-support";
 import type { EntryId, GroupId, ShownGroup } from "./interfaces";
 import { foundText, keyboardOrderOf, noMatchOf, shownGroupsOf } from "./search";
 
-const CATALOG = catalogOf(TENON_VARIANTS);
+const STEP_ABOVE = "Fetch the digest";
+
+const CATALOG = catalogOf(TENON_VARIANTS, STEP_ABOVE);
 
 const NONE_OPENED: ReadonlySet<GroupId> = new Set();
 

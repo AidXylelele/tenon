@@ -6,42 +6,44 @@ import type {
   EntryWords,
 } from "./interfaces";
 
+export const HTTP_ENTRY: CatalogEntry = {
+  id: "http",
+  title: "Fetch or send to a URL",
+  description:
+    "Get data from a web address, or send data to it — also how you post to Slack, Teams or email services",
+  example: "GET https://api.example.com/orders",
+  synonyms: [
+    "http",
+    "url",
+    "api",
+    "rest",
+    "request",
+    "get",
+    "post",
+    "fetch",
+    "download",
+    "webhook",
+    "call",
+    "slack",
+    "teams",
+    "discord",
+    "chat",
+    "email",
+    "notify",
+    "message",
+    "send",
+  ],
+  languageTerm: "call: http",
+  icon: "globe",
+  action: { kind: "insertStep", variant: "http" },
+};
+
 const CATALOG: readonly CatalogGroup[] = [
   {
     id: "common",
     title: "Common",
     entries: [
-      {
-        id: "http",
-        title: "Fetch or send to a URL",
-        description:
-          "Get data from a web address, or send data to it — also how you post to Slack, Teams or email services",
-        example: "GET https://api.example.com/orders",
-        synonyms: [
-          "http",
-          "url",
-          "api",
-          "rest",
-          "request",
-          "get",
-          "post",
-          "fetch",
-          "download",
-          "webhook",
-          "call",
-          "slack",
-          "teams",
-          "discord",
-          "chat",
-          "email",
-          "notify",
-          "message",
-          "send",
-        ],
-        languageTerm: "call: http",
-        icon: "globe",
-        action: { kind: "insertStep", variant: "http" },
-      },
+      HTTP_ENTRY,
       {
         id: "switch",
         title: "Choose a path",
@@ -339,8 +341,11 @@ const CATALOG: readonly CatalogGroup[] = [
 
 export function catalogOf(
   variants: readonly StepVariant[],
+  stepAbove: string | null,
 ): readonly CatalogGroup[] {
-  const groups = CATALOG.map((group) => offeredGroupOf(group, variants));
+  const groups = CATALOG.map((group) =>
+    offeredGroupOf(group, variants, stepAbove),
+  );
   return groups.filter((group) => group.entries.length > 0);
 }
 
@@ -361,9 +366,10 @@ export function entryWordsOf(
 function offeredGroupOf(
   group: CatalogGroup,
   variants: readonly StepVariant[],
+  stepAbove: string | null,
 ): CatalogGroup {
   const entries = group.entries.filter((entry) =>
-    isOffered(entry.action, variants),
+    isOffered(entry.action, variants, stepAbove),
   );
   return { id: group.id, title: group.title, entries };
 }
@@ -371,13 +377,23 @@ function offeredGroupOf(
 function isOffered(
   action: EntryAction,
   variants: readonly StepVariant[],
+  stepAbove: string | null,
 ): boolean {
   switch (action.kind) {
     case "insertStep":
       return variants.includes(action.variant);
     case "setFailure":
-      return variants.includes("try");
+      return canRetry(variants, stepAbove);
     case "changeStart":
       return true;
   }
+}
+
+function canRetry(
+  variants: readonly StepVariant[],
+  stepAbove: string | null,
+): boolean {
+  if (stepAbove === null) return false;
+
+  return variants.includes("try");
 }
