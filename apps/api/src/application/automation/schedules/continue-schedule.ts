@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import type { InstanceCommand } from "../instances/interfaces.js";
 import { WorkflowInstanceRepository } from "../instances/ports.js";
 import { WorkflowRepository } from "../workflows/ports.js";
@@ -11,9 +11,9 @@ export class ContinueSchedule {
     private readonly instances: WorkflowInstanceRepository,
     private readonly workflows: WorkflowRepository,
     private readonly schedules: WorkflowSchedules,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: InstanceCommand): Promise<void> {
     const instance = await this.instances.find(command.instanceId);
 
@@ -24,6 +24,8 @@ export class ContinueSchedule {
 
     if (version === null) return;
 
-    await this.schedules.continueAfter(instance, version);
+    await this.unitOfWork.run(() =>
+      this.schedules.continueAfter(instance, version),
+    );
   }
 }

@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
 import { WorkflowRepository } from "../workflows/ports.js";
 import type { SyncScheduleCommand } from "./interfaces.js";
 import { WorkflowSchedules } from "./ports.js";
@@ -11,7 +10,6 @@ export class SyncSchedule {
     private readonly schedules: WorkflowSchedules,
   ) {}
 
-  @Transactional()
   async execute(command: SyncScheduleCommand): Promise<void> {
     const workflow = await this.workflows.findById(command.workflowId);
 
