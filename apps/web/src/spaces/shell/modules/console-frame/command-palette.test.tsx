@@ -247,7 +247,9 @@ describe("the search of the console", () => {
     const options = optionNames();
     const status = screen.getByRole("status");
     expect(options).toEqual(["Secrets", "New secret"]);
-    expect(status).toHaveTextContent("2 results");
+    await waitFor(() => {
+      expect(status).toHaveTextContent("2 results");
+    });
   });
 
   it("a_search_that_matches_nothing_says_so_and_what_to_try", async () => {
@@ -263,7 +265,9 @@ describe("the search of the console", () => {
     expect(said).toHaveTextContent(
       "Nothing matches “zzzz”. Try a workflow's name, a page, an action or a run ID.",
     );
-    expect(status).toHaveTextContent("Nothing matches");
+    await waitFor(() => {
+      expect(status).toHaveTextContent("Nothing matches");
+    });
   });
 
   it("while_the_workflows_are_read_typing_says_so_and_not_that_nothing_matches", () => {
