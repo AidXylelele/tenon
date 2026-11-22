@@ -1,9 +1,11 @@
 import type {
   CloudEvent,
   EffectResponse,
+  EventFilter,
   HostProfile,
   JsonObject,
   JsonValue,
+  Program,
   StartContext,
   State,
   StepContext,
@@ -13,8 +15,10 @@ import type { Piscina } from "piscina";
 import type {
   NamedFilter,
   StepCall,
+  VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
 import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
+import type * as thread from "./interpreter.thread.js";
 
 export interface CompileSource {
   readonly document: JsonObject | string;
@@ -28,72 +32,67 @@ export interface ThreadProgram {
   readonly source: CompileSource | null;
 }
 
-interface CompileCall {
-  readonly kind: "compile";
-  readonly source: CompileSource;
+export interface AcceptingCall {
+  readonly filters: readonly NamedFilter[];
+  readonly event: CloudEvent;
 }
 
-interface StartCall {
-  readonly kind: "start";
+export interface ProgramWorkerCall {
   readonly program: ThreadProgram;
+}
+
+export interface StartCall extends ProgramWorkerCall {
   readonly input: JsonValue;
   readonly context: StartContext;
 }
 
-interface CorrelateCall {
-  readonly kind: "correlate";
-  readonly program: ThreadProgram;
+export interface CorrelateCall extends ProgramWorkerCall {
   readonly context: StartContext;
 }
 
-interface RespondCall {
-  readonly kind: "respond";
-  readonly program: ThreadProgram;
+export interface RespondCall extends ProgramWorkerCall {
   readonly state: State;
   readonly response: EffectResponse;
   readonly context: StepContext;
 }
 
-interface ControlCall {
-  readonly kind: "suspend" | "resume" | "cancel";
-  readonly program: ThreadProgram;
+export interface ControlCall extends ProgramWorkerCall {
   readonly state: State;
   readonly context: StepContext;
 }
 
-interface RouteCall {
-  readonly kind: "route";
-  readonly program: ThreadProgram;
+export interface RouteCall extends ProgramWorkerCall {
   readonly event: CloudEvent;
 }
 
-interface InputCall {
-  readonly kind: "input";
-  readonly program: ThreadProgram;
+export interface InputCall extends ProgramWorkerCall {
   readonly input: JsonValue;
 }
 
-interface StructureCall {
-  readonly kind: "structure";
-  readonly source: CompileSource;
+type ThreadTasks = typeof thread;
+
+export type TaskName = keyof ThreadTasks;
+
+export type TaskCall<N extends TaskName> = Parameters<
+  ThreadTasks[N]
+>[0]["call"];
+
+export type TaskValue<N extends TaskName> =
+  ReturnType<ThreadTasks[N]> extends WorkerAnswer<infer V> ? V : never;
+
+export type PoolName = "runs" | "checks";
+
+export interface TraceCarrier {
+  traceparent?: string;
+  tracestate?: string;
 }
 
-interface FilterCall {
-  readonly kind: "filter";
-  readonly filter: JsonValue;
+export interface ThreadTask<C> {
+  readonly call: C;
+  readonly pool: PoolName;
+  readonly enqueuedAt: number;
+  readonly trace: TraceCarrier;
 }
-
-interface AcceptingCall {
-  readonly kind: "accepting";
-  readonly filters: readonly NamedFilter[];
-  readonly event: CloudEvent;
-}
-
-export type ProgramWorkerCall =
-  StartCall | CorrelateCall | RespondCall | ControlCall | RouteCall | InputCall;
-
-export type WorkerCall =
-  CompileCall | StructureCall | FilterCall | AcceptingCall | ProgramWorkerCall;
 
 interface Answered<T> {
   readonly kind: "answered";
@@ -117,7 +116,20 @@ interface Fault {
 export type WorkerAnswer<T> =
   Answered<T> | MissingProgram | IncompatibleProgram | Fault;
 
+export interface KeptProgram {
+  readonly program: Program | null;
+}
+
+export interface KeptFilter {
+  readonly filter: EventFilter | null;
+}
+
+export interface KeptStructure {
+  readonly structure: VersionStructure | null;
+}
+
 export interface WorkerPool {
+  readonly name: PoolName;
   readonly threads: Piscina;
   readonly policy: ResiliencePolicy;
 }

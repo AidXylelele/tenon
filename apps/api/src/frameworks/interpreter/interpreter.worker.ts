@@ -1,7 +1,15 @@
 import { Inject, Injectable } from "@nestjs/common";
+import {
+  context,
+  type Histogram,
+  metrics,
+  propagation,
+  ROOT_CONTEXT,
+} from "@opentelemetry/api";
 import type {
   CloudEvent,
   EventFilter,
+  InputProblem,
   Interpreter,
   JsonObject,
   JsonValue,
@@ -10,6 +18,7 @@ import type {
 } from "interpreter";
 import type { Analysis, ast } from "interpreter/front-end";
 import { structureOf } from "language-server/structure";
+import { LRUCache } from "lru-cache";
 import type {
   CompilationData,
   FilterCheck,
@@ -20,76 +29,186 @@ import type {
   VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
 import type {
+  AcceptingCall,
   CompileSource,
+  ControlCall,
+  CorrelateCall,
+  InputCall,
+  KeptFilter,
+  KeptProgram,
   ProgramWorkerCall,
+  RespondCall,
+  RouteCall,
+  StartCall,
+  ThreadProgram,
+  ThreadTask,
   WorkerAnswer,
-  WorkerCall,
 } from "./interfaces.js";
 
 @Injectable()
 export class InterpreterWorker {
   static readonly INTERPRETER = "interpreter";
   private static readonly KEPT = 1_000;
+  private static readonly MILLISECONDS_PER_SECOND = 1_000;
+  private static readonly WAIT_BUCKETS = [
+    0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25,
+    0.5, 1, 2.5, 5, 10,
+  ];
 
-  readonly #programs = new Map<string, Program | null>();
-  readonly #filters = new Map<string, EventFilter | null>();
+  readonly #programs = new LRUCache<string, KeptProgram, CompileSource>({
+    max: InterpreterWorker.KEPT,
+    memoMethod: (_versionId, _kept, { context: source }) =>
+      this.#keptProgramOf(source),
+  });
+  readonly #filters = new LRUCache<string, KeptFilter, JsonValue>({
+    max: InterpreterWorker.KEPT,
+    memoMethod: (_key, _kept, { context: filter }) =>
+      this.#keptFilterOf(filter),
+  });
+  readonly #wait: Histogram;
 
   constructor(
     @Inject(InterpreterWorker.INTERPRETER)
     private readonly interpreter: Interpreter,
-  ) {}
+  ) {
+    const meter = metrics.getMeter("tenon-api");
+    this.#wait = meter.createHistogram("tenon.interpreter.pool.wait.duration", {
+      unit: "s",
+      description: "The time a task waits for an interpreter thread.",
+      advice: { explicitBucketBoundaries: InterpreterWorker.WAIT_BUCKETS },
+    });
+  }
 
-  handle(call: WorkerCall): WorkerAnswer<unknown> {
+  compile(task: ThreadTask<CompileSource>): WorkerAnswer<CompilationData> {
+    return this.#answered(task, (source) => this.#compiled(source));
+  }
+
+  structure(
+    task: ThreadTask<CompileSource>,
+  ): WorkerAnswer<VersionStructure | null> {
+    return this.#answered(task, (source) => this.#structured(source));
+  }
+
+  filter(task: ThreadTask<JsonValue>): WorkerAnswer<FilterCheck> {
+    return this.#answered(task, (filter) => this.#checked(filter));
+  }
+
+  accepting(task: ThreadTask<AcceptingCall>): WorkerAnswer<readonly string[]> {
+    return this.#answered(task, (call) =>
+      this.#accepting(call.filters, call.event),
+    );
+  }
+
+  start(task: ThreadTask<StartCall>): WorkerAnswer<StartedStep> {
+    return this.#played(task, (program, call) => {
+      const step = program.start(call.input, call.context);
+      return this.#started(program, step);
+    });
+  }
+
+  correlate(task: ThreadTask<CorrelateCall>): WorkerAnswer<StartedStep> {
+    return this.#played(task, (program, call) => {
+      const step = program.correlate(call.context);
+      return this.#started(program, step);
+    });
+  }
+
+  respond(task: ThreadTask<RespondCall>): WorkerAnswer<Step> {
+    return this.#played(task, (program, call) =>
+      program.respond(call.state, call.response, call.context),
+    );
+  }
+
+  suspend(task: ThreadTask<ControlCall>): WorkerAnswer<Step> {
+    return this.#played(task, (program, call) =>
+      program.suspend(call.state, call.context),
+    );
+  }
+
+  resume(task: ThreadTask<ControlCall>): WorkerAnswer<Step> {
+    return this.#played(task, (program, call) =>
+      program.resume(call.state, call.context),
+    );
+  }
+
+  cancel(task: ThreadTask<ControlCall>): WorkerAnswer<Step> {
+    return this.#played(task, (program, call) =>
+      program.cancel(call.state, call.context),
+    );
+  }
+
+  route(task: ThreadTask<RouteCall>): WorkerAnswer<readonly RouteMatch[]> {
+    return this.#played(task, (program, call) =>
+      this.#routes(program, call.event),
+    );
+  }
+
+  input(task: ThreadTask<InputCall>): WorkerAnswer<readonly InputProblem[]> {
+    return this.#played(task, (program, call) =>
+      program.inputProblemsOf(call.input),
+    );
+  }
+
+  #answered<C, T>(task: ThreadTask<C>, work: (call: C) => T): WorkerAnswer<T> {
+    return this.#ran(task, (call) => ({ kind: "answered", value: work(call) }));
+  }
+
+  #played<C extends ProgramWorkerCall, T>(
+    task: ThreadTask<C>,
+    play: (program: Program, call: C) => T,
+  ): WorkerAnswer<T> {
+    return this.#ran(task, (call) => this.#ofProgram(call, play));
+  }
+
+  #ran<C, T>(
+    task: ThreadTask<C>,
+    answer: (call: C) => WorkerAnswer<T>,
+  ): WorkerAnswer<T> {
+    this.#waited(task);
+    const extracted = propagation.extract(ROOT_CONTEXT, task.trace);
+    return context.with(extracted, () => this.#guarded(task.call, answer));
+  }
+
+  #waited(task: ThreadTask<unknown>): void {
+    const waited = Date.now() - task.enqueuedAt;
+    const seconds = waited / InterpreterWorker.MILLISECONDS_PER_SECOND;
+    const attributes = { "tenon.interpreter.pool": task.pool };
+    this.#wait.record(seconds, attributes);
+  }
+
+  #guarded<C, T>(
+    call: C,
+    answer: (call: C) => WorkerAnswer<T>,
+  ): WorkerAnswer<T> {
     try {
-      return this.#answered(call);
+      return answer(call);
     } catch (error) {
       return this.#faultOf(error);
     }
   }
 
-  #answered(call: WorkerCall): WorkerAnswer<unknown> {
-    switch (call.kind) {
-      case "compile":
-        return { kind: "answered", value: this.#compiled(call.source) };
-      case "structure":
-        return { kind: "answered", value: this.#structured(call.source) };
-      case "filter":
-        return { kind: "answered", value: this.#checked(call.filter) };
-      case "accepting": {
-        const accepting = this.#accepting(call.filters, call.event);
-        return { kind: "answered", value: accepting };
-      }
-      case "start":
-      case "correlate":
-      case "respond":
-      case "suspend":
-      case "resume":
-      case "cancel":
-      case "route":
-      case "input":
-        return this.#ofProgram(call);
-    }
+  #ofProgram<C extends ProgramWorkerCall, T>(
+    call: C,
+    play: (program: Program, call: C) => T,
+  ): WorkerAnswer<T> {
+    const kept = this.#programOf(call.program);
+
+    if (kept === undefined) return { kind: "missing" };
+
+    return this.#playedBy(kept.program, call, play);
   }
 
-  #ofProgram(call: ProgramWorkerCall): WorkerAnswer<unknown> {
-    const thread = call.program;
-    const kept = this.#programs.get(thread.versionId);
+  #programOf(thread: ThreadProgram): KeptProgram | undefined {
+    if (thread.source === null) return this.#programs.get(thread.versionId);
 
-    if (kept !== undefined) {
-      this.#keep(this.#programs, thread.versionId, kept);
-      return this.#playedBy(kept, call);
-    }
-
-    if (thread.source === null) return { kind: "missing" };
-
-    const compiled = this.#compiledOf(thread.versionId, thread.source);
-    return this.#playedBy(compiled, call);
+    return this.#programs.memo(thread.versionId, { context: thread.source });
   }
 
-  #playedBy(
+  #playedBy<C extends ProgramWorkerCall, T>(
     program: Program | null,
-    call: ProgramWorkerCall,
-  ): WorkerAnswer<unknown> {
+    call: C,
+    play: (program: Program, call: C) => T,
+  ): WorkerAnswer<T> {
     const required = call.program.fingerprint;
 
     if (required !== null && program?.fingerprint !== required)
@@ -100,32 +219,7 @@ export class InterpreterWorker {
         `The version ${call.program.versionId} does not compile`,
       );
 
-    return { kind: "answered", value: this.#played(program, call) };
-  }
-
-  #played(program: Program, call: ProgramWorkerCall): unknown {
-    switch (call.kind) {
-      case "start": {
-        const step = program.start(call.input, call.context);
-        return this.#started(program, step);
-      }
-      case "correlate": {
-        const step = program.correlate(call.context);
-        return this.#started(program, step);
-      }
-      case "respond":
-        return program.respond(call.state, call.response, call.context);
-      case "suspend":
-        return program.suspend(call.state, call.context);
-      case "resume":
-        return program.resume(call.state, call.context);
-      case "cancel":
-        return program.cancel(call.state, call.context);
-      case "route":
-        return this.#routes(program, call.event);
-      case "input":
-        return program.inputProblemsOf(call.input);
-    }
+    return { kind: "answered", value: play(program, call) };
   }
 
   #started(program: Program, step: Step): StartedStep {
@@ -216,12 +310,11 @@ export class InterpreterWorker {
     return accepting.map((named) => named.name);
   }
 
-  #compiledOf(versionId: string, source: CompileSource): Program | null {
+  #keptProgramOf(source: CompileSource): KeptProgram {
     const compilation = this.#compilationOf(source);
     const program =
       compilation.kind === "compiled" ? compilation.program : null;
-    this.#keep(this.#programs, versionId, program);
-    return program;
+    return { program };
   }
 
   #compilationOf(source: CompileSource): ReturnType<Interpreter["compile"]> {
@@ -234,25 +327,15 @@ export class InterpreterWorker {
 
   #filterOf(filter: JsonValue): EventFilter | null {
     const key = JSON.stringify(filter);
-    const kept = this.#filters.get(key);
+    const kept = this.#filters.memo(key, { context: filter });
+    return kept.filter;
+  }
 
-    if (kept !== undefined) return kept;
-
+  #keptFilterOf(filter: JsonValue): KeptFilter {
     const compilation = this.interpreter.filter(filter);
     const compiled =
       compilation.kind === "compiled" ? compilation.filter : null;
-    this.#keep(this.#filters, key, compiled);
-    return compiled;
-  }
-
-  #keep<T>(cache: Map<string, T>, key: string, value: T): void {
-    cache.delete(key);
-    const [oldest] = cache.keys();
-    const full = cache.size >= InterpreterWorker.KEPT;
-
-    if (full && oldest !== undefined) cache.delete(oldest);
-
-    cache.set(key, value);
+    return { filter: compiled };
   }
 
   #faultOf(error: unknown): WorkerAnswer<never> {

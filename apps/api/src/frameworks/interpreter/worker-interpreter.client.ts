@@ -7,6 +7,13 @@ import {
 } from "@nestjs/common";
 import { ResilienceService, ResilienceTimeoutError } from "@nestjs/resilience";
 import {
+  context,
+  metrics,
+  type ObservableGauge,
+  type ObservableResult,
+  propagation,
+} from "@opentelemetry/api";
+import {
   type CloudEvent,
   type EffectResponse,
   type Ending,
@@ -22,6 +29,7 @@ import {
   type Step,
   type StepContext,
 } from "interpreter";
+import { LRUCache } from "lru-cache";
 import { Piscina } from "piscina";
 import { PermanentFault } from "../../domain/errors.js";
 import { IncompatibleRun } from "../../interface-adapters/workflows/incompatible-run.error.js";
@@ -38,9 +46,15 @@ import {
   type VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
 import type {
+  KeptStructure,
+  PoolName,
+  TaskCall,
+  TaskName,
+  TaskValue,
   ThreadProgram,
+  ThreadTask,
+  TraceCarrier,
   WorkerAnswer,
-  WorkerCall,
   WorkerPool,
 } from "./interfaces.js";
 import type { ImportTexts } from "../../domain/automation/workflows/interfaces.js";
@@ -59,7 +73,11 @@ export class WorkerInterpreterClient
   private static readonly IDLE_RUN_THREAD_MS = 60_000;
   private static readonly MOST_KEPT_STRUCTURES = 1_000;
 
-  readonly #structures = new Map<string, VersionStructure | null>();
+  readonly #structures = new LRUCache<string, KeptStructure, VersionProgram>({
+    max: WorkerInterpreterClient.MOST_KEPT_STRUCTURES,
+    fetchMethod: (_versionId, _kept, { context: program }) =>
+      this.#keptStructureOf(program),
+  });
   private readonly descriptor: RuntimeDescriptor;
   private runs: WorkerPool | null = null;
   private checks: WorkerPool | null = null;
@@ -71,6 +89,7 @@ export class WorkerInterpreterClient
 
   onModuleInit(): void {
     this.runs = {
+      name: "runs",
       threads: this.#threadsOf(
         0,
         WorkerInterpreterClient.RUN_THREADS,
@@ -79,6 +98,7 @@ export class WorkerInterpreterClient
       policy: this.resilience.preset("interpreter"),
     };
     this.checks = {
+      name: "checks",
       threads: this.#threadsOf(
         WorkerInterpreterClient.CHECK_THREADS,
         WorkerInterpreterClient.CHECK_THREADS,
@@ -86,6 +106,8 @@ export class WorkerInterpreterClient
       ),
       policy: this.resilience.preset("interpreter-checks"),
     };
+    const queues = this.#queuesGauge();
+    queues.addCallback((result) => this.#queuesObserved(result));
   }
 
   async onApplicationShutdown(): Promise<void> {
@@ -94,24 +116,9 @@ export class WorkerInterpreterClient
   }
 
   async structureOf(program: VersionProgram): Promise<VersionStructure | null> {
-    const kept = this.#structures.get(program.versionId);
-
-    if (kept !== undefined) return kept;
-
-    const profile = this.profile(program.secrets);
-    const document = program.document as JsonObject;
-    const imports = program.imports;
-    const call: WorkerCall = {
-      kind: "structure",
-      source: { document, profile, imports },
-    };
-    const structure = await this.#called<VersionStructure | null>(
-      this.#checks(),
-      call,
-      null,
-    );
-    this.#keep(program.versionId, structure);
-    return structure;
+    const options = { context: program };
+    const kept = await this.#structures.forceFetch(program.versionId, options);
+    return kept.structure;
   }
 
   tagOf(program: VersionProgram): string {
@@ -125,10 +132,9 @@ export class WorkerInterpreterClient
   ): Promise<CompilationData> {
     const profile = this.profile(secrets);
     const source = { document, profile, imports };
-    const call: WorkerCall = { kind: "compile", source };
 
     try {
-      return await this.#called<CompilationData>(this.#checks(), call, null);
+      return await this.#called(this.#checks(), "compile", source, null);
     } catch (error) {
       const timedOut =
         error instanceof PermanentFault &&
@@ -145,8 +151,7 @@ export class WorkerInterpreterClient
     input: JsonValue,
     context: StartContext,
   ): Promise<StartedStep> {
-    return this.#program<StartedStep>(this.#runs(), call, (program) => ({
-      kind: "start",
+    return this.#program(this.#runs(), "start", call, (program) => ({
       program,
       input,
       context,
@@ -154,8 +159,7 @@ export class WorkerInterpreterClient
   }
 
   correlate(call: ProgramCall, context: StartContext): Promise<StartedStep> {
-    return this.#program<StartedStep>(this.#runs(), call, (program) => ({
-      kind: "correlate",
+    return this.#program(this.#runs(), "correlate", call, (program) => ({
       program,
       context,
     }));
@@ -167,8 +171,7 @@ export class WorkerInterpreterClient
     response: EffectResponse,
     context: StepContext,
   ): Promise<Step> {
-    return this.#program<Step>(this.#runs(), call, (program) => ({
-      kind: "respond",
+    return this.#program(this.#runs(), "respond", call, (program) => ({
       program,
       state,
       response,
@@ -181,8 +184,7 @@ export class WorkerInterpreterClient
     state: State,
     context: StepContext,
   ): Promise<Step> {
-    return this.#program<Step>(this.#runs(), call, (program) => ({
-      kind: "suspend",
+    return this.#program(this.#runs(), "suspend", call, (program) => ({
       program,
       state,
       context,
@@ -190,8 +192,7 @@ export class WorkerInterpreterClient
   }
 
   resume(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
-    return this.#program<Step>(this.#runs(), call, (program) => ({
-      kind: "resume",
+    return this.#program(this.#runs(), "resume", call, (program) => ({
       program,
       state,
       context,
@@ -199,8 +200,7 @@ export class WorkerInterpreterClient
   }
 
   cancel(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
-    return this.#program<Step>(this.#runs(), call, (program) => ({
-      kind: "cancel",
+    return this.#program(this.#runs(), "cancel", call, (program) => ({
       program,
       state,
       context,
@@ -208,27 +208,24 @@ export class WorkerInterpreterClient
   }
 
   route(call: ProgramCall, event: CloudEvent): Promise<readonly RouteMatch[]> {
-    return this.#program<readonly RouteMatch[]>(
-      this.#checks(),
-      call,
-      (program) => ({ kind: "route", program, event }),
-    );
+    return this.#program(this.#checks(), "route", call, (program) => ({
+      program,
+      event,
+    }));
   }
 
   inputProblemsOf(
     call: ProgramCall,
     input: JsonValue,
   ): Promise<readonly InputProblem[]> {
-    return this.#program<readonly InputProblem[]>(
-      this.#checks(),
-      call,
-      (program) => ({ kind: "input", program, input }),
-    );
+    return this.#program(this.#checks(), "input", call, (program) => ({
+      program,
+      input,
+    }));
   }
 
   filter(filter: JsonValue): Promise<FilterCheck> {
-    const call: WorkerCall = { kind: "filter", filter };
-    return this.#called<FilterCheck>(this.#checks(), call, null);
+    return this.#called(this.#checks(), "filter", filter, null);
   }
 
   accepting(
@@ -236,8 +233,8 @@ export class WorkerInterpreterClient
     event: CloudEvent,
     signal: AbortSignal | null,
   ): Promise<readonly string[]> {
-    const call: WorkerCall = { kind: "accepting", filters, event };
-    return this.#called<readonly string[]>(this.#checks(), call, signal);
+    const call = { filters, event };
+    return this.#called(this.#checks(), "accepting", call, signal);
   }
 
   profile(secrets: readonly string[]): Required<HostProfile> {
@@ -252,26 +249,29 @@ export class WorkerInterpreterClient
     return endingOf(end);
   }
 
-  async #program<T>(
+  async #program<N extends TaskName>(
     pool: WorkerPool,
+    name: N,
     call: ProgramCall,
-    callOf: (program: ThreadProgram) => WorkerCall,
-  ): Promise<T> {
-    const answer = await this.#programAnswer<T>(pool, call, callOf);
+    callOf: (program: ThreadProgram) => TaskCall<N>,
+  ): Promise<TaskValue<N>> {
+    const answer = await this.#programAnswer(pool, name, call, callOf);
     return this.#unwrapped(answer);
   }
 
-  async #programAnswer<T>(
+  async #programAnswer<N extends TaskName>(
     pool: WorkerPool,
+    name: N,
     call: ProgramCall,
-    callOf: (program: ThreadProgram) => WorkerCall,
-  ): Promise<WorkerAnswer<T>> {
+    callOf: (program: ThreadProgram) => TaskCall<N>,
+  ): Promise<WorkerAnswer<TaskValue<N>>> {
     const cached = {
       versionId: call.versionId,
       fingerprint: call.fingerprint,
       source: null,
     };
-    const first = await this.#answer<T>(pool, callOf(cached), call.signal);
+    const cachedCall = callOf(cached);
+    const first = await this.#answer(pool, name, cachedCall, call.signal);
 
     if (first.kind !== "missing") return first;
 
@@ -284,31 +284,49 @@ export class WorkerInterpreterClient
       fingerprint: call.fingerprint,
       source: { document, profile, imports },
     };
-    return this.#answer<T>(pool, callOf(compiled), call.signal);
+    const compiledCall = callOf(compiled);
+    return this.#answer(pool, name, compiledCall, call.signal);
   }
 
-  async #called<T>(
+  async #keptStructureOf(program: VersionProgram): Promise<KeptStructure> {
+    const profile = this.profile(program.secrets);
+    const document = program.document as JsonObject;
+    const imports = program.imports;
+    const source = { document, profile, imports };
+    const structure = await this.#called(
+      this.#checks(),
+      "structure",
+      source,
+      null,
+    );
+    return { structure };
+  }
+
+  async #called<N extends TaskName>(
     pool: WorkerPool,
-    call: WorkerCall,
+    name: N,
+    call: TaskCall<N>,
     signal: AbortSignal | null,
-  ): Promise<T> {
-    const answer = await this.#answer<T>(pool, call, signal);
+  ): Promise<TaskValue<N>> {
+    const answer = await this.#answer(pool, name, call, signal);
     return this.#unwrapped(answer);
   }
 
-  async #answer<T>(
+  async #answer<N extends TaskName>(
     pool: WorkerPool,
-    call: WorkerCall,
+    name: N,
+    call: TaskCall<N>,
     signal: AbortSignal | null,
-  ): Promise<WorkerAnswer<T>> {
+  ): Promise<WorkerAnswer<TaskValue<N>>> {
+    const task = this.#taskOf(pool.name, call);
     const options = signal === null ? {} : { signal };
 
     try {
       const answer: unknown = await pool.policy.execute(
-        (attempt) => pool.threads.run(call, { signal: attempt.signal }),
+        (attempt) => pool.threads.run(task, { name, signal: attempt.signal }),
         options,
       );
-      return answer as WorkerAnswer<T>;
+      return answer as WorkerAnswer<TaskValue<N>>;
     } catch (error) {
       if (signal?.aborted === true) throw error;
 
@@ -321,19 +339,20 @@ export class WorkerInterpreterClient
     }
   }
 
+  #taskOf<C>(pool: PoolName, call: C): ThreadTask<C> {
+    const trace: TraceCarrier = {};
+    const active = context.active();
+    propagation.inject(active, trace);
+    const enqueuedAt = Date.now();
+    return { call, pool, enqueuedAt, trace };
+  }
+
   #exhausted(error: unknown): boolean {
     if (error instanceof ResilienceTimeoutError) return true;
 
     const code: unknown =
       error instanceof Error ? Reflect.get(error, "code") : undefined;
     return code === "ERR_WORKER_OUT_OF_MEMORY";
-  }
-
-  #keep(versionId: string, structure: VersionStructure | null): void {
-    if (this.#structures.size >= WorkerInterpreterClient.MOST_KEPT_STRUCTURES)
-      this.#structures.clear();
-
-    this.#structures.set(versionId, structure);
   }
 
   #runs(): WorkerPool {
@@ -367,6 +386,24 @@ export class WorkerInterpreterClient
     return { name: "tenon", version: RELEASE_VERSION, metadata: {} };
   }
 
+  #queuesGauge(): ObservableGauge {
+    const meter = metrics.getMeter("tenon-api");
+    return meter.createObservableGauge("tenon.interpreter.pool.queue.length", {
+      unit: "{task}",
+      description: "The tasks waiting in an interpreter pool's queue.",
+    });
+  }
+
+  #queuesObserved(result: ObservableResult): void {
+    const pools = [this.#runs(), this.#checks()];
+
+    for (const pool of pools) {
+      const length = pool.threads.queueSize;
+      const attributes = { "tenon.interpreter.pool": pool.name };
+      result.observe(length, attributes);
+    }
+  }
+
   #threadsOf(least: number, most: number, idleMs: number): Piscina {
     const extension = extname(fileURLToPath(import.meta.url));
     const thread = `./interpreter.thread${extension}`;
@@ -376,6 +413,7 @@ export class WorkerInterpreterClient
       minThreads: least,
       maxThreads: most,
       idleTimeout: idleMs,
+      atomics: "async",
       resourceLimits: { maxOldGenerationSizeMb: 256 },
     });
   }
