@@ -479,6 +479,9 @@ importers:
       '@opentelemetry/api':
         specifier: 1.10.0
         version: 1.10.0
+      '@opentelemetry/instrumentation-host-metrics':
+        specifier: 0.8.0
+        version: 0.8.0(@opentelemetry/api@1.10.0)(supports-color@8.1.1)
       '@opentelemetry/instrumentation-undici':
         specifier: 0.35.1
         version: 0.35.1(@opentelemetry/api@1.10.0)(supports-color@8.1.1)
@@ -12303,6 +12306,14 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.10.0
       '@opentelemetry/instrumentation': 0.301.2(@opentelemetry/api@1.10.0)(supports-color@7.2.0)
+      systeminformation: 5.33.18
+    transitivePeerDependencies:
+      - supports-color
+
+  '@opentelemetry/instrumentation-host-metrics@0.8.0(@opentelemetry/api@1.10.0)(supports-color@8.1.1)':
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      '@opentelemetry/instrumentation': 0.301.2(@opentelemetry/api@1.10.0)(supports-color@8.1.1)
       systeminformation: 5.33.18
     transitivePeerDependencies:
       - supports-color
