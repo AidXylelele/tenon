@@ -247,3 +247,21 @@ test("a condition row with a second value it does not take is invalid", async ()
 
   await expect(refused).rejects.toMatchObject({ code: -32602 });
 });
+
+test("a wrap in a block the editor does not offer is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: {
+      kind: "wrapSteps",
+      steps: ["/do/greet"],
+      block: "loop",
+      name: null,
+    },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});

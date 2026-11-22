@@ -2,6 +2,7 @@ import type { JsonObject, Range } from "interpreter/front-end";
 import { childPointerOf, parentPointerOf, valueAt } from "../pointers/index.js";
 import type { StepNodeList } from "../steps/index.js";
 import {
+  appliedOf,
   comparedPositions,
   dedentedOf,
   indentedOf,
@@ -149,6 +150,17 @@ export function combinedOf(editings: readonly Editing[]): Editing {
   const ordered = inTextOrder(changes);
 
   return { kind: "edited", changes: ordered, ids: [] };
+}
+
+export function editedSliceOf(
+  text: string,
+  span: Span,
+  changes: readonly TextChange[],
+): string {
+  const edited = appliedOf(text, changes);
+  const growth = edited.length - text.length;
+
+  return edited.slice(span.start, span.end + growth);
 }
 
 export function afterColonOf(text: string, key: Range): number {

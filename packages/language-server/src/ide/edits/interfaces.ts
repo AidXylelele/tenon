@@ -94,6 +94,39 @@ export interface UseData {
   readonly export: string | null;
 }
 
+export type WrapBlock = "try" | "for" | "do";
+
+export interface WrapSteps {
+  readonly kind: "wrapSteps";
+  readonly steps: readonly string[];
+  readonly block: WrapBlock;
+  readonly name: string | null;
+}
+
+export interface Run {
+  readonly list: StepNodeList;
+  readonly steps: readonly StepNode[];
+  readonly name: string;
+}
+
+export interface Redirections {
+  readonly inner: readonly SetField[];
+  readonly outer: readonly SetField[];
+}
+
+export interface RunWrapping {
+  readonly run: Run;
+  readonly block: WrapBlock;
+  readonly jumps: ReadonlyMap<string, string>;
+  readonly after: StepNode | null;
+  readonly isWorkflowList: boolean;
+}
+
+export type Redirection =
+  | { readonly kind: "kept" }
+  | { readonly kind: "set"; readonly setting: SetField }
+  | { readonly kind: "refused"; readonly reason: string };
+
 export type StepAction =
   | InsertStep
   | InsertStepOnBranch
@@ -103,7 +136,8 @@ export type StepAction =
   | DuplicateStep
   | SetFailure
   | SetResult
-  | UseData;
+  | UseData
+  | WrapSteps;
 
 export type FieldAction = SetField | ClearField | SetCondition;
 

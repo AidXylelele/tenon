@@ -13,6 +13,7 @@ import { dataUseOf } from "./data-use.js";
 import { failureSettingOf } from "./failures.js";
 import { fieldEditingOf } from "./field-actions.js";
 import { resultSettingOf } from "./results.js";
+import { wrappingOf } from "./wraps.js";
 import {
   stepDuplicateOf,
   stepInsertionOf,
@@ -46,6 +47,7 @@ export function editsOf(snapshot: Snapshot, action: EditAction): Editing {
     case "setFailure":
     case "setResult":
     case "useData":
+    case "wrapSteps":
       return stepEditsOf(snapshot, action);
   }
 }
@@ -105,6 +107,8 @@ function stepEditsOf(snapshot: Snapshot, action: StepAction): Editing {
       return resultSettingOf(editable, action);
     case "useData":
       return dataUseOf(editable, action);
+    case "wrapSteps":
+      return wrappingOf(editable, action);
   }
 }
 

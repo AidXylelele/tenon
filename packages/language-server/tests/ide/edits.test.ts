@@ -1457,3 +1457,239 @@ test("a condition that cannot be written is refused with its reason", () => {
     reason: "A condition holds at least one row.",
   });
 });
+
+const wrapFlow = `${inlineHeader}do:
+  - start:
+      set:
+        a: 1
+      then: fetch
+  - fetch:
+      call: http
+      with: { method: get, endpoint: https://api.test/a }
+  - check:
+      set:
+        b: 2
+  - report:
+      set:
+        c: 3
+`;
+
+const fetchItem = `  - fetch:
+      call: http
+      with: { method: get, endpoint: https://api.test/a }
+`;
+
+const checkItem = `  - check:
+      set:
+        b: 2
+`;
+
+function wrappingOf(
+  steps: readonly string[],
+  block: "try" | "for" | "do",
+  name: string | null,
+): EditAction {
+  return { kind: "wrapSteps", steps, block, name };
+}
+
+function nestedOf(item: string): string {
+  const lines = item.split("\n");
+  const indented = lines.map((line) => (line === "" ? line : `      ${line}`));
+
+  return indented.join("\n");
+}
+
+test("a step wrapped in a group gives the group its name, so a jump to it lands on the group", () => {
+  const action = wrappingOf(["/do/fetch"], "do", null);
+
+  const outcome = outcomeOf(wrapFlow, action);
+
+  const nested = nestedOf(fetchItem);
+  const expected = wrapFlow.replace(
+    fetchItem,
+    `  - fetch:\n      do:\n${nested}`,
+  );
+  expect(outcome).toEqual({
+    text: expected,
+    ids: [{ from: "/do/fetch", to: "/do/fetch/do/fetch" }],
+    diagnostics: [],
+  });
+});
+
+test("a run of steps wrapped in a named try retries them, and a jump to its first step names the try", () => {
+  const action = wrappingOf(["/do/fetch", "/do/check"], "try", "guarded");
+
+  const outcome = outcomeOf(wrapFlow, action);
+
+  const nested = nestedOf(fetchItem + checkItem);
+  const retry = `      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+`;
+  const expected = wrapFlow
+    .replace("then: fetch", "then: guarded")
+    .replace(
+      fetchItem + checkItem,
+      `  - guarded:\n      try:\n${nested}${retry}`,
+    );
+  expect(outcome).toEqual({
+    text: expected,
+    ids: [
+      { from: "/do/fetch", to: "/do/guarded/try/fetch" },
+      { from: "/do/check", to: "/do/guarded/try/check" },
+    ],
+    diagnostics: [],
+  });
+});
+
+test("a step wrapped in a repeat leaves the list it repeats over to fill", () => {
+  const action = wrappingOf(["/do/check"], "for", null);
+
+  const edited = editedOf(wrapFlow, action);
+
+  const nested = nestedOf(checkItem);
+  const expected = wrapFlow.replace(
+    checkItem,
+    `  - check:\n      for:\n        each: item\n        in: ""\n      do:\n${nested}`,
+  );
+  const problems = snapshotOf(edited).analysis.diagnostics.map((each) => [
+    each.code,
+    each.pointer,
+  ]);
+  expect(edited).toBe(expected);
+  expect(problems).toEqual([["expression", "/do/2/check/for/in"]]);
+});
+
+const wrapRetry = `      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+`;
+
+function checkWith(then: string): string {
+  return `${checkItem}      ${then}\n`;
+}
+
+test.each<readonly [string, string, EditAction, string, string]>([
+  [
+    "a jump from the run to the step right after it leaves the group",
+    checkWith("then: report"),
+    wrappingOf(["/do/check"], "do", "inner"),
+    `  - inner:\n      do:\n${nestedOf(checkWith("then: exit"))}`,
+    "/do/inner/do/check",
+  ],
+  [
+    "a jump from the run to the step right after it leaves the try",
+    checkWith("then: report"),
+    wrappingOf(["/do/check"], "try", "inner"),
+    `  - inner:\n      try:\n${nestedOf(checkWith("then: exit"))}${wrapRetry}`,
+    "/do/inner/try/check",
+  ],
+  [
+    "leaving the workflow's list from the run ends the run",
+    checkWith("then: exit"),
+    wrappingOf(["/do/check"], "do", "inner"),
+    `  - inner:\n      do:\n${nestedOf(checkWith("then: end"))}`,
+    "/do/inner/do/check",
+  ],
+  [
+    "ending the run from the run still ends it",
+    checkWith("then: end"),
+    wrappingOf(["/do/check"], "do", "inner"),
+    `  - inner:\n      do:\n${nestedOf(checkWith("then: end"))}`,
+    "/do/inner/do/check",
+  ],
+])("%s", (_, item, action, block, moved) => {
+  const text = wrapFlow.replace(checkItem, item);
+
+  const outcome = outcomeOf(text, action);
+
+  const expected = wrapFlow.replace(checkItem, block);
+  expect(outcome).toEqual({
+    text: expected,
+    ids: [{ from: "/do/check", to: moved }],
+    diagnostics: [],
+  });
+});
+
+const nestedWrapFlow = `${inlineHeader}do:
+  - outer:
+      do:
+        - first:
+            set:
+              a: 1
+            then: exit
+        - second:
+            set:
+              b: 2
+`;
+
+test.each<readonly [string, string, EditAction, string]>([
+  [
+    "a jump from outside to a step that is not the run's first",
+    wrapFlow.replace("then: fetch", "then: check"),
+    wrappingOf(["/do/fetch", "/do/check"], "do", "group"),
+    "The step /do/start goes to 'check', which would stand inside the block; only its first step can be gone to.",
+  ],
+  [
+    "a jump from the run to a step before it",
+    wrapFlow.replace("        b: 2\n", "        b: 2\n      then: start\n"),
+    wrappingOf(["/do/check"], "do", "group"),
+    "The step /do/check goes to 'start', outside the block, which a step inside it cannot do.",
+  ],
+  [
+    "a repeat whose steps jump to the step after the run",
+    wrapFlow.replace("        b: 2\n", "        b: 2\n      then: report\n"),
+    wrappingOf(["/do/check"], "for", "each"),
+    "The step /do/check goes to 'report', outside the block, which a step inside it cannot do.",
+  ],
+  [
+    "leaving a nested list from the run",
+    nestedWrapFlow,
+    wrappingOf(["/do/outer/do/first"], "do", "group"),
+    "The step /do/outer/do/first leaves its list, which inside the block would leave only the block.",
+  ],
+  [
+    "steps that are not next to each other",
+    wrapFlow,
+    wrappingOf(["/do/fetch", "/do/report"], "do", "group"),
+    "The steps to wrap do not stand next to each other in one list.",
+  ],
+  [
+    "no step",
+    wrapFlow,
+    wrappingOf([], "do", "group"),
+    "Choose at least one step to wrap.",
+  ],
+  [
+    "a block under a sibling's name",
+    wrapFlow,
+    wrappingOf(["/do/fetch"], "do", "report"),
+    "A step named 'report' already stands in this list.",
+  ],
+  [
+    "several branches of a fork",
+    `${inlineHeader}do:\n  - both:\n      fork:\n        branches:\n          - a: { set: { a: 1 } }\n          - b: { set: { b: 2 } }\n`,
+    wrappingOf(
+      ["/do/both/fork/branches/a", "/do/both/fork/branches/b"],
+      "do",
+      "group",
+    ),
+    "Branches of a fork run at once; wrap one branch at a time.",
+  ],
+])("wrapping %s is refused", (_, text, action, reason) => {
+  const editing = check(text, action);
+
+  expect(editing).toEqual({ kind: "refused", reason });
+});

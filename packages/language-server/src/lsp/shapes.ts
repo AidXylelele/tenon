@@ -58,6 +58,7 @@ const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
   setFailure: holdsFailureSetting,
   setResult: holdsResultSetting,
   useData: holdsDataUse,
+  wrapSteps: holdsWrapping,
 };
 
 export function invalidParamsOf(method: string): ResponseError {
@@ -260,6 +261,18 @@ function holdsValueOperand(operand: unknown): boolean {
     Number.isFinite(value);
 
   return kind === "value" && isLiteral;
+}
+
+function holdsWrapping(action: unknown): boolean {
+  const steps = memberOf(action, "steps");
+  const block = memberOf(action, "block");
+  const name = memberOf(action, "name");
+  const isNamed = name === null || typeof name === "string";
+  const isBlock = block === "try" || block === "for" || block === "do";
+  const isList = Array.isArray(steps);
+  const areSteps = isList && steps.every((step) => typeof step === "string");
+
+  return areSteps && isBlock && isNamed;
 }
 
 function holdsDataUse(action: unknown): boolean {
