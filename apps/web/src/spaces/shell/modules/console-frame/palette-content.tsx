@@ -29,6 +29,7 @@ import { ACTIONS, type PaletteAction } from "./palette-actions";
 import { remember, useRecent, type Visit } from "./recent";
 import { type KeepTheme, useThemeChoice } from "./theme-choice";
 import {
+  isFirstRead,
   type WorkflowSearch,
   WorkflowResults,
   workflowValueOf,
@@ -66,6 +67,8 @@ export function PaletteContent({
 
   const author = capabilities?.author === true;
   const searching = query !== "";
+  const firstRead = isFirstRead(workflows);
+  const settled = searching && !firstRead;
   const looksLikeRun = RUN_ID.test(query);
   const runId = looksLikeRun ? query : null;
   const pages = pagesOf(capabilities);
@@ -143,7 +146,7 @@ export function PaletteContent({
           onValueChange={setQuery}
         />
         <CommandList label="Results" className="max-h-96 p-1">
-          {searching && (
+          {settled && (
             <CommandEmpty>
               Nothing matches “{query}”. Try a workflow&apos;s name, a page, an
               action or a run ID.
@@ -195,7 +198,7 @@ export function PaletteContent({
             </>
           )}
         </CommandList>
-        <ResultCount searching={searching} />
+        <ResultCount speaking={settled} />
       </Command>
       <p className="flex items-center gap-1.5 border-t px-3 py-2 text-caption text-muted-foreground">
         <Kbd>
@@ -275,14 +278,14 @@ function RunGroup({
   );
 }
 
-function ResultCount({ searching }: { readonly searching: boolean }) {
+function ResultCount({ speaking }: { readonly speaking: boolean }) {
   const count = useCommandState((state) => state.filtered.count);
   const results = count === 1 ? "1 result" : `${String(count)} results`;
   const said = count === 0 ? "Nothing matches" : results;
 
   return (
     <p role="status" className="sr-only">
-      {searching && said}
+      {speaking && said}
     </p>
   );
 }

@@ -91,6 +91,13 @@ function type(text: string) {
   fireEvent.change(input, { target: { value: text } });
 }
 
+async function readSettled() {
+  await waitFor(() => {
+    const reading = screen.queryByText("Reading workflows…");
+    expect(reading).not.toBeInTheDocument();
+  });
+}
+
 function optionNames(): string[] {
   return screen.getAllByRole("option").map((option) => option.textContent);
 }
@@ -226,11 +233,13 @@ describe("the search of the console", () => {
     expect(names).toContain("Invite someone");
   });
 
-  it("what_is_typed_narrows_the_pages_and_actions_and_says_how_many", () => {
+  it("what_is_typed_narrows_the_pages_and_actions_and_says_how_many", async () => {
+    searchable.mockResolvedValue([]);
     renderFor(EDITOR);
     pressK("metaKey");
 
     type("secret");
+    await readSettled();
 
     const options = optionNames();
     const status = screen.getByRole("status");
@@ -238,11 +247,13 @@ describe("the search of the console", () => {
     expect(status).toHaveTextContent("2 results");
   });
 
-  it("a_search_that_matches_nothing_says_so_and_what_to_try", () => {
+  it("a_search_that_matches_nothing_says_so_and_what_to_try", async () => {
+    searchable.mockResolvedValue([]);
     renderFor(VIEWER);
     pressK("metaKey");
 
     type("zzzz");
+    await readSettled();
 
     const said = screen.getByText(/Nothing matches “zzzz”/);
     const status = screen.getByRole("status");
@@ -250,6 +261,29 @@ describe("the search of the console", () => {
       "Nothing matches “zzzz”. Try a workflow's name, a page, an action or a run ID.",
     );
     expect(status).toHaveTextContent("Nothing matches");
+  });
+
+  it("while_the_workflows_are_read_typing_says_so_and_not_that_nothing_matches", () => {
+    renderFor(VIEWER);
+    pressK("metaKey");
+
+    type("zzzz");
+
+    const reading = screen.getByText("Reading workflows…");
+    const nothing = screen.queryByText(/Nothing matches/);
+    expect(reading).toBeVisible();
+    expect(nothing).not.toBeInTheDocument();
+  });
+
+  it("typing_after_a_failed_read_says_the_workflows_could_not_be_read", async () => {
+    vi.stubGlobal("fetch", () => Promise.reject(new TypeError("offline")));
+    renderFor(VIEWER);
+    pressK("metaKey");
+
+    type("route");
+
+    const said = await screen.findByText("Workflows could not be read.");
+    expect(said).toBeVisible();
   });
 
   it("a_workflow_found_opens_its_page_and_comes_first_next_time", async () => {

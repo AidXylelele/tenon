@@ -74,18 +74,34 @@ async function askForWorkflows(): Promise<Answer> {
 
 export function WorkflowResults({ search, onChoose }: WorkflowResultsProps) {
   return (
-    <CommandGroup heading="Workflows">
-      {search.reading && search.found === null && (
-        <div className="flex items-center gap-2 px-2 py-1.5 text-muted-foreground">
+    <>
+      {isFirstRead(search) && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-muted-foreground">
           <Spinner className="size-3.5" />
           Reading workflows…
         </div>
       )}
       {search.failed && (
-        <p className="px-2 py-1.5 text-muted-foreground">
+        <p className="px-3 py-1.5 text-muted-foreground">
           Workflows could not be read.
         </p>
       )}
+      <WorkflowGroup search={search} onChoose={onChoose} />
+    </>
+  );
+}
+
+export function isFirstRead(search: WorkflowSearch): boolean {
+  return search.reading && search.found === null;
+}
+
+export function workflowValueOf(workflow: FoundWorkflow): string {
+  return `${workflow.namespace} ${workflow.name}`;
+}
+
+function WorkflowGroup({ search, onChoose }: WorkflowResultsProps) {
+  return (
+    <CommandGroup heading="Workflows">
       {search.found?.map((each) => {
         const value = workflowValueOf(each);
         return (
@@ -114,8 +130,4 @@ export function WorkflowResults({ search, onChoose }: WorkflowResultsProps) {
       })}
     </CommandGroup>
   );
-}
-
-export function workflowValueOf(workflow: FoundWorkflow): string {
-  return `${workflow.namespace} ${workflow.name}`;
 }

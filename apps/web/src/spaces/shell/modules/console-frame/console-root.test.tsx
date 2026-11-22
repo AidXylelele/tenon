@@ -138,6 +138,18 @@ describe("the sidebar's state across the console", () => {
     expect(shown).toBeInTheDocument();
   });
 
+  it("a_toggle_in_the_editor_is_the_person's_choice_outside_it_too", () => {
+    address.pathname = "/workflows/sales/route-lead/edit";
+    const view = renderAt(1100, null);
+    toggle();
+
+    revisit(view, "/workflows/sales/route-lead");
+
+    const shown = screen.getByText("expanded");
+    expect(shown).toBeInTheDocument();
+    expect(document.cookie).toContain("sidebar_state=true");
+  });
+
   it("leaving_the_editor_brings_back_the_column_as_chosen", () => {
     address.pathname = "/workflows/sales/route-lead/edit";
     const view = renderAt(1440, null);
