@@ -19,7 +19,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "vite preview --outDir storybook-static --port 6007 --strictPort",
+    command:
+      "vite preview --config e2e/playground-server.config.ts --outDir storybook-static --port 6007 --strictPort",
     url: PLAYGROUND_URL,
   },
 });
