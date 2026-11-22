@@ -6,22 +6,35 @@ import {
 import formats from "ajv-formats";
 import type { JsonObject, JsonValue } from "../../api/index.js";
 import { InterpreterError } from "../faults/index.js";
-import { childPointerOf, isJsonObject, pointedValueOf } from "../json/index.js";
+import {
+  childPointerOf,
+  isJsonObject,
+  pointedValueOf,
+  rootPointer,
+} from "../json/index.js";
+import { choiceOf, distinctChoicesOf, linkedViolationsOf } from "./choices.js";
+import { schemaLocationsOf } from "./schema-locations.js";
 import { sentenceOf } from "./sentences.js";
 import type {
+  Choice,
+  Expansion,
+  Report,
   SchemaCompilation,
   SchemaCompiler,
+  SchemaLocation,
   SchemaReferences,
   SchemaViolation,
   Validator,
 } from "./types.js";
 
-const options = {
+const plainOptions = {
   strict: false,
   allErrors: true,
   logger: false,
   addUsedSchema: false,
 } as const;
+
+const tracedOptions = { ...plainOptions, verbose: true } as const;
 
 const notASchema = "A schema must be an object or a boolean.";
 
@@ -33,8 +46,11 @@ const uriTemplate = new RegExp(`^(?:${literal}|${expression})*$`, "i");
 
 export class JsonSchemas implements SchemaCompiler, SchemaReferences {
   readonly #ajv: Ajv2020;
+  readonly #locations: ReadonlyMap<object, SchemaLocation>;
 
   constructor(documents: readonly JsonObject[]) {
+    const isRegistering = documents.length > 0;
+    const options = isRegistering ? tracedOptions : plainOptions;
     const ajv = new Ajv2020(options);
     formats.default(ajv);
 
@@ -43,15 +59,11 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
     ajv.addSchema(registered);
 
     this.#ajv = ajv;
+    this.#locations = schemaLocationsOf(documents);
   }
 
   validatorOf(reference: string): Validator {
-    const validate = this.#ajv.getSchema(reference);
-
-    if (validate === undefined) {
-      throw new InterpreterError(`The schema '${reference}' is not defined.`);
-    }
-
+    const validate = this.#validateFunctionOf(reference);
     return this.#validatorOfFunction(validate);
   }
 
@@ -80,26 +92,93 @@ export class JsonSchemas implements SchemaCompiler, SchemaReferences {
     }
   }
 
-  #validatorOfFunction(validate: ValidateFunction): Validator {
-    return (value) => {
-      validate(value);
-      const errors = validate.errors ?? [];
-      return errors.map((error) => this.#violationOf(error, value));
-    };
+  #validateFunctionOf(reference: string): ValidateFunction {
+    const validate = this.#ajv.getSchema(reference);
+
+    if (validate === undefined) {
+      throw new InterpreterError(`The schema '${reference}' is not defined.`);
+    }
+
+    return validate;
   }
 
-  #violationOf(error: ErrorObject, validated: JsonValue): SchemaViolation {
-    const instance = error.instancePath;
+  #validatorOfFunction(validate: ValidateFunction): Validator {
+    return (value) => this.#violationsOf(validate, value);
+  }
+
+  #violationsOf(
+    validate: ValidateFunction,
+    value: JsonValue,
+  ): readonly SchemaViolation[] {
+    const reports = this.#reportsOf(validate, value, rootPointer);
+    const choices = distinctChoicesOf(reports);
+    const entries = choices.map((choice) => {
+      const expanded = this.#expansionsOf(choice);
+      return [choice.key, expanded] as const;
+    });
+    const expansions = new Map(entries);
+
+    return linkedViolationsOf(reports, expansions);
+  }
+
+  #reportsOf(
+    validate: ValidateFunction,
+    value: JsonValue,
+    base: string,
+  ): readonly Report[] {
+    validate(value);
+    const errors = [...(validate.errors ?? [])];
+
+    return errors.map((error) => this.#reportOf(error, value, base));
+  }
+
+  #reportOf(error: ErrorObject, validated: JsonValue, base: string): Report {
+    const instance = `${base}${error.instancePath}`;
     const params: Record<string, unknown> = error.params;
     const property = params.unevaluatedProperty ?? params.additionalProperty;
     const pointer = this.#pointerOf(instance, property);
     const subject = this.#pointerOf(pointer, params.missingProperty);
     const keyword = error.keyword;
     const message = sentenceOf(error, subject);
-    const value = pointedValueOf(validated, instance);
+    const value = pointedValueOf(validated, error.instancePath);
     const pattern = typeof params.pattern === "string" ? params.pattern : null;
+    const parent = this.#locationOf(error);
+    const location = parent?.uri ?? null;
+    const ambiguous = Array.isArray(params.passingSchemas);
+    const violation: SchemaViolation = {
+      pointer,
+      instance,
+      keyword,
+      message,
+      subject,
+      value,
+      pattern,
+      location,
+      ambiguous,
+      branches: [],
+    };
+    const choice = choiceOf(violation, parent);
 
-    return { pointer, instance, keyword, message, subject, value, pattern };
+    return { violation, choice };
+  }
+
+  #locationOf(error: ErrorObject): SchemaLocation | null {
+    const parent = error.parentSchema;
+
+    if (parent === undefined) {
+      return null;
+    }
+
+    return this.#locations.get(parent) ?? null;
+  }
+
+  #expansionsOf(choice: Choice): readonly Expansion[] {
+    return choice.alternatives.map((schema, index) => {
+      const reference = `${choice.reference}/${String(index)}`;
+      const validate = this.#validateFunctionOf(reference);
+      const reports = this.#reportsOf(validate, choice.value, choice.instance);
+      return { schema, reports };
+    });
   }
 
   #pointerOf(parent: string, property: unknown): string {

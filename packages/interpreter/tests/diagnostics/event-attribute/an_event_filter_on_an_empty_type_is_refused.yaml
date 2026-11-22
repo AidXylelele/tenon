@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listens
+    version: '0.1.0'
+  do:
+    - await:
+        listen:
+          to:
+            one:
+              with:
+                type: ''
+diagnostics:
+  - code: event-attribute
+    pointer: /do/0/await/listen/to/one/with/type
+    subject: type
+    range: { start: { line: 12, column: 21 } }
+    message: "An event filter on an empty 'type' matches no event."

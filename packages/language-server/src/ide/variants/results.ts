@@ -1,0 +1,121 @@
+import type { JsonValue } from "interpreter/front-end";
+import { childPointerOf, valueAt } from "../pointers/index.js";
+import type { StepNode } from "../steps/index.js";
+import type {
+  ChosenResult,
+  ResultMembers,
+  ResultReading,
+  StepResult,
+  WrittenResult,
+} from "./interfaces.js";
+import type { StepVariant } from "./variants.js";
+
+export const printedJsonAs = "${ fromjson }";
+
+export const inputAndValuesAs = "${ $input + . }";
+
+const printedResults: readonly ChosenResult[] = [
+  "printedJson",
+  "printedText",
+  "exitCode",
+];
+
+const setResults: readonly ChosenResult[] = ["inputAndValues", "valuesOnly"];
+
+const resultChoices: ReadonlyMap<StepVariant, readonly ChosenResult[]> =
+  new Map([
+    ["script-js", printedResults],
+    ["script-python", printedResults],
+    ["set", setResults],
+  ]);
+
+const resultMembers: Readonly<Record<ChosenResult, ResultMembers>> = {
+  printedJson: { as: printedJsonAs, return: "stdout" },
+  printedText: { as: null, return: "stdout" },
+  exitCode: { as: null, return: "code" },
+  inputAndValues: { as: inputAndValuesAs, return: null },
+  valuesOnly: { as: null, return: null },
+};
+
+export function resultChoicesOf(
+  variant: StepVariant | null,
+): readonly ChosenResult[] {
+  if (variant === null) {
+    return [];
+  }
+
+  return resultChoices.get(variant) ?? [];
+}
+
+export function resultReadingOf(
+  choices: readonly ChosenResult[],
+  written: WrittenResult,
+): ResultReading | null {
+  const isOffered = choices.length > 0;
+
+  if (!isOffered) {
+    return null;
+  }
+
+  const chosen = choices.find((choice) => isWrittenAs(written, choice));
+  const value: StepResult = chosen ?? "written";
+
+  return { value, choices };
+}
+
+export function printedResultOf(written: WrittenResult): StepResult {
+  const chosen = printedResults.find((choice) => isWrittenAs(written, choice));
+
+  return chosen ?? "written";
+}
+
+export function resultMembersOf(result: ChosenResult): ResultMembers {
+  return resultMembers[result];
+}
+
+export function isChosenResult(value: unknown): value is ChosenResult {
+  return typeof value === "string" && Object.hasOwn(resultMembers, value);
+}
+
+export function writtenResultOf(
+  node: StepNode,
+  document: JsonValue,
+): WrittenResult {
+  const asPointer = outputAsPointerOf(node.pointer);
+  const as = valueAt(document, asPointer);
+  const task = node.task;
+  const returned = task.kind === "run" ? task.return : null;
+
+  return { as, return: returned };
+}
+
+export function outputAsPointerOf(pointer: string): string {
+  const output = childPointerOf(pointer, "output");
+
+  return childPointerOf(output, "as");
+}
+
+export function returnPointerOf(pointer: string): string {
+  const run = childPointerOf(pointer, "run");
+
+  return childPointerOf(run, "return");
+}
+
+function isWrittenAs(written: WrittenResult, result: ChosenResult): boolean {
+  const members = resultMembersOf(result);
+  const isAs = isOutputAs(written.as, members.as);
+  const isReturned = written.return === members.return;
+
+  return isAs && isReturned;
+}
+
+function isOutputAs(
+  written: JsonValue | undefined,
+  as: string | null,
+): boolean {
+  if (as !== null) {
+    return written === as;
+  }
+
+  return written === undefined;
+}

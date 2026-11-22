@@ -31,13 +31,13 @@ const FAILURES: readonly {
 }[] = [
   { kind: "stop", label: "Stop the run" },
   { kind: "continue", label: "Go on with the next task" },
-  { kind: "retry", label: "Try again" },
+  { kind: "retry", label: "Retry" },
   { kind: "handle", label: "Run other tasks instead" },
 ];
 
 const FIRST_RETRY: Failure = {
   kind: "retry",
-  attempts: 3,
+  retries: 3,
   seconds: 5,
   growing: false,
 };

@@ -21,6 +21,21 @@ test("initialize answers the server's capabilities", async () => {
       definitionProvider: true,
       referencesProvider: true,
       renameProvider: true,
+      experimental: {
+        "workflow/dataAt": true,
+        "workflow/document": true,
+        "workflow/fromJson": true,
+        "workflow/newDocument": true,
+        "workflow/rangesOf": true,
+        "workflow/readCondition": true,
+        "workflow/structure": true,
+        "workflow/stepForm": true,
+        "workflow/stepVariants": true,
+        "workflow/workflowForm": true,
+        "workflow/edit": true,
+        "workflow/importsNeeded": true,
+        "workflow/didFetchImports": true,
+      },
     },
   });
 });
