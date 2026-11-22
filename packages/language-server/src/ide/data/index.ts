@@ -8,4 +8,4 @@ export type {
   DataWarning,
 } from "./interfaces.js";
 export { dataAtOf } from "./data.js";
-export { exportAsOf, exportAsPointerOf } from "./exports.js";
+export { exportAsOf, exportAsPointerOf, exportersOf } from "./exports.js";

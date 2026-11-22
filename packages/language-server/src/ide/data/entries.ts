@@ -6,9 +6,15 @@ import {
 } from "../jq-text/index.js";
 import { valueAt } from "../pointers/index.js";
 import type { StepNode } from "../steps/index.js";
-import { exportAsPointerOf, exportedNameOf } from "./exports.js";
+import {
+  exportAsPointerOf,
+  exportedNameOf,
+  exportersOf,
+  replacesContextOf,
+} from "./exports.js";
 import {
   earlierStepsOf,
+  isPassingOnOf,
   outputShapeOf,
   producerOf,
   workflowInputShapeOf,
@@ -111,7 +117,7 @@ export function timeEntriesOf(): readonly DataEntry[] {
 
 function reachedEntriesOf(site: DataSite, reach: Reach): readonly DataEntry[] {
   const { step, producer } = reach;
-  const isPassedOn = step.task.kind === "switch";
+  const isPassedOn = isPassingOnOf(step);
 
   if (isPassedOn) {
     return [];
@@ -135,12 +141,17 @@ function flowingEntryOf(site: DataSite, step: StepNode): DataEntry {
 
 function exportedEntriesOf(site: DataSite, reach: Reach): readonly DataEntry[] {
   const { step, between } = reach;
+  const { tree, document } = site.flow;
   const written = exportWrittenOf(site, step);
   const name = exportedNameOf(written);
   const isOwnExport = written !== undefined && name !== step.name;
-  const isReplaced = between.some((later) => isContextReplacedBy(site, later));
+  const isReplaced = between.some((later) =>
+    replacesContextOf(document, later),
+  );
+  const exporters = exportersOf(tree, document, step.name);
+  const isShared = exporters.some((exporter) => exporter !== step);
   const isInScope = site.scope.has("context");
-  const isUnreachable = isOwnExport || isReplaced || !isInScope;
+  const isUnreachable = isOwnExport || isReplaced || isShared || !isInScope;
 
   if (isUnreachable) {
     return [];
@@ -152,13 +163,6 @@ function exportedEntriesOf(site: DataSite, reach: Reach): readonly DataEntry[] {
   const needsExport = written === undefined;
   const origin = { source: "step", step: step.id, needsExport } as const;
   return [entryOf(member, origin)];
-}
-
-function isContextReplacedBy(site: DataSite, step: StepNode): boolean {
-  const written = exportWrittenOf(site, step);
-  const name = exportedNameOf(written);
-
-  return written !== undefined && name === null;
 }
 
 function exportWrittenOf(

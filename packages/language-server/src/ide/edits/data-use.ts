@@ -1,6 +1,6 @@
-import { exportAsOf, exportAsPointerOf } from "../data/index.js";
+import { exportAsOf, exportAsPointerOf, exportersOf } from "../data/index.js";
 import { valueAt } from "../pointers/index.js";
-import { stepWithId } from "../steps/index.js";
+import { type StepNode, stepWithId } from "../steps/index.js";
 import { combinedOf } from "./edits.js";
 import { fieldSettingOf } from "./field-actions.js";
 import type { Editable, Editing, SetField, UseData } from "./interfaces.js";
@@ -34,6 +34,12 @@ function exportOf(editable: Editable, id: string): Editing {
   const pointer = exportAsPointerOf(step.pointer);
   const written = valueAt(editable.document, pointer);
   const exportAs = exportAsOf(step.name);
+  const exporters = exportersOf(editable.tree, editable.document, step.name);
+  const other = exporters.find((exporter) => exporter !== step);
+
+  if (other !== undefined) {
+    return { kind: "refused", reason: sharedKeyOf(step, other) };
+  }
 
   if (written === exportAs) {
     return unchanged;
@@ -45,6 +51,10 @@ function exportOf(editable: Editable, id: string): Editing {
 
   const setting: SetField = { kind: "setField", pointer, value: exportAs };
   return fieldSettingOf(editable, setting);
+}
+
+function sharedKeyOf(step: StepNode, other: StepNode): string {
+  return `Rename one of the two steps named '${step.name}' (${step.id} and ${other.id}): both would export it to the context.`;
 }
 
 function ownExportOf(id: string): string {

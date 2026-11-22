@@ -1803,3 +1803,19 @@ test("a block's header comment stays when its value becomes empty", () => {
   );
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
+
+test("an export whose key another step of the same name already writes is refused", () => {
+  const twoFetches = pickFlow.replace(
+    "  - total:\n      set:\n        count: 2\n",
+    `  - total:\n      do:\n        - fetch:\n            set:\n              count: 2\n            export:\n              as: '\${ $context + { "fetch": . } }'\n`,
+  );
+  const action = useOf("${ $context.fetch }", "/do/fetch");
+
+  const editing = check(twoFetches, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason:
+      "Rename one of the two steps named 'fetch' (/do/fetch and /do/total/do/fetch): both would export it to the context.",
+  });
+});

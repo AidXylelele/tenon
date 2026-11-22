@@ -485,3 +485,167 @@ test("a text that does not read has no data", () => {
     reason: "The text does not read; edit it in the text.",
   });
 });
+
+function stepRoutesOf(text: string, step: string, field: string) {
+  const entries = entriesOf(text, step, field);
+
+  return entries
+    .filter((entry) => entry.source === "step")
+    .map((entry) => [entry.name, entry.expression]);
+}
+
+const objectInput =
+  "input:\n  schema:\n    document:\n      type: object\ndo:\n";
+
+const guardedFlow = `${inlineHeader}${objectInput}  - first:
+      set:
+        a: 1
+  - maybe:
+      if: \${ .a == 1 }
+      set:
+        b: 2
+  - next:
+      set:
+        c: 3
+`;
+
+test("a step before with a condition passes its own input on when skipped, so it reaches only through the context", () => {
+  const routes = stepRoutesOf(guardedFlow, "/do/next", "/do/2/next/set/c");
+
+  expect(routes).toEqual([
+    ["maybe", "$context.maybe"],
+    ["first", "$context.first"],
+  ]);
+});
+
+test("a step with a condition may hold nothing when it is skipped, which the data warns of", () => {
+  const reading = check(guardedFlow, "/do/next", "/do/2/next/set/c");
+
+  expect(reading).toMatchObject({
+    kind: "data",
+    warnings: [{ kind: "mayHoldNothing", step: "/do/maybe" }],
+  });
+});
+
+const guardedEarlierFlow = `${inlineHeader}${objectInput}  - maybe:
+      if: \${ .go }
+      set:
+        b: 2
+  - other:
+      set:
+        a: 1
+  - next:
+      set:
+        c: 3
+`;
+
+test("an earlier step with a condition is offered with the warning that it may hold nothing", () => {
+  const reading = check(guardedEarlierFlow, "/do/next", "/do/2/next/set/c");
+
+  expect(reading).toMatchObject({
+    kind: "data",
+    warnings: [{ kind: "mayHoldNothing", step: "/do/maybe" }],
+  });
+});
+
+const transformingSwitchFlow = `${inlineHeader}${objectInput}  - fetch:
+      set:
+        items: [ 1 ]
+  - route:
+      switch:
+        - default:
+            then: continue
+      output:
+        as: '\${ { routed: true } }'
+  - post:
+      set:
+        x: 1
+`;
+
+test("a switch with its own output passes on its result, not its input", () => {
+  const routes = stepRoutesOf(
+    transformingSwitchFlow,
+    "/do/post",
+    "/do/2/post/set/x",
+  );
+
+  expect(routes).toEqual([
+    ["route", "."],
+    ["fetch", "$context.fetch"],
+  ]);
+});
+
+const nestedExportFlow = `${inlineHeader}${objectInput}  - fetch:
+      set:
+        a: 1
+  - group:
+      do:
+        - inner:
+            set:
+              b: 2
+            export:
+              as: '\${ { b: 2 } }'
+  - last:
+      set:
+        c: 3
+`;
+
+test("an export inside an earlier block replaces the context, so the steps before that block are not offered", () => {
+  const routes = stepRoutesOf(nestedExportFlow, "/do/last", "/do/2/last/set/c");
+
+  expect(routes).toEqual([["group", "."]]);
+});
+
+const twoFetchesFlow = `${inlineHeader}${objectInput}  - fetch:
+      set:
+        a: 1
+      export:
+        as: '\${ $context + { "fetch": . } }'
+  - each:
+      for:
+        in: \${ [ 1 ] }
+      do:
+        - fetch:
+            set:
+              b: 2
+            export:
+              as: '\${ $context + { "fetch": . } }'
+  - last:
+      set:
+        c: 3
+`;
+
+test("two steps of one name in different lists export one key, so neither is offered through the context", () => {
+  const routes = stepRoutesOf(twoFetchesFlow, "/do/last", "/do/2/last/set/c");
+
+  expect(routes).toEqual([["each", "."]]);
+});
+
+const contextFlow = `${inlineHeader}do:
+  - fetch:
+      set:
+        a: 1
+  - total:
+      set:
+        b: 2
+  - last:
+      set:
+        c: 3
+`;
+
+test.each([
+  [
+    "warned where the workflow's input is not known to be an object, since the context starts as that input",
+    contextFlow,
+    [{ kind: "contextNotKnownObject" }],
+  ],
+  [
+    "not warned where the workflow's input schema makes it an object",
+    contextFlow.replace("do:\n", objectInput),
+    [],
+  ],
+])("data read through the context is %s", (_, text, warnings) => {
+  const reading = check(text, "/do/last", "/do/2/last/set/c");
+
+  expect(reading).toMatchObject({ kind: "data", warnings });
+});

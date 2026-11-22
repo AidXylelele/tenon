@@ -28,10 +28,10 @@ export interface Origin {
 
 export interface DataEntry extends DataMember, Origin {}
 
-export interface DataWarning {
-  readonly kind: "inputNotKnownObject";
-  readonly step: string;
-}
+export type DataWarning =
+  | { readonly kind: "inputNotKnownObject"; readonly step: string }
+  | { readonly kind: "mayHoldNothing"; readonly step: string }
+  | { readonly kind: "contextNotKnownObject" };
 
 export type DataReading =
   | {

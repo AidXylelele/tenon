@@ -21,7 +21,10 @@ test("the data at a step's field is answered with the expressions to insert", as
     entry.expression,
   ]);
 
-  expect(answered).toMatchObject({ version: 1, warnings: [] });
+  expect(answered).toMatchObject({
+    version: 1,
+    warnings: [{ kind: "contextNotKnownObject" }],
+  });
   expect(entries).toEqual([
     ["step", "guard", "."],
     ["step", "greet", "$context.greet"],

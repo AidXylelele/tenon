@@ -57,13 +57,14 @@ export function producerOf(
 
   const fallsThrough = fallsThroughOf(previous.task);
   const isTarget = isTargetOf(flow, node);
-  const isOnlyEntry = fallsThrough && !isTarget;
+  const isGuarded = previous.task.if !== null;
+  const isOnlyEntry = fallsThrough && !isTarget && !isGuarded;
 
   if (!isOnlyEntry) {
     return null;
   }
 
-  const isPassedOn = previous.task.kind === "switch";
+  const isPassedOn = isPassingOnOf(previous);
 
   if (isPassedOn) {
     return producerOf(flow, previous, "definition");
@@ -114,6 +115,20 @@ export function workflowInputShapeOf(workflow: ast.Workflow): Shape {
   return schemaShapeOf(workflow.input.schema) ?? unknownShape;
 }
 
+export function startShapeOf(workflow: ast.Workflow): Shape {
+  const isTransformed = workflow.input.from !== null;
+
+  if (isTransformed) {
+    return unknownShape;
+  }
+
+  return workflowInputShapeOf(workflow);
+}
+
+export function isPassingOnOf(step: StepNode): boolean {
+  return step.task.kind === "switch" && step.task.output.as === null;
+}
+
 function incomingShapeOf(flow: DataFlow, node: StepNode): Shape {
   const producer = producerOf(flow, node, "raw");
 
@@ -123,13 +138,12 @@ function incomingShapeOf(flow: DataFlow, node: StepNode): Shape {
 
   const isWorkflowStart =
     node.list === flow.tree.root.pointer && node.index === 0;
-  const isTransformed = flow.workflow.input.from !== null;
 
-  if (!isWorkflowStart || isTransformed) {
+  if (!isWorkflowStart) {
     return unknownShape;
   }
 
-  return workflowInputShapeOf(flow.workflow);
+  return startShapeOf(flow.workflow);
 }
 
 function setShapeOf(

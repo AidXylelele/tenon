@@ -7,7 +7,13 @@ import {
 import { runtimeExpressionOf } from "../jq-text/index.js";
 import { withValueAt } from "../pointers/index.js";
 import { modelOf, type Snapshot, sourceOf } from "../snapshot/index.js";
-import { type StepNode, stepTreeOf, stepWithId } from "../steps/index.js";
+import {
+  type StepNode,
+  stepHolding,
+  type StepTree,
+  stepTreeOf,
+  stepWithId,
+} from "../steps/index.js";
 import { inputAndValuesAs, writtenResultOf } from "../variants/index.js";
 import { yamlOf } from "../yaml-text/index.js";
 import {
@@ -17,8 +23,9 @@ import {
   variableEntriesOf,
   workflowInputEntriesOf,
 } from "./entries.js";
-import { definitionShapeOf } from "./flow.js";
+import { definitionShapeOf, startShapeOf } from "./flow.js";
 import type {
+  DataEntry,
   DataFlow,
   DataReading,
   DataRequest,
@@ -105,12 +112,18 @@ function dataOf(site: DataSite): DataReading {
   const secrets = secretEntriesOf(site);
   const times = timeEntriesOf();
   const entries = [...steps, ...input, ...variables, ...secrets, ...times];
-  const warnings = warningsOf(site.flow, site.node);
+  const merging = mergingWarningsOf(site.flow, site.node);
+  const skipped = skippedWarningsOf(site, steps);
+  const context = contextWarningsOf(site, steps);
+  const warnings = [...merging, ...skipped, ...context];
 
   return { kind: "data", entries, warnings };
 }
 
-function warningsOf(flow: DataFlow, node: StepNode): readonly DataWarning[] {
+function mergingWarningsOf(
+  flow: DataFlow,
+  node: StepNode,
+): readonly DataWarning[] {
   const written = writtenResultOf(node, flow.document);
   const isMerging = written.as === inputAndValuesAs;
   const incoming = definitionShapeOf(flow, node);
@@ -122,6 +135,70 @@ function warningsOf(flow: DataFlow, node: StepNode): readonly DataWarning[] {
   }
 
   return [{ kind: "inputNotKnownObject", step: node.id }];
+}
+
+function skippedWarningsOf(
+  site: DataSite,
+  steps: readonly DataEntry[],
+): readonly DataWarning[] {
+  const contextual = steps.filter((entry) => entry.expression !== ".");
+
+  return contextual.flatMap((entry) => skippedWarningOf(site, entry.step));
+}
+
+function skippedWarningOf(
+  site: DataSite,
+  id: string | null,
+): readonly DataWarning[] {
+  const tree = site.flow.tree;
+  const step = id === null ? null : stepWithId(tree, id);
+
+  if (step === null) {
+    return [];
+  }
+
+  const isGuarded = isGuardedFor(tree, step, site.node);
+
+  if (!isGuarded) {
+    return [];
+  }
+
+  return [{ kind: "mayHoldNothing", step: step.id }];
+}
+
+function contextWarningsOf(
+  site: DataSite,
+  steps: readonly DataEntry[],
+): readonly DataWarning[] {
+  const readsContext = steps.some((entry) => entry.expression !== ".");
+  const start = startShapeOf(site.flow.workflow);
+  const isObject = start.kind === "object";
+
+  if (!readsContext || isObject) {
+    return [];
+  }
+
+  return [{ kind: "contextNotKnownObject" }];
+}
+
+function isGuardedFor(tree: StepTree, step: StepNode, at: StepNode): boolean {
+  const holdsAt = at.pointer.startsWith(`${step.pointer}/`);
+  const isGuarded = step.task.if !== null;
+  const holder = stepHolding(tree, step.list);
+
+  if (holdsAt) {
+    return false;
+  }
+
+  if (isGuarded) {
+    return true;
+  }
+
+  if (holder === null) {
+    return false;
+  }
+
+  return isGuardedFor(tree, holder, at);
 }
 
 function placeOf(node: StepNode, field: string): FieldPlace {

@@ -714,7 +714,11 @@ interface DataAtParams {
 interface DataAtResult {
   version: number;
   entries: DataEntry[];
-  warnings: { kind: "inputNotKnownObject"; step: string }[];
+  warnings: (
+    | { kind: "inputNotKnownObject"; step: string }
+    | { kind: "mayHoldNothing"; step: string }
+    | { kind: "contextNotKnownObject" }
+  )[];
 }
 
 interface DataEntry extends DataMember {
@@ -733,14 +737,14 @@ interface DataMember {
 ```
 
 - **Order.** The steps before the field's step, nearest first, then the workflow's input, the variables, the secrets and the times.
-- **The steps before** are the earlier steps of the step's list and of each list holding it; a fork's other branches run beside it and are not before it. A switch passes its input on (it outputs its transformed input), so it is no entry of its own.
-- **What flows in.** The step directly before reaches as `.` (dsl.md, "Data Flow", step 9) only when it is the step's only way in: it continues into it, no `then` names the step, and, in the step's definition, the step has no `input.from` (step 4). In `if` and `input.from` the raw input flows in; in `output` and `export` the step's own output does, and no step before reaches as `.`.
-- **Through the context.** Any other step before reaches only through `$context` (step 7): its entry reads `$context.<name>` and `needsExport` is true until the step writes the export that adds it, `export.as: ${ $context + { "<name>": . } }`. A step that writes another `export.as` is not offered, and neither is any step before a step that does, since that export replaces the context.
+- **The steps before** are the earlier steps of the step's list and of each list holding it; a fork's other branches run beside it and are not before it. A switch with no `output.as` passes its input on (it outputs its transformed input), so it is no entry of its own; one with an `output.as` passes on its result and is an entry like any step.
+- **What flows in.** The step directly before reaches as `.` (dsl.md, "Data Flow", step 9) only when it is the step's only way in: it continues into it, it has no `if` (a skipped step passes on its own raw input), no `then` names the step, and, in the step's definition, the step has no `input.from` (step 4). In `if` and `input.from` the raw input flows in; in `output` and `export` the step's own output does, and no step before reaches as `.`.
+- **Through the context.** Any other step before reaches only through `$context` (step 7): its entry reads `$context.<name>` and `needsExport` is true until the step writes the export that adds it, `export.as: ${ $context + { "<name>": . } }`. A step that writes another `export.as` is not offered, and neither is any step before a step that does, or before a block holding one (in any of its lists, a listen's or a subscription's `foreach` export included), since that export replaces the context. Step names are unique only within a list, so a step whose name another step already exports under is not offered, and `useData` refuses to export it, naming both steps. `$context` starts as the workflow's transformed input (the interpreter's initial context), so the exported keys share its names, and `$context + { … }` fails at run time where that input is not an object or `null`.
 - **Shapes.** An `output.schema` gives a step's output (step 6). Else a `set` gives its values, with its input's members beside them where its `output.as` keeps the input (research D13); a script passes on the text it prints (`text`), its exit code (`number`), or, parsed by `output.as: ${ fromjson }`, JSON whose fields are not known before the run (`unknown`, research D14); everything else is `unknown`. The workflow's input is `$workflow.input`, its raw input (dsl.md, "Workflow Descriptor"), shaped by `input.schema`.
 - **Scope.** The server writes `${ . }` into the field and reads what the interpreter resolves there: the workflow's input needs `$workflow`, the steps through the context `$context`, the secrets `$secrets`, and the variables are the binders in scope (a `for`'s `each` and `at`, a catch's error).
 - **Secrets** are offered only in fields where credentials go: under `authentication` or `headers`, or an address (`endpoint`, `uri`, `server`) (research D16). Each reads `$secrets.<name>`.
 - **Times** are UTC times jq computes from the run's clock: `now` (`now | todate`), `today` and `yesterday` (the start of the day, `now | strftime("%Y-%m-%dT00:00:00Z")`, a day earlier for `yesterday`).
-- **Warnings.** `inputNotKnownObject` on a set that keeps its input (`output.as: ${ $input + . }`) where that input is not known to be an object: jq adds an object only to an object or `null`.
+- **Warnings.** `inputNotKnownObject` on a set that keeps its input (`output.as: ${ $input + . }`) where that input is not known to be an object: jq adds an object only to an object or `null`. `mayHoldNothing` for a step offered through the context that has an `if`, or sits in a block that has one apart from the field's step: when it is skipped it exports nothing, and inside a loop the previous item's value stays. `contextNotKnownObject` where data is read through the context and the workflow's transformed input is not known to be an object.
 - **Broken text.** A text the grammar refuses answers from the steps of the last version that analysed.
 - **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a field outside the step, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
 
@@ -807,7 +811,7 @@ interface DataMember {
       "members": []
     }
   ],
-  "warnings": []
+  "warnings": [{ "kind": "contextNotKnownObject" }]
 }
 ```
 
