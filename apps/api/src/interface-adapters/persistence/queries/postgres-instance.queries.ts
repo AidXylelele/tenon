@@ -15,6 +15,8 @@ import {
   sql,
 } from "drizzle-orm";
 import type {
+  CountWindow,
+  InstanceCounts,
   InstanceDetail,
   InstanceFilter,
   InstancePage,
@@ -23,6 +25,7 @@ import type {
   PhaseCount,
   TaskOutput,
   TaskPage,
+  WindowCount,
 } from "../../../application/automation/instances/interfaces.js";
 import type { InstanceQueries } from "../../../application/automation/instances/queries.js";
 import type { Person } from "../../../application/identity/users/interfaces.js";
@@ -34,6 +37,7 @@ import { WorkflowInstance } from "../../../domain/automation/instances/workflow-
 import type { RunWait } from "../../../domain/automation/instances/interfaces.js";
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type {
+  CountRow,
   LifecycleEventName,
   LifecycleEventRow,
   TaskEventRow,
@@ -269,13 +273,124 @@ export class PostgresInstanceQueries implements InstanceQueries {
     return new Map(retrying);
   }
 
-  async countsByPhase(from: Date, to: Date): Promise<readonly PhaseCount[]> {
+  async counts(window: CountWindow): Promise<InstanceCounts> {
+    const [rows, live] = await Promise.all([
+      this.#bucketed(window),
+      this.#live(window),
+    ]);
+    const buckets = window.buckets.map((start, index) => {
+      const position = index + 1;
+      const counts = this.#countsIn(rows, position);
+      return { start, counts };
+    });
+    const total = this.#windowTotalsOf(rows);
+    const previous = this.#previousOf(window.previousFrom, rows);
+    return { to: window.to, buckets, total, previous, live };
+  }
+
+  #previousOf(
+    from: Date | null,
+    rows: readonly CountRow[],
+  ): WindowCount | null {
+    if (from === null) return null;
+
+    const counts = this.#previousTotalsOf(rows);
+    return { from, counts };
+  }
+
+  #bucketed(window: CountWindow): Promise<CountRow[]> {
+    const first = window.buckets[0] ?? window.to;
+    const from = window.previousFrom ?? first;
+    const edges = window.buckets.map((start) => start.toISOString());
+    const thresholds = sql`${sql.param(edges)}::timestamptz[]`;
+    const bucket = sql<number>`width_bucket(${instances.startedAt}, ${thresholds})`;
+    const current = sql<boolean>`${instances.startedAt} >= ${first}`;
+    const workflow = this.#ofWorkflow(window.namespace, window.name);
+    const tests = this.#tests(window.tests);
+    const started = this.txHost.tx
+      .select({
+        bucket: bucket.as("bucket"),
+        current: current.as("current"),
+        phase: instances.phase,
+      })
+      .from(instances)
+      .where(
+        and(
+          gte(instances.startedAt, from),
+          lt(instances.startedAt, window.to),
+          workflow,
+          tests,
+        ),
+      )
+      .as("started");
+    const count = sql<number>`count(*)::int`;
+    return this.txHost.tx
+      .select({
+        bucket: started.bucket,
+        current: started.current,
+        phase: started.phase,
+        count,
+      })
+      .from(started)
+      .groupBy(
+        sql`grouping sets ((${started.bucket}, ${started.phase}), (${started.current}, ${started.phase}))`,
+      );
+  }
+
+  #live(window: CountWindow): Promise<PhaseCount[]> {
+    const live = WorkflowInstance.livePhases();
+    const workflow = this.#ofWorkflow(window.namespace, window.name);
+    const tests = this.#tests(window.tests);
     const count = sql<number>`count(*)::int`;
     return this.txHost.tx
       .select({ phase: instances.phase, count })
       .from(instances)
-      .where(and(gte(instances.createdAt, from), lt(instances.createdAt, to)))
+      .where(and(inArray(instances.phase, live), workflow, tests))
       .groupBy(instances.phase);
+  }
+
+  #countsIn(rows: readonly CountRow[], position: number): PhaseCount[] {
+    const counted = rows.filter((row) => row.bucket === position);
+    return counted.map((row) => ({ phase: row.phase, count: row.count }));
+  }
+
+  #windowTotalsOf(rows: readonly CountRow[]): PhaseCount[] {
+    const totals = rows.filter((row) => {
+      const total = row.bucket === null;
+      const inWindow = row.current === true;
+      return total && inWindow;
+    });
+    return totals.map((row) => ({ phase: row.phase, count: row.count }));
+  }
+
+  #previousTotalsOf(rows: readonly CountRow[]): PhaseCount[] {
+    const totals = rows.filter((row) => {
+      const total = row.bucket === null;
+      const before = row.current === false;
+      return total && before;
+    });
+    return totals.map((row) => ({ phase: row.phase, count: row.count }));
+  }
+
+  #ofWorkflow(namespace: string | null, name: string | null): SQL | undefined {
+    const anyWorkflow = namespace === null && name === null;
+
+    if (anyWorkflow) return undefined;
+
+    const inNamespace =
+      namespace === null ? undefined : eq(workflows.namespace, namespace);
+    const named = name === null ? undefined : eq(workflows.name, name);
+    const ids = this.txHost.tx
+      .select({ id: workflows.id })
+      .from(workflows)
+      .where(and(inNamespace, named));
+    return inArray(instances.workflowId, ids);
+  }
+
+  #tests(included: boolean): SQL | undefined {
+    if (included) return undefined;
+
+    return eq(instances.test, false);
   }
 
   #taskPositionsOf(

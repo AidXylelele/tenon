@@ -1,12 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import type { EventPage } from "../../../application/automation/events/interfaces.js";
 import type {
+  InstanceCounts,
   InstanceDetail,
   InstancePage,
   InstanceSummary,
   PhaseCount,
   TaskOutput,
   TaskPage,
+  WindowCount,
 } from "../../../application/automation/instances/interfaces.js";
 import { Phase } from "../../../domain/automation/instances/enums.js";
 import {
@@ -16,6 +18,7 @@ import {
   type InstancePageResponse,
   type InstanceResponse,
   type InstanceSummaryResponse,
+  type PhaseCounts,
   type ResponseJson,
   type TaskPageResponse,
 } from "../schemas/instance.schema.js";
@@ -93,21 +96,42 @@ export class InstancePresenter {
     return { items, next };
   }
 
-  counts(
-    from: Date,
-    to: Date,
-    counted: readonly PhaseCount[],
-  ): InstanceCountsResponse {
+  counts(counted: InstanceCounts): InstanceCountsResponse {
+    const buckets = counted.buckets.map((bucket) => ({
+      start: bucket.start.toISOString(),
+      counts: this.#byPhase(bucket.counts),
+    }));
+    const total = this.#byPhase(counted.total);
+    const previous = this.#previousOf(counted.previous);
+    const now = this.#liveOf(counted.live);
+    return { to: counted.to.toISOString(), buckets, total, previous, now };
+  }
+
+  #previousOf(
+    previous: WindowCount | null,
+  ): InstanceCountsResponse["previous"] {
+    if (previous === null) return null;
+
+    const counts = this.#byPhase(previous.counts);
+    return { from: previous.from.toISOString(), counts };
+  }
+
+  #liveOf(live: readonly PhaseCount[]): InstanceCountsResponse["now"] {
+    return {
+      [Phase.Pending]: this.#countOf(live, Phase.Pending),
+      [Phase.Running]: this.#countOf(live, Phase.Running),
+      [Phase.Waiting]: this.#countOf(live, Phase.Waiting),
+      [Phase.Suspended]: this.#countOf(live, Phase.Suspended),
+    };
+  }
+
+  #byPhase(counted: readonly PhaseCount[]): PhaseCounts {
     const phases = Object.values(Phase);
     const entries = phases.map((phase) => [
       phase,
       this.#countOf(counted, phase),
     ]);
-    return {
-      from: from.toISOString(),
-      to: to.toISOString(),
-      counts: Object.fromEntries(entries) as InstanceCountsResponse["counts"],
-    };
+    return Object.fromEntries(entries) as PhaseCounts;
   }
 
   #countOf(counted: readonly PhaseCount[], phase: Phase): number {

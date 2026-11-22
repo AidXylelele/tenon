@@ -116,28 +116,61 @@ describe("the reads the web console asks for", () => {
     expect(instance.waits[0]?.until).toBe("2026-01-01T01:00:00.000Z");
   });
 
-  it("instance_counts_are_given_per_phase_over_a_window", async () => {
+  it("instance_counts_are_given_per_bucket_of_start_time_with_the_runs_live_now", async () => {
     await publish(t, editor, aDocument());
     await start(t, editor);
     await start(t, editor);
     await drain(t);
+    await publish(t, editor, aWaitingDocument({ name: "waiter" }));
+    await start(t, editor, { input: {} }, "sales/waiter");
+    await drain(t);
+    const buckets =
+      "bucket=2025-12-31T00:00:00.000Z&bucket=2026-01-01T00:00:00.000Z";
+    const window = `${buckets}&to=2026-01-02T00:00:00.000Z`;
 
     const counted = await request(t.server)
-      .get(
-        "/api/v1/instance-counts?from=2025-12-31T00:00:00.000Z&to=2026-01-02T00:00:00.000Z",
-      )
+      .get(`/api/v1/instance-counts?${window}`)
       .set(viewer)
       .expect(200);
-    await request(t.server)
-      .get(
-        "/api/v1/instance-counts?from=2026-01-02T00:00:00.000Z&to=2026-01-01T00:00:00.000Z",
-      )
-      .set(viewer)
-      .expect(400);
 
     expect(counted.body).toMatchObject({
-      counts: { completed: 2, running: 0, faulted: 0 },
+      to: "2026-01-02T00:00:00.000Z",
+      buckets: [
+        { start: "2025-12-31T00:00:00.000Z", counts: { completed: 0 } },
+        {
+          start: "2026-01-01T00:00:00.000Z",
+          counts: { completed: 2, waiting: 1, faulted: 0 },
+        },
+      ],
+      total: { completed: 2, waiting: 1, faulted: 0 },
+      previous: null,
+      now: { pending: 0, running: 0, waiting: 1, suspended: 0 },
     });
+  });
+
+  it.each([
+    [
+      "descending buckets",
+      "bucket=2026-01-02T00:00:00Z&bucket=2026-01-01T00:00:00Z&to=2026-01-03T00:00:00Z",
+    ],
+    [
+      "an end before the last bucket",
+      "bucket=2026-01-02T00:00:00Z&to=2026-01-01T00:00:00Z",
+    ],
+    [
+      "a previous window after the first bucket",
+      "bucket=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z&previousFrom=2026-01-01T01:00:00Z",
+    ],
+    ["no bucket", "to=2026-01-02T00:00:00Z"],
+    [
+      "the old window form",
+      "from=2026-01-01T00:00:00Z&to=2026-01-02T00:00:00Z",
+    ],
+  ])("a_count_window_with_%s_is_a_bad_request", async (_case, window) => {
+    await request(t.server)
+      .get(`/api/v1/instance-counts?${window}`)
+      .set(viewer)
+      .expect(400);
   });
 
   it("the_host_profile_gives_what_the_editor_analyses_against_and_the_limits", async () => {

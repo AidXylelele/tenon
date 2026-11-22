@@ -57,6 +57,13 @@ export type VersionCatalogueRow = Omit<
   "workflowId" | "document" | "imports" | "source"
 >;
 
+export interface CountRow {
+  readonly bucket: number | null;
+  readonly current: boolean | null;
+  readonly phase: Phase;
+  readonly count: number;
+}
+
 export interface TaskPosition {
   readonly execution: string;
   readonly opened: number;

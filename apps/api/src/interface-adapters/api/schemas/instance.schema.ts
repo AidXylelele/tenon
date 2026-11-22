@@ -147,23 +147,70 @@ export const EventPageResponse = z.object({
 
 export type EventPageResponse = z.infer<typeof EventPageResponse>;
 
+const Instant = z.codec(z.iso.datetime({ offset: true }), z.date(), {
+  decode: (text) => new Date(text),
+  encode: (date) => date.toISOString(),
+});
+
+const MOST_BUCKETS = 100;
+
+const Buckets = z
+  .union([Instant, z.array(Instant).min(1).max(MOST_BUCKETS)])
+  .transform((value) => [value].flat());
+
+const Included = z
+  .enum(["true", "false"])
+  .transform((value) => value === "true");
+
 export const InstanceCountsQuery = z
-  .strictObject({ from: z.iso.datetime(), to: z.iso.datetime() })
+  .strictObject({
+    bucket: Buckets,
+    to: Instant,
+    previousFrom: Instant.optional(),
+    namespace: z.string().optional(),
+    name: z.string().optional(),
+    tests: Included.default(false),
+  })
+  .refine(
+    (window) =>
+      window.bucket.every((start, index) => {
+        const next = window.bucket[index + 1] ?? window.to;
+        return start < next;
+      }),
+    { message: "the buckets ascend and end before to", path: ["bucket"] },
+  )
   .refine(
     (window) => {
-      const from = Date.parse(window.from);
-      const to = Date.parse(window.to);
-      return from < to;
+      const first = window.bucket[0] ?? window.to;
+      return window.previousFrom === undefined || window.previousFrom < first;
     },
-    { message: "from is before to", path: ["to"] },
+    {
+      message: "the previous window ends at the first bucket",
+      path: ["previousFrom"],
+    },
   );
 
 export type InstanceCountsQuery = z.infer<typeof InstanceCountsQuery>;
 
+const PhaseCounts = z.record(z.enum(Phase), z.number().int());
+
+export type PhaseCounts = z.infer<typeof PhaseCounts>;
+
+const LiveCounts = z.object({
+  [Phase.Pending]: z.number().int(),
+  [Phase.Running]: z.number().int(),
+  [Phase.Waiting]: z.number().int(),
+  [Phase.Suspended]: z.number().int(),
+});
+
 export const InstanceCountsResponse = z.object({
-  from: z.iso.datetime(),
   to: z.iso.datetime(),
-  counts: z.record(z.enum(Phase), z.number().int()),
+  buckets: z.array(z.object({ start: z.iso.datetime(), counts: PhaseCounts })),
+  total: PhaseCounts,
+  previous: z
+    .object({ from: z.iso.datetime(), counts: PhaseCounts })
+    .nullable(),
+  now: LiveCounts,
 });
 
 export type InstanceCountsResponse = z.infer<typeof InstanceCountsResponse>;

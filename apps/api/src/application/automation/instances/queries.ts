@@ -1,9 +1,10 @@
 import type {
+  CountWindow,
+  InstanceCounts,
   InstanceDetail,
   InstanceFilter,
   InstancePage,
   InstancePosition,
-  PhaseCount,
   ReceiverView,
   TaskOutput,
   TaskPage,
@@ -21,7 +22,7 @@ export abstract class InstanceQueries {
     after: number | null,
     limit: number,
   ): Promise<TaskPage | null>;
-  abstract countsByPhase(from: Date, to: Date): Promise<readonly PhaseCount[]>;
+  abstract counts(window: CountWindow): Promise<InstanceCounts>;
   abstract taskOutput(
     id: string,
     execution: string,

@@ -265,6 +265,14 @@ export class WorkflowInstance {
     return !awaited;
   }
 
+  static livePhases(): Phase[] {
+    const phases = Object.values(Phase);
+    return phases.filter((phase) => {
+      const ended = WorkflowInstance.#ENDED.includes(phase);
+      return !ended;
+    });
+  }
+
   static controlsIn(phase: Phase): Control[] {
     const controls = Object.values(Control);
     return controls.filter((control) => {

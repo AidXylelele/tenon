@@ -121,6 +121,33 @@ export interface PhaseCount {
   readonly count: number;
 }
 
+export interface CountWindow {
+  readonly buckets: readonly Date[];
+  readonly to: Date;
+  readonly previousFrom: Date | null;
+  readonly namespace: string | null;
+  readonly name: string | null;
+  readonly tests: boolean;
+}
+
+export interface BucketCount {
+  readonly start: Date;
+  readonly counts: readonly PhaseCount[];
+}
+
+export interface WindowCount {
+  readonly from: Date;
+  readonly counts: readonly PhaseCount[];
+}
+
+export interface InstanceCounts {
+  readonly to: Date;
+  readonly buckets: readonly BucketCount[];
+  readonly total: readonly PhaseCount[];
+  readonly previous: WindowCount | null;
+  readonly live: readonly PhaseCount[];
+}
+
 export interface InstanceFilter {
   readonly namespace: string | null;
   readonly name: string | null;

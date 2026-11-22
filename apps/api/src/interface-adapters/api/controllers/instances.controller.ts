@@ -130,10 +130,16 @@ export class InstancesController {
   async counts(
     @Query({ schema: InstanceCountsQuery }) query: InstanceCountsQuery,
   ): Promise<InstanceCountsResponse> {
-    const from = new Date(query.from);
-    const to = new Date(query.to);
-    const counted = await this.instances.countsByPhase(from, to);
-    return this.instancePresenter.counts(from, to, counted);
+    const window = {
+      buckets: query.bucket,
+      to: query.to,
+      previousFrom: query.previousFrom ?? null,
+      namespace: query.namespace ?? null,
+      name: query.name ?? null,
+      tests: query.tests,
+    };
+    const counted = await this.instances.counts(window);
+    return this.instancePresenter.counts(counted);
   }
 
   @Get("instances/:id")
