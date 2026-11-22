@@ -22,7 +22,7 @@ import { ReceiveWebhookCall } from "../../../application/automation/webhooks/rec
 import { WebhookToken } from "../../../domain/automation/webhooks/webhook-token.js";
 import { WebhookCallMapper } from "../mappers/webhook-call.mapper.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
-import { HookParams } from "../schemas/webhook.schemas.js";
+import { HookParams } from "../schemas/webhook.schema.js";
 
 @ApiTags("webhooks")
 @Controller("hooks")

@@ -3,7 +3,7 @@ import {
   type EmailTokenRecord,
 } from "@nestjs/authentication";
 import { sql } from "drizzle-orm";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { PostgresEmailTokenStore } from "../../../src/interface-adapters/persistence/stores/postgres-email-token.store.js";
 import {
   addUser,

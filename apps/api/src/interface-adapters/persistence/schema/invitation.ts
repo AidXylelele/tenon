@@ -8,7 +8,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { InvitationStatus, type Role } from "../../../domain/identity/enums.js";
+import { InvitationStatus } from "../../../domain/identity/invitations/enums.js";
+import type { Role } from "../../../domain/identity/users/enums.js";
 import { user } from "./user.js";
 
 export const invitation = pgTable(

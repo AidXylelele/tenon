@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
-import { AccountRepository } from "../../../src/application/identity/ports.js";
-import { Account } from "../../../src/domain/identity/account.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { AccountRepository } from "../../../src/application/identity/accounts/ports.js";
+import { Account } from "../../../src/domain/identity/accounts/account.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { StaleWriteError } from "../../../src/domain/errors.js";
-import type { User } from "../../../src/domain/identity/user.js";
+import type { User } from "../../../src/domain/identity/users/user.js";
 import {
   account as accountTable,
   user as userTable,

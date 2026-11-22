@@ -1,14 +1,14 @@
-import { InviteUser } from "../../../src/application/identity/invite-user.js";
+import { InviteUser } from "../../../src/application/identity/invitations/invite-user.js";
 import {
   InvitationRefusal,
   InvitationStatus,
-  Role,
-} from "../../../src/domain/identity/enums.js";
+} from "../../../src/domain/identity/invitations/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { anInvitation, aUser } from "../../support/builders.js";
 import {
   InMemoryInvitationRepository,
   InMemoryUserRepository,
-  RecordingMailing,
+  RecordingInvitationMail,
 } from "../../support/fakes.js";
 
 const command = {
@@ -21,7 +21,7 @@ const command = {
 describe("InviteUser", () => {
   it("the_invitation_is_created_pending_for_the_email_and_the_role", async () => {
     const invitations = new InMemoryInvitationRepository();
-    const mailing = new RecordingMailing();
+    const mailing = new RecordingInvitationMail();
     const users = new InMemoryUserRepository();
     const invite = new InviteUser(invitations, users, mailing);
 
@@ -39,7 +39,7 @@ describe("InviteUser", () => {
 
   it("one_mail_from_the_inviter_carries_a_token_that_opens_the_invitation", async () => {
     const invitations = new InMemoryInvitationRepository();
-    const mailing = new RecordingMailing();
+    const mailing = new RecordingInvitationMail();
     const users = new InMemoryUserRepository();
     const invite = new InviteUser(invitations, users, mailing);
 
@@ -59,7 +59,7 @@ describe("InviteUser", () => {
     const previous = anInvitation({ role: Role.Viewer });
     const invitations = new InMemoryInvitationRepository(previous.invitation);
     const users = new InMemoryUserRepository();
-    const mailing = new RecordingMailing();
+    const mailing = new RecordingInvitationMail();
     const invite = new InviteUser(invitations, users, mailing);
 
     const invited = await invite.execute(command);
@@ -72,7 +72,7 @@ describe("InviteUser", () => {
 
   it("an_email_that_already_has_an_account_is_refused_and_nothing_is_sent", async () => {
     const invitations = new InMemoryInvitationRepository();
-    const mailing = new RecordingMailing();
+    const mailing = new RecordingInvitationMail();
     const existing = aUser({ email: "invitee@example.com" });
     const users = new InMemoryUserRepository(existing);
     const invite = new InviteUser(invitations, users, mailing);

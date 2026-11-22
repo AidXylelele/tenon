@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { MailModule, SmtpTransport } from "@nestjs/mail";
+import { MailHandler } from "../../interface-adapters/mailing/mail.handler.js";
 import { InvitationMail } from "../../interface-adapters/mailing/templates/invitation.mail.js";
 import { PasswordResetMail } from "../../interface-adapters/mailing/templates/password-reset.mail.js";
-import { MailHandler } from "../../interface-adapters/messaging/mail.handler.js";
 import { linksConfig, mailConfig } from "./configs.js";
 
 @Module({

@@ -1,9 +1,9 @@
 import { eq } from "drizzle-orm";
-import { InvitationRepository } from "../../../src/application/identity/ports.js";
-import { InvitationQueries } from "../../../src/application/identity/queries.js";
-import type { Invitation } from "../../../src/domain/identity/invitation.js";
+import { InvitationRepository } from "../../../src/application/identity/invitations/ports.js";
+import { InvitationQueries } from "../../../src/application/identity/invitations/queries.js";
+import type { Invitation } from "../../../src/domain/identity/invitations/invitation.js";
 import { invitation as invitationTable } from "../../../src/interface-adapters/persistence/schema/index.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { anInvitation, anInvitee } from "../../support/builders.js";
 import {
   addUser,

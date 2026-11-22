@@ -6,10 +6,10 @@ import {
 } from "@nestjs-cls/transactional";
 import { and, eq } from "drizzle-orm";
 import { StaleWriteError } from "../../../domain/errors.js";
-import { InvitationStatus } from "../../../domain/identity/enums.js";
-import type { Invitation } from "../../../domain/identity/invitation.js";
-import type { InvitationToken } from "../../../domain/identity/invitation-token.js";
-import type { InvitationRepository } from "../../../application/identity/ports.js";
+import { InvitationStatus } from "../../../domain/identity/invitations/enums.js";
+import type { Invitation } from "../../../domain/identity/invitations/invitation.js";
+import type { InvitationToken } from "../../../domain/identity/invitations/invitation-token.js";
+import type { InvitationRepository } from "../../../application/identity/invitations/ports.js";
 import type { Transaction } from "../interfaces.js";
 import { InvitationMapper } from "../mappers/invitation.mapper.js";
 import { invitation as invitations } from "../schema/index.js";

@@ -1,4 +1,4 @@
-import { Account } from "../../../src/domain/identity/account.js";
+import { Account } from "../../../src/domain/identity/accounts/account.js";
 import { aPasswordAccount, aUser } from "../../support/builders.js";
 
 const now = new Date("2026-10-11T10:00:00.000Z");

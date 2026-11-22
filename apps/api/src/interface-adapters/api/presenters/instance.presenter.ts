@@ -18,7 +18,7 @@ import {
   type InstanceSummaryResponse,
   type ResponseJson,
   type TaskPageResponse,
-} from "../schemas/instance.schemas.js";
+} from "../schemas/instance.schema.js";
 
 @Injectable()
 export class InstancePresenter {

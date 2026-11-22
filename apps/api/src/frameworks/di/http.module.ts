@@ -12,13 +12,13 @@ import { IdempotencyModule } from "@nestjs/idempotency";
 import { TerminusModule } from "@nestjs/terminus";
 import { minutes, ThrottlerModule } from "@nestjs/throttler";
 import type { Request } from "express";
-import type { User } from "../../domain/identity/user.js";
-import { accountEmail } from "../../interface-adapters/api/auth/account-email.js";
+import type { User } from "../../domain/identity/users/user.js";
 import { HealthController } from "../../interface-adapters/api/controllers/health.controller.js";
-import { ProblemDetailsFilter } from "../../interface-adapters/api/filters/problem-details.filter.js";
-import { RetryAfterThrottlerGuard } from "../../interface-adapters/api/guards/retry-after-throttler.guard.js";
-import { JsonOnlyMiddleware } from "../../interface-adapters/api/middleware/json-only.middleware.js";
+import { JsonOnlyMiddleware } from "../../interface-adapters/api/pipeline/json-only.middleware.js";
+import { ProblemDetailsFilter } from "../../interface-adapters/api/pipeline/problem-details.filter.js";
+import { RetryAfterThrottlerGuard } from "../../interface-adapters/api/pipeline/retry-after-throttler.guard.js";
 import { ProblemPresenter } from "../../interface-adapters/api/presenters/problem.presenter.js";
+import { AccountTracker } from "../../interface-adapters/api/schemas/auth.schema.js";
 import { IdempotencyJobs } from "../../interface-adapters/jobs/idempotency.jobs.js";
 import { PostgresIdempotencyStore } from "../../interface-adapters/persistence/stores/postgres-idempotency.store.js";
 import { httpConfig, linksConfig } from "./configs.js";
@@ -61,11 +61,12 @@ import { httpConfig, linksConfig } from "./configs.js";
         limit: 10,
         skipIf: (context) => {
           const request = context.switchToHttp().getRequest<Request>();
-          return accountEmail(request) === "";
+          const account = AccountTracker.parse(request.body);
+          return account === "";
         },
         getTracker: (_request, context) => {
           const request = context.switchToHttp().getRequest<Request>();
-          return accountEmail(request);
+          return AccountTracker.parse(request.body);
         },
       },
     ]),

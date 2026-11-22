@@ -2,8 +2,8 @@ import {
   Role,
   UserRefusal,
   UserStatus,
-} from "../../../src/domain/identity/enums.js";
-import { User } from "../../../src/domain/identity/user.js";
+} from "../../../src/domain/identity/users/enums.js";
+import { User } from "../../../src/domain/identity/users/user.js";
 import { aUser } from "../../support/builders.js";
 
 const now = new Date("2026-10-11T10:00:00.000Z");

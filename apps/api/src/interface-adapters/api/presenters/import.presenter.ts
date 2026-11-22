@@ -4,7 +4,7 @@ import type {
   FetchedImport,
   ImportFailure,
 } from "../../../application/automation/imports/interfaces.js";
-import type { ImportTextResponse } from "../schemas/import.schemas.js";
+import type { ImportTextResponse } from "../schemas/import.schema.js";
 import { ProblemPresenter } from "./problem.presenter.js";
 
 @Injectable()

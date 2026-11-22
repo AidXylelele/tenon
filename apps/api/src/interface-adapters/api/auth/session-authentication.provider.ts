@@ -4,8 +4,8 @@ import {
   type SessionRecord,
 } from "@nestjs/authentication";
 import { Injectable } from "@nestjs/common";
-import { ResolveSessionUser } from "../../../application/identity/resolve-session-user.js";
-import type { User } from "../../../domain/identity/user.js";
+import { ResolveSessionUser } from "../../../application/identity/users/resolve-session-user.js";
+import type { User } from "../../../domain/identity/users/user.js";
 
 @Injectable()
 export class SessionAuthenticationProvider extends SessionCookieProvider<User> {

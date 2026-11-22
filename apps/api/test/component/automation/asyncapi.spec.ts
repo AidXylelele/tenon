@@ -10,7 +10,7 @@ import {
   type StartedTestContainer,
   Wait,
 } from "testcontainers";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { AsyncApiHandler } from "../../../src/interface-adapters/messaging/asyncapi.handler.js";
 import { RunController } from "../../../src/interface-adapters/workflows/run.controller.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";

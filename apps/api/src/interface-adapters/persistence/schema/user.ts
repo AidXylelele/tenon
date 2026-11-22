@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { type Role, UserStatus } from "../../../domain/identity/enums.js";
+import { type Role, UserStatus } from "../../../domain/identity/users/enums.js";
 
 export const user = pgTable(
   "user",

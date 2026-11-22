@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { InvitationRepository } from "../../../src/application/identity/ports.js";
+import { InvitationRepository } from "../../../src/application/identity/invitations/ports.js";
 import { StaleWriteError } from "../../../src/domain/errors.js";
-import type { Invitation } from "../../../src/domain/identity/invitation.js";
-import { InvitationToken } from "../../../src/domain/identity/invitation-token.js";
+import type { Invitation } from "../../../src/domain/identity/invitations/invitation.js";
+import { InvitationToken } from "../../../src/domain/identity/invitations/invitation-token.js";
 import { invitation as invitationTable } from "../../../src/interface-adapters/persistence/schema/index.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { anInvitation, anInvitee } from "../../support/builders.js";
 import {
   addUser,

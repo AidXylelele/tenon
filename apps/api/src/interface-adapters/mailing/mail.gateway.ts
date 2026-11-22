@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { Outbox } from "@nestjs/outbox";
-import type { Mailing } from "../../application/identity/ports.js";
-import type { Invitation } from "../../domain/identity/invitation.js";
-import type { InvitationToken } from "../../domain/identity/invitation-token.js";
+import type { RecoveryMail } from "../../application/identity/accounts/ports.js";
+import type { InvitationMail } from "../../application/identity/invitations/ports.js";
+import type { Invitation } from "../../domain/identity/invitations/invitation.js";
+import type { InvitationToken } from "../../domain/identity/invitations/invitation-token.js";
 import { OutboxTracer } from "../messaging/outbox.tracer.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { MailTopic } from "./enums.js";
@@ -14,7 +15,7 @@ import type {
 } from "./interfaces.js";
 
 @Injectable()
-export class MailGateway implements Mailing {
+export class MailGateway implements InvitationMail, RecoveryMail {
   constructor(
     private readonly outbox: Outbox,
     private readonly txHost: TransactionHost<Transaction>,

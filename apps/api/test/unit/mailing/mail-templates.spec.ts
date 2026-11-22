@@ -1,6 +1,6 @@
 import { InvitationMail } from "../../../src/interface-adapters/mailing/templates/invitation.mail.js";
 import { PasswordResetMail } from "../../../src/interface-adapters/mailing/templates/password-reset.mail.js";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 
 describe("mail templates", () => {
   it("the_invitation_mail_links_to_the_web_application_with_the_token_and_names_the_inviter_role_and_expiry", () => {

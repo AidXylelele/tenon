@@ -12,7 +12,7 @@ import {
   ProcessPlatform,
 } from "../../../application/automation/host/queries.js";
 import { HostPresenter } from "../presenters/host.presenter.js";
-import { HostProfileResponse } from "../schemas/host.schemas.js";
+import { HostProfileResponse } from "../schemas/host.schema.js";
 
 @ApiTags("host")
 @ApiCookieAuth("sessionCookie")

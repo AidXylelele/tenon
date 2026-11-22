@@ -2,7 +2,7 @@ import {
   AuthenticationStorage,
   type SessionRecord,
 } from "@nestjs/authentication";
-import { Role } from "../../../src/domain/identity/enums.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
 import { PostgresSessionStore } from "../../../src/interface-adapters/persistence/stores/postgres-session.store.js";
 import {
   addUser,

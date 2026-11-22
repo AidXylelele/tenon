@@ -38,18 +38,20 @@ import type { WorkflowVersion } from "../../src/domain/automation/workflows/work
 import type { Result } from "../../src/domain/interfaces.js";
 import {
   AccountRepository,
-  InvitationRepository,
-  Mailing,
   PasswordHasher,
   Sessions,
-  UserRepository,
-} from "../../src/application/identity/ports.js";
-import type { Account } from "../../src/domain/identity/account.js";
-import { InvitationStatus } from "../../src/domain/identity/enums.js";
+} from "../../src/application/identity/accounts/ports.js";
+import {
+  InvitationMail,
+  InvitationRepository,
+} from "../../src/application/identity/invitations/ports.js";
+import { UserRepository } from "../../src/application/identity/users/ports.js";
+import type { Account } from "../../src/domain/identity/accounts/account.js";
+import { InvitationStatus } from "../../src/domain/identity/invitations/enums.js";
 import { StaleWriteError } from "../../src/domain/errors.js";
-import type { Invitation } from "../../src/domain/identity/invitation.js";
-import type { InvitationToken } from "../../src/domain/identity/invitation-token.js";
-import type { User } from "../../src/domain/identity/user.js";
+import type { Invitation } from "../../src/domain/identity/invitations/invitation.js";
+import type { InvitationToken } from "../../src/domain/identity/invitations/invitation-token.js";
+import type { User } from "../../src/domain/identity/users/user.js";
 
 export class InMemoryUserRepository extends UserRepository {
   readonly users = new Map<string, User>();
@@ -163,7 +165,7 @@ export interface SentInvitation {
   readonly inviterName: string;
 }
 
-export class RecordingMailing extends Mailing {
+export class RecordingInvitationMail extends InvitationMail {
   readonly sent: SentInvitation[] = [];
 
   sendInvitation(
@@ -172,10 +174,6 @@ export class RecordingMailing extends Mailing {
     inviterName: string,
   ): Promise<void> {
     this.sent.push({ invitation, token, inviterName });
-    return Promise.resolve();
-  }
-
-  sendPasswordReset(): Promise<void> {
     return Promise.resolve();
   }
 }

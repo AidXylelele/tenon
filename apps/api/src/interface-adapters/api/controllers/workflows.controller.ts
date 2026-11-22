@@ -31,7 +31,7 @@ import { CheckDefinition } from "../../../application/automation/workflows/check
 import { WorkflowQueries } from "../../../application/automation/workflows/queries.js";
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import type { User } from "../../../domain/identity/user.js";
+import type { User } from "../../../domain/identity/users/user.js";
 import {
   StructureClient,
   type VersionStructure,
@@ -50,7 +50,7 @@ import {
   WorkflowPageResponse,
   WorkflowParams,
   WorkflowResponse,
-} from "../schemas/workflow.schemas.js";
+} from "../schemas/workflow.schema.js";
 
 @ApiTags("workflows")
 @ApiCookieAuth("sessionCookie")

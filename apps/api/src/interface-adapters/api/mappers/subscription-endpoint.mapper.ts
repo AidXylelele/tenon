@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { DeliveryEndpoint } from "../../../domain/automation/subscriptions/interfaces.js";
-import type { EndpointBody } from "../schemas/subscription.schemas.js";
+import type { EndpointBody } from "../schemas/subscription.schema.js";
 
 @Injectable()
 export class SubscriptionEndpointMapper {

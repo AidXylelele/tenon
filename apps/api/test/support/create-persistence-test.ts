@@ -2,14 +2,12 @@ import type { Provider } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { Test, type TestingModule } from "@nestjs/testing";
 import { sql } from "drizzle-orm";
-import {
-  AccountRepository,
-  InvitationRepository,
-  UserRepository,
-} from "../../src/application/identity/ports.js";
-import { InvitationQueries } from "../../src/application/identity/queries.js";
-import type { Role } from "../../src/domain/identity/enums.js";
-import { User } from "../../src/domain/identity/user.js";
+import { AccountRepository } from "../../src/application/identity/accounts/ports.js";
+import { InvitationRepository } from "../../src/application/identity/invitations/ports.js";
+import { UserRepository } from "../../src/application/identity/users/ports.js";
+import { InvitationQueries } from "../../src/application/identity/invitations/queries.js";
+import type { Role } from "../../src/domain/identity/users/enums.js";
+import { User } from "../../src/domain/identity/users/user.js";
 import { ConfigModule } from "@nestjs/config";
 import { DatabaseModule } from "../../src/frameworks/di/database.module.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";

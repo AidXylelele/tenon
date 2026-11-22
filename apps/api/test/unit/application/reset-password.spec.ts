@@ -1,4 +1,4 @@
-import { ResetPassword } from "../../../src/application/identity/reset-password.js";
+import { ResetPassword } from "../../../src/application/identity/accounts/reset-password.js";
 import { Missing } from "../../../src/application/identity/enums.js";
 import { aPasswordAccount, aUser } from "../../support/builders.js";
 import {

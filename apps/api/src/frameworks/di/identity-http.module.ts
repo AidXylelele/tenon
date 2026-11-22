@@ -1,24 +1,27 @@
 import { PasswordHasher as ScryptPasswordHasher } from "@nestjs/authentication";
 import { Module } from "@nestjs/common";
-import { AcceptInvitation } from "../../application/identity/accept-invitation.js";
-import { AuthenticateUser } from "../../application/identity/authenticate-user.js";
-import { ChangePassword } from "../../application/identity/change-password.js";
-import { FindRecoveryAccount } from "../../application/identity/find-recovery-account.js";
-import { InviteUser } from "../../application/identity/invite-user.js";
+import { AuthenticateUser } from "../../application/identity/accounts/authenticate-user.js";
+import { ChangePassword } from "../../application/identity/accounts/change-password.js";
+import { FindRecoveryAccount } from "../../application/identity/accounts/find-recovery-account.js";
 import {
   AccountRepository,
-  InvitationRepository,
-  Mailing,
   PasswordHasher,
+  RecoveryMail,
   Sessions,
-  UserRepository,
-} from "../../application/identity/ports.js";
-import { InvitationQueries } from "../../application/identity/queries.js";
-import { ResetPassword } from "../../application/identity/reset-password.js";
-import { ResolveSessionUser } from "../../application/identity/resolve-session-user.js";
-import { RevokeInvitation } from "../../application/identity/revoke-invitation.js";
-import { SendRecoveryLink } from "../../application/identity/send-recovery-link.js";
-import { VerifyInvitationLink } from "../../application/identity/verify-invitation-link.js";
+} from "../../application/identity/accounts/ports.js";
+import { ResetPassword } from "../../application/identity/accounts/reset-password.js";
+import { SendRecoveryLink } from "../../application/identity/accounts/send-recovery-link.js";
+import { AcceptInvitation } from "../../application/identity/invitations/accept-invitation.js";
+import { InviteUser } from "../../application/identity/invitations/invite-user.js";
+import {
+  InvitationMail,
+  InvitationRepository,
+} from "../../application/identity/invitations/ports.js";
+import { InvitationQueries } from "../../application/identity/invitations/queries.js";
+import { RevokeInvitation } from "../../application/identity/invitations/revoke-invitation.js";
+import { VerifyInvitationLink } from "../../application/identity/invitations/verify-invitation-link.js";
+import { UserRepository } from "../../application/identity/users/ports.js";
+import { ResolveSessionUser } from "../../application/identity/users/resolve-session-user.js";
 import { InvitationPolicy } from "../../interface-adapters/api/auth/invitation.policy.js";
 import { PasswordRecoveryHandler } from "../../interface-adapters/api/auth/password-recovery.handler.js";
 import { SessionAuthenticationProvider } from "../../interface-adapters/api/auth/session-authentication.provider.js";
@@ -59,7 +62,8 @@ import { HttpModule } from "./http.module.js";
     SessionsGateway,
     { provide: Sessions, useExisting: SessionsGateway },
     MailGateway,
-    { provide: Mailing, useExisting: MailGateway },
+    { provide: InvitationMail, useExisting: MailGateway },
+    { provide: RecoveryMail, useExisting: MailGateway },
     UserMapper,
     AccountMapper,
     InvitationMapper,
