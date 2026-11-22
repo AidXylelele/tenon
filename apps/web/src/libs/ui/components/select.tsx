@@ -25,8 +25,7 @@ function Select({
     <SelectOpenContext.Provider value={shown}>
       <SelectPrimitive.Root
         data-slot="select"
-        open={open}
-        defaultOpen={defaultOpen}
+        open={shown}
         onOpenChange={change}
         {...props}
       />
