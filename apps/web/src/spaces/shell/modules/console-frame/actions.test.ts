@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { chooseThemeAction, signOutAction } from "./actions";
+import { keepThemeAction, signOutAction } from "./actions";
 
 const signOut = vi.fn<() => Promise<void>>();
 const redirect = vi.fn<(href: string) => never>();
@@ -45,7 +45,7 @@ describe("choosing a theme", () => {
     ["system", "system"],
     ["purple", "system"],
   ])("%s_is_kept_as_%s_for_a_year", async (chosen, kept) => {
-    await chooseThemeAction(chosen);
+    await keepThemeAction(chosen);
 
     expect(setCookie).toHaveBeenCalledWith(
       "theme",

@@ -1,7 +1,6 @@
-import { cn } from "@/libs/ui/tokens/cn";
 import { PRODUCT_NAME } from "@/libs/routing/page-title";
 
-function BrandMark() {
+export function BrandMark() {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -15,17 +14,11 @@ function BrandMark() {
   );
 }
 
-export function BrandLockup({
-  wordClassName,
-}: {
-  readonly wordClassName?: string;
-}) {
-  const word = cn("heading-1", wordClassName);
-
+export function BrandLockup() {
   return (
     <span className="flex items-center gap-2 text-foreground">
       <BrandMark />
-      <span className={word}>{PRODUCT_NAME}</span>
+      <span className="heading-1">{PRODUCT_NAME}</span>
     </span>
   );
 }

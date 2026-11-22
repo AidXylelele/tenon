@@ -15,7 +15,7 @@ export async function signOutAction(): Promise<void> {
   redirect(signIn);
 }
 
-export async function chooseThemeAction(chosen: string): Promise<void> {
+export async function keepThemeAction(chosen: string): Promise<void> {
   const theme = themeOf(chosen);
   const store = await cookies();
   const secure = isSessionCookieSecure();

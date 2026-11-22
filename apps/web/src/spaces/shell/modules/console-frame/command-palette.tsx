@@ -1,40 +1,41 @@
 "use client";
 
-import { PlusIcon, SearchIcon, SendIcon, WebhookIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useEffectEvent, useState } from "react";
-import type { Session } from "@/libs/data-access/types";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import type { Capabilities } from "@/libs/data-access/types";
 import { heldLeaving } from "@/libs/routing/leaving";
+import { Button } from "@/libs/ui/components/button";
 import {
-  NEW_WORKFLOW_HREF,
-  TEST_EVENT_HREF,
-  WEBHOOKS_HREF,
-} from "@/libs/routing/routes";
-import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/libs/ui/components/command";
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/libs/ui/components/dialog";
 import { Kbd } from "@/libs/ui/components/kbd";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/libs/ui/components/tooltip";
 import { useHydrated } from "@/libs/ui/hooks/use-hydrated";
-import { pagesOf } from "./destinations";
-import { useWorkflowSearch, WorkflowResults } from "./workflow-results";
+import { PaletteContent } from "./palette-content";
+import type { KeepTheme } from "./theme-choice";
+import { useWorkflowSearch } from "./workflow-results";
+
+interface CommandPaletteProps {
+  readonly capabilities: Capabilities | null;
+  readonly keepTheme: KeepTheme;
+}
 
 export function CommandPalette({
-  session,
-}: {
-  readonly session: Session | null;
-}) {
+  capabilities,
+  keepTheme,
+}: CommandPaletteProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
   const workflows = useWorkflowSearch();
-  const author = session?.capabilities.author === true;
   const hydrated = useHydrated();
+  const opener = useRef<HTMLElement | null>(null);
+  const [open, setOpen] = useState(false);
   const shortcut = hydrated ? shortcutHere() : null;
 
   const toggle = useEffectEvent(() => {
@@ -43,8 +44,10 @@ export function CommandPalette({
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey))
-        return;
+      const key = event.key.toLowerCase();
+      const command = event.metaKey || event.ctrlKey;
+
+      if (key !== "k" || !command) return;
 
       event.preventDefault();
       toggle();
@@ -56,99 +59,86 @@ export function CommandPalette({
   }, []);
 
   function change(next: boolean) {
-    setOpen(next);
+    if (next) {
+      opener.current = focusedElement();
+      workflows.read();
+    }
 
-    if (next) workflows.read();
+    setOpen(next);
   }
 
-  function go(href: string) {
+  function restoreFocus(event: Event) {
+    event.preventDefault();
+    opener.current?.focus();
+  }
+
+  function follow(href: string) {
     setOpen(false);
 
     if (!heldLeaving(href)) router.push(href);
   }
 
-  const pages = pagesOf(session?.capabilities ?? null);
-
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
+      <SearchButton
+        shortcut={shortcut}
+        onOpen={() => {
           change(true);
         }}
-        className="flex h-8 w-full max-w-md min-w-0 items-center gap-2 rounded-lg border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:bg-muted"
-      >
-        <SearchIcon className="size-4 shrink-0" aria-hidden />
-        <span className="flex-1 truncate text-left">
-          Search workflows and pages
-        </span>
-        {shortcut !== null && (
-          <Kbd className="hidden sm:inline-flex" aria-hidden>
-            {shortcut}
-          </Kbd>
-        )}
-      </button>
-      <CommandDialog
-        open={open}
-        onOpenChange={change}
-        title="Search"
-        description="Search workflows, pages and actions"
-      >
-        <Command>
-          <CommandInput placeholder="Type a workflow, a page or an action…" />
-          <CommandList>
-            <CommandEmpty>Nothing matches.</CommandEmpty>
-            {author && (
-              <CommandGroup heading="Actions">
-                <CommandItem
-                  onSelect={() => {
-                    go(NEW_WORKFLOW_HREF);
-                  }}
-                >
-                  <PlusIcon />
-                  New workflow
-                </CommandItem>
-                <CommandItem
-                  onSelect={() => {
-                    go(WEBHOOKS_HREF);
-                  }}
-                >
-                  <WebhookIcon />
-                  New webhook
-                </CommandItem>
-                <CommandItem
-                  onSelect={() => {
-                    go(TEST_EVENT_HREF);
-                  }}
-                >
-                  <SendIcon />
-                  Send a test event
-                </CommandItem>
-              </CommandGroup>
-            )}
-            <WorkflowResults search={workflows} onGo={go} />
-            <CommandSeparator />
-            <CommandGroup heading="Pages">
-              {pages.map((page) => {
-                const Icon = page.icon;
-                return (
-                  <CommandItem
-                    key={page.href}
-                    onSelect={() => {
-                      go(page.href);
-                    }}
-                  >
-                    <Icon />
-                    {page.label}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </CommandDialog>
+      />
+      <Dialog open={open} onOpenChange={change}>
+        <DialogContent
+          showCloseButton={false}
+          onCloseAutoFocus={restoreFocus}
+          aria-describedby={undefined}
+          className="top-20 translate-y-0 gap-0 overflow-hidden p-0 data-[size=default]:max-w-[min(600px,calc(100vw-16px))]"
+        >
+          <DialogTitle className="sr-only">Search and commands</DialogTitle>
+          <PaletteContent
+            capabilities={capabilities}
+            keepTheme={keepTheme}
+            workflows={workflows}
+            onFollow={follow}
+          />
+        </DialogContent>
+      </Dialog>
     </>
   );
+}
+
+function SearchButton({
+  shortcut,
+  onOpen,
+}: {
+  readonly shortcut: string | null;
+  readonly onOpen: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          onClick={onOpen}
+          aria-keyshortcuts="Meta+K Control+K"
+          className="w-60 shrink-0 justify-start px-2.5 font-normal text-muted-foreground max-md:w-8 max-md:justify-center max-md:px-0"
+        >
+          <SearchIcon />
+          <span className="max-md:sr-only">Search</span>
+          {shortcut !== null && (
+            <Kbd className="ml-auto max-md:hidden" aria-hidden>
+              {shortcut}
+            </Kbd>
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Search pages, workflows and actions</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function focusedElement(): HTMLElement | null {
+  const active = document.activeElement;
+  return active instanceof HTMLElement ? active : null;
 }
 
 function shortcutHere(): string {

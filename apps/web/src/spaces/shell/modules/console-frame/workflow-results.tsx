@@ -1,13 +1,9 @@
 "use client";
 
-import { WaypointsIcon } from "lucide-react";
+import { WorkflowIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import {
-  signInHref,
-  WORKFLOW_SEARCH_HREF,
-  workflowHref,
-} from "@/libs/routing/routes";
+import { signInHref, WORKFLOW_SEARCH_HREF } from "@/libs/routing/routes";
 import { CommandGroup, CommandItem } from "@/libs/ui/components/command";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { type FoundWorkflow, FoundWorkflows } from "./found-workflow";
@@ -17,7 +13,7 @@ type Answer =
   | { readonly kind: "failed" }
   | { readonly kind: "signed-out" };
 
-interface WorkflowSearch {
+export interface WorkflowSearch {
   readonly found: readonly FoundWorkflow[] | null;
   readonly failed: boolean;
   readonly reading: boolean;
@@ -26,7 +22,7 @@ interface WorkflowSearch {
 
 interface WorkflowResultsProps {
   readonly search: WorkflowSearch;
-  readonly onGo: (href: string) => void;
+  readonly onChoose: (workflow: FoundWorkflow) => void;
 }
 
 const FAILED: Answer = { kind: "failed" };
@@ -76,42 +72,50 @@ async function askForWorkflows(): Promise<Answer> {
   }
 }
 
-export function WorkflowResults({ search, onGo }: WorkflowResultsProps) {
+export function WorkflowResults({ search, onChoose }: WorkflowResultsProps) {
   return (
     <CommandGroup heading="Workflows">
       {search.reading && search.found === null && (
-        <div className="flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 px-2 py-1.5 text-muted-foreground">
           <Spinner className="size-3.5" />
           Reading workflows…
         </div>
       )}
       {search.failed && (
-        <p className="px-2 py-1.5 text-sm text-muted-foreground">
+        <p className="px-2 py-1.5 text-muted-foreground">
           Workflows could not be read.
         </p>
       )}
-      {search.found?.map((each) => (
-        <CommandItem
-          key={`${each.namespace}/${each.name}`}
-          value={`${each.namespace} ${each.name}`}
-          onSelect={() => {
-            const href = workflowHref(each.namespace, each.name);
-            onGo(href);
-          }}
-        >
-          <WaypointsIcon />
-          <span>{each.name}</span>
-          <span className="text-muted-foreground">{each.namespace}</span>
-          {each.archived && (
-            <span className="ml-auto text-xs text-muted-foreground">
-              Archived
-            </span>
-          )}
-          {each.on && (
-            <span className="ml-auto text-xs text-muted-foreground">On</span>
-          )}
-        </CommandItem>
-      ))}
+      {search.found?.map((each) => {
+        const value = workflowValueOf(each);
+        return (
+          <CommandItem
+            key={value}
+            value={value}
+            onSelect={() => {
+              onChoose(each);
+            }}
+          >
+            <WorkflowIcon />
+            <span>{each.name}</span>
+            <span className="text-muted-foreground">{each.namespace}</span>
+            {each.archived && (
+              <span className="ml-auto text-caption text-muted-foreground">
+                Archived
+              </span>
+            )}
+            {each.on && (
+              <span className="ml-auto text-caption text-muted-foreground">
+                On
+              </span>
+            )}
+          </CommandItem>
+        );
+      })}
     </CommandGroup>
   );
+}
+
+export function workflowValueOf(workflow: FoundWorkflow): string {
+  return `${workflow.namespace} ${workflow.name}`;
 }
