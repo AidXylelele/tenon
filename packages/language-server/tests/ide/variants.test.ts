@@ -43,6 +43,20 @@ const effectsWithoutTimer: HostProfile["effects"] = [
   "resource",
 ];
 
+const effectsWithoutGrpc: HostProfile["effects"] = [
+  "http",
+  "openapi",
+  "asyncapi",
+  "a2a",
+  "mcp",
+  "process",
+  "workflow",
+  "timer",
+  "emit",
+  "listen",
+  "resource",
+];
+
 function check(hostProfile: HostProfile) {
   const options = { profile: hostProfile, imports: {} };
   const analyze = (text: string) => created.analyze(text, options);
@@ -71,6 +85,16 @@ test.each<readonly [string, HostProfile, readonly string[]]>([
     "no shell leaves out the shell command",
     { ...profile, processes: ["container", "script"] },
     ["shell"],
+  ],
+  [
+    "no gRPC effect leaves out the gRPC call",
+    { ...profile, effects: effectsWithoutGrpc },
+    ["grpc"],
+  ],
+  [
+    "MCP only over standard input leaves out the MCP call, which starts over HTTP",
+    { ...profile, mcpTransports: ["stdio"] },
+    ["mcp"],
   ],
   [
     "no timer leaves out the wait and the try, whose retry waits between retries",

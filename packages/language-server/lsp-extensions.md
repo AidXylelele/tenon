@@ -301,7 +301,7 @@ interface Step {
   name: string;
   kind: TaskKind;
   family: "flow" | "call" | "data" | "event" | "time" | "error";
-  summary: string | null; // one line from what the step writes
+  summary: string | null; // one line from what the step writes; empty parts left out
   milliseconds: number | null; // a wait's duration, where fixed
   note: string | null; // metadata.note, where it is a string
   range: Range | null; // the whole item; null where a stale step no longer stands
@@ -321,6 +321,7 @@ interface Transition {
 
 - **Ids.** A step's id is its pointer with each list index removed (`/do/1/guard/try/0/fetch` becomes `/do/guard/try/fetch`); a list's id is its step's id and the list's pointer below the step. A repeated name's second and later occurrences in one list, and everything below them, take `#` and their full pointer (`#/do/1/greet`). A reorder keeps every id; a rename and a move to another list change the ids of the subtree, which `workflow/edit` reports.
 - **Broken text.** When the version does not analyse, the steps are those of the last version that did, `stale` is `true`, and each range is placed again by pointer in the current text, or `null` where it no longer stands or the text does not read.
+- **Summaries.** A summary joins what the step writes and leaves out what is still empty: an HTTP call with no address yet is `GET`, a container with no image `container`, and a call that writes none of its parts has no summary.
 - **Durations.** A trigger's and a wait's `summary` is the duration as written; `milliseconds` is the same duration as a number, whichever form it is written in (`PT1H` and `{ hours: 1 }` both give 3600000), so a client words a number and reads no grammar. It is `null` where the duration is not fixed: a calendar one (`P1M`), an expression, or a mistake.
 - **Published versions.** The API reads the same `WorkflowStructure` from `language-server/structure` for a version it holds, every range `null`.
 - **Errors:** `ContentModified` (-32801), `RequestFailed` (-32803) when the document is not open, `InvalidParams` (-32602).
@@ -641,7 +642,7 @@ interface StepVariantsResult {
 }
 ```
 
-- **Support.** A variant is listed when its starting content, analysed alone under the `profile` of the `initializationOptions`, has no `capability` diagnostic: what a host provides is the interpreter's rule, so `container` is left out where `profile.processes` lacks it, `script-python` where `profile.scriptLanguages` lacks `python`, and `wait` and `try`, whose retry waits between attempts, where `profile.effects` lacks `timer`.
+- **Support.** A variant is listed when its starting content, analysed alone under the `profile` of the `initializationOptions`, has no `capability` diagnostic: what a host provides is the interpreter's rule, so `grpc` is left out where `profile.effects` lacks `grpc`, `mcp` where `profile.mcpTransports` lacks `http` (its starting transport), `container` where `profile.processes` lacks it, `script-python` where `profile.scriptLanguages` lacks `python`, and `wait` and `try`, whose retry waits between attempts, where `profile.effects` lacks `timer`.
 - **Starting content.** Each variant inserts the smallest document the language accepts for it, with the values a person fills left empty rather than made up. The analysis names most of them on a model it still builds, so the new step is in the structure and its form at once: an empty address, operation, service, method, image or workflow (`schema`), an empty event type (`event-attribute`) and an empty `for.in` or condition (`expression`); an empty shell command, script code or error title is accepted as written, and the client marks those fields to fill:
 
   | Variant                      | Starting content                                                                                                                               | Left to fill                                 |

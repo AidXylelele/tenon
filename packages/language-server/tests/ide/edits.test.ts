@@ -1,6 +1,8 @@
 import type { JsonObject } from "interpreter/front-end";
 import { expect, test } from "vitest";
 import { editsOf } from "../../src/ide/edits/index.js";
+import { formOf } from "../../src/ide/forms/index.js";
+import type { SchemasAt } from "../../src/ide/places/index.js";
 import { valueAt } from "../../src/ide/pointers/index.js";
 import { sourceOf } from "../../src/ide/snapshot/index.js";
 import {
@@ -16,7 +18,13 @@ import type {
   StepVariant,
 } from "../../src/protocol/index.js";
 import { guardedFlow, inlineHeader } from "../support/documents.js";
+import { analyzer } from "../support/analyzer.js";
 import { snapshotOf } from "../support/snapshot.js";
+
+const created = await analyzer;
+
+const formSchemasAt: SchemasAt = (document, pointer) =>
+  created.schemasAt(document, pointer);
 
 const commented = guardedFlow
   .replace("  - guard:", "  # the fetch, guarded\n  - guard:")
@@ -1842,4 +1850,24 @@ test("an export whose key another step of the same name already writes is refuse
     reason:
       "Rename one of the two steps named 'fetch' (/do/fetch and /do/total/do/fetch): both would export it to the context.",
   });
+});
+
+test("a new HTTP step with its address to fill is in the structure and has its form at once", () => {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: "http",
+    name: null,
+  };
+  const edited = editedOf(emptyFlow, action);
+  const snapshot = snapshotOf(edited);
+
+  const reading = structureReadingOf(snapshot);
+  const form = formOf(snapshot, "/do/http", formSchemasAt);
+
+  const ids = reading.workflow.steps.steps.map((step) => step.id);
+  expect(reading.stale).toBe(false);
+  expect(ids).toEqual(["/do/http"]);
+  expect(form).toMatchObject({ kind: "form" });
 });

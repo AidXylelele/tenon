@@ -218,6 +218,26 @@ test.each([
     "https://example.com/errors/x",
   ],
   ["a group", "group: { do: [ { one: { set: { a: 1 } } } ] }", null],
+  [
+    "an HTTP call with no address yet",
+    'fetch: { call: http, with: { method: get, endpoint: "" } }',
+    "GET",
+  ],
+  [
+    "a gRPC call with only its method",
+    'ask: { call: grpc, with: { proto: { endpoint: "https://api.test/a.proto" }, service: { name: "", host: api.test }, method: Ask } }',
+    "Ask",
+  ],
+  [
+    "an OpenAPI call with no operation yet",
+    'op: { call: openapi, with: { document: { endpoint: "https://api.test/openapi.yaml" }, operationId: "" } }',
+    null,
+  ],
+  [
+    "a container with no image yet",
+    'box: { run: { container: { image: "" } } }',
+    "container",
+  ],
 ])("%s is summed up as written", (_, step, summary) => {
   const text = `${inlineHeader}do:\n  - ${step}\n`;
   const snapshot = snapshotOf(text);
