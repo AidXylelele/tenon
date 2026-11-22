@@ -197,7 +197,7 @@ function ClosedGroup({ group, onOpen }: ClosedGroupProps) {
       variant="ghost"
       aria-expanded={false}
       onClick={open}
-      className="h-auto w-full justify-between px-0 py-1.5 caps text-muted-foreground hover:bg-transparent hover:text-foreground active:bg-transparent"
+      className="h-auto w-full justify-between px-0 py-1.5 text-caption font-semibold tracking-caps text-muted-foreground uppercase hover:bg-transparent hover:text-foreground active:bg-transparent"
     >
       {group.title}
       <span className="flex items-center gap-1">
