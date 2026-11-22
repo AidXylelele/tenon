@@ -14,7 +14,7 @@
   "rtl": false,
   "aliases": {
     "components": "@/libs/ui",
-    "utils": "@/libs/ui/utils",
+    "utils": "@/libs/ui/tokens/cn",
     "ui": "@/libs/ui/components",
     "lib": "@/libs/ui",
     "hooks": "@/libs/ui/hooks"
