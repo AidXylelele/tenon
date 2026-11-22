@@ -1,5 +1,6 @@
 import { isUtf8 } from "node:buffer";
 import { randomUUID } from "node:crypto";
+import { MIMEType } from "node:util";
 import { Injectable } from "@nestjs/common";
 import {
   HttpNetworkError,
@@ -34,7 +35,6 @@ import type { ImportFetcher } from "../../application/automation/imports/ports.j
 import type { CallContext } from "../interpreter/interfaces.js";
 import { AddressPolicy } from "./address-policy.js";
 import { AuthorizationServer } from "./authorization-server.js";
-import { DigestAuthentication } from "./digest-authentication.js";
 import { HttpClientName } from "./enums.js";
 import { HttpAuthentication } from "./http-authentication.js";
 import type {
@@ -42,7 +42,6 @@ import type {
   EndpointFetch,
   FetchedText,
   OutboundRequest,
-  PasswordCredentials,
   ResponseOptions,
   Signed,
 } from "./interfaces.js";
@@ -68,6 +67,7 @@ const NETWORK_REASONS = new Map<string, string>([
   ["EPIPE", CLOSED_EARLY],
   ["UND_ERR_SOCKET", CLOSED_EARLY],
   ["UND_ERR_CLOSED", CLOSED_EARLY],
+  ["UND_ERR_RES_EXCEEDED_MAX_SIZE", "The response is larger than 1 MiB"],
   ["ETIMEDOUT", "The connection timed out"],
   ["UND_ERR_CONNECT_TIMEOUT", "The connection timed out"],
   ["EHOSTUNREACH", "The host is unreachable"],
@@ -87,6 +87,12 @@ const CREDENTIAL_HEADERS: readonly string[] = [
   "proxy-authorization",
 ];
 
+const TEXT_APPLICATIONS: readonly string[] = [
+  "xml",
+  "javascript",
+  "x-www-form-urlencoded",
+];
+
 @Injectable()
 export class HttpClient implements ImportFetcher {
   static readonly RESPONSE_BYTES = 1024 * 1024;
@@ -94,10 +100,9 @@ export class HttpClient implements ImportFetcher {
   private readonly policy: ResiliencePolicy;
 
   constructor(
-    @InjectHttpClient(HttpClientName.Effects)
-    private readonly effects: NestHttpClient,
+    @InjectHttpClient(HttpClientName.Outbound)
+    private readonly outbound: NestHttpClient,
     private readonly authentication: HttpAuthentication,
-    private readonly digest: DigestAuthentication,
     private readonly operations: OpenApiOperations,
     resilience: ResilienceService,
   ) {
@@ -267,11 +272,12 @@ export class HttpClient implements ImportFetcher {
 
     if (authorization.kind === "misconfigured") return authorization;
 
-    const request = {
+    const request: OutboundRequest = {
       method: "GET",
       uri: endpoint.uri,
-      headers: {},
+      headers: new Headers(),
       body: null,
+      redirect: "manual",
     };
     const signed = await this.#signed(request, authorization, signal);
     const response = signed.response;
@@ -287,8 +293,8 @@ export class HttpClient implements ImportFetcher {
     }
 
     const body = await this.#bodyOf(response);
-    const contentType = response.headers.get("content-type");
-    const text = this.#textOf(body, contentType);
+    const media = this.#mediaOf(response);
+    const text = this.#textOf(body, media);
     return { kind: "text", text };
   }
 
@@ -321,9 +327,8 @@ export class HttpClient implements ImportFetcher {
   ): Promise<RespondedHttpOutcome> {
     const response = signed.response;
     const body = await this.#bodyOf(response);
-    const contentType = response.headers.get("content-type");
-    const content = this.#contentOf(body, contentType, options.output);
-    const headers = Object.fromEntries(response.headers);
+    const content = this.#contentOf(body, response, options.output);
+    const headers = this.#headersOf(response);
     const authorization = options.revealAuthorization
       ? signed.authorization
       : null;
@@ -349,8 +354,6 @@ export class HttpClient implements ImportFetcher {
         return this.#unsigned(request, signal);
       case "header":
         return this.#signedWith(request, authorization.header, signal);
-      case "digest":
-        return this.#digested(request, authorization.credentials, signal);
     }
   }
 
@@ -373,35 +376,15 @@ export class HttpClient implements ImportFetcher {
     return { response, authorization };
   }
 
-  async #digested(
-    request: OutboundRequest,
-    credentials: PasswordCredentials,
-    signal: AbortSignal,
-  ): Promise<Signed> {
-    const unsigned = this.#withoutHeader(request, "authorization");
-    const challenged = await this.#unsigned(unsigned, signal);
-    const response = challenged.response;
-
-    if (response.status !== 401) return challenged;
-
-    const challenge = response.headers.get("www-authenticate");
-    const parameter = this.digest.answer(challenge, credentials, request);
-
-    if (parameter === null) return challenged;
-
-    await response.body?.cancel();
-    const answered = { scheme: "Digest", parameter };
-    return this.#signedWith(request, answered, signal);
-  }
-
   async #sent(
     request: OutboundRequest,
     signal: AbortSignal,
   ): Promise<Response> {
-    const sent = await this.effects.request(request.uri, {
+    const sent = await this.outbound.request(request.uri, {
       method: request.method,
       headers: request.headers,
       body: request.body,
+      redirect: request.redirect,
       signal,
       responseType: "response",
     });
@@ -414,11 +397,13 @@ export class HttpClient implements ImportFetcher {
     init: RequestInit | undefined,
     signal: AbortSignal,
   ): Promise<Response> {
-    const declared = new Headers(init?.headers);
-    const headers = Object.fromEntries(declared);
-    const body = typeof init?.body === "string" ? init.body : null;
-    const method = init?.method ?? "GET";
-    const request = { method, uri: url.toString(), headers, body };
+    const request: OutboundRequest = {
+      method: init?.method ?? "GET",
+      uri: url.toString(),
+      headers: new Headers(init?.headers),
+      body: typeof init?.body === "string" ? init.body : null,
+      redirect: init?.redirect ?? "manual",
+    };
     const signals = init?.signal ? [signal, init.signal] : [signal];
     const scoped = AbortSignal.any(signals);
     const signed = await this.#signed(request, authorization, scoped);
@@ -486,23 +471,57 @@ export class HttpClient implements ImportFetcher {
     const declared = request.body;
     const structured = declared !== null && typeof declared !== "string";
     const body = structured ? JSON.stringify(declared) : declared;
-    const plain = {
+    const headers = new Headers(request.headers);
+    const untyped = structured && !headers.has("content-type");
+
+    if (untyped) headers.set("content-type", "application/json");
+
+    return {
       method: request.method,
       uri: request.endpoint.uri,
-      headers: request.headers,
+      headers,
       body,
+      redirect: "manual",
     };
-    const typed = this.#hasHeader(request.headers, "content-type");
-
-    if (!structured || typed) return plain;
-
-    return this.#withHeader(plain, "content-type", "application/json");
   }
 
   #keyed(request: OutboundRequest, idempotencyKey: string): OutboundRequest {
-    if (this.#hasHeader(request.headers, "idempotency-key")) return request;
+    if (request.headers.has("idempotency-key")) return request;
 
     return this.#withHeader(request, "idempotency-key", idempotencyKey);
+  }
+
+  #withHeader(
+    request: OutboundRequest,
+    name: string,
+    value: string,
+  ): OutboundRequest {
+    const headers = new Headers(request.headers);
+    headers.set(name, value);
+    return {
+      method: request.method,
+      uri: request.uri,
+      headers,
+      body: request.body,
+      redirect: request.redirect,
+    };
+  }
+
+  #withoutCredentials(headers: Headers): Readonly<Record<string, string>> {
+    const shown = new Headers(headers);
+
+    for (const name of CREDENTIAL_HEADERS) shown.delete(name);
+
+    return Object.fromEntries(shown);
+  }
+
+  #headersOf(response: Response): Readonly<Record<string, string>> {
+    const headers = new Map(response.headers);
+    const cookies = response.headers.getSetCookie().join(", ");
+
+    if (cookies !== "") headers.set("set-cookie", cookies);
+
+    return Object.fromEntries(headers);
   }
 
   async #bodyOf(response: Response): Promise<Buffer> {
@@ -512,38 +531,60 @@ export class HttpClient implements ImportFetcher {
 
   #contentOf(
     body: Buffer,
-    contentType: string | null,
+    response: Response,
     output: HttpRequest["output"],
   ): JsonValue {
     if (body.length === 0) return null;
 
     if (output === "raw") return body.toString("base64");
 
-    const [essence = ""] = (contentType ?? "").split(";");
-    const media = essence.trim().toLowerCase();
+    const media = this.#mediaOf(response);
 
-    const json = /^application\/(?:json|[\w.+-]+\+json)$/;
+    if (this.#readsAsJson(media, body)) {
+      const text = this.#textOf(body, media);
+      return this.#documentOf(text);
+    }
 
-    if (json.test(media))
-      return this.#documentOf(this.#textOf(body, contentType));
+    if (this.#readsAsText(media)) return this.#textOf(body, media);
 
-    const textual =
-      /^(?:text\/[\w.+-]+|application\/(?:xml|[\w.+-]+\+xml|javascript|x-www-form-urlencoded))$/;
-
-    if (textual.test(media)) return this.#textOf(body, contentType);
-
-    const untyped = media === "" && isUtf8(body);
-
-    if (!untyped) return body.toString("base64");
-
-    return this.#documentOf(this.#textOf(body, contentType));
+    return body.toString("base64");
   }
 
-  #textOf(body: Buffer, contentType: string | null): string {
-    const declared = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(
-      contentType ?? "",
+  #mediaOf(response: Response): MIMEType | null {
+    const contentType = response.headers.get("content-type");
+
+    if (contentType === null) return null;
+
+    try {
+      return new MIMEType(contentType);
+    } catch {
+      return null;
+    }
+  }
+
+  #readsAsJson(media: MIMEType | null, body: Buffer): boolean {
+    if (media === null) return isUtf8(body);
+
+    if (media.type !== "application") return false;
+
+    return media.subtype === "json" || media.subtype.endsWith("+json");
+  }
+
+  #readsAsText(media: MIMEType | null): boolean {
+    if (media === null) return false;
+
+    if (media.type === "text") return true;
+
+    if (media.type !== "application") return false;
+
+    return (
+      TEXT_APPLICATIONS.includes(media.subtype) ||
+      media.subtype.endsWith("+xml")
     );
-    const [, charset = "utf-8"] = declared ?? [];
+  }
+
+  #textOf(body: Buffer, media: MIMEType | null): string {
+    const charset = media?.params.get("charset") ?? "utf-8";
 
     try {
       return new TextDecoder(charset).decode(body);
@@ -558,49 +599,5 @@ export class HttpClient implements ImportFetcher {
     } catch {
       return text;
     }
-  }
-
-  #hasHeader(headers: Readonly<Record<string, string>>, name: string): boolean {
-    return Object.keys(headers).some(
-      (declared) => declared.toLowerCase() === name,
-    );
-  }
-
-  #withHeader(
-    request: OutboundRequest,
-    name: string,
-    value: string,
-  ): OutboundRequest {
-    const cleared = this.#withoutHeader(request, name);
-    const entries = Object.entries(cleared.headers).concat([[name, value]]);
-    const headers = Object.fromEntries(entries);
-    return {
-      method: request.method,
-      uri: request.uri,
-      headers,
-      body: request.body,
-    };
-  }
-
-  #withoutHeader(request: OutboundRequest, name: string): OutboundRequest {
-    const kept = Object.entries(request.headers).filter(
-      ([declared]) => declared.toLowerCase() !== name,
-    );
-    const headers = Object.fromEntries(kept);
-    return {
-      method: request.method,
-      uri: request.uri,
-      headers,
-      body: request.body,
-    };
-  }
-
-  #withoutCredentials(
-    headers: Readonly<Record<string, string>>,
-  ): Readonly<Record<string, string>> {
-    const shown = Object.entries(headers).filter(
-      ([name]) => !CREDENTIAL_HEADERS.includes(name.toLowerCase()),
-    );
-    return Object.fromEntries(shown);
   }
 }

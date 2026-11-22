@@ -1,5 +1,6 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHmac } from "node:crypto";
 import type { ServerResponse } from "node:http";
+import { gzipSync } from "node:zlib";
 import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
@@ -35,22 +36,16 @@ type OAuth2Properties = Omit<
 
 const TOKEN = "token-1";
 const BASIC = `Basic ${Buffer.from("ada:lovelace").toString("base64")}`;
-const DIGEST_PASSWORD = "Circle of Life";
-const OPAQUE = "FQhe/qaU925kfnzjCev0ciny7QMkPqMAFRtzCUYo5tdS";
-const NONCE = "7ypf/xlj9XXwfDPEoM4URrv/xwf94BcCAzFZH4GiTo0v";
 const REFUSED_ADDRESS =
   "The address is private, loopback or link-local and not allow-listed";
 const ISSUER = "https://issuer.test";
-const HASH_NAMES = new Map([
-  ["MD5", "md5"],
-  ["SHA-256", "sha256"],
-  ["SHA-512-256", "sha512-256"],
-]);
 const JWT_TOKEN = [
   Buffer.from('{"alg":"none"}').toString("base64url"),
   Buffer.from(`{"iss":"${ISSUER}","sub":"runtime"}`).toString("base64url"),
   "signature",
 ].join(".");
+const OVERSIZED = "The response is larger than 1 MiB";
+const BOMB = gzipSync(Buffer.alloc(2 * 1024 * 1024));
 
 describe("a call the HTTP client performs for a run", () => {
   let context: INestApplicationContext;
@@ -184,6 +179,34 @@ describe("a call the HTTP client performs for a run", () => {
       return;
     }
 
+    if (path === "/bomb") {
+      response.writeHead(200, {
+        "content-type": "text/plain",
+        "content-encoding": "gzip",
+      });
+      response.end(BOMB);
+      return;
+    }
+
+    if (path === "/escape") {
+      response.writeHead(302, { location: "http://169.254.169.254/latest" });
+      response.end();
+      return;
+    }
+
+    if (path === "/cookies") {
+      response.writeHead(204, { "set-cookie": ["a=1; Path=/", "b=2; Path=/"] });
+      response.end();
+      return;
+    }
+
+    if (path === "/typed") {
+      const type = new URL(request.url, origin).searchParams.get("as") ?? "";
+      response.writeHead(200, { "content-type": type });
+      response.end('{"a":1}');
+      return;
+    }
+
     if (path === "/hang") return;
 
     if (path === "/basic" && authorization !== BASIC) {
@@ -194,11 +217,6 @@ describe("a call the HTTP client performs for a run", () => {
 
     if (path === "/protected" && authorization !== `Bearer ${TOKEN}`) {
       response.writeHead(401).end();
-      return;
-    }
-
-    if (path.startsWith("/digest/")) {
-      digest(request, response, path);
       return;
     }
 
@@ -241,32 +259,6 @@ describe("a call the HTTP client performs for a run", () => {
       headers: request.headers,
       body: request.body,
     });
-  }
-
-  function digest(
-    request: ReceivedRequest,
-    response: ServerResponse,
-    path: string,
-  ): void {
-    const query = new URL(request.url, origin).searchParams;
-    const qop = query.get("qop") ?? "auth, auth-int";
-    const userhash = query.get("userhash") === "true";
-    const hashed = userhash ? ", userhash=true" : "";
-    const offered = path.slice("/digest/".length).split("+");
-    const challenges = offered.map((algorithm) =>
-      algorithm === "legacy"
-        ? `Digest realm="http-auth@example.org", nonce="${NONCE}", opaque="${OPAQUE}"`
-        : `Digest realm="http-auth@example.org", qop="${qop}", algorithm=${algorithm}, nonce="${NONCE}", opaque="${OPAQUE}"${hashed}`,
-    );
-    const accepted = digestAccepted(request, offered, userhash);
-
-    if (accepted) {
-      json(response, 200, { authenticated: true });
-      return;
-    }
-
-    response.writeHead(401, { "www-authenticate": challenges });
-    response.end();
   }
 
   function contextOf(
@@ -385,6 +377,34 @@ describe("a call the HTTP client performs for a run", () => {
       });
     });
 
+    it.each([
+      ["application/problem+json", { a: 1 }],
+      ["application/xml", '{"a":1}'],
+      ["image/png", "eyJhIjoxfQ=="],
+      ["not a media type", { a: 1 }],
+    ] as const)(
+      "a_body_typed_%s_is_decoded_by_its_media_type",
+      async (type, expected) => {
+        const path = `/typed?as=${encodeURIComponent(type)}`;
+        const request = httpOf(path);
+
+        const outcome = await client.send(request, contextOf());
+
+        expect(outcome).toMatchObject({ kind: "responded", content: expected });
+      },
+    );
+
+    it("every_cookie_the_response_sets_is_answered", async () => {
+      const request = httpOf("/cookies");
+
+      const outcome = await client.send(request, contextOf());
+
+      expect(outcome).toMatchObject({
+        kind: "responded",
+        headers: { "set-cookie": "a=1; Path=/, b=2; Path=/" },
+      });
+    });
+
     it("a_redirect_is_answered_and_not_followed", async () => {
       const request = httpOf("/moved");
 
@@ -451,33 +471,12 @@ describe("a call the HTTP client performs for a run", () => {
             method: "POST",
             uri: `${origin}/pets?tag=dog`,
             headers: {
-              "X-Trace": "abc",
+              "x-trace": "abc",
               "content-type": "application/json",
               "idempotency-key": "run-1/do/0/charge",
             },
           },
           authorization: { scheme: "Bearer", parameter: TOKEN },
-        }),
-      );
-    });
-
-    it("the_request_a_digest_challenge_was_answered_with_is_answered_without_its_credentials", async () => {
-      const request = httpOf("/digest/SHA-256", {
-        kind: "digest",
-        username: "Mufasa",
-        password: DIGEST_PASSWORD,
-      });
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toEqual(
-        expect.objectContaining({
-          statusCode: 200,
-          request: {
-            method: "GET",
-            uri: `${origin}/digest/SHA-256`,
-            headers: { "idempotency-key": "run-1/do/0/charge" },
-          },
         }),
       );
     });
@@ -616,10 +615,15 @@ describe("a call the HTTP client performs for a run", () => {
 
       const outcome = await client.send(request, contextOf());
 
-      expect(outcome).toEqual({
-        kind: "unreachable",
-        detail: "The response is larger than 1 MiB",
-      });
+      expect(outcome).toEqual({ kind: "unreachable", detail: OVERSIZED });
+    });
+
+    it("a_compressed_response_larger_than_its_bound_once_decoded_is_unreachable", async () => {
+      const request = httpOf("/bomb");
+
+      const outcome = await client.send(request, contextOf());
+
+      expect(outcome).toEqual({ kind: "unreachable", detail: OVERSIZED });
     });
   });
 
@@ -662,6 +666,22 @@ describe("a call the HTTP client performs for a run", () => {
       });
     });
 
+    it("digest_authentication_is_misconfigured_before_any_request", async () => {
+      const request = httpOf("/json", {
+        kind: "digest",
+        username: "Mufasa",
+        password: "Circle of Life",
+      });
+
+      const outcome = await client.send(request, contextOf());
+
+      expect(outcome).toEqual({
+        kind: "misconfigured",
+        detail: "The host does not answer HTTP Digest challenges",
+      });
+      expect(stub.received).toHaveLength(0);
+    });
+
     it("bearer_authentication_is_sent_as_its_token", async () => {
       const request = httpOf("/protected", { kind: "bearer", token: TOKEN });
 
@@ -672,125 +692,6 @@ describe("a call the HTTP client performs for a run", () => {
         statusCode: 200,
         authorization: { scheme: "Bearer", parameter: TOKEN },
       });
-    });
-
-    it.each([
-      "MD5",
-      "MD5-sess",
-      "SHA-256",
-      "SHA-256-sess",
-      "SHA-512-256",
-      "legacy",
-    ])("digest_authentication_answers_a_%s_challenge", async (algorithm) => {
-      const request = httpOf(`/digest/${algorithm}`, {
-        kind: "digest",
-        username: "Mufasa",
-        password: DIGEST_PASSWORD,
-      });
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toMatchObject({
-        kind: "responded",
-        statusCode: 200,
-        content: { authenticated: true },
-        authorization: { scheme: "Digest" },
-      });
-      expect(stub.received).toHaveLength(2);
-    });
-
-    it("digest_authentication_answers_an_auth_int_challenge_with_the_body_s_hash", async () => {
-      const request: HttpRequest = {
-        ...httpOf("/digest/SHA-256?qop=auth-int", {
-          kind: "digest",
-          username: "Mufasa",
-          password: DIGEST_PASSWORD,
-        }),
-        method: "POST",
-        body: { name: "Rex" },
-      };
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
-      const answered = stub.received[1]?.headers.authorization ?? "";
-      expect(answered).toContain("qop=auth-int");
-    });
-
-    it("digest_authentication_hashes_the_username_when_the_challenge_asks", async () => {
-      const request = httpOf("/digest/SHA-256?userhash=true", {
-        kind: "digest",
-        username: "Mufasa",
-        password: DIGEST_PASSWORD,
-      });
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
-      const answered = stub.received[1]?.headers.authorization ?? "";
-      expect(answered).toContain(
-        'username="a947aad205e80e429958a387394944c6b496301e79f89d35a4cc23b6ee12b5b6"',
-      );
-    });
-
-    it("digest_authentication_answers_the_strongest_challenge_offered", async () => {
-      const request = httpOf("/digest/MD5+SHA-256", {
-        kind: "digest",
-        username: "Mufasa",
-        password: DIGEST_PASSWORD,
-      });
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
-      const answered = stub.received[1]?.headers.authorization ?? "";
-      expect(answered).toContain("algorithm=SHA-256");
-    });
-
-    it("digest_authentication_with_a_wrong_password_is_answered_401", async () => {
-      const request = httpOf("/digest/SHA-256", {
-        kind: "digest",
-        username: "Mufasa",
-        password: "wrong",
-      });
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toMatchObject({ kind: "responded", statusCode: 401 });
-    });
-
-    it("digest_authentication_never_sends_the_author_s_authorization_header", async () => {
-      const request: HttpRequest = {
-        ...httpOf("/digest/SHA-256", {
-          kind: "digest",
-          username: "Mufasa",
-          password: DIGEST_PASSWORD,
-        }),
-        headers: { Authorization: "Basic author" },
-      };
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
-      expect(stub.received[0]?.headers.authorization).toBeUndefined();
-      expect(stub.received[1]?.headers.authorization).toMatch(/^Digest /);
-    });
-
-    it("digest_authentication_without_a_challenge_sends_the_request_once", async () => {
-      const request = httpOf("/json", {
-        kind: "digest",
-        username: "Mufasa",
-        password: DIGEST_PASSWORD,
-      });
-
-      const outcome = await client.send(request, contextOf());
-
-      expect(outcome).toMatchObject({
-        kind: "responded",
-        statusCode: 200,
-        authorization: null,
-      });
-      expect(stub.received).toHaveLength(1);
     });
 
     describe("oauth2", () => {
@@ -862,25 +763,6 @@ describe("a call the HTTP client performs for a run", () => {
           client_id: "workflow-runtime",
           client_secret: "s3cret",
         });
-      });
-
-      it("the_password_grant_sends_the_username_and_password", async () => {
-        const authentication = oauth2Of({
-          grant: "password",
-          username: "ada",
-          password: "lovelace",
-        });
-        const request = httpOf("/protected", authentication);
-
-        await client.send(request, contextOf());
-
-        expect(formOf(tokenRequest())).toEqual([
-          ["client_id", "workflow-runtime"],
-          ["client_secret", "s3cret"],
-          ["grant_type", "password"],
-          ["password", "lovelace"],
-          ["username", "ada"],
-        ]);
       });
 
       it("the_token_exchange_grant_sends_the_subject_and_actor_tokens", async () => {
@@ -1239,21 +1121,6 @@ describe("a call the HTTP client performs for a run", () => {
         expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
       });
 
-      it("digest_credentials_come_from_the_secret_s_value", async () => {
-        const secrets = {
-          lion: { username: "Mufasa", password: DIGEST_PASSWORD },
-        };
-        const request = httpOf("/digest/SHA-256", {
-          kind: "secret",
-          scheme: "digest",
-          secret: "lion",
-        });
-
-        const outcome = await client.send(request, contextOf(secrets));
-
-        expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
-      });
-
       it("oauth2_properties_from_a_secret_take_the_reference_s_defaults", async () => {
         const secrets = {
           idp: {
@@ -1492,7 +1359,7 @@ describe("a call the HTTP client performs for a run", () => {
         kind: "responded",
         content: {
           method: "POST",
-          url: "/api/orders?tags=a%2Cb",
+          url: "/api/orders?tags=a,b",
           headers: {
             "x-tenant": "acme",
             cookie: "session=abc",
@@ -1524,9 +1391,9 @@ describe("a call the HTTP client performs for a run", () => {
           kind: "responded",
           request: {
             method: "POST",
-            uri: `${origin}/api/orders?tags=a%2Cb`,
+            uri: `${origin}/api/orders?tags=a,b`,
             headers: {
-              "X-Tenant": "acme",
+              "x-tenant": "acme",
               cookie: "session=abc",
               "content-type": "application/json",
               "idempotency-key": "run-1/do/0/charge",
@@ -1626,7 +1493,8 @@ describe("a call the HTTP client performs for a run", () => {
 
       expect(outcome).toEqual({
         kind: "misconfigured",
-        detail: 'The operation "getPetById" requires the parameter "petId"',
+        detail:
+          'The operation "getPetById" cannot be called: Required parameter petId is not provided',
       });
     });
 
@@ -1681,6 +1549,20 @@ describe("a call the HTTP client performs for a run", () => {
       });
     });
 
+    it("a_multipart_request_body_is_misconfigured_before_the_call", async () => {
+      const request = openApiOf("/v3/openapi.json", "uploadPhoto", {
+        body: { caption: "Rex" },
+      });
+
+      const outcome = await client.call(request, contextOf());
+
+      expect(outcome).toEqual({
+        kind: "misconfigured",
+        detail: "The host does not send multipart/form-data request bodies",
+      });
+      expect(stub.received).toHaveLength(1);
+    });
+
     it("a_document_at_a_refused_address_is_unreachable", async () => {
       const request: OpenApiRequest = {
         ...openApiOf("/v2/swagger.json", "getPetById", { petId: 1 }),
@@ -1696,6 +1578,43 @@ describe("a call the HTTP client performs for a run", () => {
       const outcome = await client.call(request, contextOf());
 
       expect(outcome).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });
+    });
+  });
+
+  describe("a fetch a protocol client makes", () => {
+    const anonymous = { kind: "anonymous" } as const;
+
+    it("a_redirect_is_not_followed_unless_the_request_asks", async () => {
+      const fetch = client.fetchFor(anonymous, new AbortController().signal);
+
+      const response = await fetch(`${origin}/moved`);
+
+      expect(response.status).toBe(302);
+      expect(stub.received.map((received) => received.url)).toEqual(["/moved"]);
+    });
+
+    it("a_redirect_the_request_asks_to_follow_is_followed", async () => {
+      const fetch = client.fetchFor(anonymous, new AbortController().signal);
+
+      const response = await fetch(`${origin}/moved`, { redirect: "follow" });
+
+      expect(response.status).toBe(200);
+      expect(stub.received.map((received) => received.url)).toEqual([
+        "/moved",
+        "/json",
+      ]);
+    });
+
+    it("a_followed_redirect_to_a_refused_address_is_unreachable", async () => {
+      const fetch = client.fetchFor(anonymous, new AbortController().signal);
+      const fetched = fetch(`${origin}/escape`, { redirect: "follow" });
+
+      const failure = await fetched.then(
+        () => null,
+        (error: unknown) => client.transportFailureOf(error),
+      );
+
+      expect(failure).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });
     });
   });
 
@@ -1809,57 +1728,6 @@ function json(response: ServerResponse, status: number, body: unknown): void {
   response.end(JSON.stringify(body));
 }
 
-function digestAccepted(
-  request: ReceivedRequest,
-  offered: readonly string[],
-  userhash: boolean,
-): boolean {
-  const header = request.headers.authorization ?? "";
-
-  if (!header.startsWith("Digest ")) return false;
-
-  const parameters = new Map<string, string>();
-
-  for (const [, name = "", quoted, bare] of header.matchAll(
-    /(\w+)=(?:"([^"]*)"|([^\s,]+))/g,
-  ))
-    parameters.set(name, quoted ?? bare ?? "");
-
-  const algorithm = parameters.get("algorithm") ?? "MD5";
-  const expectedAlgorithm = offered.includes("legacy") ? "MD5" : offered.at(-1);
-
-  if (algorithm !== expectedAlgorithm) return false;
-
-  const hashName = HASH_NAMES.get(algorithm.replace(/-sess$/, "")) ?? "md5";
-  const hash = (text: string): string =>
-    createHash(hashName).update(text).digest("hex");
-  const realm = parameters.get("realm") ?? "";
-  const cnonce = parameters.get("cnonce") ?? "";
-  const qop = parameters.get("qop");
-  const uri = parameters.get("uri") ?? "";
-  const secret = hash(`Mufasa:${realm}:${DIGEST_PASSWORD}`);
-  const ha1 = algorithm.endsWith("-sess")
-    ? hash(`${secret}:${NONCE}:${cnonce}`)
-    : secret;
-  const entity = qop === "auth-int" ? `:${hash(request.body)}` : "";
-  const ha2 = hash(`${request.method}:${uri}${entity}`);
-  const username = userhash ? hash(`Mufasa:${realm}`) : "Mufasa";
-  const hashedAsOffered = (parameters.get("userhash") === "true") === userhash;
-  const expected =
-    qop === undefined
-      ? hash(`${ha1}:${NONCE}:${ha2}`)
-      : hash(
-          `${ha1}:${NONCE}:${parameters.get("nc") ?? ""}:${cnonce}:${qop}:${ha2}`,
-        );
-  return (
-    uri === request.url &&
-    parameters.get("username") === username &&
-    hashedAsOffered &&
-    parameters.get("opaque") === OPAQUE &&
-    parameters.get("response") === expected
-  );
-}
-
 function swaggerDocument(port: number): unknown {
   return {
     swagger: "2.0",
@@ -1953,6 +1821,14 @@ function openApiDocument(port: number): unknown {
           operationId: "putNote",
           parameters: [{ name: "body", in: "query" }],
           requestBody: { content: { "text/plain": {} } },
+        },
+      },
+      "/photos": {
+        post: {
+          operationId: "uploadPhoto",
+          requestBody: {
+            content: { "multipart/form-data": { schema: { type: "object" } } },
+          },
         },
       },
     },

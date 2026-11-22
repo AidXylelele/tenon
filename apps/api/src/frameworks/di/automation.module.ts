@@ -20,6 +20,8 @@ import {
 } from "../../application/automation/subscriptions/ports.js";
 import { WorkflowRepository } from "../../application/automation/workflows/ports.js";
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
+import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
+import { EventDeliveries } from "../../interface-adapters/messaging/interfaces.js";
 import { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 import { LifecycleEventMapper } from "../../interface-adapters/persistence/mappers/lifecycle-event.mapper.js";
 import { SecretMapper } from "../../interface-adapters/persistence/mappers/secret.mapper.js";
@@ -48,7 +50,6 @@ import { AesGcmCipher } from "../crypto/aes-gcm.cipher.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
 import { AuthorizationServer } from "../http-client/authorization-server.js";
 import { DeliveryClient } from "../http-client/delivery.client.js";
-import { DigestAuthentication } from "../http-client/digest-authentication.js";
 import { HttpClientName } from "../http-client/enums.js";
 import { HttpAuthentication } from "../http-client/http-authentication.js";
 import { HttpClient } from "../http-client/http.client.js";
@@ -64,25 +65,7 @@ import { OutboundModule } from "./outbound.module.js";
     ConfigModule.forFeature(linksConfig),
     OutboundModule,
     HttpClientModule.registerAsync({
-      name: HttpClientName.Effects,
-      imports: [OutboundModule],
-      inject: [AddressPolicy],
-      useFactory: (policy: AddressPolicy) => ({
-        dispatcher: policy.dispatcher,
-        interceptors: [new ResponseSizeLimit(HttpClient.RESPONSE_BYTES)],
-      }),
-    }),
-    HttpClientModule.registerAsync({
-      name: HttpClientName.IdentityProvider,
-      imports: [OutboundModule],
-      inject: [AddressPolicy],
-      useFactory: (policy: AddressPolicy) => ({
-        dispatcher: policy.dispatcher,
-        interceptors: [new ResponseSizeLimit(HttpClient.RESPONSE_BYTES)],
-      }),
-    }),
-    HttpClientModule.registerAsync({
-      name: HttpClientName.Deliveries,
+      name: HttpClientName.Outbound,
       imports: [OutboundModule],
       inject: [AddressPolicy],
       useFactory: (policy: AddressPolicy) => ({
@@ -141,12 +124,13 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: InterpreterClient, useExisting: WorkerInterpreterClient },
     AuthorizationServer,
     HttpAuthentication,
-    DigestAuthentication,
     OpenApiOperations,
     HttpClient,
     { provide: ImportFetcher, useExisting: HttpClient },
     DeliveryClient,
-    { provide: EventSender, useExisting: DeliveryClient },
+    { provide: EventDeliveries, useExisting: DeliveryClient },
+    EventDeliveryGateway,
+    { provide: EventSender, useExisting: EventDeliveryGateway },
   ],
   exports: [
     CancelInstance,

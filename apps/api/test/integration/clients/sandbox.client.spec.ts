@@ -1,3 +1,7 @@
+import { spawnSync } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { INestApplicationContext } from "@nestjs/common";
 import { HttpClient as NestHttpClient } from "@nestjs/http-client";
 import { CircuitOpenError, ResilienceService } from "@nestjs/resilience";
@@ -381,8 +385,9 @@ describe("a process the sandbox runs for a run", () => {
         args: [
           "/bin/sh",
           "-c",
-          "cd -- '/tmp/it'\\''s' 2>&3 || exit\nexec 3>&-\necho \"$1\"",
+          'cd -- "$1" 2>&3 || exit\nexec 3>&-\nshift\necho "$1"',
           "sh",
+          "/tmp/it's",
           "Foo",
         ],
         files: [
@@ -392,6 +397,23 @@ describe("a process the sandbox runs for a run", () => {
           { name: "directory", max: 1024 },
         ],
       });
+    });
+
+    it("a_shell_enters_the_directory_and_keeps_the_arguments_it_was_given", async () => {
+      const prefix = join(tmpdir(), "it's ");
+      const directory = await mkdtemp(prefix);
+      const command = 'printf "%s|%s|%s" "$PWD" "$1" "$#"';
+      const request = shellOf({ directory, command });
+
+      await client.run(request, contextOf());
+      const [shell = "", ...args] = commandSent().args as string[];
+      const ran = spawnSync(shell, args, {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe", "pipe"],
+      });
+
+      expect(ran.stdout).toBe(`${directory}|Foo|1`);
+      await rm(directory, { recursive: true });
     });
 
     it("a_javascript_script_declares_its_arguments_as_constants", async () => {

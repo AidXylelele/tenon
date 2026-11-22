@@ -1,44 +1,30 @@
 import type { LookupAddress, LookupOptions } from "node:dns";
 import { lookup } from "node:dns/promises";
-import { BlockList, isIP, type LookupFunction } from "node:net";
+import { isIP, type LookupFunction } from "node:net";
 import type { OnApplicationShutdown } from "@nestjs/common";
+import ipaddr from "ipaddr.js";
 import { Agent, buildConnector } from "undici";
+import { HttpClient } from "./http.client.js";
+import type { AddressRange, AddressRanges, IpAddress } from "./interfaces.js";
 
-const REFUSED_NETWORKS: readonly string[] = [
-  "0.0.0.0/8",
-  "10.0.0.0/8",
-  "100.64.0.0/10",
-  "127.0.0.0/8",
-  "169.254.0.0/16",
-  "172.16.0.0/12",
-  "192.0.0.0/24",
-  "192.168.0.0/16",
-  "198.18.0.0/15",
-  "224.0.0.0/4",
-  "240.0.0.0/4",
-  "::/96",
-  "64:ff9b::/96",
-  "64:ff9b:1::/48",
-  "100::/64",
-  "2001::/32",
-  "2002::/16",
-  "fc00::/7",
-  "fe80::/10",
-  "fec0::/10",
-  "ff00::/8",
-];
+const IPV4_COMPATIBLE = "::/96";
+
+const UNLISTED = "unlisted";
+
+const HOST_BITS = { ipv4: 32, ipv6: 128 } as const;
 
 export class AddressPolicy implements OnApplicationShutdown {
   static readonly REFUSED = "ERR_ADDRESS_REFUSED";
 
   readonly dispatcher: Agent;
-  private readonly refused = new BlockList();
-  private readonly allowed = new BlockList();
+  private readonly allowed: AddressRanges;
+  private readonly refused: AddressRanges;
 
   constructor(allowList: readonly string[]) {
-    for (const network of REFUSED_NETWORKS) this.#add(this.refused, network);
-
-    for (const entry of allowList) this.#add(this.allowed, entry);
+    const listed = allowList.map((entry) => this.#rangeOf(entry));
+    const ipv4Compatible = ipaddr.parseCIDR(IPV4_COMPATIBLE);
+    this.allowed = { listed };
+    this.refused = { ipv4Compatible };
 
     const checked: LookupFunction = (hostname, options, callback) => {
       this.#lookup(hostname, options, callback);
@@ -47,7 +33,10 @@ export class AddressPolicy implements OnApplicationShutdown {
     const connect: buildConnector.connector = (options, callback) => {
       this.#connect(connector, options, callback);
     };
-    this.dispatcher = new Agent({ connect });
+    this.dispatcher = new Agent({
+      connect,
+      maxResponseSize: HttpClient.RESPONSE_BYTES,
+    });
   }
 
   onApplicationShutdown(): Promise<void> {
@@ -55,17 +44,20 @@ export class AddressPolicy implements OnApplicationShutdown {
   }
 
   permits(address: string): boolean {
-    const family = this.#familyOf(address);
+    const parsed = ipaddr.process(address);
 
-    if (this.allowed.check(address, family)) return true;
+    if (this.#listedIn(this.allowed, parsed)) return true;
 
-    return !this.refused.check(address, family);
+    if (this.#listedIn(this.refused, parsed)) return false;
+
+    return parsed.range() === "unicast";
   }
 
   async admits(hostname: string): Promise<boolean> {
     const host = this.#unbracketed(hostname);
+    const literal = isIP(host) !== 0;
 
-    if (isIP(host) !== 0) return this.permits(host);
+    if (literal) return this.permits(host);
 
     try {
       await this.resolve(host, 0);
@@ -100,7 +92,8 @@ export class AddressPolicy implements OnApplicationShutdown {
     const literal = isIP(host) !== 0;
 
     if (literal && !this.permits(host)) {
-      callback(this.#refusal(), null);
+      const refusal = this.#refusal();
+      callback(refusal, null);
       return;
     }
 
@@ -115,12 +108,15 @@ export class AddressPolicy implements OnApplicationShutdown {
     this.resolve(hostname, options.family).then(
       (addresses) => {
         if (options.all === true) {
-          callback(null, addresses.slice());
+          const all = addresses.slice();
+          callback(null, all);
           return;
         }
 
         const [first] = addresses;
-        callback(null, first?.address ?? "", first?.family ?? 0);
+        const address = first?.address ?? "";
+        const family = first?.family ?? 0;
+        callback(null, address, family);
       },
       (error: unknown) => {
         const failure =
@@ -128,6 +124,18 @@ export class AddressPolicy implements OnApplicationShutdown {
         callback(failure, "", 0);
       },
     );
+  }
+
+  #listedIn(ranges: AddressRanges, address: IpAddress): boolean {
+    return ipaddr.subnetMatch(address, ranges, UNLISTED) !== UNLISTED;
+  }
+
+  #rangeOf(entry: string): AddressRange {
+    if (ipaddr.isValidCIDR(entry)) return ipaddr.parseCIDR(entry);
+
+    const address = ipaddr.process(entry);
+    const bits = HOST_BITS[address.kind()];
+    return [address, bits];
   }
 
   #unbracketed(hostname: string): string {
@@ -139,28 +147,5 @@ export class AddressPolicy implements OnApplicationShutdown {
       "The address is private, loopback or link-local and not allow-listed",
     );
     return Object.assign(error, { code: AddressPolicy.REFUSED });
-  }
-
-  #add(list: BlockList, entry: string): void {
-    const [network = "", prefix] = entry.split("/");
-    const family = this.#familyOf(network);
-
-    if (prefix === undefined) {
-      list.addAddress(network, family);
-      return;
-    }
-
-    const length = Number(prefix);
-    list.addSubnet(network, length, family);
-  }
-
-  #familyOf(address: string): "ipv4" | "ipv6" {
-    const version = isIP(address);
-
-    if (version === 4) return "ipv4";
-
-    if (version === 6) return "ipv6";
-
-    throw new TypeError(`"${address}" is not an IP address`);
   }
 }

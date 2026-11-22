@@ -3,6 +3,7 @@ import type {
   AsyncApiRequest,
   Failure,
 } from "interpreter";
+import type { CloudEvent } from "../../application/automation/events/interfaces.js";
 import type { StepCall } from "../workflows/interfaces.js";
 
 export interface AcceptedEventMessage {
@@ -58,4 +59,16 @@ export abstract class SubscriptionClient {
     step: StepCall,
     inbox: AsyncApiInbox,
   ): Promise<Subscribed>;
+}
+
+export interface EventDelivery {
+  readonly uri: string;
+  readonly scheme: "basic" | "bearer" | null;
+  readonly credential: string | null;
+  readonly event: CloudEvent;
+}
+
+export abstract class EventDeliveries {
+  abstract admits(uri: string): Promise<boolean>;
+  abstract deliver(delivery: EventDelivery): Promise<string | null>;
 }

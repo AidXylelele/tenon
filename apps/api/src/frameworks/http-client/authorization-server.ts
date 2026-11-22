@@ -32,8 +32,8 @@ export class AuthorizationServer {
   static readonly REFUSED = "ERR_TOKEN_REFUSED";
 
   constructor(
-    @InjectHttpClient(HttpClientName.IdentityProvider)
-    private readonly identityProvider: NestHttpClient,
+    @InjectHttpClient(HttpClientName.Outbound)
+    private readonly outbound: NestHttpClient,
   ) {}
 
   async accessTokenFor(
@@ -149,17 +149,12 @@ export class AuthorizationServer {
   #parametersOf(credentials: OAuth2Credentials): URLSearchParams {
     const parameters = new URLSearchParams();
 
-    if (credentials.scopes.length > 0)
-      parameters.set("scope", credentials.scopes.join(" "));
+    const scope = credentials.scopes.join(" ");
+
+    if (scope !== "") parameters.set("scope", scope);
 
     for (const audience of credentials.audiences)
       parameters.append("audience", audience);
-
-    if (credentials.username !== null)
-      parameters.set("username", credentials.username);
-
-    if (credentials.password !== null)
-      parameters.set("password", credentials.password);
 
     if (credentials.subject !== null) {
       parameters.set("subject_token", credentials.subject.token);
@@ -178,15 +173,21 @@ export class AuthorizationServer {
     const client = credentials.client;
 
     switch (client.authentication) {
-      case "client_secret_basic":
-        return ClientSecretBasic(this.#secretOf(credentials));
-      case "client_secret_post":
-        return ClientSecretPost(this.#secretOf(credentials));
-      case "client_secret_jwt":
+      case "client_secret_basic": {
+        const secret = this.#secretOf(credentials);
+        return ClientSecretBasic(secret);
+      }
+      case "client_secret_post": {
+        const secret = this.#secretOf(credentials);
+        return ClientSecretPost(secret);
+      }
+      case "client_secret_jwt": {
         if (client.assertion !== null)
           return this.#assertedBy(client.assertion);
 
-        return ClientSecretJwt(this.#secretOf(credentials));
+        const secret = this.#secretOf(credentials);
+        return ClientSecretJwt(secret);
+      }
       case "private_key_jwt":
         if (client.assertion === null)
           throw this.#refused("private_key_jwt needs the client assertion");
@@ -245,10 +246,11 @@ export class AuthorizationServer {
 
     if (json) headers.set("content-type", encoding);
 
-    const response = await this.identityProvider.request(url, {
+    const response = await this.outbound.request(url, {
       method: options.method,
       headers,
       body,
+      redirect: options.redirect,
       signal: scoped,
       responseType: "response",
     });
@@ -263,7 +265,8 @@ export class AuthorizationServer {
     for (const name of body.keys()) {
       const values = body.getAll(name);
       const [single = ""] = values;
-      fields.set(name, values.length === 1 ? single : values);
+      const value = values.length === 1 ? single : values;
+      fields.set(name, value);
     }
 
     const object = Object.fromEntries(fields);
