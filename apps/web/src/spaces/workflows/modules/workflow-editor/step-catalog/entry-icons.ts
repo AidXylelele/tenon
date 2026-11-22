@@ -23,7 +23,7 @@ import {
   WorkflowIcon,
   WrenchIcon,
 } from "lucide-react";
-import type { EntryIcon } from "@/operations/step-catalog";
+import type { EntryIcon } from "./interfaces";
 
 export const ENTRY_ICONS: Readonly<Record<EntryIcon, LucideIcon>> = {
   globe: GlobeIcon,

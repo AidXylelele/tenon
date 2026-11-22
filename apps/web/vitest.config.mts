@@ -16,7 +16,7 @@ const LIB_FLOOR = {
   statements: 85,
 };
 
-const FEATURE_FLOOR = {
+const MODULE_PART_FLOOR = {
   lines: 85,
   branches: 85,
   functions: 85,
@@ -49,12 +49,18 @@ const libFloors: [string, Floor][] = [
   ["src/libs/ui/tokens/**", LIB_FLOOR],
 ];
 
-const featureFloors: [string, Floor][] = [
-  ["src/features/script-field/**", FEATURE_FLOOR],
-  ["src/features/step-catalog/**", FEATURE_FLOOR],
+const modulePartFloors: [string, Floor][] = [
+  [
+    "src/spaces/workflows/modules/workflow-editor/script-field/**",
+    MODULE_PART_FLOOR,
+  ],
+  [
+    "src/spaces/workflows/modules/workflow-editor/step-catalog/**",
+    MODULE_PART_FLOOR,
+  ],
 ];
 
-const floors = operationFloors.concat(libFloors, featureFloors);
+const floors = operationFloors.concat(libFloors, modulePartFloors);
 
 const thresholds = Object.fromEntries(floors);
 

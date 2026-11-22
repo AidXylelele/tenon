@@ -1,11 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
-import type { EntryAction } from "@/operations/step-catalog";
-import {
-  TENON_VARIANTS,
-  WITHOUT_SHELL,
-} from "@/operations/step-catalog/hosts.test-support";
-import type { StepCatalogProps } from "./interfaces";
+import { TENON_VARIANTS, WITHOUT_SHELL } from "./hosts.test-support";
+import type { EntryAction, StepCatalogProps } from "./interfaces";
 import { StepCatalog } from "./step-catalog";
 
 type PanelProps = Omit<StepCatalogProps, "onChoose">;

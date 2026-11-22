@@ -17,20 +17,16 @@ import {
   EmptyTitle,
 } from "@/libs/ui/components/empty";
 import { cn } from "@/libs/ui/tokens/cn";
-import {
-  catalogOf,
-  type EntryAction,
-  entryWordsOf,
-  foundText,
-  type GroupId,
-  keyboardOrderOf,
-  noMatchOf,
-  type ShownEntry,
-  type ShownGroup,
-  shownGroupsOf,
-} from "@/operations/step-catalog";
+import { catalogOf, entryWordsOf } from "./catalog";
 import { ENTRY_ICONS } from "./entry-icons";
-import type { StepCatalogProps } from "./interfaces";
+import type {
+  EntryAction,
+  GroupId,
+  ShownEntry,
+  ShownGroup,
+  StepCatalogProps,
+} from "./interfaces";
+import { foundText, keyboardOrderOf, noMatchOf, shownGroupsOf } from "./search";
 
 interface OptionProps {
   readonly shown: ShownEntry;

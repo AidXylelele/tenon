@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 function storyOf(name: string): string {
-  return `/iframe.html?id=features-step-catalog--${name}&viewMode=story`;
+  return `/iframe.html?id=spaces-workflows-modules-workflow-editor-step-catalog--${name}&viewMode=story`;
 }
 
 test.describe("the step catalog playground", () => {

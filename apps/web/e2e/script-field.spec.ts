@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 function storyOf(name: string): string {
-  return `/iframe.html?id=features-script-field--${name}&viewMode=story`;
+  return `/iframe.html?id=spaces-workflows-modules-workflow-editor-script-field--${name}&viewMode=story`;
 }
 
 test.describe("the script field playground", () => {

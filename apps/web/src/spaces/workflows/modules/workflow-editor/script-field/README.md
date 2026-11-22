@@ -1,6 +1,6 @@
 # script-field
 
-The code of a "Run JavaScript" or "Run Python" step: a CodeMirror editor with line numbers, highlighting on the `--code-*` tokens and completion, a bar that names the language and holds Format and Expand, and the code status line that names the first problem and says what Format did. Formatting runs off the page's thread through `libs/code-formatting` (Prettier for JavaScript, Ruff for Python).
+The code of a "Run JavaScript" or "Run Python" step: a CodeMirror editor with line numbers, highlighting on the `--code-*` tokens and completion, a bar that names the language and holds Format and Expand, and the code status line that names the first problem and says what Format did. Formatting runs off the page's thread through `libs/code-formatting` (Prettier for JavaScript, Ruff for Python). It lives in the editor module because only the workflow editor uses it (the owner's RFC: a feature repeats across domains; one page's logic stays in its module).
 
 Owner: web — editor. Decisions: research D3 (scripts in a real code editor, formatted by ready formatters) and D14 (a script's result is the JSON it prints) of the console redesign (005); design system §6 "Code editor" and "Script field" and §7 "Code editor, JSON viewer"; the approved mockup's `formScript` and its screens `editor-js` and `editor-py`.
 
@@ -8,7 +8,7 @@ Owner: web — editor. Decisions: research D3 (scripts in a real code editor, fo
 
 `ScriptField` with:
 
-- `language`: the step's `run.script.language`, `"js"` or `"python"`; the feature reads `js` as `libs/codemirror`'s `javascript`.
+- `language`: the step's `run.script.language`, `"js"` or `"python"`; the field reads `js` as `libs/codemirror`'s `javascript`.
 - `label`: the accessible name of the code, the visible label of the form's field ("Code").
 - `value` and `onChange(code)`: the field is controlled. Typing and Format report the new code; a new `value` from the owner replaces the text without being reported back.
 - `problems`: the language server's diagnostics for the script, positioned in the script's own text (line 0 is its first line). Each is marked in the gutter and underlined on its range; the status line names the first ("Line 3: “(” was never closed"), or says "No problems".
