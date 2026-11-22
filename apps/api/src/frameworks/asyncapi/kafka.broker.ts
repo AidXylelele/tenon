@@ -14,6 +14,7 @@ import {
   stringDeserializer,
   stringSerializer,
 } from "@platformatic/kafka";
+import { context, propagation } from "@opentelemetry/api";
 import type { AsyncApiOutcome, Failure } from "interpreter";
 import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
 import { AddressPolicy } from "../http-client/address-policy.js";
@@ -43,6 +44,7 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     detail: "The channel's kafka binding is not one the host reads",
   };
 
+  readonly system = "kafka";
   private readonly connections: BrokerConnections<KafkaProducer>;
 
   constructor(private readonly addresses: AddressPolicy) {
@@ -132,6 +134,7 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
       tls: server.secure ? {} : undefined,
       tlsServerName: this.#serverNameOf(server),
       sasl: this.#saslOf(credentials),
+      connectTimeout: BrokerConnections.CONNECT_MS,
       retries: false,
       serializers: {
         headerKey: stringSerializer,
@@ -160,6 +163,7 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
       tls: server.secure ? {} : undefined,
       tlsServerName: this.#serverNameOf(server),
       sasl: this.#saslOf(credentials),
+      connectTimeout: BrokerConnections.CONNECT_MS,
       deserializers: {
         headerKey: stringDeserializer,
         headerValue: stringDeserializer,
@@ -254,6 +258,8 @@ export class KafkaBroker implements BrokerClient, OnApplicationShutdown {
     for (const [name, value] of Object.entries(message.headers))
       headers[name] = typeof value === "string" ? value : JSON.stringify(value);
 
+    const active = context.active();
+    propagation.inject(active, headers);
     return headers;
   }
 

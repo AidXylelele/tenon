@@ -1,3 +1,4 @@
+import { type AddressInfo, createServer, type Socket } from "node:net";
 import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceModule, ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
@@ -29,6 +30,7 @@ import { resiliencePresets } from "../../../src/frameworks/di/resilience.presets
 import { AmqpBroker } from "../../../src/frameworks/asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../../../src/frameworks/asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../../../src/frameworks/asyncapi/asyncapi-documents.js";
+import { BrokerSpans } from "../../../src/frameworks/asyncapi/broker-spans.js";
 import type { BrokerSubscription } from "../../../src/interface-adapters/messaging/interfaces.js";
 import { KafkaBroker } from "../../../src/frameworks/asyncapi/kafka.broker.js";
 import { MqttBroker } from "../../../src/frameworks/asyncapi/mqtt.broker.js";
@@ -201,6 +203,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       http,
       authentication,
       new AsyncApiDocuments(),
+      new BrokerSpans(),
       amqp,
       kafka,
       mqtt,
@@ -308,7 +311,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       await subscriber.close();
     });
 
-    it("publishes_to_the_subject_a_version_2_channel_names_keyed_by_the_step", async () => {
+    it("publishes_to_the_subject_a_version_2_channel_names", async () => {
       served["nats.json"] = {
         asyncapi: "2.6.0",
         info: infoOf("nats orders"),
@@ -329,7 +332,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       expect(message).toEqual({
         topic: "orders.paid",
         body: '{"order":8}',
-        headers: { "Nats-Msg-Id": "step-2" },
+        headers: {},
       });
     });
 
@@ -516,6 +519,109 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       expect(outcome).toMatchObject({ kind: "unreachable" });
     });
 
+    describe("a broker that accepts a connection and never answers", () => {
+      const dialled: Socket[] = [];
+      const silent = createServer((socket) => {
+        dialled.push(socket);
+      });
+
+      beforeAll(async () => {
+        await new Promise<void>((resolve) => {
+          silent.listen(0, HOST, resolve);
+        });
+        const port = String((silent.address() as AddressInfo).port);
+
+        for (const protocol of ["amqp", "mqtt", "nats", "redis"])
+          served[`silent-${protocol}.json`] = v3Document(
+            protocol,
+            `${HOST}:${port}`,
+            { address: "orders" },
+          );
+      });
+
+      afterAll(async () => {
+        for (const socket of dialled) socket.destroy();
+
+        await new Promise((resolve) => silent.close(resolve));
+      });
+
+      it("is_unreachable_once_the_connect_times_out_and_is_dialled_anew_by_the_next_call", async () => {
+        const requestOn = (protocol: string) =>
+          requestOf(
+            `silent-${protocol}.json`,
+            { operation: "announce" },
+            published({ order: 21 }),
+          );
+        const stopped = new AbortController();
+        const stoppedCall = {
+          ...callContextOf("step-17"),
+          signal: stopped.signal,
+        };
+        const protocols = ["amqp", "mqtt", "nats", "redis"];
+        const publishing = protocols.map((protocol) =>
+          client.publish(
+            requestOn(protocol),
+            callContextOf(`step-${protocol}`),
+          ),
+        );
+
+        const outcomes = await Promise.all(publishing);
+        const next = client.publish(requestOn("amqp"), stoppedCall);
+        await vi.waitFor(
+          () => {
+            expect(dialled).toHaveLength(protocols.length + 1);
+          },
+          { timeout: 5_000, interval: 20 },
+        );
+        stopped.abort();
+
+        expect(outcomes.map((outcome) => outcome.kind)).toEqual([
+          "unreachable",
+          "unreachable",
+          "unreachable",
+          "unreachable",
+        ]);
+        expect(outcomes[0]).toEqual({
+          kind: "unreachable",
+          detail: "connect ETIMEDOUT",
+        });
+        await expect(next).resolves.toEqual({ kind: "expired" });
+      });
+
+      it("a_receive_that_ends_before_the_broker_answers_is_expired_at_once", async () => {
+        const receive: AsyncApiRequest["exchange"] = {
+          kind: "receive",
+          subscription: "/do/0/orders",
+          position: 0,
+          closesAt: null,
+        };
+        const request = requestOf(
+          "silent-amqp.json",
+          { channel: "orders" },
+          receive,
+        );
+        const ended = new AbortController();
+        const deliver = () => Promise.resolve();
+        const inbox = { ...inboxOf(deliver), ended: ended.signal };
+        const dials = dialled.length;
+
+        const subscribed = client.subscribe(
+          request,
+          callContextOf("receiver-silent"),
+          inbox,
+        );
+        await vi.waitFor(
+          () => {
+            expect(dialled).toHaveLength(dials + 1);
+          },
+          { timeout: 5_000, interval: 20 },
+        );
+        ended.abort();
+
+        await expect(subscribed).resolves.toEqual({ kind: "expired" });
+      });
+    });
+
     it("an_external_reference_of_the_document_is_never_read", async () => {
       served["external.json"] = {
         ...v3Document("redis", at(redis, 6379), { address: "orders" }),
@@ -614,9 +720,11 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
     const subscribed = async (
       request: AsyncApiRequest,
       deliver: (message: AsyncApiInboundMessage) => Promise<void>,
+      lost: () => void = () => {},
     ) => {
       const call = callContextOf("receiver-1");
-      const outcome = await client.subscribe(request, call, inboxOf(deliver));
+      const inbox = inboxOf(deliver, lost);
+      const outcome = await client.subscribe(request, call, inbox);
 
       if (outcome.kind !== "subscribed")
         throw new Error(`The client did not subscribe: ${outcome.kind}`);
@@ -743,6 +851,47 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       ]);
     });
 
+    it("a_redis_receive_keeps_its_messages_coming_after_the_broker_drops_its_connection", async () => {
+      served["redis-kept.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders-kept",
+      });
+      const inbox: AsyncApiInboundMessage[] = [];
+      const lost = vi.fn();
+      const request = requestOf(
+        "redis-kept.json",
+        { channel: "orders" },
+        receive,
+      );
+      await subscribed(request, collectedIn(inbox), lost);
+      const broker = createClient({ url: `redis://${at(redis, 6379)}` });
+      await broker.connect();
+
+      const killed = await broker.sendCommand([
+        "CLIENT",
+        "KILL",
+        "TYPE",
+        "pubsub",
+      ]);
+      await vi.waitFor(
+        async () => {
+          const counts = await broker.pubSubNumSub("orders-kept");
+          expect(counts["orders-kept"]).toBe(1);
+        },
+        { timeout: 10_000, interval: 100 },
+      );
+      await broker.publish("orders-kept", '{"order":6}');
+      await broker.publish("orders-kept", '{"order":7}');
+      await broker.close();
+      await twoOf(inbox);
+
+      expect(inbox.map((message) => message.payload)).toEqual([
+        { order: 6 },
+        { order: 7 },
+      ]);
+      expect(killed).toBeGreaterThan(0);
+      expect(lost).not.toHaveBeenCalled();
+    });
+
     describe("on AMQP", () => {
       let model: ChannelModel;
       let channel: Channel;
@@ -859,6 +1008,77 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
           { order: 11 },
           { order: 12 },
         ]);
+      });
+
+      it("a_receive_and_a_publisher_recover_after_the_broker_closes_their_connections", async () => {
+        await channel.assertQueue("orders-kept");
+        served["amqp-kept.json"] = v3Document("amqp", at(rabbit, 5672), {
+          address: "orders-kept",
+          bindings: { amqp: { is: "queue", queue: { name: "orders-kept" } } },
+        });
+        const inbox: AsyncApiInboundMessage[] = [];
+        const lost = vi.fn();
+        const receiving = requestOf(
+          "amqp-kept.json",
+          { channel: "orders" },
+          receive,
+          LOGIN,
+        );
+        const publishing = requestOf(
+          "amqp-kept.json",
+          { operation: "announce" },
+          published({ order: 13 }),
+          LOGIN,
+        );
+        await subscribed(receiving, collectedIn(inbox), lost);
+        const before = await client.publish(
+          publishing,
+          callContextOf("step-18"),
+        );
+        await vi.waitFor(
+          () => {
+            expect(inbox).toHaveLength(1);
+          },
+          { timeout: 5_000, interval: 20 },
+        );
+        model.on("error", () => undefined);
+
+        await rabbit.exec(["rabbitmqctl", "close_all_connections", "test"]);
+        model = await connectAmqp(`amqp://ada:lovelace@${at(rabbit, 5672)}`);
+        channel = await model.createChannel();
+        await vi.waitFor(
+          async () => {
+            const queue = await channel.checkQueue("orders-kept");
+            expect(queue.consumerCount).toBe(1);
+          },
+          { timeout: 10_000, interval: 100 },
+        );
+        const republishing = requestOf(
+          "amqp-kept.json",
+          { operation: "announce" },
+          published({ order: 14 }),
+          LOGIN,
+        );
+        const after = await vi.waitFor(
+          async () => {
+            const outcome = await client.publish(
+              republishing,
+              callContextOf("step-19"),
+            );
+            expect(outcome).toEqual({ kind: "published" });
+            return outcome;
+          },
+          { timeout: 10_000, interval: 100 },
+        );
+        await twoOf(inbox);
+
+        expect(before).toEqual({ kind: "published" });
+        expect(after).toEqual({ kind: "published" });
+        expect(inbox.map((message) => message.payload)).toEqual([
+          { order: 13 },
+          { order: 14 },
+        ]);
+        expect(lost).not.toHaveBeenCalled();
       });
     });
   });

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import {
+  type AttemptContext,
   type ResiliencePolicy,
   ResilienceService,
   ResilienceTimeoutError,
@@ -26,10 +27,12 @@ import type { StepCall } from "../../interface-adapters/workflows/interfaces.js"
 import type { CallContext } from "../interpreter/interfaces.js";
 import { AmqpBroker } from "./amqp.broker.js";
 import { AsyncApiDocuments } from "./asyncapi-documents.js";
+import { BrokerSpans } from "./broker-spans.js";
 import type {
   BrokerCredentials,
   BrokerClient,
   BrokerTarget,
+  Expired,
   ReceivedBrokerMessage,
 } from "./interfaces.js";
 import { BrokerProtocol } from "./enums.js";
@@ -43,6 +46,7 @@ export class AsyncApiClient implements SubscriptionClient {
   private static readonly MESSAGE_BYTES = 1024 * 1024;
   private static readonly JSON = /^application\/(?:[\w.+-]+\+)?json\b/i;
   private static readonly ANONYMOUS: BrokerCredentials = { kind: "anonymous" };
+  private static readonly EXPIRED: Expired = { kind: "expired" };
   private static readonly OVERSIZED: Failure = {
     kind: "misconfigured",
     detail: "A received message is larger than the host's 1 MiB",
@@ -55,6 +59,7 @@ export class AsyncApiClient implements SubscriptionClient {
     private readonly http: HttpClient,
     private readonly authentication: HttpAuthentication,
     private readonly documents: AsyncApiDocuments,
+    private readonly spans: BrokerSpans,
     amqp: AmqpBroker,
     kafka: KafkaBroker,
     mqtt: MqttBroker,
@@ -144,13 +149,26 @@ export class AsyncApiClient implements SubscriptionClient {
       subscriber: call.idempotencyKey,
       ended: inbox.ended,
       demanded: () => inbox.demanded(),
-      deliver: (message: ReceivedBrokerMessage) =>
-        this.#delivered(message, target, inbox),
+      deliver: (message: ReceivedBrokerMessage) => {
+        const delivering = () => this.#delivered(message, target, inbox);
+        return this.spans.processing(
+          target,
+          broker.system,
+          message.headers,
+          delivering,
+        );
+      },
       lost: () => {
         inbox.lost();
       },
     };
-    return broker.subscribe(target, credentials, brokerInbox);
+    const subscribing = broker.subscribe(target, credentials, brokerInbox);
+    const subscribed = await this.#within(subscribing, inbox.ended);
+
+    if (subscribed === AsyncApiClient.EXPIRED)
+      void this.#abandoned(subscribing);
+
+    return subscribed;
   }
 
   async #published(
@@ -187,15 +205,56 @@ export class AsyncApiClient implements SubscriptionClient {
       headers: message.headers,
       idempotencyKey: call.idempotencyKey,
     };
+    const publishing = (attempt: AttemptContext) =>
+      publisher.publish(target, sent, credentials, attempt.signal);
+    const bounded = () => this.#bounded(publishing, call.signal);
+    return this.spans.sending(target, publisher.system, bounded);
+  }
+
+  async #bounded(
+    publishing: (attempt: AttemptContext) => Promise<AsyncApiOutcome>,
+    signal: AbortSignal,
+  ): Promise<AsyncApiOutcome> {
+    const executed = this.policy.execute(publishing, { signal });
 
     try {
-      return await this.policy.execute(
-        () => publisher.publish(target, sent, credentials),
-        { signal: call.signal },
-      );
+      return await this.#within(executed, signal);
     } catch (error) {
-      return this.#failureOf(error, call.signal);
+      return this.#failureOf(error, signal);
     }
+  }
+
+  async #within<T>(
+    work: Promise<T>,
+    signal: AbortSignal,
+  ): Promise<T | Expired> {
+    const settled = new AbortController();
+    const expired = this.#expiredOn(signal, settled.signal);
+
+    try {
+      return await Promise.race([work, expired]);
+    } finally {
+      settled.abort();
+    }
+  }
+
+  async #abandoned(subscribing: Promise<Subscribed>): Promise<void> {
+    const late = await subscribing;
+
+    if (late.kind !== "subscribed") return;
+
+    await Promise.allSettled([late.subscription.close()]);
+  }
+
+  #expiredOn(signal: AbortSignal, settled: AbortSignal): Promise<Expired> {
+    if (signal.aborted) return Promise.resolve(AsyncApiClient.EXPIRED);
+
+    return new Promise((resolve) => {
+      const expire = () => {
+        resolve(AsyncApiClient.EXPIRED);
+      };
+      signal.addEventListener("abort", expire, { once: true, signal: settled });
+    });
   }
 
   #credentialsOf(
@@ -272,7 +331,7 @@ export class AsyncApiClient implements SubscriptionClient {
 
   #failureOf(error: unknown, signal: AbortSignal): AsyncApiOutcome {
     if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return { kind: "expired" };
+      return AsyncApiClient.EXPIRED;
 
     throw error;
   }
