@@ -1,10 +1,11 @@
-import { tokensOf } from "../../runtime/index.js";
+import type { JsonValue } from "../../api/index.js";
+import { isJsonObject, tokensOf } from "../../runtime/index.js";
 import { declaredNamesOf } from "./schemas-at.js";
 import type { Branch, SchemaBreach, Violation } from "./types.js";
 
 interface Resolution {
   readonly choice: SchemaBreach;
-  readonly formed: readonly Branch[];
+  readonly holder: Branch | null;
 }
 
 const valueKeywords = new Set([
@@ -14,8 +15,6 @@ const valueKeywords = new Set([
   "minimum",
   "maximum",
 ]);
-
-const choiceKeywords = new Set(["oneOf", "anyOf"]);
 
 const summaryKeywords = new Set(["if"]);
 
@@ -33,7 +32,7 @@ export function isStructureIntact(violations: readonly Violation[]): boolean {
   }
 
   const resolutions = outermost.map(resolutionOf);
-  const isResolved = resolutions.every(({ formed }) => formed.length > 0);
+  const isResolved = resolutions.every(({ holder }) => holder !== null);
 
   if (!isResolved) {
     return false;
@@ -59,8 +58,38 @@ function resolutionOf(choice: SchemaBreach): Resolution {
   const formed = choice.branches.filter((branch) =>
     isStructureIntact(branch.violations),
   );
+  const written = writtenMembersOf(choice.value);
+  const offered = written.filter((member) => isOfferedBy(member, formed));
+  const holder = formed.find((branch) => declaresAll(branch, offered)) ?? null;
 
-  return { choice, formed };
+  return { choice, holder };
+}
+
+function writtenMembersOf(value: JsonValue): readonly string[] {
+  const isObject = isJsonObject(value);
+
+  if (!isObject) {
+    return [];
+  }
+
+  return Object.keys(value);
+}
+
+function isOfferedBy(member: string, formed: readonly Branch[]): boolean {
+  return formed.some((branch) => isDeclaredBy(member, branch));
+}
+
+function declaresAll(branch: Branch, members: readonly string[]): boolean {
+  return members.every((member) => isDeclaredBy(member, branch));
+}
+
+function isDeclaredBy(member: string | null, branch: Branch): boolean {
+  if (member === null) {
+    return false;
+  }
+
+  const declared = declaredNamesOf(branch.schema);
+  return declared.includes(member);
 }
 
 function explainedOf(
@@ -80,20 +109,26 @@ function isDroppedMember(
   violation: Violation,
   resolution: Resolution,
 ): boolean {
+  const { choice, holder } = resolution;
   const isUnknown = violation.keyword === unknownMember;
-  const isAtChoice = violation.instance === resolution.choice.instance;
+  const isAtChoice = violation.instance === choice.instance;
   const isOfChoice = isUnknown && isAtChoice;
 
   if (!isOfChoice) {
     return false;
   }
 
-  const member = tokensOf(violation.pointer).at(-1) ?? "";
-  const declared = resolution.formed.flatMap(({ schema }) =>
-    declaredNamesOf(schema),
-  );
+  if (holder === null) {
+    return false;
+  }
 
-  return declared.includes(member);
+  const member = memberOf(violation);
+  return isDeclaredBy(member, holder);
+}
+
+function memberOf(violation: Violation): string | null {
+  const tokens = tokensOf(violation.pointer);
+  return tokens.at(-1) ?? null;
 }
 
 function remainderOf(
@@ -115,10 +150,12 @@ function branchViolationsOf(choice: SchemaBreach): readonly SchemaBreach[] {
 }
 
 function isChoice(violation: Violation): violation is SchemaBreach {
-  const isSchema = violation.kind === "schema";
-  const isChoosing = choiceKeywords.has(violation.keyword);
-
-  return isSchema && isChoosing;
+  switch (violation.kind) {
+    case "schema":
+      return violation.branches.length > 0;
+    case "rule":
+      return false;
+  }
 }
 
 function isOfValueOrSummary(violation: Violation): boolean {

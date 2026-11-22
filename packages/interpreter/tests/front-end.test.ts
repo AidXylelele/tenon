@@ -554,6 +554,60 @@ do:
     });
   });
 
+  test.each([
+    [
+      "a container and a script in one run",
+      {
+        document: header,
+        do: [
+          {
+            start: {
+              run: {
+                container: {
+                  image: "hello-world",
+                  lifetime: { cleanup: "eventually", after: "soon" },
+                },
+                script: {
+                  language: "js",
+                  source: { endpoint: "" },
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "one event and all events awaited at once",
+      {
+        document: header,
+        do: [
+          {
+            await: {
+              listen: {
+                to: {
+                  one: { with: { type: "com.example.a", time: "yesterday" } },
+                  all: [{ with: { type: "com.example.b", time: "yesterday" } }],
+                },
+              },
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "a basic and a bearer authentication at once",
+      fetchedAt({
+        uri: "https://example.com",
+        authentication: { basic: { use: "" }, bearer: { use: "" } },
+      }),
+    ],
+  ])("refuses %s, each alternative wrong only in a value", (_, document) => {
+    const analysis = analyzer.analyze(document, fullOptions);
+
+    expect(analysis.kind).toBe("refused");
+  });
+
   test("refuses an unknown member inside the one alternative whose value is wrong", () => {
     const document = {
       document: header,
