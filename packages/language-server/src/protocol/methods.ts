@@ -5,6 +5,7 @@ export const methods = {
   rangesOf: "workflow/rangesOf",
   structure: "workflow/structure",
   stepForm: "workflow/stepForm",
+  stepVariants: "workflow/stepVariants",
   workflowForm: "workflow/workflowForm",
   edit: "workflow/edit",
   importsNeeded: "workflow/importsNeeded",

@@ -14,4 +14,5 @@ export {
   workflowFormHandlerOf,
   workflowFormRequest,
 } from "./forms.js";
+export { stepVariantsHandlerOf, stepVariantsRequest } from "./step-variants.js";
 export { structureHandlerOf, structureRequest } from "./structure.js";

@@ -4,10 +4,10 @@ import type {
   JsonValue,
   Range,
   RangeLocator,
-  TaskKind,
 } from "interpreter/front-end";
 import type { TextChange } from "../text/index.js";
 import type { Snapshot } from "../snapshot/index.js";
+import type { StepVariant } from "../variants/index.js";
 import type {
   FailureKind,
   StepNode,
@@ -19,7 +19,7 @@ export interface InsertStep {
   readonly kind: "insertStep";
   readonly list: string;
   readonly index: number;
-  readonly step: TaskKind;
+  readonly step: StepVariant;
   readonly name: string | null;
 }
 
@@ -27,7 +27,7 @@ export interface InsertStepOnBranch {
   readonly kind: "insertStepOnBranch";
   readonly switch: string;
   readonly case: string;
-  readonly step: TaskKind;
+  readonly step: StepVariant;
   readonly name: string | null;
 }
 

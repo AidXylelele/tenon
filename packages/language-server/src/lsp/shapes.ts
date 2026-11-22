@@ -1,10 +1,11 @@
-import { type HostProfile, taskKinds } from "interpreter/front-end";
+import type { HostProfile } from "interpreter/front-end";
 import {
   ErrorCodes,
   ResponseError,
   TextDocumentIdentifier,
   VersionedTextDocumentIdentifier,
 } from "vscode-languageserver/browser";
+import { stepVariants } from "../ide/variants/index.js";
 import type {
   DidFetchImportsParams,
   EditParams,
@@ -32,7 +33,7 @@ const profileShapes: Record<keyof HostProfile, (member: unknown) => boolean> = {
 
 const draftMembers: readonly string[] = ["namespace", "name"];
 
-const kindsOfTask: ReadonlySet<unknown> = new Set(taskKinds);
+const variantsOfStep: ReadonlySet<unknown> = new Set(stepVariants);
 
 const plainFailureKinds: ReadonlySet<string> = new Set([
   "stop",
@@ -153,7 +154,7 @@ function holdsNewStep(action: unknown): boolean {
   const step = memberOf(action, "step");
   const isNamed = name === null || typeof name === "string";
 
-  return kindsOfTask.has(step) && isNamed;
+  return variantsOfStep.has(step) && isNamed;
 }
 
 function holdsMove(action: unknown): boolean {

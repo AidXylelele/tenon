@@ -1,3 +1,4 @@
+import type { JsonObject } from "interpreter/front-end";
 import { expect, test } from "vitest";
 import { editsOf } from "../../src/ide/edits/index.js";
 import { valueAt } from "../../src/ide/pointers/index.js";
@@ -9,7 +10,7 @@ import {
   type Transition,
 } from "../../src/ide/structure/index.js";
 import { appliedOf } from "../../src/ide/text/index.js";
-import type { EditAction } from "../../src/protocol/index.js";
+import type { EditAction, StepVariant } from "../../src/protocol/index.js";
 import { guardedFlow, inlineHeader } from "../support/documents.js";
 import { snapshotOf } from "../support/snapshot.js";
 
@@ -149,7 +150,7 @@ test("a new step goes between two, before the comment of the second", () => {
 
   const expected = commented.replace(
     "  # the fetch, guarded\n",
-    "  - wait:\n      wait: PT1S\n  # the fetch, guarded\n",
+    "  - wait:\n      wait: PT30M\n  # the fetch, guarded\n",
   );
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
@@ -166,7 +167,7 @@ test("a new step in a flow list is written inline", () => {
 
   const outcome = outcomeOf(text, action);
 
-  const expected = `${inlineHeader}do: [ { a: { set: { x: 1 } } }, { wait: { wait: PT1S } } ]\n`;
+  const expected = `${inlineHeader}do: [ { a: { set: { x: 1 } } }, { wait: { wait: PT30M } } ]\n`;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
@@ -182,7 +183,7 @@ test("a step inserted into a new try is written as block text", () => {
 
   const outcome = outcomeOf(text, action);
 
-  const expected = `${inlineHeader}do:\n  - guard:\n      try:\n        - wait:\n            wait: PT1S\n      catch: {}\n`;
+  const expected = `${inlineHeader}do:\n  - guard:\n      try:\n        - wait:\n            wait: PT30M\n      catch: {}\n`;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
@@ -198,7 +199,7 @@ test("a second wait takes the next free name", () => {
 
   const outcome = outcomeOf(text, action);
 
-  const expected = `${inlineHeader}do: [ { wait: { wait: PT1S } }, { wait-2: { wait: PT1S } } ]\n`;
+  const expected = `${inlineHeader}do: [ { wait: { wait: PT1S } }, { wait-2: { wait: PT30M } } ]\n`;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
@@ -866,7 +867,7 @@ test("a comment on a block's header stays on it", () => {
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
-const pause = "  - pause:\n      wait: PT1S\n";
+const pause = "  - pause:\n      wait: PT30M\n";
 
 const branchSteps: readonly (readonly [
   string,
@@ -924,7 +925,7 @@ const branchSteps: readonly (readonly [
       .replace("then: exit", "then: pause")
       .replace("then: continue", "then: exit")
       .concat(
-        "        - pause:\n            wait: PT1S\n            then: exit\n",
+        "        - pause:\n            wait: PT30M\n            then: exit\n",
       ),
   ],
   [
@@ -953,7 +954,7 @@ const branchSteps: readonly (readonly [
     "big",
     inlineRouteFlow
       .replace("{ other: { then: continue } }", "{ other: { then: total } }")
-      .replace(" { total:", " { pause: { wait: PT1S } }, { total:"),
+      .replace(" { total:", " { pause: { wait: PT30M } }, { total:"),
   ],
 ];
 
@@ -1060,3 +1061,166 @@ test.each(branchSteps)(
     expect(after).toEqual(expected);
   },
 );
+
+const emptyFlow = `${inlineHeader}do: []\n`;
+
+const validationError =
+  "https://open-workflow-specification.org/spec/1.0.0/errors/validation";
+
+function startOf(variant: StepVariant) {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: variant,
+    name: null,
+  };
+  const edited = editedOf(emptyFlow, action);
+  const snapshot = snapshotOf(edited);
+  const source = sourceOf(snapshot.analysis);
+  const pointer = `/do/0/${variant}`;
+  const document = source?.document ?? null;
+  const content = valueAt(document, pointer);
+  const problems = snapshot.analysis.diagnostics.map((diagnostic) => [
+    diagnostic.code,
+    diagnostic.pointer,
+  ]);
+
+  return { content, problems };
+}
+
+test.each<readonly [StepVariant, JsonObject, readonly (readonly string[])[]]>([
+  [
+    "http",
+    { call: "http", with: { method: "get", endpoint: "" } },
+    [["schema", "/do/0/http/with/endpoint"]],
+  ],
+  [
+    "openapi",
+    { call: "openapi", with: { document: { endpoint: "" }, operationId: "" } },
+    [["schema", "/do/0/openapi/with/document/endpoint"]],
+  ],
+  [
+    "grpc",
+    {
+      call: "grpc",
+      with: {
+        proto: { endpoint: "" },
+        service: { name: "", host: "" },
+        method: "",
+      },
+    },
+    [
+      ["schema", "/do/0/grpc/with/proto/endpoint"],
+      ["schema", "/do/0/grpc/with/service/host"],
+    ],
+  ],
+  [
+    "asyncapi",
+    {
+      call: "asyncapi",
+      with: { document: { endpoint: "" }, operation: "", message: {} },
+    },
+    [["schema", "/do/0/asyncapi/with/document/endpoint"]],
+  ],
+  [
+    "mcp",
+    {
+      call: "mcp",
+      with: {
+        method: "tools/call",
+        parameters: { name: "" },
+        transport: { http: { endpoint: "" } },
+      },
+    },
+    [["schema", "/do/0/mcp/with/transport/http/endpoint"]],
+  ],
+  [
+    "a2a",
+    { call: "a2a", with: { method: "message/send", server: "" } },
+    [["schema", "/do/0/a2a/with/server"]],
+  ],
+  [
+    "script-js",
+    {
+      run: {
+        script: {
+          language: "js",
+          code: "const result = {};\nconsole.log(JSON.stringify(result));\n",
+        },
+      },
+      output: { as: "${ fromjson }" },
+    },
+    [],
+  ],
+  [
+    "script-python",
+    {
+      run: {
+        script: {
+          language: "python",
+          code: "import json\n\nresult = {}\nprint(json.dumps(result))\n",
+        },
+      },
+      output: { as: "${ fromjson }" },
+    },
+    [],
+  ],
+  ["shell", { run: { shell: { command: "" } } }, []],
+  ["container", { run: { container: { image: "" } } }, []],
+  [
+    "workflow",
+    { run: { workflow: { namespace: "", name: "", version: "" } } },
+    [],
+  ],
+  ["do", { do: [] }, []],
+  ["emit", { emit: { event: { with: { type: "" } } } }, []],
+  [
+    "for",
+    { for: { each: "item", in: "" }, do: [] },
+    [["expression", "/do/0/for/for/in"]],
+  ],
+  ["fork", { fork: { branches: [] } }, []],
+  ["listen", { listen: { to: { one: { with: { type: "" } } } } }, []],
+  [
+    "raise",
+    { raise: { error: { type: validationError, status: 400, title: "" } } },
+    [],
+  ],
+  ["set", { set: { value: "" }, output: { as: "${ $input + . }" } }, []],
+  ["switch", { switch: [{ default: { then: "continue" } }] }, []],
+  ["try", { try: [], catch: {} }, []],
+  ["wait", { wait: "PT30M" }, []],
+])(
+  "a %s step starts with its smallest content, the blanks a person fills named by problems",
+  (variant, content, problems) => {
+    const started = startOf(variant);
+
+    expect(started).toEqual({ content, problems });
+  },
+);
+
+test("a JavaScript step starts with code that prints its result as JSON and an output that parses it", () => {
+  const action: EditAction = {
+    kind: "insertStep",
+    list: "/do",
+    index: 0,
+    step: "script-js",
+    name: null,
+  };
+
+  const outcome = outcomeOf(emptyFlow, action);
+
+  const expected = `${inlineHeader}do:
+  - script-js:
+      run:
+        script:
+          language: js
+          code: |
+            const result = {};
+            console.log(JSON.stringify(result));
+      output:
+        as: \${ fromjson }
+`;
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});

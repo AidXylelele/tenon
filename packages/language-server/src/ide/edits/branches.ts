@@ -1,6 +1,7 @@
-import type { ast, JsonObject, TaskKind } from "interpreter/front-end";
+import type { ast, JsonObject } from "interpreter/front-end";
 import { nameConflictOf, type StepTree } from "../steps/index.js";
 import type { TextChange } from "../text/index.js";
+import { startingContentOf, type StepVariant } from "../variants/index.js";
 import { insertionOf, inTextOrder, newItemFormsOf } from "./collection-text.js";
 import { fieldSettingOf } from "./field-actions.js";
 import type {
@@ -12,7 +13,7 @@ import type {
   WrittenStep,
 } from "./interfaces.js";
 import { unknownStepOf, writtenStepOf } from "./step-actions.js";
-import { newNameOf, templateOf } from "./templates.js";
+import { newNameOf } from "./step-names.js";
 
 const forkedSwitch =
   "A switch that is a branch of a fork has no list to add a step to.";
@@ -121,9 +122,9 @@ function onwardOf(tree: StepTree, written: WrittenStep): string {
 function newStepOf(
   chosen: ast.SwitchCase,
   name: string,
-  kind: TaskKind,
+  variant: StepVariant,
 ): JsonObject {
-  const template = templateOf(kind);
+  const template = startingContentOf(variant);
   const then = writtenDirectiveOf(chosen.then);
 
   if (then === null) {

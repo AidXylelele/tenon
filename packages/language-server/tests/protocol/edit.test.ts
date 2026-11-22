@@ -166,7 +166,7 @@ test("a step on a branch answers the edits that place it", async () => {
           start: { line: 28, character: 0 },
           end: { line: 28, character: 0 },
         },
-        newText: "  - wait:\n      wait: PT1S\n      then: end\n",
+        newText: "  - wait:\n      wait: PT30M\n      then: end\n",
       },
     ],
     ids: [],

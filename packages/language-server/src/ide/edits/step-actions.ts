@@ -9,6 +9,7 @@ import {
   stepWithId,
 } from "../steps/index.js";
 import { offsetOf } from "../text/index.js";
+import { startingContentOf } from "../variants/index.js";
 import { scalarLike } from "../yaml-text/index.js";
 import type {
   Destination,
@@ -32,7 +33,7 @@ import {
   withoutItem,
 } from "./collection-text.js";
 import { idChangesOf, placedStepOf } from "./ids.js";
-import { copyNameOf, newNameOf, templateOf } from "./templates.js";
+import { copyNameOf, newNameOf } from "./step-names.js";
 
 export function stepInsertionOf(
   editable: Editable,
@@ -63,7 +64,7 @@ export function stepInsertionOf(
     return { kind: "refused", reason: conflict };
   }
 
-  const template = templateOf(action.step);
+  const template = startingContentOf(action.step);
   const item = { [name]: template };
   const forms = newItemFormsOf(item);
   const insertion = insertionOf(collection, action.index, forms);

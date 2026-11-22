@@ -585,11 +585,103 @@ interface WorkflowFormResult {
 - **Edits.** Each field is written through `workflow/edit` like a step's: `setField` and `clearField` at its pointer, e.g. `setField` at `/schedule/cron` with `"0 9 * * *"`, which writes the schedule too when the text has none. Under a `oneOf`, a trigger the text does not write replaces the one it does: `setField` at `/schedule` with an object of that one member, e.g. `{ "cron": "0 9 * * *" }`, and `clearField` at `/schedule` leaves the workflow to start by hand. A second trigger written under `"one"` is the analysis's `capability` diagnostic at `/schedule`.
 - **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for a text that does not read; `InvalidParams` (-32602). A text the grammar refuses still has its form, as the step form's.
 
+## Step variants
+
+**Method:** `workflow/stepVariants`
+
+The client sends this request for the variants of a step the host runs, to list them in the step catalog. It has no params, names no document and holds no state. The catalog's words (labels, descriptions, synonyms, groups) are the client's: the server names variants only.
+
+```typescript
+type StepVariant =
+  | "http"
+  | "openapi"
+  | "grpc"
+  | "asyncapi"
+  | "mcp"
+  | "a2a" // call
+  | "script-js"
+  | "script-python"
+  | "shell"
+  | "container"
+  | "workflow" // run
+  | "do"
+  | "emit"
+  | "for"
+  | "fork"
+  | "listen"
+  | "raise"
+  | "set"
+  | "switch"
+  | "try"
+  | "wait";
+
+interface StepVariantsResult {
+  variants: StepVariant[]; // those the host runs, in this order
+}
+```
+
+- **Support.** A variant is listed when its starting content, analysed alone under the `profile` of the `initializationOptions`, has no `capability` diagnostic: what a host provides is the interpreter's rule, so `container` is left out where `profile.processes` lacks it, `script-python` where `profile.scriptLanguages` lacks `python`, and `wait` where `profile.effects` lacks `timer`.
+- **Starting content.** Each variant inserts the smallest document the language accepts for it, with the values a person fills left empty, so that the analysis names them as problems rather than the text holding made-up values:
+
+  | Variant                      | Starting content                                                                                                                               | Left to fill                                 |
+  | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+  | `http`                       | `call: http`, `with: { method: get, endpoint: "" }`                                                                                            | the address                                  |
+  | `openapi`                    | `call: openapi`, `with: { document: { endpoint: "" }, operationId: "" }`                                                                       | the description's address, the operation     |
+  | `grpc`                       | `call: grpc`, `with: { proto: { endpoint: "" }, service: { name: "", host: "" }, method: "" }`                                                 | the proto's address, the service, the method |
+  | `asyncapi`                   | `call: asyncapi`, `with: { document: { endpoint: "" }, operation: "", message: {} }`                                                           | the document's address, the operation        |
+  | `mcp`                        | `call: mcp`, `with: { method: tools/call, parameters: { name: "" }, transport: { http: { endpoint: "" } } }`                                   | the server's address, the tool               |
+  | `a2a`                        | `call: a2a`, `with: { method: message/send, server: "" }`                                                                                      | the agent's address                          |
+  | `script-js`, `script-python` | `run.script` in the language, with code that prints its result as JSON, and `output.as: ${ fromjson }`, which turns the printed text into data | the code                                     |
+  | `shell`                      | `run.shell.command: ""`                                                                                                                        | the command                                  |
+  | `container`                  | `run.container.image: ""`                                                                                                                      | the image                                    |
+  | `workflow`                   | `run.workflow: { namespace: "", name: "", version: "" }`                                                                                       | the workflow                                 |
+  | `do`, `fork`                 | `do: []`, `fork.branches: []`                                                                                                                  | their steps                                  |
+  | `emit`                       | `emit.event.with.type: ""`                                                                                                                     | the event type                               |
+  | `for`                        | `for: { each: item, in: "" }`, `do: []`                                                                                                        | the list (an `expression` problem)           |
+  | `listen`                     | `listen.to.one.with.type: ""`                                                                                                                  | the event type                               |
+  | `raise`                      | `raise.error: { type: …/errors/validation, status: 400, title: "" }`                                                                           | the title                                    |
+  | `set`                        | `set: { value: "" }` and `output.as: ${ $input + . }`, which keeps the data that came in beside the values set                                 | the values                                   |
+  | `switch`                     | `switch: [ { default: { then: continue } } ]`                                                                                                  | its branches                                 |
+  | `try`                        | `try: []`, `catch: {}`                                                                                                                         | its steps                                    |
+  | `wait`                       | `wait: PT30M`                                                                                                                                  |                                              |
+
+- **An address left empty.** The grammar refuses an empty address (`schema`, "Endpoint is not in the form the standard requires."), so the analysis of a text holding a call step with no address yet is refused: the structure stays that of the last version that analysed, without the new step, until the address is written. For the same reason a call variant's `capability` is not checked, and it is listed whatever the profile.
+- **Errors:** none of its own; the phase errors of every custom request.
+
+**Example:**
+
+```json
+{
+  "variants": [
+    "http",
+    "openapi",
+    "grpc",
+    "asyncapi",
+    "mcp",
+    "a2a",
+    "script-js",
+    "script-python",
+    "shell",
+    "workflow",
+    "do",
+    "emit",
+    "for",
+    "fork",
+    "listen",
+    "raise",
+    "set",
+    "switch",
+    "try",
+    "wait"
+  ]
+}
+```
+
 ## Edit
 
 **Method:** `workflow/edit`
 
-The client sends this request to turn a canvas or inspector action into text edits on a version. The edits keep the author's text: they replace only the ranges they must, a moved or duplicated step is the author's own text re-indented, and a new step is its kind's template.
+The client sends this request to turn a canvas or inspector action into text edits on a version. The edits keep the author's text: they replace only the ranges they must, a moved or duplicated step is the author's own text re-indented, and a new step is its variant's starting content.
 
 ```typescript
 interface EditParams {
@@ -602,14 +694,14 @@ type EditAction =
       kind: "insertStep";
       list: string;
       index: number;
-      step: TaskKind;
+      step: StepVariant; // workflow/stepVariants
       name: string | null;
     }
   | {
       kind: "insertStepOnBranch";
       switch: string; // the switch's step id
       case: string; // the branch: a case's name, as Transition.case
-      step: TaskKind;
+      step: StepVariant;
       name: string | null;
     }
   | { kind: "moveStep"; step: string; list: string; index: number }
@@ -633,7 +725,8 @@ interface EditResult {
 ```
 
 - **Ids** are the structure's. `index` is the step's index in the target list after the action. `ids` lists every id the action changes: `renameStep`, and `moveStep` into another list, give the step and every step and list below it; the others give none.
-- **Names.** A new step without a name takes its kind's name, then `<kind>-2`, `-3`, …; a duplicate takes the next free `<name>-2`.
+- **Names.** A new step without a name takes its variant's name, then `<variant>-2`, `-3`, …; a duplicate takes the next free `<name>-2`.
+- **Starting content.** A new step is its variant's starting content (`workflow/stepVariants`).
 - **Fields.** `setField` and `clearField` act at any member of a step or of the document, such as `/schedule/cron`. `setField` also writes the holders the text lacks, as an author would: a member added to a block mapping is written in block style, so `setField` at `/input/schema` on a workflow with no `input` writes `input:`, then `schema:` and the value below it; one added to a flow mapping stays on its line.
 - **Text with line breaks.** A string with a line break, set in a block mapping or sequence, is written as a literal block scalar indented under its key or dash: `|` when it ends in one line break, `|-` when it ends in none, `|+` when it ends in more, the indentation indicator where its first line starts with a space; a comment after the old value moves to the block's header. A one-line string keeps the style it was written in, a block scalar's included (`code: |-` and the line). In a flow collection a string stays on its line, double-quoted where it holds a line break.
 - **A step on a branch** (`insertStepOnBranch`). The new step goes directly after the switch, in the switch's list, because flow directives name only tasks of their own list (dsl.md, "Task Flow") and the only step that can run into that place is the switch itself. Where the branch led stays where it leads, through the new step:

@@ -35,6 +35,8 @@ import {
   rangesOfRequest,
   stepFormHandlerOf,
   stepFormRequest,
+  stepVariantsHandlerOf,
+  stepVariantsRequest,
   workflowFormHandlerOf,
   workflowFormRequest,
   structureHandlerOf,
@@ -238,6 +240,7 @@ function serveFeatures(
   const formWorkflow = workflowFormHandlerOf(documents, host, reads);
   const edit = editHandlerOf(documents, host);
   const writeNew = newDocumentHandlerOf(host);
+  const listVariants = stepVariantsHandlerOf(host);
   const answerCompletion = lifecycle.guarded(complete);
   const answerHover = lifecycle.guarded(hover);
   const answerCodeAction = lifecycle.guarded(fix);
@@ -249,6 +252,7 @@ function serveFeatures(
   const answerWorkflowForm = lifecycle.guarded(formWorkflow);
   const answerEdit = lifecycle.guarded(edit);
   const answerNewDocument = lifecycle.guarded(writeNew);
+  const answerVariants = lifecycle.guarded(listVariants);
 
   connection.onCompletion(answerCompletion);
   connection.onHover(answerHover);
@@ -261,6 +265,7 @@ function serveFeatures(
   connection.onRequest(workflowFormRequest, answerWorkflowForm);
   connection.onRequest(editRequest, answerEdit);
   connection.onRequest(newDocumentRequest, answerNewDocument);
+  connection.onRequest(stepVariantsRequest, answerVariants);
 }
 
 function pushOf(
