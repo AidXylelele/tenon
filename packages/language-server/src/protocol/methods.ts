@@ -1,0 +1,12 @@
+export const methods = {
+  document: "workflow/document",
+  fromJson: "workflow/fromJson",
+  newDocument: "workflow/newDocument",
+  rangesOf: "workflow/rangesOf",
+  structure: "workflow/structure",
+  stepForm: "workflow/stepForm",
+  workflowForm: "workflow/workflowForm",
+  edit: "workflow/edit",
+  importsNeeded: "workflow/importsNeeded",
+  didFetchImports: "workflow/didFetchImports",
+} as const;
