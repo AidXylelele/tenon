@@ -40,6 +40,7 @@ import { TurnWorkflowOn } from "../../application/automation/workflows/turn-work
 import { AutomationPolicy } from "../../interface-adapters/api/auth/automation.policy.js";
 import { DraftsController } from "../../interface-adapters/api/controllers/drafts.controller.js";
 import { EventsController } from "../../interface-adapters/api/controllers/events.controller.js";
+import { ExpectedStartsController } from "../../interface-adapters/api/controllers/expected-starts.controller.js";
 import { HooksController } from "../../interface-adapters/api/controllers/hooks.controller.js";
 import { HostController } from "../../interface-adapters/api/controllers/host.controller.js";
 import { ImportsController } from "../../interface-adapters/api/controllers/imports.controller.js";
@@ -88,6 +89,7 @@ import { HttpModule } from "./http.module.js";
   imports: [AutomationModule, HttpModule, ConfigModule.forFeature(linksConfig)],
   controllers: [
     WorkflowsController,
+    ExpectedStartsController,
     DraftsController,
     TestRunsController,
     InstancesController,

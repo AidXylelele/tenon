@@ -9,6 +9,7 @@ import {
   WorkflowRuntime,
 } from "../../application/automation/instances/ports.js";
 import { WorkflowSchedules } from "../../application/automation/schedules/ports.js";
+import { ScheduleQueries } from "../../application/automation/schedules/queries.js";
 import { SecretRepository } from "../../application/automation/secrets/ports.js";
 import { SecretQueries } from "../../application/automation/secrets/queries.js";
 import {
@@ -91,6 +92,7 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: InstanceRuns, useExisting: EngineRunGateway },
     EngineScheduleGateway,
     { provide: WorkflowSchedules, useExisting: EngineScheduleGateway },
+    { provide: ScheduleQueries, useExisting: EngineScheduleGateway },
     WorkflowMapper,
     WorkflowVersionMapper,
     WorkflowInstanceMapper,
@@ -149,6 +151,7 @@ import { OutboundModule } from "./outbound.module.js";
     EngineRunGateway,
     InstanceRuns,
     WorkflowSchedules,
+    ScheduleQueries,
     WorkflowRepository,
     WorkflowQueries,
     WorkflowInstanceRepository,

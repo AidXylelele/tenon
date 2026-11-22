@@ -1,6 +1,21 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, asc, desc, eq, isNotNull, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  lt,
+  type SQL,
+  sql,
+} from "drizzle-orm";
+import type {
+  ScheduledStarts,
+  StartSlot,
+} from "../../../application/automation/schedules/interfaces.js";
+import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import type {
   LastRun,
   VersionIdentity,
@@ -143,6 +158,43 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
       .innerJoin(workflows, eq(workflows.id, versions.workflowId))
       .where(eq(versions.id, versionId));
     return row ?? null;
+  }
+
+  scheduledStarts(slots: readonly StartSlot[]): Promise<ScheduledStarts[]> {
+    const rows = slots.map((slot) => ({
+      workflow_id: slot.workflowId,
+      first_at: slot.from.toISOString(),
+      end_at: slot.to.toISOString(),
+    }));
+    const json = JSON.stringify(rows);
+    const slotted = sql`jsonb_to_recordset(${json}::jsonb) as slot(workflow_id uuid, first_at timestamptz, end_at timestamptz)`;
+    const workflowId = sql<string>`slot.workflow_id`;
+    const count = sql<number>`count(*)::int`;
+    const started = this.txHost.tx
+      .select({ starts: count.as("starts") })
+      .from(instances)
+      .where(
+        and(
+          eq(instances.workflowId, workflowId),
+          eq(instances.trigger, TriggerKind.Schedule),
+          gte(instances.createdAt, sql`slot.first_at`),
+          lt(instances.createdAt, sql`slot.end_at`),
+        ),
+      )
+      .as("started");
+    return this.txHost.tx
+      .select({
+        workflowId: workflows.id,
+        namespace: workflows.namespace,
+        name: workflows.name,
+        schedule: versions.schedule,
+        starts: started.starts,
+      })
+      .from(slotted)
+      .innerJoin(workflows, eq(workflows.id, workflowId))
+      .innerJoin(versions, eq(versions.id, workflows.currentVersionId))
+      .leftJoinLateral(started, sql`true`)
+      .orderBy(asc(workflows.namespace), asc(workflows.name));
   }
 
   #programs() {

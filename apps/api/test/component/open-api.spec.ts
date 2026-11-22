@@ -28,6 +28,7 @@ describe("the OpenAPI document", () => {
         "/api/v1/workflows/{namespace}/{name}/draft/test-runs",
         "/api/v1/instance-counts",
         "/api/v1/members",
+        "/api/v1/expected-starts",
       ]),
     );
   });

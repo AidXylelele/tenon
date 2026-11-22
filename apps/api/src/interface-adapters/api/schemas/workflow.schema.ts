@@ -4,6 +4,7 @@ import {
   ScheduleKind,
   WorkflowStatus,
 } from "../../../domain/automation/workflows/enums.js";
+import { Instant } from "./instance.schema.js";
 
 export const DefinitionBody = z.record(z.string(), z.json());
 
@@ -131,3 +132,20 @@ export const VersionParams = z.strictObject({
 });
 
 export type VersionParams = z.infer<typeof VersionParams>;
+
+export const ExpectedStartsQuery = z.strictObject({ from: Instant });
+
+export type ExpectedStartsQuery = z.infer<typeof ExpectedStartsQuery>;
+
+export const ExpectedStartsResponse = z.array(
+  z.object({
+    namespace: z.string(),
+    name: z.string(),
+    schedule: ScheduleResponse.nullable(),
+    next: z.array(z.iso.datetime()),
+    missed: z.number().int(),
+    missedSince: z.iso.datetime(),
+  }),
+);
+
+export type ExpectedStartsResponse = z.infer<typeof ExpectedStartsResponse>;
