@@ -10,7 +10,7 @@ import type { EditAction, IdChange } from "../ide/edits/index.js";
 import type * as forms from "../ide/forms/index.js";
 import type { DraftAddress } from "../ide/snapshot/index.js";
 import type { FailureKind } from "../ide/steps/index.js";
-import type { StepVariant } from "../ide/variants/index.js";
+import type { ResultReading, StepVariant } from "../ide/variants/index.js";
 import type * as structure from "../ide/structure/index.js";
 
 export interface InitializationOptions {
@@ -93,6 +93,7 @@ export interface StepFormResult {
   readonly version: number;
   readonly step: string;
   readonly failure: FailureKind;
+  readonly result: ResultReading | null;
   readonly fields: readonly FormField[];
 }
 

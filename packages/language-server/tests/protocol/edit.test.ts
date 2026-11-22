@@ -190,3 +190,16 @@ test("a step on a branch that names no case is invalid", async () => {
 
   await expect(refused).rejects.toMatchObject({ code: -32602 });
 });
+
+test("a result that is none of the step results is invalid", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: { kind: "setResult", step: "/do/greet", result: "everything" },
+  };
+
+  const refused = session.client.sendRequest(editRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});

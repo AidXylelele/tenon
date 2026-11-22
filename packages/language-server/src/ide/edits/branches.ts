@@ -1,8 +1,7 @@
 import type { ast, JsonObject } from "interpreter/front-end";
 import { nameConflictOf, type StepTree } from "../steps/index.js";
-import type { TextChange } from "../text/index.js";
 import { startingContentOf, type StepVariant } from "../variants/index.js";
-import { insertionOf, inTextOrder, newItemFormsOf } from "./collection-text.js";
+import { combinedOf, insertionOf, newItemFormsOf } from "./collection-text.js";
 import { fieldSettingOf } from "./field-actions.js";
 import type {
   Editable,
@@ -69,8 +68,10 @@ function newBranchStepOf(
   const forms = newItemFormsOf(item);
   const after = step.index + 1;
   const insertion = insertionOf(collection, after, forms);
+  const inserted: Editing = { kind: "edited", changes: [insertion], ids: [] };
+  const all = [...editings, inserted];
 
-  return joinedOf(editings, insertion);
+  return combinedOf(all);
 }
 
 function directiveSettingsOf(
@@ -148,30 +149,6 @@ function writtenDirectiveOf(directive: ast.Directive): string | null {
 
 function settingOf(pointer: string, value: string): SetField {
   return { kind: "setField", pointer, value };
-}
-
-function joinedOf(
-  editings: readonly Editing[],
-  insertion: TextChange,
-): Editing {
-  const refusal = editings.find((editing) => editing.kind === "refused");
-
-  if (refusal !== undefined) {
-    return refusal;
-  }
-
-  const changes = editings.flatMap((editing) => {
-    switch (editing.kind) {
-      case "edited":
-        return editing.changes;
-      case "refused":
-        return [];
-    }
-  });
-  const all = [...changes, insertion];
-  const ordered = inTextOrder(all);
-
-  return { kind: "edited", changes: ordered, ids: [] };
 }
 
 function notSwitchOf(id: string): string {

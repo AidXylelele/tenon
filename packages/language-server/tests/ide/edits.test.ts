@@ -10,7 +10,11 @@ import {
   type Transition,
 } from "../../src/ide/structure/index.js";
 import { appliedOf } from "../../src/ide/text/index.js";
-import type { EditAction, StepVariant } from "../../src/protocol/index.js";
+import type {
+  ChosenResult,
+  EditAction,
+  StepVariant,
+} from "../../src/protocol/index.js";
 import { guardedFlow, inlineHeader } from "../support/documents.js";
 import { snapshotOf } from "../support/snapshot.js";
 
@@ -1223,4 +1227,93 @@ test("a JavaScript step starts with code that prints its result as JSON and an o
         as: \${ fromjson }
 `;
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+const resultHeader = `${inlineHeader}do:\n  - step:\n`;
+
+const jsonScript = `${resultHeader}      run:
+        script:
+          language: js
+          code: ""
+      output:
+        as: \${ fromjson }
+`;
+
+const textScript = `${resultHeader}      run:
+        script:
+          language: js
+          code: ""
+`;
+
+const codeScript = `${textScript}        return: code
+`;
+
+const mergingSet = `${resultHeader}      set:
+        total: 1
+      output:
+        as: \${ $input + . }
+`;
+
+const plainSet = `${resultHeader}      set:
+        total: 1
+`;
+
+const schemedScript = jsonScript.replace(
+  "      output:\n",
+  "      output:\n        schema:\n          document:\n            type: object\n",
+);
+
+test.each<readonly [string, string, ChosenResult, string]>([
+  [
+    "a script's printed text drops the output that parsed it",
+    jsonScript,
+    "printedText",
+    textScript,
+  ],
+  ["a script's exit code returns its code", textScript, "exitCode", codeScript],
+  [
+    "a script's printed JSON parses what it prints and returns what it prints",
+    codeScript,
+    "printedJson",
+    jsonScript,
+  ],
+  [
+    "a set's values alone drop the output that added its input",
+    mergingSet,
+    "valuesOnly",
+    plainSet,
+  ],
+  [
+    "a set's values beside its input add the input in its output",
+    plainSet,
+    "inputAndValues",
+    mergingSet,
+  ],
+  [
+    "an output that holds more than the parse keeps the rest",
+    schemedScript,
+    "printedText",
+    schemedScript.replace("        as: ${ fromjson }\n", ""),
+  ],
+])("%s", (_, text, result, expected) => {
+  const action: EditAction = { kind: "setResult", step: "/do/step", result };
+
+  const outcome = outcomeOf(text, action);
+
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a result the step does not offer is refused", () => {
+  const action: EditAction = {
+    kind: "setResult",
+    step: "/do/step",
+    result: "printedJson",
+  };
+
+  const editing = check(plainSet, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason: "The step /do/step offers no result 'printedJson'.",
+  });
 });

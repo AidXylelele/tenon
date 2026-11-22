@@ -11,6 +11,7 @@ import type {
 import { branchInsertionOf } from "./branches.js";
 import { failureSettingOf } from "./failures.js";
 import { fieldClearingOf, fieldSettingOf } from "./field-actions.js";
+import { resultSettingOf } from "./results.js";
 import {
   stepDuplicateOf,
   stepInsertionOf,
@@ -41,6 +42,7 @@ export function editsOf(snapshot: Snapshot, action: EditAction): Editing {
     case "renameStep":
     case "duplicateStep":
     case "setFailure":
+    case "setResult":
       return stepEditsOf(snapshot, action);
   }
 }
@@ -101,6 +103,8 @@ function stepEditsOf(snapshot: Snapshot, action: StepAction): Editing {
       return stepDuplicateOf(editable, action);
     case "setFailure":
       return failureSettingOf(editable, action);
+    case "setResult":
+      return resultSettingOf(editable, action);
   }
 }
 

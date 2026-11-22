@@ -7,7 +7,7 @@ import type {
 } from "interpreter/front-end";
 import type { TextChange } from "../text/index.js";
 import type { Snapshot } from "../snapshot/index.js";
-import type { StepVariant } from "../variants/index.js";
+import type { ChosenResult, StepVariant } from "../variants/index.js";
 import type {
   FailureKind,
   StepNode,
@@ -80,6 +80,12 @@ export interface SetFailure {
   readonly failure: Failure;
 }
 
+export interface SetResult {
+  readonly kind: "setResult";
+  readonly step: string;
+  readonly result: ChosenResult;
+}
+
 export type StepAction =
   | InsertStep
   | InsertStepOnBranch
@@ -87,7 +93,8 @@ export type StepAction =
   | RemoveStep
   | RenameStep
   | DuplicateStep
-  | SetFailure;
+  | SetFailure
+  | SetResult;
 
 export type FieldAction = SetField | ClearField;
 

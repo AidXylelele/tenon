@@ -5,7 +5,7 @@ import {
   TextDocumentIdentifier,
   VersionedTextDocumentIdentifier,
 } from "vscode-languageserver/browser";
-import { stepVariants } from "../ide/variants/index.js";
+import { isChosenResult, stepVariants } from "../ide/variants/index.js";
 import type {
   DidFetchImportsParams,
   EditParams,
@@ -51,6 +51,7 @@ const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
   setField: holdsSetting,
   clearField: (action) => holdsStrings(action, ["pointer"]),
   setFailure: holdsFailureSetting,
+  setResult: holdsResultSetting,
 };
 
 export function invalidParamsOf(method: string): ResponseError {
@@ -178,6 +179,12 @@ function holdsFailureSetting(action: unknown): boolean {
   }
 
   return holdsStrings(action, ["step"]) && isChoice;
+}
+
+function holdsResultSetting(action: unknown): boolean {
+  const result = memberOf(action, "result");
+
+  return holdsStrings(action, ["step"]) && isChosenResult(result);
 }
 
 function holdsRetry(failure: unknown): boolean {

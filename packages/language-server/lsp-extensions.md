@@ -461,8 +461,21 @@ interface StepFormResult {
   version: number;
   step: string;
   failure: "stop" | "continue" | "retry" | "handle"; // "If it fails", in force
+  result: {
+    value: StepResult; // what the step passes on, as written
+    choices: ChosenResult[];
+  } | null; // null where the step offers no choice
   fields: FormField[];
 }
+
+type ChosenResult =
+  | "printedJson"
+  | "printedText"
+  | "exitCode" // a script
+  | "inputAndValues"
+  | "valuesOnly"; // a set
+
+type StepResult = ChosenResult | "written"; // "written": none of the choices
 
 interface FormField {
   key: string;
@@ -483,12 +496,15 @@ interface FormField {
   required: boolean;
   written: boolean;
   value: JsonValue; // null where not written
+  essentialRank: number | null; // its place among the essential fields, from 0
   fields: FormField[]; // for 'group', 'oneOf' and 'duration'
   diagnostics: Diagnostic[]; // those at or under pointer
 }
 ```
 
 - **Fields** come in the grammar's order. `input, output, export` are `data`, `timeout` and `catch` are `failure`, `metadata` is `note`, and every other member is `settings`.
+- **Essential fields.** A field with an `essentialRank` is shown first, in rank order, with its own `fields`; every other field is behind "More options", where a field that holds essential ones shows only the rest. They are at most five per step, by its variant (`workflow/stepVariants`): an HTTP call's `with.method`, `with.endpoint`, and `with.body` where the method sends one (`post`, `put`, `patch`); an OpenAPI call's description address, operation and parameters; a gRPC call's proto address, service name and host, method and arguments; an AsyncAPI call's document address, operation and message; an MCP call's server address and parameters; an A2A call's server and parameters; a call of a function, its `with`; a script's language, code and arguments; a shell's command; a container's image and command; another workflow's namespace, name, version and input; an emit's event type and data; a for's list and item name; a fork's branches and `compete`; a listen's `to`; a raise's error title, type and status; a set's values; a switch's cases; a try's `catch.retry` and `catch.do`; a wait's duration; a `do`, none. In the workflow form they are `/document/title` and `/schedule`. Below the second level a group is one `structured` field, unless it holds an essential field: then it is a `group` opened down to it (a script's `run.script` holds `language` and `code`).
+- **The step's result.** A script offers what it passes on: `printedJson`, the JSON it prints (its `output.as` is `${ fromjson }`, the run returns what it prints); `printedText`, the text it prints (no `output.as`); `exitCode` (`run.return: code`, no `output.as`). A set offers `inputAndValues`, the data that came in with its values beside it (`output.as: ${ $input + . }`, research D13), or `valuesOnly`, its values alone, as the language passes them on (dsl.md, "Data Flow", step 5). Anything else written is `written`, and the client shows the fields as they stand. It is changed with `workflow/edit`'s `setResult`.
 - **Titles and descriptions.** `title` labels the field for people: the server's own words for the members an author meets most (`if` is "Run only if", `then` "Then go to", `timeout` "Time limit", `call` "Kind of call", `with` "Arguments"), else the key in words (`exceptWhen` is "Except when"). `description` describes the field itself, from the grammar; the grammar describes a call on its task, so the `call` field carries the task's ("Defines the HTTP call to perform.").
 - **If it fails.** `failure` is the choice in force for the step: `stop` for a step no try protects; for a protecting try (a try whose `try` list holds one step), `handle` where its `catch` writes `do`, `retry` where it writes `retry`, else `continue`. The web shows it and changes it with `workflow/edit`'s `setFailure`; the retry's own values are the `catch` group's fields.
 - **Input.** `choice` where the grammar admits only the values it lists (its `closed` places, such as an HTTP call's `with.output`), with those values as `choices`; else `boolean` or `number` where that is the only type; `text` where a string is admitted and the written value is one or nothing is written, with the grammar's values as suggestions in `choices` (a `then` suggests the flow directives and the names of the step's list); `duration` for the standard's duration, an ISO 8601 text or an object of units, with its `fields` the units `days`, `hours`, `minutes`, `seconds` and `milliseconds`, each a `number` whose `value` is the amount the text gives, whichever form it is written in (`PT1H30M` gives `hours` 1 and `minutes` 30), and `null` where it gives none or what is written is not a duration the units hold (an expression, or a mistake, which the field's diagnostics name); `group` for an object with named members; `oneOf` for an object whose members are alternatives, its `fields` being those alternatives (the workflow form's schedule where the host runs one trigger, below); `structured` otherwise, for the text editor.
@@ -510,6 +526,7 @@ interface FormField {
   "version": 1,
   "step": "/do/pause",
   "failure": "stop",
+  "result": null,
   "fields": [
     {
       "key": "then",
@@ -521,6 +538,7 @@ interface FormField {
       "required": false,
       "written": true,
       "value": "greet",
+      "essentialRank": null,
       "diagnostics": [],
       "section": "settings",
       "fields": []
@@ -535,6 +553,7 @@ interface FormField {
       "required": true,
       "written": true,
       "value": "PT1S",
+      "essentialRank": 0,
       "diagnostics": [],
       "section": "settings",
       "fields": [
@@ -548,6 +567,7 @@ interface FormField {
           "required": false,
           "written": false,
           "value": 1,
+          "essentialRank": null,
           "diagnostics": [],
           "section": "settings",
           "fields": []
@@ -710,7 +730,8 @@ type EditAction =
   | { kind: "duplicateStep"; step: string }
   | { kind: "setField"; pointer: string; value: JsonValue }
   | { kind: "clearField"; pointer: string }
-  | { kind: "setFailure"; step: string; failure: Failure };
+  | { kind: "setFailure"; step: string; failure: Failure }
+  | { kind: "setResult"; step: string; result: ChosenResult };
 
 type Failure =
   | { kind: "stop" }
@@ -745,9 +766,10 @@ interface EditResult {
   - on a protecting try (a try whose `try` list holds one step), `continue`, `retry` and `handle` replace its `catch`, and `stop` gives the step its own text back in the try's place, with the try's `then`;
   - the `catch` written: `continue` `{}`; `retry` `{ retry: { delay: { seconds }, backoff: { constant: {} } or { exponential: {} } when growing, limit: { attempt: { count: attempts } } } }`; `handle` `{ do: [] }`, an empty list the web fills with `insertStep` into `<id>/catch/do`; a `handle` on a try whose catch already writes `do` changes nothing;
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
+- **The step's result** (`setResult`) writes the members of the chosen result and removes the others: `output.as`, and the `output` that holds nothing else; a script's `run.return`, removed where it would return what the script prints. A result the step does not offer is refused.
 - **Errors:**
   - `ContentModified` (-32801), when the version is not the store's;
-  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
+  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a result the step does not offer, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
   - `InvalidParams` (-32602), when the params are of another shape.
 
 **Example:**

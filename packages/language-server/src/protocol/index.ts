@@ -34,5 +34,10 @@ export type { FormSection } from "../ide/forms/index.js";
 export type { DraftAddress } from "../ide/snapshot/index.js";
 export type { FailureKind } from "../ide/steps/index.js";
 export type { Transition, Trigger } from "../ide/structure/index.js";
-export type { StepVariant } from "../ide/variants/index.js";
+export type {
+  ChosenResult,
+  ResultReading,
+  StepResult,
+  StepVariant,
+} from "../ide/variants/index.js";
 export { methods } from "./methods.js";

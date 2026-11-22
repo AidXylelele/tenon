@@ -1,5 +1,6 @@
 import {
   type Analysis,
+  type ast,
   type JsonObject,
   standardVersion,
 } from "interpreter/front-end";
@@ -62,4 +63,58 @@ function probeOf(variant: StepVariant): string {
   const document = { document: probeHeader, do: [step] };
 
   return yamlOf(document);
+}
+
+export function variantOf(task: ast.Task): StepVariant | null {
+  switch (task.kind) {
+    case "call":
+      return calledVariantOf(task.call);
+    case "run":
+      return runVariantOf(task.process);
+    case "do":
+    case "emit":
+    case "for":
+    case "fork":
+    case "listen":
+    case "raise":
+    case "set":
+    case "switch":
+    case "try":
+    case "wait":
+      return task.kind;
+  }
+}
+
+function calledVariantOf(call: ast.Call): StepVariant | null {
+  switch (call.kind) {
+    case "function":
+      return null;
+    case "http":
+    case "openapi":
+    case "grpc":
+    case "asyncapi":
+    case "mcp":
+    case "a2a":
+      return call.kind;
+  }
+}
+
+function runVariantOf(process: ast.Process): StepVariant {
+  switch (process.kind) {
+    case "script":
+      return scriptVariantOf(process.language);
+    case "shell":
+    case "container":
+    case "workflow":
+      return process.kind;
+  }
+}
+
+function scriptVariantOf(language: ast.ScriptProcess["language"]): StepVariant {
+  switch (language) {
+    case "js":
+      return "script-js";
+    case "python":
+      return "script-python";
+  }
 }

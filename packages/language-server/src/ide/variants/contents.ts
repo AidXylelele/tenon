@@ -1,9 +1,6 @@
 import type { JsonObject } from "interpreter/front-end";
+import { inputAndValuesAs, printedJsonAs } from "./results.js";
 import type { StepVariant } from "./variants.js";
-
-const printedJson = "${ fromjson }";
-
-const keptInput = "${ $input + . }";
 
 const validationError =
   "https://open-workflow-specification.org/spec/1.0.0/errors/validation";
@@ -49,12 +46,12 @@ export function startingContentOf(variant: StepVariant): JsonObject {
     case "script-js":
       return {
         run: { script: { language: "js", code: jsResult } },
-        output: { as: printedJson },
+        output: { as: printedJsonAs },
       };
     case "script-python":
       return {
         run: { script: { language: "python", code: pythonResult } },
-        output: { as: printedJson },
+        output: { as: printedJsonAs },
       };
     case "shell":
       return { run: { shell: { command: "" } } };
@@ -77,7 +74,7 @@ export function startingContentOf(variant: StepVariant): JsonObject {
         raise: { error: { type: validationError, status: 400, title: "" } },
       };
     case "set":
-      return { set: { value: "" }, output: { as: keptInput } };
+      return { set: { value: "" }, output: { as: inputAndValuesAs } };
     case "switch":
       return { switch: [{ default: { then: "continue" } }] };
     case "try":
