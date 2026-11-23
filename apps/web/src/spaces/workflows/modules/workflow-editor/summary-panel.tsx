@@ -12,8 +12,7 @@ import { Button } from "@/libs/ui/components/button";
 import { PanelHeader } from "@/libs/ui/composites/panel-header";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import { triggerText } from "@/operations/schedule-words";
-import { START, type StepMark } from "@/features/workflow-flow";
-import { stepsIn } from "./steps";
+import { START, type StepMark, stepsIn } from "@/features/workflow-flow";
 
 interface SummaryPanelProps {
   readonly structure: StructureResult;

@@ -33,10 +33,10 @@ import {
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
 import { PanelHeader } from "@/libs/ui/composites/panel-header";
+import type { StepPlace } from "@/features/workflow-flow";
 import { type SlotSources, useFormSlots } from "./form-slots";
 import { catalogOf } from "./step-catalog";
 import { type Edit, StepForm } from "./step-form";
-import type { StepPlace } from "./steps";
 
 interface StepPanelProps {
   readonly step: Step;

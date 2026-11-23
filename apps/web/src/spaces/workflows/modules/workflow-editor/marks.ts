@@ -5,8 +5,7 @@ import {
 } from "vscode-languageserver-protocol";
 import { isObject } from "@/libs/json/json";
 import { diagnosticText } from "@/libs/language-client/diagnostic-text";
-import type { StepMark } from "@/features/workflow-flow";
-import { stepAt } from "./steps";
+import { stepAt, type StepMark } from "@/features/workflow-flow";
 
 const NOUNS: ReadonlyMap<string, string> = new Map([
   ["endpoint", "address"],

@@ -1,6 +1,6 @@
 import type { Step, StepList } from "language-server/protocol";
+import { stepsIn } from "@/features/workflow-flow";
 import type { StepChange } from "./interfaces";
-import { stepsIn } from "./steps";
 
 export function changesOf(before: StepList, after: StepList): StepChange[] {
   const old = stepsIn(before);

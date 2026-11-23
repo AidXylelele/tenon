@@ -41,8 +41,12 @@ import {
   type FlowHandle,
   type FlowMode,
   type InsertPlace,
+  listsOf,
+  placeOf,
   type RunStart,
   START,
+  stepAt,
+  stepsIn,
   WorkflowFlow,
 } from "@/features/workflow-flow";
 import {
@@ -70,7 +74,6 @@ import { StartPanel } from "./start-panel";
 import { type EntryAction, StepCatalog } from "./step-catalog";
 import type { Webhook } from "./step-form";
 import { StepPanel } from "./step-panel";
-import { placeOf, stepAt, stepsIn } from "./steps";
 import { SummaryPanel } from "./summary-panel";
 import { samplesOf, stepRunsOf } from "./test-run";
 import { TestRunPanel } from "./test-run-panel";
@@ -329,10 +332,7 @@ function EditingBody({
 
     if (asked === null || structure === null) return;
 
-    const lists = [
-      structure.workflow.steps,
-      ...steps.flatMap((step) => step.lists),
-    ];
+    const lists = listsOf(structure.workflow.steps);
     const list = lists.find((each) => each.id === asked.list);
     const added = list?.steps[asked.index] ?? null;
 
@@ -340,7 +340,7 @@ function EditingBody({
 
     pending.current = null;
     select(added.id);
-  }, [structure, steps, select]);
+  }, [structure, select]);
 
   useEffect(() => {
     function recheck() {
@@ -385,10 +385,7 @@ function EditingBody({
   function stepAbove(place: InsertPlace): Step | null {
     if (place.kind !== "list" || structure === null) return null;
 
-    const lists = [
-      structure.workflow.steps,
-      ...steps.flatMap((step) => step.lists),
-    ];
+    const lists = listsOf(structure.workflow.steps);
     const list = lists.find((each) => each.id === place.list);
     return list?.steps[place.index - 1] ?? null;
   }

@@ -159,10 +159,16 @@ export interface JumpLine {
   readonly arrow: string;
 }
 
-export interface StepPlace {
+export interface PlacedStep {
   readonly step: Step;
   readonly list: StepList;
   readonly index: number;
+}
+
+export interface StepPlace {
+  readonly list: string;
+  readonly index: number;
+  readonly size: number;
 }
 
 export type RunLook = StatusLook & { readonly live: boolean };

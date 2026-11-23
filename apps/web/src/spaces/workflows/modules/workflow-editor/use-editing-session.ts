@@ -25,9 +25,9 @@ import {
   stepVariantsOf,
   WorkflowSession,
 } from "@/operations/workflow-language";
-import { START } from "@/features/workflow-flow";
+import { START, stepAt, stepWithId } from "@/features/workflow-flow";
 import type { EditingSession, FormReading } from "./interfaces";
-import { protectingTryOf, stepAt, stepWithId } from "./steps";
+import { protectingTryOf } from "./steps";
 
 const NONE: readonly Diagnostic[] = [];
 

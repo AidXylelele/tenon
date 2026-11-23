@@ -1,11 +1,11 @@
 "use client";
 
-import type { StepPlace } from "./interfaces";
+import type { PlacedStep } from "./interfaces";
 import { kindLookOf } from "./looks";
 import { KindTile, Selectable, StateLine } from "./parts";
 
 interface StepHeaderProps {
-  readonly place: StepPlace;
+  readonly place: PlacedStep;
   readonly line: string;
   readonly empty: boolean;
   readonly className?: string;
