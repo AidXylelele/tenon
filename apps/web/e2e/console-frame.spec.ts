@@ -35,6 +35,10 @@ function placeOfFocus(page: Page): Promise<string> {
   });
 }
 
+function fontsLoaded(): Promise<boolean> {
+  return document.fonts.ready.then(() => true);
+}
+
 function layoutShiftSoFar(): Promise<number> {
   return new Promise((resolve) => {
     let shifted = 0;
@@ -188,6 +192,7 @@ test.describe("the sidebar's width", () => {
   }) => {
     await page.setViewportSize(COMPACT);
     await open(page, "expanded");
+    await page.evaluate(fontsLoaded);
 
     await page.reload();
     await page.getByRole("button", { name: "Run" }).waitFor();
