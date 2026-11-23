@@ -25,7 +25,7 @@ export function InvitationForm({
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="email">Email</FieldLabel>
-          <Input id="email" value={email} readOnly disabled />
+          <Input id="email" value={email} readOnly />
         </Field>
         <Field>
           <FieldLabel htmlFor="name">Your name</FieldLabel>

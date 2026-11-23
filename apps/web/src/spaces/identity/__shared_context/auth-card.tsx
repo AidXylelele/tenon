@@ -20,7 +20,7 @@ export function AuthCard({
 }: AuthCardProps) {
   return (
     <>
-      <Card>
+      <Card className="[&_input]:h-10">
         <CardHeader>
           <h1 className="heading-1">{title}</h1>
           {description !== undefined && (
@@ -30,9 +30,7 @@ export function AuthCard({
         <CardContent>{children}</CardContent>
       </Card>
       {footer !== undefined && (
-        <div className="text-center text-sm text-muted-foreground">
-          {footer}
-        </div>
+        <div className="text-center text-body text-accent-text">{footer}</div>
       )}
     </>
   );
