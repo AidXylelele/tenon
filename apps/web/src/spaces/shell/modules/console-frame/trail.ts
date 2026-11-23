@@ -1,4 +1,5 @@
 import {
+  isEditorPath,
   NOTIFICATIONS_HREF,
   RUNS_HREF,
   SETTINGS_HREF,
@@ -11,13 +12,12 @@ import {
   placeOf,
   SETTINGS_PAGES,
 } from "../../__shared_context/places";
+import { runLabelOf } from "../../__shared_context/run-label";
 
 export interface Crumb {
   readonly label: string;
   readonly href?: string;
 }
-
-const RUN_ID_SHOWN = 8;
 
 const TEST_EVENT: Crumb = { label: "Send a test event" };
 const NEW_WORKFLOW: Crumb = { label: "New workflow" };
@@ -43,10 +43,11 @@ function belowOf(place: Place, pathname: string): readonly Crumb[] {
 
   const after = pathname.slice(place.href.length);
   const rest = segmentsOf(after);
+  const editing = isEditorPath(pathname);
 
   switch (place.href) {
     case WORKFLOWS_HREF:
-      return workflowCrumbs(rest);
+      return workflowCrumbs(rest, editing);
     case RUNS_HREF:
       return runCrumbs(rest);
     case NOTIFICATIONS_HREF:
@@ -58,7 +59,10 @@ function belowOf(place: Place, pathname: string): readonly Crumb[] {
   }
 }
 
-function workflowCrumbs(rest: readonly string[]): readonly Crumb[] {
+function workflowCrumbs(
+  rest: readonly string[],
+  editing: boolean,
+): readonly Crumb[] {
   const [namespace, name, part, version] = rest;
 
   if (namespace === "new" && name === undefined) return [NEW_WORKFLOW];
@@ -70,7 +74,7 @@ function workflowCrumbs(rest: readonly string[]): readonly Crumb[] {
   const href = workflowHref(namespace, name);
   const workflow: Crumb = { label: name, href };
 
-  if (part === "edit") return [workflow, EDITOR];
+  if (editing) return [workflow, EDITOR];
 
   if (part !== "versions" || version === undefined) return [workflow];
 
@@ -83,8 +87,7 @@ function runCrumbs(rest: readonly string[]): readonly Crumb[] {
 
   if (id === undefined) return [];
 
-  const shown = id.slice(0, RUN_ID_SHOWN);
-  const label = `Run ${shown}`;
+  const label = runLabelOf(id);
   return [{ label }];
 }
 

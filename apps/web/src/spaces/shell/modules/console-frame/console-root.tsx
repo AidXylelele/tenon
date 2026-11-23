@@ -2,14 +2,13 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { NEW_WORKFLOW_HREF } from "@/libs/routing/routes";
+import { isEditorPath } from "@/libs/routing/routes";
 import { SidebarProvider } from "@/libs/ui/components/sidebar";
 import { useModalOpen } from "./modal-open";
 import { type Viewport, VIEWPORT_COOKIE } from "./viewport";
 
 const COMPACT = "(max-width: 1199px)";
 const YEAR_S = 365 * 24 * 60 * 60;
-const EDITOR = /^\/workflows\/[^/]+\/[^/]+\/edit$/;
 
 interface ConsoleRootProps {
   readonly defaultOpen: boolean | null;
@@ -23,7 +22,7 @@ export function ConsoleRoot({
   children,
 }: ConsoleRootProps) {
   const pathname = usePathname();
-  const editing = isEditorAddress(pathname);
+  const editing = isEditorPath(pathname);
   const lastCompact = lastViewport === "narrow";
   const compact = useCompactScreen(lastCompact);
   const modalOpen = useModalOpen();
@@ -54,10 +53,6 @@ export function ConsoleRoot({
       {children}
     </SidebarProvider>
   );
-}
-
-function isEditorAddress(pathname: string): boolean {
-  return pathname === NEW_WORKFLOW_HREF || EDITOR.test(pathname);
 }
 
 function useCompactScreen(lastCompact: boolean): boolean {

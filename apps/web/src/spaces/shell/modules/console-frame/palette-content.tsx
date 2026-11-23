@@ -25,6 +25,7 @@ import { Kbd } from "@/libs/ui/components/kbd";
 import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { useColorScheme } from "@/libs/ui/hooks/use-color-scheme";
 import { allowedOf, pagesOf, placeOf } from "../../__shared_context/places";
+import { runLabelOf } from "../../__shared_context/run-label";
 import type { FoundWorkflow } from "./found-workflow";
 import { ACTIONS, type PaletteAction } from "./palette-actions";
 import { remember, useRecent, type Visit } from "./recent";
@@ -42,7 +43,6 @@ type Scheme = "light" | "dark";
 
 const RUN_ID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const RUN_ID_SHOWN = 8;
 const PROMPT = "Search pages, workflows, actions and run IDs";
 const RUN_PROMPT = "Which workflow to run?";
 
@@ -261,8 +261,7 @@ function RunGroup({
   readonly id: string;
   readonly onVisit: (visit: Visit) => void;
 }) {
-  const shown = id.slice(0, RUN_ID_SHOWN);
-  const label = `Run ${shown}`;
+  const label = runLabelOf(id);
   const href = runHref(id);
   const visited = { label, href };
 
