@@ -26,6 +26,9 @@ export function NewPasswordField({
   return (
     <Field>
       <FieldLabel htmlFor={name}>{label}</FieldLabel>
+      <FieldDescription id={hint}>
+        At least {PASSWORD_MIN} characters.{note !== undefined && ` ${note}`}
+      </FieldDescription>
       <Input
         id={name}
         aria-describedby={hint}
@@ -37,9 +40,6 @@ export function NewPasswordField({
         maxLength={PASSWORD_MAX}
         autoFocus={autoFocus}
       />
-      <FieldDescription id={hint}>
-        At least {PASSWORD_MIN} characters.{note !== undefined && ` ${note}`}
-      </FieldDescription>
     </Field>
   );
 }

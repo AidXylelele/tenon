@@ -92,6 +92,14 @@ describe("runs as a table", () => {
     expect(cells.getByText("Schedule")).toBeInTheDocument();
   });
 
+  it("the_status_column_is_named_status", () => {
+    render(<RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />);
+
+    expect(
+      screen.getByRole("columnheader", { name: "Status" }),
+    ).toBeInTheDocument();
+  });
+
   it("a_run_is_dated_by_its_start_and_lasts_from_start_to_end", () => {
     render(<RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />);
     const row = firstRow();

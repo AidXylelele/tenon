@@ -34,7 +34,7 @@ export function RunTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Phase</TableHead>
+            <TableHead>Status</TableHead>
             {showWorkflow && <TableHead>Workflow</TableHead>}
             <TableHead className="hidden md:table-cell">Version</TableHead>
             <TableHead className="hidden md:table-cell">Started by</TableHead>

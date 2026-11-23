@@ -7,6 +7,7 @@ import {
   notificationHref,
   signInHref,
   versionHref,
+  versionSourceHref,
   workflowHref,
   workflowsHref,
 } from "./routes";
@@ -87,5 +88,19 @@ describe("the addresses of the console", () => {
     const editor = isEditorPath(pathname);
 
     expect(editor).toBe(editing);
+  });
+});
+
+describe("the addresses of a version", () => {
+  it("a_version_keeps_its_view_in_the_query", () => {
+    expect(versionHref("sales", "route-lead", "1.0.0", { view: "code" })).toBe(
+      "/workflows/sales/route-lead/versions/1.0.0?view=code",
+    );
+  });
+
+  it("a_version_source_is_its_own_address", () => {
+    expect(versionSourceHref("sales", "route-lead", "1.0.0")).toBe(
+      "/workflows/sales/route-lead/versions/1.0.0/source",
+    );
   });
 });

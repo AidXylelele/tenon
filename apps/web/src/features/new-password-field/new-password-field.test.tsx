@@ -22,16 +22,25 @@ describe("a password being chosen", () => {
     expect(field).toHaveAccessibleDescription("At least 12 characters.");
   });
 
-  it("takes_the_focus_only_when_asked", () => {
-    const { unmount } = render(
-      <NewPasswordField name="password" label="Password" />,
-    );
-    const unfocused = document.activeElement;
-    unmount();
+  it("does_not_take_the_focus_unasked", () => {
+    render(<NewPasswordField name="password" label="Password" />);
+
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("takes_the_focus_when_asked", () => {
     render(<NewPasswordField name="password" label="Password" autoFocus />);
 
-    expect(unfocused).toBe(document.body);
     expect(screen.getByLabelText("Password")).toHaveFocus();
+  });
+
+  it("says_its_rule_under_the_label_before_the_field", () => {
+    render(<NewPasswordField name="password" label="Password" />);
+    const rule = screen.getByText("At least 12 characters.");
+    const field = screen.getByLabelText("Password");
+
+    const order = rule.compareDocumentPosition(field);
+    expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("adds_its_note_after_the_length", () => {
