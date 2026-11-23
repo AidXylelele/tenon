@@ -32,7 +32,6 @@ import { PageHeader } from "@/libs/ui/composites/page-header";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import { Time } from "@/libs/ui/composites/time";
-import { NOTIFICATIONS_HREF, WEBHOOKS_HREF } from "@/libs/routing/routes";
 import { ViewerNotice } from "@/features/viewer-notice";
 import { describeFilter } from "../../__shared_context/event-filter";
 import { NOTIFICATIONS_PURPOSE } from "../../__shared_context/notifications";
@@ -83,11 +82,6 @@ export async function NotificationDetail({
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "Connections", href: WEBHOOKS_HREF },
-          { label: "Notifications", href: NOTIFICATIONS_HREF },
-          { label: subscription.name },
-        ]}
         title={subscription.name}
         description={takes}
         actions={

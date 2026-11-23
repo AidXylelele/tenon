@@ -1,4 +1,5 @@
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import { geistMono, geistSans } from "@/libs/ui/fonts";
 import { chosenTheme } from "../../__shared_context/chosen-theme";
 import { themeAttributeOf } from "../../__shared_context/theme";
@@ -17,7 +18,7 @@ export async function RootFrame({
     <html lang="en" data-theme={attribute} className={fonts}>
       <body className="min-h-full">
         <TooltipProvider delayDuration={300}>
-          {children}
+          <Announcer>{children}</Announcer>
           <ConsoleToaster />
         </TooltipProvider>
       </body>

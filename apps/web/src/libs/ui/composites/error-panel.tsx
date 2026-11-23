@@ -39,8 +39,8 @@ export function ErrorPanel({ retry, digest }: ErrorPanelProps) {
         </EmptyMedia>
         <h1 className="heading-1">This page could not be loaded</h1>
         <EmptyDescription>
-          The platform did not answer as expected. This page tries again by
-          itself every few seconds.
+          Tenon did not answer as expected. This page tries again by itself
+          every few seconds.
           {digest !== undefined && (
             <span className="mt-1 block text-xs">Reference {digest}</span>
           )}
