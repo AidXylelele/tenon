@@ -15,6 +15,7 @@ export interface PeriodFiguresProps {
 
 export interface RunsChartProps {
   readonly bars: readonly Bar[];
+  readonly hrefs: readonly string[];
   readonly unit: "hour" | "day";
   readonly zone: string;
 }

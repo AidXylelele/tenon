@@ -1,6 +1,16 @@
 "use client";
 
-import { Bar as RunBar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef } from "react";
+import {
+  BarChart,
+  CartesianGrid,
+  type MouseHandlerDataParam,
+  Bar as RunBar,
+  useActiveTooltipDataPoints,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   type ChartConfig,
   ChartContainer,
@@ -33,9 +43,42 @@ const CONFIG = {
 const FOCUS =
   "h-48 w-full aspect-auto [&_.recharts-surface:focus-visible]:outline-2 [&_.recharts-surface:focus-visible]:outline-offset-2 [&_.recharts-surface:focus-visible]:outline-(--focus-ring)";
 
-export function RunsChart({ bars, unit, zone }: RunsChartProps) {
+export function RunsChart({ bars, hrefs, unit, zone }: RunsChartProps) {
+  const router = useRouter();
+  const active = useRef<number | null>(null);
   const note = chartNoteOf(unit, zone);
-  const label = `Runs per ${unit}; arrow keys move between bars`;
+  const label = `Runs per ${unit}; arrow keys move between bars, Enter opens a bar's runs`;
+
+  const open = useCallback(
+    (index: number | null) => {
+      const href = index === null ? undefined : hrefs[index];
+
+      if (href === undefined) return;
+
+      router.push(href);
+    },
+    [hrefs, router],
+  );
+
+  const keep = useCallback(
+    (from: string | null) => {
+      const index = bars.findIndex((bar) => bar.from === from);
+      active.current = index === -1 ? null : index;
+    },
+    [bars],
+  );
+
+  function openClicked(state: MouseHandlerDataParam) {
+    const index = Number(state.activeTooltipIndex);
+    const found = Number.isInteger(index) ? index : null;
+    open(found);
+  }
+
+  function openFocused(event: React.KeyboardEvent) {
+    if (event.key !== "Enter") return;
+
+    open(active.current);
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -44,8 +87,15 @@ export function RunsChart({ bars, unit, zone }: RunsChartProps) {
         className={FOCUS}
         role="group"
         aria-label={label}
+        onKeyDown={openFocused}
       >
-        <BarChart data={bars} accessibilityLayer>
+        <BarChart
+          data={bars}
+          accessibilityLayer
+          onClick={openClicked}
+          className="cursor-pointer"
+        >
+          <ActiveBar onActive={keep} />
           <CartesianGrid vertical={false} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} />
           <YAxis
@@ -75,6 +125,21 @@ export function RunsChart({ bars, unit, zone }: RunsChartProps) {
       </Disclosure>
     </div>
   );
+}
+
+function ActiveBar({
+  onActive,
+}: {
+  readonly onActive: (from: string | null) => void;
+}) {
+  const points = useActiveTooltipDataPoints<Bar>();
+  const from = points?.[0]?.from ?? null;
+
+  useEffect(() => {
+    onActive(from);
+  }, [from, onActive]);
+
+  return null;
 }
 
 function ChartTable({

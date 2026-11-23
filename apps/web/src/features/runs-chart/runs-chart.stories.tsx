@@ -46,6 +46,7 @@ function RunsOfAPeriod({ period, zone }: PeriodProps) {
     return { start: bucket.from, counts };
   });
   const bars = seriesOf(windows.buckets, counted);
+  const hrefs = bars.map((bar) => `/runs?from=${bar.from}&to=${bar.to}`);
   const figures = figuresOf(TOTAL, PREVIOUS);
 
   return (
@@ -58,7 +59,7 @@ function RunsOfAPeriod({ period, zone }: PeriodProps) {
         hrefOf={hrefOf}
         inProgressHref="/runs?status=in-progress&started=all"
       />
-      <RunsChart bars={bars} unit={windows.unit} zone={zone} />
+      <RunsChart bars={bars} hrefs={hrefs} unit={windows.unit} zone={zone} />
     </section>
   );
 }

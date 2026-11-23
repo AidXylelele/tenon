@@ -11,6 +11,7 @@ describe("the Runs address", () => {
       version: undefined,
       statuses: [],
       started: "all",
+      between: null,
       page: 1,
       size: 50,
       sort: "started",
@@ -58,5 +59,33 @@ describe("the Runs address", () => {
     const address = runsAddressOf({ phase: "faulted", status: "cancelled" });
 
     expect(address.statuses).toEqual(["failed", "cancelled"]);
+  });
+});
+
+describe("a time range in the Runs address", () => {
+  it("a_bars_range_goes_back_to_the_same_address", () => {
+    const text =
+      "/runs?status=failed&from=2026-11-16T00%3A00%3A00.000Z&to=2026-11-17T00%3A00%3A00.000Z";
+    const query = Object.fromEntries(new URL(text, "http://x").searchParams);
+
+    const address = runsAddressOf(query);
+    const again = runsHrefOf(address);
+
+    expect(address.between).toEqual({
+      from: "2026-11-16T00:00:00.000Z",
+      to: "2026-11-17T00:00:00.000Z",
+    });
+    expect(again).toBe(text);
+    expect(isFiltered(address)).toBe(true);
+  });
+
+  it.each([
+    [{ from: "2026-11-16T00:00:00.000Z" }],
+    [{ from: "2026-11-17T00:00:00.000Z", to: "2026-11-16T00:00:00.000Z" }],
+    [{ from: "yesterday", to: "today" }],
+  ])("a_range_without_two_ordered_instants_is_none_%#", (query) => {
+    const address = runsAddressOf(query);
+
+    expect(address.between).toBeNull();
   });
 });

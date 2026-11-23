@@ -19,10 +19,12 @@ export {
   PERIODS,
   STARTED,
   startedOf,
+  windowPhrase,
 } from "./periods";
 export { countWindowOf, figuresOf, inProgressOf, seriesOf } from "./figures";
 export {
   phasesOf,
+  runsPhraseOf,
   statusOf,
   statusesOf,
   statusLabel,

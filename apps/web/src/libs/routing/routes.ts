@@ -40,6 +40,8 @@ export interface RunsQuery {
   readonly version?: string;
   readonly status?: string;
   readonly started?: string;
+  readonly from?: string;
+  readonly to?: string;
   readonly page?: number;
   readonly size?: number;
   readonly sort?: string;

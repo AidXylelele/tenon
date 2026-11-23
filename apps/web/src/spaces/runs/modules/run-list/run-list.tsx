@@ -9,7 +9,13 @@ import type { Query } from "@/libs/routing/segment";
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
-import { phasesOf, summaryOf, windowsOf } from "@/operations/run-periods";
+import {
+  phasesOf,
+  runsPhraseOf,
+  summaryOf,
+  windowPhrase,
+  windowsOf,
+} from "@/operations/run-periods";
 import { isUnended, phaseLabel } from "@/operations/run-progress";
 import { PhaseStatus } from "@/features/run-status";
 import { RunPager, RunTable } from "@/features/run-table";
@@ -26,7 +32,8 @@ const numbers = new Intl.NumberFormat("en-US");
 export async function RunList({ query }: { readonly query: Query }) {
   const address = runsAddressOf(query);
   const zone = await viewerZone();
-  const from = startOf(address, zone);
+  const from = address.between?.from ?? startOf(address, zone);
+  const to = address.between?.to;
   const phases = address.statuses.flatMap((status) => phasesOf(status));
   const read = await available(
     Promise.all([
@@ -37,6 +44,7 @@ export async function RunList({ query }: { readonly query: Query }) {
         version: address.version,
         phases,
         from,
+        to,
         sort: address.sort,
         page: address.page,
         limit: address.size,
@@ -55,7 +63,7 @@ export async function RunList({ query }: { readonly query: Query }) {
     namespace: workflow.namespace,
     name: workflow.name,
   }));
-  const summary = summaryLineOf(address, page.total, page.exact);
+  const summary = summaryLineOf(address, zone, page.total, page.exact);
   const order = {
     sort: address.sort,
     hrefOf: (sort: InstanceOrder) => runsHrefOf({ ...address, sort, page: 1 }),
@@ -93,7 +101,7 @@ export async function RunList({ query }: { readonly query: Query }) {
           <RefreshControl activity={activity} renderedAt={page.readAt} />
         }
       />
-      <Filters address={address} workflows={known} />
+      <Filters address={address} workflows={known} zone={zone} />
       <h2 className="text-sm font-semibold" role="status">
         {summary}
       </h2>
@@ -126,12 +134,22 @@ function startOf(address: RunsAddress, zone: string): string | undefined {
 
 function summaryLineOf(
   address: RunsAddress,
+  zone: string,
   total: number,
   exact: boolean,
 ): string {
-  const runs = summaryOf(address.statuses, address.started, phaseLabel);
+  const runs = runsOf(address, zone);
   const workflow = address.name === undefined ? "" : ` of ${address.name}`;
   const counted = numbers.format(total);
   const count = exact ? counted : `more than ${counted}`;
   return `${runs}${workflow} · ${count}`;
+}
+
+function runsOf(address: RunsAddress, zone: string): string {
+  if (address.between === null)
+    return summaryOf(address.statuses, address.started, phaseLabel);
+
+  const runs = runsPhraseOf(address.statuses, phaseLabel);
+  const range = windowPhrase(address.between, zone);
+  return `${runs} ${range}`;
 }

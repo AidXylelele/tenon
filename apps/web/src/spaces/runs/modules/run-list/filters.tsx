@@ -27,6 +27,8 @@ import {
   STATUSES,
   statusesOf,
   statusLabel,
+  type TimeWindow,
+  windowPhrase,
 } from "@/operations/run-periods";
 import { phaseLabel } from "@/operations/run-progress";
 import { isFiltered, type RunsAddress, runsHrefOf } from "./runs-address";
@@ -43,15 +45,18 @@ type Changes = Partial<RunsAddress>;
 export function Filters({
   address,
   workflows,
+  zone,
 }: {
   readonly address: RunsAddress;
   readonly workflows: readonly KnownWorkflow[];
+  readonly zone: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const filtered = isFiltered(address);
   const workflow = keyOf(address.namespace, address.name);
   const chosen = address.statuses.slice();
+  const startedChoice = address.between === null ? address.started : "";
 
   function apply(changes: Changes) {
     const next: RunsAddress = { ...address, ...changes, page: 1 };
@@ -80,7 +85,7 @@ export function Filters({
 
   function chooseStarted(value: string) {
     const started: Started = startedOf(value) ?? address.started;
-    apply({ started });
+    apply({ started, between: null });
   }
 
   function chooseVersion(value: string) {
@@ -145,13 +150,22 @@ export function Filters({
         type="single"
         variant="outline"
         aria-label="Started"
-        value={address.started}
+        value={startedChoice}
         onValueChange={chooseStarted}
       >
         {STARTED.map((each) => (
           <StartedOption key={each} started={each} />
         ))}
       </ToggleGroup>
+      {address.between !== null && (
+        <RangeChip
+          range={address.between}
+          zone={zone}
+          onClear={() => {
+            apply({ between: null });
+          }}
+        />
+      )}
       {filtered && (
         <Button variant="ghost" onClick={clear}>
           <XIcon data-icon="inline-start" />
@@ -180,6 +194,27 @@ function StatusOption({ status }: { readonly status: RunStatus }) {
   const label = statusLabel(status, phaseLabel);
 
   return <ToggleGroupItem value={status}>{label}</ToggleGroupItem>;
+}
+
+function RangeChip({
+  range,
+  zone,
+  onClear,
+}: {
+  readonly range: TimeWindow;
+  readonly zone: string;
+  readonly onClear: () => void;
+}) {
+  const phrase = windowPhrase(range, zone);
+  const label = `Started ${phrase}`;
+  const clearLabel = `Clear the range: ${label}`;
+
+  return (
+    <Button variant="outline" onClick={onClear} aria-label={clearLabel}>
+      {label}
+      <XIcon data-icon="inline-end" />
+    </Button>
+  );
 }
 
 function StartedOption({ started }: { readonly started: Started }) {

@@ -72,12 +72,15 @@ export function summaryOf(
   started: Started,
   phaseWord: PhaseWord,
 ): string {
-  const runs = runsOf(statuses, phaseWord);
+  const runs = runsPhraseOf(statuses, phaseWord);
   const phrase = periodPhrase(started);
   return `${runs} ${phrase}`;
 }
 
-function runsOf(statuses: readonly RunStatus[], phaseWord: PhaseWord): string {
+export function runsPhraseOf(
+  statuses: readonly RunStatus[],
+  phaseWord: PhaseWord,
+): string {
   const chosen = inOrder(statuses);
 
   if (chosen.length === 0) return ALL_RUNS;

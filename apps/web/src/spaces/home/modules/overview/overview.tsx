@@ -59,6 +59,7 @@ export async function Overview({ query }: { readonly query: Query }) {
   const figures = figuresOf(counts.total, counts.previous?.counts ?? null);
   const inProgress = inProgressOf(counts.now);
   const bars = seriesOf(windows.buckets, counts.buckets);
+  const barHrefs = bars.map((bar) => runsHref({ from: bar.from, to: bar.to }));
   const activity = inProgress > 0 ? "in-flight" : "open";
   const figureHrefOf = (kind: FigureKind) =>
     runsHref({ status: STATUS_OF[kind], started: period });
@@ -92,7 +93,12 @@ export async function Overview({ query }: { readonly query: Query }) {
           hrefOf={figureHrefOf}
           inProgressHref={inProgressHref}
         />
-        <RunsChart bars={bars} unit={windows.unit} zone={zone} />
+        <RunsChart
+          bars={bars}
+          hrefs={barHrefs}
+          unit={windows.unit}
+          zone={zone}
+        />
       </section>
       <NeedsAttention
         period={period}

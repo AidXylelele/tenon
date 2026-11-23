@@ -6,6 +6,7 @@ import {
   periodLabel,
   periodPhrase,
   startedOf,
+  windowPhrase,
 } from "./periods";
 
 describe("the words of a period", () => {
@@ -61,5 +62,18 @@ describe("the note under the runs chart", () => {
     const text = chartNoteOf(unit, zone);
 
     expect(text).toBe(note);
+  });
+});
+
+describe("the words of a time range", () => {
+  it("a_range_reads_its_edges_in_the_viewers_zone", () => {
+    const window = {
+      from: "2026-11-16T08:00:00.000Z",
+      to: "2026-11-16T09:00:00.000Z",
+    };
+
+    const phrase = windowPhrase(window, "Europe/Kyiv");
+
+    expect(phrase).toBe("between 16 Nov, 10:00 and 16 Nov, 11:00");
   });
 });

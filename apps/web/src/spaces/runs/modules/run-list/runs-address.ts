@@ -6,6 +6,7 @@ import {
   type RunStatus,
   type Started,
   startedOf,
+  type TimeWindow,
   statusesOf,
   statusOf,
   statusParamOf,
@@ -24,6 +25,7 @@ export interface RunsAddress {
   readonly version: string | undefined;
   readonly statuses: readonly RunStatus[];
   readonly started: Started;
+  readonly between: TimeWindow | null;
   readonly page: number;
   readonly size: number;
   readonly sort: InstanceOrder;
@@ -36,6 +38,8 @@ const Read = z.object({
   status: queryText,
   phase: z.enum(PHASES).optional().catch(undefined),
   started: queryText,
+  from: z.iso.datetime({ offset: true }).optional().catch(undefined),
+  to: z.iso.datetime({ offset: true }).optional().catch(undefined),
   page: z.coerce.number().int().min(1).catch(1),
   size: z.coerce
     .number()
@@ -49,6 +53,7 @@ export function runsAddressOf(query: unknown): RunsAddress {
   const read = Read.parse(query);
   const statuses = statusesWith(read.status, read.phase);
   const started = startedOf(read.started) ?? "all";
+  const between = betweenOf(read.from, read.to);
   const lastPage = Math.ceil(COUNTED / read.size);
   const page = Math.min(read.page, lastPage);
   return {
@@ -57,6 +62,7 @@ export function runsAddressOf(query: unknown): RunsAddress {
     version: read.version,
     statuses,
     started,
+    between,
     page,
     size: read.size,
     sort: read.sort,
@@ -75,6 +81,8 @@ export function runsHrefOf(address: RunsAddress): string {
     version: address.version,
     status,
     started,
+    from: address.between?.from,
+    to: address.between?.to,
     page,
     size,
     sort,
@@ -84,7 +92,21 @@ export function runsHrefOf(address: RunsAddress): string {
 export function isFiltered(address: RunsAddress): boolean {
   const chosen = [address.namespace, address.version];
   const named = chosen.some((value) => value !== undefined);
-  return named || address.statuses.length > 0 || address.started !== "all";
+  const timed = address.started !== "all" || address.between !== null;
+  return named || address.statuses.length > 0 || timed;
+}
+
+function betweenOf(
+  from: string | undefined,
+  to: string | undefined,
+): TimeWindow | null {
+  if (from === undefined || to === undefined) return null;
+
+  const ordered = Date.parse(from) < Date.parse(to);
+
+  if (!ordered) return null;
+
+  return { from, to };
 }
 
 function statusesWith(
