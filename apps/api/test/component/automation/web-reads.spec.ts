@@ -1,4 +1,5 @@
 import request from "supertest";
+import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
 import { Role } from "../../../src/domain/identity/users/enums.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
@@ -97,6 +98,32 @@ describe("the reads the web console asks for", () => {
     expect(versions.body).toMatchObject([
       { publishedBy: { id: editorId, name: "Ada" } },
     ]);
+  });
+
+  it("a_workflow_is_read_with_the_title_its_document_gives_or_none", async () => {
+    const titled = aDocument();
+    const header = {
+      ...(titled.document as JsonObject),
+      title: "Route a lead",
+    };
+    await publish(t, editor, { ...titled, document: header });
+    await publish(t, editor, aDocument({ name: "other-flow" }));
+
+    const listed = await request(t.server)
+      .get("/api/v1/workflows")
+      .set(viewer)
+      .expect(200);
+    const read = await request(t.server)
+      .get("/api/v1/workflows/sales/route-lead")
+      .set(viewer)
+      .expect(200);
+
+    const items = (listed.body as { items: WorkflowItem[] }).items;
+    expect(items).toMatchObject([
+      { name: "other-flow", title: null },
+      { name: "route-lead", title: "Route a lead" },
+    ]);
+    expect(read.body).toMatchObject({ title: "Route a lead" });
   });
 
   it("a_waiting_instance_names_its_wait_its_controls_and_its_starter", async () => {

@@ -225,10 +225,14 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
       .limit(1)
       .as("last_run");
     const starts = sql<number>`(select count(*)::int from ${instances} where ${instances.workflowId} = ${workflows.id} and not ${instances.test})`;
+    const title = sql<
+      string | null
+    >`${versions.document} -> 'document' ->> 'title'`;
     return this.txHost.tx
       .select({
         namespace: workflows.namespace,
         name: workflows.name,
+        title,
         status: workflows.status,
         on: workflows.on,
         currentVersion: versions.semver,
@@ -248,6 +252,7 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     return {
       namespace: row.namespace,
       name: row.name,
+      title: row.title,
       status: row.status,
       on: row.on,
       currentVersion: row.currentVersion,

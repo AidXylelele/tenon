@@ -64,6 +64,7 @@ export interface LastRun {
 export interface WorkflowSummary {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
   readonly status: WorkflowStatus;
   readonly on: boolean;
   readonly currentVersion: string | null;

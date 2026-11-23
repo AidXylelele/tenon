@@ -150,6 +150,7 @@ export interface SealedRun {
 export interface WorkflowSummaryRow {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
   readonly status: WorkflowStatus;
   readonly on: boolean;
   readonly currentVersion: string | null;

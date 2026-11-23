@@ -59,6 +59,7 @@ export class WorkflowPresenter {
     return {
       namespace: workflow.namespace,
       name: workflow.name,
+      title: workflow.title,
       status: workflow.status,
       on: workflow.on,
       currentVersion: workflow.currentVersion,

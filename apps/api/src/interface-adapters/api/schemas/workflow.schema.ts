@@ -69,6 +69,7 @@ export type VersionSourceResponse = z.infer<typeof VersionSourceResponse>;
 export const WorkflowResponse = z.object({
   namespace: z.string(),
   name: z.string(),
+  title: z.string().nullable(),
   status: z.enum(WorkflowStatus),
   on: z.boolean(),
   currentVersion: z.string().nullable(),
