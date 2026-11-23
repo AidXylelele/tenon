@@ -182,6 +182,7 @@ function AsideContent({
       tested={test.state.kind === "ran"}
       onSelect={onSelect}
       onTest={onTest}
+      onEdit={sources.onEdit}
     />
   );
 }

@@ -13,7 +13,7 @@ export type {
 } from "./interfaces";
 export { branchNameOf } from "./flow";
 export { START } from "./items";
-export { kindLookOf } from "./looks";
+export { kindLookOf, startCardOf } from "./looks";
 export {
   listsOf,
   placeOf,

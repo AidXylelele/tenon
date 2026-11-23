@@ -6,13 +6,25 @@ import {
   PlayIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import type { Step, StructureResult } from "language-server/protocol";
+import type {
+  EditAction,
+  Step,
+  StepList,
+  StructureResult,
+} from "language-server/protocol";
 import { useId } from "react";
 import { Button } from "@/libs/ui/components/button";
+import { Field, FieldLabel } from "@/libs/ui/components/field";
+import { Input } from "@/libs/ui/components/input";
 import { PanelHeader } from "@/libs/ui/composites/panel-header";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
-import { triggerText } from "@/operations/schedule-words";
-import { START, type StepMark, stepsIn } from "@/features/workflow-flow";
+import { blurOnEnter } from "./step-form";
+import {
+  kindLookOf,
+  START,
+  startCardOf,
+  type StepMark,
+} from "@/features/workflow-flow";
 
 interface SummaryPanelProps {
   readonly structure: StructureResult;
@@ -22,6 +34,13 @@ interface SummaryPanelProps {
   readonly tested: boolean;
   readonly onSelect: (target: string) => void;
   readonly onTest: () => void;
+  readonly onEdit: (actions: readonly EditAction[]) => void;
+}
+
+interface OutlineProps {
+  readonly list: StepList;
+  readonly marks: ReadonlyMap<string, StepMark>;
+  readonly onSelect: (target: string) => void;
 }
 
 const TITLE_ID = "summary-panel-title";
@@ -32,7 +51,7 @@ const READY: StatusLook = {
   label: "Ready",
 };
 
-const BY_HAND = "By hand, or when another app starts it";
+const TITLE_POINTER = "/document/title";
 
 export function SummaryPanel({
   structure,
@@ -42,13 +61,27 @@ export function SummaryPanel({
   tested,
   onSelect,
   onTest,
+  onEdit,
 }: SummaryPanelProps) {
   const id = useId();
   const stepsId = `${id}-steps`;
-  const steps = stepsIn(structure.workflow.steps);
-  const triggers = structure.workflow.triggers;
-  const starts =
-    triggers.length === 0 ? BY_HAND : triggers.map(triggerText).join(" · ");
+  const titleId = `${id}-title`;
+  const root = structure.workflow.steps;
+  const written = structure.workflow.title ?? "";
+  const start = startCardOf(structure.workflow.triggers, null);
+  const StartIcon = start.icon;
+
+  function retitle(typed: string) {
+    const value = typed.trim();
+
+    if (value === written) return;
+
+    const change: EditAction =
+      value === ""
+        ? { kind: "clearField", pointer: TITLE_POINTER }
+        : { kind: "setField", pointer: TITLE_POINTER, value };
+    onEdit([change]);
+  }
 
   return (
     <section
@@ -57,6 +90,18 @@ export function SummaryPanel({
     >
       <PanelHeader title={title} titleId={TITLE_ID} subtitle={status} />
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
+        <Field>
+          <FieldLabel htmlFor={titleId}>Title</FieldLabel>
+          <Input
+            key={written}
+            id={titleId}
+            defaultValue={written}
+            onBlur={(event) => {
+              retitle(event.currentTarget.value);
+            }}
+            onKeyDown={blurOnEnter}
+          />
+        </Field>
         <div className="flex flex-col gap-1.5">
           <h3 className="font-semibold">Starts</h3>
           <Button
@@ -66,27 +111,21 @@ export function SummaryPanel({
               onSelect(START);
             }}
           >
-            {starts}
+            <StartIcon data-icon="inline-start" />
+            {start.title}
           </Button>
         </div>
         <div className="flex flex-col gap-1.5">
           <h3 id={stepsId} className="font-semibold">
             Steps
           </h3>
-          {steps.length === 0 ? (
+          {root.steps.length === 0 ? (
             <p className="text-caption text-muted-foreground">
               No steps yet. Press + under the start to add your first step.
             </p>
           ) : (
             <ul aria-labelledby={stepsId} className="flex flex-col">
-              {steps.map((step) => (
-                <StepLine
-                  key={step.id}
-                  step={step}
-                  mark={marks.get(step.id) ?? null}
-                  onSelect={onSelect}
-                />
-              ))}
+              <Outline list={root} marks={marks} onSelect={onSelect} />
             </ul>
           )}
         </div>
@@ -109,16 +148,24 @@ export function SummaryPanel({
   );
 }
 
+function Outline({ list, marks, onSelect }: OutlineProps) {
+  return list.steps.map((step) => (
+    <StepLine key={step.id} step={step} marks={marks} onSelect={onSelect} />
+  ));
+}
+
 function StepLine({
   step,
-  mark,
+  marks,
   onSelect,
 }: {
   readonly step: Step;
-  readonly mark: StepMark | null;
+  readonly marks: ReadonlyMap<string, StepMark>;
   readonly onSelect: (target: string) => void;
 }) {
-  const look = lookOf(mark);
+  const look = lookOf(marks.get(step.id) ?? null);
+  const kind = kindLookOf(step.kind);
+  const Icon = kind.icon;
 
   return (
     <li>
@@ -129,9 +176,17 @@ function StepLine({
           onSelect(step.id);
         }}
       >
-        <span className="truncate">{step.name}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">{step.name}</span>
+        </span>
         <Status look={look} className="text-caption" />
       </button>
+      {step.lists.map((inner) => (
+        <ul key={inner.id} className="flex flex-col pl-4">
+          <Outline list={inner} marks={marks} onSelect={onSelect} />
+        </ul>
+      ))}
     </li>
   );
 }

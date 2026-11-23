@@ -205,7 +205,7 @@ export function FieldTitle({
   const isOptional = !field.required && words.fill === null && !hasDefault;
 
   return (
-    <>
+    <span className="inline-flex flex-wrap items-baseline gap-x-2">
       {words.title}
       {isOptional && (
         <span className="font-normal text-muted-foreground">optional</span>
@@ -215,7 +215,7 @@ export function FieldTitle({
           {term}
         </code>
       )}
-    </>
+    </span>
   );
 }
 
