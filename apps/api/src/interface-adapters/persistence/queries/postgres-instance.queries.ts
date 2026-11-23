@@ -32,7 +32,7 @@ import type {
   WindowCount,
 } from "../../../application/automation/instances/interfaces.js";
 import { InstanceOrder } from "../../../application/automation/instances/enums.js";
-import type { InstanceQueries } from "../../../application/automation/instances/queries.js";
+import { InstanceQueries } from "../../../application/automation/instances/queries.js";
 import type { Person } from "../../../application/identity/users/interfaces.js";
 import {
   Phase,
@@ -67,7 +67,6 @@ import {
 
 @Injectable()
 export class PostgresInstanceQueries implements InstanceQueries {
-  private static readonly MOST_COUNTED = 10_000;
   private static readonly OPENINGS: LifecycleEventName[] = [
     "task.started",
     "task.completed",
@@ -147,7 +146,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
   }
 
   async #totalOf(filtered: SQL | undefined): Promise<InstanceTotal> {
-    const most = PostgresInstanceQueries.MOST_COUNTED;
+    const most = InstanceQueries.MOST_COUNTED;
     const beyond = most + 1;
     const matching = this.txHost.tx
       .select({ id: instances.id })

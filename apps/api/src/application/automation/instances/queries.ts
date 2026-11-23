@@ -12,6 +12,8 @@ import type {
 } from "./interfaces.js";
 
 export abstract class InstanceQueries {
+  static readonly MOST_COUNTED = 10_000;
+
   abstract list(request: InstancePageRequest): Promise<InstancePage>;
   abstract get(id: string): Promise<InstanceDetail | null>;
   abstract tasks(

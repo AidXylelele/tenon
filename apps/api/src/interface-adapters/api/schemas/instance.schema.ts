@@ -3,6 +3,7 @@ import {
   InstanceOrder,
   TaskStatus,
 } from "../../../application/automation/instances/enums.js";
+import { InstanceQueries } from "../../../application/automation/instances/queries.js";
 import {
   Control,
   Phase,
@@ -135,6 +136,13 @@ export const Instant = z.codec(z.iso.datetime({ offset: true }), z.date(), {
 
 const MOST_BUCKETS = 100;
 
+const LONGEST_SPAN = 92 * 24 * 60 * 60 * 1_000;
+
+function spans(from: Date, to: Date): boolean {
+  const span = to.getTime() - from.getTime();
+  return span <= LONGEST_SPAN;
+}
+
 const Buckets = z
   .union([Instant, z.array(Instant).min(1).max(MOST_BUCKETS)])
   .transform((value) => [value].flat());
@@ -147,18 +155,26 @@ const Phases = z
   .union([z.enum(Phase), z.array(z.enum(Phase))])
   .transform((value) => [value].flat());
 
-export const ListInstancesQuery = z.strictObject({
-  namespace: z.string().optional(),
-  name: z.string().optional(),
-  version: z.string().min(1).optional(),
-  phase: Phases.optional(),
-  from: Instant.optional(),
-  to: Instant.optional(),
-  tests: Included.default(false),
-  sort: z.enum(InstanceOrder).default(InstanceOrder.Started),
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
-});
+export const ListInstancesQuery = z
+  .strictObject({
+    namespace: z.string().optional(),
+    name: z.string().optional(),
+    version: z.string().min(1).optional(),
+    phase: Phases.optional(),
+    from: Instant.optional(),
+    to: Instant.optional(),
+    tests: Included.default(false),
+    sort: z.enum(InstanceOrder).default(InstanceOrder.Started),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .refine(
+    (query) => {
+      const skipped = (query.page - 1) * query.limit;
+      return skipped < InstanceQueries.MOST_COUNTED;
+    },
+    { message: "the page starts beyond the counted runs", path: ["page"] },
+  );
 
 export type ListInstancesQuery = z.infer<typeof ListInstancesQuery>;
 
@@ -188,6 +204,14 @@ export const InstanceCountsQuery = z
       message: "the previous window ends at the first bucket",
       path: ["previousFrom"],
     },
+  )
+  .refine(
+    (window) => {
+      const first = window.bucket[0] ?? window.to;
+      const from = window.previousFrom ?? first;
+      return spans(from, window.to);
+    },
+    { message: "the counts span at most 92 days", path: ["previousFrom"] },
   );
 
 export type InstanceCountsQuery = z.infer<typeof InstanceCountsQuery>;
@@ -234,6 +258,10 @@ export const FailingWorkflowsQuery = z
   .refine((window) => window.from < window.to, {
     message: "from is before to",
     path: ["to"],
+  })
+  .refine((window) => spans(window.from, window.to), {
+    message: "the window spans at most 92 days",
+    path: ["from"],
   });
 
 export type FailingWorkflowsQuery = z.infer<typeof FailingWorkflowsQuery>;
