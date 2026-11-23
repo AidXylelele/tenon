@@ -62,7 +62,7 @@ function setUp() {
     },
   };
   const archive = new ArchiveWorkflow(workflows, events, unitOfWork);
-  return { compiler, workflows, check, publish, archive };
+  return { compiler, workflows, events, check, publish, archive };
 }
 
 interface DraftPublication {
@@ -324,6 +324,20 @@ describe("publishing versions", () => {
 });
 
 describe("publishing and archiving together", () => {
+  it("a_new_version_and_an_archive_each_dispatch_once_after_their_save", async () => {
+    const fixture = setUp();
+
+    await publishOf(fixture, "1.0.0");
+    await publishOf(fixture, "1.0.0");
+    await fixture.archive.execute({ name });
+    await fixture.archive.execute({ name });
+
+    const workflow = await fixture.workflows.findByName(name);
+    const id = workflow?.id;
+    expect(fixture.workflows.saves).toBe(2);
+    expect(fixture.events.calls).toEqual([id, id]);
+  });
+
   it("archiving_keeps_the_current_version_and_the_first_moment", async () => {
     const fixture = setUp();
     await publishOf(fixture, "1.0.0");
