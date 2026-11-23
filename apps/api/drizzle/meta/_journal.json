@@ -5,43 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1795403302986,
+      "when": 1795474002444,
       "tag": "0000_platform_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1795403326310,
+      "when": 1795474003129,
       "tag": "0001_outbox_schema",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1795403327012,
-      "tag": "0002_engine_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1795403327712,
-      "tag": "0003_first_administrator",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1795470909936,
-      "tag": "0004_workflow_schedule_arming",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1795471213487,
-      "tag": "0005_drop_engine_schema",
+      "when": 1795474003814,
+      "tag": "0002_first_administrator",
       "breakpoints": true
     }
   ]

@@ -16,7 +16,7 @@ const journal = JSON.parse(
 
 const ADMIN_EMAIL = "Owner@Example.COM";
 
-const FIRST_ADMINISTRATOR = join(MIGRATIONS, "0003_first_administrator.sql");
+const FIRST_ADMINISTRATOR = join(MIGRATIONS, "0002_first_administrator.sql");
 
 const firstAdministrator = readFileSync(FIRST_ADMINISTRATOR, "utf8");
 
@@ -41,7 +41,6 @@ const TAKEN = {
 interface Applied {
   readonly platform: number;
   readonly outbox: number;
-  readonly engine: boolean;
 }
 
 describe("the migrations applied before the API starts", () => {
@@ -73,11 +72,10 @@ describe("the migrations applied before the API starts", () => {
     const result = await db.execute(sql`
       select
         (select count(*)::int from drizzle.__drizzle_migrations) as platform,
-        (select max(version) from nest_outbox.migrations) as outbox,
-        exists (select 1 from information_schema.schemata where schema_name = 'nest_workflows') as engine
+        (select max(version) from nest_outbox.migrations) as outbox
     `);
     const [row] = result.rows as unknown as Applied[];
-    return row ?? { platform: 0, outbox: 0, engine: false };
+    return row ?? { platform: 0, outbox: 0 };
   }
 
   async function seedAfresh(
@@ -101,14 +99,13 @@ describe("the migrations applied before the API starts", () => {
     });
   }
 
-  it("an_empty_database_gets_the_platforms_and_the_outboxs_migrations_and_no_engine", async () => {
+  it("an_empty_database_gets_the_platforms_and_the_outboxs_migrations", async () => {
     await migrate(db, migrations);
     const state = await applied();
 
     expect(state).toEqual({
       platform: journal.entries.length,
       outbox: PostgresOutboxStore.schemaVersion,
-      engine: false,
     });
   });
 

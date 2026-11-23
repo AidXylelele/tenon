@@ -1,6 +1,6 @@
 {
-  "id": "192e638b-b035-444d-b7bd-9a247a396631",
-  "prevId": "145af5f7-344c-483e-8f34-5ef41548f253",
+  "id": "9b079ae1-9e2d-420f-8074-0b3ce58b47c4",
+  "prevId": "6c02f038-22df-4e69-967c-8d3c81b50cc8",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -671,6 +671,19 @@
         },
         "archived_at": {
           "name": "archived_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "schedule_arming": {
+          "name": "schedule_arming",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "scheduled_since": {
+          "name": "scheduled_since",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
