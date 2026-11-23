@@ -13,7 +13,8 @@ import {
 } from "@/libs/ui/components/table";
 import { utcText } from "@/libs/ui/composites/format";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Duration, Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
+import { Duration } from "@/libs/ui/composites/time";
 import { phaseLabel, triggerLabel } from "@/operations/run-progress";
 import type { RunOrder, RunTableProps } from "./interfaces";
 
@@ -32,8 +33,8 @@ export function RunTable({
         <TableHeader>
           <TableRow>
             <TableHead>Status</TableHead>
-            <SortableHead sort="started" label="Started" order={order} />
             {showWorkflow && <TableHead>Workflow</TableHead>}
+            <SortableHead sort="started" label="Started" order={order} />
             <SortableHead
               sort="duration"
               label="Duration"
@@ -73,7 +74,9 @@ function RunRow({
   const phase = phaseLabel(run.phase);
   const started = run.startedAt ?? run.createdAt;
   const startedText = utcText(started);
-  const name = `, open the ${phase} run of ${run.name} started ${startedText}`;
+  const title = run.title ?? run.name;
+  const named = `${run.namespace}/${run.name}`;
+  const name = `, open the ${phase} run of ${title} started ${startedText}`;
   const href = runHref(run.id);
   const starter = run.startedBy?.name ?? triggerLabel(run.trigger);
 
@@ -92,20 +95,20 @@ function RunRow({
           )}
         </span>
       </TableCell>
-      <TableCell>
-        <Link href={href} className="after:absolute after:inset-0">
-          <Time value={started} />
-          <span className="sr-only">{name}</span>
-        </Link>
-      </TableCell>
       {showWorkflow && (
         <TableCell>
-          <span className="block font-medium">{run.name}</span>
-          <span className="block text-xs text-muted-foreground">
-            {run.namespace}
+          <span className="block font-medium">{title}</span>
+          <span className="block font-mono text-xs text-muted-foreground">
+            {named}
           </span>
         </TableCell>
       )}
+      <TableCell>
+        <Link href={href} className="after:absolute after:inset-0">
+          <AbsoluteTime value={started} seconds />
+          <span className="sr-only">{name}</span>
+        </Link>
+      </TableCell>
       <TableCell className="hidden text-right sm:table-cell">
         <Duration from={run.startedAt} to={run.endedAt} />
       </TableCell>

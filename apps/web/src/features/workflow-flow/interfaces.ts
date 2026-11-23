@@ -162,16 +162,10 @@ export interface JumpLine {
   readonly arrow: string;
 }
 
-export interface PlacedStep {
+export interface StepPlace {
   readonly step: Step;
   readonly list: StepList;
   readonly index: number;
-}
-
-export interface StepPlace {
-  readonly list: string;
-  readonly index: number;
-  readonly size: number;
 }
 
 export type RunLook = StatusLook & { readonly live: boolean };
@@ -210,4 +204,10 @@ export interface FlowState {
   readonly start: RunStart | null;
   readonly sources: ReadonlyMap<string, string>;
   readonly store: FlowViewStore;
+}
+
+export interface ListPlace {
+  readonly list: string;
+  readonly index: number;
+  readonly size: number;
 }

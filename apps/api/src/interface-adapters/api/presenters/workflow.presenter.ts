@@ -46,6 +46,7 @@ export class WorkflowPresenter {
       current: version.current,
       publishedBy,
       publishedAt: version.publishedAt.toISOString(),
+      runs: version.runs,
     };
   }
 
@@ -64,7 +65,7 @@ export class WorkflowPresenter {
       on: workflow.on,
       currentVersion: workflow.currentVersion,
       schedule,
-      starts: workflow.starts,
+      week: { runs: workflow.week.runs, failed: workflow.week.failed },
       lastRun,
     };
   }
@@ -79,6 +80,8 @@ export class WorkflowPresenter {
     return expected.map((workflow) => ({
       namespace: workflow.namespace,
       name: workflow.name,
+      title: workflow.title,
+      lastRun: this.#lastRunOf(workflow.lastRun),
       schedule: this.#scheduleOf(workflow.schedule),
       next: workflow.next.map((at) => at.toISOString()),
       missed: workflow.missed,

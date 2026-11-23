@@ -34,6 +34,7 @@ import {
 } from "@/libs/ui/components/select";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { Textarea } from "@/libs/ui/components/textarea";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { JsonBlock } from "@/libs/ui/composites/json-block";
 import { PanelHeader } from "@/libs/ui/composites/panel-header";
@@ -326,9 +327,9 @@ function StepResult({
               <TaskStatusOf status={record.status} />
             )}
           </span>
-          {line !== null && (
+          {record !== null && (
             <span className="truncate text-caption text-muted-foreground">
-              {line}
+              {line} · <AbsoluteTime value={record.startedAt} seconds />
             </span>
           )}
         </span>

@@ -61,6 +61,11 @@ export interface LastRun {
   readonly createdAt: Date;
 }
 
+export interface WeekRuns {
+  readonly runs: number;
+  readonly failed: number;
+}
+
 export interface WorkflowSummary {
   readonly namespace: string;
   readonly name: string;
@@ -69,7 +74,7 @@ export interface WorkflowSummary {
   readonly on: boolean;
   readonly currentVersion: string | null;
   readonly schedule: Schedule | null;
-  readonly starts: number;
+  readonly week: WeekRuns;
   readonly lastRun: LastRun | null;
 }
 
@@ -98,6 +103,7 @@ export interface VersionSummary {
   readonly current: boolean;
   readonly publishedBy: Person;
   readonly publishedAt: Date;
+  readonly runs: number;
 }
 
 export interface VersionSource {

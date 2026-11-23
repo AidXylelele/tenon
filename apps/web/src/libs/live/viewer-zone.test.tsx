@@ -22,6 +22,15 @@ describe("telling the console the viewer's time zone", () => {
     expect(refresh).toHaveBeenCalledOnce();
   });
 
+  it("a_cookie_that_already_holds_the_viewers_zone_reads_nothing_again", () => {
+    const kept = encodeURIComponent(OWN);
+    document.cookie = `console_zone=${kept}; path=/`;
+
+    render(<ViewerZone zone="Pacific/Chatham" />);
+
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it("a_page_read_in_the_viewers_zone_changes_nothing", () => {
     render(<ViewerZone zone={OWN} />);
 

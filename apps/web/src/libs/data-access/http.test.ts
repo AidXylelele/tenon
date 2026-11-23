@@ -9,6 +9,7 @@ import {
   read,
   send,
   UNAVAILABLE,
+  viewerZone,
 } from "./http";
 import { SIGN_IN_AGAIN_HEADER } from "./session-cookie";
 
@@ -487,5 +488,25 @@ describe("a read the page can do without", () => {
 
     expect(read).toBe(UNAVAILABLE);
     await expect(available(refused)).rejects.toThrow("Not yours");
+  });
+});
+
+describe("the viewer's time zone", () => {
+  it("is_the_zone_the_cookie_holds_as_next_already_decoded_it", async () => {
+    cookieJar.mockResolvedValue(cookieStore);
+    cookieStore.get.mockReturnValue({ value: "Europe/Kyiv" });
+
+    const zone = await viewerZone();
+
+    expect(zone).toBe("Europe/Kyiv");
+  });
+
+  it("a_kept_value_with_a_percent_sign_is_not_decoded_twice", async () => {
+    cookieJar.mockResolvedValue(cookieStore);
+    cookieStore.get.mockReturnValue({ value: "100%" });
+
+    const zone = await viewerZone();
+
+    expect(zone).toBe("UTC");
   });
 });

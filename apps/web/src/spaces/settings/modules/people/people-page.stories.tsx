@@ -10,7 +10,7 @@ const meta = {
     layout: "fullscreen",
     nextjs: {
       appDirectory: true,
-      navigation: { pathname: "/settings/invitations" },
+      navigation: { pathname: "/settings/people" },
     },
   },
   decorators: [

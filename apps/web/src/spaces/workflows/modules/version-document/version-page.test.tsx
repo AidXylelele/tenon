@@ -61,6 +61,12 @@ describe("a version's page", () => {
     expect(screen.getByRole("region", { name: "The flow" })).toBeVisible();
   });
 
+  it("the_meta_line_counts_the_versions_runs", () => {
+    show();
+
+    expect(screen.getByText("24 runs ·")).toBeInTheDocument();
+  });
+
   it("an_earlier_version_is_not_marked_current", () => {
     show({ version: "1.1.0" });
 

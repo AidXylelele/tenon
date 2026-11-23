@@ -93,6 +93,7 @@ export const InstanceResponse = InstanceSummaryResponse.extend({
 export type InstanceResponse = z.infer<typeof InstanceResponse>;
 
 const ListedInstanceResponse = InstanceSummaryResponse.extend({
+  title: z.string().nullable(),
   startedBy: StarterResponse.nullable(),
   durationMs: z.number().int().nullable(),
   waits: z.array(
@@ -279,6 +280,7 @@ export const FailingWorkflowsResponse = z.object({
     z.object({
       namespace: z.string(),
       name: z.string(),
+      title: z.string().nullable(),
       failed: z.number().int(),
       runs: z.number().int(),
       firstFailedAt: z.iso.datetime(),

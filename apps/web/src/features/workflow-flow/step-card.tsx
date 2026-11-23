@@ -5,7 +5,7 @@ import { cn } from "@/libs/ui/tokens/cn";
 import { PlusButton } from "./connector";
 import { useFlow, useFlowView, useMark, useSelected } from "./context";
 import { branchesOf, doneExitOf, jumpKeyOf } from "./flow";
-import type { Branch, Exit, PlacedStep } from "./interfaces";
+import type { Branch, Exit, StepPlace } from "./interfaces";
 import { branchItemOf, branchPlusItemOf } from "./items";
 import { cardLineOf, exitLookOf, kindLookOf } from "./looks";
 import { Caption, Selectable } from "./parts";
@@ -19,7 +19,7 @@ interface BranchRowProps {
 
 const NOT_TAKEN = "not taken";
 
-export function StepCard({ place }: { readonly place: PlacedStep }) {
+export function StepCard({ place }: { readonly place: StepPlace }) {
   const { kind } = useFlow();
   const { step, list } = place;
   const chosen = useSelected(step.id);

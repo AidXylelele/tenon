@@ -2,7 +2,8 @@
 
 import { ChevronLeftIcon } from "lucide-react";
 import type { Step, WorkflowStructure } from "language-server/protocol";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { runHref } from "@/libs/routing/routes";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import type {
   CloudEvent,
@@ -24,12 +25,17 @@ import {
   recordsOf,
   type TaskProgress,
 } from "@/operations/run-progress";
-import { stepsIn, stepsUnder } from "@/operations/workflow-graph";
-import { kindInfoOf } from "@/operations/step-kinds";
-import { type StepRun, WorkflowFlow } from "@/features/workflow-flow";
+import {
+  kindLookOf,
+  type StepRun,
+  stepsIn,
+  stepsUnder,
+  WorkflowFlow,
+} from "@/features/workflow-flow";
 import { EventList } from "./event-list";
 import { FaultStrip } from "./fault-strip";
-import type { RunPanel } from "./query";
+import { panelOf, type RunPanel } from "./query";
+import { StepTabs } from "./step-tabs";
 import { Timeline } from "./timeline";
 
 interface RunViewProps {
@@ -52,13 +58,15 @@ export function RunView({
   canEdit,
 }: RunViewProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const [selected, setSelected] = useState<string | null>(null);
   const [shown, setShown] = useState<RunPanel>(panel);
   const [, startShowing] = useTransition();
   const show = (value: string) => {
-    const chosen = value as RunPanel;
-    const address = `${pathname}?view=${chosen}`;
+    const chosen = panelOf(value);
+
+    if (chosen === null) return;
+
+    const address = runHref(instance.id, { view: chosen });
     setShown(chosen);
     startShowing(() => {
       router.replace(address, { scroll: false });
@@ -93,6 +101,7 @@ export function RunView({
   const step = steps.find((each) => each.id === selected) ?? null;
   const stepRecords = step === null ? [] : recordsOf(records, stepsUnder(step));
   const live = isUnended(instance.phase);
+  const latest = stepRecords.at(-1);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -178,21 +187,24 @@ export function RunView({
                     {step.name}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {kindInfoOf(step.kind).label},{" "}
+                    {kindLookOf(step.kind).word},{" "}
                     {stepRecords.length === 1
                       ? "1 execution"
                       : `${String(stepRecords.length)} executions`}
                   </div>
                 </div>
               </div>
-              {stepRecords.length === 0 ? (
+              {latest === undefined ? (
                 <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                   {live
                     ? "This task has not run yet."
                     : "This task did not run."}
                 </p>
               ) : (
-                <Timeline records={stepRecords} more={false} open />
+                <StepTabs record={latest} />
+              )}
+              {stepRecords.length > 1 && (
+                <Timeline records={stepRecords} more={false} />
               )}
             </div>
           )}

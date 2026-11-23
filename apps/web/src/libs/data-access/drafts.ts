@@ -13,6 +13,7 @@ import type {
   DraftAnswer,
   DraftCheck,
   DraftContent,
+  DraftDiscard,
   DraftPublication,
   DraftRefusal,
   DraftRevision,
@@ -96,6 +97,24 @@ export async function publishDraft(
 
   const version: Version = await response.json();
   return { kind: "published", version };
+}
+
+export async function discardDraft(
+  namespace: string,
+  name: string,
+  etag: string,
+): Promise<DraftDiscard> {
+  const headers = { "if-match": etag };
+  const options = { method: "DELETE" as const, headers };
+  const answer = await answerOf(draftPath(namespace, name), options);
+
+  if (answer.kind === "refused") return answer;
+
+  const response = answer.response;
+
+  if (!response.ok) return refusalOf(response);
+
+  return { kind: "discarded" };
 }
 
 export async function testDraft(

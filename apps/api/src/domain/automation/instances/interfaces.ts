@@ -77,6 +77,11 @@ export interface InboundMessage {
   readonly correlationId: string | null;
 }
 
+export type LivePhase = Exclude<
+  Phase,
+  Phase.Completed | Phase.Faulted | Phase.Cancelled
+>;
+
 export type Inbound =
   | { readonly kind: InboundKind.Message; readonly message: InboundMessage }
   | { readonly kind: InboundKind.Failure; readonly failure: JsonObject };

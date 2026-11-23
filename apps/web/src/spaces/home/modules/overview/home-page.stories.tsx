@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { InstanceCounts, PhaseCounts } from "@/libs/data-access/types";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { PageBody } from "@/libs/ui/composites/page-body";
 import { windowsOf } from "@/operations/run-periods";
 import { HomePage } from "./home-page";
@@ -20,12 +21,12 @@ const NONE: PhaseCounts = {
 
 const DAILY = [
   [38, 2, 0],
-  [41, 6, 1],
-  [36, 3, 0],
-  [44, 12, 1],
-  [39, 4, 0],
+  [41, 3, 1],
+  [36, 2, 0],
+  [44, 6, 1],
+  [39, 3, 0],
   [27, 1, 0],
-  [22, 3, 1],
+  [22, 2, 1],
 ];
 
 const BUCKETS = WINDOWS.buckets.map((bucket, index) => {
@@ -38,7 +39,7 @@ const BUCKETS = WINDOWS.buckets.map((bucket, index) => {
 const COUNTS: InstanceCounts & { readonly readAt: number } = {
   to: NOW,
   buckets: BUCKETS,
-  total: { ...NONE, completed: 247, faulted: 31, cancelled: 3, running: 3 },
+  total: { ...NONE, completed: 247, faulted: 19, cancelled: 3, running: 3 },
   previous: {
     from: WINDOWS.previous.from,
     counts: { ...NONE, completed: 230, faulted: 18, cancelled: 3 },
@@ -56,9 +57,11 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <PageBody>
-        <Story />
-      </PageBody>
+      <TooltipProvider>
+        <PageBody>
+          <Story />
+        </PageBody>
+      </TooltipProvider>
     ),
   ],
   args: {
@@ -71,6 +74,7 @@ const meta = {
         {
           namespace: "billing",
           name: "legacy-sync",
+          title: "Legacy sync",
           failed: 12,
           runs: 40,
           firstFailedAt: "2026-11-20T08:12:00.000Z",
@@ -86,6 +90,7 @@ const meta = {
         {
           namespace: "sales",
           name: "order-router",
+          title: "Order router",
           failed: 7,
           runs: 120,
           firstFailedAt: "2026-11-19T10:02:00.000Z",
@@ -107,6 +112,7 @@ const meta = {
         id: "5b0e9a13-0000-4000-8000-000000000009",
         namespace: "ops",
         name: "cool-down",
+        title: "Wait out the cool-down, then report",
         version: "1.0.0",
         phase: "suspended",
         trigger: "manual",
@@ -119,10 +125,18 @@ const meta = {
         waits: [],
       },
     ],
+    operator: true,
+    author: true,
     expected: [
       {
         namespace: "ops",
         name: "health-check",
+        title: "Health check",
+        lastRun: {
+          id: "6c1f0b24-0000-4000-8000-000000000010",
+          phase: "completed",
+          createdAt: "2026-11-22T23:35:00.000Z",
+        },
         schedule: { kind: "every", interval: 300_000 },
         next: ["2026-11-23T03:40:00.000Z"],
         missed: 1,
@@ -131,6 +145,12 @@ const meta = {
       {
         namespace: "news",
         name: "daily-digest",
+        title: "Daily digest",
+        lastRun: {
+          id: "6c1f0b24-0000-4000-8000-000000000011",
+          phase: "completed",
+          createdAt: "2026-11-22T09:00:02.000Z",
+        },
         schedule: { kind: "cron", cron: "0 9 * * *" },
         next: ["2026-11-24T09:00:00.000Z"],
         missed: 0,

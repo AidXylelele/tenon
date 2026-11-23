@@ -1,30 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { Phase } from "@/libs/data-access/types";
-import type { RunStatus, Started } from "./interfaces";
-
-const PHASE_WORDS: Readonly<Record<Phase, string>> = {
-  pending: "Queued",
-  running: "Running",
-  waiting: "Waiting",
-  suspended: "Paused",
-  completed: "Succeeded",
-  faulted: "Failed",
-  cancelled: "Cancelled",
-};
-
-function phaseWord(phase: Phase): string {
-  return PHASE_WORDS[phase];
-}
+import type { RunStatus } from "./interfaces";
 import {
+  isUnended,
   phasesOf,
+  runsPhraseOf,
   statusOf,
   statusesOf,
-  statusLabel,
   statusParamOf,
-  summaryOf,
 } from "./statuses";
+import { statusLabel } from "./vocabulary";
 
-describe("a run's status in the person's words, a single phase's in the words given", () => {
+describe("a run's status in the person's words", () => {
   it.each<[RunStatus, string, readonly Phase[]]>([
     [
       "in-progress",
@@ -35,10 +22,26 @@ describe("a run's status in the person's words, a single phase's in the words gi
     ["failed", "Failed", ["faulted"]],
     ["cancelled", "Cancelled", ["cancelled"]],
   ])("%s_is_named_%s_and_counts_%o", (status, label, phases) => {
-    const named = statusLabel(status, phaseWord);
+    const named = statusLabel(status);
     const counted = phasesOf(status);
 
     expect({ named, counted }).toEqual({ named: label, counted: phases });
+  });
+});
+
+describe("a run that has not ended", () => {
+  it.each<[Phase, boolean]>([
+    ["pending", true],
+    ["running", true],
+    ["waiting", true],
+    ["suspended", true],
+    ["completed", false],
+    ["faulted", false],
+    ["cancelled", false],
+  ])("a_%s_run_is_unended_%s", (phase, unended) => {
+    const answer = isUnended(phase);
+
+    expect(answer).toBe(unended);
   });
 });
 
@@ -66,26 +69,17 @@ describe("the statuses in the address", () => {
   });
 });
 
-describe("the line that sums up a list of runs", () => {
-  it.each<[readonly RunStatus[], Started, string]>([
-    [[], "all", "All runs at any time"],
-    [[], "24h", "All runs in the last 24 hours"],
-    [["failed"], "7d", "Failed in the last 7 days"],
-    [["in-progress"], "all", "In progress at any time"],
-    [
-      ["failed", "in-progress"],
-      "24h",
-      "In progress or failed in the last 24 hours",
-    ],
-    [
-      ["succeeded", "failed", "cancelled"],
-      "30d",
-      "Succeeded, failed or cancelled in the last 30 days",
-    ],
-  ])("%o_%s_reads_%s", (statuses, started, line) => {
-    const summary = summaryOf(statuses, started, phaseWord);
+describe("the runs a list of statuses names", () => {
+  it.each<[readonly RunStatus[], string]>([
+    [[], "All runs"],
+    [["failed"], "Failed"],
+    [["in-progress"], "In progress"],
+    [["failed", "in-progress"], "In progress or failed"],
+    [["succeeded", "failed", "cancelled"], "Succeeded, failed or cancelled"],
+  ])("%o_reads_%s", (statuses, line) => {
+    const runs = runsPhraseOf(statuses);
 
-    expect(summary).toBe(line);
+    expect(runs).toBe(line);
   });
 });
 

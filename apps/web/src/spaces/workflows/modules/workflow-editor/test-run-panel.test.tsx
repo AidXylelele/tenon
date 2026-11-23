@@ -123,6 +123,10 @@ describe("the test run panel", () => {
 
     expect(row).toHaveTextContent("GET https://httpbin.org/json → 2 fields");
     expect(row).toHaveTextContent("512 ms");
+    expect(row.querySelector("time")).toHaveAttribute(
+      "datetime",
+      "2026-11-23T08:10:00.000Z",
+    );
     expect(row).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("What it received")).toBeVisible();
   });

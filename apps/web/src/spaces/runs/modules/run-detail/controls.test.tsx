@@ -1,4 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Controls } from "./controls";
 
@@ -66,5 +72,20 @@ describe("the controls of a run", () => {
     expect(
       screen.getByRole("alertdialog", { name: "Delete this run?" }),
     ).toBeInTheDocument();
+  });
+
+  it("keeping_the_run_gives_the_focus_back_to_more_actions", async () => {
+    render(<Controls id="r1" controls={["suspend", "cancel"]} />);
+
+    const menu = openMenu();
+    const cancel = within(menu).getByRole("menuitem", { name: "Cancel run…" });
+    fireEvent.click(cancel);
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "More actions" }),
+      ).toHaveFocus();
+    });
   });
 });

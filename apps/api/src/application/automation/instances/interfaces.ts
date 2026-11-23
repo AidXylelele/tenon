@@ -165,6 +165,7 @@ export interface FailureCause {
 export interface FailingWorkflow {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
   readonly failed: number;
   readonly runs: number;
   readonly firstFailedAt: Date;
@@ -203,6 +204,7 @@ export interface ListedWait {
 }
 
 export interface ListedInstance extends InstanceSummary {
+  readonly title: string | null;
   readonly startedBy: Person | null;
   readonly durationMs: number | null;
   readonly waits: readonly ListedWait[];

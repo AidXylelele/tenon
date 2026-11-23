@@ -81,4 +81,14 @@ describe("a draft", () => {
     expect(retried).toEqual({ ok: true, value: false });
     expect(draft.revision).toBe(current);
   });
+
+  it("a_discard_is_allowed_only_on_the_current_revision", () => {
+    const draft = aDraft();
+
+    const current = draft.discard(draft.revision);
+    const stale = draft.discard("an-older-revision");
+
+    expect(current).toEqual({ ok: true, value: undefined });
+    expect(stale).toEqual({ ok: false, failure: DraftRefusal.Stale });
+  });
 });

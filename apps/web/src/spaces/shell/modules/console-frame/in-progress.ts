@@ -1,17 +1,14 @@
 import "server-only";
 import { instanceCounts } from "@/libs/data-access/automation";
 import { ApiError } from "@/libs/data-access/http";
-import { inProgressOf } from "@/operations/run-periods";
-
-const MINUTE_MS = 60_000;
+import { inProgressOf, liveWindowOf } from "@/operations/run-periods";
 
 export async function inProgressNow(): Promise<number> {
-  const at = Date.now();
-  const now = new Date(at).toISOString();
-  const minuteAgo = new Date(at - MINUTE_MS).toISOString();
+  const now = new Date().toISOString();
+  const window = liveWindowOf(now);
 
   try {
-    const read = await instanceCounts({ buckets: [minuteAgo], to: now });
+    const read = await instanceCounts(window);
     return inProgressOf(read.now);
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;

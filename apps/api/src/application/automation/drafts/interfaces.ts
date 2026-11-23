@@ -28,6 +28,13 @@ export interface SaveDraftCommand extends CreateDraftCommand {
   readonly expected: string;
 }
 
+export interface DiscardDraftCommand {
+  readonly name: WorkflowName;
+  readonly expected: string;
+}
+
+export type DiscardDraftResult = Result<void, DraftConflict | Missing>;
+
 export interface PublishDraftCommand {
   readonly name: WorkflowName;
   readonly expected: string;

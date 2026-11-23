@@ -98,7 +98,7 @@ export class DraftPresenter {
       title: "The draft's revision is required",
       status: HttpStatus.PRECONDITION_REQUIRED,
       detail:
-        "Send If-Match with the draft's ETag to save or publish it, or If-None-Match: * to create it",
+        "Send If-Match with the draft's ETag to save, publish or discard it, or If-None-Match: * to create it",
     };
     const headers = { "Cache-Control": DraftPresenter.UNSTORED };
     return new ConditionalRequestException(problem, headers);

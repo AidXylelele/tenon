@@ -1,5 +1,7 @@
+import { LIVE_PHASES } from "@/libs/data-access/phases";
 import type {
   CountedBucket,
+  CountWindow,
   LivePhase,
   Phase,
   PhaseCounts,
@@ -35,12 +37,7 @@ const FIGURES: readonly FigureKind[] = [
   "cancelled",
 ];
 
-const LIVE: readonly LivePhase[] = [
-  "pending",
-  "running",
-  "waiting",
-  "suspended",
-];
+const MINUTE_MS = 60_000;
 
 export function countWindowOf(windows: PeriodWindows): CountRequest {
   const buckets = windows.buckets.map((bucket) => bucket.from);
@@ -49,6 +46,12 @@ export function countWindowOf(windows: PeriodWindows): CountRequest {
     to: windows.current.to,
     previousFrom: windows.previous.from,
   };
+}
+
+export function liveWindowOf(now: string): CountWindow {
+  const at = Date.parse(now);
+  const minuteAgo = new Date(at - MINUTE_MS).toISOString();
+  return { buckets: [minuteAgo], to: now };
 }
 
 export function figuresOf(
@@ -63,7 +66,7 @@ export function figuresOf(
 }
 
 export function inProgressOf(now: Readonly<Record<LivePhase, number>>): number {
-  return LIVE.reduce((sum, phase) => sum + now[phase], 0);
+  return LIVE_PHASES.reduce((sum, phase) => sum + now[phase], 0);
 }
 
 export function seriesOf(
@@ -96,5 +99,5 @@ function countOf(counts: PhaseCounts | null, phase: Phase): number {
 function liveOf(counts: PhaseCounts | null): number {
   if (counts === null) return 0;
 
-  return sumOf(counts, LIVE);
+  return sumOf(counts, LIVE_PHASES);
 }

@@ -9,17 +9,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/libs/ui/components/table";
-import { Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { scheduleText } from "@/operations/schedule-words";
+import { AutomaticStarts } from "@/features/automatic-starts";
+import { PhaseStatus } from "@/features/run-status";
+import { turnAction } from "./actions";
 import { SectionHead } from "./section-head";
 
 const more = { href: WORKFLOWS_HREF, label: "All workflows" };
 
-export function AutomaticStarts({
-  expected,
-}: {
+interface StartsProps {
   readonly expected: readonly ExpectedStarts[];
-}) {
+  readonly zone: string;
+  readonly author: boolean;
+}
+
+export function StartsAutomatically({ expected, zone, author }: StartsProps) {
   return (
     <section
       aria-labelledby="automatic"
@@ -43,8 +48,9 @@ export function AutomaticStarts({
               <TableRow>
                 <TableHead className="pl-4">Workflow</TableHead>
                 <TableHead>Starts (UTC)</TableHead>
-                <TableHead>Next start</TableHead>
+                <TableHead>Last run</TableHead>
                 <TableHead>Missed starts</TableHead>
+                <TableHead>Automatic starts</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -52,6 +58,8 @@ export function AutomaticStarts({
                 <StartRow
                   key={`${workflow.namespace}/${workflow.name}`}
                   workflow={workflow}
+                  zone={zone}
+                  author={author}
                 />
               ))}
             </TableBody>
@@ -62,11 +70,20 @@ export function AutomaticStarts({
   );
 }
 
-function StartRow({ workflow }: { readonly workflow: ExpectedStarts }) {
+function StartRow({
+  workflow,
+  zone,
+  author,
+}: {
+  readonly workflow: ExpectedStarts;
+  readonly zone: string;
+  readonly author: boolean;
+}) {
   const href = workflowHref(workflow.namespace, workflow.name);
-  const starts =
-    workflow.schedule === null ? "—" : scheduleText(workflow.schedule);
-  const next = workflow.next[0] ?? null;
+  const title = workflow.title ?? workflow.name;
+  const starts = startsOf(workflow, zone);
+  const lastRun = workflow.lastRun;
+  const turn = turnAction.bind(null, workflow.namespace, workflow.name);
 
   return (
     <TableRow>
@@ -75,25 +92,61 @@ function StartRow({ workflow }: { readonly workflow: ExpectedStarts }) {
           href={href}
           className="font-medium underline-offset-4 hover:underline"
         >
-          {workflow.name}
+          {title}
         </Link>
-        <span className="block text-xs text-muted-foreground">
-          {workflow.namespace}
+        <span className="block font-mono text-xs text-muted-foreground">
+          {workflow.namespace}/{workflow.name}
         </span>
       </TableCell>
-      <TableCell>{starts}</TableCell>
       <TableCell>
-        <Time value={next} />
+        <span className="whitespace-nowrap">{starts}</span>
+      </TableCell>
+      <TableCell>
+        {lastRun === null ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <span className="flex flex-wrap items-center gap-x-2">
+            <PhaseStatus phase={lastRun.phase} />
+            <span className="text-caption text-muted-foreground">
+              <AbsoluteTime value={lastRun.createdAt} />
+            </span>
+          </span>
+        )}
       </TableCell>
       <TableCell>
         {workflow.missed === 0 ? (
           <span className="text-muted-foreground">none</span>
         ) : (
           <span className="text-warning">
-            {workflow.missed} missed since <Time value={workflow.missedSince} />
+            {workflow.missed} missed since{" "}
+            <AbsoluteTime value={workflow.missedSince} />
           </span>
         )}
       </TableCell>
+      <TableCell>
+        <AutomaticStarts workflow={title} on disabled={!author} turn={turn} />
+      </TableCell>
     </TableRow>
   );
+}
+
+function startsOf(workflow: ExpectedStarts, zone: string): string {
+  const schedule = workflow.schedule;
+
+  if (schedule === null) return "—";
+
+  const words = scheduleText(schedule);
+  const next = workflow.next[0];
+
+  if (schedule.kind !== "cron" || next === undefined || zone === "UTC")
+    return words;
+
+  const clock = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: zone,
+  });
+  const local = clock.format(Date.parse(next));
+  return `${words} · ${local} your time`;
 }

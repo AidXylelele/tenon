@@ -1,5 +1,5 @@
 import type { Phase, Trigger } from "@/libs/data-access/types";
-import type { StepState } from "./interfaces";
+import type { RunStatus, StepState } from "./interfaces";
 
 const PHASE: Record<Phase, string> = {
   pending: "Queued",
@@ -24,13 +24,15 @@ export function phaseLabel(phase: Phase): string {
   return PHASE[phase];
 }
 
-export function isUnended(phase: Phase): boolean {
-  return (
-    phase === "pending" ||
-    phase === "running" ||
-    phase === "waiting" ||
-    phase === "suspended"
-  );
+const STATUS: Record<RunStatus, string> = {
+  "in-progress": "In progress",
+  succeeded: PHASE.completed,
+  failed: PHASE.faulted,
+  cancelled: PHASE.cancelled,
+};
+
+export function statusLabel(status: RunStatus): string {
+  return STATUS[status];
 }
 
 export function stepStateLabel(state: StepState): string {

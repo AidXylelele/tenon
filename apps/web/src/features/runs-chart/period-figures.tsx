@@ -13,6 +13,7 @@ import {
   type FigureKind,
   periodPhrase,
 } from "@/operations/run-periods";
+import { statusLabel } from "@/operations/run-progress";
 import type { PeriodFiguresProps } from "./interfaces";
 
 interface FigureLook {
@@ -24,19 +25,25 @@ interface FigureLook {
 const LOOK: Readonly<Record<FigureKind, FigureLook>> = {
   started: { label: "Started", icon: null, tone: "" },
   succeeded: {
-    label: "Succeeded",
+    label: statusLabel("succeeded"),
     icon: CircleCheckIcon,
     tone: "text-success",
   },
-  failed: { label: "Failed", icon: CircleXIcon, tone: "text-destructive" },
+  failed: {
+    label: statusLabel("failed"),
+    icon: CircleXIcon,
+    tone: "text-destructive",
+  },
   cancelled: {
-    label: "Cancelled",
+    label: statusLabel("cancelled"),
     icon: CircleSlashIcon,
     tone: "text-muted-foreground",
   },
 };
 
 const numbers = new Intl.NumberFormat("en-US");
+
+const IN_PROGRESS_NOW = `${statusLabel("in-progress")} now`;
 
 const FIGURE =
   "flex min-w-32 flex-col gap-0.5 rounded-md p-2 hover:bg-muted focus-visible:bg-muted";
@@ -68,12 +75,12 @@ export function PeriodFigures({
       ))}
       <span
         aria-hidden
-        className="hidden w-px self-stretch bg-border sm:block"
+        className="hidden w-px self-stretch bg-border xl:block"
       />
       <Link href={inProgressHref} className={FIGURE}>
         <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <HourglassIcon aria-hidden className="size-4 text-info" />
-          In progress now
+          {IN_PROGRESS_NOW}
         </span>
         <span className="text-2xl font-semibold tabular-nums">{live}</span>
         <span className="text-caption text-muted-foreground">live</span>

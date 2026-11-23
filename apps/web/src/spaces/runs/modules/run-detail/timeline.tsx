@@ -1,5 +1,6 @@
 import { ChevronRightIcon } from "lucide-react";
 import type { TaskRecord } from "@/libs/data-access/types";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { JsonBlock } from "@/libs/ui/composites/json-block";
 import { Countdown, Duration, Time } from "@/libs/ui/composites/time";
 import { TaskStatusOf } from "@/features/run-status";
@@ -7,11 +8,9 @@ import { TaskStatusOf } from "@/features/run-status";
 export function Timeline({
   records,
   more,
-  open = false,
 }: {
   readonly records: readonly TaskRecord[];
   readonly more: boolean;
-  readonly open?: boolean;
 }) {
   if (records.length === 0)
     return (
@@ -25,7 +24,7 @@ export function Timeline({
       <ol className="flex flex-col divide-y rounded-lg border">
         {records.map((record) => (
           <li key={record.execution}>
-            <details className="group" open={open && records.length === 1}>
+            <details className="group">
               <summary className="flex min-h-10 cursor-pointer list-none items-center gap-3 px-3 py-2 hover:bg-muted">
                 <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
                 <span className="min-w-0 flex-1">
@@ -33,14 +32,10 @@ export function Timeline({
                     <span className="truncate text-sm font-medium">
                       {record.name}
                     </span>
-                    {record.attempt > 1 && (
-                      <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-xs font-medium text-muted-foreground">
-                        Attempt {record.attempt}
-                      </span>
-                    )}
                   </span>
-                  <span className="block truncate font-mono text-xs text-muted-foreground">
-                    {record.execution}
+                  <span className="block truncate text-xs text-muted-foreground">
+                    started <AbsoluteTime value={record.startedAt} seconds /> ·
+                    attempt {record.attempt}
                   </span>
                 </span>
                 <TaskStatusOf status={record.status} />

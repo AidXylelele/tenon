@@ -28,7 +28,7 @@ import {
   isReached,
   lineOf,
 } from "./flow";
-import type { PlacedStep } from "./interfaces";
+import type { StepPlace } from "./interfaces";
 import { iterationItemOf, plusItemOf } from "./items";
 import { blockLineOf, kindLookOf, laneOf, plusLabelOf } from "./looks";
 import { Caption } from "./parts";
@@ -99,7 +99,7 @@ function Between({
   return <Connector line={line} plus={plus} />;
 }
 
-function StepItem({ place }: { readonly place: PlacedStep }) {
+function StepItem({ place }: { readonly place: StepPlace }) {
   if (place.step.lists.length === 0) return <StepCard place={place} />;
 
   return <Block place={place} />;
@@ -126,7 +126,7 @@ function NestedSteps({ list, owner }: NestedStepsProps) {
   );
 }
 
-function Block({ place }: { readonly place: PlacedStep }) {
+function Block({ place }: { readonly place: StepPlace }) {
   const { kind } = useFlow();
   const { step, list } = place;
   const chosen = useSelected(step.id);
@@ -175,7 +175,7 @@ function Block({ place }: { readonly place: PlacedStep }) {
 const BlockInside = memo(function BlockInside({
   place,
 }: {
-  readonly place: PlacedStep;
+  readonly place: StepPlace;
 }) {
   const { step } = place;
 
@@ -272,7 +272,7 @@ function ForkColumn({ fork, branches, index }: ForkColumnProps) {
   );
 }
 
-function TryInside({ place }: { readonly place: PlacedStep }) {
+function TryInside({ place }: { readonly place: StepPlace }) {
   const { step, list } = place;
   const body = step.lists.find((each) => each.part === "try");
   const handler = step.lists.find((each) => each.part === "catch");

@@ -79,7 +79,13 @@ export class InstancePresenter {
       until: wait.until?.toISOString() ?? null,
       stream: wait.stream,
     }));
-    return { ...summary, startedBy, durationMs: item.durationMs, waits };
+    return {
+      ...summary,
+      title: item.title,
+      startedBy,
+      durationMs: item.durationMs,
+      waits,
+    };
   }
 
   output(output: TaskOutput): string {
@@ -114,6 +120,7 @@ export class InstancePresenter {
     const items = failing.items.map((workflow) => ({
       namespace: workflow.namespace,
       name: workflow.name,
+      title: workflow.title,
       failed: workflow.failed,
       runs: workflow.runs,
       firstFailedAt: workflow.firstFailedAt.toISOString(),
@@ -155,15 +162,15 @@ export class InstancePresenter {
     return this.#countedIn(counted, phases);
   }
 
-  #countedIn(
+  #countedIn<Counted extends Phase>(
     counted: readonly PhaseCount[],
-    phases: readonly Phase[],
-  ): PhaseCounts {
+    phases: readonly Counted[],
+  ): Record<Counted, number> {
     const entries = phases.map((phase) => [
       phase,
       this.#countOf(counted, phase),
     ]);
-    return Object.fromEntries(entries) as PhaseCounts;
+    return Object.fromEntries(entries) as Record<Counted, number>;
   }
 
   #countOf(counted: readonly PhaseCount[], phase: Phase): number {

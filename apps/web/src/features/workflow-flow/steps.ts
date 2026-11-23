@@ -1,6 +1,6 @@
 import type { Step, StepList } from "language-server/protocol";
 import type { Position, Range } from "vscode-languageserver-protocol";
-import type { StepPlace } from "./interfaces";
+import type { ListPlace } from "./interfaces";
 
 export function stepsIn(list: StepList): Step[] {
   return list.steps.flatMap(stepsUnder);
@@ -27,7 +27,7 @@ export function stepAt(list: StepList, at: Position): Step | null {
   return holding.at(-1) ?? null;
 }
 
-export function placeOf(list: StepList, id: string): StepPlace | null {
+export function placeOf(list: StepList, id: string): ListPlace | null {
   const holder = listsOf(list).find((each) =>
     each.steps.some((step) => step.id === id),
   );

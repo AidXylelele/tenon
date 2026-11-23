@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { checkDraft, publishDraft, testDraft, writeDraft } from "./drafts";
+import {
+  checkDraft,
+  discardDraft,
+  publishDraft,
+  testDraft,
+  writeDraft,
+} from "./drafts";
 
 const fetchApi = vi.fn();
 
@@ -131,6 +137,25 @@ describe("a workflow's draft at the API", () => {
     expect(tested).toMatchObject({
       kind: "refused",
       problem: { status: 422, detail: problem.detail },
+    });
+  });
+
+  it("is_discarded_at_the_revision_it_was_read_at_and_a_newer_one_conflicts", async () => {
+    const stale = { type: "urn:problem:draft.stale", current: SAVED };
+    fetchApi.mockResolvedValueOnce(answer(204));
+    fetchApi.mockResolvedValueOnce(answer(412, stale, '"7"'));
+
+    const discarded = await discardDraft("sales", "leads", '"1"');
+    const sent = lastHeaders().get("if-match");
+    const [, init] = fetchApi.mock.lastCall as [URL, RequestInit];
+    const conflicted = await discardDraft("sales", "leads", '"1"');
+
+    expect(discarded).toEqual({ kind: "discarded" });
+    expect(sent).toBe('"1"');
+    expect(init.method).toBe("DELETE");
+    expect(conflicted).toEqual({
+      kind: "conflict",
+      current: { draft: SAVED, etag: '"7"' },
     });
   });
 });

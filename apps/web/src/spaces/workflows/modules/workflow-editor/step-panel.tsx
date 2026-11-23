@@ -33,7 +33,7 @@ import {
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
 import { PanelHeader } from "@/libs/ui/composites/panel-header";
-import type { StepPlace } from "@/features/workflow-flow";
+import type { ListPlace } from "@/features/workflow-flow";
 import { type SlotSources, useFormSlots } from "./form-slots";
 import { catalogOf } from "./step-catalog";
 import { type Edit, StepForm } from "./step-form";
@@ -43,7 +43,7 @@ interface StepPanelProps {
   readonly form: StepFormResult | null;
   readonly protection: StepFormResult | null;
   readonly formless: boolean;
-  readonly place: StepPlace | null;
+  readonly place: ListPlace | null;
   readonly variants: readonly StepVariant[];
   readonly revealProblems: boolean;
   readonly languageTerms: boolean;
@@ -55,7 +55,7 @@ interface StepPanelProps {
 
 interface StepMenuProps {
   readonly step: Step;
-  readonly place: StepPlace | null;
+  readonly place: ListPlace | null;
   readonly onEdit: Edit;
   readonly onRemove: (step: string) => void;
 }

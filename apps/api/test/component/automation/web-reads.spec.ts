@@ -18,7 +18,7 @@ import {
 interface WorkflowItem {
   readonly name: string;
   readonly schedule: unknown;
-  readonly starts: number;
+  readonly week: { readonly runs: number; readonly failed: number };
   readonly lastRun: { readonly id: string; readonly phase: string } | null;
 }
 
@@ -69,13 +69,14 @@ describe("the reads the web console asks for", () => {
     });
   });
 
-  it("the_workflow_list_carries_the_schedule_the_starts_and_the_last_run_and_searches_by_name", async () => {
+  it("the_workflow_list_carries_the_schedule_the_runs_of_the_week_and_the_last_run_and_searches_by_name", async () => {
     await publish(t, editor, {
       ...aDocument(),
       schedule: { every: { minutes: 5 } },
     });
     await publish(t, editor, aDocument({ name: "other-flow" }));
     const started = await start(t, editor);
+    await drain(t);
 
     const listed = await request(t.server)
       .get("/api/v1/workflows?q=route")
@@ -91,13 +92,50 @@ describe("the reads the web console asks for", () => {
       expect.objectContaining({
         name: "route-lead",
         schedule: { kind: "every", interval: 300_000 },
-        starts: 1,
+        week: { runs: 1, failed: 0 },
         lastRun: expect.objectContaining({ id: started.id }) as unknown,
       }),
     ]);
     expect(versions.body).toMatchObject([
-      { publishedBy: { id: editorId, name: "Ada" } },
+      { publishedBy: { id: editorId, name: "Ada" }, runs: 1 },
     ]);
+  });
+
+  it("the_workflow_list_finds_a_workflow_by_its_title", async () => {
+    const titled = aDocument();
+    const header = {
+      ...(titled.document as JsonObject),
+      title: "Route a lead",
+    };
+    await publish(t, editor, { ...titled, document: header });
+    await publish(t, editor, aDocument({ name: "other-flow" }));
+
+    const listed = await request(t.server)
+      .get("/api/v1/workflows?q=a%20lead")
+      .set(viewer)
+      .expect(200);
+
+    expect(listed.body).toMatchObject({ items: [{ name: "route-lead" }] });
+  });
+
+  it("a_listed_run_carries_its_workflows_title", async () => {
+    const titled = aDocument();
+    const header = {
+      ...(titled.document as JsonObject),
+      title: "Route a lead",
+    };
+    await publish(t, editor, { ...titled, document: header });
+    await start(t, editor);
+    await drain(t);
+
+    const listed = await request(t.server)
+      .get("/api/v1/instances")
+      .set(viewer)
+      .expect(200);
+
+    expect(listed.body).toMatchObject({
+      items: [{ name: "route-lead", title: "Route a lead" }],
+    });
   });
 
   it("a_workflow_is_read_with_the_title_its_document_gives_or_none", async () => {
@@ -237,6 +275,7 @@ describe("the reads the web console asks for", () => {
         {
           namespace: "sales",
           name: "broken",
+          title: null,
           failed: 1,
           runs: 1,
           lastError: {

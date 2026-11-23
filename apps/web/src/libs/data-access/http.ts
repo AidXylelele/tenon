@@ -132,8 +132,7 @@ export async function command<T = void>(
 export async function viewerZone(): Promise<string> {
   const store = await cookies();
   const kept = store.get(ZONE_COOKIE)?.value;
-  const text = kept === undefined ? undefined : decodeURIComponent(kept);
-  return zoneOf(text);
+  return zoneOf(kept);
 }
 
 export async function sessionPair(): Promise<string | null> {

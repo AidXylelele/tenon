@@ -52,7 +52,8 @@ const FAILED: Instance = {
     status: 429,
     instance: "/do/Post the items",
     title: "Post the items failed",
-    detail: "The service answered 429 Too Many Requests",
+    detail:
+      "the service answered 429 Too Many Requests — it limits how often it is called",
   },
   originId: null,
   startedBy: null,

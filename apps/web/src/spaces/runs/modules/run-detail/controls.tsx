@@ -10,7 +10,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { InstanceControl } from "@/libs/data-access/automation";
 import type { Control } from "@/libs/data-access/types";
@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/libs/ui/components/dropdown-menu";
 import { Spinner } from "@/libs/ui/components/spinner";
-import { ConfirmAction } from "@/libs/ui/composites/confirm-action";
+import { ConfirmDialog } from "@/libs/ui/composites/confirm-dialog";
 import { controlAction, deleteAction, restartAction } from "./actions";
 
 type Confirmed = "cancel" | "delete";
@@ -40,6 +40,7 @@ export function Controls({
   const [pending, start] = useTransition();
   const [refusal, setRefusal] = useState<string | null>(null);
   const [confirming, setConfirming] = useState<Confirmed | null>(null);
+  const more = useRef<HTMLButtonElement>(null);
   const allowed = new Set(controls);
   const cancel = controlAction.bind(null, id, "cancel");
   const remove = deleteAction.bind(null, id);
@@ -117,6 +118,7 @@ export function Controls({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
+              ref={more}
               variant="ghost"
               size="icon"
               aria-label="More actions"
@@ -169,30 +171,30 @@ export function Controls({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <ConfirmAction
-        icon={<CircleStopIcon data-icon="inline-start" />}
-        label="Cancel run"
+      <ConfirmDialog
+        open={cancelling}
+        onOpenChange={onCancelling}
         title="Cancel this run?"
         description="Steps already done are not undone. A cancelled run does not resume."
         actionLabel="Cancel run"
+        icon={<CircleStopIcon data-icon="inline-start" />}
         action={cancel}
         success="Cancelled"
-        open={cancelling}
-        onOpenChange={onCancelling}
+        returnFocus={() => more.current}
       />
-      <ConfirmAction
-        icon={<Trash2Icon data-icon="inline-start" />}
-        label="Delete run"
+      <ConfirmDialog
+        open={deleting}
+        onOpenChange={onDeleting}
         title="Delete this run?"
         description="Its record, tasks and events are removed for good."
         actionLabel="Delete run"
+        icon={<Trash2Icon data-icon="inline-start" />}
         action={remove}
         success="Run deleted"
+        returnFocus={() => more.current}
         onDone={() => {
           router.push(RUNS_HREF);
         }}
-        open={deleting}
-        onOpenChange={onDeleting}
       />
       {refusal !== null && (
         <p role="alert" className="text-sm text-destructive">

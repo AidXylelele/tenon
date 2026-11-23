@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { ListedInstance, Phase } from "@/libs/data-access/types";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { RunPager } from "./run-pager";
 import { RunTable } from "./run-table";
 
@@ -8,6 +9,7 @@ const RUNS: readonly ListedInstance[] = [
     id: "4f2a9c10-0000-4000-8000-000000000001",
     namespace: "sales",
     name: "route-lead",
+    title: "Route a lead",
     version: "1.2.0",
     phase: "faulted",
     trigger: "schedule",
@@ -23,6 +25,7 @@ const RUNS: readonly ListedInstance[] = [
     id: "4f2a9c10-0000-4000-8000-000000000002",
     namespace: "sales",
     name: "route-lead",
+    title: "Route a lead",
     version: "draft",
     phase: "completed",
     trigger: "manual",
@@ -77,6 +80,13 @@ function RunsPage({ total, exact }: RunsPageProps) {
 
 const meta = {
   component: RunsPage,
+  decorators: [
+    (Story) => (
+      <TooltipProvider>
+        <Story />
+      </TooltipProvider>
+    ),
+  ],
 } satisfies Meta<typeof RunsPage>;
 
 export default meta;

@@ -4,15 +4,16 @@ export type {
   FlowMode,
   InsertPlace,
   Iteration,
+  ListPlace,
   RunMode,
   RunStart,
   StepMark,
-  StepPlace,
   StepRun,
   WorkflowFlowProps,
 } from "./interfaces";
 export { branchNameOf } from "./flow";
 export { START } from "./items";
+export { kindLookOf } from "./looks";
 export {
   listsOf,
   placeOf,

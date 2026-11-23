@@ -101,6 +101,14 @@ export class Draft {
     return { ok: false, failure: DraftRefusal.Stale };
   }
 
+  discard(expected: string): Result<void, DraftRefusal> {
+    const current = this.isAt(expected);
+
+    if (!current) return { ok: false, failure: DraftRefusal.Stale };
+
+    return { ok: true, value: undefined };
+  }
+
   #apply(edit: DraftEdit): void {
     this.#source = edit.source;
     this.#layout = edit.layout;

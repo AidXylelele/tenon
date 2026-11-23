@@ -69,10 +69,15 @@ export type Schedule =
   | { readonly kind: "after"; readonly delay: number }
   | { readonly kind: "on"; readonly stream: string };
 
-interface LastRun {
+export interface LastRun {
   readonly id: string;
   readonly phase: Phase;
   readonly createdAt: string;
+}
+
+export interface WeekRuns {
+  readonly runs: number;
+  readonly failed: number;
 }
 
 export interface Workflow {
@@ -83,7 +88,7 @@ export interface Workflow {
   readonly on: boolean;
   readonly currentVersion: string | null;
   readonly schedule: Schedule | null;
-  readonly starts: number;
+  readonly week: WeekRuns;
   readonly lastRun: LastRun | null;
 }
 
@@ -94,6 +99,7 @@ export interface Version {
   readonly current: boolean;
   readonly publishedBy: Person;
   readonly publishedAt: string;
+  readonly runs: number;
 }
 
 export interface LifecycleEvent {
@@ -165,6 +171,8 @@ export type DraftWrite =
 export type DraftPublication =
   { readonly kind: "published"; readonly version: Version } | DraftRefusal;
 
+export type DraftDiscard = { readonly kind: "discarded" } | DraftRefusal;
+
 export type DraftTestRun =
   { readonly kind: "started"; readonly run: InstanceSummary } | DraftRefusal;
 
@@ -208,6 +216,7 @@ export interface ListedWait {
 }
 
 export interface ListedInstance extends InstanceSummary {
+  readonly title: string | null;
   readonly startedBy: Person | null;
   readonly durationMs: number | null;
   readonly waits: readonly ListedWait[];
@@ -333,6 +342,7 @@ export interface LastError {
 export interface FailingWorkflow {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
   readonly failed: number;
   readonly runs: number;
   readonly firstFailedAt: string;
@@ -350,6 +360,8 @@ export interface FailingWorkflows {
 export interface ExpectedStarts {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
+  readonly lastRun: LastRun | null;
   readonly schedule: Schedule | null;
   readonly next: readonly string[];
   readonly missed: number;

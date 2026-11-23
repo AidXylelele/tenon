@@ -8,6 +8,11 @@ const clock = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
   minute: "2-digit",
 });
+const clockWithSeconds = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
 const dayAndMonth = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
@@ -29,8 +34,9 @@ function dayOf(at: number): number {
   ).getTime();
 }
 
-export function absoluteText(at: number, now: number): string {
-  const time = clock.format(at);
+export function absoluteText(at: number, now: number, seconds = false): string {
+  const shownClock = seconds ? clockWithSeconds : clock;
+  const time = shownClock.format(at);
   const days = Math.round((dayOf(now) - dayOf(at)) / DAY_MS);
 
   if (days === 0) return `Today ${time}`;
@@ -54,7 +60,13 @@ function nowOnServer(): null {
   return null;
 }
 
-export function AbsoluteTime({ value }: { readonly value: string | null }) {
+export function AbsoluteTime({
+  value,
+  seconds = false,
+}: {
+  readonly value: string | null;
+  readonly seconds?: boolean;
+}) {
   const now = useSyncExternalStore(subscribe, nowOnClient, nowOnServer);
 
   if (value === null) return <span className="text-muted-foreground">—</span>;
@@ -67,7 +79,7 @@ export function AbsoluteTime({ value }: { readonly value: string | null }) {
     );
 
   const at = new Date(value).getTime();
-  const shown = absoluteText(at, now);
+  const shown = absoluteText(at, now, seconds);
   const ago = relativeText(Math.min(at, now), now);
 
   return (

@@ -33,9 +33,11 @@ function hrefOf(value: string): string {
   return `/runs?status=${value}`;
 }
 
-function periodHrefOf(period: Period): string {
-  return `/?period=${period}`;
-}
+const PERIOD_HREFS: Readonly<Record<Period, string>> = {
+  "24h": "/?period=24h",
+  "7d": "/?period=7d",
+  "30d": "/?period=30d",
+};
 
 function RunsOfAPeriod({ period, zone }: PeriodProps) {
   const windows = windowsOf(period, NOW, zone);
@@ -51,7 +53,7 @@ function RunsOfAPeriod({ period, zone }: PeriodProps) {
 
   return (
     <section aria-label="Runs" className="flex flex-col gap-4 p-4">
-      <PeriodPicker period={period} hrefOf={periodHrefOf} />
+      <PeriodPicker period={period} hrefs={PERIOD_HREFS} />
       <PeriodFigures
         period={period}
         figures={figures}
