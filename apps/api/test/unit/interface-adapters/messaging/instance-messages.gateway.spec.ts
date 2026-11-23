@@ -13,7 +13,10 @@ import { WorkflowName } from "../../../../src/domain/automation/workflows/workfl
 import { AesGcmCipher } from "../../../../src/frameworks/crypto/aes-gcm.cipher.js";
 import { MessageTopic } from "../../../../src/interface-adapters/messaging/enums.js";
 import { InstanceMessagesGateway } from "../../../../src/interface-adapters/messaging/instance-messages.gateway.js";
-import type { RespondMessage } from "../../../../src/interface-adapters/messaging/interfaces.js";
+import type {
+  ProcessMessage,
+  RespondMessage,
+} from "../../../../src/interface-adapters/messaging/interfaces.js";
 import { RunDataMapper } from "../../../../src/interface-adapters/messaging/mappers/run-data.mapper.js";
 import type { Transaction } from "../../../../src/interface-adapters/persistence/interfaces.js";
 import {
@@ -186,6 +189,26 @@ describe("the run commands of an instance", () => {
     expect(payload.effectId).toBe("/do/0/fetch");
     expect(text).not.toContain("card 4111");
     expect(opened).toEqual(outcome);
+  });
+
+  it("a_detached_process_carries_its_request_sealed_under_its_effect_key", async () => {
+    const fixture = setUp();
+    const instance = anInstanceIn(Phase.Running);
+    const request = { kind: "process", script: "echo card 4111" };
+
+    await fixture.gateway.detach(instance, "/do/0/report", request);
+
+    const sent = fixture.outbox.added[0];
+    const payload = sent?.payload as ProcessMessage;
+    const text = JSON.stringify(sent);
+    const opened = runData.dataOf(payload.sealedRequest);
+    expect(sent?.topic).toBe(MessageTopic.RunProcess);
+    expect(sent?.key).toBe("instance-1//do/0/report");
+    expect(payload.instanceId).toBe("instance-1");
+    expect(payload.effectId).toBe("/do/0/report");
+    expect(payload.versionId).toBe("version-1");
+    expect(text).not.toContain("card 4111");
+    expect(opened).toEqual(request);
   });
 
   it("receives_and_failures_are_commands_under_the_instance_key", async () => {

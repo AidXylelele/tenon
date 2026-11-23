@@ -8,6 +8,7 @@ export enum MessageTopic {
   RunReceives = "run.receives",
   RunFail = "run.fail",
   RunEffect = "run.effect",
+  RunProcess = "run.process",
   RunTimer = "run.timer",
   DeliveryRequested = "delivery.requested",
   ScheduleArmed = "schedule.armed",

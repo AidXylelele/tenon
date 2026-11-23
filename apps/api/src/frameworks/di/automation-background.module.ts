@@ -17,6 +17,7 @@ import { EmitForEffect } from "../../application/automation/instances/emit-for-e
 import { FailRun } from "../../application/automation/instances/fail-run.js";
 import { GiveUpEffect } from "../../application/automation/instances/give-up-effect.js";
 import { OfferEvent } from "../../application/automation/instances/offer-event.js";
+import { PerformDetachedProcess } from "../../application/automation/instances/perform-detached-process.js";
 import { PerformEffect } from "../../application/automation/instances/perform-effect.js";
 import {
   ChildCancellations,
@@ -117,6 +118,7 @@ import { OutboundModule } from "./outbound.module.js";
     AnswerChildren,
     PerformEffect,
     StartDetachedProcess,
+    PerformDetachedProcess,
     StartChildForEffect,
     EmitForEffect,
     ReceiveForEffect,

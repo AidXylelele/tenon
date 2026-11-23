@@ -37,6 +37,13 @@ export interface EffectMessage {
   readonly effect: EffectKind;
 }
 
+export interface ProcessMessage {
+  readonly instanceId: string;
+  readonly effectId: string;
+  readonly versionId: string;
+  readonly sealedRequest: string;
+}
+
 export interface TimerMessage {
   readonly instanceId: string;
   readonly effectId: string;

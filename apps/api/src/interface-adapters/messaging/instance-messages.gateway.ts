@@ -13,6 +13,7 @@ import type {
   EffectAnswer,
   InstanceEvent,
 } from "../../domain/automation/instances/interfaces.js";
+import type { JsonObject } from "../../domain/automation/interfaces.js";
 import type { WorkflowInstance } from "../../domain/automation/instances/workflow-instance.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { MessageTopic } from "./enums.js";
@@ -20,6 +21,7 @@ import type {
   EffectMessage,
   InstanceEndedMessage,
   InstanceMessage,
+  ProcessMessage,
   RespondMessage,
   TimerMessage,
 } from "./interfaces.js";
@@ -56,6 +58,23 @@ export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
       key: instance.id,
       payload,
     };
+    await this.outbox.add(this.txHost.tx, message);
+  }
+
+  async detach(
+    instance: WorkflowInstance,
+    effectId: string,
+    request: JsonObject,
+  ): Promise<void> {
+    const sealedRequest = this.runData.sealedOf(request);
+    const payload: ProcessMessage = {
+      instanceId: instance.id,
+      effectId,
+      versionId: instance.versionId,
+      sealedRequest,
+    };
+    const key = `${instance.id}/${effectId}`;
+    const message = { topic: MessageTopic.RunProcess, key, payload };
     await this.outbox.add(this.txHost.tx, message);
   }
 

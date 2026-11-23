@@ -65,6 +65,11 @@ export abstract class InstanceRuns {
     instance: WorkflowInstance,
     answer: EffectAnswer,
   ): Promise<void>;
+  abstract detach(
+    instance: WorkflowInstance,
+    effectId: string,
+    request: JsonObject,
+  ): Promise<void>;
   abstract receive(instance: WorkflowInstance): Promise<void>;
   abstract fail(instance: WorkflowInstance): Promise<void>;
 }

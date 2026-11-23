@@ -10,6 +10,7 @@ import type { BeginRun } from "../../../../src/application/automation/instances/
 import type { EmitForEffect } from "../../../../src/application/automation/instances/emit-for-effect.js";
 import type { FailRun } from "../../../../src/application/automation/instances/fail-run.js";
 import type { GiveUpEffect } from "../../../../src/application/automation/instances/give-up-effect.js";
+import type { PerformDetachedProcess } from "../../../../src/application/automation/instances/perform-detached-process.js";
 import type { PerformEffect } from "../../../../src/application/automation/instances/perform-effect.js";
 import type { ReceiveForEffect } from "../../../../src/application/automation/instances/receive-for-effect.js";
 import type { RespondToEffect } from "../../../../src/application/automation/instances/respond-to-effect.js";
@@ -91,8 +92,10 @@ function effectHandlerOf(recorder: Recorder) {
   return new EffectHandler(
     new ConsumerSpan(),
     recorder.outbox(),
+    runData,
     recorder.use<PerformEffect>("perform"),
     recorder.use<StartDetachedProcess>("detach"),
+    recorder.use<PerformDetachedProcess>("process"),
     recorder.use<StartChildForEffect>("child"),
     recorder.use<EmitForEffect>("emit"),
     recorder.use<ReceiveForEffect>("receive"),
@@ -246,6 +249,60 @@ describe("the effects a run asks for", () => {
     await handler.requested(message, context);
 
     expect(names(recorder)).toEqual(["perform", "giveUp"]);
+  });
+
+  it("a_detached_process_is_performed_with_its_request_unsealed", async () => {
+    const recorder = new Recorder();
+    const handler = effectHandlerOf(recorder);
+    const sealedRequest = runData.sealedOf({ id: "/do/0/report" });
+    const message = {
+      instanceId: "instance-1",
+      effectId: "/do/0/report",
+      versionId: "version-1",
+      sealedRequest,
+    };
+    const context = contextAt(1);
+
+    await handler.detached(message, context);
+
+    expect(names(recorder)).toEqual(["process"]);
+    expect(recorder.calls[0]).toContain('"request":{"id":"/do/0/report"}');
+  });
+
+  it("a_failing_detached_process_is_retried", async () => {
+    const recorder = new Recorder();
+    recorder.failure = new Error("The sandbox is unreachable");
+    const handler = effectHandlerOf(recorder);
+    const sealedRequest = runData.sealedOf({ id: "/do/0/report" });
+    const message = {
+      instanceId: "instance-1",
+      effectId: "/do/0/report",
+      versionId: "version-1",
+      sealedRequest,
+    };
+    const context = contextAt(1);
+
+    const performed = handler.detached(message, context);
+
+    await expect(performed).rejects.toThrow("The sandbox is unreachable");
+  });
+
+  it("an_exhausted_detached_process_is_given_up_without_touching_its_run", async () => {
+    const recorder = new Recorder();
+    recorder.failure = new Error("The sandbox is unreachable");
+    const handler = effectHandlerOf(recorder);
+    const sealedRequest = runData.sealedOf({ id: "/do/0/report" });
+    const message = {
+      instanceId: "instance-1",
+      effectId: "/do/0/report",
+      versionId: "version-1",
+      sealedRequest,
+    };
+    const context = contextAt(RunHandler.ATTEMPTS);
+
+    await handler.detached(message, context);
+
+    expect(names(recorder)).toEqual(["process"]);
   });
 
   it("a_timer_answers_its_wait", async () => {

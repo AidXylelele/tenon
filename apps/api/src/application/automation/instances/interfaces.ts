@@ -84,6 +84,12 @@ export interface EffectReference {
   readonly effectId: string;
 }
 
+export interface DetachedProcessCommand extends EffectReference {
+  readonly versionId: string;
+  readonly request: JsonObject;
+  readonly signal: AbortSignal;
+}
+
 export interface EffectCall {
   readonly idempotencyKey: string;
   readonly signal: AbortSignal;

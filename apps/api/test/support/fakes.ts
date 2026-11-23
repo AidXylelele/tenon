@@ -484,13 +484,29 @@ export interface RecordedAnswer {
   readonly answer: EffectAnswer;
 }
 
+export interface RecordedProcess {
+  readonly instanceId: string;
+  readonly effectId: string;
+  readonly request: JsonObject;
+}
+
 export class RecordingInstanceRuns extends InstanceRuns {
   readonly responded: RecordedAnswer[] = [];
+  readonly detached: RecordedProcess[] = [];
   readonly received: string[] = [];
   readonly failed: string[] = [];
 
   respond(instance: WorkflowInstance, answer: EffectAnswer): Promise<void> {
     this.responded.push({ instanceId: instance.id, answer });
+    return Promise.resolve();
+  }
+
+  detach(
+    instance: WorkflowInstance,
+    effectId: string,
+    request: JsonObject,
+  ): Promise<void> {
+    this.detached.push({ instanceId: instance.id, effectId, request });
     return Promise.resolve();
   }
 
