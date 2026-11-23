@@ -88,10 +88,10 @@ src/
 │   │   └── pipeline/           around the routes: JSON-only middleware, throttler guard, stale-draft interceptor and
 │   │                           its conditional-request exception, problem-details filter, CloudEvent decorator
 │   ├── messaging/              outbox handlers, the AsyncAPI receivers' handler, event delivery to subscribers (over
-│   │                           HTTP), the outbox topics and tracer, the contracts it needs from broker clients
+│   │                           HTTP), the outbox topics, the contracts it needs from broker connections
 │   ├── mailing/                the mail gateway, its outbox handler, its topics and templates/
 │   ├── workflows/              the durable engine and the interpreter
-│   │   ├── runners/            the engine's @Workflow classes (run, process, schedule, delivery) and the run tracer
+│   │   ├── runners/            the engine's @Workflow classes (run, process, schedule, delivery) and their step names
 │   │   ├── gateways/           application ports over the engine (engine-*), the interpreter (interpreter-*) and
 │   │   │                       outbound HTTP (http-import)
 │   │   ├── effects/            the effect dispatcher and one gateway per external system: effect ⇄ protocol call ⇄
@@ -101,7 +101,7 @@ src/
 │   │   ├── program-calls.ts    a version's program call, its source fetched on demand
 │   │   ├── *.error.ts          PermanentFault (a failure no retry mends) and IncompatibleRun
 │   │   └── interfaces.ts       the contracts this group needs from framework clients, and their types
-│   ├── jobs/                   scheduled jobs (idempotency pruning, retention) and their tracer
+│   ├── jobs/                   scheduled jobs (idempotency pruning, retention)
 │   └── persistence/            PostgreSQL through Drizzle
 │       ├── schema/             the Drizzle tables, source of the migrations in drizzle/
 │       ├── repositories/       one per aggregate: load and save (upsert, optimistic lock)
@@ -114,11 +114,14 @@ src/
     ├── release.ts              the build's version, read from package.json
     ├── di/                     the roots (api, worker), core and shared modules, feature modules (*-http in the API,
     │                           *-background in the worker), the interpreter thread's module, configuration, host presets
-    ├── network/                the outbound address policy (SSRF), the response size limit and the HTTP connection
+    ├── network/                the outbound address policy (SSRF), the response size limit, the HTTP connection and
+    │                           the pool of broker connections
     ├── oauth/                  OAuth 2.0 and OpenID Connect tokens through openid-client
     ├── mcp/                    the MCP connection over the SDK's streamable HTTP transport
     ├── grpc/                   the gRPC connection: the channel pool, its TLS rule and address check
-    ├── asyncapi/               AsyncAPI documents, the client, one broker per protocol, broker connections and tracer
+    ├── asyncapi/               the AsyncAPI parser's options
+    ├── kafka/, amqp/, mqtt/,   one connection per broker protocol: the calls into its library
+    │   nats/, redis/
     ├── go-judge/               the sandbox's result schemas and the image's shell platform
     ├── interpreter/            the interpreter on Piscina threads (client, tasks, thread entry), the host profile
     ├── crypto/                 AES-GCM sealing of secret values
@@ -127,8 +130,8 @@ src/
 ```
 
 Each kind of file has one suffix: `*.controller.ts`, `*.presenter.ts`, `*.schema.ts`, `*.mapper.ts`, `*.policy.ts`,
-`*.gateway.ts`, `*.handler.ts`, `*.run.ts`, `*.jobs.ts`, `*.tracer.ts`, `*.repository.ts`, `*.queries.ts`, `*.store.ts`,
-`*.client.ts`, `*.broker.ts`, `*.metrics.ts`, `*.mail.ts`, `*.error.ts`, `*.module.ts`, `*.presets.ts`, `*.sdk.ts`,
+`*.gateway.ts`, `*.handler.ts`, `*.run.ts`, `*.jobs.ts`, `*.repository.ts`, `*.queries.ts`, `*.store.ts`,
+`*.client.ts`, `*.connection.ts`, `*.options.ts`, `*.metrics.ts`, `*.mail.ts`, `*.error.ts`, `*.module.ts`, `*.presets.ts`, `*.sdk.ts`,
 `*.shutdown.ts`, `*.cipher.ts`, `*.dispatcher.ts`, `*.http-connection.ts`, `*.mcp-connection.ts`,
 `*.authorization-server.ts`, `*.tasks.ts`, `*.thread.ts`, and Nest's own `*.middleware.ts`, `*.guard.ts`,
 `*.interceptor.ts`, `*.filter.ts`, `*.decorator.ts`, `*.provider.ts`. A use case is named for its action
@@ -157,8 +160,7 @@ and net ones; each interpreter thread starts its own SDK with only the runtime m
   span. An outbox message is processed in a root span `process <topic>` (consumer) linked to the span that added it,
   and a scheduled job's run is a span `job <name>`. A query outside any span, such as a poll, is not traced.
 - **Metrics.** `tenon.workflow.executions`, `tenon.workflow.step.duration`, `tenon.workflow.compensation.failures`,
-  `tenon.outbox.publish.duration`, `tenon.outbox.lag`, `tenon.outbox.failures` and
-  `tenon.lock.losses`, beside the runtime, HTTP, database and interpreter metrics.
+  `tenon.outbox.lag`, `tenon.outbox.failures` and `tenon.lock.losses`, beside the runtime, HTTP, database and interpreter metrics.
 - **Logs.** Every pino record goes to stdout and by OTLP, with `trace_id` and `span_id`. A request is logged by its
   id, method, path (without the query, a hook by its route) and remote address, and its response by its status code.
 

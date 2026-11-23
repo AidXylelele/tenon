@@ -1,7 +1,7 @@
 {
   "uid": "tenon-engine",
   "title": "Tenon \u00b7 Workflow engine",
-  "description": "The durable engine: executions, step attempts with journaling, effects, and the outbox.",
+  "description": "The durable engine: executions, step attempts with journaling, and the outbox.",
   "tags": ["tenon"],
   "editable": false,
   "graphTooltip": 1,
@@ -502,337 +502,6 @@
     },
     {
       "type": "row",
-      "title": "Effects",
-      "collapsed": false,
-      "id": 10,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 26
-      },
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "Effects per second",
-      "description": "RED \u00b7 rate: effects performed, by kind and outcome.",
-      "id": 11,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 27
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 30,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "sum by (tenon_effect_kind, tenon_effect_outcome) (rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval]))",
-          "legendFormat": "{{tenon_effect_kind}} {{tenon_effect_outcome}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Effect errors",
-      "description": "RED \u00b7 errors: the share of effects that threw, by kind.",
-      "id": 12,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 27
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          },
-          "max": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "(sum by (tenon_effect_kind) (rate(tenon_effect_duration_seconds_count{error_type!=\"\", service_name=~\"$service\"}[$__rate_interval])) or sum by (tenon_effect_kind) (rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval])) * 0) / sum by (tenon_effect_kind) (rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval]))",
-          "legendFormat": "{{tenon_effect_kind}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Effect duration",
-      "description": "RED \u00b7 duration: p50 and p99 of an effect alone, by kind.",
-      "id": 13,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 27
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.5, sum by (le, tenon_effect_kind) (rate(tenon_effect_duration_seconds_bucket{service_name=~\"$service\"}[$__rate_interval])))",
-          "legendFormat": "p50 {{tenon_effect_kind}}",
-          "range": true,
-          "exemplar": false
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, tenon_effect_kind) (rate(tenon_effect_duration_seconds_bucket{service_name=~\"$service\"}[$__rate_interval])))",
-          "legendFormat": "p99 {{tenon_effect_kind}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Step overhead around effects",
-      "description": "The mean effect-step attempt (without the journal write) over the mean effect alone, minus one: what the step adds around its effect; the line marks 10 %. The journal writes sit beside the step in its trace: see Journaling.",
-      "id": 14,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 18,
-        "x": 0,
-        "y": 35
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0,
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "(sum(rate(tenon_workflow_step_duration_seconds_sum{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__rate_interval])) / sum(rate(tenon_workflow_step_duration_seconds_count{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__rate_interval]))) / (sum(rate(tenon_effect_duration_seconds_sum{service_name=~\"$service\"}[$__rate_interval])) / sum(rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval]))) - 1",
-          "legendFormat": "overhead",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Step overhead over the range",
-      "description": "For the whole time range: the mean effect-step attempt over the mean effect alone, minus one.",
-      "id": 15,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 35
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "(sum(increase(tenon_workflow_step_duration_seconds_sum{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__range])) / sum(increase(tenon_workflow_step_duration_seconds_count{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__range]))) / (sum(increase(tenon_effect_duration_seconds_sum{service_name=~\"$service\"}[$__range])) / sum(increase(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__range]))) - 1",
-          "legendFormat": "",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "row",
       "title": "Journaling (thesis \u04134)",
       "collapsed": false,
       "id": 16,
@@ -840,7 +509,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 26
       },
       "panels": []
     },
@@ -857,7 +526,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 44
+        "y": 27
       },
       "fieldConfig": {
         "defaults": {
@@ -953,7 +622,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 44
+        "y": 27
       },
       "fieldConfig": {
         "defaults": {
@@ -1093,67 +762,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 33
       },
       "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "Publish duration",
-      "description": "RED \u00b7 duration: p99 of publishing a message, by topic.",
-      "id": 20,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 51
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, tenon_outbox_topic) (rate(tenon_outbox_publish_duration_seconds_bucket{service_name=~\"$service\"}[$__rate_interval])))",
-          "legendFormat": "{{tenon_outbox_topic}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
     },
     {
       "type": "timeseries",
@@ -1166,9 +777,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 51
+        "w": 12,
+        "x": 0,
+        "y": 34
       },
       "fieldConfig": {
         "defaults": {
@@ -1224,9 +835,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 51
+        "w": 12,
+        "x": 12,
+        "y": 34
       },
       "fieldConfig": {
         "defaults": {
