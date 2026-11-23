@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type {
   EditAction,
   FormField,
@@ -21,6 +28,7 @@ import {
   SCRIPT_FORM,
   SCRIPT_STEP,
   SET_STEP,
+  problemOf,
   setFormOf,
   stepOf,
   SWITCH_FORM,
@@ -672,5 +680,118 @@ describe("retry settings", () => {
     expect(onEdit).toHaveBeenCalledWith([
       { kind: "setField", pointer, value: { bearer: { use: "API_TOKEN" } } },
     ]);
+  });
+
+  it("text_with_data_is_written_as_a_template_after_its_export", () => {
+    const parts = [
+      { kind: "text" as const, text: "Total: " },
+      {
+        kind: "data" as const,
+        expression: "$context.fetch.total",
+        label: "total",
+      },
+    ];
+    const renderData = (slot: DataSlot) => (
+      <button
+        type="button"
+        onClick={() => {
+          slot.onTemplate(parts, {
+            value: "${ $context.fetch.total }",
+            export: "/do/fetch",
+          });
+        }}
+      >
+        Insert
+      </button>
+    );
+    const { onEdit } = shown({
+      step: SET_STEP,
+      form: setFormOf({ total: "1" }, "inputAndValues"),
+      renderData,
+    });
+
+    act(() => {
+      screen.getByRole("button", { name: "Insert" }).click();
+    });
+
+    const pointer = `${SET_STEP.pointer}/set/total`;
+    expect(onEdit).toHaveBeenCalledWith([
+      {
+        kind: "useData",
+        pointer,
+        value: "${ $context.fetch.total }",
+        export: "/do/fetch",
+      },
+      { kind: "setTemplate", pointer, parts },
+    ]);
+  });
+
+  it("a_case's_problems_show_under_its_branch", () => {
+    const pointer = `${SWITCH_STEP.pointer}/switch/0/Has items`;
+    const problem = problemOf("The condition reads no data");
+    const branch = fieldOf({
+      key: "Has items",
+      pointer,
+      diagnostics: [problem],
+    });
+    const fields = SWITCH_FORM.fields.map((field) =>
+      field.key === "switch" ? { ...field, fields: [branch] } : field,
+    );
+    shown({ step: SWITCH_STEP, form: { ...SWITCH_FORM, fields } });
+
+    const card = screen.getByRole("group", { name: "Has items" });
+
+    expect(card).toHaveAccessibleDescription("The condition reads no data");
+  });
+
+  it("signing_in_is_taken_back_with_none_and_other_policies_stay_as_written", () => {
+    const pointer = `${FETCH_STEP.pointer}/with/endpoint/authentication`;
+    const bearer = fieldOf({
+      key: "authentication",
+      pointer,
+      input: "oneOf",
+      written: true,
+      value: { bearer: { use: "API_TOKEN" } },
+    });
+    const other = { ...bearer, value: { oauth2: { authority: "x" } } };
+    const withField = (authentication: typeof bearer) =>
+      FETCH_FORM.fields.map((field) =>
+        field.key === "with"
+          ? { ...field, fields: [...field.fields, authentication] }
+          : field,
+      );
+    const { onEdit } = shown({
+      step: FETCH_STEP,
+      form: { ...FETCH_FORM, fields: withField(bearer) },
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /More options/ }));
+    });
+    const secret = screen.getByRole("textbox", { name: "The secret's name" });
+    act(() => {
+      fireEvent.blur(secret);
+    });
+    const scheme = screen.getByRole("combobox", { name: /Authentication/ });
+    act(() => {
+      fireEvent.keyDown(scheme, { key: "ArrowDown" });
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole("option", { name: "None" }));
+    });
+
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onEdit).toHaveBeenCalledWith([{ kind: "clearField", pointer }]);
+
+    cleanup();
+    shown({
+      step: FETCH_STEP,
+      form: { ...FETCH_FORM, fields: withField(other) },
+    });
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /More options/ }));
+    });
+
+    const written = screen.getByRole("combobox", { name: /Authentication/ });
+    expect(written).toHaveTextContent("As written in the text");
   });
 });
