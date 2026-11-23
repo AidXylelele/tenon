@@ -1,10 +1,14 @@
 "use client";
 
 import { WifiOffIcon } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useSyncExternalStore } from "react";
+
+const RECHECK_MS = 30_000;
 
 export function OfflineStrip({ reachable }: { readonly reachable: boolean }) {
   const online = useOnline();
+  useRecheckWhileUnreachable(reachable);
   const lost = !reachable || !online;
 
   return (
@@ -18,6 +22,24 @@ export function OfflineStrip({ reachable }: { readonly reachable: boolean }) {
       )}
     </div>
   );
+}
+
+function useRecheckWhileUnreachable(reachable: boolean): void {
+  const router = useRouter();
+
+  useEffect(() => {
+    if (reachable) return;
+
+    const recheck = () => {
+      router.refresh();
+    };
+    const timer = window.setInterval(recheck, RECHECK_MS);
+    window.addEventListener("online", recheck);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("online", recheck);
+    };
+  }, [reachable, router]);
 }
 
 function useOnline(): boolean {
