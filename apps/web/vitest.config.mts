@@ -23,18 +23,9 @@ const FEATURE_FLOOR = {
   statements: 85,
 };
 
-const FEATURES_DELETED_IN_M5 = [
-  "code-editor",
-  "step-inspector",
-  "workflow-canvas",
-];
+const FEATURES_DELETED_IN_M5 = ["code-editor", "workflow-canvas"];
 
-const FEATURES_WAITING_FOR_TESTS = [
-  "draft-conflict",
-  "new-password-field",
-  "problems",
-  "viewer-notice",
-];
+const FEATURES_WAITING_FOR_TESTS = ["new-password-field", "viewer-notice"];
 
 const FEATURES_BELOW_THE_FLOOR = FEATURES_DELETED_IN_M5.concat(
   FEATURES_WAITING_FOR_TESTS,

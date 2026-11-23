@@ -52,4 +52,17 @@ describe("the problems of the text", () => {
     expect(fixesFor).toHaveBeenCalledWith(missing);
     expect(apply).toHaveBeenCalled();
   });
+
+  it.each([
+    ["a_warning", 2],
+    ["information", 3],
+    ["a_hint", 4],
+  ] as const)("%s_is_said_in_its_own_tone", (_, severity) => {
+    const quiet = { ...missing, severity };
+
+    render(<Problems problems={[quiet]} onShow={vi.fn()} fixesFor={noFixes} />);
+
+    const message = screen.getByText("The task needs a name");
+    expect(message).toBeInTheDocument();
+  });
 });

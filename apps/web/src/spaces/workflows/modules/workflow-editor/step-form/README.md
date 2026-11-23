@@ -20,7 +20,7 @@ The form shows the name, the essential fields, the step's result where the langu
 
 `StartForm` (`StartFormProps`): `form` (`workflow/workflowForm`), `webhooks` (`name`, `eventType`, `address`), `now` (an ISO instant) and `zone` (an IANA name) for the local time beside the UTC schedule, `revealProblems`, `languageTerms`, `onEdit`. By hand, on a schedule (repeat, time in UTC, days, minutes, or a cron; the viewer's time, the daylight-saving note and the next three starts), by a webhook (its address to copy) or by an event type; the workflow's input under "Workflow input".
 
-Consumer: the workflow editor's panel, which replaces the old `step-inspector` with these in M5.
+Consumer: the workflow editor's panel.
 
 A member the grammar leaves for a person to name (`suggested`: headers, query, arguments, environment) is offered as rows to add. An HTTP call's Authentication (More options) is None, a bearer token or a user name and password from a secret, written whole at `with/endpoint/authentication`. The time limit shows the language server's `timeout` in seconds, whatever form it is written in. An HTTP call's data says how it is sent ("Send as": Message, the usual, written as `{ "text": … }`; JSON; Form fields, named values with their content type), and its headers are named values. A field is "optional" only when it is not required, has no fill words and no usual value (a choice, after this step, a method, a language, a time limit). Errors carry a circle-alert icon; placeholders are faint.
 

@@ -131,12 +131,7 @@ function Resolve({
   }
 
   return (
-    <Dialog
-      open
-      onOpenChange={(next) => {
-        if (!next) onClose();
-      }}
-    >
+    <Dialog open onOpenChange={onClose}>
       <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Your text against {savedBy}&apos;s</DialogTitle>
@@ -185,8 +180,8 @@ function Resolve({
         </DialogFooter>
         <AlertDialog
           open={undecided !== null}
-          onOpenChange={(open) => {
-            if (!open) setUndecided(null);
+          onOpenChange={() => {
+            setUndecided(null);
           }}
         >
           <AlertDialogContent>
