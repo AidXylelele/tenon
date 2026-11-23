@@ -23,7 +23,9 @@ export class StartScheduledInstance {
 
     if (workflow === null) return;
 
-    const chainRunning = await this.instances.hasUnendedScheduled(workflow.id);
+    const chainRunning =
+      workflow.chainsSchedule &&
+      (await this.instances.hasUnendedScheduled(workflow.id));
     const now = new Date();
     const started = workflow.startFiredInstance({
       instanceId: command.instanceId,

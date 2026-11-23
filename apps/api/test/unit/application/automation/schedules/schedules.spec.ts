@@ -229,6 +229,17 @@ describe("the instance of a fired slot", () => {
     expect(fixture.workflowEvents.calls).toEqual([]);
   });
 
+  it("a_slot_of_an_unchained_schedule_asks_for_no_running_chain", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, true);
+    const asked = vi.spyOn(fixture.instances, "hasUnendedScheduled");
+
+    await fixture.start.execute({ workflowId: workflow.id, instanceId: SLOT });
+
+    expect(asked).not.toHaveBeenCalled();
+    expect(fixture.instances.rows.size).toBe(1);
+  });
+
   it("starts_nothing_once_the_workflow_is_off", async () => {
     const fixture = setUp();
     const { workflow } = await aWorkflow(fixture, false);

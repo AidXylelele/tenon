@@ -291,6 +291,10 @@ export class Workflow {
     });
   }
 
+  get chainsSchedule(): boolean {
+    return this.#schedule()?.chained ?? false;
+  }
+
   get scheduledVersion(): WorkflowVersion | null {
     if (!this.#on) return null;
 
