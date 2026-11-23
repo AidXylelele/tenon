@@ -20,17 +20,18 @@ import {
 } from "@/libs/ui/components/toggle-group";
 import {
   periodLabel,
-  type RunStatus,
   STARTED,
   type Started,
   startedOf,
-  STATUSES,
-  statusesOf,
-  statusLabel,
   type TimeWindow,
   windowPhrase,
 } from "@/operations/run-periods";
-import { phaseLabel } from "@/operations/run-progress";
+import {
+  type RunStatus,
+  STATUSES,
+  statusesOf,
+  statusLabel,
+} from "@/operations/run-progress";
 import { isFiltered, type RunsAddress, runsHrefOf } from "./runs-address";
 
 export interface KnownWorkflow {
@@ -191,7 +192,7 @@ function WorkflowOption({ workflow }: { readonly workflow: KnownWorkflow }) {
 }
 
 function StatusOption({ status }: { readonly status: RunStatus }) {
-  const label = statusLabel(status, phaseLabel);
+  const label = statusLabel(status);
 
   return <ToggleGroupItem value={status}>{label}</ToggleGroupItem>;
 }

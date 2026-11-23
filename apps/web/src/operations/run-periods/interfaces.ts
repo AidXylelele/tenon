@@ -2,8 +2,6 @@ export type Period = "24h" | "7d" | "30d";
 
 export type Started = Period | "all";
 
-export type RunStatus = "in-progress" | "succeeded" | "failed" | "cancelled";
-
 export type BucketUnit = "hour" | "day";
 
 export interface TimeWindow {

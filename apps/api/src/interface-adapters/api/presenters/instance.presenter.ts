@@ -155,15 +155,15 @@ export class InstancePresenter {
     return this.#countedIn(counted, phases);
   }
 
-  #countedIn(
+  #countedIn<Counted extends Phase>(
     counted: readonly PhaseCount[],
-    phases: readonly Phase[],
-  ): PhaseCounts {
+    phases: readonly Counted[],
+  ): Record<Counted, number> {
     const entries = phases.map((phase) => [
       phase,
       this.#countOf(counted, phase),
     ]);
-    return Object.fromEntries(entries) as PhaseCounts;
+    return Object.fromEntries(entries) as Record<Counted, number>;
   }
 
   #countOf(counted: readonly PhaseCount[], phase: Phase): number {

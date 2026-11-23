@@ -16,6 +16,7 @@ import type {
   InstanceEvent,
   LifecycleEvent,
   Listening,
+  LivePhase,
   PlayedTurn,
   Receiving,
   RunAgenda,
@@ -265,9 +266,9 @@ export class WorkflowInstance {
     return !awaited;
   }
 
-  static livePhases(): Phase[] {
+  static livePhases(): LivePhase[] {
     const phases = Object.values(Phase);
-    return phases.filter((phase) => {
+    return phases.filter((phase): phase is LivePhase => {
       const ended = WorkflowInstance.#ENDED.includes(phase);
       return !ended;
     });

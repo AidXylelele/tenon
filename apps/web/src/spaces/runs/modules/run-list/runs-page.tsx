@@ -7,12 +7,8 @@ import type {
 import { RefreshControl } from "@/libs/live/refresh-control";
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
-import {
-  runsPhraseOf,
-  summaryOf,
-  windowPhrase,
-} from "@/operations/run-periods";
-import { isUnended, phaseLabel } from "@/operations/run-progress";
+import { periodPhrase, windowPhrase } from "@/operations/run-periods";
+import { isUnended, runsPhraseOf } from "@/operations/run-progress";
 import { PhaseStatus } from "@/features/run-status";
 import { RunPager, RunTable } from "@/features/run-table";
 import { Filters, type KnownWorkflow } from "./filters";
@@ -103,18 +99,16 @@ function summaryLineOf(
   total: number,
   exact: boolean,
 ): string {
-  const runs = runsOf(address, zone);
+  const runs = runsPhraseOf(address.statuses);
+  const when = whenOf(address, zone);
   const workflow = address.name === undefined ? "" : ` of ${address.name}`;
   const counted = numbers.format(total);
   const count = exact ? counted : `more than ${counted}`;
-  return `${runs}${workflow} · ${count}`;
+  return `${runs} ${when}${workflow} · ${count}`;
 }
 
-function runsOf(address: RunsAddress, zone: string): string {
-  if (address.between === null)
-    return summaryOf(address.statuses, address.started, phaseLabel);
+function whenOf(address: RunsAddress, zone: string): string {
+  if (address.between === null) return periodPhrase(address.started);
 
-  const runs = runsPhraseOf(address.statuses, phaseLabel);
-  const range = windowPhrase(address.between, zone);
-  return `${runs} ${range}`;
+  return windowPhrase(address.between, zone);
 }

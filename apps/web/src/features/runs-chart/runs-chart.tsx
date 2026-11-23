@@ -29,15 +29,19 @@ import {
 } from "@/libs/ui/components/table";
 import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { type Bar, chartNoteOf } from "@/operations/run-periods";
+import { statusLabel } from "@/operations/run-progress";
 import type { RunsChartProps } from "./interfaces";
 
 const SERIES = ["succeeded", "failed", "cancelled", "inProgress"] as const;
 
 const CONFIG = {
-  succeeded: { label: "Succeeded", color: "var(--success-chart)" },
-  failed: { label: "Failed", color: "var(--danger-chart)" },
-  cancelled: { label: "Cancelled", color: "var(--neutral-chart)" },
-  inProgress: { label: "In progress", color: "var(--info-chart)" },
+  succeeded: { label: statusLabel("succeeded"), color: "var(--success-chart)" },
+  failed: { label: statusLabel("failed"), color: "var(--danger-chart)" },
+  cancelled: { label: statusLabel("cancelled"), color: "var(--neutral-chart)" },
+  inProgress: {
+    label: statusLabel("in-progress"),
+    color: "var(--info-chart)",
+  },
 } satisfies ChartConfig;
 
 const FOCUS =
@@ -164,10 +168,11 @@ function ChartTable({
           <TableRow>
             <TableHead>{bucket}</TableHead>
             <TableHead className="text-right">Started</TableHead>
-            <TableHead className="text-right">Succeeded</TableHead>
-            <TableHead className="text-right">Failed</TableHead>
-            <TableHead className="text-right">Cancelled</TableHead>
-            <TableHead className="text-right">In progress</TableHead>
+            {SERIES.map((series) => (
+              <TableHead key={series} className="text-right">
+                {CONFIG[series].label}
+              </TableHead>
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>

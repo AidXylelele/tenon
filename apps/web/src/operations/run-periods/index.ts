@@ -7,7 +7,6 @@ export type {
   FigureKind,
   Period,
   PeriodWindows,
-  RunStatus,
   Started,
   TimeWindow,
 } from "./interfaces";
@@ -21,15 +20,11 @@ export {
   startedOf,
   windowPhrase,
 } from "./periods";
-export { countWindowOf, figuresOf, inProgressOf, seriesOf } from "./figures";
 export {
-  phasesOf,
-  runsPhraseOf,
-  statusOf,
-  statusesOf,
-  statusLabel,
-  statusParamOf,
-  STATUSES,
-  summaryOf,
-} from "./statuses";
+  countWindowOf,
+  figuresOf,
+  inProgressOf,
+  liveWindowOf,
+  seriesOf,
+} from "./figures";
 export { windowsOf } from "./windows";

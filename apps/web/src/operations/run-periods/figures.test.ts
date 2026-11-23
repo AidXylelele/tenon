@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { PhaseCounts } from "@/libs/data-access/types";
-import { countWindowOf, figuresOf, inProgressOf, seriesOf } from "./figures";
+import {
+  countWindowOf,
+  figuresOf,
+  inProgressOf,
+  liveWindowOf,
+  seriesOf,
+} from "./figures";
 import { windowsOf } from "./windows";
 
 const NONE: PhaseCounts = {
@@ -46,6 +52,15 @@ describe("runs counted by period", () => {
 
     const previous = figures.map((figure) => figure.previous);
     expect(previous).toEqual([null, null, null, null]);
+  });
+
+  it("the_live_count_asks_for_the_minute_up_to_now", () => {
+    const window = liveWindowOf("2026-11-23T10:00:00.000Z");
+
+    expect(window).toEqual({
+      buckets: ["2026-11-23T09:59:00.000Z"],
+      to: "2026-11-23T10:00:00.000Z",
+    });
   });
 
   it("in_progress_now_is_every_run_still_going_whenever_it_started", () => {

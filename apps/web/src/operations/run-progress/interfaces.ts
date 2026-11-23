@@ -1,5 +1,7 @@
 import type { Phase, TaskRecord } from "@/libs/data-access/types";
 
+export type RunStatus = "in-progress" | "succeeded" | "failed" | "cancelled";
+
 export type StepStatus = Phase | "retrying" | "skipped";
 
 export type StepState = StepStatus | "not-reached";

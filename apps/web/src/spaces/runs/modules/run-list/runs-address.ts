@@ -3,17 +3,18 @@ import type { InstanceOrder, Phase } from "@/libs/data-access/types";
 import { runsHref } from "@/libs/routing/routes";
 import { queryText } from "@/libs/routing/segment";
 import {
-  type RunStatus,
   type Started,
   startedOf,
   type TimeWindow,
+} from "@/operations/run-periods";
+import {
+  PHASES,
+  type RunStatus,
   statusesOf,
   statusOf,
   statusParamOf,
-} from "@/operations/run-periods";
-import { PHASES } from "@/operations/run-progress";
-
-const SIZES = [25, 50, 100];
+} from "@/operations/run-progress";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZES } from "@/features/run-table";
 
 const COUNTED = 10_000;
 
@@ -44,8 +45,8 @@ const Read = z.object({
   size: z.coerce
     .number()
     .int()
-    .refine((size) => SIZES.includes(size))
-    .catch(50),
+    .refine((size) => PAGE_SIZES.includes(size))
+    .catch(DEFAULT_PAGE_SIZE),
   sort: z.enum(ORDERS).catch("started"),
 });
 
@@ -73,7 +74,7 @@ export function runsHrefOf(address: RunsAddress): string {
   const status = statusParamOf(address.statuses);
   const started = address.started === "all" ? undefined : address.started;
   const page = address.page === 1 ? undefined : address.page;
-  const size = address.size === 50 ? undefined : address.size;
+  const size = address.size === DEFAULT_PAGE_SIZE ? undefined : address.size;
   const sort = address.sort === "started" ? undefined : address.sort;
   return runsHref({
     namespace: address.namespace,

@@ -2,6 +2,8 @@ import type { PageNumber } from "./interfaces";
 
 export const PAGE_SIZES: readonly number[] = [25, 50, 100];
 
+export const DEFAULT_PAGE_SIZE = 50;
+
 const NEAR = 2;
 
 const numbers = new Intl.NumberFormat("en-US");
