@@ -32,6 +32,7 @@ import {
 import type { Imports } from "interpreter/front-end";
 import { LRUCache } from "lru-cache";
 import { Piscina } from "piscina";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
 import type {
   CompilationData,
   FilterCheck,
@@ -146,7 +147,11 @@ export class PiscinaInterpreterClient
     try {
       return await this.#called(pool, "compile", source, null);
     } catch (error) {
-      if (error instanceof ResilienceTimeoutError) return { kind: "expired" };
+      const timedOut =
+        error instanceof PermanentFault &&
+        error.cause instanceof ResilienceTimeoutError;
+
+      if (timedOut) return { kind: "expired" };
 
       throw error;
     }
@@ -369,11 +374,25 @@ export class PiscinaInterpreterClient
   ): Promise<TaskAnswer<TaskValue<N>>> {
     const task = this.#taskOf(pool.name, call);
     const options = signal === null ? {} : { signal };
-    const answer: unknown = await pool.policy.execute(
-      (attempt) => pool.threads.run(task, { name, signal: attempt.signal }),
-      options,
-    );
-    return answer as TaskAnswer<TaskValue<N>>;
+
+    try {
+      const answer: unknown = await pool.policy.execute(
+        (attempt) => pool.threads.run(task, { name, signal: attempt.signal }),
+        options,
+      );
+      return answer as TaskAnswer<TaskValue<N>>;
+    } catch (error) {
+      if (signal?.aborted === true) throw error;
+
+      const exhausted = this.#exhausted(error);
+
+      if (exhausted)
+        throw new PermanentFault("The interpreter ran out of time or memory", {
+          cause: error,
+        });
+
+      throw error;
+    }
   }
 
   #taskOf<C>(pool: PoolName, call: C): ThreadTask<C> {
@@ -382,6 +401,14 @@ export class PiscinaInterpreterClient
     propagation.inject(active, trace);
     const enqueuedAt = Date.now();
     return { call, pool, enqueuedAt, trace };
+  }
+
+  #exhausted(error: unknown): boolean {
+    if (error instanceof ResilienceTimeoutError) return true;
+
+    const code: unknown =
+      error instanceof Error ? Reflect.get(error, "code") : undefined;
+    return code === "ERR_WORKER_OUT_OF_MEMORY";
   }
 
   #runs(): ThreadPool {

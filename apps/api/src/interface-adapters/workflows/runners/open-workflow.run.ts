@@ -1,6 +1,7 @@
 import {
   type Duration,
   isWorkflowInterrupt,
+  NonRetryableStepError,
   Workflow,
   type WorkflowContext,
   type WorkflowRunner,
@@ -22,6 +23,7 @@ import {
   type StepCall,
   type TimedWait,
 } from "../interfaces.js";
+import { PermanentFault } from "../permanent-fault.error.js";
 import { RunController } from "../run.controller.js";
 import type {
   Generation,
@@ -407,8 +409,26 @@ export class OpenWorkflowRun implements WorkflowRunner<
     work: (attempt: WorkflowStepContext) => Promise<T>,
     options: WorkflowStepOptions<T> = {},
   ): Promise<T> {
-    const result: unknown = await ctx.step<T>(name, work, options);
+    const result: unknown = await ctx.step<T>(
+      name,
+      (attempt) => this.#attempted(work, attempt),
+      options,
+    );
     return result as T;
+  }
+
+  async #attempted<T>(
+    work: (attempt: WorkflowStepContext) => Promise<T>,
+    attempt: WorkflowStepContext,
+  ): Promise<T> {
+    try {
+      return await work(attempt);
+    } catch (error) {
+      if (error instanceof PermanentFault)
+        throw new NonRetryableStepError(error.message, { cause: error });
+
+      throw error;
+    }
   }
 
   #sizeOf(value: unknown): number {

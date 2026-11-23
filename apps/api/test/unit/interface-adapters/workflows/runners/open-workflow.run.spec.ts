@@ -7,6 +7,7 @@ import {
   WorkflowWorker,
 } from "@nestjs/workflows";
 import type { Effect, EffectOutcome } from "interpreter";
+import { PermanentFault } from "../../../../../src/interface-adapters/workflows/permanent-fault.error.js";
 import { EngineRunGateway } from "../../../../../src/interface-adapters/workflows/gateways/engine-run.gateway.js";
 import {
   EffectClient,
@@ -318,7 +319,7 @@ describe("the run of an instance on the engine", () => {
     expect(runs.answers).toEqual([]);
   });
 
-  it("fails_its_instance_when_a_call_keeps_failing", async () => {
+  it("fails_its_instance_when_a_call_fails_permanently", async () => {
     const agenda = {
       ended: false,
       calls: [aCall("/do/0/fetch")],
@@ -330,7 +331,7 @@ describe("the run of an instance on the engine", () => {
     };
     const runs = new ScriptedRuns(agenda);
     const refusing = new ScriptedPerformer(() =>
-      Promise.reject(new Error("The host does not perform it")),
+      Promise.reject(new PermanentFault("The host does not perform it")),
     );
     const worker = await started(runs, refusing);
 
