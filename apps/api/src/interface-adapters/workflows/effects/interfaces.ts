@@ -2,6 +2,8 @@ import type {
   AuthenticationScheme,
   Endpoint,
   Failure,
+  JsonObject,
+  McpRequest,
   ResolvedAuthentication,
   RevealedAuthorization,
 } from "interpreter";
@@ -54,4 +56,47 @@ export interface AgentOffer {
   readonly url: string;
   readonly binding: string;
   readonly version: string;
+}
+
+export type EndpointFetch = (
+  url: string | URL,
+  init?: RequestInit,
+) => Promise<Response>;
+
+type HttpTransport = Extract<
+  McpRequest["transport"],
+  { readonly kind: "http" }
+>;
+
+export type HttpMcpRequest = McpRequest & {
+  readonly transport: HttpTransport;
+};
+
+export type McpMethod = McpRequest["method"];
+
+export interface McpSession {
+  readonly endpoint: string;
+  readonly headers: Readonly<Record<string, string>>;
+  readonly client: McpRequest["client"];
+  readonly protocolVersion: string;
+  readonly fetchOf: (signal: AbortSignal) => EndpointFetch;
+}
+
+export interface McpCall {
+  readonly method: McpMethod;
+  readonly params: JsonObject | null;
+  readonly remaining: number | null;
+}
+
+export type McpAnswer =
+  | { readonly kind: "answered"; readonly result: unknown }
+  | { readonly kind: "outdated" };
+
+export abstract class McpConnection {
+  abstract speaks(protocolVersion: string): boolean;
+  abstract request(
+    session: McpSession,
+    call: McpCall,
+    signal: AbortSignal,
+  ): Promise<McpAnswer>;
 }

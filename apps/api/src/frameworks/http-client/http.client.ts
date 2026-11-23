@@ -18,6 +18,7 @@ import { Authenticator } from "../../interface-adapters/workflows/effects/authen
 import type {
   Authorization,
   CallContext,
+  EndpointFetch,
 } from "../../interface-adapters/workflows/effects/interfaces.js";
 import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
 import type {
@@ -25,12 +26,7 @@ import type {
   StepCall,
 } from "../../interface-adapters/workflows/interfaces.js";
 import { HttpClientName } from "../network/enums.js";
-import type {
-  EndpointFetch,
-  OutboundRequest,
-  ResponseOptions,
-  Signed,
-} from "./interfaces.js";
+import type { OutboundRequest, ResponseOptions, Signed } from "./interfaces.js";
 import { OpenApiOperations } from "./openapi-operations.js";
 import { ResponseContent } from "./response-content.js";
 

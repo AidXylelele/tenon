@@ -24,11 +24,6 @@ export type ResponseOptions = Pick<
   "output" | "revealAuthorization"
 >;
 
-export type EndpointFetch = (
-  url: string | URL,
-  init?: RequestInit,
-) => Promise<Response>;
-
 export type OpenApiDocument = z.infer<typeof OPENAPI_DOCUMENT>;
 
 type OpenApiPath = z.infer<typeof OPENAPI_PATH>;

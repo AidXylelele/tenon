@@ -52,6 +52,7 @@ import { AsyncApiGateway } from "../../interface-adapters/workflows/effects/asyn
 import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
 import { GrpcGateway } from "../../interface-adapters/workflows/effects/grpc.gateway.js";
 import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
+import { McpConnection } from "../../interface-adapters/workflows/effects/interfaces.js";
 import { McpGateway } from "../../interface-adapters/workflows/effects/mcp.gateway.js";
 import { OpenApiGateway } from "../../interface-adapters/workflows/effects/openapi.gateway.js";
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
@@ -73,7 +74,7 @@ import { SandboxClient } from "../go-judge/sandbox.client.js";
 import { SandboxLimits } from "../go-judge/sandbox-limits.js";
 import { GrpcClient } from "../grpc/grpc.client.js";
 import { ProtoSchema } from "../grpc/proto-schema.js";
-import { McpClient } from "../mcp/mcp.client.js";
+import { StreamableHttpMcpConnection } from "../mcp/streamable-http.mcp-connection.js";
 import { HttpClientName } from "../network/enums.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
 import { AutomationModule } from "./automation.module.js";
@@ -147,7 +148,7 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: EffectClient, useExisting: EffectDispatcher },
     ProtoSchema,
     GrpcClient,
-    McpClient,
+    { provide: McpConnection, useClass: StreamableHttpMcpConnection },
     AsyncApiDocuments,
     BrokerTracer,
     AmqpBroker,

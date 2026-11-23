@@ -1,14 +1,47 @@
 import { Injectable } from "@nestjs/common";
-import type { McpRequest, RpcOutcome } from "interpreter";
-import type { HttpMcpRequest } from "../../../frameworks/mcp/interfaces.js";
-import { McpClient } from "../../../frameworks/mcp/mcp.client.js";
-import type { CallContext } from "./interfaces.js";
+import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
+import {
+  ResilienceError,
+  type ResiliencePolicy,
+  ResilienceService,
+  ResilienceTimeoutError,
+} from "@nestjs/resilience";
+import type {
+  JsonObject,
+  JsonValue,
+  McpRequest,
+  RpcOutcome,
+} from "interpreter";
+import { $ZodError } from "zod/v4/core";
+import { HttpClient } from "../../../frameworks/http-client/http.client.js";
+import { Authenticator } from "./authenticator.js";
+import {
+  type CallContext,
+  type HttpMcpRequest,
+  McpConnection,
+  type McpSession,
+} from "./interfaces.js";
+import { TransportFailures } from "./transport-failures.js";
 
 @Injectable()
 export class McpGateway {
-  constructor(private readonly client: McpClient) {}
+  private readonly policy: ResiliencePolicy;
 
-  perform(request: McpRequest, context: CallContext): Promise<RpcOutcome> {
+  constructor(
+    private readonly connection: McpConnection,
+    private readonly authenticator: Authenticator,
+    private readonly http: HttpClient,
+    private readonly failures: TransportFailures,
+    resilience: ResilienceService,
+  ) {
+    this.policy = resilience.preset("mcp-calls");
+  }
+
+  async perform(
+    request: McpRequest,
+    context: CallContext,
+  ): Promise<RpcOutcome> {
     const overHttp = this.#overHttp(request);
 
     if (!overHttp)
@@ -16,7 +49,148 @@ export class McpGateway {
         "The host does not perform 'mcp.stdio'; its profile refuses it at publish",
       );
 
-    return this.client.call(request, context);
+    const spoken = this.connection.speaks(request.protocolVersion);
+
+    if (!spoken)
+      return {
+        kind: "misconfigured",
+        detail:
+          "The host does not speak this version of the Model Context Protocol",
+      };
+
+    const parameters = request.parameters;
+    const unfit = parameters !== null && !this.#isObject(parameters);
+
+    if (unfit)
+      return {
+        kind: "misconfigured",
+        detail: "The parameters of an MCP method are an object",
+      };
+
+    try {
+      return await this.policy.execute(
+        (attempt) =>
+          this.#answered(request, parameters, context, attempt.signal),
+        { signal: context.signal },
+      );
+    } catch (error) {
+      return this.#failureOf(error, context.signal);
+    }
+  }
+
+  async #answered(
+    request: HttpMcpRequest,
+    params: JsonObject | null,
+    context: CallContext,
+    signal: AbortSignal,
+  ): Promise<RpcOutcome> {
+    const transport = request.transport;
+    const authorization = await this.authenticator.authorizationOf(
+      transport.endpoint.authentication,
+      context.secrets,
+      signal,
+    );
+
+    if (authorization.kind === "forbidden") return authorization;
+
+    if (authorization.kind === "misconfigured") return authorization;
+
+    const session: McpSession = {
+      endpoint: transport.endpoint.uri,
+      headers: transport.headers,
+      client: request.client,
+      protocolVersion: request.protocolVersion,
+      fetchOf: (scope) => this.http.fetchFor(authorization, scope),
+    };
+    const call = {
+      method: request.method,
+      params,
+      remaining: context.remaining,
+    };
+    const answer = await this.connection.request(session, call, signal);
+
+    if (answer.kind === "outdated")
+      return {
+        kind: "misconfigured",
+        detail: `The MCP server speaks a version of the protocol older than ${request.protocolVersion}`,
+      };
+
+    const result = this.#jsonOf(answer.result);
+    return { kind: "answered", result };
+  }
+
+  #failureOf(error: unknown, signal: AbortSignal): RpcOutcome {
+    const expired = signal.aborted || error instanceof ResilienceTimeoutError;
+
+    if (expired) return { kind: "expired" };
+
+    if (error instanceof ResilienceError) throw error;
+
+    if (error instanceof McpError) return this.#rpcFailureOf(error);
+
+    if (error instanceof StreamableHTTPError) return this.#httpFailureOf(error);
+
+    const unspoken = error instanceof $ZodError || error instanceof SyntaxError;
+
+    if (unspoken)
+      return {
+        kind: "unreachable",
+        detail: "The MCP server answered other than the protocol describes",
+      };
+
+    const failure = this.failures.classified(error);
+
+    if (failure !== null) return failure;
+
+    const reason = error instanceof Error ? error.message : String(error);
+    return { kind: "unreachable", detail: `The MCP session failed: ${reason}` };
+  }
+
+  #rpcFailureOf(error: McpError): RpcOutcome {
+    const closed: number = ErrorCode.ConnectionClosed;
+
+    if (error.code === closed)
+      return {
+        kind: "unreachable",
+        detail: "The MCP server closed the connection before it answered",
+      };
+
+    const prefix = `MCP error ${String(error.code)}: `;
+    const prefixed = error.message.startsWith(prefix);
+    const message = prefixed
+      ? error.message.slice(prefix.length)
+      : error.message;
+    const data = this.#jsonOf(error.data);
+    return { kind: "rpcError", code: error.code, message, data };
+  }
+
+  #httpFailureOf(error: StreamableHTTPError): RpcOutcome {
+    const status = error.code;
+    const answered =
+      typeof status === "number" && status >= 100 && status <= 599;
+
+    if (!answered)
+      return {
+        kind: "unreachable",
+        detail: "The MCP server answered other than the protocol describes",
+      };
+
+    return {
+      kind: "rejected",
+      statusCode: status,
+      detail: `The MCP server answered with status ${String(status)}`,
+    };
+  }
+
+  #jsonOf(value: unknown): JsonValue {
+    const defined = value ?? null;
+    const text = JSON.stringify(defined);
+    return JSON.parse(text) as JsonValue;
+  }
+
+  #isObject(value: JsonValue): value is JsonObject {
+    const list = Array.isArray(value);
+    return typeof value === "object" && value !== null && !list;
   }
 
   #overHttp(request: McpRequest): request is HttpMcpRequest {

@@ -14,22 +14,30 @@ import {
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
-import type { Authentication, JsonObject, JsonValue } from "interpreter";
+import type {
+  Authentication,
+  JsonObject,
+  JsonValue,
+  McpRequest,
+} from "interpreter";
 import { z } from "zod";
 import { ResilienceModule } from "@nestjs/resilience";
-import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
-import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
-import type { HttpMcpRequest } from "../../../../src/frameworks/mcp/interfaces.js";
-import { McpClient } from "../../../../src/frameworks/mcp/mcp.client.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
-import { closedPort } from "../../../support/stub-server.js";
+import { resiliencePresets } from "../../../../../src/frameworks/di/host.presets.js";
+import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import { StreamableHttpMcpConnection } from "../../../../../src/frameworks/mcp/streamable-http.mcp-connection.js";
+import type {
+  CallContext,
+  HttpMcpRequest,
+} from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import { McpGateway } from "../../../../../src/interface-adapters/workflows/effects/mcp.gateway.js";
+import { closedPort } from "../../../../support/stub-server.js";
 import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
   httpClientOf,
-} from "../../../support/outbound.js";
+} from "../../../../support/outbound.js";
 
 const TOKEN = "token-1";
 const DATED = new Map([
@@ -44,11 +52,11 @@ interface Initialized {
   readonly headers: IncomingMessage["headers"];
 }
 
-describe("a call the MCP client performs for a run", () => {
+describe("a call the MCP gateway performs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let client: McpClient;
+  let gateway: McpGateway;
   let server: Server;
   let origin = "";
   let port = 0;
@@ -63,7 +71,7 @@ describe("a call the MCP client performs for a run", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
-    client = mcpClientOf(policy);
+    gateway = mcpGatewayOf(policy);
     server = createServer((request, response) => {
       void serve(request, response);
     });
@@ -81,10 +89,11 @@ describe("a call the MCP client performs for a run", () => {
     await context.close();
   });
 
-  function mcpClientOf(guard: AddressPolicy): McpClient {
+  function mcpGatewayOf(guard: AddressPolicy): McpGateway {
     const authentication = authenticationOf(fetchClientOf(guard.dispatcher));
     const http = httpClientOf(guard, resilience);
-    return new McpClient(
+    return new McpGateway(
+      new StreamableHttpMcpConnection(),
       authentication,
       http,
       new TransportFailures(),
@@ -270,7 +279,7 @@ describe("a call the MCP client performs for a run", () => {
 
   describe("methods", () => {
     it("the_tools_of_the_server_are_listed", async () => {
-      const outcome = await client.call(mcpOf("tools/list"), contextOf());
+      const outcome = await gateway.perform(mcpOf("tools/list"), contextOf());
 
       expect(outcome).toMatchObject({
         kind: "answered",
@@ -290,7 +299,7 @@ describe("a call the MCP client performs for a run", () => {
         arguments: { a: 2, b: 3 },
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "answered",
@@ -301,7 +310,7 @@ describe("a call the MCP client performs for a run", () => {
     it("a_tool_that_fails_answers_its_error_as_a_result", async () => {
       const request = mcpOf("tools/call", { name: "missing", arguments: {} });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "answered",
@@ -318,8 +327,8 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("the_prompts_are_listed_and_one_is_got_with_its_arguments", async () => {
-      const listed = await client.call(mcpOf("prompts/list"), contextOf());
-      const got = await client.call(
+      const listed = await gateway.perform(mcpOf("prompts/list"), contextOf());
+      const got = await gateway.perform(
         mcpOf("prompts/get", { name: "greet", arguments: { name: "Ada" } }),
         contextOf(),
       );
@@ -341,12 +350,15 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("the_resources_and_their_templates_are_listed_and_one_is_read", async () => {
-      const listed = await client.call(mcpOf("resources/list"), contextOf());
-      const templates = await client.call(
+      const listed = await gateway.perform(
+        mcpOf("resources/list"),
+        contextOf(),
+      );
+      const templates = await gateway.perform(
         mcpOf("resources/templates/list"),
         contextOf(),
       );
-      const read = await client.call(
+      const read = await gateway.perform(
         mcpOf("resources/read", { uri: "note://1" }),
         contextOf(),
       );
@@ -390,7 +402,7 @@ describe("a call the MCP client performs for a run", () => {
         client: { name: "synapse", version: "1.0.0-alpha5.2" },
       };
 
-      await client.call(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(initialized.map((entry) => entry.client)).toEqual([
         { name: "synapse", version: "1.0.0-alpha5.2" },
@@ -398,7 +410,7 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("the_host_names_itself_when_the_document_names_no_client", async () => {
-      await client.call(mcpOf("tools/list"), contextOf());
+      await gateway.perform(mcpOf("tools/list"), contextOf());
 
       expect(initialized.map((entry) => entry.client)).toEqual([
         { name: "tenon", version: "1.0.0" },
@@ -412,13 +424,13 @@ describe("a call the MCP client performs for a run", () => {
         transport: { ...plain.transport, headers: { "x-tenant": "acme" } },
       };
 
-      await client.call(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(initialized[0]?.headers["x-tenant"]).toBe("acme");
     });
 
     it("the_session_is_closed_after_the_method", async () => {
-      await client.call(mcpOf("tools/list"), contextOf());
+      await gateway.perform(mcpOf("tools/list"), contextOf());
 
       expect(received.at(-1)).toBe("DELETE /mcp");
       expect(sessions.size).toBe(0);
@@ -427,7 +439,7 @@ describe("a call the MCP client performs for a run", () => {
     it("the_session_is_closed_after_a_method_that_expires", async () => {
       const request = mcpOf("tools/call", { name: "wait", arguments: {} });
 
-      const outcome = await client.call(request, contextOf({}, 300));
+      const outcome = await gateway.perform(request, contextOf({}, 300));
 
       expect(outcome).toEqual({ kind: "expired" });
       expect(received).toContain("DELETE /mcp");
@@ -447,7 +459,7 @@ describe("a call the MCP client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({ kind: "answered" });
       expect(initialized[0]?.headers["mcp-session-id"]).toBeUndefined();
@@ -455,7 +467,7 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("a_server_older_than_the_version_the_workflow_requires_is_misconfigured", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         mcpOf("tools/list", null, "/older"),
         contextOf(),
       );
@@ -476,7 +488,7 @@ describe("a call the MCP client performs for a run", () => {
         token: TOKEN,
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({ kind: "answered" });
     });
@@ -488,7 +500,7 @@ describe("a call the MCP client performs for a run", () => {
         secret: "mcp",
       });
 
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         request,
         contextOf({ mcp: { token: TOKEN } }),
       );
@@ -506,7 +518,7 @@ describe("a call the MCP client performs for a run", () => {
         transport: { ...plain.transport, headers: { Authorization: "old" } },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({ kind: "answered" });
     });
@@ -517,7 +529,7 @@ describe("a call the MCP client performs for a run", () => {
         token: "wrong",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -533,7 +545,7 @@ describe("a call the MCP client performs for a run", () => {
         secret: "mcp",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "forbidden",
@@ -544,10 +556,30 @@ describe("a call the MCP client performs for a run", () => {
   });
 
   describe("failures", () => {
+    it("a_stdio_server_the_profile_refuses_throws_before_any_request", async () => {
+      const request: McpRequest = {
+        ...mcpOf("tools/list"),
+        transport: {
+          kind: "stdio",
+          command: "mcp-server",
+          arguments: [],
+          environment: {},
+        },
+      };
+      const context = contextOf();
+
+      const performed = gateway.perform(request, context);
+
+      await expect(performed).rejects.toThrow(
+        "The host does not perform 'mcp.stdio'",
+      );
+      expect(received).toHaveLength(0);
+    });
+
     it("a_json_rpc_error_of_the_server_is_answered_as_an_rpc_error", async () => {
       const request = mcpOf("prompts/get", { name: "missing" });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rpcError",
@@ -563,7 +595,7 @@ describe("a call the MCP client performs for a run", () => {
         protocolVersion: "2099-01-01",
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -576,7 +608,7 @@ describe("a call the MCP client performs for a run", () => {
     it("parameters_other_than_an_object_are_misconfigured", async () => {
       const request = mcpOf("tools/call", ["add"]);
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -585,7 +617,7 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("a_redirect_within_the_origin_is_followed", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         mcpOf("tools/list", null, "/redirect"),
         contextOf(),
       );
@@ -595,7 +627,7 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("a_redirect_to_another_origin_is_rejected_and_not_followed", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         mcpOf("tools/list", null, "/elsewhere"),
         contextOf(),
       );
@@ -609,7 +641,7 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("a_server_answering_a_protocol_version_the_host_does_not_speak_is_unreachable", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         mcpOf("tools/list", null, "/ancient"),
         contextOf(),
       );
@@ -622,7 +654,7 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("a_status_outside_two_hundreds_is_rejected_with_it", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         mcpOf("tools/list", null, "/gone"),
         contextOf(),
       );
@@ -635,7 +667,7 @@ describe("a call the MCP client performs for a run", () => {
     });
 
     it("an_answer_the_protocol_does_not_describe_is_unreachable", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         mcpOf("tools/list", null, "/garbled"),
         contextOf(),
       );
@@ -649,7 +681,7 @@ describe("a call the MCP client performs for a run", () => {
     it("a_call_still_unanswered_at_its_deadline_expires", async () => {
       const request = mcpOf("tools/list", null, "/hang");
 
-      const outcome = await client.call(request, contextOf({}, 200));
+      const outcome = await gateway.perform(request, contextOf({}, 200));
 
       expect(outcome).toEqual({ kind: "expired" });
     });
@@ -668,7 +700,7 @@ describe("a call the MCP client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "unreachable",
@@ -680,7 +712,7 @@ describe("a call the MCP client performs for a run", () => {
       "a_private_destination_%s_is_refused_before_any_connection",
       async (host) => {
         const guarded = new AddressPolicy([]);
-        const guardedClient = mcpClientOf(guarded);
+        const guardedGateway = mcpGatewayOf(guarded);
         const plain = mcpOf("tools/list");
         const request: HttpMcpRequest = {
           ...plain,
@@ -693,7 +725,7 @@ describe("a call the MCP client performs for a run", () => {
           },
         };
 
-        const outcome = await guardedClient.call(request, contextOf());
+        const outcome = await guardedGateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unreachable",
@@ -707,7 +739,7 @@ describe("a call the MCP client performs for a run", () => {
     it("a_response_larger_than_its_bound_is_unreachable", async () => {
       const request = mcpOf("tools/call", { name: "flood", arguments: {} });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "unreachable",
