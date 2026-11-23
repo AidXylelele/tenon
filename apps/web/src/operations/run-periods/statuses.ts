@@ -52,6 +52,11 @@ export function phasesOf(status: RunStatus): readonly Phase[] {
   return [group.phase];
 }
 
+export function statusOf(phase: Phase): RunStatus {
+  const found = STATUSES.find((status) => phasesOf(status).includes(phase));
+  return found ?? "in-progress";
+}
+
 export function statusParamOf(statuses: readonly RunStatus[]): string {
   const chosen = inOrder(statuses);
   return chosen.join(SEPARATOR);

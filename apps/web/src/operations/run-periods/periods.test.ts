@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Period, Started } from "./interfaces";
-import { changeText, periodLabel, periodPhrase, startedOf } from "./periods";
+import type { BucketUnit, Period, Started } from "./interfaces";
+import {
+  changeText,
+  chartNoteOf,
+  periodLabel,
+  periodPhrase,
+  startedOf,
+} from "./periods";
 
 describe("the words of a period", () => {
   it.each<[Started, string, string]>([
@@ -40,5 +46,20 @@ describe("the period in the address", () => {
     const parsed = startedOf(text);
 
     expect(parsed).toBe(started);
+  });
+});
+
+describe("the note under the runs chart", () => {
+  it.each<[BucketUnit, string, string]>([
+    [
+      "hour",
+      "Europe/Kyiv",
+      "Each bar is an hour in your time zone, Europe/Kyiv.",
+    ],
+    ["day", "UTC", "Each bar is a day in UTC."],
+  ])("bars_of_an_%s_in_%s_read_%s", (unit, zone, note) => {
+    const text = chartNoteOf(unit, zone);
+
+    expect(text).toBe(note);
   });
 });

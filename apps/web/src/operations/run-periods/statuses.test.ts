@@ -17,6 +17,7 @@ function phaseWord(phase: Phase): string {
 }
 import {
   phasesOf,
+  statusOf,
   statusesOf,
   statusLabel,
   statusParamOf,
@@ -85,5 +86,19 @@ describe("the line that sums up a list of runs", () => {
     const summary = summaryOf(statuses, started, phaseWord);
 
     expect(summary).toBe(line);
+  });
+});
+
+describe("the status that counts a phase", () => {
+  it.each<[Phase, RunStatus]>([
+    ["pending", "in-progress"],
+    ["suspended", "in-progress"],
+    ["completed", "succeeded"],
+    ["faulted", "failed"],
+    ["cancelled", "cancelled"],
+  ])("%s_is_counted_in_%s", (phase, status) => {
+    const counted = statusOf(phase);
+
+    expect(counted).toBe(status);
   });
 });
