@@ -4,11 +4,11 @@ import {
   Outbox,
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
+import { v5 } from "uuid";
 import { FireSchedule } from "../../application/automation/schedules/fire-schedule.js";
 import { StartScheduledInstance } from "../../application/automation/schedules/start-scheduled-instance.js";
 import { ConsumerSpan } from "./consumer-span.js";
-import { MessageTopic } from "./enums.js";
-import { instanceIdOf } from "./instance-id.js";
+import { IdNamespace, MessageTopic } from "./enums.js";
 import type { ScheduleFiredMessage, ScheduleMessage } from "./interfaces.js";
 
 @Injectable()
@@ -40,7 +40,7 @@ export class ScheduleHandler {
     context: OutboxHandlerContext,
   ): Promise<void> {
     const slot = `${message.workflowId}@${String(message.at)}`;
-    const instanceId = instanceIdOf(slot);
+    const instanceId = v5(slot, IdNamespace.Instances);
     const command = { workflowId: message.workflowId, instanceId };
     await this.span.around(context, () =>
       this.startScheduledInstance.execute(command),

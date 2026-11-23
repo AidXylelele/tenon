@@ -1,5 +1,6 @@
 import type { TransactionHost } from "@nestjs-cls/transactional";
 import type { NewOutboxMessage, Outbox } from "@nestjs/outbox";
+import { v5 } from "uuid";
 import type { FireSchedule } from "../../../../src/application/automation/schedules/fire-schedule.js";
 import type {
   FireScheduleCommand,
@@ -11,7 +12,10 @@ import { Schedule } from "../../../../src/domain/automation/workflows/schedule.j
 import { Workflow } from "../../../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../../../src/domain/automation/workflows/workflow-name.js";
 import { ConsumerSpan } from "../../../../src/interface-adapters/messaging/consumer-span.js";
-import { MessageTopic } from "../../../../src/interface-adapters/messaging/enums.js";
+import {
+  IdNamespace,
+  MessageTopic,
+} from "../../../../src/interface-adapters/messaging/enums.js";
 import { ScheduleHandler } from "../../../../src/interface-adapters/messaging/schedule.handler.js";
 import { WorkflowMessagesGateway } from "../../../../src/interface-adapters/messaging/workflow-messages.gateway.js";
 import type { Transaction } from "../../../../src/interface-adapters/persistence/interfaces.js";
@@ -113,8 +117,6 @@ describe("an armed schedule", () => {
     const ids = started.map((command) => command.instanceId);
     expect(ids[0]).toBe(ids[1]);
     expect(ids[2]).not.toBe(ids[0]);
-    expect(ids[0]).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/,
-    );
+    expect(ids[0]).toBe(v5("w-1@1000", IdNamespace.Instances));
   });
 });

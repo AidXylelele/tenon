@@ -5,6 +5,7 @@ import {
   Outbox,
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
+import { v5 } from "uuid";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
@@ -14,8 +15,7 @@ import { StartOnEvent } from "../../application/automation/schedules/start-on-ev
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
 import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { ConsumerSpan } from "./consumer-span.js";
-import { MessageTopic } from "./enums.js";
-import { instanceIdOf } from "./instance-id.js";
+import { IdNamespace, MessageTopic } from "./enums.js";
 import type {
   AcceptedEventMessage,
   EventOfferedMessage,
@@ -77,7 +77,7 @@ export class AutomationHandler {
     context: OutboxHandlerContext,
   ): Promise<void> {
     const slot = `${message.workflowId}#${String(message.sequence)}`;
-    const instanceId = instanceIdOf(slot);
+    const instanceId = v5(slot, IdNamespace.Instances);
     const command = {
       workflowId: message.workflowId,
       sequence: message.sequence,
