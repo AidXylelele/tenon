@@ -9,7 +9,7 @@ import {
 } from "@asyncapi/parser";
 import type { AsyncApiRequest, JsonObject, JsonValue } from "interpreter";
 import { BrokerProtocol } from "./enums.js";
-import type { BrokerServer, Targeted } from "./interfaces.js";
+import type { AsyncApiServer, Targeted } from "./interfaces.js";
 
 @Injectable()
 export class AsyncApiDocuments {
@@ -165,7 +165,7 @@ export class AsyncApiDocuments {
     return JSON.stringify(given);
   }
 
-  #brokerOf(server: ServerInterface, url: URL): BrokerServer {
+  #brokerOf(server: ServerInterface, url: URL): AsyncApiServer {
     const protocol = server.protocol();
     const port = url.port === "" ? null : Number(url.port);
     const hostname = url.hostname.replace(/^\[(.*)\]$/, "$1");

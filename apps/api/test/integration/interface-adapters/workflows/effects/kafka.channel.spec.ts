@@ -19,39 +19,40 @@ import type {
   AsyncApiRequest,
   JsonObject,
 } from "interpreter";
-import { AmqpBroker } from "../../../../src/frameworks/asyncapi/amqp.broker.js";
-import { AsyncApiClient } from "../../../../src/frameworks/asyncapi/asyncapi.client.js";
-import { AsyncApiDocuments } from "../../../../src/frameworks/asyncapi/asyncapi-documents.js";
-import { BrokerTracer } from "../../../../src/frameworks/asyncapi/broker.tracer.js";
-import type { BrokerSubscription } from "../../../../src/interface-adapters/messaging/interfaces.js";
-import { KafkaBroker } from "../../../../src/frameworks/asyncapi/kafka.broker.js";
-import { MqttBroker } from "../../../../src/frameworks/asyncapi/mqtt.broker.js";
-import { NatsBroker } from "../../../../src/frameworks/asyncapi/nats.broker.js";
-import { RedisBroker } from "../../../../src/frameworks/asyncapi/redis.broker.js";
+import { AmqpConnection } from "../../../../../src/frameworks/amqp/amqp.connection.js";
 import {
   resiliencePresets,
   responseSizeLimit,
-} from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+} from "../../../../../src/frameworks/di/host.presets.js";
+import { KafkaConnection } from "../../../../../src/frameworks/kafka/kafka.connection.js";
+import { MqttConnection } from "../../../../../src/frameworks/mqtt/mqtt.connection.js";
+import { NatsConnection } from "../../../../../src/frameworks/nats/nats.connection.js";
+import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import { RedisConnection } from "../../../../../src/frameworks/redis/redis.connection.js";
+import type { BrokerSubscription } from "../../../../../src/interface-adapters/messaging/interfaces.js";
+import { AmqpChannel } from "../../../../../src/interface-adapters/workflows/effects/amqp.channel.js";
+import { AsyncApiDocuments } from "../../../../../src/interface-adapters/workflows/effects/asyncapi-documents.js";
+import { AsyncApiGateway } from "../../../../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
+import { KafkaChannel } from "../../../../../src/interface-adapters/workflows/effects/kafka.channel.js";
+import { MqttChannel } from "../../../../../src/interface-adapters/workflows/effects/mqtt.channel.js";
+import { NatsChannel } from "../../../../../src/interface-adapters/workflows/effects/nats.channel.js";
+import { RedisChannel } from "../../../../../src/interface-adapters/workflows/effects/redis.channel.js";
 import {
   startStubServer,
   type StubServer,
-} from "../../../support/stub-server.js";
-import { RecordedSpans } from "../../../support/recorded-spans.js";
+} from "../../../../support/stub-server.js";
 import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
   inboxOf,
   resourcesOf,
-} from "../../../support/outbound.js";
+} from "../../../../support/outbound.js";
 
 const HOST = "127.0.0.1";
 const LOOPBACK = ["127.0.0.1", "::1"];
 const PORT = 9093;
 const PROBE = '{"probe":true}';
-const PRODUCER_SPAN = "00f067aa0ba902b7";
-const PRODUCED = `00-4bf92f3577b34da6a3ce929d0e0e4736-${PRODUCER_SPAN}-01`;
 const REFUSED_ADDRESS =
   "The address is private, loopback or link-local and not allow-listed";
 
@@ -84,8 +85,7 @@ function documentOf(bootstrap: string, topic: string): JsonObject {
   };
 }
 
-describe("the AsyncAPI client on a Kafka cluster a document names", () => {
-  let spans: RecordedSpans;
+describe("the AsyncAPI gateway on a Kafka cluster a document names", () => {
   let context: INestApplicationContext;
   let kafka: StartedKafkaContainer;
   let documents: StubServer;
@@ -93,24 +93,23 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
   let bootstrap: string;
   let advertised: string;
   let resilience: ResilienceService;
-  let broker: KafkaBroker;
-  let client: AsyncApiClient;
+  let kafkaConnection: KafkaConnection;
+  let gateway: AsyncApiGateway;
   let admin: Admin;
   let producer: Producer<string, string, string, string>;
   const subscriptions: BrokerSubscription[] = [];
 
-  const clientOn = (policy: AddressPolicy, kafkaBroker: KafkaBroker) =>
-    new AsyncApiClient(
+  const gatewayOn = (policy: AddressPolicy, kafkaOn: KafkaConnection) =>
+    new AsyncApiGateway(
       resourcesOf(new AddressPolicy([HOST]), resilience),
       authenticationOf(fetchClientOf(policy.dispatcher)),
       new AsyncApiDocuments(),
-      new BrokerTracer(),
       responseSizeLimit,
-      new AmqpBroker(policy),
-      kafkaBroker,
-      new MqttBroker(policy),
-      new NatsBroker(policy),
-      new RedisBroker(policy),
+      new AmqpChannel(new AmqpConnection(policy)),
+      new KafkaChannel(kafkaOn),
+      new MqttChannel(new MqttConnection(policy)),
+      new NatsChannel(new NatsConnection(policy)),
+      new RedisChannel(new RedisConnection(policy)),
       resilience,
     );
 
@@ -151,14 +150,14 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     lost: () => void = () => {},
   ) => {
     const call = callContextOf(subscriber);
-    const outcome = await client.subscribe(
+    const outcome = await gateway.subscribe(
       request,
       call,
       inboxOf(deliver, lost),
     );
 
     if (outcome.kind !== "subscribed")
-      throw new Error(`The client did not subscribe: ${outcome.kind}`);
+      throw new Error(`The gateway did not subscribe: ${outcome.kind}`);
 
     subscriptions.push(outcome.subscription);
     return outcome.subscription;
@@ -183,7 +182,6 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     );
 
   beforeAll(async () => {
-    spans = new RecordedSpans();
     kafka = await new KafkaContainer("confluentinc/cp-kafka:8.1.0").start();
     advertised = kafka.getHost();
     bootstrap = `${HOST}:${String(kafka.getMappedPort(PORT))}`;
@@ -205,8 +203,8 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     const policy = new AddressPolicy(LOOPBACK);
-    broker = new KafkaBroker(policy);
-    client = clientOn(policy, broker);
+    kafkaConnection = new KafkaConnection(policy);
+    gateway = gatewayOn(policy, kafkaConnection);
     admin = new Admin({
       clientId: "test",
       bootstrapBrokers: [bootstrap],
@@ -223,13 +221,12 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
   afterAll(async () => {
     const closed = subscriptions.map((subscription) => subscription.close());
     await Promise.allSettled(closed);
-    await broker.onApplicationShutdown();
+    await kafkaConnection.onApplicationShutdown();
     await producer.close();
     await admin.close();
     await context.close();
     await documents.close();
     await kafka.stop();
-    await spans.stop();
   });
 
   it("publishes_the_message_and_its_headers_to_the_topic_the_channel_names", async () => {
@@ -241,7 +238,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     };
     const request = requestOf("paid.json", exchange);
 
-    const outcome = await client.publish(request, callContextOf("step-1"));
+    const outcome = await gateway.perform(request, callContextOf("step-1"));
     const reader = new Consumer({
       clientId: "test",
       groupId: "test-reader",
@@ -260,14 +257,12 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     }
 
     await reader.close(true);
-    const span = spans.only("send paid").spanContext();
 
     expect(outcome).toEqual({ kind: "published" });
     expect(read[0]?.value).toBe('{"order":1}');
     expect(Object.fromEntries(read[0]?.headers ?? [])).toEqual({
       "content-type": "application/json",
       source: "tenon",
-      traceparent: `00-${span.traceId}-${span.spanId}-01`,
     });
   });
 
@@ -298,34 +293,6 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
       },
       { payload: "not json", headers: {}, correlationId: null },
     ]);
-  });
-
-  it("a_receive_takes_each_message_in_a_span_linked_to_where_it_was_produced", async () => {
-    const request = await topicFor("traced");
-    const inbox: AsyncApiInboundMessage[] = [];
-    await subscribed(request, "receiver-traced", (message) => {
-      inbox.push(message);
-      return Promise.resolve();
-    });
-    await joined("traced", inbox);
-
-    await produced("traced", '{"order":5}', { traceparent: PRODUCED });
-    await vi.waitFor(
-      () => {
-        expect(realOf(inbox)).toHaveLength(1);
-      },
-      { timeout: 10_000, interval: 50 },
-    );
-    const processed = spans
-      .all()
-      .filter(
-        (span) => span.name === "process traced" && span.links.length > 0,
-      );
-
-    expect(processed.map((span) => span.links[0]?.context.spanId)).toEqual([
-      PRODUCER_SPAN,
-    ]);
-    expect(processed[0]?.attributes["messaging.system"]).toBe("kafka");
   });
 
   it("a_message_whose_delivery_fails_is_not_committed_and_comes_again_to_the_next_subscription", async () => {
@@ -375,8 +342,8 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
   it("a_cluster_that_advertises_a_broker_the_host_refuses_is_unreachable", async () => {
     expect(advertised).not.toBe(HOST);
     const policy = new AdvertisedNameRefused(advertised);
-    const refusing = new KafkaBroker(policy);
-    const guarded = clientOn(policy, refusing);
+    const refusing = new KafkaConnection(policy);
+    const guarded = gatewayOn(policy, refusing);
     await admin.createTopics({
       topics: ["guarded"],
       partitions: 1,
@@ -389,7 +356,7 @@ describe("the AsyncAPI client on a Kafka cluster a document names", () => {
     };
     const request = requestOf("guarded.json", exchange);
 
-    const outcome = await guarded.publish(request, callContextOf("step-2"));
+    const outcome = await guarded.perform(request, callContextOf("step-2"));
     await refusing.onApplicationShutdown();
 
     expect(outcome).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });

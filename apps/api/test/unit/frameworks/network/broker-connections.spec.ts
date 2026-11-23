@@ -1,10 +1,10 @@
-import { BrokerConnections } from "../../../../src/frameworks/asyncapi/broker-connections.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+import { BrokerConnections } from "../../../../src/frameworks/network/broker-connections.js";
 import type {
-  BrokerCredentials,
   BrokerServer,
   Lost,
-} from "../../../../src/frameworks/asyncapi/interfaces.js";
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+} from "../../../../src/frameworks/network/interfaces.js";
+import type { PasswordCredentials } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 
 interface Connection {
   readonly address: string;
@@ -12,9 +12,8 @@ interface Connection {
 }
 
 const KEPT = 64;
-const ANONYMOUS: BrokerCredentials = { kind: "anonymous" };
-const LOGIN: BrokerCredentials = {
-  kind: "password",
+const ANONYMOUS = null;
+const LOGIN: PasswordCredentials = {
   username: "ada",
   password: "lovelace",
 };
@@ -22,8 +21,6 @@ const LOGIN: BrokerCredentials = {
 function serverAt(hostname: string): BrokerServer {
   return {
     url: `redis://${hostname}:6379`,
-    protocol: "redis",
-    protocolVersion: null,
     hostname,
     port: 6379,
     pathname: "",
@@ -124,7 +121,6 @@ describe("the broker connections a host keeps", () => {
 
   it("the_late_loss_of_an_evicted_connection_leaves_its_successor_kept", async () => {
     const others = Array.from({ length: KEPT }, (_, index) => ({
-      kind: "password" as const,
       username: `user-${String(index)}`,
       password: "p",
     }));

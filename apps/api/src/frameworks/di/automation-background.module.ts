@@ -48,12 +48,18 @@ import { PostgresReceivedMessageStore } from "../../interface-adapters/persisten
 import { EngineDeliveryGateway } from "../../interface-adapters/workflows/gateways/engine-delivery.gateway.js";
 import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
 import { A2aGateway } from "../../interface-adapters/workflows/effects/a2a.gateway.js";
+import { AmqpChannel } from "../../interface-adapters/workflows/effects/amqp.channel.js";
+import { AsyncApiDocuments } from "../../interface-adapters/workflows/effects/asyncapi-documents.js";
 import { AsyncApiGateway } from "../../interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
 import { GrpcGateway } from "../../interface-adapters/workflows/effects/grpc.gateway.js";
 import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
+import { KafkaChannel } from "../../interface-adapters/workflows/effects/kafka.channel.js";
 import { McpGateway } from "../../interface-adapters/workflows/effects/mcp.gateway.js";
+import { MqttChannel } from "../../interface-adapters/workflows/effects/mqtt.channel.js";
+import { NatsChannel } from "../../interface-adapters/workflows/effects/nats.channel.js";
 import { OpenApiGateway } from "../../interface-adapters/workflows/effects/openapi.gateway.js";
+import { RedisChannel } from "../../interface-adapters/workflows/effects/redis.channel.js";
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { EffectClient } from "../../interface-adapters/workflows/interfaces.js";
 import { RunController } from "../../interface-adapters/workflows/run.controller.js";
@@ -62,21 +68,18 @@ import { OpenWorkflowRun } from "../../interface-adapters/workflows/runners/open
 import { ProcessRun } from "../../interface-adapters/workflows/runners/process.run.js";
 import { ScheduleRun } from "../../interface-adapters/workflows/runners/schedule.run.js";
 import { A2aClient } from "../a2a/a2a.client.js";
-import { AmqpBroker } from "../asyncapi/amqp.broker.js";
-import { AsyncApiClient } from "../asyncapi/asyncapi.client.js";
-import { AsyncApiDocuments } from "../asyncapi/asyncapi-documents.js";
-import { BrokerTracer } from "../asyncapi/broker.tracer.js";
-import { KafkaBroker } from "../asyncapi/kafka.broker.js";
-import { MqttBroker } from "../asyncapi/mqtt.broker.js";
-import { NatsBroker } from "../asyncapi/nats.broker.js";
-import { RedisBroker } from "../asyncapi/redis.broker.js";
+import { AmqpConnection } from "../amqp/amqp.connection.js";
 import { SandboxClient } from "../go-judge/sandbox.client.js";
 import { SandboxLimits } from "../go-judge/sandbox-limits.js";
 import { GrpcClient } from "../grpc/grpc.client.js";
 import { ProtoSchema } from "../grpc/proto-schema.js";
+import { KafkaConnection } from "../kafka/kafka.connection.js";
 import { McpClient } from "../mcp/mcp.client.js";
+import { MqttConnection } from "../mqtt/mqtt.connection.js";
+import { NatsConnection } from "../nats/nats.connection.js";
 import { HttpClientName } from "../network/enums.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { RedisConnection } from "../redis/redis.connection.js";
 import { AutomationModule } from "./automation.module.js";
 import { sandboxConfig } from "./configs.js";
 import { sandboxLimits } from "./host.presets.js";
@@ -150,15 +153,18 @@ import { OutboundModule } from "./outbound.module.js";
     GrpcClient,
     McpClient,
     A2aClient,
+    AmqpConnection,
+    KafkaConnection,
+    MqttConnection,
+    NatsConnection,
+    RedisConnection,
     AsyncApiDocuments,
-    BrokerTracer,
-    AmqpBroker,
-    KafkaBroker,
-    MqttBroker,
-    NatsBroker,
-    RedisBroker,
-    AsyncApiClient,
-    { provide: SubscriptionClient, useExisting: AsyncApiClient },
+    AmqpChannel,
+    KafkaChannel,
+    MqttChannel,
+    NatsChannel,
+    RedisChannel,
+    { provide: SubscriptionClient, useExisting: AsyncApiGateway },
     { provide: SandboxLimits, useValue: sandboxLimits },
     SandboxClient,
   ],

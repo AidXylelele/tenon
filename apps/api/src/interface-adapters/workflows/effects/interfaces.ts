@@ -1,10 +1,19 @@
 import type {
+  AsyncApiOutcome,
   AuthenticationScheme,
   Failure,
+  JsonObject,
   ResolvedAuthentication,
   RevealedAuthorization,
 } from "interpreter";
+import type { z } from "zod";
+import type { BrokerServer } from "../../../frameworks/network/interfaces.js";
+import type { Subscribed } from "../../messaging/interfaces.js";
 import type { StepCall } from "../interfaces.js";
+import type {
+  AMQP_CHANNEL,
+  MQTT_OPERATION,
+} from "./asyncapi-bindings.schema.js";
 
 export interface CallContext extends StepCall {
   readonly remaining: number | null;
@@ -41,3 +50,73 @@ export abstract class AuthorizationServer {
     signal: AbortSignal,
   ): Promise<string>;
 }
+
+export type BasicCredentials = Extract<Credentials, { readonly kind: "basic" }>;
+
+export interface AsyncApiServer extends BrokerServer {
+  readonly protocol: string;
+  readonly protocolVersion: string | null;
+}
+
+interface BrokerBindings {
+  readonly channel: Readonly<Record<string, unknown>>;
+  readonly operation: Readonly<Record<string, unknown>>;
+}
+
+export interface BrokerTarget {
+  readonly kind: "target";
+  readonly server: AsyncApiServer;
+  readonly address: string;
+  readonly contentType: string;
+  readonly bindings: BrokerBindings;
+}
+
+export type Targeted =
+  BrokerTarget | Extract<Failure, { readonly kind: "misconfigured" }>;
+
+export type Expired = Extract<Failure, { readonly kind: "expired" }>;
+
+export interface BrokerMessage {
+  readonly body: Buffer;
+  readonly contentType: string;
+  readonly headers: JsonObject;
+  readonly idempotencyKey: string;
+  readonly login: BasicCredentials | null;
+}
+
+export interface ReceivedBrokerMessage {
+  readonly body: Buffer;
+  readonly contentType: string | null;
+  readonly headers: JsonObject;
+  readonly correlationId: string | null;
+}
+
+export interface BrokerInbox {
+  readonly subscriber: string;
+  readonly ended: AbortSignal;
+  demanded(): Promise<void>;
+  deliver(message: ReceivedBrokerMessage): Promise<void>;
+  lost(): void;
+}
+
+export interface BrokerChannel {
+  publish(
+    target: BrokerTarget,
+    message: BrokerMessage,
+    signal: AbortSignal,
+  ): Promise<AsyncApiOutcome>;
+  subscribe(
+    target: BrokerTarget,
+    login: BasicCredentials | null,
+    inbox: BrokerInbox,
+  ): Promise<Subscribed>;
+}
+
+export type AmqpBinding = z.infer<typeof AMQP_CHANNEL>;
+
+export interface AmqpQueue {
+  readonly name: string;
+  readonly shared: boolean;
+}
+
+export type MqttBinding = z.infer<typeof MQTT_OPERATION>;
