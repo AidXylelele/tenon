@@ -7,7 +7,11 @@ import {
   type Authorization,
   HttpConnection,
 } from "../workflows/effects/interfaces.js";
-import type { EventDeliveries, EventDelivery } from "./interfaces.js";
+import {
+  DeliveryAdmission,
+  type EventDeliveries,
+  type EventDelivery,
+} from "./interfaces.js";
 
 @Injectable()
 export class HttpDeliveryGateway implements EventDeliveries {
@@ -16,6 +20,7 @@ export class HttpDeliveryGateway implements EventDeliveries {
   private readonly policy: ResiliencePolicy;
 
   constructor(
+    private readonly admission: DeliveryAdmission,
     private readonly connection: HttpConnection,
     private readonly authenticator: Authenticator,
     resilience: ResilienceService,
@@ -24,7 +29,7 @@ export class HttpDeliveryGateway implements EventDeliveries {
   }
 
   admits(uri: string): Promise<boolean> {
-    return this.connection.admits(uri);
+    return this.admission.admits(uri);
   }
 
   async deliver(delivery: EventDelivery): Promise<string | null> {

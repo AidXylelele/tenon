@@ -42,7 +42,7 @@ export class ResponseContent {
 
   async textOf(response: Response): Promise<string> {
     const body = await this.#bodyOf(response);
-    const media = this.#mediaOf(response);
+    const media = this.mediaOf(response);
     return this.#decoded(body, media);
   }
 
@@ -51,6 +51,18 @@ export class ResponseContent {
       return JSON.parse(text) as JsonValue;
     } catch {
       return text;
+    }
+  }
+
+  mediaOf(response: Response): MIMEType | null {
+    const contentType = response.headers.get("content-type");
+
+    if (contentType === null) return null;
+
+    try {
+      return new MIMEType(contentType);
+    } catch {
+      return null;
     }
   }
 
@@ -85,7 +97,7 @@ export class ResponseContent {
 
     if (output === "raw") return body.toString("base64");
 
-    const media = this.#mediaOf(response);
+    const media = this.mediaOf(response);
     const json = this.#readsAsJson(media, body);
 
     if (json) {
@@ -98,18 +110,6 @@ export class ResponseContent {
     if (textual) return this.#decoded(body, media);
 
     return body.toString("base64");
-  }
-
-  #mediaOf(response: Response): MIMEType | null {
-    const contentType = response.headers.get("content-type");
-
-    if (contentType === null) return null;
-
-    try {
-      return new MIMEType(contentType);
-    } catch {
-      return null;
-    }
   }
 
   #readsAsJson(media: MIMEType | null, body: Buffer): boolean {

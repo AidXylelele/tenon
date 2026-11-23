@@ -250,6 +250,16 @@ describe("a call the A2A gateway performs for a run", () => {
           return;
         }
 
+        if (JSON.stringify(params).includes("shouted")) {
+          stream(
+            response,
+            envelope.id,
+            [TASK],
+            "Text/Event-Stream; charset=utf-8",
+          );
+          return;
+        }
+
         if (JSON.stringify(params).includes("flood")) {
           stream(
             response,
@@ -456,6 +466,15 @@ describe("a call the A2A gateway performs for a run", () => {
           },
         ],
       });
+    });
+
+    it("a_stream_whose_media_type_differs_in_case_and_parameters_is_read_as_events", async () => {
+      const request = serverOf("message/stream", { message: "shouted" });
+      const context = contextOf();
+
+      const outcome = await gateway.perform(request, context);
+
+      expect(outcome).toEqual({ kind: "answered", result: [TASK] });
     });
 
     it("a_stream_answered_with_plain_json_answers_a_list_of_its_one_result", async () => {
@@ -872,8 +891,9 @@ function stream(
   response: ServerResponse,
   id: string,
   results: readonly JsonValue[],
+  contentType = "text/event-stream",
 ): void {
-  response.writeHead(200, { "content-type": "text/event-stream" });
+  response.writeHead(200, { "content-type": contentType });
 
   for (const result of results)
     response.write(

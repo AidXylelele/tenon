@@ -482,6 +482,22 @@ describe("a call the MCP gateway performs for a run", () => {
   });
 
   describe("authentication", () => {
+    it("digest_authentication_the_profile_refuses_throws_before_any_request", async () => {
+      const request = mcpOf("tools/list", null, "/protected", {
+        kind: "digest",
+        username: "Mufasa",
+        password: "Circle of Life",
+      });
+      const context = contextOf();
+
+      const performed = gateway.perform(request, context);
+
+      await expect(performed).rejects.toThrow(
+        "The host does not perform 'authentication.digest'",
+      );
+      expect(received).toHaveLength(0);
+    });
+
     it("a_bearer_token_is_sent_with_every_request_of_the_session", async () => {
       const request = mcpOf("tools/list", null, "/protected", {
         kind: "bearer",

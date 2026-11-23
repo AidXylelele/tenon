@@ -32,32 +32,9 @@ export class HttpGateway {
     request: HttpRequest,
     context: CallContext,
   ): Promise<HttpOutcome> {
-    const authentication = request.endpoint.authentication;
-
-    try {
-      const outbound = this.#outboundOf(request);
-      return await this.send(outbound, authentication, request, context);
-    } catch (error) {
-      return this.failures.of(error, context.signal);
-    }
-  }
-
-  async send(
-    outbound: OutboundRequest,
-    authentication: Authentication | null,
-    options: ResponseOptions,
-    context: CallContext,
-  ): Promise<HttpOutcome> {
     try {
       return await this.policy.execute(
-        (attempt) =>
-          this.#responded(
-            outbound,
-            authentication,
-            options,
-            context,
-            attempt.signal,
-          ),
+        (attempt) => this.#sent(request, context, attempt.signal),
         { signal: context.signal },
       );
     } catch (error) {
@@ -65,11 +42,7 @@ export class HttpGateway {
     }
   }
 
-  fetchFor(authorization: Authorization, signal: AbortSignal): EndpointFetch {
-    return (url, init) => this.#fetchedFor(authorization, url, init, signal);
-  }
-
-  async #responded(
+  async exchange(
     outbound: OutboundRequest,
     authentication: Authentication | null,
     options: ResponseOptions,
@@ -89,6 +62,20 @@ export class HttpGateway {
     const keyed = this.#keyed(outbound, context.idempotencyKey);
     const signed = await this.#signed(keyed, authorization, signal);
     return this.content.respondedOf(keyed, signed, options);
+  }
+
+  fetchFor(authorization: Authorization, signal: AbortSignal): EndpointFetch {
+    return (url, init) => this.#fetchedFor(authorization, url, init, signal);
+  }
+
+  #sent(
+    request: HttpRequest,
+    context: CallContext,
+    signal: AbortSignal,
+  ): Promise<HttpOutcome> {
+    const outbound = this.#outboundOf(request);
+    const authentication = request.endpoint.authentication;
+    return this.exchange(outbound, authentication, request, context, signal);
   }
 
   async #signed(

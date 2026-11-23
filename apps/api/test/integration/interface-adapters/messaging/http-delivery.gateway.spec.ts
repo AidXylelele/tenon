@@ -71,7 +71,12 @@ describe("a delivery and the outbound address policy", () => {
     const outbound = fetchClientOf(policy.dispatcher);
     const authentication = authenticationOf(outbound);
     const connection = connectionOf(policy);
-    return new HttpDeliveryGateway(connection, authentication, resilience);
+    return new HttpDeliveryGateway(
+      policy,
+      connection,
+      authentication,
+      resilience,
+    );
   }
 
   it("a_loopback_destination_is_refused_before_any_connection", async () => {

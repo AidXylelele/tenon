@@ -37,7 +37,7 @@ export class ResourceGateway implements ResourceClient {
   async text(resource: Resource, step: StepCall): Promise<FetchedText> {
     try {
       return await this.policy.execute(
-        (attempt) => this.#textFetched(resource, step, attempt.signal),
+        (attempt) => this.read(resource, step, attempt.signal),
         { signal: step.signal },
       );
     } catch (error) {
@@ -45,7 +45,7 @@ export class ResourceGateway implements ResourceClient {
     }
   }
 
-  async #textFetched(
+  async read(
     resource: Resource,
     step: StepCall,
     signal: AbortSignal,

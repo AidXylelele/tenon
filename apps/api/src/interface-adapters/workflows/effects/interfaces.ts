@@ -46,11 +46,34 @@ export type Authorization =
 
 export type Authorized = Authorization | UnusableSecret;
 
+export type ClientAuthentication =
+  | {
+      readonly kind:
+        "client_secret_basic" | "client_secret_post" | "client_secret_jwt";
+      readonly secret: string;
+    }
+  | { readonly kind: "assertion"; readonly assertion: string }
+  | { readonly kind: "none" };
+
+export interface TokenClient {
+  readonly authority: string;
+  readonly tokenEndpoint: string | null;
+  readonly id: string;
+  readonly authentication: ClientAuthentication;
+  readonly encoding: OAuth2Credentials["encoding"];
+}
+
+export interface TokenEndpoint {
+  readonly issuer: string;
+  readonly located: boolean;
+  grant(type: string, parameters: URLSearchParams): Promise<string>;
+}
+
 export abstract class AuthorizationServer {
-  abstract accessTokenFor(
-    credentials: OAuth2Credentials,
+  abstract endpointOf(
+    client: TokenClient,
     signal: AbortSignal,
-  ): Promise<string>;
+  ): Promise<TokenEndpoint>;
 }
 
 export type AgentCardProperties = z.infer<typeof AGENT_CARD>;
@@ -125,7 +148,6 @@ export type ResponseOptions = Pick<
 >;
 
 export abstract class HttpConnection {
-  abstract admits(uri: string): Promise<boolean>;
   abstract fetch(url: string | URL, init?: RequestInit): Promise<Response>;
 }
 

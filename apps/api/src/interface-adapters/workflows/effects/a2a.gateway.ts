@@ -125,7 +125,7 @@ export class A2aGateway {
 
   #outcomeOf(response: Response, text: string, streamed: boolean): RpcOutcome {
     const status = response.status;
-    const eventStream = this.#isEventStream(response);
+    const eventStream = this.#isEventStream(response, text);
     const events = streamed && response.ok && eventStream;
 
     if (events) return this.#eventsOf(text);
@@ -148,9 +148,24 @@ export class A2aGateway {
     return answer;
   }
 
-  #isEventStream(response: Response): boolean {
-    const contentType = response.headers.get("content-type") ?? "";
-    return contentType.startsWith(A2aGateway.EVENT_STREAM);
+  #isEventStream(response: Response, text: string): boolean {
+    const media = this.content.mediaOf(response);
+
+    if (media === null) {
+      const json = this.#isJson(text);
+      return text !== "" && !json;
+    }
+
+    return media.essence === A2aGateway.EVENT_STREAM;
+  }
+
+  #isJson(text: string): boolean {
+    try {
+      JSON.parse(text);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   #eventsOf(text: string): RpcOutcome {

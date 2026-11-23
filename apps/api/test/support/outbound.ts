@@ -8,6 +8,7 @@ import type { AddressPolicy } from "../../src/frameworks/network/address-policy.
 import { HOST_PROFILE } from "../../src/frameworks/interpreter/host-profile.js";
 import { OutboundHttpConnection } from "../../src/frameworks/network/outbound.http-connection.js";
 import { OpenIdAuthorizationServer } from "../../src/frameworks/oauth/openid.authorization-server.js";
+import { AccessTokens } from "../../src/interface-adapters/workflows/effects/access-tokens.js";
 import { Authenticator } from "../../src/interface-adapters/workflows/effects/authenticator.js";
 import { HttpGateway } from "../../src/interface-adapters/workflows/effects/http.gateway.js";
 import type { CallContext } from "../../src/interface-adapters/workflows/effects/interfaces.js";
@@ -50,13 +51,15 @@ export function trustingIdentityProvider(): NestHttpClient {
 }
 
 export function authenticationOf(identity: NestHttpClient): Authenticator {
-  const server = new OpenIdAuthorizationServer(identity);
-  return new Authenticator(server, HOST_PROFILE);
+  const connection = new OutboundHttpConnection(identity);
+  const server = new OpenIdAuthorizationServer(connection);
+  const tokens = new AccessTokens(server);
+  return new Authenticator(tokens, HOST_PROFILE);
 }
 
 export function connectionOf(policy: AddressPolicy): OutboundHttpConnection {
   const outbound = fetchClientOf(policy.dispatcher);
-  return new OutboundHttpConnection(outbound, policy);
+  return new OutboundHttpConnection(outbound);
 }
 
 export function httpGatewayOf(

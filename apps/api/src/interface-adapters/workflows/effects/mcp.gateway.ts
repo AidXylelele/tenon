@@ -1,12 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import {
-  ResilienceError,
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from "@nestjs/resilience";
+import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type {
   JsonObject,
   JsonValue,
@@ -19,6 +14,7 @@ import { HttpGateway } from "./http.gateway.js";
 import {
   type CallContext,
   type HttpMcpRequest,
+  type McpCall,
   McpConnection,
   type McpSession,
 } from "./interfaces.js";
@@ -74,7 +70,7 @@ export class McpGateway {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      return this.failures.of(error, context.signal);
     }
   }
 
@@ -107,6 +103,20 @@ export class McpGateway {
       params,
       remaining: context.remaining,
     };
+
+    try {
+      return await this.#sessionAnswered(request, session, call, signal);
+    } catch (error) {
+      return this.#sessionFailureOf(error, signal);
+    }
+  }
+
+  async #sessionAnswered(
+    request: HttpMcpRequest,
+    session: McpSession,
+    call: McpCall,
+    signal: AbortSignal,
+  ): Promise<RpcOutcome> {
     const answer = await this.connection.request(session, call, signal);
 
     if (answer.kind === "outdated")
@@ -119,12 +129,8 @@ export class McpGateway {
     return { kind: "answered", result };
   }
 
-  #failureOf(error: unknown, signal: AbortSignal): RpcOutcome {
-    const expired = signal.aborted || error instanceof ResilienceTimeoutError;
-
-    if (expired) return { kind: "expired" };
-
-    if (error instanceof ResilienceError) throw error;
+  #sessionFailureOf(error: unknown, signal: AbortSignal): RpcOutcome {
+    if (signal.aborted) throw error;
 
     if (error instanceof McpError) return this.#rpcFailureOf(error);
 

@@ -73,7 +73,12 @@ describe("a call the HTTP gateways perform for a run", () => {
     const identity = trustingIdentityProvider();
     gateway = httpGatewayOf(policy, resilience, identity);
     resources = resourcesOf(policy, resilience, identity);
-    openApi = new OpenApiGateway(resources, gateway);
+    openApi = new OpenApiGateway(
+      resources,
+      gateway,
+      new TransportFailures(),
+      resilience,
+    );
     stub = await startStubServer((request, response) => {
       answer(request, response);
     });

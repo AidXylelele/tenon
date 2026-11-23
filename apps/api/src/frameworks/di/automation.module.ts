@@ -20,7 +20,10 @@ import { WorkflowRepository } from "../../application/automation/workflows/ports
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
 import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
 import { HttpDeliveryGateway } from "../../interface-adapters/messaging/http-delivery.gateway.js";
-import { EventDeliveries } from "../../interface-adapters/messaging/interfaces.js";
+import {
+  DeliveryAdmission,
+  EventDeliveries,
+} from "../../interface-adapters/messaging/interfaces.js";
 import { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 import { LifecycleEventMapper } from "../../interface-adapters/persistence/mappers/lifecycle-event.mapper.js";
 import { SecretMapper } from "../../interface-adapters/persistence/mappers/secret.mapper.js";
@@ -43,6 +46,7 @@ import { EngineRunGateway } from "../../interface-adapters/workflows/gateways/en
 import { EngineScheduleGateway } from "../../interface-adapters/workflows/gateways/engine-schedule.gateway.js";
 import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
 import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
+import { AccessTokens } from "../../interface-adapters/workflows/effects/access-tokens.js";
 import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
 import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
 import {
@@ -138,11 +142,12 @@ import { OutboundModule } from "./outbound.module.js";
     PiscinaInterpreterClient,
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
     { provide: AuthorizationServer, useClass: OpenIdAuthorizationServer },
+    AccessTokens,
     {
       provide: Authenticator,
-      inject: [AuthorizationServer],
-      useFactory: (server: AuthorizationServer) =>
-        new Authenticator(server, HOST_PROFILE),
+      inject: [AccessTokens],
+      useFactory: (tokens: AccessTokens) =>
+        new Authenticator(tokens, HOST_PROFILE),
     },
     { provide: HttpConnection, useClass: OutboundHttpConnection },
     TransportFailures,
@@ -150,6 +155,7 @@ import { OutboundModule } from "./outbound.module.js";
     HttpGateway,
     ResourceGateway,
     { provide: ResourceClient, useExisting: ResourceGateway },
+    { provide: DeliveryAdmission, useExisting: AddressPolicy },
     HttpDeliveryGateway,
     { provide: EventDeliveries, useExisting: HttpDeliveryGateway },
     EventDeliveryGateway,
