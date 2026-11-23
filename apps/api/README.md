@@ -87,13 +87,15 @@ src/
 │   │   │                       provider, the password-recovery handler, the sessions gateway
 │   │   └── pipeline/           around the routes: JSON-only middleware, throttler guard, stale-draft interceptor and
 │   │                           its conditional-request exception, problem-details filter, CloudEvent decorator
-│   ├── messaging/              outbox handlers, the AsyncAPI receivers' handler, event delivery to subscribers, the
-│   │                           outbox topics and tracer, the contracts it needs from broker and delivery clients
+│   ├── messaging/              outbox handlers, the AsyncAPI receivers' handler, event delivery to subscribers (over
+│   │                           HTTP), the outbox topics and tracer, the contracts it needs from broker clients
 │   ├── mailing/                the mail gateway, its outbox handler, its topics and templates/
 │   ├── workflows/              the durable engine and the interpreter
 │   │   ├── runners/            the engine's @Workflow classes (run, process, schedule, delivery) and the run tracer
 │   │   ├── gateways/           application ports over the engine (engine-*), the interpreter (interpreter-*) and
 │   │   │                       outbound HTTP (http-import)
+│   │   ├── effects/            the effect dispatcher and one gateway per external system: effect ⇄ protocol call ⇄
+│   │   │                       outcome; the authenticator, transport failures, and the contracts connections implement
 │   │   ├── mappers/            domain values ↔ the interpreter's protocol, definitions and run turns
 │   │   ├── run.controller.ts   the runners' way into the use cases
 │   │   ├── program-calls.ts    a version's program call, its source fetched on demand
@@ -112,14 +114,13 @@ src/
     ├── release.ts              the build's version, read from package.json
     ├── di/                     the roots (api, worker), core and shared modules, feature modules (*-http in the API,
     │                           *-background in the worker), the interpreter thread's module, configuration, host presets
-    ├── http-client/            outbound HTTP: the effect client, OpenAPI operations, authentication and OAuth tokens,
-    │                           address policy, size limit, transport failures, response content, event delivery
+    ├── network/                the outbound address policy (SSRF), the response size limit and the HTTP connection
+    ├── oauth/                  OAuth 2.0 and OpenID Connect tokens through openid-client
+    ├── mcp/                    the MCP connection over the SDK's streamable HTTP transport
     ├── grpc/                   the gRPC connection: the channel pool, its TLS rule and address check
-    ├── mcp/, a2a/              one client per effect protocol
     ├── asyncapi/               AsyncAPI documents, the client, one broker per protocol, broker connections and tracer
     ├── go-judge/               the sandbox's result schemas and the image's shell platform
-    ├── interpreter/            the interpreter on Piscina threads (client, tasks, thread entry), the host profile, the
-    │                           effect performer
+    ├── interpreter/            the interpreter on Piscina threads (client, tasks, thread entry), the host profile
     ├── crypto/                 AES-GCM sealing of secret values
     └── opentelemetry/          the process and thread SDKs, the engine, outbox and lock metrics, the instrumentation
                                 scope, the request path traces and logs redact, the shutdown
@@ -128,7 +129,8 @@ src/
 Each kind of file has one suffix: `*.controller.ts`, `*.presenter.ts`, `*.schema.ts`, `*.mapper.ts`, `*.policy.ts`,
 `*.gateway.ts`, `*.handler.ts`, `*.run.ts`, `*.jobs.ts`, `*.tracer.ts`, `*.repository.ts`, `*.queries.ts`, `*.store.ts`,
 `*.client.ts`, `*.broker.ts`, `*.metrics.ts`, `*.mail.ts`, `*.error.ts`, `*.module.ts`, `*.presets.ts`, `*.sdk.ts`,
-`*.shutdown.ts`, `*.cipher.ts`, `*.tasks.ts`, `*.thread.ts`, and Nest's own `*.middleware.ts`, `*.guard.ts`,
+`*.shutdown.ts`, `*.cipher.ts`, `*.dispatcher.ts`, `*.http-connection.ts`, `*.mcp-connection.ts`,
+`*.authorization-server.ts`, `*.tasks.ts`, `*.thread.ts`, and Nest's own `*.middleware.ts`, `*.guard.ts`,
 `*.interceptor.ts`, `*.filter.ts`, `*.decorator.ts`, `*.provider.ts`. A use case is named for its action
 (`publish-draft.ts`), an aggregate or value object for itself (`workflow.ts`). Each folder keeps its types in
 `interfaces.ts` and its enums in `enums.ts`; an application folder keeps its ports in `ports.ts` and its query ports in
@@ -150,12 +152,12 @@ and net ones; each interpreter thread starts its own SDK with only the runtime m
 - **Traces.** HTTP server spans carry `http.route`; a hook call shows `/api/v1/hooks/:token` as its `url.path`, and
   the health checks are not traced. Each engine execution is a root span `execute <workflow>` (consumer) with
   `tenon.workflow` and, for a run, `tenon.instance.id` and `tenon.workflow.generation`; each real step attempt is a
-  span `step <kind>` inside it with `tenon.step.kind` and `tenon.step.attempt`, and an effect's step span names its
-  `tenon.effect.kind`. The engine's journal writes are the PostgreSQL spans beside the step spans. A replay opens no
+  span `step <kind>` inside it with `tenon.step.kind` and `tenon.step.attempt`; an effect's network calls are the
+  HTTP, gRPC and broker client spans inside it. The engine's journal writes are the PostgreSQL spans beside the step spans. A replay opens no
   span. An outbox message is processed in a root span `process <topic>` (consumer) linked to the span that added it,
   and a scheduled job's run is a span `job <name>`. A query outside any span, such as a poll, is not traced.
 - **Metrics.** `tenon.workflow.executions`, `tenon.workflow.step.duration`, `tenon.workflow.compensation.failures`,
-  `tenon.effect.duration`, `tenon.outbox.publish.duration`, `tenon.outbox.lag`, `tenon.outbox.failures` and
+  `tenon.outbox.publish.duration`, `tenon.outbox.lag`, `tenon.outbox.failures` and
   `tenon.lock.losses`, beside the runtime, HTTP, database and interpreter metrics.
 - **Logs.** Every pino record goes to stdout and by OTLP, with `trace_id` and `span_id`. A request is logged by its
   id, method, path (without the query, a hook by its route) and remote address, and its response by its status code.

@@ -52,7 +52,7 @@ import { A2aGateway } from "../../interface-adapters/workflows/effects/a2a.gatew
 import { AsyncApiGateway } from "../../interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
 import { GrpcGateway } from "../../interface-adapters/workflows/effects/grpc.gateway.js";
-import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
+import { McpConnection } from "../../interface-adapters/workflows/effects/interfaces.js";
 import { McpGateway } from "../../interface-adapters/workflows/effects/mcp.gateway.js";
 import { OpenApiGateway } from "../../interface-adapters/workflows/effects/openapi.gateway.js";
 import { ProtoSchema } from "../../interface-adapters/workflows/effects/proto-schema.js";
@@ -64,7 +64,6 @@ import { DeliveryRun } from "../../interface-adapters/workflows/runners/delivery
 import { OpenWorkflowRun } from "../../interface-adapters/workflows/runners/open-workflow.run.js";
 import { ProcessRun } from "../../interface-adapters/workflows/runners/process.run.js";
 import { ScheduleRun } from "../../interface-adapters/workflows/runners/schedule.run.js";
-import { A2aClient } from "../a2a/a2a.client.js";
 import { AmqpBroker } from "../asyncapi/amqp.broker.js";
 import { AsyncApiClient } from "../asyncapi/asyncapi.client.js";
 import { AsyncApiDocuments } from "../asyncapi/asyncapi-documents.js";
@@ -74,7 +73,7 @@ import { MqttBroker } from "../asyncapi/mqtt.broker.js";
 import { NatsBroker } from "../asyncapi/nats.broker.js";
 import { RedisBroker } from "../asyncapi/redis.broker.js";
 import { GrpcConnection } from "../grpc/grpc.connection.js";
-import { McpClient } from "../mcp/mcp.client.js";
+import { StreamableHttpMcpConnection } from "../mcp/streamable-http.mcp-connection.js";
 import { HttpClientName } from "../network/enums.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
 import { AutomationModule } from "./automation.module.js";
@@ -137,7 +136,6 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: ReceivedMessages, useClass: PostgresReceivedMessageStore },
     { provide: ReceiverQueries, useClass: PostgresReceiverQueries },
     PostgresLockStore,
-    HttpGateway,
     OpenApiGateway,
     GrpcGateway,
     McpGateway,
@@ -148,8 +146,7 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: EffectClient, useExisting: EffectDispatcher },
     ProtoSchema,
     GrpcConnection,
-    McpClient,
-    A2aClient,
+    { provide: McpConnection, useClass: StreamableHttpMcpConnection },
     AsyncApiDocuments,
     BrokerTracer,
     AmqpBroker,

@@ -8,12 +8,12 @@ import {
   type RevealedAuthorization,
   type SecretPolicies,
 } from "interpreter";
-import {
-  AuthorizationServer,
-  type Authorized,
-  type Credentials,
-  type PasswordCredentials,
-  type UnusableSecret,
+import { AccessTokens } from "./access-tokens.js";
+import type {
+  Authorized,
+  Credentials,
+  PasswordCredentials,
+  UnusableSecret,
 } from "./interfaces.js";
 
 @Injectable()
@@ -21,7 +21,7 @@ export class Authenticator {
   private readonly policies: SecretPolicies;
 
   constructor(
-    private readonly server: AuthorizationServer,
+    private readonly tokens: AccessTokens,
     private readonly profile: HostProfile,
   ) {
     this.policies = createSecretPolicies();
@@ -48,7 +48,7 @@ export class Authenticator {
       }
       case "oauth2":
       case "oidc": {
-        const token = await this.server.accessTokenFor(credentials, signal);
+        const token = await this.tokens.accessTokenFor(credentials, signal);
         return this.#header("Bearer", token);
       }
     }

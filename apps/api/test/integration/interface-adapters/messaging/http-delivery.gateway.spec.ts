@@ -6,9 +6,13 @@ import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
 import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
-import { DeliveryClient } from "../../../../src/frameworks/http-client/delivery.client.js";
+import { HttpDeliveryGateway } from "../../../../src/interface-adapters/messaging/http-delivery.gateway.js";
 import type { EventDelivery } from "../../../../src/interface-adapters/messaging/interfaces.js";
-import { authenticationOf, fetchClientOf } from "../../../support/outbound.js";
+import {
+  authenticationOf,
+  connectionOf,
+  fetchClientOf,
+} from "../../../support/outbound.js";
 
 describe("a delivery and the outbound address policy", () => {
   let context: INestApplicationContext;
@@ -63,10 +67,16 @@ describe("a delivery and the outbound address policy", () => {
     return { uri, scheme, credential, event };
   }
 
-  function clientOf(policy: AddressPolicy): DeliveryClient {
+  function clientOf(policy: AddressPolicy): HttpDeliveryGateway {
     const outbound = fetchClientOf(policy.dispatcher);
     const authentication = authenticationOf(outbound);
-    return new DeliveryClient(outbound, policy, authentication, resilience);
+    const connection = connectionOf(policy);
+    return new HttpDeliveryGateway(
+      policy,
+      connection,
+      authentication,
+      resilience,
+    );
   }
 
   it("a_loopback_destination_is_refused_before_any_connection", async () => {

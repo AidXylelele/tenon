@@ -1,39 +1,35 @@
 import { Injectable } from "@nestjs/common";
-import {
-  HttpNetworkError,
-  InjectHttpClient,
-  HttpClient as NestHttpClient,
-} from "@nestjs/http-client";
+import { HttpNetworkError } from "@nestjs/http-client";
 import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type { Authentication, JsonObject } from "interpreter";
-import type {
-  EventDeliveries,
-  EventDelivery,
-} from "../../interface-adapters/messaging/interfaces.js";
-import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
-import type { Authorization } from "../../interface-adapters/workflows/effects/interfaces.js";
-import { AddressPolicy } from "../network/address-policy.js";
-import { HttpClientName } from "../network/enums.js";
+import { Authenticator } from "../workflows/effects/authenticator.js";
+import {
+  type Authorization,
+  HttpConnection,
+} from "../workflows/effects/interfaces.js";
+import {
+  DeliveryAdmission,
+  type EventDeliveries,
+  type EventDelivery,
+} from "./interfaces.js";
 
 @Injectable()
-export class DeliveryClient implements EventDeliveries {
+export class HttpDeliveryGateway implements EventDeliveries {
   private static readonly SECRET = "subscription";
 
   private readonly policy: ResiliencePolicy;
 
   constructor(
-    @InjectHttpClient(HttpClientName.Outbound)
-    private readonly outbound: NestHttpClient,
-    private readonly addresses: AddressPolicy,
-    private readonly authentication: Authenticator,
+    private readonly admission: DeliveryAdmission,
+    private readonly connection: HttpConnection,
+    private readonly authenticator: Authenticator,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("service-calls");
   }
 
   admits(uri: string): Promise<boolean> {
-    const hostname = new URL(uri).hostname;
-    return this.addresses.admits(hostname);
+    return this.admission.admits(uri);
   }
 
   async deliver(delivery: EventDelivery): Promise<string | null> {
@@ -55,7 +51,7 @@ export class DeliveryClient implements EventDeliveries {
   ): Promise<string | null> {
     const authentication = this.#authenticationOf(delivery);
     const secrets = this.#secretsOf(delivery);
-    const authorization = await this.authentication.authorizationOf(
+    const authorization = await this.authenticator.authorizationOf(
       authentication,
       secrets,
       signal,
@@ -71,33 +67,32 @@ export class DeliveryClient implements EventDeliveries {
 
   async #posted(
     delivery: EventDelivery,
-    headers: Readonly<Record<string, string | null>>,
+    headers: Headers,
     signal: AbortSignal,
   ): Promise<string | null> {
     const body = JSON.stringify(delivery.event);
-    const response = await this.outbound.post(delivery.uri, {
+    const response = await this.connection.fetch(delivery.uri, {
+      method: "POST",
       headers,
       body,
-      redirect: "manual",
       signal,
-      responseType: "response",
     });
-    await response.data.body?.cancel();
+    await response.body?.cancel();
     const status = String(response.status);
     return response.ok ? null : `The destination answered ${status}`;
   }
 
-  #headersOf(
-    authorization: Authorization,
-  ): Readonly<Record<string, string | null>> {
-    const value =
-      authorization.kind === "header"
-        ? this.authentication.headerValueOf(authorization.header)
-        : null;
-    return {
+  #headersOf(authorization: Authorization): Headers {
+    const headers = new Headers({
       "content-type": "application/cloudevents+json",
-      authorization: value,
-    };
+    });
+
+    if (authorization.kind === "header") {
+      const value = this.authenticator.headerValueOf(authorization.header);
+      headers.set("authorization", value);
+    }
+
+    return headers;
   }
 
   #authenticationOf(delivery: EventDelivery): Authentication | null {
@@ -105,7 +100,7 @@ export class DeliveryClient implements EventDeliveries {
 
     if (scheme === null || delivery.credential === null) return null;
 
-    return { kind: "secret", scheme, secret: DeliveryClient.SECRET };
+    return { kind: "secret", scheme, secret: HttpDeliveryGateway.SECRET };
   }
 
   #secretsOf(delivery: EventDelivery): JsonObject {
@@ -113,6 +108,6 @@ export class DeliveryClient implements EventDeliveries {
 
     if (credential === null) return {};
 
-    return { [DeliveryClient.SECRET]: credential };
+    return { [HttpDeliveryGateway.SECRET]: credential };
   }
 }
