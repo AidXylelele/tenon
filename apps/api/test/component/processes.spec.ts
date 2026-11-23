@@ -11,12 +11,12 @@ import { EffectClient } from "../../src/application/automation/instances/ports.j
 import { WorkerModule } from "../../src/frameworks/di/worker.module.js";
 import { IdempotencyJobs } from "../../src/interface-adapters/jobs/idempotency.jobs.js";
 import { AsyncApiHandler } from "../../src/interface-adapters/messaging/asyncapi.handler.js";
+import { DeliveryHandler } from "../../src/interface-adapters/messaging/delivery.handler.js";
 import { EffectHandler } from "../../src/interface-adapters/messaging/effect.handler.js";
 import { RunHandler } from "../../src/interface-adapters/messaging/run.handler.js";
 import { AsyncApiGateway } from "../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { SandboxGateway } from "../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
-import { DeliveryRun } from "../../src/interface-adapters/workflows/runners/delivery.run.js";
 import { ScheduleRun } from "../../src/interface-adapters/workflows/runners/schedule.run.js";
 import { truncateAll } from "../support/db.js";
 
@@ -39,7 +39,7 @@ const RUNNERS = new Set<unknown>([
   RunHandler,
   EffectHandler,
   ScheduleRun,
-  DeliveryRun,
+  DeliveryHandler,
 ]);
 
 function runnersOf(app: INestApplication | TestingModule): unknown[] {

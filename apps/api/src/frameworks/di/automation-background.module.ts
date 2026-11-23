@@ -46,6 +46,8 @@ import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
 import { AsyncApiHandler } from "../../interface-adapters/messaging/asyncapi.handler.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
 import { ConsumerSpan } from "../../interface-adapters/messaging/consumer-span.js";
+import { DeliveryMessagesGateway } from "../../interface-adapters/messaging/delivery-messages.gateway.js";
+import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.handler.js";
 import { EffectHandler } from "../../interface-adapters/messaging/effect.handler.js";
 import { RunHandler } from "../../interface-adapters/messaging/run.handler.js";
 import { SubscriptionClient } from "../../interface-adapters/messaging/interfaces.js";
@@ -56,7 +58,6 @@ import { PostgresDeliveryLogStore } from "../../interface-adapters/persistence/s
 import { PostgresEventOfferStore } from "../../interface-adapters/persistence/stores/postgres-event-offer.store.js";
 import { PostgresLockStore } from "../../interface-adapters/persistence/stores/postgres-lock.store.js";
 import { PostgresReceivedMessageStore } from "../../interface-adapters/persistence/stores/postgres-received-message.store.js";
-import { EngineDeliveryGateway } from "../../interface-adapters/workflows/gateways/engine-delivery.gateway.js";
 import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
 import { A2aGateway } from "../../interface-adapters/workflows/effects/a2a.gateway.js";
 import { AmqpGateway } from "../../interface-adapters/workflows/effects/amqp.gateway.js";
@@ -75,7 +76,6 @@ import { RedisGateway } from "../../interface-adapters/workflows/effects/redis.g
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
 import { RunController } from "../../interface-adapters/workflows/run.controller.js";
-import { DeliveryRun } from "../../interface-adapters/workflows/runners/delivery.run.js";
 import { ScheduleRun } from "../../interface-adapters/workflows/runners/schedule.run.js";
 import { AmqpConnection } from "../amqp/amqp.connection.js";
 import { parserOptions } from "../asyncapi/parser.options.js";
@@ -135,15 +135,15 @@ import { OutboundModule } from "./outbound.module.js";
     FailDelivery,
     RunController,
     ScheduleRun,
-    DeliveryRun,
-    EngineDeliveryGateway,
-    { provide: Deliveries, useExisting: EngineDeliveryGateway },
+    DeliveryMessagesGateway,
+    { provide: Deliveries, useExisting: DeliveryMessagesGateway },
     InterpreterRoutingGateway,
     { provide: EventRouting, useExisting: InterpreterRoutingGateway },
     ConsumerSpan,
     AutomationHandler,
     RunHandler,
     EffectHandler,
+    DeliveryHandler,
     AsyncApiHandler,
     RetentionJobs,
     InboundMapper,

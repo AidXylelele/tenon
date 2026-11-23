@@ -9,4 +9,5 @@ export enum MessageTopic {
   RunFail = "run.fail",
   RunEffect = "run.effect",
   RunTimer = "run.timer",
+  DeliveryRequested = "delivery.requested",
 }

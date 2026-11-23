@@ -42,6 +42,11 @@ export interface TimerMessage {
   readonly at: number;
 }
 
+export interface DeliveryMessage {
+  readonly subscriptionId: string;
+  readonly sequence: number;
+}
+
 export interface RespondMessage {
   readonly instanceId: string;
   readonly effectId: string;
