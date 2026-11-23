@@ -1,5 +1,6 @@
 import type { MethodDefinition } from "@grpc/proto-loader";
 import type {
+  AsyncApiOutcome,
   AuthenticationScheme,
   Endpoint,
   Failure,
@@ -13,8 +14,14 @@ import type {
 } from "interpreter";
 import type { Message, Root } from "protobufjs";
 import type { z } from "zod";
+import type { BrokerServer } from "../../../frameworks/network/interfaces.js";
+import type { Subscribed } from "../../messaging/interfaces.js";
 import type { StepCall } from "../interfaces.js";
 import type { AGENT_CARD } from "./agent-card.schema.js";
+import type {
+  AMQP_CHANNEL,
+  MQTT_OPERATION,
+} from "./asyncapi-bindings.schema.js";
 import type {
   OPENAPI_DOCUMENT,
   OPENAPI_OPERATION,
@@ -217,3 +224,68 @@ export interface LocatedOperation {
 export type OperationRequest =
   | { readonly kind: "operation"; readonly request: OutboundRequest }
   | Extract<Failure, { readonly kind: "misconfigured" }>;
+
+export type BasicCredentials = Extract<Credentials, { readonly kind: "basic" }>;
+
+export interface AsyncApiServer extends BrokerServer {
+  readonly protocol: string;
+  readonly protocolVersion: string | null;
+}
+
+interface BrokerBindings {
+  readonly channel: Readonly<Record<string, unknown>>;
+  readonly operation: Readonly<Record<string, unknown>>;
+}
+
+export interface BrokerTarget {
+  readonly kind: "target";
+  readonly server: AsyncApiServer;
+  readonly address: string;
+  readonly contentType: string;
+  readonly bindings: BrokerBindings;
+}
+
+export type Targeted =
+  BrokerTarget | Extract<Failure, { readonly kind: "misconfigured" }>;
+
+export type Expired = Extract<Failure, { readonly kind: "expired" }>;
+
+export interface BrokerMessage {
+  readonly body: Buffer;
+  readonly contentType: string;
+  readonly headers: JsonObject;
+  readonly idempotencyKey: string;
+  readonly login: BasicCredentials | null;
+}
+
+export interface ReceivedBrokerMessage {
+  readonly body: Buffer;
+  readonly contentType: string | null;
+  readonly headers: JsonObject;
+  readonly correlationId: string | null;
+}
+
+export interface BrokerInbox {
+  readonly subscriber: string;
+  readonly ended: AbortSignal;
+  demanded(): Promise<void>;
+  deliver(message: ReceivedBrokerMessage): Promise<void>;
+  lost(): void;
+}
+
+export interface BrokerGateway {
+  publish(
+    target: BrokerTarget,
+    message: BrokerMessage,
+    signal: AbortSignal,
+  ): Promise<AsyncApiOutcome>;
+  subscribe(
+    target: BrokerTarget,
+    login: BasicCredentials | null,
+    inbox: BrokerInbox,
+  ): Promise<Subscribed>;
+}
+
+export type AmqpBinding = z.infer<typeof AMQP_CHANNEL>;
+
+export type MqttBinding = z.infer<typeof MQTT_OPERATION>;

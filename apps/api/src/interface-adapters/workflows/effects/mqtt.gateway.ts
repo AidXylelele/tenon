@@ -1,37 +1,22 @@
-import { isIP } from "node:net";
-import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
-import { context, propagation } from "@opentelemetry/api";
+import { Injectable } from "@nestjs/common";
 import type { AsyncApiOutcome, Failure } from "interpreter";
-import {
-  type AckHandler,
-  connectAsync,
-  type IClientPublishOptions,
-  type IPublishPacket,
-  type MqttClient,
-} from "mqtt";
-import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
-import { AddressPolicy } from "../network/address-policy.js";
-import { MQTT_OPERATION } from "./bindings.schema.js";
-import { BrokerConnections } from "./broker-connections.js";
+import type { AckHandler, IClientPublishOptions, IPublishPacket } from "mqtt";
+import type { MqttVersion } from "../../../frameworks/mqtt/interfaces.js";
+import { MqttConnection } from "../../../frameworks/mqtt/mqtt.connection.js";
+import type { Subscribed } from "../../messaging/interfaces.js";
+import { MQTT_OPERATION } from "./asyncapi-bindings.schema.js";
 import type {
-  BrokerCredentials,
-  BrokerMessage,
+  BasicCredentials,
+  BrokerGateway,
   BrokerInbox,
-  BrokerClient,
-  BrokerServer,
+  BrokerMessage,
   BrokerTarget,
-  Lost,
   MqttBinding,
-  MqttVersion,
   ReceivedBrokerMessage,
 } from "./interfaces.js";
 
 @Injectable()
-export class MqttBroker implements BrokerClient, OnApplicationShutdown {
-  private static readonly PORT = 1883;
-  private static readonly SECURE_PORT = 8883;
-  private static readonly RECONNECT_MS = 1_000;
-  private static readonly FORCED = true;
+export class MqttGateway implements BrokerGateway {
   private static readonly VERSION_5: MqttVersion = 5;
   private static readonly VERSION_3_1_1: MqttVersion = 4;
   private static readonly REFUSED_LOGINS = [4, 5, 134, 135];
@@ -42,41 +27,31 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     detail: "The operation's mqtt binding is not one the host reads",
   };
 
-  readonly system = "mqtt";
-  private readonly connections: BrokerConnections<MqttClient>;
-
-  constructor(addresses: AddressPolicy) {
-    this.connections = new BrokerConnections(addresses, (client) =>
-      client.endAsync(MqttBroker.FORCED),
-    );
-  }
+  constructor(private readonly mqtt: MqttConnection) {}
 
   async publish(
     target: BrokerTarget,
     message: BrokerMessage,
-    credentials: BrokerCredentials,
   ): Promise<AsyncApiOutcome> {
-    const version = this.#versionOf(target.server);
+    const version = this.#versionOf(target);
     const headed = Object.keys(message.headers).length > 0;
-    const declared = target.bindings.operation.mqtt ?? {};
-    const binding = MQTT_OPERATION.safeParse(declared);
+    const binding = this.#bindingOf(target);
 
-    if (headed && version !== MqttBroker.VERSION_5)
+    if (headed && version !== MqttGateway.VERSION_5)
       return {
         kind: "misconfigured",
         detail: "MQTT 3.1.1 carries no headers; name protocolVersion 5",
       };
 
-    if (!binding.success) return MqttBroker.UNREAD_BINDING;
+    if (binding === null) return MqttGateway.UNREAD_BINDING;
 
     try {
-      const client = await this.connections.of(
+      const client = await this.mqtt.clientOf(
         target.server,
-        credentials,
-        (address, lost) =>
-          this.#connected(target.server, address, credentials, lost),
+        message.login,
+        version,
       );
-      const options = this.#optionsOf(binding.data, message, version);
+      const options = this.#optionsOf(binding, message, version);
       await client.publishAsync(target.address, message.body, options);
       return { kind: "published" };
     } catch (error) {
@@ -86,14 +61,14 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
 
   async subscribe(
     target: BrokerTarget,
-    credentials: BrokerCredentials,
+    login: BasicCredentials | null,
     inbox: BrokerInbox,
   ): Promise<Subscribed> {
-    const declared = target.bindings.operation.mqtt ?? {};
-    const binding = MQTT_OPERATION.safeParse(declared);
+    const binding = this.#bindingOf(target);
 
-    if (!binding.success) return MqttBroker.UNREAD_BINDING;
+    if (binding === null) return MqttGateway.UNREAD_BINDING;
 
+    const version = this.#versionOf(target);
     const lost = () => {
       inbox.lost();
     };
@@ -107,19 +82,21 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     };
 
     try {
-      const client = await this.connections.dedicated(
+      const client = await this.mqtt.subscriberOf(
         target.server,
-        (address) =>
-          this.#connected(target.server, address, credentials, lost, acked),
+        login,
+        version,
+        acked,
+        lost,
       );
       const subscription = { close: () => client.endAsync() };
       client.on("message", (_topic, payload, packet) => {
-        if (packet.qos !== MqttBroker.AT_MOST_ONCE) return;
+        if (packet.qos !== MqttGateway.AT_MOST_ONCE) return;
 
         this.#delivered(payload, packet, inbox);
       });
       await client
-        .subscribeAsync(target.address, { qos: binding.data.qos })
+        .subscribeAsync(target.address, { qos: binding.qos })
         .catch(async (error: unknown) => {
           const closed = subscription.close();
           await Promise.allSettled([closed]);
@@ -131,10 +108,6 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     }
   }
 
-  onApplicationShutdown(): Promise<void> {
-    return this.connections.close();
-  }
-
   #acked(
     payload: Buffer,
     packet: IPublishPacket,
@@ -144,7 +117,7 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     const received = this.#receivedOf(payload, packet);
     inbox.deliver(received).then(
       () => {
-        done(MqttBroker.SUCCESS);
+        done(MqttGateway.SUCCESS);
       },
       () => {
         inbox.lost();
@@ -175,37 +148,13 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     };
   }
 
-  async #connected(
-    server: BrokerServer,
-    address: string,
-    credentials: BrokerCredentials,
-    lost: Lost,
-    acked?: AckHandler,
-  ): Promise<MqttClient> {
-    const scheme = server.secure ? "mqtts" : "mqtt";
-    const ipv6 = isIP(address) === 6;
-    const host = ipv6 ? `[${address}]` : address;
-    const defaultPort = server.secure
-      ? MqttBroker.SECURE_PORT
-      : MqttBroker.PORT;
-    const port = server.port ?? defaultPort;
-    const url = `${scheme}://${host}:${String(port)}`;
-    const login = credentials.kind === "password" ? credentials : null;
-    const named = isIP(server.hostname) === 0;
-    const options = {
-      servername: named ? server.hostname : undefined,
-      protocolVersion: this.#versionOf(server),
-      username: login?.username,
-      password: login?.password,
-      connectTimeout: BrokerConnections.CONNECT_MS,
-      reconnectPeriod: MqttBroker.RECONNECT_MS,
-      resubscribe: true,
-      customHandleAcks: acked,
-    };
-    const client = await connectAsync(url, options, false);
-    client.on("error", () => undefined);
-    client.on("end", lost);
-    return client;
+  #bindingOf(target: BrokerTarget): MqttBinding | null {
+    const declared = target.bindings.operation.mqtt ?? {};
+    const binding = MQTT_OPERATION.safeParse(declared);
+
+    if (!binding.success) return null;
+
+    return binding.data;
   }
 
   #optionsOf(
@@ -216,7 +165,7 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     const qos = binding.qos;
     const retain = binding.retain;
 
-    if (version !== MqttBroker.VERSION_5) return { qos, retain };
+    if (version !== MqttGateway.VERSION_5) return { qos, retain };
 
     const userProperties: Record<string, string> = {};
 
@@ -224,8 +173,6 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
       userProperties[name] =
         typeof value === "string" ? value : JSON.stringify(value);
 
-    const active = context.active();
-    propagation.inject(active, userProperties);
     const contentType = message.contentType;
     return { qos, retain, properties: { contentType, userProperties } };
   }
@@ -244,11 +191,12 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
     return headers;
   }
 
-  #versionOf(server: BrokerServer): MqttVersion {
+  #versionOf(target: BrokerTarget): MqttVersion {
+    const server = target.server;
     const five =
       server.protocol === "mqtt5" ||
       (server.protocolVersion?.startsWith("5") ?? false);
-    return five ? MqttBroker.VERSION_5 : MqttBroker.VERSION_3_1_1;
+    return five ? MqttGateway.VERSION_5 : MqttGateway.VERSION_3_1_1;
   }
 
   #failureOf(error: unknown): Failure {
@@ -256,7 +204,7 @@ export class MqttBroker implements BrokerClient, OnApplicationShutdown {
       error instanceof Error ? Reflect.get(error, "code") : undefined;
     const detail = error instanceof Error ? error.message : String(error);
     const refused =
-      typeof code === "number" && MqttBroker.REFUSED_LOGINS.includes(code);
+      typeof code === "number" && MqttGateway.REFUSED_LOGINS.includes(code);
 
     if (refused) return { kind: "unauthenticated", detail };
 

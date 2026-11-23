@@ -1,3 +1,4 @@
+import { Parser } from "@asyncapi/parser";
 import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { HttpClientModule } from "@nestjs/http-client";
@@ -49,13 +50,19 @@ import { PostgresReceivedMessageStore } from "../../interface-adapters/persisten
 import { EngineDeliveryGateway } from "../../interface-adapters/workflows/gateways/engine-delivery.gateway.js";
 import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
 import { A2aGateway } from "../../interface-adapters/workflows/effects/a2a.gateway.js";
+import { AmqpGateway } from "../../interface-adapters/workflows/effects/amqp.gateway.js";
+import { AsyncApiDocuments } from "../../interface-adapters/workflows/effects/asyncapi-documents.js";
 import { AsyncApiGateway } from "../../interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
 import { GrpcGateway } from "../../interface-adapters/workflows/effects/grpc.gateway.js";
 import { McpConnection } from "../../interface-adapters/workflows/effects/interfaces.js";
+import { KafkaGateway } from "../../interface-adapters/workflows/effects/kafka.gateway.js";
 import { McpGateway } from "../../interface-adapters/workflows/effects/mcp.gateway.js";
+import { MqttGateway } from "../../interface-adapters/workflows/effects/mqtt.gateway.js";
+import { NatsGateway } from "../../interface-adapters/workflows/effects/nats.gateway.js";
 import { OpenApiGateway } from "../../interface-adapters/workflows/effects/openapi.gateway.js";
 import { ProtoSchema } from "../../interface-adapters/workflows/effects/proto-schema.js";
+import { RedisGateway } from "../../interface-adapters/workflows/effects/redis.gateway.js";
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
 import { EffectClient } from "../../interface-adapters/workflows/interfaces.js";
@@ -64,18 +71,16 @@ import { DeliveryRun } from "../../interface-adapters/workflows/runners/delivery
 import { OpenWorkflowRun } from "../../interface-adapters/workflows/runners/open-workflow.run.js";
 import { ProcessRun } from "../../interface-adapters/workflows/runners/process.run.js";
 import { ScheduleRun } from "../../interface-adapters/workflows/runners/schedule.run.js";
-import { AmqpBroker } from "../asyncapi/amqp.broker.js";
-import { AsyncApiClient } from "../asyncapi/asyncapi.client.js";
-import { AsyncApiDocuments } from "../asyncapi/asyncapi-documents.js";
-import { BrokerTracer } from "../asyncapi/broker.tracer.js";
-import { KafkaBroker } from "../asyncapi/kafka.broker.js";
-import { MqttBroker } from "../asyncapi/mqtt.broker.js";
-import { NatsBroker } from "../asyncapi/nats.broker.js";
-import { RedisBroker } from "../asyncapi/redis.broker.js";
+import { AmqpConnection } from "../amqp/amqp.connection.js";
+import { parserOptions } from "../asyncapi/parser.options.js";
 import { GrpcConnection } from "../grpc/grpc.connection.js";
+import { KafkaConnection } from "../kafka/kafka.connection.js";
 import { StreamableHttpMcpConnection } from "../mcp/streamable-http.mcp-connection.js";
+import { MqttConnection } from "../mqtt/mqtt.connection.js";
+import { NatsConnection } from "../nats/nats.connection.js";
 import { HttpClientName } from "../network/enums.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { RedisConnection } from "../redis/redis.connection.js";
 import { AutomationModule } from "./automation.module.js";
 import { sandboxConfig } from "./configs.js";
 import { processPlatform, sandboxLimits } from "./host.presets.js";
@@ -147,15 +152,19 @@ import { OutboundModule } from "./outbound.module.js";
     ProtoSchema,
     GrpcConnection,
     { provide: McpConnection, useClass: StreamableHttpMcpConnection },
+    AmqpConnection,
+    KafkaConnection,
+    MqttConnection,
+    NatsConnection,
+    RedisConnection,
+    { provide: Parser, useFactory: () => new Parser(parserOptions) },
     AsyncApiDocuments,
-    BrokerTracer,
-    AmqpBroker,
-    KafkaBroker,
-    MqttBroker,
-    NatsBroker,
-    RedisBroker,
-    AsyncApiClient,
-    { provide: SubscriptionClient, useExisting: AsyncApiClient },
+    AmqpGateway,
+    KafkaGateway,
+    MqttGateway,
+    NatsGateway,
+    RedisGateway,
+    { provide: SubscriptionClient, useExisting: AsyncApiGateway },
     { provide: SandboxLimits, useValue: sandboxLimits },
     { provide: ProcessPlatform, useValue: processPlatform },
   ],

@@ -1,4 +1,10 @@
-import { type AddressInfo, createServer, type Socket } from "node:net";
+import { Parser } from "@asyncapi/parser";
+import {
+  type AddressInfo,
+  connect as connectTcp,
+  createServer,
+  type Socket,
+} from "node:net";
 import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceModule, ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
@@ -6,7 +12,7 @@ import {
   connect as connectNats,
   headers as natsHeaders,
   type Msg,
-  type NatsConnection,
+  type NatsConnection as NatsClient,
 } from "@nats-io/transport-node";
 import {
   type Channel,
@@ -16,6 +22,7 @@ import {
 import type {
   AsyncApiInboundMessage,
   AsyncApiRequest,
+  Failure,
   JsonObject,
 } from "interpreter";
 import { connectAsync, type MqttClient, type Packet } from "mqtt";
@@ -25,33 +32,38 @@ import {
   type StartedTestContainer,
   Wait,
 } from "testcontainers";
-import { PermanentFault } from "../../../../src/interface-adapters/workflows/permanent-fault.error.js";
+import { AmqpConnection } from "../../../../../src/frameworks/amqp/amqp.connection.js";
+import { parserOptions } from "../../../../../src/frameworks/asyncapi/parser.options.js";
 import {
   resiliencePresets,
   responseSizeLimit,
-} from "../../../../src/frameworks/di/host.presets.js";
-import { AmqpBroker } from "../../../../src/frameworks/asyncapi/amqp.broker.js";
-import { AsyncApiClient } from "../../../../src/frameworks/asyncapi/asyncapi.client.js";
-import { AsyncApiDocuments } from "../../../../src/frameworks/asyncapi/asyncapi-documents.js";
-import { BrokerTracer } from "../../../../src/frameworks/asyncapi/broker.tracer.js";
-import type { BrokerSubscription } from "../../../../src/interface-adapters/messaging/interfaces.js";
-import { KafkaBroker } from "../../../../src/frameworks/asyncapi/kafka.broker.js";
-import { MqttBroker } from "../../../../src/frameworks/asyncapi/mqtt.broker.js";
-import { NatsBroker } from "../../../../src/frameworks/asyncapi/nats.broker.js";
-import { RedisBroker } from "../../../../src/frameworks/asyncapi/redis.broker.js";
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+} from "../../../../../src/frameworks/di/host.presets.js";
+import { KafkaConnection } from "../../../../../src/frameworks/kafka/kafka.connection.js";
+import { MqttConnection } from "../../../../../src/frameworks/mqtt/mqtt.connection.js";
+import { NatsConnection } from "../../../../../src/frameworks/nats/nats.connection.js";
+import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import { RedisConnection } from "../../../../../src/frameworks/redis/redis.connection.js";
+import type { BrokerSubscription } from "../../../../../src/interface-adapters/messaging/interfaces.js";
+import { AmqpGateway } from "../../../../../src/interface-adapters/workflows/effects/amqp.gateway.js";
+import { AsyncApiDocuments } from "../../../../../src/interface-adapters/workflows/effects/asyncapi-documents.js";
+import { AsyncApiGateway } from "../../../../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
+import { KafkaGateway } from "../../../../../src/interface-adapters/workflows/effects/kafka.gateway.js";
+import { MqttGateway } from "../../../../../src/interface-adapters/workflows/effects/mqtt.gateway.js";
+import { NatsGateway } from "../../../../../src/interface-adapters/workflows/effects/nats.gateway.js";
+import { RedisGateway } from "../../../../../src/interface-adapters/workflows/effects/redis.gateway.js";
+import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
 import {
   closedPort,
   startStubServer,
   type StubServer,
-} from "../../../support/stub-server.js";
+} from "../../../../support/stub-server.js";
 import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
   inboxOf,
   resourcesOf,
-} from "../../../support/outbound.js";
+} from "../../../../support/outbound.js";
 
 const HOST = "127.0.0.1";
 const LOGIN = { kind: "basic", username: "ada", password: "lovelace" } as const;
@@ -107,10 +119,10 @@ function eventuallyOne<T>(received: readonly T[]): Promise<T> {
   );
 }
 
-describe("the AsyncAPI client publishing on the servers a document names", () => {
+describe("the AsyncAPI gateway publishing on the servers a document names", () => {
   let context: INestApplicationContext;
-  let client: AsyncApiClient;
-  let publishers: readonly { onApplicationShutdown(): Promise<void> }[];
+  let gateway: AsyncApiGateway;
+  let connections: readonly { onApplicationShutdown(): Promise<void> }[];
   let documents: StubServer;
   let served: Record<string, JsonObject>;
   let mosquitto: StartedTestContainer;
@@ -196,30 +208,30 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
     const policy = new AddressPolicy([HOST]);
     const resources = resourcesOf(policy, resilience);
     const authentication = authenticationOf(fetchClientOf(policy.dispatcher));
-    const amqp = new AmqpBroker(policy);
-    const kafka = new KafkaBroker(policy);
-    const mqtt = new MqttBroker(policy);
-    const natsPublisher = new NatsBroker(policy);
-    const redisPublisher = new RedisBroker(policy);
-    publishers = [amqp, kafka, mqtt, natsPublisher, redisPublisher];
-    client = new AsyncApiClient(
+    const amqp = new AmqpConnection(policy);
+    const kafka = new KafkaConnection(policy);
+    const mqtt = new MqttConnection(policy);
+    const natsConnection = new NatsConnection(policy);
+    const redisConnection = new RedisConnection(policy);
+    connections = [amqp, kafka, mqtt, natsConnection, redisConnection];
+    gateway = new AsyncApiGateway(
       resources,
       authentication,
-      new AsyncApiDocuments(),
-      new BrokerTracer(),
+      new AsyncApiDocuments(new Parser(parserOptions)),
       responseSizeLimit,
-      amqp,
-      kafka,
-      mqtt,
-      natsPublisher,
-      redisPublisher,
+      new TransportFailures(),
+      new AmqpGateway(amqp),
+      new KafkaGateway(kafka),
+      new MqttGateway(mqtt),
+      new NatsGateway(natsConnection),
+      new RedisGateway(redisConnection),
       resilience,
     );
   }, 180_000);
 
   afterAll(async () => {
     await Promise.all(
-      publishers.map((publisher) => publisher.onApplicationShutdown()),
+      connections.map((connection) => connection.onApplicationShutdown()),
     );
     await context.close();
     await documents.close();
@@ -271,7 +283,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 7 }, { source: "tenon" }),
       );
 
-      const outcome = await client.publish(request, callContextOf("step-1"));
+      const outcome = await gateway.perform(request, callContextOf("step-1"));
       const message = await eventuallyOne(received);
 
       expect(outcome).toEqual({ kind: "published" });
@@ -284,7 +296,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
   });
 
   describe("on NATS", () => {
-    let subscriber: NatsConnection;
+    let subscriber: NatsClient;
     const received: Received[] = [];
 
     beforeAll(async () => {
@@ -329,7 +341,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         LOGIN,
       );
 
-      const outcome = await client.publish(request, callContextOf("step-2"));
+      const outcome = await gateway.perform(request, callContextOf("step-2"));
       const message = await eventuallyOne(received);
 
       expect(outcome).toEqual({ kind: "published" });
@@ -348,7 +360,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         ANOTHER_LOGIN,
       );
 
-      const outcome = await client.publish(request, callContextOf("step-3"));
+      const outcome = await gateway.perform(request, callContextOf("step-3"));
 
       expect(outcome).toMatchObject({ kind: "unauthenticated" });
     });
@@ -385,8 +397,8 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 11 }, { source: "tenon" }),
       );
 
-      const outcome = await client.publish(plain, callContextOf("step-4"));
-      const refused = await client.publish(headed, callContextOf("step-5"));
+      const outcome = await gateway.perform(plain, callContextOf("step-4"));
+      const refused = await gateway.perform(headed, callContextOf("step-5"));
       const message = await eventuallyOne(received);
 
       expect(outcome).toEqual({ kind: "published" });
@@ -425,7 +437,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         LOGIN,
       );
 
-      const outcome = await client.publish(request, callContextOf("step-6"));
+      const outcome = await gateway.perform(request, callContextOf("step-6"));
       const message = await vi.waitFor(
         async () => {
           const got = await channel.get("orders", { noAck: true });
@@ -455,7 +467,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         ANOTHER_LOGIN,
       );
 
-      const outcome = await client.publish(request, callContextOf("step-7"));
+      const outcome = await gateway.perform(request, callContextOf("step-7"));
 
       expect(outcome).toMatchObject({ kind: "unauthenticated" });
     });
@@ -487,7 +499,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         { name: "broker", variables: { port } },
       );
 
-      const outcome = await client.publish(request, callContextOf("step-8"));
+      const outcome = await gateway.perform(request, callContextOf("step-8"));
 
       expect(outcome).toEqual({ kind: "published" });
     });
@@ -502,7 +514,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 15 }),
       );
 
-      const outcome = await client.publish(request, callContextOf("step-9"));
+      const outcome = await gateway.perform(request, callContextOf("step-9"));
 
       expect(outcome).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });
     });
@@ -518,7 +530,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 16 }),
       );
 
-      const outcome = await client.publish(request, callContextOf("step-10"));
+      const outcome = await gateway.perform(request, callContextOf("step-10"));
 
       expect(outcome).toMatchObject({ kind: "unreachable" });
     });
@@ -563,14 +575,14 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         };
         const protocols = ["amqp", "mqtt", "nats", "redis"];
         const publishing = protocols.map((protocol) =>
-          client.publish(
+          gateway.perform(
             requestOn(protocol),
             callContextOf(`step-${protocol}`),
           ),
         );
 
         const outcomes = await Promise.all(publishing);
-        const next = client.publish(requestOn("amqp"), stoppedCall);
+        const next = gateway.perform(requestOn("amqp"), stoppedCall);
         await vi.waitFor(
           () => {
             expect(dialled).toHaveLength(protocols.length + 1);
@@ -609,7 +621,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         const inbox = { ...inboxOf(deliver), ended: ended.signal };
         const dials = dialled.length;
 
-        const subscribed = client.subscribe(
+        const subscribed = gateway.subscribe(
           request,
           callContextOf("receiver-silent"),
           inbox,
@@ -640,7 +652,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 17 }),
       );
 
-      const outcome = await client.publish(request, callContextOf("step-11"));
+      const outcome = await gateway.perform(request, callContextOf("step-11"));
       const read = documents.received.map((received) => received.url);
 
       expect(outcome).toMatchObject({ kind: "misconfigured" });
@@ -657,7 +669,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 18 }),
       );
 
-      const outcome = await client.publish(request, callContextOf("step-12"));
+      const outcome = await gateway.perform(request, callContextOf("step-12"));
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -675,11 +687,136 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 19 }),
       );
 
-      const outcome = await client.publish(request, callContextOf("step-13"));
+      const outcome = await gateway.perform(request, callContextOf("step-13"));
 
       expect(outcome).toEqual({
         kind: "misconfigured",
         detail: "The host does not publish over the protocol 'stomp'",
+      });
+    });
+
+    it("a_broker_login_other_than_basic_is_misconfigured", async () => {
+      served["bearer.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders",
+      });
+      const request = requestOf(
+        "bearer.json",
+        { operation: "announce" },
+        published({ order: 22 }),
+        { kind: "bearer", token: "t-1" },
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-20"));
+
+      expect(outcome).toEqual({
+        kind: "misconfigured",
+        detail: "A broker is authenticated with basic credentials only",
+      });
+    });
+
+    it("a_message_larger_than_the_host_takes_is_misconfigured_and_never_sent", async () => {
+      served["large.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders",
+      });
+      const text = "x".repeat(responseSizeLimit.bytes);
+      const request = requestOf(
+        "large.json",
+        { operation: "announce" },
+        published({ text }),
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-21"));
+
+      expect(outcome).toEqual({
+        kind: "misconfigured",
+        detail: "The message is larger than the host's 1 MiB",
+      });
+    });
+
+    it("a_message_of_exactly_the_host_limit_is_sent", async () => {
+      served["limit.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders-limit",
+      });
+      const text = "x".repeat(responseSizeLimit.bytes - 2);
+      const request = requestOf(
+        "limit.json",
+        { operation: "announce" },
+        { kind: "publish", message: { payload: text, headers: {} } },
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-24"));
+
+      expect(outcome).toEqual({ kind: "published" });
+    });
+
+    it("a_text_payload_on_a_text_channel_is_sent_as_it_is", async () => {
+      served["text.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders-text",
+        messages: { note: { contentType: "text/plain", payload: {} } },
+      });
+      const subscriber = createClient({ url: `redis://${at(redis, 6379)}` });
+      const notes: string[] = [];
+      await subscriber.connect();
+      await subscriber.subscribe("orders-text", (body: string) => {
+        notes.push(body);
+      });
+      const request = requestOf(
+        "text.json",
+        { channel: "orders" },
+        { kind: "publish", message: { payload: "paid", headers: {} } },
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-25"));
+      const note = await eventuallyOne(notes);
+      await subscriber.close();
+
+      expect(outcome).toEqual({ kind: "published" });
+      expect(note).toBe("paid");
+    });
+
+    it("headers_on_mqtt_3_1_1_are_misconfigured", async () => {
+      served["mqtt-3.json"] = {
+        asyncapi: "3.0.0",
+        info: infoOf("mqtt 3.1.1 orders"),
+        servers: {
+          broker: {
+            host: at(mosquitto, 1883),
+            protocol: "mqtt",
+            protocolVersion: "3.1.1",
+          },
+        },
+        channels: { orders: { address: "orders/paid" } },
+      };
+      const request = requestOf(
+        "mqtt-3.json",
+        { channel: "orders" },
+        published({ order: 23 }, { source: "tenon" }),
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-22"));
+
+      expect(outcome).toEqual({
+        kind: "misconfigured",
+        detail: "MQTT 3.1.1 carries no headers; name protocolVersion 5",
+      });
+    });
+
+    it("a_kafka_binding_the_host_cannot_read_is_misconfigured", async () => {
+      served["kafka-binding.json"] = v3Document("kafka", `${HOST}:9092`, {
+        address: "orders",
+        bindings: { kafka: { topic: "" } },
+      });
+      const request = requestOf(
+        "kafka-binding.json",
+        { operation: "announce" },
+        published({ order: 24 }),
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-23"));
+
+      expect(outcome).toEqual({
+        kind: "misconfigured",
+        detail: "The channel's kafka binding is not one the host reads",
       });
     });
 
@@ -690,7 +827,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         published({ order: 20 }),
       );
 
-      const outcome = await client.publish(request, callContextOf("step-14"));
+      const outcome = await gateway.perform(request, callContextOf("step-14"));
 
       expect(outcome).toMatchObject({ kind: "rejected", statusCode: 404 });
     });
@@ -707,9 +844,11 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         },
       );
 
-      const outcome = client.publish(request, callContextOf("step-15"));
+      const outcome = gateway.perform(request, callContextOf("step-15"));
 
-      await expect(outcome).rejects.toBeInstanceOf(PermanentFault);
+      await expect(outcome).rejects.toThrow(
+        "A receive is a wait of the run that the host's receivers answer",
+      );
     });
   });
   describe("receiving the messages of a subscription", () => {
@@ -728,10 +867,10 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
     ) => {
       const call = callContextOf("receiver-1");
       const inbox = inboxOf(deliver, lost);
-      const outcome = await client.subscribe(request, call, inbox);
+      const outcome = await gateway.subscribe(request, call, inbox);
 
       if (outcome.kind !== "subscribed")
-        throw new Error(`The client did not subscribe: ${outcome.kind}`);
+        throw new Error(`The gateway did not subscribe: ${outcome.kind}`);
 
       subscriptions.push(outcome.subscription);
       return outcome.subscription;
@@ -852,6 +991,186 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
       expect(inbox).toEqual([
         { payload: { order: 4 }, headers: {}, correlationId: null },
         { payload: { order: 5 }, headers: {}, correlationId: null },
+      ]);
+    });
+
+    it("a_receive_refuses_a_login_other_than_basic_and_a_protocol_the_host_does_not_receive_over", async () => {
+      served["stomp-in.json"] = v3Document("stomp", `${HOST}:61613`, {
+        address: "orders",
+      });
+      const bearer = requestOf(
+        "redis-in.json",
+        { channel: "orders" },
+        receive,
+        { kind: "bearer", token: "t-1" },
+      );
+      const stomp = requestOf("stomp-in.json", { channel: "orders" }, receive);
+      const inbox = inboxOf(() => Promise.resolve());
+
+      const refused = await gateway.subscribe(
+        bearer,
+        callContextOf("receiver-bearer"),
+        inbox,
+      );
+      const unspoken = await gateway.subscribe(
+        stomp,
+        callContextOf("receiver-stomp"),
+        inbox,
+      );
+
+      expect(refused).toEqual({
+        kind: "misconfigured",
+        detail: "A broker is authenticated with basic credentials only",
+      });
+      expect(unspoken).toEqual({
+        kind: "misconfigured",
+        detail: "The host does not receive over the protocol 'stomp'",
+      });
+    });
+
+    it("an_mqtt_receive_reads_json_by_the_content_type_of_each_message", async () => {
+      served["mqtt-typed.json"] = v3Document("mqtt", at(mosquitto, 1883), {
+        address: "orders/typed",
+      });
+      const inbox: AsyncApiInboundMessage[] = [];
+      const request = requestOf(
+        "mqtt-typed.json",
+        { channel: "orders" },
+        receive,
+      );
+      await subscribed(request, collectedIn(inbox));
+      const publisher = await connectAsync(`mqtt://${at(mosquitto, 1883)}`, {
+        protocolVersion: 5,
+      });
+      const vendor = { contentType: "application/vnd.order+json" };
+      const plain = { contentType: "text/plain" };
+
+      await publisher.publishAsync("orders/typed", '{"order":1}', {
+        qos: 1,
+        properties: vendor,
+      });
+      await publisher.publishAsync("orders/typed", '{"order":2}', {
+        qos: 1,
+        properties: plain,
+      });
+      await publisher.endAsync();
+      await twoOf(inbox);
+
+      expect(inbox.map((message) => message.payload)).toEqual([
+        { order: 1 },
+        '{"order":2}',
+      ]);
+    });
+
+    it("a_receive_ended_while_its_broker_answers_late_closes_the_subscription_that_arrives", async () => {
+      const relayed = { held: false, subscribed: false, closed: false };
+      const release = new AbortController();
+      const relay = createServer((socket) => {
+        relayed.held = true;
+        socket.pause();
+        release.signal.addEventListener("abort", () => {
+          const upstream = connectTcp(redis.getMappedPort(6379), HOST);
+          socket.on("data", (chunk: Buffer) => {
+            if (/subscribe/i.test(chunk.toString())) relayed.subscribed = true;
+            upstream.write(chunk);
+          });
+          socket.on("close", () => {
+            relayed.closed = true;
+            upstream.destroy();
+          });
+          upstream.pipe(socket);
+          socket.resume();
+        });
+      });
+      await new Promise<void>((resolve) => {
+        relay.listen(0, HOST, resolve);
+      });
+      const port = String((relay.address() as AddressInfo).port);
+      served["redis-late.json"] = v3Document("redis", `${HOST}:${port}`, {
+        address: "orders-late",
+      });
+      const request = requestOf(
+        "redis-late.json",
+        { channel: "orders" },
+        receive,
+      );
+      const ended = new AbortController();
+      const inbox = {
+        ...inboxOf(() => Promise.resolve()),
+        ended: ended.signal,
+      };
+
+      const subscribing = gateway.subscribe(
+        request,
+        callContextOf("receiver-late"),
+        inbox,
+      );
+      await vi.waitFor(
+        () => {
+          expect(relayed.held).toBe(true);
+        },
+        { timeout: 5_000, interval: 20 },
+      );
+      ended.abort();
+      const subscribed = await subscribing;
+      release.abort();
+      await vi.waitFor(
+        () => {
+          expect(relayed.closed).toBe(true);
+        },
+        { timeout: 5_000, interval: 20 },
+      );
+      await new Promise((resolve) => relay.close(resolve));
+
+      expect(subscribed).toEqual({ kind: "expired" });
+      expect(relayed.subscribed).toBe(true);
+    });
+
+    it("a_received_message_larger_than_the_host_takes_fails_the_receive", async () => {
+      served["redis-large.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders-large",
+      });
+      const failures: Failure[] = [];
+      const inbox = {
+        ...inboxOf(() => Promise.resolve()),
+        failure: (failure: Failure) => {
+          failures.push(failure);
+          return Promise.resolve();
+        },
+      };
+      const request = requestOf(
+        "redis-large.json",
+        { channel: "orders" },
+        receive,
+      );
+      const outcome = await gateway.subscribe(
+        request,
+        callContextOf("receiver-large"),
+        inbox,
+      );
+
+      if (outcome.kind !== "subscribed")
+        throw new Error(`The gateway did not subscribe: ${outcome.kind}`);
+
+      subscriptions.push(outcome.subscription);
+      const publisher = createClient({ url: `redis://${at(redis, 6379)}` });
+      await publisher.connect();
+      const large = "x".repeat(responseSizeLimit.bytes + 1);
+
+      await publisher.publish("orders-large", large);
+      await publisher.close();
+      await vi.waitFor(
+        () => {
+          expect(failures).toHaveLength(1);
+        },
+        { timeout: 5_000, interval: 20 },
+      );
+
+      expect(failures).toEqual([
+        {
+          kind: "misconfigured",
+          detail: "A received message is larger than the host's 1 MiB",
+        },
       ]);
     });
 
@@ -1035,7 +1354,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
           LOGIN,
         );
         await subscribed(receiving, collectedIn(inbox), lost);
-        const before = await client.publish(
+        const before = await gateway.perform(
           publishing,
           callContextOf("step-18"),
         );
@@ -1065,7 +1384,7 @@ describe("the AsyncAPI client publishing on the servers a document names", () =>
         );
         const after = await vi.waitFor(
           async () => {
-            const outcome = await client.publish(
+            const outcome = await gateway.perform(
               republishing,
               callContextOf("step-19"),
             );
