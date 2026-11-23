@@ -34,7 +34,6 @@ import type { WorkflowInstance } from "../../../domain/automation/instances/work
 import type { JsonValue } from "../../../domain/automation/interfaces.js";
 import type { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import type { WorkflowVersion } from "../../../domain/automation/workflows/workflow-version.js";
-import { IncompatibleRun } from "../incompatible-run.error.js";
 import {
   type ControlStep,
   InterpreterClient,
@@ -90,16 +89,31 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     return this.turns.toTurn(program, played, []);
   }
 
-  respond(
+  async respond(
     instance: WorkflowInstance,
     answer: EffectAnswer,
     secrets: RunSecrets,
     now: Date,
     signal: AbortSignal,
   ): Promise<PlayedTurn> {
-    return this.#played(instance, now, () =>
-      this.#responded(instance, answer, secrets, now, signal),
+    const run = this.#runOf(instance);
+    const program = this.#programOf(instance, run, signal);
+    const state = this.turns.toState(run);
+    const context = this.#contextOf(secrets, now);
+    const response = this.protocol.toResponse(answer);
+    const stepped = await this.client.respond(
+      program.call,
+      state,
+      response,
+      context,
     );
+
+    if (stepped.kind === "incompatible") return this.#stranded(instance, now);
+
+    const answered = [answer.effectId];
+    const played = { steps: [stepped.step], answered, taken: null };
+    const expired = response.outcome.kind === "expired" ? answered : [];
+    return this.turns.toTurn(program, played, expired);
   }
 
   receive(
@@ -113,16 +127,30 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     return this.respond(instance, answer, secrets, now, signal);
   }
 
-  offer(
+  async offer(
     instance: WorkflowInstance,
     offer: EventOffer,
     secrets: RunSecrets,
     now: Date,
     signal: AbortSignal,
   ): Promise<PlayedTurn> {
-    return this.#played(instance, now, () =>
-      this.#offered(instance, offer, secrets, now, signal),
+    const run = this.#runOf(instance);
+    const program = this.#programOf(instance, run, signal);
+    const state = this.turns.toState(run);
+    const context = this.#contextOf(secrets, now);
+    const event = this.protocol.toCloudEvent(offer.event);
+    const candidates = run.listeningFor(offer);
+    const played = await this.#offeredTo(
+      program.call,
+      state,
+      context,
+      event,
+      candidates,
     );
+
+    if (played === null) return this.#stranded(instance, now);
+
+    return this.turns.toTurn(program, played, []);
   }
 
   answerChild(
@@ -213,10 +241,7 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     return this.#endingOf(end);
   }
 
-  async #cancelledEnding(
-    instance: WorkflowInstance,
-    now: Date,
-  ): Promise<RunEnding> {
+  async #stranded(instance: WorkflowInstance, now: Date): Promise<PlayedTurn> {
     const identity = await this.#identityOf(instance);
     const at = now.getTime();
     const end: HostEnd = {
@@ -225,7 +250,8 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
       now: at,
       phase: "cancelled",
     };
-    return this.#endingOf(end);
+    const ending = this.#endingOf(end);
+    return { status: TurnStatus.Stranded, ending };
   }
 
   async #identityOf(instance: WorkflowInstance): Promise<VersionIdentity> {
@@ -242,81 +268,20 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     return this.turns.toEnding(ending);
   }
 
-  #controlled(
+  async #controlled(
     instance: WorkflowInstance,
     now: Date,
     signal: AbortSignal | null,
     control: ControlStep,
   ): Promise<PlayedTurn> {
-    return this.#played(instance, now, async () => {
-      const run = this.#runOf(instance);
-      const program = this.#programOf(instance, run, signal);
-      const state = this.turns.toState(run);
-      const step = await control(program.call, state);
-      const played = { steps: [step], answered: [], taken: null };
-      return this.turns.toTurn(program, played, []);
-    });
-  }
-
-  async #played(
-    instance: WorkflowInstance,
-    now: Date,
-    turn: () => Promise<RunTurn>,
-  ): Promise<PlayedTurn> {
-    try {
-      return await turn();
-    } catch (error) {
-      if (!(error instanceof IncompatibleRun)) throw error;
-
-      const ending = await this.#cancelledEnding(instance, now);
-      return { status: TurnStatus.Stranded, ending };
-    }
-  }
-
-  async #responded(
-    instance: WorkflowInstance,
-    answer: EffectAnswer,
-    secrets: RunSecrets,
-    now: Date,
-    signal: AbortSignal,
-  ): Promise<RunTurn> {
     const run = this.#runOf(instance);
     const program = this.#programOf(instance, run, signal);
     const state = this.turns.toState(run);
-    const context = this.#contextOf(secrets, now);
-    const response = this.protocol.toResponse(answer);
-    const step = await this.client.respond(
-      program.call,
-      state,
-      response,
-      context,
-    );
-    const answered = [answer.effectId];
-    const played = { steps: [step], answered, taken: null };
-    const expired = response.outcome.kind === "expired" ? answered : [];
-    return this.turns.toTurn(program, played, expired);
-  }
+    const stepped = await control(program.call, state);
 
-  async #offered(
-    instance: WorkflowInstance,
-    offer: EventOffer,
-    secrets: RunSecrets,
-    now: Date,
-    signal: AbortSignal,
-  ): Promise<RunTurn> {
-    const run = this.#runOf(instance);
-    const program = this.#programOf(instance, run, signal);
-    const state = this.turns.toState(run);
-    const context = this.#contextOf(secrets, now);
-    const event = this.protocol.toCloudEvent(offer.event);
-    const candidates = run.listeningFor(offer);
-    const played = await this.#offeredTo(
-      program.call,
-      state,
-      context,
-      event,
-      candidates,
-    );
+    if (stepped.kind === "incompatible") return this.#stranded(instance, now);
+
+    const played = { steps: [stepped.step], answered: [], taken: null };
     return this.turns.toTurn(program, played, []);
   }
 
@@ -339,14 +304,18 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
         id: listen.id,
         outcome: { kind: "event", event },
       };
-      const step = await this.client.respond(
+      const stepped = await this.client.respond(
         call,
         current.state,
         response,
         context,
       );
-      steps.push(step);
-      const declined = step.declined.includes(event.id);
+
+      if (stepped.kind === "incompatible")
+        throw new TypeError("A run that has not begun fits every build");
+
+      steps.push(stepped.step);
+      const declined = stepped.step.declined.includes(event.id);
 
       if (!declined) answered.push(listen.id);
     }
@@ -360,7 +329,7 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
     context: StepContext,
     event: CloudEvent,
     candidates: readonly Listening[],
-  ): Promise<Played> {
+  ): Promise<Played | null> {
     const steps: Step[] = [];
     let current = state;
 
@@ -369,10 +338,18 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
         id: candidate.effectId,
         outcome: { kind: "event", event },
       };
-      const step = await this.client.respond(call, current, response, context);
-      steps.push(step);
-      current = step.state;
-      const declined = step.declined.includes(event.id);
+      const stepped = await this.client.respond(
+        call,
+        current,
+        response,
+        context,
+      );
+
+      if (stepped.kind === "incompatible") return null;
+
+      steps.push(stepped.step);
+      current = stepped.step.state;
+      const declined = stepped.step.declined.includes(event.id);
 
       if (declined) continue;
 

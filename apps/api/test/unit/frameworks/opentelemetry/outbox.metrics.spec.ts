@@ -33,7 +33,7 @@ describe("the metrics of the outbox relay", () => {
     vi.restoreAllMocks();
   });
 
-  it("records_a_publish_and_the_lag_from_the_add_to_it_by_topic", () => {
+  it("records_the_lag_from_the_add_to_the_publish_by_topic", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(CREATED + 1_500);
 
@@ -44,15 +44,6 @@ describe("the metrics of the outbox relay", () => {
       durationMs: 40,
     });
 
-    expect(recorded.pointsOf("tenon.outbox.publish.duration")).toEqual([
-      {
-        value: 0.04,
-        attributes: {
-          "tenon.outbox.topic": "event.accepted",
-          "tenon.outbox.transport": "local",
-        },
-      },
-    ]);
     expect(recorded.pointsOf("tenon.outbox.lag")).toEqual([
       { value: 1.5, attributes: { "tenon.outbox.topic": "event.accepted" } },
     ]);

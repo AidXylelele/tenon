@@ -17,20 +17,11 @@ import { durationBoundaries } from "./histogram.presets.js";
 @Injectable()
 export class OutboxMetrics implements OnModuleInit, OnApplicationShutdown {
   readonly #subscription = new Subscription();
-  readonly #publishDuration: Histogram;
   readonly #lag: Histogram;
   readonly #failures: Counter;
 
   constructor(private readonly events: OutboxEvents) {
     const meter = metrics.getMeter(Instrumentation.Scope);
-    this.#publishDuration = meter.createHistogram(
-      "tenon.outbox.publish.duration",
-      {
-        unit: "s",
-        description: "The time a transport took to accept a message.",
-        advice: { explicitBucketBoundaries: durationBoundaries },
-      },
-    );
     this.#lag = meter.createHistogram("tenon.outbox.lag", {
       unit: "s",
       description: "The time from adding a message to its publish.",
@@ -67,16 +58,9 @@ export class OutboxMetrics implements OnModuleInit, OnApplicationShutdown {
   }
 
   #published(event: OutboxPublishedEvent): void {
-    const topic = event.message.topic;
-    const published = {
-      "tenon.outbox.topic": topic,
-      "tenon.outbox.transport": event.transport,
-    };
-    const lagged = { "tenon.outbox.topic": topic };
-    const seconds = event.durationMs / 1000;
+    const attributes = { "tenon.outbox.topic": event.message.topic };
     const lag = (Date.now() - event.message.createdAt) / 1000;
-    this.#publishDuration.record(seconds, published);
-    this.#lag.record(lag, lagged);
+    this.#lag.record(lag, attributes);
   }
 
   #failed(message: OutboxMessage, failure: string): void {

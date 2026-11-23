@@ -8,6 +8,7 @@ import {
   type WorkflowStepContext,
   type WorkflowStepOptions,
 } from "@nestjs/workflows";
+import { SpanKind, trace } from "@opentelemetry/api";
 import {
   type Effect,
   type EffectOutcome,
@@ -31,7 +32,6 @@ import type {
   Turn,
 } from "./interfaces.js";
 import { ProcessRun } from "./process.run.js";
-import { RunTracer } from "./run.tracer.js";
 
 @Workflow(EngineRunGateway.RUN, { version: EngineRunGateway.VERSION })
 export class OpenWorkflowRun implements WorkflowRunner<
@@ -43,23 +43,29 @@ export class OpenWorkflowRun implements WorkflowRunner<
   private static readonly ENTRIES = 5_000;
   private static readonly BYTES = 5_000_000;
 
+  readonly #tracer = trace.getTracer("tenon-api");
+
   constructor(
     private readonly runs: RunController,
     private readonly performer: EffectClient,
     private readonly engine: EngineRunGateway,
-    private readonly tracer: RunTracer,
   ) {}
 
   run(ctx: WorkflowContext, input: OpenWorkflowRunInput): Promise<void> {
+    const name = `execute ${ctx.workflowName}`;
     const attributes = {
+      "tenon.workflow": ctx.workflowName,
       "tenon.instance.id": input.instanceId,
       "tenon.workflow.generation": input.generation,
     };
-    return this.tracer.execution(
-      ctx,
-      () => this.#executed(ctx, input),
-      attributes,
-    );
+    const options = { kind: SpanKind.CONSUMER, attributes };
+    return this.#tracer.startActiveSpan(name, options, async (span) => {
+      try {
+        await this.#executed(ctx, input);
+      } finally {
+        span.end();
+      }
+    });
   }
 
   async #executed(
@@ -405,10 +411,7 @@ export class OpenWorkflowRun implements WorkflowRunner<
   ): Promise<T> {
     const result: unknown = await ctx.step<T>(
       name,
-      (attempt) =>
-        this.tracer.attempt(name, attempt, () =>
-          this.#attempted(work, attempt),
-        ),
+      (attempt) => this.#attempted(work, attempt),
       options,
     );
     return result as T;
