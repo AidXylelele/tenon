@@ -24,6 +24,8 @@ export interface DataAtParams {
   readonly textDocument: VersionedTextDocumentIdentifier;
   readonly step: string;
   readonly field: string;
+  readonly samples?: Readonly<Record<string, JsonValue>>;
+  readonly typed?: string;
 }
 
 export interface DataAtResult {
@@ -113,6 +115,7 @@ export interface StepFormResult {
   readonly version: number;
   readonly step: string;
   readonly failure: FailureKind;
+  readonly retry: structure.RetryPlan | null;
   readonly result: ResultReading | null;
   readonly fields: readonly FormField[];
 }

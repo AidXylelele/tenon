@@ -1,6 +1,12 @@
-import type { ast, RangeLocator, SemanticModel } from "interpreter/front-end";
+import type {
+  ast,
+  JsonValue,
+  RangeLocator,
+  SemanticModel,
+} from "interpreter/front-end";
+import { type ConditionReading, conditionOf } from "../conditions/index.js";
 import { stepFamilies } from "../families/index.js";
-import { parentPointerOf } from "../pointers/index.js";
+import { parentPointerOf, valueAt } from "../pointers/index.js";
 import { type Basis, type Snapshot, sourceOf } from "../snapshot/index.js";
 import {
   type StepNode,
@@ -9,6 +15,8 @@ import {
   stepTreeOf,
   targetOf,
 } from "../steps/index.js";
+import { variantOf } from "../variants/index.js";
+import { catchPolicyOf } from "./catches.js";
 import type {
   Destination,
   NestedList,
@@ -119,6 +127,7 @@ function stepOf(node: StepNode, sources: Sources): Step {
   const task = node.task;
   const document = sources.model.source.document;
   const family = stepFamilies[task.kind];
+  const variant = variantOf(task);
   const summary = summaryOf(task, document);
   const milliseconds = stepMillisecondsOf(task);
   const written = task.metadata.note;
@@ -128,12 +137,14 @@ function stepOf(node: StepNode, sources: Sources): Step {
   const selectionRange = sources.positions?.keyRangeOf(node.pointer) ?? null;
   const lists = node.lists.flatMap((list) => nestedListsOf(list, sources));
   const flow = flowOf(node, sources);
+  const catchPolicy = catchPolicyOf(task, sources.model);
 
   return {
     id: node.id,
     pointer: node.pointer,
     name: node.name,
     kind: task.kind,
+    variant,
     family,
     summary,
     milliseconds,
@@ -142,6 +153,7 @@ function stepOf(node: StepNode, sources: Sources): Step {
     selectionRange,
     lists,
     flow,
+    catch: catchPolicy,
   };
 }
 
@@ -152,6 +164,7 @@ function flowOf(node: StepNode, sources: Sources): readonly Transition[] {
     on: "done",
     case: null,
     when: null,
+    condition: null,
     ...destination,
   };
 
@@ -187,8 +200,24 @@ function caseTransitionOf(
 ): Transition {
   const destination = destinationOf(switchCase.then, node, sources);
   const when = switchCase.when?.source ?? null;
+  const document = sources.model.source.document;
+  const condition = caseConditionOf(switchCase.when, document);
+  const name = switchCase.name;
 
-  return { on: "case", case: switchCase.name, when, ...destination };
+  return { on: "case", case: name, when, condition, ...destination };
+}
+
+function caseConditionOf(
+  when: ast.Expression | null,
+  document: JsonValue,
+): ConditionReading | null {
+  if (when === null) {
+    return null;
+  }
+
+  const written = valueAt(document, when.pointer);
+  const text = typeof written === "string" ? written : when.source;
+  return conditionOf(text);
 }
 
 function caughtTransitionsOf(
@@ -203,7 +232,14 @@ function caughtTransitionsOf(
   }
 
   const destination = destinationOf(then, node, sources);
-  return [{ on: "caught", case: null, when: null, ...destination }];
+  const transition: Transition = {
+    on: "caught",
+    case: null,
+    when: null,
+    condition: null,
+    ...destination,
+  };
+  return [transition];
 }
 
 function destinationOf(

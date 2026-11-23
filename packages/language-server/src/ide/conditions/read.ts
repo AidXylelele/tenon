@@ -21,8 +21,6 @@ import {
 } from "./patterns.js";
 import { conditionTextOf } from "./write.js";
 
-const expression: ConditionReading = { kind: "expression" };
-
 const unwritten: ConditionReading = {
   kind: "condition",
   condition: { join: "all", rows: [] },
@@ -93,20 +91,28 @@ export function conditionOf(text: string): ConditionReading {
   const isWrapped = text.startsWith(opening) && text.endsWith(closing);
 
   if (!isWrapped) {
-    return expression;
+    return expressionOf(text);
   }
 
   const inner = text.slice(opening.length, -closing.length);
   const condition = conditionInOf(inner);
 
   if (condition === null) {
-    return expression;
+    return expressionOf(text);
   }
 
   const written = conditionTextOf(condition);
   const isCanonical = written.kind === "text" && written.text === text;
 
-  return isCanonical ? { kind: "condition", condition } : expression;
+  if (!isCanonical) {
+    return expressionOf(text);
+  }
+
+  return { kind: "condition", condition };
+}
+
+function expressionOf(text: string): ConditionReading {
+  return { kind: "expression", text };
 }
 
 function conditionInOf(inner: string): Condition | null {

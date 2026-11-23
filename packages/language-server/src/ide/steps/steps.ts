@@ -1,21 +1,19 @@
-import {
-  type ast,
-  flowDirectives,
-  type JsonObject,
-} from "interpreter/front-end";
+import { type ast, flowDirectives } from "interpreter/front-end";
 import { childPointerOf } from "../pointers/index.js";
 import type {
+  Afterward,
   FailureKind,
   HeldList,
   ListEnd,
   NamedPlace,
-  Retry,
   StepNode,
   StepNodeList,
   StepTree,
 } from "./interfaces.js";
 
 const none: readonly HeldList[] = [];
+
+const noLists: readonly StepNodeList[] = [];
 
 const directiveNames: readonly string[] = flowDirectives;
 
@@ -110,28 +108,25 @@ export function failureOf(step: StepNode): FailureKind {
     return "stop";
   }
 
-  if (task.catch.do !== null) {
-    return "handle";
+  const afterward = afterwardOf(task.catch);
+  return afterward === "stop" ? "retry" : afterward;
+}
+
+export function afterwardOf(caught: ast.Catch): Afterward {
+  const isRaisedAgain =
+    caught.retry !== null && caught.do === null && caught.then === null;
+
+  if (isRaisedAgain) {
+    return "stop";
   }
 
-  return task.catch.retry === null ? "continue" : "retry";
+  return caught.do === null ? "continue" : "handle";
 }
 
 export function listEndOf(tree: StepTree, list: StepNodeList): ListEnd {
   const isWorkflowList = list === tree.root;
 
   return isWorkflowList ? "end" : "exit";
-}
-
-export function retryCatchOf(retry: Retry): JsonObject {
-  const backoff = retry.growing ? "exponential" : "constant";
-  const policy = {
-    delay: { seconds: retry.seconds },
-    backoff: { [backoff]: {} },
-    limit: { attempt: { count: retry.retries } },
-  };
-
-  return { retry: policy };
 }
 
 export function stepWithId(tree: StepTree, id: string): StepNode | null {
@@ -142,6 +137,16 @@ export function stepWithId(tree: StepTree, id: string): StepNode | null {
 
 export function listWithId(tree: StepTree, id: string): StepNodeList | null {
   const lists = [...tree.lists.values()];
+
+  return lists.find((list) => list.id === id) ?? null;
+}
+
+export function unwrittenCatchListWithId(
+  tree: StepTree,
+  id: string,
+): StepNodeList | null {
+  const steps = [...tree.steps.values()];
+  const lists = steps.flatMap(unwrittenCatchListsOf);
 
   return lists.find((list) => list.id === id) ?? null;
 }
@@ -253,6 +258,23 @@ function caughtListsOf(caught: ast.Catch): readonly HeldList[] {
   }
 
   return [{ list: caught.do, part: "catch", role: "sequence" }];
+}
+
+function unwrittenCatchListsOf(step: StepNode): readonly StepNodeList[] {
+  const task = step.task;
+
+  if (task.kind !== "try") {
+    return noLists;
+  }
+
+  if (task.catch.do !== null) {
+    return noLists;
+  }
+
+  const pointer = childPointerOf(task.catch.pointer, "do");
+  const relative = pointer.slice(task.pointer.length);
+  const id = step.id + relative;
+  return [{ id, pointer, part: "catch", role: "sequence", steps: [] }];
 }
 
 function subscribedListsOf(call: ast.Call): readonly HeldList[] {
