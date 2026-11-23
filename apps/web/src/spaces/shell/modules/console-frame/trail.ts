@@ -6,7 +6,11 @@ import {
   workflowHref,
   WORKFLOWS_HREF,
 } from "@/libs/routing/routes";
-import { type Place, placeOf, SETTINGS_PAGES } from "./places";
+import {
+  type Place,
+  placeOf,
+  SETTINGS_PAGES,
+} from "../../__shared_context/places";
 
 export interface Crumb {
   readonly label: string;
