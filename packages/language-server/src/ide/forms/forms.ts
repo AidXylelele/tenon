@@ -2,7 +2,6 @@ import type {
   HostProfile,
   JsonValue,
   SchemaAt,
-  SchemaMember,
   SemanticModel,
 } from "interpreter/front-end";
 import {
@@ -256,10 +255,10 @@ function triggersFieldOf(
   sources: FieldSources,
   profile: HostProfile,
 ): FormField {
-  const { member, holder, section } = placed;
-  const field = memberFieldOf(member, holder, sources);
+  const field = memberFieldOf(placed, sources);
   const entries = sources.schemasAt(sources.document, field.pointer);
   const members = membersOf(entries);
+  const section = placed.section;
   const runnable: readonly string[] = profile.schedules;
   const triggers = members.filter((candidate) =>
     runnable.includes(candidate.name),
@@ -311,8 +310,8 @@ function sectionedFieldOf(
   placed: PlacedMember,
   sources: FieldSources,
 ): FormField {
-  const { member, holder, section } = placed;
-  const field = memberFieldOf(member, holder, sources);
+  const section = placed.section;
+  const field = memberFieldOf(placed, sources);
   const fields = fieldsBelowOf(field, section, sources);
 
   return { ...field, section, fields };
@@ -347,7 +346,8 @@ function groupFieldsOf(
   const members = membersOf(entries);
 
   return members.map((member) => {
-    const field = memberFieldOf(member, pointer, sources);
+    const placed = { member, holder: pointer, section };
+    const field = memberFieldOf(placed, sources);
     const isGroup = field.input === "group";
     const isOpened = holdsEssentialOf(field.pointer, sources);
     const isFlattened = isGroup && !isOpened;
@@ -384,6 +384,7 @@ function unitFieldsOf(
       choices: [],
       required: false,
       written: writtenUnit !== undefined,
+      suggested: false,
       value: amounts.get(unit.name) ?? null,
       essentialRank: null,
       fields: [],
@@ -393,10 +394,10 @@ function unitFieldsOf(
 }
 
 function memberFieldOf(
-  member: SchemaMember,
-  holder: string,
+  placed: PlacedMember,
   sources: FieldSources,
 ): MemberField {
+  const { member, holder, section } = placed;
   const pointer = childPointerOf(holder, member.name);
   const entries = sources.schemasAt(sources.document, pointer);
   const written = valueAt(sources.document, pointer);
@@ -405,6 +406,9 @@ function memberFieldOf(
   const description =
     own ?? holderDescriptionOf(sources.document, pointer, sources.schemasAt);
   const title = titleOf(member.name);
+  const isWritten = written !== undefined;
+  const isOpenObject = entries.some(isOpenObjectOf);
+  const isTransformation = section === "data";
   const input = inputOf(entries, written);
   const choices = choicesOf(entries, pointer, sources);
   const diagnostics = diagnosticsAt(pointer, sources);
@@ -418,11 +422,18 @@ function memberFieldOf(
     input,
     choices,
     required: member.required,
-    written: written !== undefined,
+    written: isWritten,
+    suggested: !isWritten && isOpenObject && !isTransformation,
     value: written ?? null,
     essentialRank,
     diagnostics,
   };
+}
+
+function isOpenObjectOf(entry: SchemaAt): boolean {
+  const isObject = entry.types.includes("object");
+
+  return isObject && entry.members.length === 0;
 }
 
 function holdsEssentialOf(pointer: string, sources: FieldSources): boolean {

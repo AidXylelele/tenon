@@ -530,6 +530,7 @@ interface FormField {
   choices: JsonValue[]; // suggestions beside a 'text'
   required: boolean;
   written: boolean;
+  suggested: boolean; // not written, an object whose members a person adds
   value: JsonValue; // null where not written
   essentialRank: number | null; // its place among the essential fields, from 0
   fields: FormField[]; // for 'group', 'oneOf' and 'duration'
@@ -543,6 +544,7 @@ interface FormField {
 - **Titles and descriptions.** `title` labels the field for people: the server's own words for the members an author meets most (`if` is "Run only if", `then` "Then go to", `timeout` "Time limit", `call` "Kind of call", `with` "Arguments"), else the key in words (`exceptWhen` is "Except when"). `description` describes the field itself, from the grammar; the grammar describes a call on its task, so the `call` field carries the task's ("Defines the HTTP call to perform.").
 - **If it fails.** `failure` is the choice in force for the step: `stop` for a step no try protects; for a protecting try (a try whose `try` list holds one step), what its catch's `afterward` says (`workflow/structure`): `retry` where it is `stop` (a retry with neither `do` nor `then`), else `continue` or `handle`, so a retry with a `then` and no `do` is `continue`. The web shows it and changes it with `workflow/edit`'s `setFailure`. `retry` is that try's retry as data, read as `workflow/structure` reads it, whatever form its delay is written in (`PT2S` and `{ seconds: 2 }` both give 2000); `null` where no try protects the step or its catch writes no retry. Its `on` says which errors it retries in the form `setFailure` writes (`any`, `statuses`, `timeouts`), or `written` for any other `when` or an `exceptWhen`, which the web shows as the text holds it.
 - **Input.** `choice` where the grammar admits only the values it lists (its `closed` places, such as an HTTP call's `with.output`), with those values as `choices`; else `boolean` or `number` where that is the only type; `text` where a string is admitted and the written value is one or nothing is written, with the grammar's values as suggestions in `choices` (a `then` suggests the flow directives and the names of the step's list); `duration` for the standard's duration, an ISO 8601 text or an object of units, with its `fields` the units `days`, `hours`, `minutes`, `seconds` and `milliseconds`, each a `number` whose `value` is the amount the text gives, whichever form it is written in (`PT1H30M` gives `hours` 1 and `minutes` 30), and `null` where it gives none or what is written is not a duration the units hold (an expression, or a mistake, which the field's diagnostics name); `group` for an object with named members; `oneOf` for an object whose members are alternatives, its `fields` being those alternatives (the workflow form's schedule where the host runs one trigger, below); `structured` otherwise, for the text editor.
+- **Suggested objects.** `suggested` is true on a field not written whose value the grammar admits as an object with no members of its own, so that a person names each one: a script's `arguments` and `environment`, an HTTP call's `headers` and `query`, a step's `metadata`. The web shows it as a "+ Add" row and writes it with `setField`, e.g. `{ "MODE": "test" }` at `/do/0/run/run/script/environment`. Only the grammar's own members are offered, never member names of its own; an object of named members is a `group` instead, and a transformation (`input.from`, `output.as`, `export.as`) is never suggested, since an object there is the data it makes.
 - **Duration edits.** A duration is set whole, as an object of units, by `setField` at its pointer, e.g. `{ "minutes": 15 }`, whatever form it was written in.
 - **Broken text.** A form stands while the text is wrong, so a mistake is a diagnostic at its field, never a refused form: a value the grammar does not admit is a diagnostic of a version that still analyses; where the grammar refuses the text's structure, the fields are read from the text as it stands and a step is found by the steps of the last version that analysed, where the text still holds it. `setField` and `clearField` act on such a text; the step actions and `setFailure` need a version that analyses.
 - **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
@@ -573,6 +575,7 @@ interface FormField {
       "choices": ["continue", "exit", "end", "pause", "greet"],
       "required": false,
       "written": true,
+      "suggested": false,
       "value": "greet",
       "essentialRank": null,
       "diagnostics": [],
@@ -588,6 +591,7 @@ interface FormField {
       "choices": [],
       "required": true,
       "written": true,
+      "suggested": false,
       "value": "PT1S",
       "essentialRank": 0,
       "diagnostics": [],
@@ -602,6 +606,7 @@ interface FormField {
           "choices": [],
           "required": false,
           "written": false,
+          "suggested": false,
           "value": 1,
           "essentialRank": null,
           "diagnostics": [],

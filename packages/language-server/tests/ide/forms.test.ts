@@ -109,6 +109,7 @@ test("a then suggests the flow directives and the names of its list", () => {
     choices: ["continue", "exit", "end", "pause", "route"],
     required: false,
     written: true,
+    suggested: false,
     value: "route",
     essentialRank: null,
     fields: [],
@@ -132,12 +133,62 @@ test("a member not written is a field with no value", () => {
     choices: [],
     required: false,
     written: false,
+    suggested: false,
     value: null,
     essentialRank: null,
     fields: [],
     diagnostics: [],
   });
 });
+
+const scriptAndCall = `${inlineHeader}do:
+  - run:
+      run:
+        script:
+          language: js
+          code: "1"
+          environment:
+            MODE: test
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: https://example.com
+`;
+
+function suggestedOf(fields: readonly FormField[]): readonly string[] {
+  return fields.flatMap((field) => {
+    const below = suggestedOf(field.fields);
+    const own = field.suggested ? [field.pointer] : [];
+    return [...own, ...below];
+  });
+}
+
+test.each([
+  [
+    "a script",
+    "/do/run",
+    ["/do/0/run/metadata", "/do/0/run/run/script/arguments"],
+  ],
+  [
+    "an HTTP call",
+    "/do/fetch",
+    [
+      "/do/1/fetch/metadata",
+      "/do/1/fetch/with/headers",
+      "/do/1/fetch/with/query",
+    ],
+  ],
+])(
+  "%s suggests the unwritten objects whose members a person adds",
+  (_, step, pointers) => {
+    const fields = fieldsOf(scriptAndCall, step);
+
+    const suggested = suggestedOf(fields);
+
+    expect(suggested).toEqual(pointers);
+  },
+);
 
 test("an object of named members is a group of fields in its section", () => {
   const fields = fieldsOf(paused, "/do/pause");
