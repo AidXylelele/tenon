@@ -85,7 +85,12 @@ import { HttpClientName } from "../network/enums.js";
 import { OutboundHttpConnection } from "../network/outbound.http-connection.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
 import { OpenIdAuthorizationServer } from "../oauth/openid.authorization-server.js";
-import { interpreterConfig, linksConfig, secretsConfig } from "./configs.js";
+import {
+  interpreterConfig,
+  interpreterThreadsConfig,
+  linksConfig,
+  secretsConfig,
+} from "./configs.js";
 import { OutboundModule } from "./outbound.module.js";
 
 @Module({
@@ -93,6 +98,7 @@ import { OutboundModule } from "./outbound.module.js";
     ConfigModule.forFeature(secretsConfig),
     ConfigModule.forFeature(linksConfig),
     ConfigModule.forFeature(interpreterConfig),
+    ConfigModule.forFeature(interpreterThreadsConfig),
     OutboundModule,
     HttpClientModule.registerAsync({
       name: HttpClientName.Outbound,
@@ -163,18 +169,20 @@ import { OutboundModule } from "./outbound.module.js";
     },
     {
       provide: PiscinaInterpreterClient,
-      inject: [ResilienceService, interpreterConfig.KEY],
+      inject: [
+        ResilienceService,
+        interpreterConfig.KEY,
+        interpreterThreadsConfig.KEY,
+      ],
       useFactory: (
         resilience: ResilienceService,
         interpreter: ConfigType<typeof interpreterConfig>,
+        threads: ConfigType<typeof interpreterThreadsConfig>,
       ) =>
         new PiscinaInterpreterClient(
           resilience,
           { legacyEventTypes: interpreter.LEGACY_EVENT_TYPES },
-          {
-            runs: interpreter.INTERPRETER_RUN_THREADS,
-            checks: interpreter.INTERPRETER_CHECK_THREADS,
-          },
+          threads,
         ),
     },
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },

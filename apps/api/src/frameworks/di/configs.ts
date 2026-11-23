@@ -1,4 +1,5 @@
 import { registerAs } from "@nestjs/config";
+import type { InterpreterThreads } from "../interpreter/interfaces.js";
 import {
   databaseEnvSchema,
   httpEnvSchema,
@@ -42,6 +43,17 @@ export const outboxConfig = registerAs("outbox", () =>
 
 export const interpreterConfig = registerAs("interpreter", () =>
   interpreterEnvSchema.parse(process.env),
+);
+
+export const interpreterThreadsConfig = registerAs(
+  "interpreterThreads",
+  (): InterpreterThreads => {
+    const interpreter = interpreterEnvSchema.parse(process.env);
+    return {
+      runs: interpreter.INTERPRETER_RUN_THREADS,
+      checks: interpreter.INTERPRETER_CHECK_THREADS,
+    };
+  },
 );
 
 export const sandboxConfig = registerAs("sandbox", () =>

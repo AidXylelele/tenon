@@ -4,7 +4,7 @@ import { HttpClientModule } from "@nestjs/http-client";
 import { ResilienceModule } from "@nestjs/resilience";
 import { ScheduleModule } from "@nestjs/schedule";
 import { DatabaseModule } from "./database.module.js";
-import { interpreterConfig } from "./configs.js";
+import { interpreterThreadsConfig } from "./configs.js";
 import { interpreterPresetsOf, resiliencePresets } from "./host.presets.js";
 import { LoggingModule } from "./logging.module.js";
 
@@ -14,13 +14,9 @@ import { LoggingModule } from "./logging.module.js";
     LoggingModule,
     DatabaseModule,
     ResilienceModule.forRootAsync({
-      imports: [ConfigModule.forFeature(interpreterConfig)],
-      inject: [interpreterConfig.KEY],
-      useFactory: (interpreter: ConfigType<typeof interpreterConfig>) => {
-        const threads = {
-          runs: interpreter.INTERPRETER_RUN_THREADS,
-          checks: interpreter.INTERPRETER_CHECK_THREADS,
-        };
+      imports: [ConfigModule.forFeature(interpreterThreadsConfig)],
+      inject: [interpreterThreadsConfig.KEY],
+      useFactory: (threads: ConfigType<typeof interpreterThreadsConfig>) => {
         const interpreterPresets = interpreterPresetsOf(threads);
         return { presets: { ...resiliencePresets, ...interpreterPresets } };
       },
