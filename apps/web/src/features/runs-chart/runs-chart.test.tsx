@@ -62,21 +62,27 @@ const HREFS = [
   "/runs?from=2026-11-16T00%3A00%3A00.000Z&to=2026-11-17T00%3A00%3A00.000Z",
 ];
 
+const PERIOD_HREFS = {
+  "24h": "/?period=24h",
+  "7d": "/?period=7d",
+  "30d": "/?period=30d",
+};
+
 function hrefOf(kind: string): string {
   return `/runs?status=${kind}`;
 }
 
 describe("the runs of a period", () => {
-  it("each_period_is_a_link_and_the_chosen_one_is_marked", () => {
-    render(
-      <PeriodPicker period="7d" hrefOf={(period) => `/?period=${period}`} />,
-    );
-    const week = screen.getByRole("link", { name: "7 days" });
-    const day = screen.getByRole("link", { name: "24 hours" });
+  it("each_period_is_a_segment_the_chosen_one_is_checked_and_another_opens_its_address", () => {
+    render(<PeriodPicker period="7d" hrefs={PERIOD_HREFS} />);
+    const week = screen.getByRole("radio", { name: "7 days" });
+    const day = screen.getByRole("radio", { name: "24 hours" });
 
-    expect(week).toHaveAttribute("aria-current", "true");
-    expect(day).toHaveAttribute("aria-current", "false");
-    expect(day).toHaveAttribute("href", "/?period=24h");
+    fireEvent.click(day);
+
+    expect(week).toHaveAttribute("aria-checked", "true");
+    expect(day).toHaveAttribute("aria-checked", "false");
+    expect(push).toHaveBeenCalledWith("/?period=24h");
   });
 
   it("each_figure_opens_its_runs_and_says_its_change_from_the_previous_period", () => {

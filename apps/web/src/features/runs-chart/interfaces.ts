@@ -2,7 +2,7 @@ import type { Bar, Figure, FigureKind, Period } from "@/operations/run-periods";
 
 export interface PeriodPickerProps {
   readonly period: Period;
-  readonly hrefOf: (period: Period) => string;
+  readonly hrefs: Readonly<Record<Period, string>>;
 }
 
 export interface PeriodFiguresProps {

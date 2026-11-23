@@ -6,7 +6,7 @@ import type {
   Read,
 } from "@/libs/data-access/types";
 import { LiveUpdates } from "@/libs/live/live-updates";
-import { HOME_HREF, runsHref } from "@/libs/routing/routes";
+import { homeHref, runsHref } from "@/libs/routing/routes";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import {
   type FigureKind,
@@ -61,7 +61,7 @@ export function HomePage({
       <PageHeader
         title="Home"
         description="Runs of every workflow, counted by the time they started. Test runs are not counted."
-        actions={<PeriodPicker period={period} hrefOf={homeHrefOf} />}
+        actions={<PeriodPicker period={period} hrefs={PERIOD_HREFS} />}
       />
       <LiveUpdates activity={activity} />
       <section
@@ -96,6 +96,8 @@ export function HomePage({
   );
 }
 
-function homeHrefOf(period: Period): string {
-  return period === "24h" ? HOME_HREF : `${HOME_HREF}?period=${period}`;
-}
+const PERIOD_HREFS: Readonly<Record<Period, string>> = {
+  "24h": homeHref({}),
+  "7d": homeHref({ period: "7d" }),
+  "30d": homeHref({ period: "30d" }),
+};

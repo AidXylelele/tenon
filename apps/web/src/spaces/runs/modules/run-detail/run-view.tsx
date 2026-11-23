@@ -2,7 +2,8 @@
 
 import { ChevronLeftIcon } from "lucide-react";
 import type { Step, WorkflowStructure } from "language-server/protocol";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { runHref } from "@/libs/routing/routes";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import type {
   CloudEvent,
@@ -33,7 +34,7 @@ import {
 } from "@/features/workflow-flow";
 import { EventList } from "./event-list";
 import { FaultStrip } from "./fault-strip";
-import type { RunPanel } from "./query";
+import { panelOf, type RunPanel } from "./query";
 import { Timeline } from "./timeline";
 
 interface RunViewProps {
@@ -56,13 +57,15 @@ export function RunView({
   canEdit,
 }: RunViewProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const [selected, setSelected] = useState<string | null>(null);
   const [shown, setShown] = useState<RunPanel>(panel);
   const [, startShowing] = useTransition();
   const show = (value: string) => {
-    const chosen = value as RunPanel;
-    const address = `${pathname}?view=${chosen}`;
+    const chosen = panelOf(value);
+
+    if (chosen === null) return;
+
+    const address = runHref(instance.id, { view: chosen });
     setShown(chosen);
     startShowing(() => {
       router.replace(address, { scroll: false });
