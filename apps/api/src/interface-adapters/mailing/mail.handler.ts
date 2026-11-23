@@ -17,7 +17,7 @@ import { PasswordResetMail } from "./templates/password-reset.mail.js";
 
 @Injectable()
 export class MailHandler {
-  readonly #tracer = trace.getTracer("tenon-api");
+  private readonly tracer = trace.getTracer("tenon-api");
 
   constructor(private readonly mailer: Mailer) {}
 
@@ -70,7 +70,7 @@ export class MailHandler {
         "messaging.destination.name": topic,
       },
     };
-    return this.#tracer.startActiveSpan(name, options, (span) =>
+    return this.tracer.startActiveSpan(name, options, (span) =>
       this.#traced(span, send),
     );
   }

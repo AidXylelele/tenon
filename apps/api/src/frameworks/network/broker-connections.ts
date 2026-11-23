@@ -10,7 +10,7 @@ export class BrokerConnections<C extends object> {
   private static readonly IDLE_MS = 5 * 60 * 1000;
 
   private readonly opened: LRUCache<string, C, Opening<C>>;
-  readonly #closing = new Set<Promise<unknown>>();
+  private readonly closings = new Set<Promise<unknown>>();
 
   constructor(
     private readonly addresses: AddressPolicy,
@@ -50,7 +50,7 @@ export class BrokerConnections<C extends object> {
 
   async close(): Promise<void> {
     this.opened.clear();
-    const closing = Array.from(this.#closing);
+    const closing = Array.from(this.closings);
     await Promise.all(closing);
   }
 
@@ -101,8 +101,8 @@ export class BrokerConnections<C extends object> {
   #closed(connection: C): void {
     const closing = this.closing(connection);
     const settled = Promise.allSettled([closing]);
-    this.#closing.add(settled);
-    void settled.then(() => this.#closing.delete(settled));
+    this.closings.add(settled);
+    void settled.then(() => this.closings.delete(settled));
   }
 
   #keyOf(server: BrokerServer, variant: string, login: Login | null): string {

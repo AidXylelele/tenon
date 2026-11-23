@@ -24,8 +24,8 @@ export class AsyncApiHandler implements OnModuleDestroy {
   ];
 
   private readonly logger = new Logger(AsyncApiHandler.name);
-  readonly #consumers = new Map<string, Consumer>();
-  #closing = false;
+  private readonly consumers = new Map<string, Consumer>();
+  private closing = false;
 
   constructor(
     private readonly receivers: ReceiverController,
@@ -35,7 +35,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
 
   @Interval(AsyncApiHandler.SYNC_MS)
   async sync(): Promise<void> {
-    if (this.#closing) return;
+    if (this.closing) return;
 
     const opened = await this.receivers.openReceivers();
     const keyed = opened.map(
@@ -43,24 +43,24 @@ export class AsyncApiHandler implements OnModuleDestroy {
     );
     const open = new Map(keyed);
 
-    for (const [key, consumer] of this.#consumers) {
+    for (const [key, consumer] of this.consumers) {
       const wanted = open.has(key);
 
       if (!wanted) consumer.stopped.abort();
     }
 
-    if (this.#closing) return;
+    if (this.closing) return;
 
     for (const [key, receiver] of open) {
-      const started = this.#consumers.has(key);
+      const started = this.consumers.has(key);
 
       if (!started) this.#start(key, receiver);
     }
   }
 
   async onModuleDestroy(): Promise<void> {
-    this.#closing = true;
-    const running = this.#consumers.values();
+    this.closing = true;
+    const running = this.consumers.values();
     const consumers = Array.from(running);
 
     for (const consumer of consumers) consumer.stopped.abort();
@@ -74,9 +74,9 @@ export class AsyncApiHandler implements OnModuleDestroy {
     const done = this.#consumed(key, receiver, stopped.signal)
       .catch((error: unknown) => this.#failed(receiver, error, stopped.signal))
       .finally(() => {
-        this.#consumers.delete(key);
+        this.consumers.delete(key);
       });
-    this.#consumers.set(key, { stopped, done });
+    this.consumers.set(key, { stopped, done });
   }
 
   async #consumed(

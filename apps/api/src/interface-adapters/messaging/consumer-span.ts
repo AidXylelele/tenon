@@ -4,7 +4,7 @@ import { type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 
 @Injectable()
 export class ConsumerSpan {
-  readonly #tracer = trace.getTracer("tenon-api");
+  private readonly tracer = trace.getTracer("tenon-api");
 
   around(
     context: OutboxHandlerContext,
@@ -21,7 +21,7 @@ export class ConsumerSpan {
         "messaging.destination.name": topic,
       },
     };
-    return this.#tracer.startActiveSpan(name, options, (span) =>
+    return this.tracer.startActiveSpan(name, options, (span) =>
       this.#traced(span, work),
     );
   }
