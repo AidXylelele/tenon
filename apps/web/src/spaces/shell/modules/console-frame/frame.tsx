@@ -1,3 +1,4 @@
+import { TrailNames } from "@/libs/routing/trail-name";
 import { SidebarInset } from "@/libs/ui/components/sidebar";
 import { BreadcrumbTrail } from "./breadcrumb-trail";
 import { NavigationTrigger } from "./navigation-trigger";
@@ -15,7 +16,7 @@ interface FrameProps {
 
 export function Frame({ sidebar, search, notice, children }: FrameProps) {
   return (
-    <>
+    <TrailNames>
       <a
         href={CONTENT_HREF}
         className="sr-only z-50 rounded-md bg-background px-3 py-2 font-semibold shadow-overlay focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -38,6 +39,6 @@ export function Frame({ sidebar, search, notice, children }: FrameProps) {
           {children}
         </main>
       </SidebarInset>
-    </>
+    </TrailNames>
   );
 }

@@ -11,7 +11,9 @@ import {
 import { draft } from "@/libs/data-access/drafts";
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
+import { workflowHref } from "@/libs/routing/routes";
 import { type Query, segment } from "@/libs/routing/segment";
+import { type Named, TrailName } from "@/libs/routing/trail-name";
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import type { WorkflowParams } from "../../__shared_context/workflow-params";
 import { Editor } from "./editor";
@@ -69,21 +71,25 @@ export async function WorkflowEditor({
   }));
 
   return (
-    <Editor
-      opening={opened.opening}
-      profile={profile}
-      secretNames={secretNames}
-      webhooks={known}
-      starts={opened.starts}
-      task={task}
-      userId={session.user.id}
-    />
+    <>
+      {opened.trail !== null && <TrailName {...opened.trail} />}
+      <Editor
+        opening={opened.opening}
+        profile={profile}
+        secretNames={secretNames}
+        webhooks={known}
+        starts={opened.starts}
+        task={task}
+        userId={session.user.id}
+      />
+    </>
   );
 }
 
 interface Opened {
   readonly opening: Opening;
   readonly starts: Starts | null;
+  readonly trail: Named | null;
 }
 
 async function openingOf(
@@ -91,7 +97,7 @@ async function openingOf(
   name: string | undefined,
 ): Promise<Opened> {
   if (namespace === undefined || name === undefined)
-    return { opening: { kind: "new" }, starts: null };
+    return { opening: { kind: "new" }, starts: null, trail: null };
 
   const named = { namespace, name };
   const [saved, found] = await Promise.all([
@@ -101,6 +107,9 @@ async function openingOf(
   const currentVersion = found?.currentVersion ?? null;
   const starts =
     found === null || currentVersion === null ? null : { on: found.on };
+  const href = workflowHref(namespace, name);
+  const label = found?.title ?? name;
+  const trail = { href, label };
 
   if (saved !== null) {
     const opening: Opening = {
@@ -109,7 +118,7 @@ async function openingOf(
       revision: saved,
       currentVersion,
     };
-    return { opening, starts };
+    return { opening, starts, trail };
   }
 
   if (currentVersion === null) notFound();
@@ -129,5 +138,5 @@ async function openingOf(
     source,
     document,
   };
-  return { opening, starts };
+  return { opening, starts, trail };
 }

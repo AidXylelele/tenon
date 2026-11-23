@@ -1,4 +1,35 @@
-import type { ConditionReading } from "language-server/protocol";
+import type {
+  ConditionReading,
+  DataAtResult,
+  WrittenMember,
+} from "language-server/protocol";
+import { AFTER_FETCH } from "../data-picker/data-choices/data.test-support";
+
+function writtenOf(
+  expression: string,
+  label: readonly string[],
+): WrittenMember {
+  return {
+    name: label.at(-1) ?? "",
+    expression,
+    value: `\${ ${expression} }`,
+    isPath: true,
+    shape: "unknown",
+    size: null,
+    members: [],
+    label,
+  };
+}
+
+export const WRITTEN_BEFORE_A_TEST: DataAtResult = {
+  ...AFTER_FETCH,
+  written: [
+    writtenOf(".slideshow.slides", ["Fetch the digest", "slideshow", "slides"]),
+    writtenOf(".slideshow.title", ["Fetch the digest", "slideshow", "title"]),
+    writtenOf(".due", ["Fetch the digest", "due"]),
+    writtenOf(".owner", ["Fetch the digest", "owner"]),
+  ],
+};
 
 export const TWO_ROWS_ALL: ConditionReading = {
   kind: "condition",

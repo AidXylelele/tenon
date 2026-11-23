@@ -33,7 +33,7 @@ import {
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
 import { PanelHeader } from "@/libs/ui/composites/panel-header";
-import type { ListPlace } from "@/features/workflow-flow";
+import { KindTile, kindLookOf, type ListPlace } from "@/features/workflow-flow";
 import { type SlotSources, useFormSlots } from "./form-slots";
 import { catalogOf } from "./step-catalog";
 import { type Edit, StepForm } from "./step-form";
@@ -94,6 +94,8 @@ export function StepPanel({
   const kind = entry?.title ?? step.kind;
   const term = languageTerms && entry !== undefined ? entry.languageTerm : null;
   const subtitle = term === null ? kind : `${kind} · ${term}`;
+  const look = kindLookOf(step.kind);
+  const icon = <KindTile icon={look.icon} />;
   const wide = sources.wide;
 
   return (
@@ -105,6 +107,7 @@ export function StepPanel({
         title={step.name}
         titleId={TITLE_ID}
         subtitle={subtitle}
+        icon={icon}
         onClose={onClose}
         actions={
           <>

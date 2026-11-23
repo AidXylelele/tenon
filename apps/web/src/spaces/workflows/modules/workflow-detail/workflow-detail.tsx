@@ -9,7 +9,9 @@ import {
 } from "@/libs/data-access/automation";
 import { available, UNAVAILABLE, viewerZone } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
+import { workflowHref } from "@/libs/routing/routes";
 import { type Query, segment } from "@/libs/routing/segment";
+import { TrailName } from "@/libs/routing/trail-name";
 import { ViewerZone } from "@/libs/live/viewer-zone";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
 import { countWindowOf, windowsOf } from "@/operations/run-periods";
@@ -68,10 +70,13 @@ export async function WorkflowDetail({
   const newestFirst = versions.slice().reverse();
   const author = session?.capabilities.author === true;
   const operator = session?.capabilities.operator === true;
+  const href = workflowHref(namespace, name);
+  const label = workflow.title ?? name;
 
   return (
     <>
       <ViewerZone zone={zone} />
+      <TrailName href={href} label={label} />
       <WorkflowPage
         workflow={workflow}
         tab={tab}

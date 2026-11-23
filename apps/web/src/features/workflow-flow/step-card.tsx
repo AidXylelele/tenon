@@ -19,6 +19,10 @@ interface BranchRowProps {
 
 const NOT_TAKEN = "not taken";
 
+const OTHERWISE = "when no other branch matches";
+
+const UNWORDED = "when its condition holds";
+
 export function StepCard({ place }: { readonly place: StepPlace }) {
   const { kind } = useFlow();
   const { step, list } = place;
@@ -117,7 +121,12 @@ function BranchRow({ step, branch, taken }: BranchRowProps) {
   const look = exitLookOf(branch.exit);
   const Icon = look.icon;
   const words = passed ? NOT_TAKEN : look.words;
-  const when = branch.when ?? "when no other branch matches";
+  const worded = useFlowView(
+    (view) => view.conditions.get(step.id)?.get(branch.case) ?? null,
+  );
+  const languageTerms = useFlowView((view) => view.languageTerms);
+  const showsTerms = languageTerms && branch.when !== null;
+  const when = conditionTextOf(branch.when, worded, showsTerms);
   const jump = jumpKeyOf(step.id, branch.case);
   const item = branchItemOf(step.id, branch.case);
   const place = { kind: "branch", switch: step.id, case: branch.case } as const;
@@ -132,8 +141,8 @@ function BranchRow({ step, branch, taken }: BranchRowProps) {
     passed && "font-normal text-muted-foreground",
   );
   const condition = cn(
-    "truncate text-muted-foreground",
-    branch.when !== null && "font-mono",
+    "line-clamp-2 text-muted-foreground",
+    showsTerms && "font-mono break-all",
   );
   const exit = cn(
     "flex items-center gap-1 whitespace-nowrap text-muted-foreground",
@@ -165,4 +174,16 @@ function BranchRow({ step, branch, taken }: BranchRowProps) {
       {edit && <PlusButton item={plus} label={label} place={place} />}
     </li>
   );
+}
+
+function conditionTextOf(
+  when: string | null,
+  worded: string | null,
+  showsTerms: boolean,
+): string {
+  if (when === null) return OTHERWISE;
+
+  if (showsTerms) return when;
+
+  return worded ?? UNWORDED;
 }

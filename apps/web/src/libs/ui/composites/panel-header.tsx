@@ -5,6 +5,7 @@ interface PanelHeaderProps {
   readonly title: string;
   readonly titleId?: string;
   readonly subtitle?: React.ReactNode;
+  readonly icon?: React.ReactNode;
   readonly onBack?: () => void;
   readonly backLabel?: string;
   readonly actions?: React.ReactNode;
@@ -15,6 +16,7 @@ export function PanelHeader({
   title,
   titleId,
   subtitle,
+  icon,
   onBack,
   backLabel = "Back",
   actions,
@@ -30,6 +32,7 @@ export function PanelHeader({
           onClick={onBack}
         />
       )}
+      {icon}
       <div className="flex min-w-0 flex-1 flex-col">
         <h2 id={titleId} className="truncate text-body font-semibold">
           {title}
