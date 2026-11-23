@@ -24,6 +24,7 @@ export const pushed = {
   code: "unknown-task",
   source: "workflow",
   message: "Task 'nowhere' is not declared in this list.",
+  data: { pointer: "/do/0/route/switch/0/known/then", field: "Then go to" },
 };
 
 export const inlineHeader = `document: { dsl: '1.1.0', namespace: test, name: flow, version: '0.1.0' }

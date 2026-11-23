@@ -18,6 +18,7 @@ interface InitializationOptions {
 ```
 
 - **Refused** with `InvalidParams` (-32602) and no retry when the profile is not of the interpreter's shape, or the draft is not a namespace and a name.
+- **Diagnostics' data.** Each pushed diagnostic carries `data: { pointer: string; field: string | null }`: the pointer of what it is about, and that field's title as the step form titles it ("Then go to", "Endpoint"), or `null` where the pointer ends in a list index or names nothing, so a client names the field still to fill in without reading the language's members.
 - **The draft's address.** Where the document's `namespace` or `name` differs from the draft's, the server reports a `draft-address` diagnostic at the first that differs ("This draft is sales/lead-intake, and the document names orders/greet; publishing it here is refused."), so `workflow/document` refuses as the API's publish would. Its quick fix (`textDocument/codeAction`, `quickfix`) is "Use sales/lead-intake", which writes both; `setField` at `/document/namespace` and `/document/name` does the same through `workflow/edit`.
 
 ## Document

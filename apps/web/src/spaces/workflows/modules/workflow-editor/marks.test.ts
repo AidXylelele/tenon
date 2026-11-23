@@ -35,17 +35,27 @@ const STRUCTURE: StructureResult = {
   },
 };
 
-function errorAt(line: number, pointer: string, message: string): Diagnostic {
+function errorAt(
+  line: number,
+  pointer: string,
+  field: string | null,
+  message: string,
+): Diagnostic {
   const at = { line, character: 6 };
   return {
     range: { start: at, end: at },
     severity: DiagnosticSeverity.Error,
     message,
-    data: { pointer },
+    data: { pointer, field },
   };
 }
 
-const MISSING_ADDRESS = errorAt(5, "/do/0/fetch/with/endpoint", "Required");
+const MISSING_ADDRESS = errorAt(
+  5,
+  "/do/0/fetch/with/endpoint",
+  "Endpoint",
+  "Required",
+);
 
 describe("the marks a step's problems put on the flow", () => {
   it("before_a_test_or_publish_an_empty_field_asks_to_be_filled_in", () => {
@@ -53,12 +63,17 @@ describe("the marks a step's problems put on the flow", () => {
 
     expect(marks.get("/do/fetch")).toEqual({
       kind: "fill",
-      missing: "address",
+      missing: "endpoint",
     });
   });
 
   it("after_a_test_or_publish_it_is_a_problem_with_its_count", () => {
-    const other = errorAt(6, "/do/0/fetch/with/method", "Unknown method");
+    const other = errorAt(
+      6,
+      "/do/0/fetch/with/method",
+      "Method",
+      "Unknown method",
+    );
 
     const marks = marksOf(STRUCTURE, [MISSING_ADDRESS, other], true);
 
@@ -66,12 +81,12 @@ describe("the marks a step's problems put on the flow", () => {
       kind: "problem",
       count: 2,
       message: "Required",
-      missing: "address",
+      missing: "endpoint",
     });
   });
 
   it("a_problem_outside_every_step_marks_none", () => {
-    const outside = errorAt(1, "/document/version", "Not a version");
+    const outside = errorAt(1, "/document/version", "Version", "Not a version");
 
     const marks = marksOf(STRUCTURE, [outside], true);
 

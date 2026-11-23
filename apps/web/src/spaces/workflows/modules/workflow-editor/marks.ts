@@ -7,13 +7,6 @@ import { isObject } from "@/libs/json/json";
 import { diagnosticText } from "@/libs/language-client/diagnostic-text";
 import { stepAt, type StepMark } from "@/features/workflow-flow";
 
-const NOUNS: ReadonlyMap<string, string> = new Map([
-  ["endpoint", "address"],
-  ["uri", "address"],
-  ["in", "list"],
-  ["when", "condition"],
-]);
-
 const NO_MARKS: ReadonlyMap<string, StepMark> = new Map();
 
 export function marksOf(
@@ -57,13 +50,7 @@ function markOf(
 function missingOf(diagnostic: Diagnostic): string | null {
   const data: unknown = diagnostic.data;
 
-  if (!isObject(data) || typeof data.pointer !== "string") return null;
+  if (!isObject(data) || typeof data.field !== "string") return null;
 
-  const last = data.pointer.split("/").at(-1) ?? "";
-  const isIndex = last === "" || /^\d+$/.test(last);
-
-  if (isIndex) return null;
-
-  const words = last.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
-  return NOUNS.get(last) ?? words;
+  return data.field.toLowerCase();
 }
