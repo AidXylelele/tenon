@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Diagnostic } from "vscode-languageserver-protocol";
+import type { Version } from "@/libs/data-access/types";
 import type { WorkflowSession } from "@/operations/workflow-language";
 import { PublishBar } from "./publish-bar";
 
@@ -28,6 +29,16 @@ const refusal = {
   retryAfter: null,
 };
 
+const PUBLISHING = {
+  title: "Daily digest",
+  startsByItself: true,
+  tested: false,
+  onTest: vi.fn(),
+  changesOf: () => Promise.resolve([]),
+  setVersion: () => Promise.resolve(),
+  turnOn: () => Promise.resolve({ ok: true as const, value: undefined }),
+};
+
 describe("the publish bar", () => {
   it("places_each_refusal_by_its_line_or_else_by_its_pointer", async () => {
     const session = {
@@ -47,10 +58,14 @@ describe("the publish bar", () => {
         currentVersion={null}
         onUseVersion={vi.fn()}
         onShowProblems={vi.fn()}
+        {...PUBLISHING}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Publish 1\.0\.0/ }),
+    );
 
     await waitFor(() => {
       expect(onPlatformProblems).toHaveBeenCalled();
@@ -76,6 +91,7 @@ describe("the publish bar", () => {
         currentVersion={null}
         onUseVersion={vi.fn()}
         onShowProblems={onShowProblems}
+        {...PUBLISHING}
       />,
     );
 
@@ -83,5 +99,58 @@ describe("the publish bar", () => {
 
     expect(onShowProblems).toHaveBeenCalled();
     expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("a_later_version_is_chosen_by_what_changed_and_turned_on", async () => {
+    const session = {
+      document: () =>
+        Promise.resolve({
+          kind: "document",
+          version: 3,
+          document: { document: { version: "1.0.1" } },
+        }),
+    } as unknown as WorkflowSession;
+    const version = {
+      namespace: "sales",
+      name: "digest",
+      version: "1.1.0",
+    } as unknown as Version;
+    const setVersion = vi.fn(() => Promise.resolve());
+    const turnOn = vi.fn(() =>
+      Promise.resolve({ ok: true as const, value: undefined }),
+    );
+    const changes = [{ name: "Post the items", kind: "changed" as const }];
+    render(
+      <PublishBar
+        session={session}
+        problems={0}
+        onPlatformProblems={vi.fn()}
+        publish={() => Promise.resolve({ kind: "published", version })}
+        onPublished={() => Promise.resolve()}
+        currentVersion="1.0.0"
+        onUseVersion={vi.fn()}
+        onShowProblems={vi.fn()}
+        {...PUBLISHING}
+        tested
+        changesOf={() => Promise.resolve(changes)}
+        setVersion={setVersion}
+        turnOn={turnOn}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    const changed = await screen.findByText("Post the items — changed");
+    const untested = screen.queryByText("Not tested since your last change");
+    fireEvent.click(screen.getByRole("radio", { name: /A new feature/ }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Publish 1.1.0 and turn on" }),
+    );
+
+    await waitFor(() => {
+      expect(turnOn).toHaveBeenCalled();
+    });
+    expect(changed).toHaveTextContent("Post the items — changed");
+    expect(setVersion).toHaveBeenCalledWith("1.1.0");
+    expect(untested).toBeNull();
   });
 });

@@ -66,7 +66,6 @@ export async function WorkflowEditor({
   const known = hooks.map((hook) => ({
     name: hook.name,
     eventType: hook.eventType,
-    address: "",
   }));
 
   return (

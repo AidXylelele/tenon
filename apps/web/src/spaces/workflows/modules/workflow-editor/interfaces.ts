@@ -138,3 +138,19 @@ export type Publication =
   | { readonly kind: "published"; readonly version: Version }
   | { readonly kind: "refused"; readonly problem: Problem }
   | { readonly kind: "held" };
+
+export interface VersionChoice {
+  readonly kind: "fix" | "feature" | "breaking";
+  readonly words: string;
+  readonly version: string;
+}
+
+export interface StepChange {
+  readonly name: string;
+  readonly kind: "added" | "changed" | "removed";
+}
+
+export interface PublishChoice {
+  readonly version: string;
+  readonly turnOn: boolean;
+}

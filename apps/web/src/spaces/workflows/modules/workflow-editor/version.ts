@@ -1,4 +1,5 @@
 import { PublishedVersion } from "./form";
+import type { VersionChoice } from "./interfaces";
 
 export const VERSION_POINTER = "/document/version";
 
@@ -9,6 +10,27 @@ export function nextVersion(version: string): string {
 
   const [major, minor, patch] = parts;
   return `${String(major)}.${String(minor)}.${String(patch + 1)}`;
+}
+
+export function versionChoicesOf(current: string): VersionChoice[] {
+  const parts = partsOf(current);
+
+  if (parts === null) return [];
+
+  const [major, minor, patch] = parts;
+  const fix = `${String(major)}.${String(minor)}.${String(patch + 1)}`;
+  const feature = `${String(major)}.${String(minor + 1)}.0`;
+  const breaking = `${String(major + 1)}.0.0`;
+  return [
+    { kind: "fix", words: "A fix", version: fix },
+    { kind: "feature", words: "A new feature", version: feature },
+    { kind: "breaking", words: "A breaking change", version: breaking },
+  ];
+}
+
+export function writtenVersionOf(document: unknown): string | null {
+  const parsed = PublishedVersion.safeParse(document);
+  return parsed.success ? parsed.data.document.version : null;
 }
 
 export function freeVersion(

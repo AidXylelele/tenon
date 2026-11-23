@@ -3,6 +3,8 @@
 import {
   fetchImport,
   instance,
+  versionSource,
+  versionStructure,
   publishEvent,
   taskRecords,
   turnWorkflow,
@@ -30,7 +32,9 @@ import {
   RunId,
   StartsTurn,
   TestEventType,
+  VersionTarget,
 } from "./form";
+import type { StepList } from "language-server/protocol";
 import type { TestRun, TestRunAnswer } from "./interfaces";
 import { testDraft } from "./test-runs";
 
@@ -170,4 +174,27 @@ export async function testEventAction(type: unknown): Promise<Outcome<void>> {
     data: {},
   };
   return publishEvent(event);
+}
+
+export async function versionStepsAction(
+  request: unknown,
+): Promise<StepList | null> {
+  const parsed = VersionTarget.safeParse(request);
+
+  if (!parsed.success) return null;
+
+  const { namespace, name, version } = parsed.data;
+  const structure = await versionStructure(namespace, name, version);
+  return structure?.steps ?? null;
+}
+
+export async function versionSourceAction(
+  request: unknown,
+): Promise<string | null> {
+  const parsed = VersionTarget.safeParse(request);
+
+  if (!parsed.success) return null;
+
+  const { namespace, name, version } = parsed.data;
+  return versionSource(namespace, name, version);
 }

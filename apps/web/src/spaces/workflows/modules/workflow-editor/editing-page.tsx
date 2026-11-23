@@ -14,6 +14,7 @@ import {
   isChangedHere,
   replaceTextAsOneStep,
 } from "@/libs/codemirror/owned-text";
+import type { Outcome, Problem } from "@/libs/data-access/problem";
 import type { DraftRevision, Version } from "@/libs/data-access/types";
 import { isObject, type JsonValue } from "@/libs/json/json";
 import {
@@ -44,12 +45,24 @@ import {
   START,
   WorkflowFlow,
 } from "@/features/workflow-flow";
+import {
+  turnStartsAction,
+  versionSourceAction,
+  versionStepsAction,
+} from "./actions";
+import { changesOf } from "./changes";
 import { CodeView } from "./code-view";
 import { DraftStore } from "./draft-store";
 import { DraftGuard, DraftLine, DraftResolution } from "./draft-views";
 import { EditorToolbar } from "./editor-toolbar";
 import type { SlotSources } from "./form-slots";
-import type { Aside, CodeShown, Starts, WorkflowName } from "./interfaces";
+import type {
+  Aside,
+  CodeShown,
+  Starts,
+  StepChange,
+  WorkflowName,
+} from "./interfaces";
 import { marksOf } from "./marks";
 import { ProblemsPanel } from "./problems-panel";
 import { PublishBar } from "./publish-bar";
@@ -93,6 +106,15 @@ const FORM: Aside = { kind: "form" };
 const TEST: Aside = { kind: "test" };
 
 const PROBLEMS: Aside = { kind: "problems" };
+
+const NOT_DISCARDED: Problem = {
+  type: "about:blank",
+  title: "The published version could not be read",
+  status: 404,
+  detail: "The published version's text could not be read, so the draft stays.",
+  errors: [],
+  retryAfter: null,
+};
 
 const PANEL_SIZE = 400;
 const PANEL_MIN = 360;
@@ -146,6 +168,7 @@ function EditingBody({
   const bumped = useRef(false);
   const quiet = useRef(false);
   const test = useTestRun(name, store);
+  const [testedText, setTestedText] = useState<string | null>(null);
   const {
     structure,
     diagnostics,
@@ -156,6 +179,10 @@ function EditingBody({
     view,
     onUpdate: follow,
   } = editing;
+  const readMine = useCallback(
+    () => view()?.state.doc.toString() ?? "",
+    [view],
+  );
   const problems = useMemo(
     () => [...diagnostics, ...platform],
     [diagnostics, platform],
@@ -194,6 +221,8 @@ function EditingBody({
       ? WORKFLOWS_HREF
       : workflowHref(name.namespace, name.name);
   const selectedId = editing.selectedId;
+  const startsByItself = (structure?.workflow.triggers.length ?? 0) > 0;
+  const tested = testedText !== null && testedText === readMine();
   const selected = editing.selected;
 
   const onEdit = useCallback(
@@ -259,11 +288,6 @@ function EditingBody({
       setPlatform(NO_PROBLEMS);
     },
     [follow, store],
-  );
-
-  const readMine = useCallback(
-    () => view()?.state.doc.toString() ?? "",
-    [view],
   );
 
   useEffect(() => {
@@ -469,6 +493,43 @@ function EditingBody({
     }
   }
 
+  async function changesSincePublished(): Promise<readonly StepChange[]> {
+    if (currentVersion === null || structure === null) return [];
+
+    const request = { ...name, version: currentVersion };
+    const published = await versionStepsAction(request);
+
+    if (published === null) return [];
+
+    return changesOf(published, structure.workflow.steps);
+  }
+
+  async function setVersion(value: string) {
+    const bump: EditAction = {
+      kind: "setField",
+      pointer: VERSION_POINTER,
+      value,
+    };
+    await edit([bump]);
+  }
+
+  function turnOn(): Promise<Outcome<void>> {
+    const request = { ...name, on: true };
+    return turnStartsAction(request);
+  }
+
+  async function discard(): Promise<Outcome<void>> {
+    const editor = view();
+    const request = { ...name, version: currentVersion ?? "" };
+    const source = await versionSourceAction(request);
+
+    if (source === null || editor === null)
+      return { ok: false, problem: NOT_DISCARDED };
+
+    replaceTextAsOneStep(editor, source, 0);
+    return { ok: true, value: undefined };
+  }
+
   function download() {
     const yaml = readMine();
     const file = new Blob([yaml], { type: "application/yaml" });
@@ -514,6 +575,7 @@ function EditingBody({
           state={test.state}
           steps={steps}
           onRun={(input) => {
+            setTestedText(readMine());
             void test.run(input);
           }}
           onAgain={test.reset}
@@ -630,6 +692,7 @@ function EditingBody({
           void load(loaded);
         }}
         onDownload={download}
+        discard={currentVersion === null ? null : discard}
       >
         <PublishBar
           session={session}
@@ -640,6 +703,13 @@ function EditingBody({
           currentVersion={currentVersion}
           onUseVersion={takeVersion}
           onShowProblems={showProblems}
+          title={title}
+          startsByItself={startsByItself}
+          tested={tested}
+          onTest={openTest}
+          changesOf={changesSincePublished}
+          setVersion={setVersion}
+          turnOn={turnOn}
         />
       </EditorToolbar>
       <DraftResolution store={store} readMine={readMine} />

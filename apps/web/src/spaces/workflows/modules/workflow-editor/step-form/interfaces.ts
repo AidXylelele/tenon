@@ -68,7 +68,6 @@ export interface StepFormProps extends FormSlots {
 export interface Webhook {
   readonly name: string;
   readonly eventType: string;
-  readonly address: string;
 }
 
 export interface StartFormProps {

@@ -2,6 +2,7 @@
 
 import {
   ArrowLeftIcon,
+  Trash2Icon,
   CodeIcon,
   DownloadIcon,
   EllipsisIcon,
@@ -10,13 +11,15 @@ import {
   UploadIcon,
   WorkflowIcon,
 } from "lucide-react";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useRef, useState } from "react";
+import type { Outcome } from "@/libs/data-access/problem";
 import { Link } from "@/libs/routing/link";
 import { Button } from "@/libs/ui/components/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/libs/ui/components/dropdown-menu";
 import {
@@ -28,6 +31,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
+import { ConfirmDialog } from "@/libs/ui/composites/confirm-dialog";
 import type { CodeShown } from "./interfaces";
 
 interface EditorToolbarProps {
@@ -42,6 +46,7 @@ interface EditorToolbarProps {
   readonly onTest: () => void;
   readonly onLoad: (text: string) => void;
   readonly onDownload: () => void;
+  readonly discard: (() => Promise<Outcome<void>>) | null;
   readonly children: ReactNode;
 }
 
@@ -59,9 +64,12 @@ export function EditorToolbar({
   onTest,
   onLoad,
   onDownload,
+  discard,
   children,
 }: EditorToolbarProps) {
   const picker = useRef<HTMLInputElement>(null);
+  const more = useRef<HTMLButtonElement>(null);
+  const [discarding, setDiscarding] = useState(false);
   const counted = problems === 1 ? "1 problem" : `${String(problems)} problems`;
 
   return (
@@ -136,7 +144,12 @@ export function EditorToolbar({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More actions">
+                <Button
+                  ref={more}
+                  variant="ghost"
+                  size="icon"
+                  aria-label="More actions"
+                >
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
@@ -156,8 +169,34 @@ export function EditorToolbar({
               <DownloadIcon />
               Download YAML
             </DropdownMenuItem>
+            {discard !== null && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => {
+                    setDiscarding(true);
+                  }}
+                >
+                  <Trash2Icon />
+                  Discard the draft…
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
+        {discard !== null && (
+          <ConfirmDialog
+            open={discarding}
+            onOpenChange={setDiscarding}
+            title="Discard the draft?"
+            description="The text goes back to the published version; your changes since are lost."
+            actionLabel="Discard the draft"
+            action={discard}
+            success="The draft is back to the published version"
+            returnFocus={() => more.current}
+          />
+        )}
       </div>
     </header>
   );

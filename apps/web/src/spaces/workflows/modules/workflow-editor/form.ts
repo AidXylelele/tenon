@@ -40,3 +40,5 @@ export const RunId = z.uuid();
 export const StartsTurn = DraftTarget.extend({ on: z.boolean() });
 
 export const TestEventType = z.string().trim().min(1).max(256);
+
+export const VersionTarget = DraftTarget.extend({ version: z.string().min(1) });
