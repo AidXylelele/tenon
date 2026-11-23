@@ -499,6 +499,7 @@ describe("PostgresInstanceQueries finding failing workflows", () => {
           detail: NOT_FOUND.detail,
         },
         stillFailing: true,
+        title: null,
       },
       {
         namespace: "sales",
@@ -509,6 +510,7 @@ describe("PostgresInstanceQueries finding failing workflows", () => {
         lastFailedAt: at("2026-03-01T03:00:00.000Z"),
         lastError: { status: null, type: null, title: null, detail: null },
         stillFailing: false,
+        title: null,
       },
     ]);
   });
