@@ -65,13 +65,20 @@ test.describe("the script field playground", () => {
 
     await page.keyboard.type(line);
 
+    const typed = line.trim();
+    await expect(code).toContainText(typed);
     const field = page.getByRole("group", { name: "Code" });
     const fieldBox = await field.boundingBox();
-    const codeBox = await code.boundingBox();
     const fieldWidth = fieldBox?.width ?? 0;
-    const codeRight = (codeBox?.x ?? 0) + (codeBox?.width ?? 0);
-    const fieldRight = (fieldBox?.x ?? 0) + fieldWidth;
     expect(fieldWidth).toBeLessThanOrEqual(368);
-    expect(codeRight).toBeGreaterThan(fieldRight);
+
+    const overflow = async (): Promise<number> =>
+      code.evaluate((content) => {
+        const scroller = content.parentElement;
+        return scroller === null
+          ? 0
+          : scroller.scrollWidth - scroller.clientWidth;
+      });
+    await expect.poll(overflow).toBeGreaterThan(0);
   });
 });

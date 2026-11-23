@@ -88,12 +88,10 @@ function heldOf(
   return { [token]: value };
 }
 
-export function isJsonObject(
-  value: JsonValue | undefined,
-): value is JsonObject {
+export function isJsonObject(value: unknown): value is JsonObject {
   const isComposite = typeof value === "object" && value !== null;
 
-  return isComposite && !isJsonArray(value);
+  return isComposite && !Array.isArray(value);
 }
 
 function isJsonArray(value: JsonArray | JsonObject): value is JsonArray {

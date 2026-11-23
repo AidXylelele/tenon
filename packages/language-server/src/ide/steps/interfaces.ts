@@ -1,4 +1,4 @@
-import type { ast } from "interpreter/front-end";
+import type { ast, JsonObject } from "interpreter/front-end";
 
 export type ListPart = "do" | "for" | "branches" | "try" | "catch" | "foreach";
 
@@ -41,11 +41,31 @@ export interface HeldList {
 
 export type FailureKind = "stop" | "continue" | "retry" | "handle";
 
+export type Afterward = "stop" | "continue" | "handle";
+
 export type ListEnd = "end" | "exit";
 
-export interface Retry {
-  readonly kind: "retry";
-  readonly retries: number;
-  readonly seconds: number;
-  readonly growing: boolean;
+export type RetriedErrors =
+  | { readonly kind: "any" }
+  | { readonly kind: "statuses"; readonly statuses: readonly number[] }
+  | { readonly kind: "timeouts" };
+
+export type RetryOn = RetriedErrors | { readonly kind: "written" };
+
+export interface RetrySetting {
+  readonly retries: number | null;
+  readonly milliseconds: number;
+  readonly backoff: ast.Backoff["kind"];
+  readonly on: RetryOn;
 }
+
+export interface RetryFields {
+  readonly when: string | null;
+  readonly delay: JsonObject | null;
+  readonly backoff: JsonObject;
+  readonly count: number | null;
+}
+
+export type RetryFieldsReading =
+  | { readonly kind: "fields"; readonly fields: RetryFields }
+  | { readonly kind: "refused"; readonly reason: string };

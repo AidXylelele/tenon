@@ -19,6 +19,7 @@ test("a step's form gives each field its section", async () => {
     version: 1,
     step: "/do/greet",
     failure: "stop",
+    retry: null,
   });
   expect(sections).toEqual([
     ["if", "settings"],

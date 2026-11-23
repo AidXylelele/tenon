@@ -1,4 +1,5 @@
 export type {
+  ComparingRow,
   Comparison,
   Condition,
   ConditionReading,

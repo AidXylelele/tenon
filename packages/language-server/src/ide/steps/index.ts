@@ -1,14 +1,20 @@
 export type {
+  Afterward,
   FailureKind,
   ListEnd,
   ListPart,
-  Retry,
   ListRole,
+  RetriedErrors,
+  RetryFields,
+  RetryOn,
+  RetrySetting,
   StepNode,
   StepNodeList,
   StepTree,
 } from "./interfaces.js";
+export { retryFieldsOf, retryOnOf, retryPolicyOf } from "./retries.js";
 export {
+  afterwardOf,
   directiveAt,
   directivesOf,
   failureOf,
@@ -17,10 +23,10 @@ export {
   listWithId,
   nameConflictOf,
   protectedStepOf,
-  retryCatchOf,
   stepHolding,
   stepIdOf,
   stepTreeOf,
   stepWithId,
   targetOf,
+  unwrittenCatchListWithId,
 } from "./steps.js";

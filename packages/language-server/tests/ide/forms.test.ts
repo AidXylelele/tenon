@@ -225,10 +225,53 @@ const protectedGreet = `${inlineHeader}do:
 test.each([
   ["a step with no protection stops", paused, "/do/pause", "stop"],
   ["a protected step retries", protectedGreet, "/do/greet", "retry"],
+  [
+    "a protected step whose catch goes on after the retries continues",
+    protectedGreet.replace(
+      "count: 3 } } }\n",
+      "count: 3 } } }\n        then: end\n",
+    ),
+    "/do/greet",
+    "continue",
+  ],
 ])("%s", (_, text, step, failure) => {
   const reading = check(text, step);
 
   expect(reading).toMatchObject({ kind: "form", failure });
+});
+
+test.each([
+  ["a step with no protection has no retry", paused, "/do/pause", null],
+  [
+    "a protecting try gives its retry as data",
+    protectedGreet,
+    "/do/greet",
+    {
+      retries: 3,
+      milliseconds: 5000,
+      backoff: "constant",
+      when: null,
+      exceptWhen: null,
+      on: { kind: "any" },
+    },
+  ],
+  [
+    "an ISO delay is read as its milliseconds",
+    protectedGreet.replace("{ seconds: 5 }", "PT2S"),
+    "/do/greet",
+    {
+      retries: 3,
+      milliseconds: 2000,
+      backoff: "constant",
+      when: null,
+      exceptWhen: null,
+      on: { kind: "any" },
+    },
+  ],
+])("%s", (_, text, step, retry) => {
+  const reading = check(text, step);
+
+  expect(reading).toMatchObject({ kind: "form", retry });
 });
 
 test("a protected step's catch is in the failure section", () => {

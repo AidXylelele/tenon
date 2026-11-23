@@ -1,3 +1,4 @@
+import type { JsonValue } from "interpreter/front-end";
 import { json } from "jq-wasm";
 import { expect, test } from "vitest";
 import { dataAtOf } from "../../src/ide/data/index.js";
@@ -9,12 +10,16 @@ const created = await analyzer;
 
 const options = { profile, imports: {} };
 
+const noSamples: ReadonlyMap<string, JsonValue> = new Map();
+
 const speculate = (text: string) => created.analyze(text, options);
 
 function check(text: string, step: string, field: string) {
   const snapshot = snapshotOf(text);
 
-  return dataAtOf(snapshot, { step, field }, speculate);
+  const request = { step, field, samples: noSamples, typed: null };
+
+  return dataAtOf(snapshot, request, speculate);
 }
 
 function entriesOf(text: string, step: string, field: string) {
@@ -68,21 +73,28 @@ test("the step before reaches as the data the step receives, with the values its
     step: "/do/total",
     expression: ".",
     value: "${ . }",
+    isPath: true,
     shape: "object",
+    size: null,
     needsExport: false,
+    typed: null,
     members: [
       {
         name: "count",
         expression: ".count",
         value: "${ .count }",
+        isPath: true,
         shape: "number",
+        size: null,
         members: [],
       },
       {
         name: "label",
         expression: ".label",
         value: "${ .label }",
+        isPath: true,
         shape: "text",
+        size: null,
         members: [],
       },
     ],
@@ -98,8 +110,11 @@ test("a set replaces what flows on, so a step before it reaches only through the
     step: "/do/fetch",
     expression: "$context.fetch",
     value: "${ $context.fetch }",
+    isPath: true,
     shape: "unknown",
+    size: null,
     needsExport: true,
+    typed: null,
     members: [],
   });
 });
@@ -127,14 +142,19 @@ test("the workflow's raw input is offered with the members its schema describes"
     step: null,
     expression: "$workflow.input",
     value: "${ $workflow.input }",
+    isPath: true,
     shape: "object",
+    size: null,
     needsExport: false,
+    typed: null,
     members: [
       {
         name: "customer",
         expression: "$workflow.input.customer",
         value: "${ $workflow.input.customer }",
+        isPath: true,
         shape: "text",
+        size: null,
         members: [],
       },
     ],
@@ -224,6 +244,7 @@ test("a script's printed result reaches as text, its fields unknown", () => {
   expect(printed).toMatchObject({
     expression: ".",
     shape: "text",
+    size: null,
     members: [],
   });
 });
@@ -234,6 +255,7 @@ test("a script whose output parses what it prints passes on data whose fields ar
   expect(parsed).toMatchObject({
     expression: ".",
     shape: "unknown",
+    size: null,
     members: [],
   });
 });
@@ -261,7 +283,9 @@ test("an output schema gives the members of a step's output", () => {
       name: "items",
       expression: ".items",
       value: "${ .items }",
+      isPath: true,
       shape: "list",
+      size: null,
       members: [],
     },
   ]);
@@ -414,7 +438,12 @@ test.each([
 
     const [computed] = await json(null, clocked);
 
-    expect(time).toMatchObject({ source: "time", shape: "text" });
+    expect(time).toMatchObject({
+      source: "time",
+      shape: "text",
+      size: null,
+      isPath: false,
+    });
     expect(computed).toBe(expected);
   },
 );
@@ -467,12 +496,14 @@ test("a text the grammar refuses keeps the data of the last version that analyse
     "        body: {}\n      nope: 1\n",
   );
   const snapshot = snapshotAfter(reportFlow, broken);
+  const request = {
+    step: "/do/report",
+    field: body,
+    samples: noSamples,
+    typed: null,
+  };
 
-  const reading = dataAtOf(
-    snapshot,
-    { step: "/do/report", field: body },
-    speculate,
-  );
+  const reading = dataAtOf(snapshot, request, speculate);
 
   expect(reading).toMatchObject({ kind: "data" });
 });
@@ -728,4 +759,192 @@ test("a group runs its steps once, so an export after the field's step does not 
   );
 
   expect(routes).toEqual([["a", "$context.a"]]);
+});
+
+function readingWith(
+  samples: ReadonlyMap<string, JsonValue>,
+  typed: string | null,
+) {
+  const snapshot = snapshotOf(reportFlow);
+  const request = { step: "/do/report", field: body, samples, typed };
+  const reading = dataAtOf(snapshot, request, speculate);
+
+  if (reading.kind === "refused") {
+    throw new Error(reading.reason);
+  }
+
+  return reading.entries;
+}
+
+test("every entry says whether its expression is a path, which only the times are not", () => {
+  const entries = entriesOf(reportFlow, "/do/report", body);
+
+  const paths = entries.map((entry) => [entry.name, entry.isPath]);
+  expect(paths).toEqual([
+    ["total", true],
+    ["fetch", true],
+    ["input", true],
+    ["now", false],
+    ["today", false],
+    ["yesterday", false],
+  ]);
+});
+
+test("the last test run's sample gives the fields of a step whose output is not known before the run", () => {
+  const sample = {
+    items: [{ id: 1 }],
+    owner: { login: "ada" },
+    "a name": 1,
+  };
+  const samples = new Map([["/do/fetch", sample]]);
+
+  const entries = readingWith(samples, null);
+
+  const fetch = entries.find((entry) => entry.name === "fetch");
+  expect(fetch).toMatchObject({ shape: "object" });
+  expect(fetch?.members).toEqual([
+    {
+      name: "items",
+      expression: "$context.fetch.items",
+      value: "${ $context.fetch.items }",
+      isPath: true,
+      shape: "list",
+      size: 1,
+      members: [],
+    },
+    {
+      name: "owner",
+      expression: "$context.fetch.owner",
+      value: "${ $context.fetch.owner }",
+      isPath: true,
+      shape: "object",
+      size: null,
+      members: [
+        {
+          name: "login",
+          expression: "$context.fetch.owner.login",
+          value: "${ $context.fetch.owner.login }",
+          isPath: true,
+          shape: "text",
+          size: null,
+          members: [],
+        },
+      ],
+    },
+    {
+      name: "a name",
+      expression: '$context.fetch["a name"]',
+      value: '${ $context.fetch["a name"] }',
+      isPath: true,
+      shape: "number",
+      size: null,
+      members: [],
+    },
+  ]);
+});
+
+test("a sample leaves alone a step whose fields are known before the run", () => {
+  const samples = new Map([["/do/total", { other: true }]]);
+
+  const entries = readingWith(samples, null);
+
+  const total = entries.find((entry) => entry.name === "total");
+  const names = total?.members.map((member) => member.name);
+  expect(names).toEqual(["count", "label"]);
+});
+
+test.each([
+  [
+    "a typed field name is a field of each step's output that may have fields",
+    "items.title",
+    [
+      ["total", ".items.title"],
+      ["fetch", "$context.fetch.items.title"],
+    ],
+  ],
+  [
+    "a typed name that is no identifier is read as a key",
+    "first-name",
+    [
+      ["total", '.["first-name"]'],
+      ["fetch", '$context.fetch["first-name"]'],
+    ],
+  ],
+  [
+    "a typed field a step already offers is not offered again",
+    "count",
+    [
+      ["total", null],
+      ["fetch", "$context.fetch.count"],
+    ],
+  ],
+  [
+    "typed text that is not a field name is no field",
+    "orders of today",
+    [
+      ["total", null],
+      ["fetch", null],
+    ],
+  ],
+])("%s", (_, typed, expected) => {
+  const entries = readingWith(noSamples, typed);
+
+  const steps = entries.filter((entry) => entry.source === "step");
+  const fields = steps.map((entry) => [
+    entry.name,
+    entry.typed?.expression ?? null,
+  ]);
+  expect(fields).toEqual(expected);
+});
+
+test("a typed field is a path whose fields are not known", () => {
+  const entries = readingWith(noSamples, "items.title");
+
+  const fetch = entries.find((entry) => entry.name === "fetch");
+  expect(fetch?.typed).toEqual({
+    name: "items.title",
+    expression: "$context.fetch.items.title",
+    value: "${ $context.fetch.items.title }",
+    isPath: true,
+    shape: "unknown",
+    size: null,
+    members: [],
+  });
+});
+
+test("the workflow's input takes a typed field, and the times take none", () => {
+  const entries = readingWith(noSamples, "order.id");
+
+  const others = entries.filter((entry) => entry.source !== "step");
+  const typed = others.map((entry) => [
+    entry.name,
+    entry.typed?.expression ?? null,
+  ]);
+  expect(typed).toEqual([
+    ["input", "$workflow.input.order.id"],
+    ["now", null],
+    ["today", null],
+    ["yesterday", null],
+  ]);
+});
+
+test("the variables a loop binds take a typed field", () => {
+  const snapshot = snapshotOf(loopFlow);
+  const request = {
+    step: "/do/each/do/total",
+    field: "/do/0/each/do/0/total/set/x",
+    samples: noSamples,
+    typed: "id",
+  };
+
+  const reading = dataAtOf(snapshot, request, speculate);
+  const entries = reading.kind === "data" ? reading.entries : [];
+
+  const variables = entries
+    .filter((entry) => entry.source === "variable")
+    .map((entry) => [entry.name, entry.typed?.expression ?? null]);
+  expect(variables).toEqual([
+    ["order", "$order.id"],
+    ["index", "$index.id"],
+  ]);
 });

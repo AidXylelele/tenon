@@ -353,7 +353,7 @@ test.each([
 ])("a hand-written expression stays an expression: %s", (_, text) => {
   const read = conditionOf(text);
 
-  expect(read).toEqual({ kind: "expression" });
+  expect(read).toEqual({ kind: "expression", text });
 });
 
 test.each<readonly [string, Condition, string]>([

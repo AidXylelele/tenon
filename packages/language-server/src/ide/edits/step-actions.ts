@@ -1,3 +1,4 @@
+import type { JsonObject } from "interpreter/front-end";
 import { renameAt } from "../names/index.js";
 import { parentPointerOf, valueAt } from "../pointers/index.js";
 import {
@@ -8,6 +9,7 @@ import {
   type StepNodeList,
   type StepTree,
   stepWithId,
+  unwrittenCatchListWithId,
 } from "../steps/index.js";
 import { offsetOf } from "../text/index.js";
 import { kindOf, startingContentOf } from "../variants/index.js";
@@ -21,6 +23,7 @@ import type {
   MoveStep,
   RemoveStep,
   RenameStep,
+  SetField,
   WrittenItem,
   WrittenStep,
 } from "./interfaces.js";
@@ -33,6 +36,7 @@ import {
   removalOf,
   withoutItem,
 } from "./collection-text.js";
+import { fieldSettingOf } from "./field-actions.js";
 import { idChangesOf, placedStepOf } from "./ids.js";
 import { copyNameOf, newNameOf } from "./step-names.js";
 
@@ -40,19 +44,16 @@ export function stepInsertionOf(
   editable: Editable,
   action: InsertStep,
 ): Editing {
-  const list = listWithId(editable.tree, action.list);
+  const written = listWithId(editable.tree, action.list);
+  const unwritten = unwrittenCatchListWithId(editable.tree, action.list);
+  const list = written ?? unwritten;
 
   if (list === null) {
     return { kind: "refused", reason: unknownListOf(action.list) };
   }
 
-  const collection = listTextOf(editable, list);
   const room = list.steps.length;
   const isWithin = isIndexWithin(action.index, room);
-
-  if (collection === null) {
-    return { kind: "refused", reason: unknownListOf(action.list) };
-  }
 
   if (!isWithin) {
     return { kind: "refused", reason: outsideOf(action.index) };
@@ -69,8 +70,42 @@ export function stepInsertionOf(
   const otherwise = listEndOf(editable.tree, list);
   const content = startingContentOf(action.step, otherwise);
   const item = { [name]: content };
+
+  if (written === null) {
+    return listWritingOf(editable, list, item);
+  }
+
+  return itemInsertionOf(editable, written, action.index, item);
+}
+
+function listWritingOf(
+  editable: Editable,
+  list: StepNodeList,
+  item: JsonObject,
+): Editing {
+  const items = [item];
+  const setting: SetField = {
+    kind: "setField",
+    pointer: list.pointer,
+    value: items,
+  };
+  return fieldSettingOf(editable, setting);
+}
+
+function itemInsertionOf(
+  editable: Editable,
+  list: StepNodeList,
+  index: number,
+  item: JsonObject,
+): Editing {
+  const collection = listTextOf(editable, list);
+
+  if (collection === null) {
+    return { kind: "refused", reason: unknownListOf(list.id) };
+  }
+
   const forms = newItemFormsOf(item);
-  const insertion = insertionOf(collection, action.index, forms);
+  const insertion = insertionOf(collection, index, forms);
   return { kind: "edited", changes: [insertion], ids: [] };
 }
 
