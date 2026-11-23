@@ -948,3 +948,49 @@ test("the variables a loop binds take a typed field", () => {
     ["index", "$index.id"],
   ]);
 });
+
+const digestFlow = `${inlineHeader}do:
+  - prepare:
+      set:
+        total: 2
+  - Fetch the digest:
+      call: http
+      with: { method: get, endpoint: https://api.test/digest }
+  - route:
+      switch:
+        - has slides:
+            when: '\${ (.slideshow.slides | . != null and . != "" and . != [] and . != {}) and ($workflow.input.due == .slideshow["first date"]) }'
+            then: end
+        - otherwise:
+            then: end
+`;
+
+test("the data paths written in the field come back with their names in words", () => {
+  const field = "/do/2/route/switch/0/has slides/when";
+  const reading = check(digestFlow, "/do/route", field);
+
+  const written = reading.kind === "data" ? reading.written : [];
+  const labels = written.map((member) => [member.expression, member.label]);
+  expect(labels).toEqual([
+    [".slideshow.slides", ["Fetch the digest", "slideshow", "slides"]],
+    ["$workflow.input.due", ["The workflow's input", "due"]],
+    [
+      '.slideshow["first date"]',
+      ["Fetch the digest", "slideshow", "first date"],
+    ],
+  ]);
+  expect(written[0]).toMatchObject({
+    name: "slides",
+    value: "${ .slideshow.slides }",
+    isPath: true,
+    shape: "unknown",
+    members: [],
+  });
+});
+
+test("a field that writes no data has no written paths", () => {
+  const reading = check(reportFlow, "/do/report", body);
+
+  const written = reading.kind === "data" ? reading.written : null;
+  expect(written).toEqual([]);
+});

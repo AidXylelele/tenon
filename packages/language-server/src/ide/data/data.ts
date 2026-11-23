@@ -25,6 +25,7 @@ import {
 import { exportersByKeyOf } from "./exports.js";
 import { chainShapesOf, definitionShapeOf, startShapeOf } from "./flow.js";
 import { unknownShape } from "./shapes.js";
+import { writtenMembersOf } from "./written.js";
 import type {
   DataEntry,
   DataFlow,
@@ -143,8 +144,9 @@ function dataOf(site: DataSite): DataReading {
   const skipped = skippedWarningsOf(site, offered);
   const context = contextWarningsOf(site, steps);
   const warnings = [...merging, ...skipped, ...context];
+  const written = writtenMembersOf(site.flow.document, site.field, entries);
 
-  return { kind: "data", entries, warnings };
+  return { kind: "data", entries, written, warnings };
 }
 
 function mergingWarningsOf(site: DataSite): readonly DataWarning[] {

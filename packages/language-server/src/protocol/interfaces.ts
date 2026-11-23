@@ -7,7 +7,11 @@ import type {
   VersionedTextDocumentIdentifier,
 } from "vscode-languageserver/browser";
 import type { ConditionReading } from "../ide/conditions/index.js";
-import type { DataEntry, DataWarning } from "../ide/data/index.js";
+import type {
+  DataEntry,
+  DataWarning,
+  WrittenMember,
+} from "../ide/data/index.js";
 import type { EditAction, IdChange } from "../ide/edits/index.js";
 import type * as forms from "../ide/forms/index.js";
 import type { DraftAddress } from "../ide/snapshot/index.js";
@@ -32,6 +36,7 @@ export interface DataAtParams {
 export interface DataAtResult {
   readonly version: number;
   readonly entries: readonly DataEntry[];
+  readonly written: readonly WrittenMember[];
   readonly warnings: readonly DataWarning[];
 }
 
