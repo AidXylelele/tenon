@@ -5,7 +5,6 @@ import {
   ClockIcon,
   MailIcon,
   UsersIcon,
-  XIcon,
 } from "lucide-react";
 import type {
   Invitation,
@@ -27,14 +26,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/libs/ui/components/table";
-import { ConfirmAction } from "@/libs/ui/composites/confirm-action";
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { roleLabel } from "@/operations/roles";
-import { revokeAction } from "./actions";
+import { InvitationMenu } from "./invitation-menu";
 import { InviteForm } from "./invite-form";
 
 const STATUS: Record<InvitationStatus, StatusLook> = {
@@ -138,22 +136,27 @@ export function PeoplePage({ people, list }: PeoplePageProps) {
 function MemberRow({ member }: { readonly member: Member }) {
   const look = MEMBER[member.status];
   const role = roleLabel(member.role);
-  const name = member.name ?? member.email;
 
   return (
     <TableRow>
       <TableCell>
-        <span className="block font-medium">{name}</span>
-        <span className="block text-xs text-muted-foreground">
-          {member.email}
-        </span>
+        {member.name === null ? (
+          <span className="block font-medium">{member.email}</span>
+        ) : (
+          <>
+            <span className="block font-medium">{member.name}</span>
+            <span className="block text-xs text-muted-foreground">
+              {member.email}
+            </span>
+          </>
+        )}
       </TableCell>
       <TableCell className="hidden sm:table-cell">{role}</TableCell>
       <TableCell>
         <Status look={look} />
       </TableCell>
       <TableCell className="hidden md:table-cell">
-        <Time value={member.since} />
+        <AbsoluteTime value={member.since} />
       </TableCell>
     </TableRow>
   );
@@ -163,10 +166,6 @@ function InvitationRow({ invitation }: { readonly invitation: Invitation }) {
   const look = STATUS[invitation.status];
   const pending = invitation.status === "pending";
   const role = roleLabel(invitation.role);
-  const label = `Revoke the invitation for ${invitation.email}`;
-  const title = `${label}?`;
-  const revoke = revokeAction.bind(null, invitation.id);
-  const revoked = `Invitation for ${invitation.email} revoked`;
 
   return (
     <TableRow>
@@ -176,23 +175,14 @@ function InvitationRow({ invitation }: { readonly invitation: Invitation }) {
         <Status look={look} />
       </TableCell>
       <TableCell className="hidden md:table-cell">
-        <Time value={invitation.expiresAt} />
+        <AbsoluteTime value={invitation.expiresAt} />
       </TableCell>
       <TableCell className="hidden lg:table-cell">
-        <Time value={invitation.createdAt} />
+        <AbsoluteTime value={invitation.createdAt} />
       </TableCell>
       <TableCell>
         {pending && (
-          <ConfirmAction
-            icon={<XIcon />}
-            label={label}
-            size="icon-sm"
-            title={title}
-            description="The link stops working. You can invite the address again."
-            actionLabel="Revoke invitation"
-            action={revoke}
-            success={revoked}
-          />
+          <InvitationMenu id={invitation.id} email={invitation.email} />
         )}
       </TableCell>
     </TableRow>
