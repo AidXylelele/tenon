@@ -92,6 +92,16 @@ const drafts = new Map([
 
 let tested = null;
 
+const PUBLISHED_STRUCTURE = {
+  namespace: "sales",
+  name: "digest",
+  title: "Daily digest",
+  triggers: [],
+  steps: { id: "/do", pointer: "/do", role: "sequence", steps: [] },
+  summary: null,
+  input: { schema: null },
+};
+
 function send(response, status, body, headers = {}) {
   const text = body === undefined ? "" : JSON.stringify(body);
   response.writeHead(status, {
@@ -254,6 +264,9 @@ const server = createServer(async (request, response) => {
     const name = decodeURIComponent(workflowMatch[2]);
     return send(response, 200, workflowOf(namespace, name));
   }
+
+  if (path === "/workflows/sales/digest/versions/1.0.0/structure")
+    return send(response, 200, PUBLISHED_STRUCTURE);
 
   if (path === `/instances/${RUN_ID}`) {
     const ran = tested !== null && Date.now() - tested > 1500;
