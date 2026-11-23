@@ -51,7 +51,7 @@ function startedOn(
     input: {},
     trigger: TriggerKind.Manual,
     starterId: "tester-1",
-    originId: null,
+    origin: null,
     originEffectId: null,
     now,
   });
@@ -198,5 +198,27 @@ describe("Workflow testing its draft", () => {
     expect(test.test).toBe(true);
     expect(test.versionId).toBe(version.id);
     expect(real.test).toBe(false);
+  });
+
+  it("a_child_of_a_test_run_is_a_test_run_even_on_a_published_version", () => {
+    const workflow = Workflow.register(name);
+    const current = published(workflow, "1.0.0");
+    const parent = startedOn(workflow, tested(workflow, "draft-1"));
+
+    const started = workflow.startInstance({
+      instanceId: null,
+      version: current,
+      input: {},
+      trigger: TriggerKind.Parent,
+      starterId: null,
+      origin: parent,
+      originEffectId: "/do/0/child",
+      now,
+    });
+
+    expect(started).toMatchObject({
+      ok: true,
+      value: { test: true, originId: parent.id, versionId: current.id },
+    });
   });
 });

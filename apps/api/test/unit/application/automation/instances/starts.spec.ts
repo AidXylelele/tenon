@@ -3,12 +3,17 @@ import type { InputProblem } from "../../../../../src/application/automation/ins
 import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
 import { StartInstance } from "../../../../../src/application/automation/instances/start-instance.js";
 import { StartSubWorkflow } from "../../../../../src/application/automation/instances/start-sub-workflow.js";
-import { TriggerKind } from "../../../../../src/domain/automation/instances/enums.js";
+import {
+  Phase,
+  TriggerKind,
+} from "../../../../../src/domain/automation/instances/enums.js";
+import type { WorkflowInstance } from "../../../../../src/domain/automation/instances/workflow-instance.js";
 import { WorkflowRefusal } from "../../../../../src/domain/automation/workflows/enums.js";
 import { Workflow } from "../../../../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../../../../src/domain/automation/workflows/workflow-name.js";
 import { aDefinition } from "../../../../support/builders.js";
 import {
+  anInstanceIn,
   RecordingInstanceRuns,
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
@@ -23,9 +28,13 @@ function inputsChecked(problems: readonly InputProblem[]): WorkflowRuntime {
   return checker as unknown as WorkflowRuntime;
 }
 
-async function setUp(archived = false, problems: readonly InputProblem[] = []) {
+async function setUp(
+  archived = false,
+  problems: readonly InputProblem[] = [],
+  parent: WorkflowInstance = anInstanceIn(Phase.Running, { id: "parent-1" }),
+) {
   const workflows = new StoredWorkflowRepository();
-  const instances = new StoredWorkflowInstanceRepository();
+  const instances = new StoredWorkflowInstanceRepository(parent);
   const runs = new RecordingInstanceRuns(instances);
   const workflow = Workflow.register(name);
   const definition = aDefinition({}, "content-1");
@@ -47,9 +56,9 @@ async function setUp(archived = false, problems: readonly InputProblem[] = []) {
   };
 }
 
-function childOf(workflow: WorkflowName) {
+function childOf(workflow: WorkflowName, parentId = "parent-1") {
   return {
-    parentId: "parent-1",
+    parentId,
     effectId: "/do/0/child",
     name: workflow,
     version: null,
@@ -102,7 +111,7 @@ describe("starting an instance", () => {
     });
 
     expect(started).toEqual({ ok: false, failure: problems });
-    expect(fixture.instances.rows.size).toBe(0);
+    expect(fixture.instances.rows.size).toBe(1);
     expect(fixture.runs.started).toHaveLength(0);
   });
 });
@@ -132,6 +141,27 @@ describe("starting a sub-workflow", () => {
     const started = await fixture.child.execute(childOf(name));
 
     expect(started).toEqual({ ok: false, failure: WorkflowRefusal.Archived });
-    expect(fixture.instances.rows.size).toBe(0);
+    expect(fixture.instances.rows.size).toBe(1);
+  });
+
+  it("a_child_of_a_parent_no_longer_kept_is_refused_as_missing", async () => {
+    const fixture = await setUp();
+    const orphan = childOf(name, "parent-gone");
+
+    const started = await fixture.child.execute(orphan);
+
+    expect(started).toEqual({ ok: false, failure: Missing.Instance });
+    expect(fixture.runs.started).toHaveLength(0);
+  });
+
+  it("a_child_of_a_test_run_is_a_test_run", async () => {
+    const parent = anInstanceIn(Phase.Running, { id: "parent-1", test: true });
+    const fixture = await setUp(false, [], parent);
+
+    await fixture.child.execute(childOf(name));
+
+    const child = fixture.runs.started[0]?.instance;
+    expect(child?.test).toBe(true);
+    expect(child?.originId).toBe("parent-1");
   });
 });

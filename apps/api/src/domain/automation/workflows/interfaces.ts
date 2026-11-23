@@ -84,7 +84,7 @@ export interface NewInstance {
   readonly input: JsonValue;
   readonly trigger: TriggerKind;
   readonly starterId: string | null;
-  readonly originId: string | null;
+  readonly origin: WorkflowInstance | null;
   readonly originEffectId: string | null;
   readonly now: Date;
 }

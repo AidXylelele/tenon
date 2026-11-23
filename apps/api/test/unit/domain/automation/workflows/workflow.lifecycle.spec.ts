@@ -52,7 +52,7 @@ function startOn(
     input: { amount: 7 },
     trigger: TriggerKind.Manual,
     starterId: "author-1",
-    originId: null,
+    origin: null,
     originEffectId: null,
     now,
   });
@@ -367,7 +367,7 @@ describe("Workflow starting and restarting instances", () => {
       input: [1, "two", null],
       trigger: TriggerKind.Event,
       starterId: null,
-      originId: "origin-1",
+      origin: anInstanceIn(Phase.Completed, { id: "origin-1" }),
       originEffectId: null,
       now,
     });
@@ -412,7 +412,7 @@ describe("Workflow starting and restarting instances", () => {
       input: null,
       trigger: TriggerKind.Manual,
       starterId: "author-1",
-      originId: null,
+      origin: null,
       originEffectId: null,
       now,
     });

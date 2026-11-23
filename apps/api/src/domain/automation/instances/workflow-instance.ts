@@ -85,7 +85,7 @@ export class WorkflowInstance {
       versionId: input.version.id,
       trigger: input.trigger,
       starterId: input.starterId,
-      originId: input.originId,
+      originId: input.origin?.id ?? null,
       originEffectId: input.originEffectId,
       input: input.input,
       phase: Phase.Pending,
@@ -96,7 +96,7 @@ export class WorkflowInstance {
       endedAt: null,
       cancelReason: null,
       run: null,
-      test: input.version.test,
+      test: WorkflowInstance.#testOf(input),
       version: 0,
     });
   }
@@ -450,6 +450,12 @@ export class WorkflowInstance {
     if (ended) return null;
 
     return InstanceRefusal.NotEnded;
+  }
+
+  static #testOf(input: NewInstance): boolean {
+    if (input.version.test) return true;
+
+    return input.origin?.test === true;
   }
 
   #raise(kind: InstanceEventKind): void {

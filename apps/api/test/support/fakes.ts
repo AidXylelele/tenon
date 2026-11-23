@@ -496,6 +496,7 @@ export interface InstanceOverrides {
   readonly input?: WorkflowInstanceProps["input"];
   readonly startedAt?: Date | null;
   readonly endedAt?: Date | null;
+  readonly test?: boolean;
   readonly version?: number;
 }
 
@@ -527,7 +528,7 @@ export function anInstanceIn(
     endedAt: overrides.endedAt === undefined ? endedAt : overrides.endedAt,
     cancelReason: null,
     run: overrides.run ?? null,
-    test: false,
+    test: overrides.test ?? false,
     version: overrides.version ?? 1,
   });
 }

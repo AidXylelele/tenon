@@ -238,7 +238,7 @@ export class Workflow {
       input: start.input,
       trigger: start.trigger,
       starterId: null,
-      originId: null,
+      origin: null,
       originEffectId: null,
       now: start.now,
     });
@@ -266,7 +266,7 @@ export class Workflow {
       input: previous.input,
       trigger: TriggerKind.Restart,
       starterId: restart.starterId,
-      originId: previous.id,
+      origin: previous,
       originEffectId: null,
       now: restart.now,
     });
