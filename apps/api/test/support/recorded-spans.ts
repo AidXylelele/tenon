@@ -46,15 +46,6 @@ export class RecordedSpans {
     return span;
   }
 
-  childrenOf(parent: RecordedSpan): readonly RecordedSpan[] {
-    const id = parent.spanContext().spanId;
-    return this.#ended.filter((span) => span.parentSpanContext?.spanId === id);
-  }
-
-  clear(): void {
-    this.#ended.length = 0;
-  }
-
   async stop(): Promise<void> {
     await this.#sdk.shutdown();
     trace.disable();
