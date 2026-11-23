@@ -10,11 +10,13 @@ const {
   readDraftAction,
   checkDraftAction,
   publishDraftAction,
+  testRunAction,
 } = vi.hoisted(() => ({
   saveDraftAction: vi.fn(),
   readDraftAction: vi.fn(),
   checkDraftAction: vi.fn(),
   publishDraftAction: vi.fn(),
+  testRunAction: vi.fn(),
 }));
 
 vi.mock("./actions", () => ({
@@ -22,6 +24,7 @@ vi.mock("./actions", () => ({
   readDraftAction,
   checkDraftAction,
   publishDraftAction,
+  testRunAction,
 }));
 
 const WORKFLOW = { namespace: "sales", name: "leads" };
@@ -53,6 +56,7 @@ describe("the draft kept beside the editor", () => {
     readDraftAction.mockReset();
     checkDraftAction.mockReset();
     publishDraftAction.mockReset();
+    testRunAction.mockReset();
   });
 
   afterEach(() => {
@@ -145,6 +149,36 @@ describe("the draft kept beside the editor", () => {
       etag: '"2"',
     });
     expect(publication).toEqual({ kind: "published", version });
+  });
+
+  it("a_test_run_tests_the_saved_revision_with_the_key_of_its_attempt", async () => {
+    const opened = revisionOf(BASE, '"1"');
+    const { keeper } = keeperOn(BASE, opened);
+    const run = { id: "run-1", phase: "pending" };
+    testRunAction.mockResolvedValue({ kind: "started", run });
+
+    const started = await keeper.test({ id: 7 }, "key-1");
+
+    expect(testRunAction).toHaveBeenCalledWith({
+      ...WORKFLOW,
+      etag: '"1"',
+      input: { id: 7 },
+      key: "key-1",
+    });
+    expect(started).toEqual({ kind: "started", run });
+  });
+
+  it("a_test_run_refused_by_a_newer_draft_holds_with_that_revision", async () => {
+    const opened = revisionOf(BASE, '"1"');
+    const { keeper } = keeperOn(BASE, opened);
+    const theirs = revisionOf(BASE.replace("leads", "theirs"), '"2"', GRACE);
+    testRunAction.mockResolvedValue({ kind: "conflict", current: theirs });
+
+    const started = await keeper.test({}, "key-2");
+
+    expect(started).toEqual({ kind: "held" });
+    expect(readDraftAction).not.toHaveBeenCalled();
+    expect(keeper.read().conflict).toEqual({ theirs, base: BASE });
   });
 
   it("an_untouched_editor_takes_a_newer_draft_saved_elsewhere", async () => {

@@ -30,5 +30,5 @@ function isSame(one: Step, other: Step): boolean {
 }
 
 function changeOf(step: Step, kind: StepChange["kind"]): StepChange {
-  return { name: step.name, kind };
+  return { id: step.id, name: step.name, kind };
 }

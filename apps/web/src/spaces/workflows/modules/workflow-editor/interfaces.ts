@@ -68,11 +68,6 @@ export interface TestRun {
   readonly records: readonly TaskRecord[];
 }
 
-export type TestRunAnswer =
-  | { readonly kind: "started"; readonly run: InstanceSummary }
-  | { readonly kind: "conflict" }
-  | { readonly kind: "refused"; readonly problem: Problem };
-
 export interface LeaveGuard {
   readonly leaving: string | null;
   readonly stay: () => void;
@@ -87,6 +82,14 @@ export interface NamedDraft {
 export interface WorkflowName {
   readonly namespace: string;
   readonly name: string;
+}
+
+export interface TestRunParams extends WorkflowName {
+  readonly run: string;
+}
+
+export interface VersionParams extends WorkflowName {
+  readonly version: string;
 }
 
 export type Opening =
@@ -134,10 +137,19 @@ export interface DraftState {
   readonly conflict: OpenConflict | null;
 }
 
+export interface Held {
+  readonly kind: "held";
+}
+
 export type Publication =
   | { readonly kind: "published"; readonly version: Version }
   | { readonly kind: "refused"; readonly problem: Problem }
-  | { readonly kind: "held" };
+  | Held;
+
+export type TestStart =
+  | { readonly kind: "started"; readonly run: InstanceSummary }
+  | { readonly kind: "refused"; readonly problem: Problem }
+  | Held;
 
 export interface VersionChoice {
   readonly kind: "fix" | "feature" | "breaking";
@@ -146,9 +158,15 @@ export interface VersionChoice {
 }
 
 export interface StepChange {
+  readonly id: string;
   readonly name: string;
   readonly kind: "added" | "changed" | "removed";
 }
+
+export type ChangeReading =
+  | { readonly kind: "reading" }
+  | { readonly kind: "read"; readonly changes: readonly StepChange[] }
+  | { readonly kind: "unread" };
 
 export interface PublishChoice {
   readonly version: string;

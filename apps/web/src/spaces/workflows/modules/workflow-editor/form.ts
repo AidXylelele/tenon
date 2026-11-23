@@ -33,12 +33,10 @@ export const PublishedVersion = z.object({
   document: z.object({ version: z.string() }),
 });
 
-export const DraftTest = DraftEtag.extend({ input: z.json() });
+export const DraftTest = DraftEtag.extend({ input: z.json(), key: z.uuid() });
 
 export const RunId = z.uuid();
 
 export const StartsTurn = DraftTarget.extend({ on: z.boolean() });
 
 export const TestEventType = z.string().trim().min(1).max(256);
-
-export const VersionTarget = DraftTarget.extend({ version: z.string().min(1) });

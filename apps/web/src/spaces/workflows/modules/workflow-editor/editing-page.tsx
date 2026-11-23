@@ -49,11 +49,7 @@ import {
   stepsIn,
   WorkflowFlow,
 } from "@/features/workflow-flow";
-import {
-  turnStartsAction,
-  versionSourceAction,
-  versionStepsAction,
-} from "./actions";
+import { turnStartsAction } from "./actions";
 import { changesOf } from "./changes";
 import { CodeView } from "./code-view";
 import { DraftStore } from "./draft-store";
@@ -62,14 +58,15 @@ import { EditorToolbar } from "./editor-toolbar";
 import type { SlotSources } from "./form-slots";
 import type {
   Aside,
+  ChangeReading,
   CodeShown,
   Starts,
-  StepChange,
   WorkflowName,
 } from "./interfaces";
 import { marksOf } from "./marks";
 import { ProblemsPanel } from "./problems-panel";
 import { PublishBar } from "./publish-bar";
+import { publishedStepsOf, publishedTextOf } from "./reads";
 import { StartPanel } from "./start-panel";
 import { type EntryAction, StepCatalog } from "./step-catalog";
 import type { Webhook } from "./step-form";
@@ -113,11 +110,15 @@ const PROBLEMS: Aside = { kind: "problems" };
 const NOT_DISCARDED: Problem = {
   type: "about:blank",
   title: "The published version could not be read",
-  status: 404,
+  status: 503,
   detail: "The published version's text could not be read, so the draft stays.",
   errors: [],
   retryAfter: null,
 };
+
+const NO_CHANGES: ChangeReading = { kind: "read", changes: [] };
+
+const UNREAD: ChangeReading = { kind: "unread" };
 
 const PANEL_SIZE = 400;
 const PANEL_MIN = 360;
@@ -490,15 +491,16 @@ function EditingBody({
     }
   }
 
-  async function changesSincePublished(): Promise<readonly StepChange[]> {
-    if (currentVersion === null || structure === null) return [];
+  async function changesSincePublished(): Promise<ChangeReading> {
+    if (currentVersion === null || structure === null) return NO_CHANGES;
 
-    const request = { ...name, version: currentVersion };
-    const published = await versionStepsAction(request);
-
-    if (published === null) return [];
-
-    return changesOf(published, structure.workflow.steps);
+    try {
+      const published = await publishedStepsOf(name, currentVersion);
+      const changes = changesOf(published, structure.workflow.steps);
+      return { kind: "read", changes };
+    } catch {
+      return UNREAD;
+    }
   }
 
   async function setVersion(value: string) {
@@ -517,14 +519,18 @@ function EditingBody({
 
   async function discard(): Promise<Outcome<void>> {
     const editor = view();
-    const request = { ...name, version: currentVersion ?? "" };
-    const source = await versionSourceAction(request);
 
-    if (source === null || editor === null)
+    if (currentVersion === null || editor === null)
       return { ok: false, problem: NOT_DISCARDED };
 
-    replaceTextAsOneStep(editor, source, 0);
-    return { ok: true, value: undefined };
+    try {
+      const published = await publishedTextOf(name, currentVersion);
+      const text = await yamlOf(published);
+      replaceTextAsOneStep(editor, text, 0);
+      return { ok: true, value: undefined };
+    } catch {
+      return { ok: false, problem: NOT_DISCARDED };
+    }
   }
 
   function download() {
@@ -570,12 +576,14 @@ function EditingBody({
       {aside.kind === "test" && (
         <TestRunPanel
           state={test.state}
+          lost={test.lost}
           steps={steps}
           onRun={(input) => {
             setTestedText(readMine());
             void test.run(input);
           }}
           onAgain={test.reset}
+          onReadAgain={test.readAgain}
           onBack={() => {
             setAside(FORM);
           }}

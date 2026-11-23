@@ -37,9 +37,9 @@ describe("what changed since the published version", () => {
     const changes = changesOf(before, after);
 
     expect(changes).toEqual([
-      { name: "notify", kind: "added" },
-      { name: "fetch", kind: "changed" },
-      { name: "post", kind: "removed" },
+      { id: "/do/notify", name: "notify", kind: "added" },
+      { id: "/do/fetch", name: "fetch", kind: "changed" },
+      { id: "/do/post", name: "post", kind: "removed" },
     ]);
   });
 

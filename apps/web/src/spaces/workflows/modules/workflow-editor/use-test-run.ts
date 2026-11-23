@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { Problem } from "@/libs/data-access/problem";
 import type { JsonValue } from "@/libs/json/json";
 import { isUnended } from "@/operations/run-progress";
-import { testRunAction, testRunReadAction } from "./actions";
 import type { DraftStore } from "./draft-store";
 import type { TestRun, WorkflowName } from "./interfaces";
+import { testRunOf } from "./reads";
 
 const POLL_MS = 1000;
+
+const MOST_MISSES = 3;
 
 export type TestRunState =
   | { readonly kind: "idle" }
@@ -24,49 +26,51 @@ const IDLE: TestRunState = { kind: "idle" };
 
 const STARTING: TestRunState = { kind: "starting" };
 
-const NOT_SAVED = "The draft could not be saved, so it was not tested.";
-
-const SAVED_ELSEWHERE =
-  "Someone else saved this draft meanwhile; resolve it, then test again.";
+const HELD =
+  "The draft is not saved yet, so it was not tested; see the line under the title, then test again.";
 
 export function useTestRun(name: WorkflowName, draft: DraftStore) {
   const [state, setState] = useState<TestRunState>(IDLE);
+  const [misses, setMisses] = useState(0);
   const shown = state.kind === "ran" ? state.test : null;
   const id = shown?.run.id ?? null;
   const ended = shown === null || !isUnended(shown.run.phase);
+  const lost = misses >= MOST_MISSES;
 
   useEffect(() => {
     let current = true;
 
-    if (id === null || ended) return;
+    if (id === null || ended || lost) return;
 
     const timer = setTimeout(() => {
-      void testRunReadAction(id).then((test) => {
-        if (current && test !== null) setState({ kind: "ran", test });
-      });
+      testRunOf(name, id).then(
+        (test) => {
+          if (!current) return;
+
+          setMisses(0);
+          setState({ kind: "ran", test });
+        },
+        () => {
+          if (current) setMisses((count) => count + 1);
+        },
+      );
     }, POLL_MS);
 
     return () => {
       current = false;
       clearTimeout(timer);
     };
-  }, [id, ended, shown]);
+  }, [name, id, ended, lost, misses, shown]);
 
   const run = useCallback(
     async (input: JsonValue) => {
       setState(STARTING);
-      const etag = await draft.flush();
+      setMisses(0);
+      const key = crypto.randomUUID();
+      const answer = await draft.test(input, key);
 
-      if (etag === null) {
-        setState({ kind: "refused", reason: NOT_SAVED, problem: null });
-        return;
-      }
-
-      const request = { ...name, etag, input };
-      const answer = await testRunAction(request);
-
-      if (answer.kind === "conflict") {
-        setState({ kind: "refused", reason: SAVED_ELSEWHERE, problem: null });
+      if (answer.kind === "held") {
+        setState({ kind: "refused", reason: HELD, problem: null });
         return;
       }
 
@@ -79,12 +83,16 @@ export function useTestRun(name: WorkflowName, draft: DraftStore) {
       const test = { run: answer.run, records: [] };
       setState({ kind: "ran", test });
     },
-    [draft, name],
+    [draft],
   );
 
   const reset = useCallback(() => {
     setState(IDLE);
   }, []);
 
-  return { state, run, reset };
+  const readAgain = useCallback(() => {
+    setMisses(0);
+  }, []);
+
+  return { state, lost, run, reset, readAgain };
 }

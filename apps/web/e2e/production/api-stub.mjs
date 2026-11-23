@@ -52,14 +52,17 @@ do:
       run:
         script:
           language: js
-          code: "const names=[ 'ada','grace' ];console.log(JSON.stringify(names.map(n=>n.toUpperCase())))"
+          code: |
+            const names=[ 'ada','grace' ];console.log(JSON.stringify(names.map(n=>n.toUpperCase())))
       output:
         as: \${ fromjson }
   - Score a lead:
       run:
         script:
           language: python
-          code: "import json\\nprint(json.dumps({'score':  7}))"
+          code: |
+            import json
+            print(json.dumps({'score':  7}))
       output:
         as: \${ fromjson }
   - Post the items:
@@ -182,6 +185,18 @@ const RECORDS = [
     "Normalize names",
     ["ADA", "GRACE"],
     "2026-11-23T08:10:00.600Z",
+  ),
+  recordOf(
+    "/do/3/Score a lead",
+    "Score a lead",
+    { score: 7 },
+    "2026-11-23T08:10:00.640Z",
+  ),
+  recordOf(
+    "/do/4/Post the items",
+    "Post the items",
+    { ok: true },
+    "2026-11-23T08:10:00.700Z",
   ),
 ];
 

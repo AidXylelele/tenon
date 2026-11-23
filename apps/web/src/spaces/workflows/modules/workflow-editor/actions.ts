@@ -2,17 +2,14 @@
 
 import {
   fetchImport,
-  instance,
-  versionSource,
-  versionStructure,
   publishEvent,
-  taskRecords,
   turnWorkflow,
 } from "@/libs/data-access/automation";
 import {
   checkDraft,
   draft,
   publishDraft,
+  testDraft,
   writeDraft,
 } from "@/libs/data-access/drafts";
 import type { Outcome, Problem } from "@/libs/data-access/problem";
@@ -20,6 +17,7 @@ import type {
   DraftCheck,
   DraftPublication,
   DraftRevision,
+  DraftTestRun,
   DraftWrite,
 } from "@/libs/data-access/types";
 import {
@@ -29,14 +27,9 @@ import {
   DraftTarget,
   DraftTest,
   ImportAddress,
-  RunId,
   StartsTurn,
   TestEventType,
-  VersionTarget,
 } from "./form";
-import type { StepList } from "language-server/protocol";
-import type { TestRun, TestRunAnswer } from "./interfaces";
-import { testDraft } from "./test-runs";
 
 const UNREADABLE: Problem = {
   type: "about:blank",
@@ -122,29 +115,13 @@ export async function publishDraftAction(
   return publishDraft(namespace, name, etag);
 }
 
-export async function testRunAction(request: unknown): Promise<TestRunAnswer> {
+export async function testRunAction(request: unknown): Promise<DraftTestRun> {
   const parsed = DraftTest.safeParse(request);
 
   if (!parsed.success) return REFUSED;
 
-  const { namespace, name, etag, input } = parsed.data;
-  const key = crypto.randomUUID();
+  const { namespace, name, etag, input, key } = parsed.data;
   return testDraft(namespace, name, etag, input, key);
-}
-
-export async function testRunReadAction(id: unknown): Promise<TestRun | null> {
-  const parsed = RunId.safeParse(id);
-
-  if (!parsed.success) return null;
-
-  const [run, records] = await Promise.all([
-    instance(parsed.data),
-    taskRecords(parsed.data),
-  ]);
-
-  if (run === null) return null;
-
-  return { run, records: records.items };
 }
 
 export async function turnStartsAction(
@@ -174,27 +151,4 @@ export async function testEventAction(type: unknown): Promise<Outcome<void>> {
     data: {},
   };
   return publishEvent(event);
-}
-
-export async function versionStepsAction(
-  request: unknown,
-): Promise<StepList | null> {
-  const parsed = VersionTarget.safeParse(request);
-
-  if (!parsed.success) return null;
-
-  const { namespace, name, version } = parsed.data;
-  const structure = await versionStructure(namespace, name, version);
-  return structure?.steps ?? null;
-}
-
-export async function versionSourceAction(
-  request: unknown,
-): Promise<string | null> {
-  const parsed = VersionTarget.safeParse(request);
-
-  if (!parsed.success) return null;
-
-  const { namespace, name, version } = parsed.data;
-  return versionSource(namespace, name, version);
 }

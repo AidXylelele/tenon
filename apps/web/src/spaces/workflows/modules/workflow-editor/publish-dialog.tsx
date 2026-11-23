@@ -19,7 +19,12 @@ import {
 } from "@/libs/ui/components/dialog";
 import { Label } from "@/libs/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@/libs/ui/components/radio-group";
-import type { PublishChoice, StepChange, VersionChoice } from "./interfaces";
+import type {
+  ChangeReading,
+  PublishChoice,
+  StepChange,
+  VersionChoice,
+} from "./interfaces";
 import { versionChoicesOf } from "./version";
 
 interface PublishDialogProps {
@@ -27,7 +32,7 @@ interface PublishDialogProps {
   readonly title: string;
   readonly currentVersion: string | null;
   readonly draftVersion: string;
-  readonly changes: readonly StepChange[] | null;
+  readonly changes: ChangeReading;
   readonly startsByItself: boolean;
   readonly tested: boolean;
   readonly onTest: () => void;
@@ -146,17 +151,20 @@ export function PublishDialog({
   );
 }
 
-function ChangeList({
-  changes,
-}: {
-  readonly changes: readonly StepChange[] | null;
-}) {
+function ChangeList({ changes }: { readonly changes: ChangeReading }) {
   const id = useId();
 
-  if (changes === null)
+  if (changes.kind === "reading")
     return (
       <p role="status" className="text-caption text-muted-foreground">
         Reading what changed…
+      </p>
+    );
+
+  if (changes.kind === "unread")
+    return (
+      <p role="status" className="text-caption text-muted-foreground">
+        What changed could not be read; you can still publish.
       </p>
     );
 
@@ -165,14 +173,14 @@ function ChangeList({
       <h3 id={id} className="font-semibold">
         What changed
       </h3>
-      {changes.length === 0 ? (
+      {changes.changes.length === 0 ? (
         <p className="text-caption text-muted-foreground">
           No step was added, changed or removed.
         </p>
       ) : (
         <ul aria-labelledby={id} className="list-disc pl-5">
-          {changes.map((change) => (
-            <li key={`${change.kind}:${change.name}`}>
+          {changes.changes.map((change) => (
+            <li key={change.id}>
               {change.name} — {CHANGE_WORDS[change.kind]}
             </li>
           ))}

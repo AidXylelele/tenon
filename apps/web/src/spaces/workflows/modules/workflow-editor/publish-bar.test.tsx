@@ -34,7 +34,7 @@ const PUBLISHING = {
   startsByItself: true,
   tested: false,
   onTest: vi.fn(),
-  changesOf: () => Promise.resolve([]),
+  changesOf: () => Promise.resolve({ kind: "read" as const, changes: [] }),
   setVersion: () => Promise.resolve(),
   turnOn: () => Promise.resolve({ ok: true as const, value: undefined }),
 };
@@ -119,7 +119,9 @@ describe("the publish bar", () => {
     const turnOn = vi.fn(() =>
       Promise.resolve({ ok: true as const, value: undefined }),
     );
-    const changes = [{ name: "Post the items", kind: "changed" as const }];
+    const changes = [
+      { id: "/do/2/Post the items", name: "Post the items", kind: "changed" },
+    ] as const;
     render(
       <PublishBar
         session={session}
@@ -132,7 +134,7 @@ describe("the publish bar", () => {
         onShowProblems={vi.fn()}
         {...PUBLISHING}
         tested
-        changesOf={() => Promise.resolve(changes)}
+        changesOf={() => Promise.resolve({ kind: "read", changes })}
         setVersion={setVersion}
         turnOn={turnOn}
       />,
@@ -152,5 +154,40 @@ describe("the publish bar", () => {
     expect(changed).toHaveTextContent("Post the items — changed");
     expect(setVersion).toHaveBeenCalledWith("1.1.0");
     expect(untested).toBeNull();
+  });
+
+  it("what_changed_that_cannot_be_read_says_so_and_publishing_stays", async () => {
+    const session = {
+      document: () =>
+        Promise.resolve({
+          kind: "document",
+          version: 3,
+          document: { document: { version: "1.0.1" } },
+        }),
+    } as unknown as WorkflowSession;
+    render(
+      <PublishBar
+        session={session}
+        problems={0}
+        onPlatformProblems={vi.fn()}
+        publish={vi.fn()}
+        onPublished={() => Promise.resolve()}
+        currentVersion="1.0.0"
+        onUseVersion={vi.fn()}
+        onShowProblems={vi.fn()}
+        {...PUBLISHING}
+        changesOf={() => Promise.resolve({ kind: "unread" })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    const unread = await screen.findByText(
+      "What changed could not be read; you can still publish.",
+    );
+
+    expect(unread).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /^Publish 1\.0\.1/ }),
+    ).toBeEnabled();
   });
 });

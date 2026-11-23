@@ -15,7 +15,7 @@ import { Button } from "@/libs/ui/components/button";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import type { WorkflowSession } from "@/operations/workflow-language";
-import type { PublishChoice, Publication, StepChange } from "./interfaces";
+import type { ChangeReading, PublishChoice, Publication } from "./interfaces";
 import { PublishDialog } from "./publish-dialog";
 import { freeVersion, writtenVersionOf } from "./version";
 
@@ -34,17 +34,21 @@ interface PublishBarProps {
   readonly startsByItself: boolean;
   readonly tested: boolean;
   readonly onTest: () => void;
-  readonly changesOf: () => Promise<readonly StepChange[]>;
+  readonly changesOf: () => Promise<ChangeReading>;
   readonly setVersion: (version: string) => Promise<void>;
   readonly turnOn: () => Promise<Outcome<void>>;
 }
 
 interface OpenDialog {
   readonly draftVersion: string;
-  readonly changes: readonly StepChange[] | null;
+  readonly changes: ChangeReading;
 }
 
 const FIRST_VERSION = "1.0.0";
+
+const READING: ChangeReading = { kind: "reading" };
+
+const NO_CHANGES: ChangeReading = { kind: "read", changes: [] };
 
 export function PublishBar({
   session,
@@ -111,8 +115,8 @@ export function PublishBar({
       if (document === null) return;
 
       const draftVersion = writtenVersionOf(document) ?? FIRST_VERSION;
-      setDialog({ draftVersion, changes: null });
-      const changes = currentVersion === null ? [] : await changesOf();
+      setDialog({ draftVersion, changes: READING });
+      const changes = currentVersion === null ? NO_CHANGES : await changesOf();
       setDialog((shown) => (shown === null ? null : { ...shown, changes }));
     });
   }

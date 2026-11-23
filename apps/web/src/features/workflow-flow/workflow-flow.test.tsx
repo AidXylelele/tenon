@@ -258,7 +258,7 @@ describe("adding steps", () => {
     expect(mode.onInsert).toHaveBeenCalledWith({
       kind: "branch",
       switch: "/do/Has items?",
-      case: "Otherwise",
+      case: "default",
     });
   });
 

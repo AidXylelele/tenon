@@ -1,22 +1,36 @@
 import type { EditorView } from "@codemirror/view";
 import { forgetHistory } from "@/libs/codemirror/base-setup";
 import { takeOwnersText } from "@/libs/codemirror/owned-text";
-import type { DraftRevision, DraftWrite } from "@/libs/data-access/types";
-import type { JsonObject } from "@/libs/json/json";
+import type {
+  DraftRefusal,
+  DraftRevision,
+  DraftWrite,
+} from "@/libs/data-access/types";
+import type { JsonObject, JsonValue } from "@/libs/json/json";
 import { reasonOf } from "@/libs/language-client/failures";
 import {
   checkDraftAction,
   publishDraftAction,
   readDraftAction,
   saveDraftAction,
+  testRunAction,
 } from "./actions";
-import type { DraftState, Publication, WorkflowName } from "./interfaces";
+import type {
+  DraftState,
+  Held,
+  Publication,
+  TestStart,
+  WorkflowName,
+} from "./interfaces";
+
+type Conflict = Extract<DraftRefusal, { readonly kind: "conflict" }>;
 
 const PAUSE_MS = 1500;
 const RETRY_MS = 5000;
 const SECOND_MS = 1000;
 const TRANSIENT: ReadonlySet<number> = new Set([408, 429]);
 const NO_LAYOUT: JsonObject = {};
+const HELD: Held = { kind: "held" };
 
 export class DraftStore {
   private etag: string | null;
@@ -67,18 +81,18 @@ export class DraftStore {
     return this.enqueue(null);
   }
 
-  async publish(): Promise<Publication> {
-    const etag = await this.flush();
+  publish(): Promise<Publication> {
+    return this.attempt((etag) => {
+      const request = { ...this.workflow, etag };
+      return publishDraftAction(request);
+    });
+  }
 
-    if (etag === null) return { kind: "held" };
-
-    const request = { ...this.workflow, etag };
-    const answer = await publishDraftAction(request);
-
-    if (answer.kind !== "conflict") return answer;
-
-    await this.holdAgainst(answer.current);
-    return { kind: "held" };
+  test(input: JsonValue, key: string): Promise<TestStart> {
+    return this.attempt((etag) => {
+      const request = { ...this.workflow, etag, input, key };
+      return testRunAction(request);
+    });
   }
 
   resolve(text: string): void {
@@ -127,6 +141,21 @@ export class DraftStore {
     if (unsaved && this.state.conflict === null) void this.enqueue(this.text());
 
     this.listeners.clear();
+  }
+
+  private async attempt<Answer extends { readonly kind: string }>(
+    send: (etag: string) => Promise<Answer | Conflict>,
+  ): Promise<Answer | Held> {
+    const etag = await this.flush();
+
+    if (etag === null) return HELD;
+
+    const answer = await send(etag);
+
+    if (!DraftStore.isConflict(answer)) return answer;
+
+    await this.holdAgainst(answer.current);
+    return HELD;
   }
 
   private schedule(delay: number): void {
@@ -242,6 +271,12 @@ export class DraftStore {
     if (this.timer !== null) clearTimeout(this.timer);
 
     this.timer = null;
+  }
+
+  private static isConflict(answer: {
+    readonly kind: string;
+  }): answer is Conflict {
+    return answer.kind === "conflict";
   }
 
   private static savedOf(revision: DraftRevision): DraftState["saved"] {
