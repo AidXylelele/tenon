@@ -33,4 +33,23 @@ describe("the OpenAPI document", () => {
       ]),
     );
   });
+
+  it("the_start_and_the_test_run_answer_one_described_input_problem", () => {
+    const options = new DocumentBuilder().setTitle("Tenon API").build();
+    const document = SwaggerModule.createDocument(t.app, options);
+    const start =
+      document.paths["/api/v1/workflows/{namespace}/{name}/instances"];
+    const test =
+      document.paths["/api/v1/workflows/{namespace}/{name}/draft/test-runs"];
+    const reference = "#/components/schemas/InputProblemsResponse";
+
+    const started = JSON.stringify(start?.post?.responses["422"]);
+    const tested = JSON.stringify(test?.post?.responses["422"]);
+
+    expect(document.components?.schemas).toHaveProperty(
+      "InputProblemsResponse",
+    );
+    expect(started).toContain(reference);
+    expect(tested).toContain(reference);
+  });
 });

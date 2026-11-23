@@ -47,6 +47,7 @@ import {
   InstancePageResponse,
   InstanceParams,
   InstanceResponse,
+  InputProblemsResponse,
   InstanceSummaryResponse,
   LATEST,
   ListInstancesQuery,
@@ -83,7 +84,7 @@ export class InstancesController {
   @ApiCreatedResponse({ standardSchema: InstanceSummaryResponse })
   @ApiNotFoundResponse()
   @ApiConflictResponse()
-  @ApiUnprocessableEntityResponse()
+  @ApiUnprocessableEntityResponse({ standardSchema: InputProblemsResponse })
   async start(
     @Param({ schema: WorkflowParams }) params: WorkflowParams,
     @Body({ schema: StartInstanceBody }) body: StartInstanceBody,

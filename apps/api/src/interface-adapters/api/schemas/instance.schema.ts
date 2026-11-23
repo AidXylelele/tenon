@@ -44,6 +44,16 @@ export const TasksQuery = z.strictObject({
 
 export type TasksQuery = z.infer<typeof TasksQuery>;
 
+export const InputProblemsResponse = z
+  .object({
+    type: z.string(),
+    title: z.string(),
+    status: z.number().int(),
+    detail: z.string(),
+    errors: z.array(z.object({ pointer: z.string(), detail: z.string() })),
+  })
+  .meta({ id: "InputProblemsResponse" });
+
 export const InstanceSummaryResponse = z.object({
   id: z.uuid(),
   namespace: z.string(),

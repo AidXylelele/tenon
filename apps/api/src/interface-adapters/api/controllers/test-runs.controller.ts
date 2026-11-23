@@ -33,12 +33,10 @@ import {
   DraftConflictResponse,
   TestRunBody,
   TestRunFingerprint,
+  TestRunProblemsResponse,
 } from "../schemas/draft.schema.js";
 import { InstanceSummaryResponse } from "../schemas/instance.schema.js";
-import {
-  DefinitionProblemsResponse,
-  WorkflowParams,
-} from "../schemas/workflow.schema.js";
+import { WorkflowParams } from "../schemas/workflow.schema.js";
 
 @ApiTags("drafts")
 @ApiCookieAuth("sessionCookie")
@@ -67,9 +65,7 @@ export class TestRunsController {
     standardSchema: DraftConflictResponse,
   })
   @ApiResponse({ status: HttpStatus.PRECONDITION_REQUIRED })
-  @ApiUnprocessableEntityResponse({
-    standardSchema: DefinitionProblemsResponse,
-  })
+  @ApiUnprocessableEntityResponse({ standardSchema: TestRunProblemsResponse })
   async create(
     @Param({ schema: WorkflowParams }) params: WorkflowParams,
     @Body({ schema: TestRunBody }) body: TestRunBody,
