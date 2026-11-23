@@ -43,7 +43,6 @@ export function ConsoleSidebar({
   inProgress,
   account,
 }: ConsoleSidebarProps) {
-  const connectLabel = useId();
   const work = placesOf(capabilities, "work");
   const connect = placesOf(capabilities, "connect");
   const settings = placesOf(capabilities, "settings");
@@ -58,15 +57,7 @@ export function ConsoleSidebar({
             <Places places={work} inProgress={inProgress} />
           </SidebarGroupContent>
         </SidebarGroup>
-        {connect.length > 0 && (
-          <SidebarGroup role="group" aria-labelledby={connectLabel}>
-            <SidebarGroupLabel id={connectLabel}>Connect</SidebarGroupLabel>
-            <SidebarSeparator className="mx-0 mb-2 hidden group-data-[collapsible=icon]:block" />
-            <SidebarGroupContent>
-              <Places places={connect} inProgress={0} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        {connect.length > 0 && <ConnectGroup places={connect} />}
       </SidebarContent>
       <SidebarFooter>
         <Places places={settings} inProgress={0} />
@@ -131,6 +122,20 @@ function Brand() {
         </SidebarMenuButton>
       </SidebarMenuItem>
     </SidebarMenu>
+  );
+}
+
+function ConnectGroup({ places }: { readonly places: readonly Place[] }) {
+  const label = useId();
+
+  return (
+    <SidebarGroup role="group" aria-labelledby={label}>
+      <SidebarGroupLabel id={label}>Connect</SidebarGroupLabel>
+      <SidebarSeparator className="mx-0 mb-2 hidden group-data-[collapsible=icon]:block" />
+      <SidebarGroupContent>
+        <Places places={places} inProgress={0} />
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
 
