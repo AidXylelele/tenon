@@ -16,6 +16,7 @@ import {
   NON_CANONICAL_TEXT,
   TWO_ROWS_ALL,
   TWO_ROWS_TEXT,
+  WRITTEN_BEFORE_A_TEST,
 } from "./readings.test-support";
 
 const POINTER = "/do/1/Has items/switch/0/Has items/when";
@@ -355,20 +356,38 @@ describe("a condition in the builder", () => {
     expect(inputName).toBeInTheDocument();
   });
 
-  it("data_the_picker_does_not_offer_is_shown_as_its_path", () => {
+  it("data_written_in_the_field_is_named_as_its_chip_before_a_test_run", () => {
+    shown({ data: WRITTEN_BEFORE_A_TEST });
+
+    const slides = within(row(1)).getByText(
+      "Fetch the digest › slideshow › slides",
+    );
+    const path = within(row(1)).queryByText(".slideshow.slides");
+
+    expect(slides).toBeInTheDocument();
+    expect(path).toBeNull();
+  });
+
+  it("data_not_yet_named_never_shows_its_jq", () => {
     shown({ data: null });
 
-    const path = within(row(1)).getByText(".slideshow.slides");
+    const reading = within(row(1)).getByText("Reading the data…");
+    const path = within(row(1)).queryByText(".slideshow.slides");
 
-    expect(path.tagName).toBe("CODE");
+    expect(reading).toBeInTheDocument();
+    expect(path).toBeNull();
   });
 
   it("a_reading_from_elsewhere_replaces_the_rows", () => {
     const { rerender } = shown();
 
-    rerender({ text: "", reading: BEFORE_TODAY });
+    rerender({
+      text: "",
+      reading: BEFORE_TODAY,
+      data: WRITTEN_BEFORE_A_TEST,
+    });
 
-    const due = within(row(1)).getByText(".due");
+    const due = within(row(1)).getByText("Fetch the digest › due");
     expect(due).toBeInTheDocument();
   });
 

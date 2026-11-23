@@ -26,4 +26,9 @@ export interface AddressDiagnostic extends Omit<Diagnostic, "code"> {
   readonly code: "draft-address";
 }
 
-export type Problem = Diagnostic | AddressDiagnostic;
+export interface WrittenReferenceDiagnostic extends Omit<Diagnostic, "code"> {
+  readonly code: "written-reference";
+}
+
+export type Problem =
+  Diagnostic | AddressDiagnostic | WrittenReferenceDiagnostic;

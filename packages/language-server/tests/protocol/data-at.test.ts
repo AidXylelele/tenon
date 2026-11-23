@@ -23,6 +23,7 @@ test("the data at a step's field is answered with the expressions to insert", as
 
   expect(answered).toMatchObject({
     version: 1,
+    written: [{ expression: ".retry", label: ["guard", "retry"] }],
     warnings: [{ kind: "contextNotKnownObject" }],
   });
   expect(entries).toEqual([

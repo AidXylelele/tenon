@@ -15,9 +15,9 @@ import {
   startWorkflowLanguage,
   textFromJson,
 } from "@/operations/workflow-language";
-import { LANGUAGE_FEATURES } from "@/features/code-editor";
 import { fetchImportAction, startDraftAction } from "./actions";
-import { EditingSurface } from "./editing-surface";
+import { LANGUAGE_FEATURES } from "./code-view";
+import { EditingPage } from "./editing-page";
 import type { EditorProps, Opening, WorkflowName } from "./interfaces";
 import { NamingDialog } from "./naming-dialog";
 import { editorTitle } from "./titles";
@@ -34,6 +34,8 @@ export function Editor({
   opening,
   profile,
   secretNames,
+  webhooks,
+  starts,
   task,
   userId,
 }: EditorProps) {
@@ -79,6 +81,8 @@ export function Editor({
       connection={state.connection}
       board={board}
       opening={opening}
+      webhooks={webhooks}
+      starts={starts}
       task={task}
       userId={userId}
     />
@@ -89,12 +93,16 @@ function Opener({
   connection,
   board,
   opening,
+  webhooks,
+  starts,
   task,
   userId,
 }: {
   readonly connection: LanguageConnection;
   readonly board: DiagnosticsBoard;
   readonly opening: Opening;
+  readonly webhooks: EditorProps["webhooks"];
+  readonly starts: EditorProps["starts"];
   readonly task: string | null;
   readonly userId: string;
 }) {
@@ -164,7 +172,7 @@ function Opener({
     );
 
   return (
-    <EditingSurface
+    <EditingPage
       client={client}
       board={board}
       name={opened.name}
@@ -174,6 +182,8 @@ function Opener({
       bumpFrom={opened.bumpFrom}
       task={task}
       userId={userId}
+      webhooks={webhooks}
+      starts={starts}
     />
   );
 }

@@ -11,13 +11,11 @@ import { StartForm } from "./start-form";
 const SIGN_UPS = {
   name: "Sign-ups from the website",
   eventType: "com.example.signup.v1",
-  address: "https://tenon.example.com/api/v1/hooks/dTSi8Xvw",
 };
 
 const ORDERS = {
   name: "Order approvals",
   eventType: "com.example.order.approved.v1",
-  address: "https://tenon.example.com/api/v1/hooks/q2Lk0Pzr",
 };
 
 const meta = {

@@ -52,6 +52,24 @@ describe("a session asking the language server about one open document", () => {
       { textDocument },
     ],
     [
+      "data_at",
+      (session) => session.dataAt("fetch", "/do/0/fetch/with/body", {}, ""),
+      methods.dataAt,
+      {
+        textDocument,
+        step: "fetch",
+        field: "/do/0/fetch/with/body",
+        samples: {},
+        typed: "",
+      },
+    ],
+    [
+      "template",
+      (session) => session.readTemplate("/do/0/greet/set/message"),
+      methods.readTemplate,
+      { textDocument, pointer: "/do/0/greet/set/message" },
+    ],
+    [
       "ranges",
       (session) => session.rangesOf(["/do/0"]),
       methods.rangesOf,
@@ -69,6 +87,18 @@ describe("a session asking the language server about one open document", () => {
       expect(request).toHaveBeenCalledWith(method, params);
     },
   );
+
+  it("a_condition_is_read_from_its_text_alone", async () => {
+    const { client, request } = clientOf(null);
+    const session = new WorkflowSession(client, URI);
+
+    const answer = await session.readCondition("${ .ok }");
+
+    expect(answer).toBe("answered");
+    expect(request).toHaveBeenCalledWith(methods.readCondition, {
+      text: "${ .ok }",
+    });
+  });
 
   it("the_text_is_synced_before_the_server_is_asked", async () => {
     const { client, sync, request } = clientOf(7);

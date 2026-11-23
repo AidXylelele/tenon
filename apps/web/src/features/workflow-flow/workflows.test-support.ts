@@ -166,7 +166,7 @@ export const DAILY_DIGEST = workflowOf(
         "${ .slideshow.slides | length > 0 }",
         next(POST),
       ),
-      whenCase("Otherwise", null, ends()),
+      whenCase("default", null, ends()),
       next(POST),
     ]),
     stepAt(POST, "call", "POST https://httpbin.org/post", [next(null)]),
@@ -186,7 +186,7 @@ export const DRAFT_DIGEST = workflowOf(
         "${ .slideshow.slides | length > 0 }",
         next(POST),
       ),
-      whenCase("Otherwise", null, ends()),
+      whenCase("default", null, ends()),
       next(POST),
     ]),
     stepAt(POST, "call", "POST", [next(PAUSE)]),
@@ -210,7 +210,7 @@ export const ORDER_ROUTER = workflowOf(
     stepAt(WHICH, "switch", "3 cases", [
       whenCase("A licence", '${ .kind == "licence" }', goTo(LICENCE)),
       whenCase("A parcel", '${ .kind == "parcel" }', goTo(BOOK)),
-      whenCase("Otherwise", null, ends()),
+      whenCase("default", null, ends()),
       next(LICENCE),
     ]),
     stepAt(LICENCE, "call", "POST https://httpbin.org/anything/licence", [

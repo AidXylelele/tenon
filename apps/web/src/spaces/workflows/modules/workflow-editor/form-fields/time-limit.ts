@@ -1,19 +1,14 @@
 import type { Commit, FieldState } from "./interfaces";
-import { isObject, type Json } from "./json";
 import { clearEditsOf, valueEditsOf } from "./edits";
+
+const MILLISECONDS_IN_SECOND = 1000;
 
 const REFUSED_SECONDS = "Write the seconds as a whole number above 0.";
 
-export function timeLimitOf(value: Json): number | null {
-  const after = isObject(value) ? value.after : null;
+export function limitSecondsOf(milliseconds: number | null): number | null {
+  if (milliseconds === null) return null;
 
-  if (!isObject(after)) return null;
-
-  const units = Object.keys(after);
-  const seconds = after.seconds;
-  const isSeconds = units.length === 1 && typeof seconds === "number";
-
-  return isSeconds ? seconds : null;
+  return milliseconds / MILLISECONDS_IN_SECOND;
 }
 
 export function timeLimitCommitOf(field: FieldState, text: string): Commit {

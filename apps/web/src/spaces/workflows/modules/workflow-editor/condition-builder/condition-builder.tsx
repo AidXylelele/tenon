@@ -8,6 +8,7 @@ import type {
   Join,
 } from "language-server/protocol";
 import { useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/libs/ui/components/button";
 import {
   Field,
@@ -69,6 +70,7 @@ function ConditionEditor({
   describedBy,
   reading,
   data,
+  header,
   renderPicker,
   onEdit,
 }: ConditionBuilderProps & { readonly reading: ConditionReading }) {
@@ -101,6 +103,17 @@ function ConditionEditor({
 
   const toggleWords = writing ? "Use the builder" : "Write an expression";
   const showsToggle = !writing || canBuild;
+  const toggleButton = (
+    <Button
+      type="button"
+      variant="link"
+      size="sm"
+      className="px-0"
+      onClick={toggle}
+    >
+      {toggleWords}
+    </Button>
+  );
 
   return (
     <div
@@ -109,19 +122,13 @@ function ConditionEditor({
       aria-describedby={describedBy}
       className="flex flex-col gap-3"
     >
-      {showsToggle && (
-        <div className="flex items-center justify-end">
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="px-0"
-            onClick={toggle}
-          >
-            {toggleWords}
-          </Button>
-        </div>
+      {showsToggle && header === undefined && (
+        <div className="flex items-center justify-end">{toggleButton}</div>
       )}
+      {showsToggle &&
+        header !== undefined &&
+        header !== null &&
+        createPortal(toggleButton, header)}
       {writing ? (
         <ExpressionField
           pointer={pointer}

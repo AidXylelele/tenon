@@ -1,3 +1,4 @@
+import { Announcer } from "@/libs/ui/composites/announcer";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
 import { TENON_VARIANTS, WITHOUT_SHELL } from "./hosts.test-support";
@@ -36,6 +37,13 @@ function CatalogPanel({ variants, stepAbove, languageTerms }: PanelProps) {
 
 const meta = {
   component: CatalogPanel,
+  decorators: [
+    (Story) => (
+      <Announcer>
+        <Story />
+      </Announcer>
+    ),
+  ],
   args: {
     variants: TENON_VARIANTS,
     stepAbove: "Fetch the digest",

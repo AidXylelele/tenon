@@ -7,7 +7,7 @@ import type {
   WordsKind,
 } from "./interfaces";
 import { isObject } from "./json";
-import { timeLimitOf } from "./time-limit";
+import { limitSecondsOf } from "./time-limit";
 import { hasWords, wordsOf } from "./words";
 
 const SUMMARY_LIMIT = 3;
@@ -170,20 +170,37 @@ export function summaryOf(
   kind: WordsKind,
   base: string,
   unwritten: string,
+  timeLimit: number | null = null,
 ): string {
-  const said = fields.flatMap((field) => statementOf(field, kind, base));
+  const said = fields.flatMap((field) =>
+    statementOf(field, kind, base, timeLimit),
+  );
   const shown = said.slice(0, SUMMARY_LIMIT);
   const hidden = said.length - shown.length;
   const more = hidden > 0 ? [`${String(hidden)} more`] : [];
-  const parts = shown.concat(more);
+  const parts = shown.concat(more).map(sentenceCaseOf);
 
   return parts.length > 0 ? parts.join(" · ") : unwritten;
+}
+
+function sentenceCaseOf(part: string, index: number): string {
+  const first = part.charAt(0);
+  const second = part.charAt(1);
+  const isAcronym = second !== second.toLowerCase();
+  const rest = part.slice(1);
+
+  if (index === 0) return `${first.toUpperCase()}${rest}`;
+
+  if (isAcronym) return part;
+
+  return `${first.toLowerCase()}${rest}`;
 }
 
 function statementOf(
   field: FormField,
   kind: WordsKind,
   base: string,
+  timeLimit: number | null,
 ): string[] {
   const path = pathOf(field, base);
   const words = wordsOf(kind, path, field);
@@ -194,7 +211,7 @@ function statementOf(
     case "values":
       return [countedOf(field, words.title)];
     case "seconds":
-      return field.written ? [limitText(field)] : [];
+      return field.written ? [limitText(timeLimit)] : [];
     case "body":
     case "value":
     case "data":
@@ -205,6 +222,10 @@ function statementOf(
     case "httpMethod":
     case "cases":
       return field.written ? [words.title] : [];
+    case "authentication":
+      return field.written
+        ? [words.title]
+        : [`No ${words.title.toLowerCase()}`];
   }
 }
 
@@ -216,8 +237,8 @@ function countedOf(field: FormField, title: string): string {
   return `${title}: ${String(count)}`;
 }
 
-function limitText(field: FormField): string {
-  const seconds = timeLimitOf(field.value);
+function limitText(timeLimit: number | null): string {
+  const seconds = limitSecondsOf(timeLimit);
 
   if (seconds === null) return TIME_LIMIT_WORDS;
 

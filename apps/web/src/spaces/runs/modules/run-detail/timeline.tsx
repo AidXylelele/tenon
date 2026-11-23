@@ -34,8 +34,8 @@ export function Timeline({
                     </span>
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    started <AbsoluteTime value={record.startedAt} /> · attempt{" "}
-                    {record.attempt}
+                    started <AbsoluteTime value={record.startedAt} seconds /> ·
+                    attempt {record.attempt}
                   </span>
                 </span>
                 <TaskStatusOf status={record.status} />

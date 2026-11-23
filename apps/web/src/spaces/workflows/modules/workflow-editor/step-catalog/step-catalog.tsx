@@ -16,6 +16,7 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/libs/ui/components/empty";
+import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { cn } from "@/libs/ui/tokens/cn";
 import { catalogOf, entryWordsOf } from "./catalog";
 import { ENTRY_ICONS } from "./entry-icons";
@@ -60,17 +61,26 @@ export function StepCatalog({
   const [query, setQuery] = useState("");
   const [opened, setOpened] = useState(NONE_OPENED);
   const searchBox = useRef<HTMLInputElement>(null);
+  const announce = useAnnounce();
 
   const catalog = catalogOf(variants, stepAbove);
   const groups = shownGroupsOf(catalog, query, opened);
-  const order = keyboardOrderOf(groups);
   const open = groups.filter((group) => group.open);
   const closed = groups.filter((group) => !group.open);
   const someClosed = closed.length > 0;
-  const searching = query.trim() !== "";
-  const found = foundText(order.length);
-  const said = searching ? found : "";
   const nothingMatches = groups.length === 0;
+
+  function search(typed: string): void {
+    setQuery(typed);
+    const isSearching = typed.trim() !== "";
+
+    if (!isSearching) return;
+
+    const found = shownGroupsOf(catalog, typed, opened);
+    const count = keyboardOrderOf(found).length;
+    const said = foundText(count);
+    announce(said);
+  }
 
   function openGroup(id: GroupId): void {
     const next = new Set(opened);
@@ -91,7 +101,7 @@ export function StepCatalog({
           ref={searchBox}
           autoFocus
           value={query}
-          onValueChange={setQuery}
+          onValueChange={search}
           placeholder="Find a step: http, slack, if, loop, wait…"
         />
         <CommandList
@@ -126,9 +136,6 @@ export function StepCatalog({
         </div>
       ) : null}
       {nothingMatches ? <NoMatchNote query={query} /> : null}
-      <p role="status" className="sr-only">
-        {said}
-      </p>
     </div>
   );
 }

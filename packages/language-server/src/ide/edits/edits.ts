@@ -37,6 +37,7 @@ export function editsOf(snapshot: Snapshot, action: EditAction): Editing {
     case "setField":
     case "clearField":
     case "setCondition":
+    case "setTemplate":
       return fieldEditsOf(snapshot, action);
     case "insertStep":
     case "insertStepOnBranch":

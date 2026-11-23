@@ -103,7 +103,7 @@ export function dataOf(
   entries: readonly DataEntry[],
   warnings: DataAtResult["warnings"] = [],
 ): DataAtResult {
-  return { version: 1, entries, warnings };
+  return { version: 1, entries, written: [], warnings };
 }
 
 export const AFTER_FETCH = dataOf([

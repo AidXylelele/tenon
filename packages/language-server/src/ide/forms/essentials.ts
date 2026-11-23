@@ -1,9 +1,13 @@
 import type { JsonValue } from "interpreter/front-end";
-import { childPointerOf, valueAt } from "../pointers/index.js";
+import { childPointerOf, isJsonObject, valueAt } from "../pointers/index.js";
 import type { StepNode } from "../steps/index.js";
 import { type StepVariant, variantOf } from "../variants/index.js";
 
 type Path = readonly string[];
+
+const endpointKey = "endpoint";
+
+const uriKey = "uri";
 
 const httpMethod: Path = ["with", "method"];
 
@@ -99,9 +103,24 @@ export function stepEssentialsOf(
   const paths =
     variant === null ? functionCallEssentials : variantEssentials[variant];
   const shown = paths.filter((path) => isShownOf(path, node, document));
-  const pointers = shown.map((path) => pointerOf(node, path));
+  const pointers = shown.map((path) =>
+    essentialPointerOf(node, path, document),
+  );
 
   return rankedOf(pointers);
+}
+
+function essentialPointerOf(
+  node: StepNode,
+  path: Path,
+  document: JsonValue,
+): string {
+  const pointer = pointerOf(node, path);
+  const written = valueAt(document, pointer);
+  const isEndpoint = path.at(-1) === endpointKey;
+  const isObjectForm = isEndpoint && isJsonObject(written);
+
+  return isObjectForm ? childPointerOf(pointer, uriKey) : pointer;
 }
 
 export function workflowEssentialsOf(): ReadonlyMap<string, number> {

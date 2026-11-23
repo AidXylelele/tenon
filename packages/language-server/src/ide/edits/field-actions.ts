@@ -18,6 +18,7 @@ import {
   yamlOf,
 } from "../yaml-text/index.js";
 import { conditionTextOf } from "../conditions/index.js";
+import { templateTextOf, writtenTemplateOf } from "../templates/index.js";
 import type {
   ClearField,
   EditableText,
@@ -25,6 +26,7 @@ import type {
   FieldAction,
   SetCondition,
   SetField,
+  SetTemplate,
   ValueText,
   WrittenField,
 } from "./interfaces.js";
@@ -37,6 +39,10 @@ import {
   mappingTextOf,
   removalOf,
 } from "./collection-text.js";
+
+const endpointKey = "endpoint";
+
+const authenticationKey = "authentication";
 
 const unedited: Editing = { kind: "edited", changes: [], ids: [] };
 
@@ -71,6 +77,8 @@ export function fieldEditingOf(
       return fieldClearingOf(editable, action);
     case "setCondition":
       return conditionSettingOf(editable, action);
+    case "setTemplate":
+      return templateSettingOf(editable, action);
   }
 }
 
@@ -112,6 +120,12 @@ export function fieldSettingOf(
     return { kind: "refused", reason: unheldOf(action.pointer) };
   }
 
+  const addressObject = addressObjectSettingOf(editable.document, action);
+
+  if (addressObject !== null) {
+    return fieldSettingOf(editable, addressObject);
+  }
+
   const written = valueAt(editable.document, action.pointer);
   const change =
     written === undefined
@@ -126,6 +140,24 @@ export function fieldSettingOf(
   }
 
   return { kind: "edited", changes: [change], ids: [] };
+}
+
+function addressObjectSettingOf(
+  document: JsonValue,
+  action: SetField,
+): SetField | null {
+  const endpoint = parentPointerOf(action.pointer);
+  const address = valueAt(document, endpoint);
+  const isAuthentication = lastTokenOf(action.pointer) === authenticationKey;
+  const isEndpoint = lastTokenOf(endpoint) === endpointKey;
+  const isAddressText = typeof address === "string";
+
+  if (!isAuthentication || !isEndpoint || !isAddressText) {
+    return null;
+  }
+
+  const value = { uri: address, authentication: action.value };
+  return { kind: "setField", pointer: endpoint, value };
 }
 
 export function fieldClearingOf(
@@ -178,6 +210,40 @@ function conditionSettingOf(
     }
     case "refused":
       return written;
+  }
+}
+
+function templateSettingOf(
+  editable: EditableText,
+  action: SetTemplate,
+): Editing {
+  const pointer = action.pointer;
+  const written = valueAt(editable.document, pointer);
+  const standing = writtenTemplateOf(written, pointer);
+  const template = templateTextOf(action.parts);
+
+  if (standing.kind === "refused") {
+    return standing;
+  }
+
+  if (standing.kind === "expression") {
+    return {
+      kind: "refused",
+      reason: `${pointer} holds an expression a template does not show; edit it as jq.`,
+    };
+  }
+
+  switch (template.kind) {
+    case "text": {
+      const setting: SetField = {
+        kind: "setField",
+        pointer,
+        value: template.text,
+      };
+      return fieldSettingOf(editable, setting);
+    }
+    case "refused":
+      return template;
   }
 }
 

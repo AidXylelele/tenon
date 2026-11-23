@@ -5,10 +5,13 @@ export interface Size {
   readonly height: number;
 }
 
+export type ZoomCorner = "bottom-left" | "top-right";
+
 export interface FlowCanvasProps {
   readonly label: string;
   readonly description?: string;
   readonly focusable: boolean;
+  readonly zoomAt?: ZoomCorner;
   readonly children: ReactNode;
 }
 

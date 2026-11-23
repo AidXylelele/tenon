@@ -134,7 +134,27 @@ describe("the summary of options behind a disclosure", () => {
 
     const summary = summaryOf(fields, "http", FETCH_STEP.pointer, "Usual");
 
-    expect(summary).toBe("Run only if · Time limit");
+    expect(summary).toBe("Run only if · time limit");
+  });
+
+  it("the_summary_is_one_sentence_in_sentence_case", () => {
+    const authentication = fieldOf({
+      key: "authentication",
+      pointer: `${FETCH_STEP.pointer}/with/endpoint/authentication`,
+    });
+    const headers = fieldOf({
+      key: "headers",
+      pointer: `${FETCH_STEP.pointer}/with/headers`,
+    });
+
+    const summary = summaryOf(
+      [authentication, headers],
+      "http",
+      FETCH_STEP.pointer,
+      "Usual",
+    );
+
+    expect(summary).toBe("No authentication · no headers");
   });
 
   it("named_values_are_said_by_how_many_are_set", () => {
@@ -155,7 +175,13 @@ describe("the summary of options behind a disclosure", () => {
     const value = { after: { seconds: 45 } };
     const limit = { ...written("timeout", "Timeout"), value };
 
-    const summary = summaryOf([limit], "http", FETCH_STEP.pointer, "Usual");
+    const summary = summaryOf(
+      [limit],
+      "http",
+      FETCH_STEP.pointer,
+      "Usual",
+      45_000,
+    );
 
     expect(summary).toBe("Time limit 45 s");
   });
@@ -165,6 +191,6 @@ describe("the summary of options behind a disclosure", () => {
 
     const summary = summaryOf(fields, "http", FETCH_STEP.pointer, "Usual");
 
-    expect(summary).toBe("a · b · c · 2 more");
+    expect(summary).toBe("A · b · c · 2 more");
   });
 });

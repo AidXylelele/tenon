@@ -223,6 +223,19 @@ describe("a step's essential fields", () => {
     expect(limit).not.toHaveValue("");
   });
 
+  it("a_time_limit_written_in_any_form_is_shown_in_the_seconds_it_lasts", () => {
+    const pointer = `${FETCH_STEP.pointer}/timeout`;
+    const value = { after: "PT30S" };
+    const written = formChanged(FETCH_FORM, pointer, { written: true, value });
+    const form = { ...written, timeout: 30_000 };
+    shown({ form });
+    open("More options");
+
+    const limit = screen.getByRole("textbox", { name: /Time limit, seconds/ });
+
+    expect(limit).toHaveValue("30");
+  });
+
   it("a_time_limit_is_written_in_seconds", () => {
     const { onEdit } = shown();
     open("More options");
@@ -508,7 +521,7 @@ describe("a switch's branches", () => {
 describe("set data", () => {
   it("keeps_the_incoming_data_until_turned_off", () => {
     const { onEdit } = shown({ step: SET_STEP, form: SET_FORM });
-    const keep = screen.getByRole("switch", {
+    const keep = screen.getByRole("checkbox", {
       name: "Keep the data that came in",
     });
 
@@ -525,7 +538,7 @@ describe("set data", () => {
   it("a_result_written_another_way_says_so_and_can_be_turned_on", () => {
     const written = setFormOf({ total: "1" }, "written");
     const { onEdit } = shown({ step: SET_STEP, form: written });
-    const keep = screen.getByRole("switch", {
+    const keep = screen.getByRole("checkbox", {
       name: "Keep the data that came in",
     });
 

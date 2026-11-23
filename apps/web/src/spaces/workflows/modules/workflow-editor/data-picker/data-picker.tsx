@@ -86,7 +86,7 @@ export function DataPicker({
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="w-[min(22rem,calc(100vw-16px))] gap-0 p-0"
+        className="flex max-h-(--radix-popover-content-available-height) w-[min(22rem,calc(100vw-16px))] flex-col gap-0 p-0"
         aria-label={label}
         onCloseAutoFocus={closeFocus}
       >
@@ -139,13 +139,17 @@ function ChoiceList({
   const [query, setQuery] = useState("");
   const choices = choicesOf(data, query, onlyPaths);
   const typed = query.trim();
-  const groupNotes = choices.groups.flatMap((group) =>
-    group.note === null ? [] : [`${group.title}: ${group.note}`],
+  const groupNoteIds = choices.groups.map(
+    (_, index) => `${id}-group-${String(index)}-note`,
   );
-  const notes = groupNotes.concat(choices.notes);
-  const listed = choices.groups.filter((group) => group.choices.length > 0);
-  const noteIds = notes.map((_, index) => `${id}-note-${String(index)}`);
-  const describedBy = noteIds.length > 0 ? noteIds.join(" ") : undefined;
+  const groupIds = choices.groups.flatMap((group, index) =>
+    group.note === null ? [] : [groupNoteIds[index] ?? ""],
+  );
+  const noteIds = choices.notes.map(
+    (_, index) => `${id}-note-${String(index)}`,
+  );
+  const described = groupIds.concat(noteIds);
+  const describedBy = described.length > 0 ? described.join(" ") : undefined;
 
   function search(next: string) {
     setQuery(next);
@@ -161,24 +165,32 @@ function ChoiceList({
   }
 
   return (
-    <Command shouldFilter={false} label={SEARCH}>
+    <Command shouldFilter={false} label={SEARCH} className="min-h-0 flex-1">
       <CommandInput
         placeholder={SEARCH}
         value={query}
         aria-describedby={describedBy}
         onValueChange={search}
       />
-      <CommandList className="max-h-80">
+      <CommandList className="max-h-80 min-h-0 flex-1">
         <CommandEmpty>Nothing matches “{typed}”.</CommandEmpty>
-        {listed.map((group) => (
+        {choices.groups.map((group, index) => (
           <CommandGroup key={group.id} heading={group.title}>
             {group.choices.map((choice) => (
               <ChoiceItem key={choice.id} choice={choice} onPick={onPick} />
             ))}
+            {group.note !== null && (
+              <p
+                id={groupNoteIds[index]}
+                className="px-2 pb-1.5 text-caption text-muted-foreground"
+              >
+                {group.note}
+              </p>
+            )}
           </CommandGroup>
         ))}
       </CommandList>
-      {notes.map((note, index) => (
+      {choices.notes.map((note, index) => (
         <p
           key={note}
           id={noteIds[index]}

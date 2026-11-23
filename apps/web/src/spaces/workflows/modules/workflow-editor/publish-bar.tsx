@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  CircleCheckIcon,
-  CircleXIcon,
-  SendIcon,
-  ShieldCheckIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { CircleXIcon, SendIcon, TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -14,24 +8,18 @@ import {
   type Diagnostic,
   DiagnosticSeverity,
 } from "vscode-languageserver-protocol";
-import { codeOf, type Problem } from "@/libs/data-access/problem";
+import { codeOf, type Outcome, type Problem } from "@/libs/data-access/problem";
 import type { Version } from "@/libs/data-access/types";
 import { workflowHref } from "@/libs/routing/routes";
 import { Button } from "@/libs/ui/components/button";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import type { WorkflowSession } from "@/operations/workflow-language";
-import { checkAction } from "./actions";
-import type { Publication } from "./interfaces";
-import { freeVersion } from "./version";
+import type { ChangeReading, PublishChoice, Publication } from "./interfaces";
+import { PublishDialog } from "./publish-dialog";
+import { freeVersion, writtenVersionOf } from "./version";
 
 const TAKEN = "workflow.version-taken";
-
-const READY: StatusLook = {
-  tone: "success",
-  icon: CircleCheckIcon,
-  label: "Ready to publish",
-};
 
 interface PublishBarProps {
   readonly session: WorkflowSession;
@@ -41,7 +29,27 @@ interface PublishBarProps {
   readonly onPublished: (version: Version) => Promise<void>;
   readonly currentVersion: string | null;
   readonly onUseVersion: (version: string) => void;
+  readonly onShowProblems: () => void;
+  readonly title: string;
+  readonly startsByItself: boolean;
+  readonly tested: boolean;
+  readonly ready: boolean;
+  readonly onTest: () => void;
+  readonly changesOf: () => Promise<ChangeReading>;
+  readonly setVersion: (version: string) => Promise<void>;
+  readonly turnOn: () => Promise<Outcome<void>>;
 }
+
+interface OpenDialog {
+  readonly draftVersion: string;
+  readonly changes: ChangeReading;
+}
+
+const FIRST_VERSION = "1.0.0";
+
+const READING: ChangeReading = { kind: "reading" };
+
+const NO_CHANGES: ChangeReading = { kind: "read", changes: [] };
 
 export function PublishBar({
   session,
@@ -51,13 +59,23 @@ export function PublishBar({
   onPublished,
   currentVersion,
   onUseVersion,
+  onShowProblems,
+  title,
+  startsByItself,
+  tested,
+  ready,
+  onTest,
+  changesOf,
+  setVersion,
+  turnOn,
 }: PublishBarProps) {
   const router = useRouter();
   const [outcome, setOutcome] = useState<StatusLook | null>(null);
   const [offered, setOffered] = useState<string | null>(null);
-  const [checking, startChecking] = useTransition();
+  const [dialog, setDialog] = useState<OpenDialog | null>(null);
+  const [opening, startOpening] = useTransition();
   const [publishing, startPublishing] = useTransition();
-  const busy = checking || publishing;
+  const busy = publishing || opening;
 
   async function documentOrRefusal(): Promise<unknown> {
     const read = await session.document();
@@ -86,29 +104,32 @@ export function PublishBar({
     setOutcome({ tone: "danger", icon: CircleXIcon, label: problem.detail });
   }
 
-  function check() {
+  function openDialog() {
+    if (problems > 0) {
+      onShowProblems();
+      return;
+    }
+
     setOutcome(null);
-    startChecking(async () => {
+    startOpening(async () => {
       const document = await documentOrRefusal();
 
       if (document === null) return;
 
-      const checked = await checkAction(document);
-
-      if (checked.ok) {
-        onPlatformProblems([]);
-        setOutcome(READY);
-        return;
-      }
-
-      await refuse(checked.problem);
+      const draftVersion = writtenVersionOf(document) ?? FIRST_VERSION;
+      setDialog({ draftVersion, changes: READING });
+      const changes = currentVersion === null ? NO_CHANGES : await changesOf();
+      setDialog((shown) => (shown === null ? null : { ...shown, changes }));
     });
   }
 
-  function publishDraft() {
-    setOutcome(null);
+  function publishDraft(choice: PublishChoice) {
+    const draftVersion = dialog?.draftVersion ?? null;
+    setDialog(null);
     setOffered(null);
     startPublishing(async () => {
+      if (choice.version !== draftVersion) await setVersion(choice.version);
+
       const document = await documentOrRefusal();
 
       if (document === null) return;
@@ -126,10 +147,12 @@ export function PublishBar({
       }
 
       const version = publication.version;
+      const turned = choice.turnOn ? await turnOn() : null;
+      const told = turned?.ok === true ? " · Turned on" : "";
       const startPage = workflowHref(version.namespace, version.name, {
         start: true,
       });
-      toast.success(`Version ${version.version} published`, {
+      toast.success(`Version ${version.version} published${told}`, {
         action: {
           label: "Start a run",
           onClick: () => {
@@ -149,20 +172,10 @@ export function PublishBar({
         {busy && (
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <Spinner />
-            {publishing ? "Publishing…" : "Checking…"}
+            {publishing ? "Publishing…" : "Reading the draft…"}
           </span>
         )}
         {!busy && outcome !== null && <Status look={outcome} />}
-        {!busy && outcome === null && problems > 0 && (
-          <Status
-            look={{
-              tone: "danger",
-              icon: CircleXIcon,
-              label:
-                problems === 1 ? "1 problem" : `${String(problems)} problems`,
-            }}
-          />
-        )}
       </span>
       {!busy && offered !== null && (
         <Button
@@ -177,14 +190,33 @@ export function PublishBar({
           Use version {offered}
         </Button>
       )}
-      <Button variant="outline" disabled={busy} onClick={check}>
-        <ShieldCheckIcon data-icon="inline-start" />
-        Check
-      </Button>
-      <Button disabled={busy} onClick={publishDraft}>
+      <Button
+        variant={ready ? "default" : "outline"}
+        disabled={busy}
+        onClick={openDialog}
+      >
         <SendIcon data-icon="inline-start" />
         Publish
       </Button>
+      {dialog !== null && (
+        <PublishDialog
+          open
+          title={title}
+          currentVersion={currentVersion}
+          draftVersion={dialog.draftVersion}
+          changes={dialog.changes}
+          startsByItself={startsByItself}
+          tested={tested}
+          onTest={() => {
+            setDialog(null);
+            onTest();
+          }}
+          onOpenChange={(open) => {
+            if (!open) setDialog(null);
+          }}
+          onPublish={publishDraft}
+        />
+      )}
     </div>
   );
 }

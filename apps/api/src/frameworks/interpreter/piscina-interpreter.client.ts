@@ -1,4 +1,3 @@
-import { availableParallelism } from "node:os";
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -72,7 +71,7 @@ export class PiscinaInterpreterClient
     OnModuleInit,
     OnApplicationShutdown
 {
-  static readonly RUN_THREADS = availableParallelism();
+  static readonly RUN_THREADS = 10;
   static readonly CHECK_THREADS = 2;
   private static readonly MOST_KEPT_STRUCTURES = 1_000;
   private static readonly NOT_STARTED =

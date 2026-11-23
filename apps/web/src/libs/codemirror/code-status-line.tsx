@@ -35,9 +35,7 @@ export function CodeStatusLine({
     <div className="flex flex-wrap items-center gap-x-2 border-t px-2.5 py-1 text-caption text-muted-foreground">
       <Status look={look} className="text-caption whitespace-normal" />
       <span className="ml-auto">{note}</span>
-      <p role="status" className="basis-full">
-        {message}
-      </p>
+      <p className="basis-full">{message}</p>
     </div>
   );
 }

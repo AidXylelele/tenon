@@ -27,6 +27,7 @@ export function fieldOf(shape: FieldShape): FormField {
     choices: [],
     required: false,
     written: false,
+    suggested: false,
     value: null,
     essentialRank: null,
     fields: [],
@@ -220,6 +221,7 @@ export const FETCH_FORM: StepFormResult = {
   step: FETCH_STEP.id,
   failure: "stop",
   retry: null,
+  timeout: null,
   result: null,
   fields: httpFields(FETCH_STEP.pointer, "get", "https://httpbin.org/json", []),
 };
@@ -229,6 +231,7 @@ export const POST_FORM: StepFormResult = {
   step: POST_STEP.id,
   failure: "stop",
   retry: null,
+  timeout: null,
   result: null,
   fields: httpFields(POST_STEP.pointer, "post", "", [
     "Endpoint is not in the form the standard requires.",
@@ -240,6 +243,7 @@ export const REPORT_FORM: StepFormResult = {
   step: REPORT_INNER_STEP.id,
   failure: "stop",
   retry: null,
+  timeout: null,
   result: null,
   fields: httpFields(
     REPORT_INNER_STEP.pointer,
@@ -271,6 +275,7 @@ export function protectionOf(
     step: REPORT_STEP.id,
     failure,
     retry: plan,
+    timeout: null,
     result: null,
     fields: [
       ...commonFields(pointer, NAMES),
@@ -356,6 +361,7 @@ export const SWITCH_FORM: StepFormResult = {
   step: SWITCH_STEP.id,
   failure: "stop",
   retry: null,
+  timeout: null,
   result: null,
   fields: [
     ...commonFields(SWITCH_STEP.pointer, NAMES),
@@ -381,6 +387,7 @@ export function setFormOf(
     step: SET_STEP.id,
     failure: "stop",
     retry: null,
+    timeout: null,
     result: { value: result, choices: ["inputAndValues", "valuesOnly"] },
     fields: [
       ...commonFields(SET_STEP.pointer, NAMES),
@@ -410,6 +417,7 @@ export const SCRIPT_FORM: StepFormResult = {
   step: SCRIPT_STEP.id,
   failure: "stop",
   retry: null,
+  timeout: null,
   result: {
     value: "printedJson",
     choices: ["printedJson", "printedText", "exitCode"],
@@ -514,6 +522,7 @@ export const WAIT_FORM: StepFormResult = {
   step: WAIT_STEP.id,
   failure: "stop",
   retry: null,
+  timeout: null,
   result: null,
   fields: [
     ...commonFields(WAIT_STEP.pointer, NAMES),

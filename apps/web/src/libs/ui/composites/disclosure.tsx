@@ -11,6 +11,7 @@ import {
 interface DisclosureProps {
   readonly title: string;
   readonly summary?: React.ReactNode;
+  readonly summaryBelow?: boolean;
   readonly defaultOpen?: boolean;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
@@ -20,6 +21,7 @@ interface DisclosureProps {
 export function Disclosure({
   title,
   summary,
+  summaryBelow = false,
   defaultOpen,
   open,
   onOpenChange,
@@ -39,9 +41,24 @@ export function Disclosure({
         aria-describedby={described}
         className="flex w-full items-center justify-between gap-2 rounded-sm py-1 text-left font-semibold text-foreground"
       >
-        {title}
+        {summaryBelow ? (
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate">{title}</span>
+            {summary !== undefined && (
+              <span
+                id={summaryId}
+                aria-hidden
+                className="truncate text-caption font-normal text-muted-foreground"
+              >
+                {summary}
+              </span>
+            )}
+          </span>
+        ) : (
+          title
+        )}
         <span className="flex items-center gap-1.5">
-          {summary !== undefined && (
+          {!summaryBelow && summary !== undefined && (
             <span
               id={summaryId}
               aria-hidden

@@ -34,7 +34,14 @@ interface Commit {
 
 const NO_MARKS: ReadonlyMap<string, StepMark> = new Map();
 
+const NO_CONDITIONS: ReadonlyMap<
+  string,
+  ReadonlyMap<string, string>
+> = new Map();
+
 const READING: FlowMode = { kind: "read" };
+
+const CHOICE = "/do/Which kind?";
 
 const FETCH = "/do/Fetch the digest";
 
@@ -48,6 +55,8 @@ function editing(changes: Partial<EditMode> = {}): EditMode {
     marks: NO_MARKS,
     inserting: null,
     onInsert: vi.fn(),
+    conditions: NO_CONDITIONS,
+    languageTerms: false,
     ...changes,
   };
 }
@@ -258,7 +267,7 @@ describe("adding steps", () => {
     expect(mode.onInsert).toHaveBeenCalledWith({
       kind: "branch",
       switch: "/do/Has items?",
-      case: "Otherwise",
+      case: "default",
     });
   });
 
@@ -392,14 +401,39 @@ describe("the structure in the accessibility tree", () => {
 });
 
 describe("branches and jumps", () => {
-  it("a_branch_says_its_condition_and_where_it_goes", () => {
-    const mode = editing();
+  it("a_branch_says_its_condition_in_words_and_where_it_goes", () => {
+    const words = new Map([
+      ["A licence", "Read the order › kind is “licence”"],
+    ]);
+    const conditions = new Map([[CHOICE, words]]);
+    const mode = editing({ conditions });
+    draw(ORDER_ROUTER, mode);
+
+    const licence = stepButton("A licence");
+
+    expect(licence).toHaveTextContent(
+      "A licenceRead the order › kind is “licence”go to Send the licence",
+    );
+  });
+
+  it("a_branch_shows_its_jq_only_with_the_language_terms", () => {
+    const mode = editing({ languageTerms: true });
     draw(ORDER_ROUTER, mode);
 
     const licence = stepButton("A licence");
 
     expect(licence).toHaveTextContent(
       'A licence${ .kind == "licence" }go to Send the licence',
+    );
+  });
+
+  it("a_branch_not_worded_never_shows_its_jq", () => {
+    draw(ORDER_ROUTER, READING);
+
+    const parcel = stepButton("A parcel");
+
+    expect(parcel).toHaveTextContent(
+      "A parcelwhen its condition holdsgo to Book the courier",
     );
   });
 
@@ -574,6 +608,27 @@ describe("removing a step", () => {
     shown.rerender(<TooltipProvider>{flow}</TooltipProvider>);
 
     expect(post).toHaveFocus();
+  });
+
+  it("focuses_a_step_it_is_asked_to", () => {
+    const mode = editing();
+    const handle = createRef<FlowHandle>();
+    render(
+      <TooltipProvider>
+        <WorkflowFlow
+          ref={handle}
+          workflow={DAILY_DIGEST}
+          mode={mode}
+          onSelect={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    act(() => {
+      handle.current?.focusStep(POST);
+    });
+
+    expect(stepButton("Post the items")).toHaveFocus();
   });
 
   it("offers_no_step_menu_on_the_card", () => {

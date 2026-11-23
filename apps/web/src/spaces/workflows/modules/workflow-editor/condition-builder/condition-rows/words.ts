@@ -52,6 +52,18 @@ const WORDS: ReadonlyMap<string, Literal> = new Map<string, Literal>([
   ["null", null],
 ]);
 
+export function comparisonWordsOf(comparison: Comparison): string {
+  const found = COMPARISONS.find((each) => each.comparison === comparison);
+
+  return found?.words ?? comparison;
+}
+
+export function timeWordsOf(time: TimeName): string {
+  const found = TIMES.find((each) => each.time === time);
+
+  return found?.words ?? time;
+}
+
 export function secondOf(comparison: Comparison): SecondValue {
   return SECOND_VALUES[comparison];
 }

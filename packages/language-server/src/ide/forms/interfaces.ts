@@ -27,6 +27,7 @@ export interface FormField<Report = Problem> {
   readonly choices: readonly JsonValue[];
   readonly required: boolean;
   readonly written: boolean;
+  readonly suggested: boolean;
   readonly value: JsonValue;
   readonly essentialRank: number | null;
   readonly fields: readonly FormField<Report>[];
@@ -64,6 +65,7 @@ export type StepFormReading =
       readonly failure: FailureKind;
       readonly retry: RetryPlan | null;
       readonly result: ResultReading | null;
+      readonly timeout: number | null;
       readonly fields: readonly FormField[];
     }
   | FormRefusal;

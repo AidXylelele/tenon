@@ -51,11 +51,15 @@ export interface RunStart {
   readonly detail: string;
 }
 
+export type ConditionWords = ReadonlyMap<string, ReadonlyMap<string, string>>;
+
 export interface EditMode {
   readonly kind: "edit";
   readonly marks: ReadonlyMap<string, StepMark>;
   readonly inserting: InsertPlace | null;
   readonly onInsert: (place: InsertPlace) => void;
+  readonly conditions: ConditionWords;
+  readonly languageTerms: boolean;
 }
 
 export interface RunMode {
@@ -70,6 +74,7 @@ export type FlowMode = { readonly kind: "read" } | EditMode | RunMode;
 
 export interface FlowHandle {
   readonly focusAfterRemoving: (step: string) => void;
+  readonly focusStep: (step: string) => void;
 }
 
 export interface WorkflowFlowProps {
@@ -118,6 +123,7 @@ export type Exit =
 
 export interface Branch {
   readonly case: string;
+  readonly name: string;
   readonly when: string | null;
   readonly exit: Exit;
 }
@@ -131,6 +137,7 @@ export interface Jump {
   readonly between: readonly string[];
   readonly lane: number;
   readonly case: string | null;
+  readonly branch: string | null;
 }
 
 export interface JumpTransition {
@@ -191,6 +198,8 @@ export interface FlowView {
   readonly marks: ReadonlyMap<string, StepMark>;
   readonly inserting: InsertPlace | null;
   readonly run: RunView | null;
+  readonly conditions: ConditionWords;
+  readonly languageTerms: boolean;
 }
 
 export interface FlowState {

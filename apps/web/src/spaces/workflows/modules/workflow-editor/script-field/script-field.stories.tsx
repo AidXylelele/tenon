@@ -1,3 +1,4 @@
+import { Announcer } from "@/libs/ui/composites/announcer";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { useState } from "react";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
@@ -52,6 +53,13 @@ function ScriptFieldPlayground({ language, value, expanded }: PlaygroundProps) {
 
 const meta = {
   component: ScriptFieldPlayground,
+  decorators: [
+    (Story) => (
+      <Announcer>
+        <Story />
+      </Announcer>
+    ),
+  ],
   args: { language: "js", value: JS_RAW, expanded: false },
 } satisfies Meta<typeof ScriptFieldPlayground>;
 

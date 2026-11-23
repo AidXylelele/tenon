@@ -13,13 +13,11 @@ import { StartForm } from "./start-form";
 const SIGN_UPS = {
   name: "Sign-ups from the website",
   eventType: "com.example.signup.v1",
-  address: "https://tenon.example.com/api/v1/hooks/dTSi8Xvw",
 };
 
 const ORDERS = {
   name: "Order approvals",
   eventType: "com.example.order.approved.v1",
-  address: "https://tenon.example.com/api/v1/hooks/q2Lk0Pzr",
 };
 
 function shown(props: Partial<StartFormProps> = {}) {
@@ -219,16 +217,14 @@ describe("how the workflow starts", () => {
 });
 
 describe("a start by webhook or event", () => {
-  it("a_webhook_shows_its_address_to_copy", () => {
+  it("a_webhook_is_named_and_its_address_left_to_the_webhooks_page", () => {
     shown({ form: ON_SIGN_UP });
 
-    const address = screen.getByLabelText("Its address");
+    const address = screen.queryByLabelText("Its address");
+    const webhooks = screen.getByRole("link", { name: "Webhooks" });
 
-    expect(address).toHaveValue(SIGN_UPS.address);
-    const copyTheAddress = screen.getByRole("button", {
-      name: "Copy",
-    });
-    expect(copyTheAddress).toBeInTheDocument();
+    expect(address).toBeNull();
+    expect(webhooks).toBeInTheDocument();
   });
 
   it("another_webhook_writes_its_event_type", () => {

@@ -13,6 +13,7 @@ export {
   readConditionAnswerOf,
   readConditionRequest,
 } from "./read-condition.js";
+export { readTemplateHandlerOf, readTemplateRequest } from "./read-template.js";
 export {
   stepFormHandlerOf,
   stepFormRequest,

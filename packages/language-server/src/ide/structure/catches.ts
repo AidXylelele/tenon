@@ -24,6 +24,35 @@ export function catchPolicyOf(
   return { errors, when, exceptWhen, retry, afterward };
 }
 
+export function timeLimitOf(
+  task: ast.Task,
+  model: SemanticModel,
+): number | null {
+  const timeout = timeoutOf(task.timeout, model);
+
+  if (timeout === null) {
+    return null;
+  }
+
+  return millisecondsOf(timeout.after);
+}
+
+function timeoutOf(
+  timeout: ast.Timeout | ast.Reference | null,
+  model: SemanticModel,
+): ast.Timeout | null {
+  if (timeout === null) {
+    return null;
+  }
+
+  switch (timeout.kind) {
+    case "timeout":
+      return timeout;
+    case "reference":
+      return model.symbols.references.timeouts.get(timeout.pointer) ?? null;
+  }
+}
+
 function caughtErrorsOf(filter: ast.ErrorFilter | null): CaughtErrors | null {
   if (filter === null) {
     return null;

@@ -1,8 +1,31 @@
 import type { ast, JsonValue } from "interpreter/front-end";
 import { isJsonObject, valueAt } from "../pointers/index.js";
+import type { StepNode } from "../steps/index.js";
+import {
+  printedResultOf,
+  type StepResult,
+  writtenResultOf,
+} from "../variants/index.js";
 import { inlineYamlOf } from "../yaml-text/index.js";
 
-export function summaryOf(task: ast.Task, document: JsonValue): string | null {
+const languageNames: Readonly<Record<ast.ScriptProcess["language"], string>> = {
+  js: "JavaScript",
+  python: "Python",
+};
+
+const printedWords: ReadonlyMap<StepResult, string> = new Map([
+  ["printedJson", "prints its result as JSON"],
+  ["printedText", "prints its result as text"],
+  ["exitCode", "returns its exit code"],
+]);
+
+export function summaryOf(node: StepNode, document: JsonValue): string | null {
+  const task = node.task;
+
+  if (task.kind === "run" && task.process.kind === "script") {
+    return scriptSummaryOf(node, task.process, document);
+  }
+
   switch (task.kind) {
     case "call":
       return callSummaryOf(task.call, document);
@@ -23,7 +46,7 @@ export function summaryOf(task: ast.Task, document: JsonValue): string | null {
     case "fork":
       return forkSummaryOf(task);
     case "switch":
-      return countOf(task.switch.length, "case", "cases");
+      return countOf(task.switch.length, "branch", "branches");
     case "try":
     case "do":
       return null;
@@ -119,6 +142,23 @@ function processSummaryOf(
   const detail = processDetailOf(process, document);
 
   return writtenPartsOf([process.kind, detail], " ");
+}
+
+function scriptSummaryOf(
+  node: StepNode,
+  script: ast.ScriptProcess,
+  document: JsonValue,
+): string {
+  const language = languageNames[script.language];
+  const written = writtenResultOf(node, document);
+  const printed = printedResultOf(written);
+  const words = printedWords.get(printed);
+
+  if (words === undefined) {
+    return language;
+  }
+
+  return `${language} · ${words}`;
 }
 
 function processDetailOf(process: ast.Process, document: JsonValue): string {

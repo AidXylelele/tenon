@@ -33,6 +33,10 @@ export interface DataEntry extends DataMember, Origin {
   readonly typed: DataMember | null;
 }
 
+export interface WrittenMember extends DataMember {
+  readonly label: readonly string[];
+}
+
 export type DataWarning =
   | { readonly kind: "inputNotKnownObject"; readonly step: string }
   | { readonly kind: "mayHoldNothing"; readonly step: string }
@@ -42,6 +46,7 @@ export type DataReading =
   | {
       readonly kind: "data";
       readonly entries: readonly DataEntry[];
+      readonly written: readonly WrittenMember[];
       readonly warnings: readonly DataWarning[];
     }
   | { readonly kind: "refused"; readonly reason: string };

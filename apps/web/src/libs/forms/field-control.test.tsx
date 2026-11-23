@@ -22,6 +22,7 @@ function fieldOf(
     required: false,
     written: value !== null,
     value,
+    suggested: false,
     essentialRank: null,
     fields,
     diagnostics: [],

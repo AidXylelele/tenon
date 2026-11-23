@@ -6,7 +6,6 @@ import type {
   Jump,
   JumpTransition,
   Line,
-  ListPlace,
   RunView,
 } from "./interfaces";
 import { END, plusItemOf, START, stepItemOf } from "./items";
@@ -14,9 +13,16 @@ import { END, plusItemOf, START, stepItemOf } from "./items";
 const CONTINUES: Exit = { kind: "next" };
 const ENDS: Exit = { kind: "end" };
 const LEAVES: Exit = { kind: "exit" };
+const OTHERWISE = "Otherwise";
 
 function doneOf(step: Step): Transition | undefined {
   return step.flow.find((transition) => transition.on === "done");
+}
+
+export function branchNameOf(transition: Transition): string {
+  if (transition.when === null) return OTHERWISE;
+
+  return transition.case ?? "";
 }
 
 export function continuesOf(step: Step): boolean {
@@ -61,6 +67,7 @@ export function branchesOf(step: Step, list: StepList): readonly Branch[] {
 
   return cases.map((transition) => ({
     case: transition.case ?? "",
+    name: branchNameOf(transition),
     when: transition.when,
     exit: exitOf(transition, list),
   }));
@@ -154,9 +161,9 @@ export function sourcesOf(jumps: readonly Jump[]): ReadonlyMap<string, string> {
 }
 
 function sourceOf(jump: Jump): string {
-  if (jump.case === null) return jump.fromName;
+  if (jump.branch === null) return jump.fromName;
 
-  return `${jump.fromName} · ${jump.case}`;
+  return `${jump.fromName} · ${jump.branch}`;
 }
 
 function casesOf(step: Step): readonly Transition[] {
@@ -176,6 +183,7 @@ function ownJumpsOf(list: StepList): readonly Jump[] {
   return found.map(({ step, transition, to }, lane) => {
     const key = jumpKeyOf(step.id, transition.case);
     const between = stepsBetweenOf(list, step.id, to);
+    const branch = transition.case === null ? null : branchNameOf(transition);
 
     return {
       key,
@@ -186,6 +194,7 @@ function ownJumpsOf(list: StepList): readonly Jump[] {
       between,
       lane,
       case: transition.case,
+      branch,
     };
   });
 }
@@ -221,29 +230,4 @@ function stepsBetweenOf(
   const last = Math.max(start, end);
 
   return ids.slice(first, last + 1);
-}
-
-export function stepsIn(list: StepList): Step[] {
-  return list.steps.flatMap(stepsUnder);
-}
-
-export function stepsUnder(step: Step): Step[] {
-  const inner = step.lists.flatMap(stepsIn);
-  return [step, ...inner];
-}
-
-export function stepWithId(list: StepList, id: string): Step | null {
-  return stepsIn(list).find((step) => step.id === id) ?? null;
-}
-
-export function placeOf(list: StepList, id: string): ListPlace | null {
-  const nested = stepsIn(list).flatMap((step) => step.lists);
-
-  for (const each of [list, ...nested]) {
-    const index = each.steps.findIndex((step) => step.id === id);
-
-    if (index >= 0) return { list: each.id, index, size: each.steps.length };
-  }
-
-  return null;
 }
