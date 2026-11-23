@@ -7,15 +7,26 @@ import type {
 } from "./interfaces";
 
 export const COMPARISONS: readonly ComparisonWords[] = [
-  { comparison: "isNotEmpty", words: "is not empty", second: "none" },
-  { comparison: "isEmpty", words: "is empty", second: "none" },
-  { comparison: "is", words: "is", second: "operand" },
-  { comparison: "isNot", words: "is not", second: "operand" },
-  { comparison: "contains", words: "contains", second: "value" },
-  { comparison: "doesNotContain", words: "does not contain", second: "value" },
-  { comparison: "isGreaterThan", words: "is greater than", second: "operand" },
-  { comparison: "isLessThan", words: "is less than", second: "operand" },
+  { comparison: "isNotEmpty", words: "is not empty" },
+  { comparison: "isEmpty", words: "is empty" },
+  { comparison: "is", words: "is" },
+  { comparison: "isNot", words: "is not" },
+  { comparison: "contains", words: "contains" },
+  { comparison: "doesNotContain", words: "does not contain" },
+  { comparison: "isGreaterThan", words: "is greater than" },
+  { comparison: "isLessThan", words: "is less than" },
 ];
+
+const SECOND_VALUES: Readonly<Record<Comparison, SecondValue>> = {
+  isNotEmpty: "none",
+  isEmpty: "none",
+  is: "operand",
+  isNot: "operand",
+  contains: "value",
+  doesNotContain: "value",
+  isGreaterThan: "operand",
+  isLessThan: "operand",
+};
 
 export const TIMES: readonly {
   readonly time: TimeName;
@@ -42,8 +53,7 @@ const WORDS: ReadonlyMap<string, Literal> = new Map<string, Literal>([
 ]);
 
 export function secondOf(comparison: Comparison): SecondValue {
-  const found = COMPARISONS.find((each) => each.comparison === comparison);
-  return found?.second ?? "none";
+  return SECOND_VALUES[comparison];
 }
 
 export function literalOf(text: string, comparison: Comparison): Typed {

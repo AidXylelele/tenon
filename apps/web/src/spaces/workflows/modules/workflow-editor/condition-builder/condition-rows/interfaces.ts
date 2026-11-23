@@ -7,7 +7,6 @@ export type SecondValue = "none" | "value" | "operand";
 export interface ComparisonWords {
   readonly comparison: Comparison;
   readonly words: string;
-  readonly second: SecondValue;
 }
 
 export type DraftOperand =
