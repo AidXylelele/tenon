@@ -1,6 +1,7 @@
 import { type ast, flowDirectives } from "interpreter/front-end";
 import { childPointerOf } from "../pointers/index.js";
 import type {
+  Afterward,
   FailureKind,
   HeldList,
   ListEnd,
@@ -107,11 +108,19 @@ export function failureOf(step: StepNode): FailureKind {
     return "stop";
   }
 
-  if (task.catch.do !== null) {
-    return "handle";
+  const afterward = afterwardOf(task.catch);
+  return afterward === "stop" ? "retry" : afterward;
+}
+
+export function afterwardOf(caught: ast.Catch): Afterward {
+  const isRaisedAgain =
+    caught.retry !== null && caught.do === null && caught.then === null;
+
+  if (isRaisedAgain) {
+    return "stop";
   }
 
-  return task.catch.retry === null ? "continue" : "retry";
+  return caught.do === null ? "continue" : "handle";
 }
 
 export function listEndOf(tree: StepTree, list: StepNodeList): ListEnd {

@@ -7,7 +7,13 @@ import type {
 } from "interpreter/front-end";
 import type { ConditionReading } from "../conditions/index.js";
 import type { StepFamily } from "../families/index.js";
-import type { ListPart, ListRole, RetryOn, StepTree } from "../steps/index.js";
+import type {
+  Afterward,
+  ListPart,
+  ListRole,
+  RetryOn,
+  StepTree,
+} from "../steps/index.js";
 import type { StepVariant } from "../variants/index.js";
 
 export interface Trigger {
@@ -53,8 +59,6 @@ export interface RetryPlan {
   readonly exceptWhen: string | null;
   readonly on: RetryOn;
 }
-
-export type Afterward = "stop" | "continue" | "handle";
 
 export interface CatchPolicy {
   readonly errors: CaughtErrors | null;

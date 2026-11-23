@@ -4,11 +4,23 @@ import type { DataShape, Shape } from "./interfaces.js";
 
 const noMembers: ReadonlyMap<string, Shape> = new Map();
 
-export const unknownShape: Shape = { kind: "unknown", members: noMembers };
+export const unknownShape: Shape = {
+  kind: "unknown",
+  members: noMembers,
+  size: null,
+};
 
-export const textShape: Shape = { kind: "text", members: noMembers };
+export const textShape: Shape = {
+  kind: "text",
+  members: noMembers,
+  size: null,
+};
 
-export const numberShape: Shape = { kind: "number", members: noMembers };
+export const numberShape: Shape = {
+  kind: "number",
+  members: noMembers,
+  size: null,
+};
 
 const schemaTypes: ReadonlyMap<string, DataShape> = new Map([
   ["object", "object"],
@@ -40,10 +52,10 @@ export function templateShapeOf(template: ast.ValueTemplate): Shape {
       const members = fields.map(
         ([name, field]) => [name, templateShapeOf(field)] as const,
       );
-      return { kind: "object", members: new Map(members) };
+      return { kind: "object", members: new Map(members), size: null };
     }
     case "array":
-      return { kind: "list", members: noMembers };
+      return { kind: "list", members: noMembers, size: null };
     case "expression":
       return unknownShape;
     case "literal":
@@ -56,7 +68,7 @@ export function mergedShapeOf(incoming: Shape, values: Shape): Shape {
   const kept = isObject ? [...incoming.members] : [];
   const members = new Map([...kept, ...values.members]);
 
-  return { kind: "object", members };
+  return { kind: "object", members, size: null };
 }
 
 function jsonSchemaShapeOf(schema: JsonValue): Shape {
@@ -69,14 +81,14 @@ function jsonSchemaShapeOf(schema: JsonValue): Shape {
   const isDescribed = kind === "object" && isJsonObject(properties);
 
   if (!isDescribed) {
-    return { kind, members: noMembers };
+    return { kind, members: noMembers, size: null };
   }
 
   const entries = Object.entries(properties);
   const members = entries.map(
     ([name, property]) => [name, jsonSchemaShapeOf(property)] as const,
   );
-  return { kind, members: new Map(members) };
+  return { kind, members: new Map(members), size: null };
 }
 
 function schemaKindOf(schema: JsonObject): DataShape {
@@ -91,16 +103,20 @@ function schemaKindOf(schema: JsonObject): DataShape {
 }
 
 export function literalShapeOf(value: JsonValue): Shape {
+  if (Array.isArray(value)) {
+    return { kind: "list", members: noMembers, size: value.length };
+  }
+
   if (!isJsonObject(value)) {
     const kind = literalKindOf(value);
-    return { kind, members: noMembers };
+    return { kind, members: noMembers, size: null };
   }
 
   const entries = Object.entries(value);
   const members = entries.map(
     ([name, member]) => [name, literalShapeOf(member)] as const,
   );
-  return { kind: "object", members: new Map(members) };
+  return { kind: "object", members: new Map(members), size: null };
 }
 
 function literalKindOf(value: JsonValue): DataShape {

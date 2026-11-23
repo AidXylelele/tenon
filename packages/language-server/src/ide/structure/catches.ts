@@ -1,12 +1,7 @@
 import type { ast, JsonValue, SemanticModel } from "interpreter/front-end";
 import { valueAt } from "../pointers/index.js";
-import { retryOnOf } from "../steps/index.js";
-import type {
-  Afterward,
-  CatchPolicy,
-  CaughtErrors,
-  RetryPlan,
-} from "./interfaces.js";
+import { afterwardOf, retryOnOf } from "../steps/index.js";
+import type { CatchPolicy, CaughtErrors, RetryPlan } from "./interfaces.js";
 import { millisecondsOf } from "./summaries.js";
 
 export function catchPolicyOf(
@@ -98,15 +93,4 @@ function delayOf(delay: ast.Duration | null): number | null {
   }
 
   return millisecondsOf(delay);
-}
-
-function afterwardOf(caught: ast.Catch): Afterward {
-  const isRaisedAgain =
-    caught.retry !== null && caught.do === null && caught.then === null;
-
-  if (isRaisedAgain) {
-    return "stop";
-  }
-
-  return caught.do === null ? "continue" : "handle";
 }

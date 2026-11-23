@@ -75,6 +75,7 @@ test("the step before reaches as the data the step receives, with the values its
     value: "${ . }",
     isPath: true,
     shape: "object",
+    size: null,
     needsExport: false,
     typed: null,
     members: [
@@ -84,6 +85,7 @@ test("the step before reaches as the data the step receives, with the values its
         value: "${ .count }",
         isPath: true,
         shape: "number",
+        size: null,
         members: [],
       },
       {
@@ -92,6 +94,7 @@ test("the step before reaches as the data the step receives, with the values its
         value: "${ .label }",
         isPath: true,
         shape: "text",
+        size: null,
         members: [],
       },
     ],
@@ -109,6 +112,7 @@ test("a set replaces what flows on, so a step before it reaches only through the
     value: "${ $context.fetch }",
     isPath: true,
     shape: "unknown",
+    size: null,
     needsExport: true,
     typed: null,
     members: [],
@@ -140,6 +144,7 @@ test("the workflow's raw input is offered with the members its schema describes"
     value: "${ $workflow.input }",
     isPath: true,
     shape: "object",
+    size: null,
     needsExport: false,
     typed: null,
     members: [
@@ -149,6 +154,7 @@ test("the workflow's raw input is offered with the members its schema describes"
         value: "${ $workflow.input.customer }",
         isPath: true,
         shape: "text",
+        size: null,
         members: [],
       },
     ],
@@ -238,6 +244,7 @@ test("a script's printed result reaches as text, its fields unknown", () => {
   expect(printed).toMatchObject({
     expression: ".",
     shape: "text",
+    size: null,
     members: [],
   });
 });
@@ -248,6 +255,7 @@ test("a script whose output parses what it prints passes on data whose fields ar
   expect(parsed).toMatchObject({
     expression: ".",
     shape: "unknown",
+    size: null,
     members: [],
   });
 });
@@ -277,6 +285,7 @@ test("an output schema gives the members of a step's output", () => {
       value: "${ .items }",
       isPath: true,
       shape: "list",
+      size: null,
       members: [],
     },
   ]);
@@ -432,6 +441,7 @@ test.each([
     expect(time).toMatchObject({
       source: "time",
       shape: "text",
+      size: null,
       isPath: false,
     });
     expect(computed).toBe(expected);
@@ -799,6 +809,7 @@ test("the last test run's sample gives the fields of a step whose output is not 
       value: "${ $context.fetch.items }",
       isPath: true,
       shape: "list",
+      size: 1,
       members: [],
     },
     {
@@ -807,6 +818,7 @@ test("the last test run's sample gives the fields of a step whose output is not 
       value: "${ $context.fetch.owner }",
       isPath: true,
       shape: "object",
+      size: null,
       members: [
         {
           name: "login",
@@ -814,6 +826,7 @@ test("the last test run's sample gives the fields of a step whose output is not 
           value: "${ $context.fetch.owner.login }",
           isPath: true,
           shape: "text",
+          size: null,
           members: [],
         },
       ],
@@ -824,6 +837,7 @@ test("the last test run's sample gives the fields of a step whose output is not 
       value: '${ $context.fetch["a name"] }',
       isPath: true,
       shape: "number",
+      size: null,
       members: [],
     },
   ]);
@@ -893,14 +907,44 @@ test("a typed field is a path whose fields are not known", () => {
     value: "${ $context.fetch.items.title }",
     isPath: true,
     shape: "unknown",
+    size: null,
     members: [],
   });
 });
 
-test("only steps take typed fields", () => {
-  const entries = readingWith(noSamples, "customer");
+test("the workflow's input takes a typed field, and the times take none", () => {
+  const entries = readingWith(noSamples, "order.id");
 
   const others = entries.filter((entry) => entry.source !== "step");
-  const typed = others.map((entry) => entry.typed);
-  expect(typed).toEqual([null, null, null, null]);
+  const typed = others.map((entry) => [
+    entry.name,
+    entry.typed?.expression ?? null,
+  ]);
+  expect(typed).toEqual([
+    ["input", "$workflow.input.order.id"],
+    ["now", null],
+    ["today", null],
+    ["yesterday", null],
+  ]);
+});
+
+test("the variables a loop binds take a typed field", () => {
+  const snapshot = snapshotOf(loopFlow);
+  const request = {
+    step: "/do/each/do/total",
+    field: "/do/0/each/do/0/total/set/x",
+    samples: noSamples,
+    typed: "id",
+  };
+
+  const reading = dataAtOf(snapshot, request, speculate);
+  const entries = reading.kind === "data" ? reading.entries : [];
+
+  const variables = entries
+    .filter((entry) => entry.source === "variable")
+    .map((entry) => [entry.name, entry.typed?.expression ?? null]);
+  expect(variables).toEqual([
+    ["order", "$order.id"],
+    ["index", "$index.id"],
+  ]);
 });

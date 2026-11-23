@@ -7,6 +7,7 @@ import {
 } from "vscode-languageserver/browser";
 import { type Comparison, secondValues } from "../ide/conditions/index.js";
 import { timeExpressions } from "../ide/jq-text/index.js";
+import { isJsonObject } from "../ide/pointers/index.js";
 import { isChosenResult, stepVariants } from "../ide/variants/index.js";
 import type {
   DataAtParams,
@@ -126,14 +127,8 @@ export function holdsFetchedImports(
   return TextDocumentIdentifier.is(textDocument) && holdsTexts && holdsFailures;
 }
 
-function isRecord(value: unknown): boolean {
-  const isObject = typeof value === "object" && value !== null;
-
-  return isObject && !Array.isArray(value);
-}
-
 function holdsTextsByReference(value: unknown): boolean {
-  const isObject = typeof value === "object" && value !== null;
+  const isObject = isJsonObject(value);
 
   return (
     isObject && Object.values(value).every((text) => typeof text === "string")
@@ -147,7 +142,7 @@ export function holdsStepFormParams(params: unknown): params is StepFormParams {
 export function holdsDataAtParams(params: unknown): params is DataAtParams {
   const samples = memberOf(params, "samples");
   const typed = memberOf(params, "typed");
-  const holdsSamples = samples === undefined || isRecord(samples);
+  const holdsSamples = samples === undefined || isJsonObject(samples);
   const holdsTyped = typed === undefined || typeof typed === "string";
 
   return (
@@ -313,7 +308,8 @@ function holdsRetry(retry: unknown): boolean {
   const milliseconds = memberOf(retry, "milliseconds");
   const backoff = memberOf(retry, "backoff");
   const on = memberOf(retry, "on");
-  const isCount = Number.isInteger(retries) && Number(retries) >= 0;
+  const isCount =
+    retries === null || (Number.isInteger(retries) && Number(retries) >= 0);
   const isDelay = Number.isInteger(milliseconds) && Number(milliseconds) >= 0;
   const isBackoff = backoffKinds.has(backoff);
 
@@ -327,6 +323,7 @@ function holdsRetriedErrors(on: unknown): boolean {
   switch (kind) {
     case "any":
     case "timeouts":
+    case "written":
       return true;
     case "statuses":
       return Array.isArray(statuses) && statuses.every(Number.isInteger);

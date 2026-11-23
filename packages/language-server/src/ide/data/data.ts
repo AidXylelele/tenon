@@ -137,7 +137,7 @@ function dataOf(site: DataSite): DataReading {
   const input = workflowInputEntriesOf(site);
   const variables = variableEntriesOf(site);
   const secrets = secretEntriesOf(site);
-  const times = timeEntriesOf();
+  const times = timeEntriesOf(site);
   const entries = [...steps, ...input, ...variables, ...secrets, ...times];
   const merging = mergingWarningsOf(site);
   const skipped = skippedWarningsOf(site, offered);

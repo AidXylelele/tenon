@@ -88,7 +88,7 @@ export function workflowInputEntriesOf(site: DataSite): readonly DataEntry[] {
 
   const shape = workflowInputShapeOf(site.flow.workflow);
   const member = memberOf("input", "$workflow.input", shape);
-  return [entryOf(member, fromWorkflow, null)];
+  return [entryOf(site, member, fromWorkflow)];
 }
 
 export function variableEntriesOf(site: DataSite): readonly DataEntry[] {
@@ -97,7 +97,7 @@ export function variableEntriesOf(site: DataSite): readonly DataEntry[] {
 
   return binders.map(([name]) => {
     const member = memberOf(name, `$${name}`, unknownShape);
-    return entryOf(member, fromVariable, null);
+    return entryOf(site, member, fromVariable);
   });
 }
 
@@ -113,11 +113,11 @@ export function secretEntriesOf(site: DataSite): readonly DataEntry[] {
   return site.flow.secrets.map((name) => {
     const expression = memberAccessOf("$secrets", name);
     const member = memberOf(name, expression, textShape);
-    return entryOf(member, fromSecrets, null);
+    return entryOf(site, member, fromSecrets);
   });
 }
 
-export function timeEntriesOf(): readonly DataEntry[] {
+export function timeEntriesOf(site: DataSite): readonly DataEntry[] {
   const times = Object.entries(timeExpressions);
 
   return times.map(([name, expression]) => {
@@ -128,9 +128,10 @@ export function timeEntriesOf(): readonly DataEntry[] {
       value,
       isPath: false,
       shape: "text",
+      size: null,
       members: [],
     };
-    return entryOf(member, fromClock, null);
+    return entryOf(site, member, fromClock);
   });
 }
 
@@ -154,9 +155,8 @@ function flowingEntryOf(site: DataSite, step: StepNode): DataEntry {
   const shape = outputOf(site, step);
   const member = memberOf(step.name, ".", shape);
   const origin = { source: "step", step: step.id, needsExport: false } as const;
-  const typed = typedMemberOf(site, member);
 
-  return entryOf(member, origin, typed);
+  return entryOf(site, member, origin);
 }
 
 function exportedEntriesOf(site: DataSite, reach: Reach): readonly Offered[] {
@@ -178,8 +178,7 @@ function exportedEntriesOf(site: DataSite, reach: Reach): readonly Offered[] {
   const member = memberOf(step.name, expression, shape);
   const needsExport = written === undefined;
   const origin = { source: "step", step: step.id, needsExport } as const;
-  const typed = typedMemberOf(site, member);
-  const entry = entryOf(member, origin, typed);
+  const entry = entryOf(site, member, origin);
   return [{ entry, step }];
 }
 
@@ -213,7 +212,7 @@ function typedMemberOf(site: DataSite, member: DataMember): DataMember | null {
 
   const isFielded = fieldedShapes.has(member.shape);
 
-  if (!isFielded) {
+  if (!member.isPath || !isFielded) {
     return null;
   }
 
@@ -232,6 +231,7 @@ function typedMemberOf(site: DataSite, member: DataMember): DataMember | null {
     value,
     isPath: true,
     shape: "unknown",
+    size: null,
     members: [],
   };
 }
@@ -259,14 +259,24 @@ function memberOf(name: string, expression: string, shape: Shape): DataMember {
     return memberOf(memberName, access, memberShape);
   });
 
-  return { name, expression, value, isPath: true, shape: shape.kind, members };
+  return {
+    name,
+    expression,
+    value,
+    isPath: true,
+    shape: shape.kind,
+    size: shape.size,
+    members,
+  };
 }
 
 function entryOf(
+  site: DataSite,
   member: DataMember,
   origin: Origin,
-  typed: DataMember | null,
 ): DataEntry {
+  const typed = typedMemberOf(site, member);
+
   return { ...origin, ...member, typed };
 }
 

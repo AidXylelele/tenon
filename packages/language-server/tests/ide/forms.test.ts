@@ -225,6 +225,15 @@ const protectedGreet = `${inlineHeader}do:
 test.each([
   ["a step with no protection stops", paused, "/do/pause", "stop"],
   ["a protected step retries", protectedGreet, "/do/greet", "retry"],
+  [
+    "a protected step whose catch goes on after the retries continues",
+    protectedGreet.replace(
+      "count: 3 } } }\n",
+      "count: 3 } } }\n        then: end\n",
+    ),
+    "/do/greet",
+    "continue",
+  ],
 ])("%s", (_, text, step, failure) => {
   const reading = check(text, step);
 

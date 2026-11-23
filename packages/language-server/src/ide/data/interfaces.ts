@@ -7,6 +7,7 @@ export type DataShape =
 export interface Shape {
   readonly kind: DataShape;
   readonly members: ReadonlyMap<string, Shape>;
+  readonly size: number | null;
 }
 
 export interface DataMember {
@@ -15,6 +16,7 @@ export interface DataMember {
   readonly value: string;
   readonly isPath: boolean;
   readonly shape: DataShape;
+  readonly size: number | null;
   readonly members: readonly DataMember[];
 }
 

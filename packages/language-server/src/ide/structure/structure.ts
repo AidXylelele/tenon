@@ -16,6 +16,7 @@ import {
   targetOf,
 } from "../steps/index.js";
 import { variantOf } from "../variants/index.js";
+import { catchPolicyOf } from "./catches.js";
 import type {
   Destination,
   NestedList,
@@ -27,7 +28,6 @@ import type {
   Trigger,
   WorkflowStructure,
 } from "./interfaces.js";
-import { catchPolicyOf } from "./catches.js";
 import {
   stepMillisecondsOf,
   summaryOf,

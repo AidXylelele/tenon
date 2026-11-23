@@ -795,6 +795,259 @@ test.each([
   expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
 });
 
+const guardHeader = `${inlineHeader}do:
+  - guard:
+      try:
+        - fetch:
+            set:
+              a: 1
+`;
+
+const statusRetry = {
+  retries: 3,
+  milliseconds: 2000,
+  backoff: "constant",
+  on: { kind: "statuses", statuses: [503] },
+} as const;
+
+test.each([
+  [
+    "a new catch keeps the name its error is bound under",
+    `${guardHeader}      catch:
+        as: failure
+        do:
+          - notify:
+              set:
+                failed: true
+`,
+    { kind: "retry", retry: statusRetry },
+    `${guardHeader}      catch:
+        as: failure
+        retry:
+          when: \${ $failure.status == 503 }
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+`,
+  ],
+  [
+    "a written retry keeps its condition, jitter and time limit and changes only what is set",
+    `${guardHeader}      catch:
+        retry:
+          when: \${ .attempt < 2 }
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          jitter:
+            from: { seconds: 1 }
+            to: { seconds: 2 }
+          limit:
+            attempt:
+              count: 3
+            duration:
+              minutes: 5
+`,
+    {
+      kind: "retry",
+      retry: {
+        retries: 5,
+        milliseconds: 1500,
+        backoff: "linear",
+        on: { kind: "written" },
+      },
+    },
+    `${guardHeader}      catch:
+        retry:
+          when: \${ .attempt < 2 }
+          delay: { milliseconds: 1500 }
+          backoff: { linear: {} }
+          jitter:
+            from: { seconds: 1 }
+            to: { seconds: 2 }
+          limit:
+            attempt:
+              count: 5
+            duration:
+              minutes: 5
+`,
+  ],
+  [
+    "errors chosen for a written retry replace its condition and its exception",
+    `${guardHeader}      catch:
+        retry:
+          exceptWhen: \${ $error.status == 404 }
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+`,
+    { kind: "retry", retry: statusRetry },
+    `${guardHeader}      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+          when: \${ $error.status == 503 }
+`,
+  ],
+  [
+    "a retry with no count keeps no count",
+    `${guardHeader}      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+            duration:
+              minutes: 5
+`,
+    {
+      kind: "retry",
+      retry: {
+        retries: null,
+        milliseconds: 2000,
+        backoff: "constant",
+        on: { kind: "any" },
+      },
+    },
+    `${guardHeader}      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt: {}
+            duration:
+              minutes: 5
+`,
+  ],
+  [
+    "retrying then stopping removes the steps and the way out of a catch that keeps its retry",
+    `${guardHeader}      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+        do:
+          - notify:
+              set:
+                failed: true
+        then: end
+`,
+    { kind: "retry", retry: statusRetry },
+    `${guardHeader}      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+          when: \${ $error.status == 503 }
+`,
+  ],
+  [
+    "handling after a written retry adds the steps' list and keeps the retry",
+    `${guardHeader}      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 3
+`,
+    {
+      kind: "handle",
+      retry: {
+        retries: 4,
+        milliseconds: 2000,
+        backoff: "constant",
+        on: { kind: "any" },
+      },
+    },
+    `${guardHeader}      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            constant: {}
+          limit:
+            attempt:
+              count: 4
+        do: []
+`,
+  ],
+] as const)("%s", (_, text, failure, expected) => {
+  const action: EditAction = { kind: "setFailure", step: "/do/guard", failure };
+
+  const outcome = outcomeOf(text, action);
+
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a named retry is changed where it is defined, and the catch keeps naming it", () => {
+  const named = `${inlineHeader}use:
+  retries:
+    patient:
+      delay:
+        seconds: 2
+      backoff:
+        constant: {}
+      limit:
+        attempt:
+          count: 3
+do:
+  - guard:
+      try:
+        - fetch:
+            set:
+              a: 1
+      catch:
+        retry: patient
+`;
+  const action: EditAction = {
+    kind: "setFailure",
+    step: "/do/guard",
+    failure: {
+      kind: "retry",
+      retry: {
+        retries: 6,
+        milliseconds: 2000,
+        backoff: "constant",
+        on: { kind: "any" },
+      },
+    },
+  };
+
+  const outcome = outcomeOf(named, action);
+
+  const expected = named.replace("count: 3", "count: 6");
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
 test("a retry on statuses names at least one", () => {
   const action: EditAction = {
     kind: "setFailure",

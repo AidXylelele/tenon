@@ -79,20 +79,14 @@ export type Failure =
   | { readonly kind: "retry"; readonly retry: RetrySetting }
   | { readonly kind: "handle"; readonly retry?: RetrySetting };
 
-export interface CatchHandling {
-  readonly kind: "catch";
-  readonly catch: JsonObject;
-  readonly retry: JsonObject | null;
-  readonly isHandling: boolean;
-}
+export type ProtectingFailure = Exclude<Failure, { readonly kind: "stop" }>;
 
-export type Handling =
-  | { readonly kind: "stop" }
-  | CatchHandling
+export type CatchWriting =
+  | { readonly kind: "catch"; readonly catch: JsonObject }
   | { readonly kind: "refused"; readonly reason: string };
 
-export type WrittenRetry =
-  | { readonly kind: "policy"; readonly policy: JsonObject }
+export type PolicyWriting =
+  | { readonly kind: "policy"; readonly policy: JsonObject | null }
   | { readonly kind: "refused"; readonly reason: string };
 
 export interface SetFailure {

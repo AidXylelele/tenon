@@ -1,5 +1,4 @@
 export type {
-  Afterward,
   CatchPolicy,
   CaughtErrors,
   NestedList,

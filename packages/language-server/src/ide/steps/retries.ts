@@ -8,7 +8,12 @@ import {
   conditionTextOf,
 } from "../conditions/index.js";
 import { memberAccessOf } from "../jq-text/index.js";
-import type { RetriedErrors, RetryOn, RetrySetting } from "./interfaces.js";
+import type {
+  RetryFields,
+  RetryFieldsReading,
+  RetryOn,
+  RetrySetting,
+} from "./interfaces.js";
 
 const timeoutType =
   "https://open-workflow-specification.org/spec/1.0.0/errors/timeout";
@@ -24,17 +29,30 @@ const noStatus: ConditionText = {
   reason: "A retry on statuses names at least one status.",
 };
 
-export function retryPolicyOf(
+export function retryFieldsOf(
   retry: RetrySetting,
-  when: string | null,
-): JsonObject {
+  binder: string,
+): RetryFieldsReading {
+  const when = retriedWhenOf(retry.on, binder);
+
+  if (when?.kind === "refused") {
+    return when;
+  }
+
+  const text = when?.text ?? null;
   const delay = delayOf(retry.milliseconds);
   const backoff = { [retry.backoff]: {} };
-  const limit = { attempt: { count: retry.retries } };
+  const count = retry.retries;
+  const fields = { when: text, delay, backoff, count };
+  return { kind: "fields", fields };
+}
+
+export function retryPolicyOf(fields: RetryFields): JsonObject {
+  const limit = limitOf(fields.count);
   const members: readonly (readonly [string, JsonValue | null])[] = [
-    ["when", when],
-    ["delay", delay],
-    ["backoff", backoff],
+    ["when", fields.when],
+    ["delay", fields.delay],
+    ["backoff", fields.backoff],
     ["limit", limit],
   ];
   const written = members.filter(([, value]) => value !== null);
@@ -42,12 +60,10 @@ export function retryPolicyOf(
   return Object.fromEntries(written);
 }
 
-export function retriedWhenOf(
-  on: RetriedErrors,
-  binder: string,
-): ConditionText | null {
+function retriedWhenOf(on: RetryOn, binder: string): ConditionText | null {
   switch (on.kind) {
     case "any":
+    case "written":
       return null;
     case "statuses":
       return statusesWhenOf(on.statuses, binder);
@@ -56,6 +72,14 @@ export function retriedWhenOf(
       return conditionTextOf({ join: "all", rows: [row] });
     }
   }
+}
+
+function limitOf(count: number | null): JsonObject | null {
+  if (count === null) {
+    return null;
+  }
+
+  return { attempt: { count } };
 }
 
 export function retryOnOf(
