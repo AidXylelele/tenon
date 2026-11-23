@@ -3,7 +3,13 @@
 import { MaximizeIcon, ZoomInIcon, ZoomOutIcon } from "lucide-react";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { IconButton } from "@/libs/ui/composites/icon-button";
-import type { FlowCanvasProps, ScrollAnchor, Size } from "./interfaces";
+import { cn } from "@/libs/ui/tokens/cn";
+import type {
+  FlowCanvasProps,
+  ScrollAnchor,
+  Size,
+  ZoomCorner,
+} from "./interfaces";
 import {
   centredScrollOf,
   fitOf,
@@ -15,10 +21,16 @@ import {
   zoomOutOf,
 } from "./zoom";
 
+const ZOOM_CORNERS: Readonly<Record<ZoomCorner, string>> = {
+  "bottom-left": "bottom-3 left-3",
+  "top-right": "top-3 right-3",
+};
+
 export function FlowCanvas({
   label,
   description,
   focusable,
+  zoomAt = "bottom-left",
   children,
 }: FlowCanvasProps) {
   const canvas = useRef<HTMLElement>(null);
@@ -154,7 +166,10 @@ export function FlowCanvas({
       <div
         role="group"
         aria-label="Zoom"
-        className="absolute bottom-3 left-3 flex gap-0.5 rounded-lg border bg-surface p-0.5 shadow-overlay"
+        className={cn(
+          "absolute flex gap-0.5 rounded-lg border bg-surface p-0.5 shadow-overlay",
+          ZOOM_CORNERS[zoomAt],
+        )}
       >
         <IconButton
           label="Zoom in"

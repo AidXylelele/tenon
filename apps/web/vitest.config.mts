@@ -24,7 +24,7 @@ const FEATURE_FLOOR = {
   statements: 85,
 };
 
-const FEATURES_DELETED_IN_M5 = ["code-editor", "workflow-canvas"];
+const FEATURES_DELETED_IN_M5 = ["code-editor"];
 
 const FEATURES_WAITING_FOR_TESTS: string[] = [];
 

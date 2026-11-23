@@ -104,6 +104,24 @@ describe("a flow canvas", () => {
     );
   });
 
+  it("pins_its_zoom_bar_bottom_left_or_where_the_caller_asks", () => {
+    const { unmount } = drawn();
+    const usual = screen.getByRole("group", { name: "Zoom" }).className;
+    unmount();
+    render(
+      <TooltipProvider>
+        <FlowCanvas label="A version" focusable zoomAt="top-right">
+          <p>Inside</p>
+        </FlowCanvas>
+      </TooltipProvider>,
+    );
+
+    const read = screen.getByRole("group", { name: "Zoom" }).className;
+
+    expect(usual).toContain("bottom-3 left-3");
+    expect(read).toContain("top-3 right-3");
+  });
+
   it("is_a_tab_stop_of_its_own_when_nothing_inside_takes_focus", () => {
     drawn(true);
 
