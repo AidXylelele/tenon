@@ -7,7 +7,11 @@ import { RunsPage } from "./runs-page";
 
 const NOW = Date.parse("2026-11-22T23:40:00.000Z");
 
-const ROWS: readonly [string, Phase, Trigger, number, string | null][] = [
+type Row = readonly [string, Phase, Trigger, number, string | null];
+
+const PAGE_SIZE = 50;
+
+const LATEST: readonly Row[] = [
   ["route-lead", "running", "schedule", 2, null],
   ["legacy-sync", "faulted", "schedule", 3, null],
   ["route-lead", "completed", "manual", 9, "Ada Lovelace"],
@@ -17,6 +21,34 @@ const ROWS: readonly [string, Phase, Trigger, number, string | null][] = [
   ["order-router", "cancelled", "event", 95, null],
   ["order-router", "completed", "event", 121, null],
 ];
+
+type Kind = readonly [string, Phase, Trigger, string | null];
+
+const EARLIER: readonly Kind[] = [
+  ["route-lead", "completed", "event", null],
+  ["order-router", "completed", "event", null],
+  ["daily-digest", "completed", "schedule", null],
+  ["legacy-sync", "faulted", "schedule", null],
+  ["route-lead", "completed", "manual", "Ada Lovelace"],
+  ["order-router", "completed", "event", null],
+];
+
+const EARLIER_COUNT = PAGE_SIZE - LATEST.length;
+
+const ROUNDS = Math.ceil(EARLIER_COUNT / EARLIER.length);
+
+const EARLIER_KINDS = Array.from({ length: ROUNDS }, () => EARLIER)
+  .flat()
+  .slice(0, EARLIER_COUNT);
+
+const EARLIER_ROWS: readonly Row[] = EARLIER_KINDS.map(
+  ([name, phase, trigger, starter], index) => {
+    const minutesAgo = 150 + index * 37;
+    return [name, phase, trigger, minutesAgo, starter] as const;
+  },
+);
+
+const ROWS: readonly Row[] = LATEST.concat(EARLIER_ROWS);
 
 const TITLES: Readonly<Record<string, string>> = {
   "route-lead": "Route a lead",
@@ -35,7 +67,7 @@ const RUNS: readonly ListedInstance[] = ROWS.map(
       : null;
     const startedBy = starter === null ? null : { id: "u-1", name: starter };
     return {
-      id: `4f2a9c10-0000-4000-8000-00000000000${String(index)}`,
+      id: `4f2a9c10-0000-4000-8000-${String(index).padStart(12, "0")}`,
       namespace: name === "daily-digest" ? "news" : "sales",
       name,
       title: TITLES[name] ?? null,
