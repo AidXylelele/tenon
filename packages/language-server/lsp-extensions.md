@@ -530,10 +530,11 @@ interface FormField {
   choices: JsonValue[]; // suggestions beside a 'text'
   required: boolean;
   written: boolean;
+  suggested: boolean; // not written, an object whose members a person adds
   value: JsonValue; // null where not written
   essentialRank: number | null; // its place among the essential fields, from 0
-  fields: FormField[]; // for 'group', 'oneOf' and 'duration'
-  diagnostics: Diagnostic[]; // those at or under pointer
+  fields: FormField[]; // for 'group', 'oneOf' and 'duration', and a switch's cases
+  diagnostics: Diagnostic[]; // those at or under pointer, but a switch's none inside a case
 }
 ```
 
@@ -543,6 +544,8 @@ interface FormField {
 - **Titles and descriptions.** `title` labels the field for people: the server's own words for the members an author meets most (`if` is "Run only if", `then` "Then go to", `timeout` "Time limit", `call` "Kind of call", `with` "Arguments"), else the key in words (`exceptWhen` is "Except when"). `description` describes the field itself, from the grammar; the grammar describes a call on its task, so the `call` field carries the task's ("Defines the HTTP call to perform.").
 - **If it fails.** `failure` is the choice in force for the step: `stop` for a step no try protects; for a protecting try (a try whose `try` list holds one step), what its catch's `afterward` says (`workflow/structure`): `retry` where it is `stop` (a retry with neither `do` nor `then`), else `continue` or `handle`, so a retry with a `then` and no `do` is `continue`. The web shows it and changes it with `workflow/edit`'s `setFailure`. `retry` is that try's retry as data, read as `workflow/structure` reads it, whatever form its delay is written in (`PT2S` and `{ seconds: 2 }` both give 2000); `null` where no try protects the step or its catch writes no retry. Its `on` says which errors it retries in the form `setFailure` writes (`any`, `statuses`, `timeouts`), or `written` for any other `when` or an `exceptWhen`, which the web shows as the text holds it.
 - **Input.** `choice` where the grammar admits only the values it lists (its `closed` places, such as an HTTP call's `with.output`), with those values as `choices`; else `boolean` or `number` where that is the only type; `text` where a string is admitted and the written value is one or nothing is written, with the grammar's values as suggestions in `choices` (a `then` suggests the flow directives and the names of the step's list); `duration` for the standard's duration, an ISO 8601 text or an object of units, with its `fields` the units `days`, `hours`, `minutes`, `seconds` and `milliseconds`, each a `number` whose `value` is the amount the text gives, whichever form it is written in (`PT1H30M` gives `hours` 1 and `minutes` 30), and `null` where it gives none or what is written is not a duration the units hold (an expression, or a mistake, which the field's diagnostics name); `group` for an object with named members; `oneOf` for an object whose members are alternatives, its `fields` being those alternatives (the workflow form's schedule where the host runs one trigger, below); `structured` otherwise, for the text editor.
+- **Cases.** A switch's `switch` field stays `structured`, and its `fields` are its cases, in order: each a `group` of its `when` and `then`, its `key` the case's name, its `pointer` the case's (`/do/0/route/switch/0/known`), `required`. A problem inside a case is in that case's `diagnostics` (and its member's), not in the `switch` field's, so the web shows it under its branch; the `switch` field keeps only the problems outside every case.
+- **Suggested objects.** `suggested` is true on a field not written whose value the grammar admits as an object with no members of its own, so that a person names each one: a script's `arguments` and `environment`, an HTTP call's `headers` and `query`, a step's `metadata`. The web shows it as a "+ Add" row and writes it with `setField`, e.g. `{ "MODE": "test" }` at `/do/0/run/run/script/environment`. Only the grammar's own members are offered, never member names of its own; an object of named members is a `group` instead, and a transformation (`input.from`, `output.as`, `export.as`) is never suggested, since an object there is the data it makes.
 - **Duration edits.** A duration is set whole, as an object of units, by `setField` at its pointer, e.g. `{ "minutes": 15 }`, whatever form it was written in.
 - **Broken text.** A form stands while the text is wrong, so a mistake is a diagnostic at its field, never a refused form: a value the grammar does not admit is a diagnostic of a version that still analyses; where the grammar refuses the text's structure, the fields are read from the text as it stands and a step is found by the steps of the last version that analysed, where the text still holds it. `setField` and `clearField` act on such a text; the step actions and `setFailure` need a version that analyses.
 - **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
@@ -573,6 +576,7 @@ interface FormField {
       "choices": ["continue", "exit", "end", "pause", "greet"],
       "required": false,
       "written": true,
+      "suggested": false,
       "value": "greet",
       "essentialRank": null,
       "diagnostics": [],
@@ -588,6 +592,7 @@ interface FormField {
       "choices": [],
       "required": true,
       "written": true,
+      "suggested": false,
       "value": "PT1S",
       "essentialRank": 0,
       "diagnostics": [],
@@ -602,6 +607,7 @@ interface FormField {
           "choices": [],
           "required": false,
           "written": false,
+          "suggested": false,
           "value": 1,
           "essentialRank": null,
           "diagnostics": [],
@@ -983,6 +989,56 @@ type Literal = string | number | boolean | null;
 }
 ```
 
+## Read a template
+
+**Method:** `workflow/readTemplate`
+
+The client sends this request to open a text field that mixes text with data, such as a message or a subject, in the template builder, so that it never parses jq itself.
+
+```typescript
+interface ReadTemplateParams {
+  textDocument: VersionedTextDocumentIdentifier;
+  pointer: string; // the field's pointer
+}
+
+type ReadTemplateResult =
+  | { kind: "template"; parts: TemplatePart[] }
+  | { kind: "expression"; text: string }; // open the field as jq; the text as written
+
+type TemplatePart =
+  | { kind: "text"; text: string }
+  | {
+      kind: "data";
+      expression: string; // a workflow/dataAt expression that is a path
+      label: string; // the member it names, e.g. "title" for .title
+    };
+```
+
+- **What reads as a template.** A text alone (`Hello`); a reference alone (`${ .title }`); a jq string whose interpolations are paths (`${ "New digest: \(.title)" }`); and a text with references written into it (`New digest: ${ .title }`), which the interpreter passes on as written: in the default `strict` mode an expression is marked with `${}` (dsl.md, "Runtime Expressions"), and the interpreter takes a text for one only where `${` starts it and `}` ends it. Paths are those of `workflow/readCondition`: `.`, `.name`, `.["a name"]`, `$name` and their members. An empty text, or a field not written, is a template with no part.
+- **Labels.** A reference's `label` is the last member it names: `title` for `.title`, `items` for `$context.fetch.items`, `first name` for `.["first name"]`, `order` for `$order`, and `.` for `.`.
+- **Anything else** is `expression`, so the client opens it as jq: a computation (`${ .count + 1 }`), an interpolation that is no path (`${ "Total: \(.a + .b)" }`), a join of strings, or a text with a written-in reference that is no path (`Price: ${ 5 }`). A template that cannot be shown is never rewritten: `setTemplate` refuses it.
+- **Writing** is `workflow/edit`'s `setTemplate`, in one form, the one the interpreter evaluates: no part writes `""`; text alone writes the text, or a jq string where it holds `${`; a reference alone writes `${ <path> }`; anything else writes one jq string, its text escaped as JSON escapes it and each reference interpolated, `${ "New digest: \(.title)" }`. jq interpolates data that is not text as its JSON (`Count: \(.count)` gives `Count: 3`). A reference that is no path is refused with its reason.
+- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for a text that does not read and a field that holds no text; `InvalidParams` (-32602).
+
+**Example**, on a step that sets `message: 'New digest: ${ .title }'`:
+
+```json
+{
+  "textDocument": { "uri": "file:///flow.yaml", "version": 1 },
+  "pointer": "/do/0/greet/set/message"
+}
+```
+
+```json
+{
+  "kind": "template",
+  "parts": [
+    { "kind": "text", "text": "New digest: " },
+    { "kind": "data", "expression": ".title", "label": "title" }
+  ]
+}
+```
+
 ## Edit
 
 **Method:** `workflow/edit`
@@ -1017,6 +1073,7 @@ type EditAction =
   | { kind: "setField"; pointer: string; value: JsonValue }
   | { kind: "clearField"; pointer: string }
   | { kind: "setCondition"; pointer: string; condition: Condition }
+  | { kind: "setTemplate"; pointer: string; parts: TemplatePart[] }
   | { kind: "setFailure"; step: string; failure: Failure }
   | {
       kind: "wrapSteps";
@@ -1096,10 +1153,11 @@ interface EditResult {
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
 - **The step's result** (`setResult`) writes the members of the chosen result and removes the others: `output.as`, and the `output` that holds nothing else; a script's `run.return`, set to the mode the result needs (`stdout` or `code`) where the step returns another. A result the step does not offer is refused.
 - **Conditions** (`setCondition`) write the condition at the field in its one form (`workflow/readCondition`), as `setField` would its text.
+- **Templates** (`setTemplate`) write the parts at the field in their one form (`workflow/readTemplate`), as `setField` would its text, where the field is not written or holds a text that reads as a template.
 - **Data** (`useData`) sets the field to the value and, with `export`, writes that step's `export.as: ${ $context + { "<name>": . } }`, the export a `$context.<name>` entry of `workflow/dataAt` reads; a step that already writes it is left as it is, and a step that writes another export is refused.
 - **Errors:**
   - `ContentModified` (-32801), when the version is not the store's;
-  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a condition with no row or with a path that is not one, a retry on no status, a wrap of no step, of steps not next to each other in one list, of several fork branches or whose directives cannot keep their meaning, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
+  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a condition with no row or with a path that is not one, a template with a reference that is no path or over a field that holds no text or an expression it does not show, a retry on no status, a wrap of no step, of steps not next to each other in one list, of several fork branches or whose directives cannot keep their meaning, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
   - `InvalidParams` (-32602), when the params are of another shape.
 
 **Example:**
