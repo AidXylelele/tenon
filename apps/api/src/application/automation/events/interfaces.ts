@@ -12,6 +12,11 @@ export interface AcceptedEvent {
   readonly lifecycleOf: string | null;
 }
 
+export interface InstanceOffer {
+  readonly instanceId: string;
+  readonly candidates: readonly string[];
+}
+
 export interface AcceptEventCommand {
   readonly cloudEvent: CloudEvent;
   readonly origin: EventOrigin;

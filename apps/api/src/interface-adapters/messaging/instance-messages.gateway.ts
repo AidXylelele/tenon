@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { type NewOutboxMessage, Outbox } from "@nestjs/outbox";
 import type {
+  ChildCancellations,
   InstanceEvents,
   InstanceRuns,
 } from "../../application/automation/instances/ports.js";
@@ -28,7 +29,9 @@ import type {
 import { RunDataMapper } from "./mappers/run-data.mapper.js";
 
 @Injectable()
-export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
+export class InstanceMessagesGateway
+  implements InstanceEvents, InstanceRuns, ChildCancellations
+{
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
     private readonly outbox: Outbox,
@@ -86,6 +89,14 @@ export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
   async fail(instance: WorkflowInstance): Promise<void> {
     const message = this.#commandOf(MessageTopic.RunFail, instance.id);
     await this.outbox.add(this.txHost.tx, message);
+  }
+
+  async request(children: readonly WorkflowInstance[]): Promise<void> {
+    const messages = children.map((child) =>
+      this.#commandOf(MessageTopic.CancelRequested, child.id),
+    );
+
+    if (messages.length > 0) await this.outbox.add(this.txHost.tx, messages);
   }
 
   #messageOf(event: InstanceEvent): NewOutboxMessage {

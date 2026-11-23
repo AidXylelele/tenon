@@ -1,10 +1,31 @@
-import type { OutboxHandlerContext, OutboxMessage } from "@nestjs/outbox";
+import type {
+  NewOutboxMessage,
+  OutboxHandlerContext,
+  OutboxMessage,
+} from "@nestjs/outbox";
 import { AesGcmCipher } from "../../src/frameworks/crypto/aes-gcm.cipher.js";
 import { RunDataMapper } from "../../src/interface-adapters/messaging/mappers/run-data.mapper.js";
 
 const SECRETS_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 
 export const runDataMapper = new RunDataMapper(new AesGcmCipher(SECRETS_KEY));
+
+export class RecordingOutbox {
+  readonly added: NewOutboxMessage[] = [];
+  readonly transactions: unknown[] = [];
+
+  add(
+    tx: unknown,
+    messages: NewOutboxMessage | NewOutboxMessage[],
+  ): Promise<void> {
+    this.transactions.push(tx);
+    const many = ([] as NewOutboxMessage[]).concat(messages);
+
+    for (const message of many) this.added.push(message);
+
+    return Promise.resolve();
+  }
+}
 
 export function aHandlerContext(
   topic: string,

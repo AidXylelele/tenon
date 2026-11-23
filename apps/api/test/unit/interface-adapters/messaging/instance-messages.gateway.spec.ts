@@ -1,5 +1,5 @@
 import type { TransactionHost } from "@nestjs-cls/transactional";
-import type { NewOutboxMessage, Outbox } from "@nestjs/outbox";
+import type { Outbox } from "@nestjs/outbox";
 import {
   EffectKind,
   Phase,
@@ -23,27 +23,10 @@ import {
   aTurn,
 } from "../../../support/builders.js";
 import { anInstanceIn, T0 } from "../../../support/fakes.js";
-import { runDataMapper } from "../../../support/outbox.js";
+import { RecordingOutbox, runDataMapper } from "../../../support/outbox.js";
 
 const TX = { id: "tx-1" };
 const runData = runDataMapper;
-
-class RecordingOutbox {
-  readonly added: NewOutboxMessage[] = [];
-  readonly transactions: unknown[] = [];
-
-  add(
-    tx: unknown,
-    messages: NewOutboxMessage | NewOutboxMessage[],
-  ): Promise<void> {
-    this.transactions.push(tx);
-    const many = ([] as NewOutboxMessage[]).concat(messages);
-
-    for (const message of many) this.added.push(message);
-
-    return Promise.resolve();
-  }
-}
 
 function setUp() {
   const outbox = new RecordingOutbox();
@@ -245,6 +228,28 @@ describe("the run commands of an instance", () => {
     expect(sent).toEqual([
       [MessageTopic.RunReceives, "instance-1"],
       [MessageTopic.RunFail, "instance-1"],
+    ]);
+  });
+
+  it("each_abandoned_child_is_asked_to_cancel_under_its_own_key", async () => {
+    const fixture = setUp();
+    const first = anInstanceIn(Phase.Running, { id: "child-1" });
+    const second = anInstanceIn(Phase.Running, { id: "child-2" });
+
+    await fixture.gateway.request([first, second]);
+    await fixture.gateway.request([]);
+
+    expect(fixture.outbox.added).toEqual([
+      {
+        topic: MessageTopic.CancelRequested,
+        key: "child-1",
+        payload: { instanceId: "child-1" },
+      },
+      {
+        topic: MessageTopic.CancelRequested,
+        key: "child-2",
+        payload: { instanceId: "child-2" },
+      },
     ]);
   });
 });

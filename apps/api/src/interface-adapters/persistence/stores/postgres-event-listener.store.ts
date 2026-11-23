@@ -1,19 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { Outbox } from "@nestjs/outbox";
 import { and, asc, eq, isNull, lte, or, type SQL, sql } from "drizzle-orm";
-import type { AcceptedEvent } from "../../../application/automation/events/interfaces.js";
-import type { EventOffers } from "../../../application/automation/events/ports.js";
+import type {
+  AcceptedEvent,
+  InstanceOffer,
+} from "../../../application/automation/events/interfaces.js";
+import type { EventListeners } from "../../../application/automation/events/ports.js";
 import type {
   ProgramReference,
   RoutingMatch,
 } from "../../../domain/automation/instances/interfaces.js";
 import { ScheduleKind } from "../../../domain/automation/workflows/enums.js";
-import { MessageTopic } from "../../messaging/enums.js";
-import type {
-  EventOfferedMessage,
-  TriggerOfferedMessage,
-} from "../../messaging/interfaces.js";
 import type { Transaction } from "../interfaces.js";
 import {
   listener as listeners,
@@ -23,13 +20,10 @@ import {
 } from "../schema/index.js";
 
 @Injectable()
-export class PostgresEventOfferStore implements EventOffers {
+export class PostgresEventListenerStore implements EventListeners {
   private static readonly ON = JSON.stringify({ kind: ScheduleKind.On });
 
-  constructor(
-    private readonly txHost: TransactionHost<Transaction>,
-    private readonly outbox: Outbox,
-  ) {}
+  constructor(private readonly txHost: TransactionHost<Transaction>) {}
 
   async programsFor(event: AcceptedEvent): Promise<ProgramReference[]> {
     const listening = this.txHost.tx
@@ -49,11 +43,11 @@ export class PostgresEventOfferStore implements EventOffers {
     return rows.map((row) => ({ versionId: row.versionId }));
   }
 
-  async offer(
+  async instancesFor(
     matches: readonly RoutingMatch[],
     event: AcceptedEvent,
-  ): Promise<void> {
-    if (matches.length === 0) return;
+  ): Promise<InstanceOffer[]> {
+    if (matches.length === 0) return [];
 
     const matching = matches.map((match) => this.#listening(match));
     const rows = await this.txHost.tx
@@ -79,20 +73,14 @@ export class PostgresEventOfferStore implements EventOffers {
       candidates.set(row.instanceId, listed);
     }
 
-    const entries = Array.from(candidates, ([instanceId, listens]) => ({
-      topic: MessageTopic.EventOffered,
-      key: instanceId,
-      payload: this.#offered(instanceId, event, listens),
+    return Array.from(candidates, ([instanceId, listens]) => ({
+      instanceId,
+      candidates: listens,
     }));
-
-    if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
   }
 
-  async trigger(
-    matches: readonly RoutingMatch[],
-    event: AcceptedEvent,
-  ): Promise<void> {
-    if (matches.length === 0) return;
+  async workflowsFor(matches: readonly RoutingMatch[]): Promise<string[]> {
+    if (matches.length === 0) return [];
 
     const matching = matches.map((match) =>
       and(
@@ -106,25 +94,7 @@ export class PostgresEventOfferStore implements EventOffers {
       .from(workflows)
       .innerJoin(versions, eq(versions.id, workflows.currentVersionId))
       .where(and(eq(workflows.on, true), startsOnEvents, or(...matching)));
-    const entries = rows.map((row) => ({
-      topic: MessageTopic.TriggerOffered,
-      key: event.eventId,
-      payload: this.#triggered(row.workflowId, event),
-    }));
-
-    if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
-  }
-
-  #offered(
-    instanceId: string,
-    event: AcceptedEvent,
-    candidates: readonly string[],
-  ): EventOfferedMessage {
-    return { instanceId, sequence: event.sequence, candidates };
-  }
-
-  #triggered(workflowId: string, event: AcceptedEvent): TriggerOfferedMessage {
-    return { workflowId, sequence: event.sequence };
+    return rows.map((row) => row.workflowId);
   }
 
   #listening(match: RoutingMatch): SQL | undefined {
@@ -138,6 +108,6 @@ export class PostgresEventOfferStore implements EventOffers {
   }
 
   #startsOnEvents(): SQL {
-    return sql`${versions.schedule} @> ${PostgresEventOfferStore.ON}::jsonb`;
+    return sql`${versions.schedule} @> ${PostgresEventListenerStore.ON}::jsonb`;
   }
 }

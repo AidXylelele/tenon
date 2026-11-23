@@ -1,16 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { Outbox } from "@nestjs/outbox";
 import { and, eq } from "drizzle-orm";
 import { EventOrigin } from "../../../application/automation/events/enums.js";
 import type {
   AcceptedEvent,
   CloudEvent,
 } from "../../../application/automation/events/interfaces.js";
-import type { EventStore } from "../../../application/automation/events/ports.js";
+import {
+  EventAnnouncements,
+  type EventStore,
+} from "../../../application/automation/events/ports.js";
 import type { WebhookEvent } from "../../../domain/automation/webhooks/interfaces.js";
-import { MessageTopic } from "../../messaging/enums.js";
-import type { AcceptedEventMessage } from "../../messaging/interfaces.js";
 import type {
   EventRow,
   LifecycleCloudEvent,
@@ -26,7 +26,7 @@ import {
 export class PostgresEventStore implements EventStore {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly outbox: Outbox,
+    private readonly announcements: EventAnnouncements,
     private readonly webhookEventMapper: WebhookEventMapper,
   ) {}
 
@@ -39,21 +39,17 @@ export class PostgresEventStore implements EventStore {
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
     const type = cloudEvent.type as string;
-    const lane = origin === EventOrigin.Emit ? source : eventId;
-    return this.#inserted(
-      {
-        source,
-        eventId,
-        type,
-        origin,
-        instanceId,
-        execution: null,
-        lifecycle: null,
-        cloudEvent,
-        acceptedAt,
-      },
-      lane,
-    );
+    return this.#inserted({
+      source,
+      eventId,
+      type,
+      origin,
+      instanceId,
+      execution: null,
+      lifecycle: null,
+      cloudEvent,
+      acceptedAt,
+    });
   }
 
   acceptLifecycle(
@@ -66,20 +62,17 @@ export class PostgresEventStore implements EventStore {
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
     const type = cloudEvent.type as string;
-    return this.#inserted(
-      {
-        source,
-        eventId,
-        type,
-        origin: EventOrigin.Lifecycle,
-        instanceId,
-        execution,
-        lifecycle: told.lifecycle,
-        cloudEvent,
-        acceptedAt,
-      },
+    return this.#inserted({
       source,
-    );
+      eventId,
+      type,
+      origin: EventOrigin.Lifecycle,
+      instanceId,
+      execution,
+      lifecycle: told.lifecycle,
+      cloudEvent,
+      acceptedAt,
+    });
   }
 
   acceptWebhookEvent(event: WebhookEvent): Promise<number | null> {
@@ -87,7 +80,7 @@ export class PostgresEventStore implements EventStore {
     return this.accept(cloudEvent, EventOrigin.Webhook, null, event.at);
   }
 
-  async #inserted(row: EventRow, lane: string): Promise<number | null> {
+  async #inserted(row: EventRow): Promise<number | null> {
     const [accepted] = await this.txHost.tx
       .insert(events)
       .values(row)
@@ -97,14 +90,7 @@ export class PostgresEventStore implements EventStore {
     if (accepted === undefined) return null;
 
     const sequence = accepted.sequence;
-    const payload: AcceptedEventMessage = { sequence };
-    await this.outbox.add(this.txHost.tx, [
-      {
-        topic: MessageTopic.EventAccepted,
-        key: lane,
-        payload,
-      },
-    ]);
+    await this.announcements.announce(sequence, row.origin, row.cloudEvent);
     return sequence;
   }
 

@@ -2,9 +2,14 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { HttpClientModule } from "@nestjs/http-client";
 import { ResilienceService } from "@nestjs/resilience";
-import { EventStore } from "../../application/automation/events/ports.js";
+import {
+  EventAnnouncements,
+  EventOffers,
+  EventStore,
+} from "../../application/automation/events/ports.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import {
+  ChildCancellations,
   InstanceEvents,
   InstanceRuns,
   WorkflowInstanceRepository,
@@ -24,6 +29,7 @@ import {
 } from "../../application/automation/workflows/ports.js";
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
 import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
+import { EventMessagesGateway } from "../../interface-adapters/messaging/event-messages.gateway.js";
 import { HttpDeliveryGateway } from "../../interface-adapters/messaging/http-delivery.gateway.js";
 import { InstanceMessagesGateway } from "../../interface-adapters/messaging/instance-messages.gateway.js";
 import { RunDataMapper } from "../../interface-adapters/messaging/mappers/run-data.mapper.js";
@@ -112,6 +118,10 @@ import { OutboundModule } from "./outbound.module.js";
     InstanceMessagesGateway,
     { provide: InstanceEvents, useExisting: InstanceMessagesGateway },
     { provide: InstanceRuns, useExisting: InstanceMessagesGateway },
+    { provide: ChildCancellations, useExisting: InstanceMessagesGateway },
+    EventMessagesGateway,
+    { provide: EventAnnouncements, useExisting: EventMessagesGateway },
+    { provide: EventOffers, useExisting: EventMessagesGateway },
     WorkflowMessagesGateway,
     { provide: WorkflowEvents, useExisting: WorkflowMessagesGateway },
     { provide: ScheduleQueries, useClass: ExpectedStartsQueries },
@@ -197,6 +207,8 @@ import { OutboundModule } from "./outbound.module.js";
     RunDataMapper,
     InstanceEvents,
     InstanceRuns,
+    ChildCancellations,
+    EventOffers,
     WorkflowEvents,
     ScheduleQueries,
     WorkflowRepository,

@@ -5,7 +5,7 @@ import { HttpClientModule } from "@nestjs/http-client";
 import { LocksModule } from "@nestjs/locks";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
 import {
-  EventOffers,
+  EventListeners,
   EventRouting,
 } from "../../application/automation/events/ports.js";
 import { AnswerChildren } from "../../application/automation/instances/answer-children.js";
@@ -20,7 +20,6 @@ import { OfferEvent } from "../../application/automation/instances/offer-event.j
 import { PerformDetachedProcess } from "../../application/automation/instances/perform-detached-process.js";
 import { PerformEffect } from "../../application/automation/instances/perform-effect.js";
 import {
-  ChildCancellations,
   EffectClient,
   ReceivedMessages,
 } from "../../application/automation/instances/ports.js";
@@ -54,9 +53,8 @@ import { ScheduleHandler } from "../../interface-adapters/messaging/schedule.han
 import { SubscriptionClient } from "../../interface-adapters/messaging/interfaces.js";
 import { InboundMapper } from "../../interface-adapters/persistence/mappers/inbound.mapper.js";
 import { PostgresReceiverQueries } from "../../interface-adapters/persistence/queries/postgres-receiver.queries.js";
-import { PostgresChildCancellationStore } from "../../interface-adapters/persistence/stores/postgres-child-cancellation.store.js";
 import { PostgresDeliveryLogStore } from "../../interface-adapters/persistence/stores/postgres-delivery-log.store.js";
-import { PostgresEventOfferStore } from "../../interface-adapters/persistence/stores/postgres-event-offer.store.js";
+import { PostgresEventListenerStore } from "../../interface-adapters/persistence/stores/postgres-event-listener.store.js";
 import { PostgresLockStore } from "../../interface-adapters/persistence/stores/postgres-lock.store.js";
 import { PostgresReceivedMessageStore } from "../../interface-adapters/persistence/stores/postgres-received-message.store.js";
 import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
@@ -147,9 +145,8 @@ import { OutboundModule } from "./outbound.module.js";
     AsyncApiHandler,
     RetentionJobs,
     InboundMapper,
-    { provide: EventOffers, useClass: PostgresEventOfferStore },
+    { provide: EventListeners, useClass: PostgresEventListenerStore },
     { provide: DeliveryLog, useClass: PostgresDeliveryLogStore },
-    { provide: ChildCancellations, useClass: PostgresChildCancellationStore },
     { provide: ReceivedMessages, useClass: PostgresReceivedMessageStore },
     { provide: ReceiverQueries, useClass: PostgresReceiverQueries },
     PostgresLockStore,

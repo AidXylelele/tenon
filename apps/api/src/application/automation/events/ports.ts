@@ -4,7 +4,7 @@ import type {
 } from "../../../domain/automation/instances/interfaces.js";
 import type { WebhookEvent } from "../../../domain/automation/webhooks/interfaces.js";
 import type { EventOrigin } from "./enums.js";
-import type { AcceptedEvent, CloudEvent } from "./interfaces.js";
+import type { AcceptedEvent, CloudEvent, InstanceOffer } from "./interfaces.js";
 
 export abstract class EventStore {
   abstract accept(
@@ -25,14 +25,30 @@ export abstract class EventRouting {
   ): Promise<readonly RoutingMatch[]>;
 }
 
-export abstract class EventOffers {
+export abstract class EventAnnouncements {
+  abstract announce(
+    sequence: number,
+    origin: EventOrigin,
+    cloudEvent: CloudEvent,
+  ): Promise<void>;
+}
+
+export abstract class EventListeners {
   abstract programsFor(event: AcceptedEvent): Promise<ProgramReference[]>;
-  abstract offer(
+  abstract instancesFor(
     matches: readonly RoutingMatch[],
+    event: AcceptedEvent,
+  ): Promise<InstanceOffer[]>;
+  abstract workflowsFor(matches: readonly RoutingMatch[]): Promise<string[]>;
+}
+
+export abstract class EventOffers {
+  abstract offer(
+    offers: readonly InstanceOffer[],
     event: AcceptedEvent,
   ): Promise<void>;
   abstract trigger(
-    matches: readonly RoutingMatch[],
+    workflowIds: readonly string[],
     event: AcceptedEvent,
   ): Promise<void>;
 }
