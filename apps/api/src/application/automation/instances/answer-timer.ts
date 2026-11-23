@@ -21,7 +21,8 @@ export class AnswerTimer {
 
     if (instance === null) return;
 
-    const now = Math.max(Date.now(), command.at);
+    const current = Date.now();
+    const now = Math.max(current, command.at);
     const end = instance.waitEndAt(command.effectId, now);
 
     if (end === null) return;

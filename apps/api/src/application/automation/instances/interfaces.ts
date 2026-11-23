@@ -69,25 +69,22 @@ export interface RespondCommand extends RunCommand {
   readonly answer: EffectAnswer;
 }
 
-export interface EffectCommand extends RunCommand {
-  readonly effectId: string;
-}
-
-export interface TimerCommand {
-  readonly instanceId: string;
-  readonly effectId: string;
-  readonly at: number;
-}
-
 export interface EffectReference {
   readonly instanceId: string;
   readonly effectId: string;
 }
 
-export interface DetachedProcessCommand extends EffectReference {
+export interface EffectCommand extends EffectReference {
+  readonly signal: AbortSignal;
+}
+
+export interface TimerCommand extends EffectReference {
+  readonly at: number;
+}
+
+export interface DetachedProcessCommand extends EffectCommand {
   readonly versionId: string;
   readonly request: JsonObject;
-  readonly signal: AbortSignal;
 }
 
 export interface EffectCall {

@@ -17,17 +17,17 @@ export class StartDetachedProcess {
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async execute(reference: EffectReference): Promise<void> {
-    const instance = await this.instances.find(reference.instanceId);
-    const request = instance?.requestOf(reference.effectId) ?? null;
+  async execute(command: EffectReference): Promise<void> {
+    const instance = await this.instances.find(command.instanceId);
+    const request = instance?.requestOf(command.effectId) ?? null;
 
     if (instance === null || request === null) return;
 
     const outcome = this.runtime.outcomeOf(EffectResult.Started);
-    const answer = { effectId: reference.effectId, outcome };
+    const answer = { effectId: command.effectId, outcome };
     await this.unitOfWork.run(async () => {
       await this.runs.respond(instance, answer);
-      await this.runs.detach(instance, reference.effectId, request);
+      await this.runs.detach(instance, command.effectId, request);
     });
   }
 }

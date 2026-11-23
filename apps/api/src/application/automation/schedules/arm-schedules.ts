@@ -17,10 +17,13 @@ export class ArmSchedules {
 
     for (const workflowId of unarmed) {
       const workflow = await this.workflows.findById(workflowId);
-      const now = new Date();
-      const scheduled = workflow?.armSchedule(now) ?? false;
 
-      if (workflow === null || !scheduled) continue;
+      if (workflow === null) continue;
+
+      const now = new Date();
+      const scheduled = workflow.armSchedule(now);
+
+      if (!scheduled) continue;
 
       await this.unitOfWork.run(async () => {
         await this.workflows.save(workflow);

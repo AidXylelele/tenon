@@ -18,6 +18,9 @@ export class CancelChildren {
 
     const children = await this.instances.findAwaitedChildren(parent.id);
     const abandoned = children.filter((child) => parent.abandons(child));
+
+    if (abandoned.length === 0) return;
+
     await this.unitOfWork.run(() => this.cancellations.request(abandoned));
   }
 }

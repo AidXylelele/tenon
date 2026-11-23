@@ -11,12 +11,12 @@ export class GiveUpEffect {
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async execute(reference: EffectReference): Promise<void> {
-    const instance = await this.instances.find(reference.instanceId);
+  async execute(command: EffectReference): Promise<void> {
+    const instance = await this.instances.find(command.instanceId);
 
     if (instance === null) return;
 
-    const awaited = instance.awaits(reference.effectId);
+    const awaited = instance.awaits(command.effectId);
 
     if (!awaited) return;
 
