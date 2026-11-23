@@ -21,8 +21,11 @@ import {
   type HostEnd,
   type HostProfile,
   type InputProblem,
+  type InterpreterOptions,
   type JsonObject,
   type JsonValue,
+  type LifecycleEventTypes,
+  lifecycleEventTypesOf,
   type RuntimeDescriptor,
   type StartContext,
   type State,
@@ -86,7 +89,10 @@ export class PiscinaInterpreterClient
   private runs: ThreadPool | null = null;
   private checks: ThreadPool | null = null;
 
-  constructor(private readonly resilience: ResilienceService) {
+  constructor(
+    private readonly resilience: ResilienceService,
+    private readonly options: InterpreterOptions,
+  ) {
     this.descriptor = this.#descriptorOf();
   }
 
@@ -294,7 +300,11 @@ export class PiscinaInterpreterClient
   }
 
   ending(end: HostEnd): Ending {
-    return endingOf(end);
+    return endingOf(end, this.options);
+  }
+
+  lifecycleEventTypes(): LifecycleEventTypes {
+    return lifecycleEventTypesOf(this.options);
   }
 
   async #program<N extends TaskName>(

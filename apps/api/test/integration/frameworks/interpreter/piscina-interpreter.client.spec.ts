@@ -1,5 +1,9 @@
 import type { INestApplicationContext } from "@nestjs/common";
-import { ResilienceModule, ResilienceTimeoutError } from "@nestjs/resilience";
+import {
+  ResilienceModule,
+  ResilienceService,
+  ResilienceTimeoutError,
+} from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
 import {
   context,
@@ -92,7 +96,14 @@ describe("the interpreter on its Piscina threads", () => {
     vi.spyOn(metrics, "getMeter").mockReturnValue(meter);
     const moduleRef = await Test.createTestingModule({
       imports: [ResilienceModule.forRoot({ presets: resiliencePresets })],
-      providers: [PiscinaInterpreterClient],
+      providers: [
+        {
+          provide: PiscinaInterpreterClient,
+          inject: [ResilienceService],
+          useFactory: (resilience: ResilienceService) =>
+            new PiscinaInterpreterClient(resilience, {}),
+        },
+      ],
     }).compile();
     app = await moduleRef.init();
     client = app.get(PiscinaInterpreterClient);

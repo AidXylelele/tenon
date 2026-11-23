@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { lifecycleEventCatalogue } from "interpreter";
 import type {
   AnalysisProfile,
   LifecycleEventKind,
@@ -28,7 +27,8 @@ export class InterpreterCapabilitiesGateway implements HostCapabilities {
   }
 
   lifecycleEvents(): readonly LifecycleEventKind[] {
-    const entries = Object.entries(lifecycleEventCatalogue);
-    return entries.map(([name, entry]) => ({ name, types: entry.types }));
+    const eventTypes = this.client.lifecycleEventTypes();
+    const entries = Object.entries(eventTypes);
+    return entries.map(([name, types]) => ({ name, types }));
   }
 }
