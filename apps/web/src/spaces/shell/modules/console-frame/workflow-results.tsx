@@ -114,16 +114,16 @@ function WorkflowGroup({ search, onChoose }: WorkflowResultsProps) {
           >
             <WorkflowIcon />
             <span>{each.name}</span>
-            <span className="text-muted-foreground">{each.namespace}</span>
+            <span className="flex-1 truncate text-muted-foreground">
+              {each.namespace}
+            </span>
             {each.archived && (
-              <span className="ml-auto text-caption text-muted-foreground">
+              <span className="text-caption text-muted-foreground">
                 Archived
               </span>
             )}
             {each.on && (
-              <span className="ml-auto text-caption text-muted-foreground">
-                On
-              </span>
+              <span className="text-caption text-muted-foreground">On</span>
             )}
           </CommandItem>
         );

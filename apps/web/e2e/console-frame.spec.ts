@@ -373,3 +373,19 @@ test.describe("the button that shows the navigation", () => {
     expect(hovered).not.toBe(resting);
   });
 });
+
+test.describe("a workflow found by the search", () => {
+  test("shows_its_status_at_the_end_of_its_row", async ({ page }) => {
+    await page.goto(storyOf("search-results"));
+    const row = page.getByRole("option", { name: /run-month-end/ });
+    const status = row.getByText("Archived");
+    await status.waitFor();
+
+    const rowBox = await row.boundingBox();
+    const statusBox = await status.boundingBox();
+
+    const rowEnd = (rowBox?.x ?? 0) + (rowBox?.width ?? 0);
+    const statusEnd = (statusBox?.x ?? 0) + (statusBox?.width ?? 0);
+    expect(rowEnd - statusEnd).toBeLessThanOrEqual(40);
+  });
+});
