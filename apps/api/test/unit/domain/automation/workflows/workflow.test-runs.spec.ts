@@ -88,7 +88,7 @@ describe("Workflow testing its draft", () => {
     expect(workflow.versionToRun(null)).toBeNull();
   });
 
-  it("the_same_draft_tested_again_reuses_its_test_version", () => {
+  it("the_same_draft_tested_again_by_its_tester_reuses_its_test_version", () => {
     const workflow = Workflow.register(name);
     const first = tested(workflow, "draft-1");
     workflow.clearPublications();
@@ -97,7 +97,7 @@ describe("Workflow testing its draft", () => {
     const again = workflow.testDraft({
       definition,
       source: "draft text",
-      publisherId: "tester-2",
+      publisherId: "tester-1",
       now,
     });
     const changed = tested(workflow, "draft-2");
@@ -109,6 +109,26 @@ describe("Workflow testing its draft", () => {
     });
     expect(changed).not.toBe(first);
     expect(kept).toEqual([changed]);
+  });
+
+  it("the_same_draft_tested_by_another_tester_is_their_own_test_version", () => {
+    const workflow = Workflow.register(name);
+    const first = tested(workflow, "draft-1");
+    const definition = definitionOf("1.0.0", "draft-1");
+
+    const theirs = workflow.testDraft({
+      definition,
+      source: "draft text",
+      publisherId: "tester-2",
+      now,
+    });
+
+    const kept = workflow.versionById(first.id);
+    expect(theirs).toMatchObject({
+      ok: true,
+      value: { created: true, version: { publisherId: "tester-2" } },
+    });
+    expect(kept?.publisherId).toBe("tester-1");
   });
 
   it("a_test_version_is_neither_run_by_its_number_nor_taken_by_a_publish", () => {

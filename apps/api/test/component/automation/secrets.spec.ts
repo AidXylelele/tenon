@@ -186,6 +186,40 @@ describe("keeping credentials for workflows", () => {
     expect(authorizations).toEqual([BASIC]);
   });
 
+  it("two_testers_of_one_draft_each_run_it_with_their_own_secret_of_the_same_name", async () => {
+    const theirs = JSON.stringify({
+      username: "grace",
+      password: "h0pper-pass",
+    });
+    const theirBasic = `Basic ${Buffer.from("grace:h0pper-pass").toString("base64")}`;
+    const draft = "/api/v1/workflows/sales/route-lead/draft";
+    const source = JSON.stringify(aCallingDocument(crm.origin));
+    await createSecret(editor, "crm", CREDENTIAL);
+    await createSecret(other, "crm", theirs);
+    const saved = await request(t.server)
+      .put(draft)
+      .set(editor)
+      .set("If-None-Match", "*")
+      .send({ source, layout: {} })
+      .expect(201);
+    const etag = String(saved.headers.etag);
+
+    for (const tester of [editor, other])
+      await request(t.server)
+        .post(`${draft}/test-runs`)
+        .set(tester)
+        .set("If-Match", etag)
+        .send({})
+        .expect(201);
+    await drain(t);
+    const authorizations = crm.received.map(
+      (request) => request.headers.authorization,
+    );
+
+    expect(authorizations).toHaveLength(2);
+    expect(authorizations).toEqual(expect.arrayContaining([BASIC, theirBasic]));
+  });
+
   it("a_replaced_value_is_the_one_the_next_run_uses", async () => {
     await createSecret(editor, "crm", CREDENTIAL);
     await publish(t, editor, aCallingDocument(crm.origin));

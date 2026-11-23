@@ -114,9 +114,10 @@ export class WorkflowVersion {
     return published && same;
   }
 
-  isTestOf(definition: CheckedDefinition): boolean {
+  isTestOf(definition: CheckedDefinition, testerId: string): boolean {
     const same = this.#digest === definition.digest;
-    return this.#test && same;
+    const own = this.#publisherId === testerId;
+    return this.#test && same && own;
   }
 
   republish(

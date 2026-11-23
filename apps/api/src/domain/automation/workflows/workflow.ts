@@ -138,7 +138,7 @@ export class Workflow {
     if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
 
     const tested = this.#versions.find((version) =>
-      version.isTestOf(definition),
+      version.isTestOf(definition, input.publisherId),
     );
 
     if (tested !== undefined)
