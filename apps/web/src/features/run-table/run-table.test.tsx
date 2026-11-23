@@ -1,4 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { describe, expect, it, vi } from "vitest";
 import type { InstanceSummary, Phase } from "@/libs/data-access/types";
 import { RunTable } from "./run-table";
@@ -62,11 +63,13 @@ function firstRow(): HTMLElement {
 describe("runs as a table", () => {
   it("each_run_is_a_row_that_opens_its_run", () => {
     render(
-      <RunTable
-        runs={[finished, pending]}
-        Status={PhaseWord}
-        empty={nothing}
-      />,
+      <TooltipProvider>
+        <RunTable
+          runs={[finished, pending]}
+          Status={PhaseWord}
+          empty={nothing}
+        />
+      </TooltipProvider>,
     );
     const first = screen.getByRole("link", {
       name: "Succeeded run of route-lead, started 2026-11-03 09:00 UTC",
@@ -81,7 +84,11 @@ describe("runs as a table", () => {
   });
 
   it("a_row_shows_the_phase_the_workflow_the_version_and_what_started_it", () => {
-    render(<RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />);
+    render(
+      <TooltipProvider>
+        <RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />
+      </TooltipProvider>,
+    );
     const row = firstRow();
     const cells = within(row);
 
@@ -93,7 +100,11 @@ describe("runs as a table", () => {
   });
 
   it("the_status_column_is_named_status", () => {
-    render(<RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />);
+    render(
+      <TooltipProvider>
+        <RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />
+      </TooltipProvider>,
+    );
 
     expect(
       screen.getByRole("columnheader", { name: "Status" }),
@@ -101,7 +112,11 @@ describe("runs as a table", () => {
   });
 
   it("a_run_is_dated_by_its_start_and_lasts_from_start_to_end", () => {
-    render(<RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />);
+    render(
+      <TooltipProvider>
+        <RunTable runs={[finished]} Status={PhaseWord} empty={nothing} />
+      </TooltipProvider>,
+    );
     const row = firstRow();
     const time = row.querySelector("time");
 
@@ -110,7 +125,11 @@ describe("runs as a table", () => {
   });
 
   it("a_run_not_yet_started_is_dated_by_its_creation_and_has_no_duration", () => {
-    render(<RunTable runs={[pending]} Status={PhaseWord} empty={nothing} />);
+    render(
+      <TooltipProvider>
+        <RunTable runs={[pending]} Status={PhaseWord} empty={nothing} />
+      </TooltipProvider>,
+    );
     const row = firstRow();
     const cells = within(row);
     const time = row.querySelector("time");
@@ -122,12 +141,14 @@ describe("runs as a table", () => {
 
   it("a_workflow_page_leaves_the_workflow_column_out", () => {
     render(
-      <RunTable
-        runs={[finished]}
-        Status={PhaseWord}
-        showWorkflow={false}
-        empty={nothing}
-      />,
+      <TooltipProvider>
+        <RunTable
+          runs={[finished]}
+          Status={PhaseWord}
+          showWorkflow={false}
+          empty={nothing}
+        />
+      </TooltipProvider>,
     );
 
     expect(
@@ -137,7 +158,11 @@ describe("runs as a table", () => {
   });
 
   it("without_runs_the_page_shows_what_it_gave_instead_of_a_table", () => {
-    render(<RunTable runs={[]} Status={PhaseWord} empty={nothing} />);
+    render(
+      <TooltipProvider>
+        <RunTable runs={[]} Status={PhaseWord} empty={nothing} />
+      </TooltipProvider>,
+    );
 
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();

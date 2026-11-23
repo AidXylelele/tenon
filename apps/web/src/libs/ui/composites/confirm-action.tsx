@@ -16,6 +16,8 @@ interface ConfirmActionProps {
   readonly action: () => Promise<Outcome<void>>;
   readonly success: string;
   readonly onDone?: () => void;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 export function ConfirmAction({
@@ -28,10 +30,20 @@ export function ConfirmAction({
   action,
   success,
   onDone,
+  open,
+  onOpenChange,
 }: ConfirmActionProps) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
   const opener = useRef<HTMLButtonElement>(null);
+  const controlled = open !== undefined;
+  const shown = open ?? ownOpen;
   const iconOnly = size === "icon-sm";
+
+  function change(next: boolean) {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  }
+
   const trigger = (
     <Button
       ref={opener}
@@ -39,7 +51,7 @@ export function ConfirmAction({
       size={size}
       aria-label={label}
       onClick={() => {
-        setOpen(true);
+        change(true);
       }}
     >
       {icon}
@@ -47,19 +59,21 @@ export function ConfirmAction({
     </Button>
   );
 
+  const button = iconOnly ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  ) : (
+    trigger
+  );
+
   return (
     <>
-      {iconOnly ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          <TooltipContent>{label}</TooltipContent>
-        </Tooltip>
-      ) : (
-        trigger
-      )}
+      {!controlled && button}
       <ConfirmDialog
-        open={open}
-        onOpenChange={setOpen}
+        open={shown}
+        onOpenChange={change}
         title={title}
         description={description}
         actionLabel={actionLabel}
