@@ -12,14 +12,8 @@ import { currentSession } from "@/libs/data-access/identity";
 import type { Instance, Wait } from "@/libs/data-access/types";
 import { RefreshControl } from "@/libs/live/refresh-control";
 import { type Query, segment } from "@/libs/routing/segment";
-import { Crumbs } from "@/libs/ui/composites/crumbs";
 import { Countdown, Duration, Time } from "@/libs/ui/composites/time";
-import {
-  runHref,
-  RUNS_HREF,
-  versionHref,
-  workflowHref,
-} from "@/libs/routing/routes";
+import { runHref, versionHref } from "@/libs/routing/routes";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
 import { isUnended, startedBy } from "@/operations/run-progress";
 import { PhaseStatus } from "@/features/run-status";
@@ -74,16 +68,6 @@ export async function RunDetail({ params, query }: RunDetailProps) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-start gap-x-6 gap-y-3 border-b px-4 py-3 md:px-6">
         <div className="min-w-60 flex-1">
-          <Crumbs
-            trail={[
-              { label: "Runs", href: RUNS_HREF },
-              {
-                label: instance.name,
-                href: workflowHref(instance.namespace, instance.name),
-              },
-              { label: `Run ${instance.id.slice(0, 8)}` },
-            ]}
-          />
           <h1 className="heading-1 flex flex-wrap items-center gap-3">
             Run of {instance.name}
             <PhaseStatus phase={instance.phase} />

@@ -43,6 +43,9 @@ const MODAL_STORIES = [
   "design-system-components-command--open",
   "design-system-components-fields--select-open",
   "design-system-components-sidebar--mobile-sheet-open",
+  "spaces-shell-console-frame--search-open",
+  "spaces-shell-console-frame--search-results",
+  "spaces-shell-console-frame--narrow-drawer-open",
 ];
 
 const REVIEWED_INCOMPLETE: readonly Reviewed[] = [

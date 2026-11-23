@@ -1,7 +1,6 @@
 import { hostProfile, secrets } from "@/libs/data-access/automation";
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
-import { NOTIFICATIONS_HREF, WEBHOOKS_HREF } from "@/libs/routing/routes";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
 import { ViewerNotice } from "@/features/viewer-notice";
@@ -43,11 +42,6 @@ export async function NotificationForm() {
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "Connections", href: WEBHOOKS_HREF },
-          { label: "Notifications", href: NOTIFICATIONS_HREF },
-          { label: "New" },
-        ]}
         title="New notification"
         description="Tell another application about the events it needs: what workflows emit, what comes in, and when runs start and end."
       />
