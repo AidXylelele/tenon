@@ -207,6 +207,12 @@ export class StoredDrafts extends DraftRepository {
     this.#drafts.set(key, draft);
     return Promise.resolve();
   }
+
+  remove(draft: Draft): Promise<void> {
+    const key = `${draft.name.namespace}/${draft.name.name}`;
+    this.#drafts.delete(key);
+    return Promise.resolve();
+  }
 }
 
 export class FakeDefinitionCompiler extends DefinitionCompiler {

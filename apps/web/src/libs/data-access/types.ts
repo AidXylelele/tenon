@@ -171,6 +171,8 @@ export type DraftWrite =
 export type DraftPublication =
   { readonly kind: "published"; readonly version: Version } | DraftRefusal;
 
+export type DraftDiscard = { readonly kind: "discarded" } | DraftRefusal;
+
 export type DraftTestRun =
   { readonly kind: "started"; readonly run: InstanceSummary } | DraftRefusal;
 

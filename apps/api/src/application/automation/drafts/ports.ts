@@ -4,4 +4,5 @@ import type { WorkflowName } from "../../../domain/automation/workflows/workflow
 export abstract class DraftRepository {
   abstract findByName(name: WorkflowName): Promise<Draft | null>;
   abstract save(draft: Draft): Promise<void>;
+  abstract remove(draft: Draft): Promise<void>;
 }

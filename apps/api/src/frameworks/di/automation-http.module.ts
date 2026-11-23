@@ -5,6 +5,7 @@ import { DraftRepository } from "../../application/automation/drafts/ports.js";
 import { DraftCompilation } from "../../application/automation/drafts/draft-compilation.js";
 import { PublishDraft } from "../../application/automation/drafts/publish-draft.js";
 import { DraftQueries } from "../../application/automation/drafts/queries.js";
+import { DiscardDraft } from "../../application/automation/drafts/discard-draft.js";
 import { SaveDraft } from "../../application/automation/drafts/save-draft.js";
 import { TestDraft } from "../../application/automation/drafts/test-draft.js";
 import { AcceptEvent } from "../../application/automation/events/accept-event.js";
@@ -106,6 +107,7 @@ import { HttpModule } from "./http.module.js";
     TurnWorkflowOff,
     CreateDraft,
     SaveDraft,
+    DiscardDraft,
     DraftCompilation,
     PublishDraft,
     TestDraft,

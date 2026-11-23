@@ -50,6 +50,16 @@ export class PostgresDraftRepository implements DraftRepository {
     if (saved.length === 0) throw new StaleWriteError();
   }
 
+  async remove(draft: Draft): Promise<void> {
+    const named = this.named(draft.name);
+    const removed = await this.txHost.tx
+      .delete(drafts)
+      .where(and(named, eq(drafts.revision, draft.revision)))
+      .returning({ revision: drafts.revision });
+
+    if (removed.length === 0) throw new StaleWriteError();
+  }
+
   private async insert(row: DraftRow): Promise<void> {
     const inserted = await this.txHost.tx
       .insert(drafts)
