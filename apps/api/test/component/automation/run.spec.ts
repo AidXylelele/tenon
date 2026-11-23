@@ -47,6 +47,7 @@ const LISTED_KEYS = [
   ...SUMMARY_KEYS,
   "durationMs",
   "startedBy",
+  "title",
   "waits",
 ].sort();
 
