@@ -64,6 +64,26 @@ const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
       "CodeMirror's fold markers are glyphs, not text; the gutter's colours meet 3:1 in the token table.",
   },
   {
+    rule: "color-contrast",
+    stories: [
+      "features-runs-chart--week-in-kyiv",
+      "features-runs-chart--day-in-utc",
+    ],
+    target: "tspan",
+    reason:
+      "Recharts draws the axis ticks as SVG text, whose background axe cannot read; they are --muted-foreground on --surface, which meets 4.5:1 in the token table.",
+  },
+  {
+    rule: "color-contrast",
+    stories: [
+      "features-runs-chart--week-in-kyiv",
+      "features-runs-chart--day-in-utc",
+    ],
+    target: "\\:text-muted-foreground",
+    reason:
+      "The legend's items hold a coloured swatch beside their words, so axe cannot pick one background; the words are --muted-foreground on --surface, which meets 4.5:1.",
+  },
+  {
     rule: "aria-hidden-focus",
     stories: MODAL_STORIES,
     target: "data-radix-focus-guard",

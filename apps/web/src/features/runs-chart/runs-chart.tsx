@@ -39,7 +39,12 @@ export function RunsChart({ bars, unit, zone }: RunsChartProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <ChartContainer config={CONFIG} className={FOCUS} aria-label={label}>
+      <ChartContainer
+        config={CONFIG}
+        className={FOCUS}
+        role="group"
+        aria-label={label}
+      >
         <BarChart data={bars} accessibilityLayer>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} />

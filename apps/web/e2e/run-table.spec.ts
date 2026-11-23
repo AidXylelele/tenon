@@ -10,7 +10,9 @@ test.describe("the run table playground", () => {
   }) => {
     await page.goto(PAGED);
 
-    const run = page.getByRole("link", { name: /^Failed run of route-lead/ });
+    const run = page.getByRole("link", {
+      name: /open the Failed run of route-lead/,
+    });
     await expect(run).toHaveAttribute(
       "href",
       "/runs/4f2a9c10-0000-4000-8000-000000000001",

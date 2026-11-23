@@ -73,7 +73,7 @@ function RunRow({
   const phase = phaseLabel(run.phase);
   const started = run.startedAt ?? run.createdAt;
   const startedText = utcText(started);
-  const name = `${phase} run of ${run.name}, started ${startedText}`;
+  const name = `, open the ${phase} run of ${run.name} started ${startedText}`;
   const href = runHref(run.id);
   const starter = run.startedBy?.name ?? triggerLabel(run.trigger);
 
@@ -93,12 +93,9 @@ function RunRow({
         </span>
       </TableCell>
       <TableCell>
-        <Link
-          href={href}
-          className="after:absolute after:inset-0"
-          aria-label={name}
-        >
+        <Link href={href} className="after:absolute after:inset-0">
           <Time value={started} />
+          <span className="sr-only">{name}</span>
         </Link>
       </TableCell>
       {showWorkflow && (

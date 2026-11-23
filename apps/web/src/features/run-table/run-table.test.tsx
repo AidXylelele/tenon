@@ -85,10 +85,10 @@ describe("runs as a table", () => {
       />,
     );
     const first = screen.getByRole("link", {
-      name: "Succeeded run of route-lead, started 2026-11-03 09:00 UTC",
+      name: /open the Succeeded run of route-lead started 2026-11-03 09:00 UTC$/,
     });
     const second = screen.getByRole("link", {
-      name: "Queued run of charge-card, started 2026-11-03 10:00 UTC",
+      name: /open the Queued run of charge-card started 2026-11-03 10:00 UTC$/,
     });
 
     expect(rows()).toHaveLength(2);
