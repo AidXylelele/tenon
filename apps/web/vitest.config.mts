@@ -33,7 +33,6 @@ const FEATURES_WAITING_FOR_TESTS = [
   "draft-conflict",
   "new-password-field",
   "problems",
-  "run-status",
   "viewer-notice",
 ];
 
