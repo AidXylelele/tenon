@@ -1,10 +1,5 @@
 import type { TransactionHost } from "@nestjs-cls/transactional";
-import type {
-  NewOutboxMessage,
-  Outbox,
-  OutboxHandlerContext,
-  OutboxMessage,
-} from "@nestjs/outbox";
+import type { NewOutboxMessage, Outbox } from "@nestjs/outbox";
 import type { FireSchedule } from "../../../../src/application/automation/schedules/fire-schedule.js";
 import type {
   FireScheduleCommand,
@@ -22,6 +17,7 @@ import { WorkflowMessagesGateway } from "../../../../src/interface-adapters/mess
 import type { Transaction } from "../../../../src/interface-adapters/persistence/interfaces.js";
 import { aDefinition } from "../../../support/builders.js";
 import { T0 } from "../../../support/fakes.js";
+import { aHandlerContext } from "../../../support/outbox.js";
 
 describe("an armed schedule", () => {
   it("is_a_message_held_until_its_slot_without_an_ordering_key", async () => {
@@ -83,13 +79,7 @@ describe("an armed schedule", () => {
       starts,
     );
     const message = { workflowId: "w-1", arming: 4, at: 1_000 };
-    const context = {
-      message: { topic: MessageTopic.ScheduleArmed } as OutboxMessage,
-      consumer: "schedules",
-      attempt: 1,
-      signal: new AbortController().signal,
-      processInTransaction: () => Promise.reject(new Error("Not used")),
-    } as OutboxHandlerContext;
+    const context = aHandlerContext(MessageTopic.ScheduleArmed, "schedules");
 
     await handler.armed(message, context);
 
@@ -112,13 +102,7 @@ describe("an armed schedule", () => {
       {} as FireSchedule,
       starts,
     );
-    const context = {
-      message: { topic: MessageTopic.ScheduleFired } as OutboxMessage,
-      consumer: "schedules",
-      attempt: 1,
-      signal: new AbortController().signal,
-      processInTransaction: () => Promise.reject(new Error("Not used")),
-    } as OutboxHandlerContext;
+    const context = aHandlerContext(MessageTopic.ScheduleFired, "schedules");
     const slot = { workflowId: "w-1", at: 1_000 };
     const other = { workflowId: "w-1", at: 2_000 };
 

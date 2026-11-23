@@ -13,8 +13,8 @@ import {
   publishing,
   type RunApp,
   relay,
-  resetRuns,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import type { Problem } from "../../support/bodies.js";
 
 const WORKFLOW = "/api/v1/workflows/sales/route-lead";
@@ -47,7 +47,7 @@ describe("starting workflows on a schedule and on events", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));
   });

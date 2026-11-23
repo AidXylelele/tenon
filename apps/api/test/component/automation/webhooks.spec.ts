@@ -12,9 +12,9 @@ import {
   publish,
   type RunApp,
   relay,
-  resetRuns,
   start,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 
 const PROBLEM = "application/problem+json";
 const TYPE = "com.example.form.submitted";
@@ -42,7 +42,7 @@ describe("webhooks: secret URLs other applications call", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     await createUser(t, { email: "viewer@example.com", role: Role.Viewer });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));

@@ -1,10 +1,5 @@
 import type { TransactionHost } from "@nestjs-cls/transactional";
-import type {
-  NewOutboxMessage,
-  Outbox,
-  OutboxHandlerContext,
-  OutboxMessage,
-} from "@nestjs/outbox";
+import type { NewOutboxMessage, Outbox } from "@nestjs/outbox";
 import type { AcceptedEvent } from "../../../../src/application/automation/events/interfaces.js";
 import type { DeliverEvent } from "../../../../src/application/automation/subscriptions/deliver-event.js";
 import type { FailDelivery } from "../../../../src/application/automation/subscriptions/fail-delivery.js";
@@ -16,6 +11,7 @@ import { DeliveryHandler } from "../../../../src/interface-adapters/messaging/de
 import { MessageTopic } from "../../../../src/interface-adapters/messaging/enums.js";
 import type { Transaction } from "../../../../src/interface-adapters/persistence/interfaces.js";
 import { T0 } from "../../../support/fakes.js";
+import { aHandlerContext } from "../../../support/outbox.js";
 
 const REFUSED = "The destination answered 503";
 const DELIVERY = { subscriptionId: "subscription-1", sequence: 7 };
@@ -44,26 +40,8 @@ class RecordingFailures {
   }
 }
 
-function contextAt(attempt: number): OutboxHandlerContext {
-  const message = {
-    id: "message-1",
-    topic: MessageTopic.DeliveryRequested,
-    payload: DELIVERY,
-    headers: {},
-    key: "subscription-1",
-    createdAt: 0,
-    availableAt: 0,
-    attempts: attempt - 1,
-    lastError: null,
-  } as OutboxMessage;
-  return {
-    message,
-    consumer: "deliveries",
-    attempt,
-    signal: new AbortController().signal,
-    processInTransaction: () => Promise.reject(new Error("Not used")),
-  };
-}
+const contextAt = (attempt: number) =>
+  aHandlerContext(MessageTopic.DeliveryRequested, "deliveries", attempt);
 
 function setUp(refusals: number) {
   const deliveries = new ScriptedDeliveries(refusals);

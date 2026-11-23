@@ -10,8 +10,8 @@ import {
   publish,
   type RunApp,
   relay,
-  resetRuns,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 
 interface Expected {
   readonly namespace: string;
@@ -43,7 +43,7 @@ describe("the starts a schedule is expected to make", () => {
 
   beforeEach(async () => {
     run.clock.set(Date.UTC(2026, 0, 1));
-    await resetRuns(t);
+    await truncateAll(t.db);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     await createUser(t, { email: "viewer@example.com", role: Role.Viewer });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));

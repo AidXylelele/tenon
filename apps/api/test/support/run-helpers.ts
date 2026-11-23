@@ -6,7 +6,6 @@ import type { JsonObject } from "../../src/domain/automation/interfaces.js";
 import { AddressPolicy } from "../../src/frameworks/network/address-policy.js";
 import { aDocument, type DocumentHeader } from "./builders.js";
 import { createTestApp, type TestApp } from "./create-test-app.js";
-import { truncateAll } from "./db.js";
 import type { Page } from "./bodies.js";
 
 const DURATION = /^(\d+)(ms|s|m|h|d)$/;
@@ -48,10 +47,6 @@ export async function createRunApp(
   );
   const clock = new SystemTime();
   return { t, clock };
-}
-
-export async function resetRuns(t: TestApp): Promise<void> {
-  await truncateAll(t.db);
 }
 
 export async function drain(t: TestApp): Promise<number> {

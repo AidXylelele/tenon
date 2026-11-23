@@ -12,10 +12,10 @@ import {
   publish,
   type RunApp,
   relay,
-  resetRuns,
   start,
   tasksOf,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 
 const INTERPRETER_CHANGED = "the platform's interpreter changed";
 
@@ -34,7 +34,7 @@ describe("a run this build of the interpreter cannot continue", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));
     await publish(t, editor, aWaitingDocument({ name: "waiter" }));

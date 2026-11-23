@@ -9,14 +9,12 @@ import {
 import { RunSecrets } from "../../../../src/domain/automation/secrets/run-secrets.js";
 import { Workflow } from "../../../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../../../src/domain/automation/workflows/workflow-name.js";
-import { AesGcmCipher } from "../../../../src/frameworks/crypto/aes-gcm.cipher.js";
 import { MessageTopic } from "../../../../src/interface-adapters/messaging/enums.js";
 import { InstanceMessagesGateway } from "../../../../src/interface-adapters/messaging/instance-messages.gateway.js";
 import type {
   ProcessMessage,
   RespondMessage,
 } from "../../../../src/interface-adapters/messaging/interfaces.js";
-import { RunDataMapper } from "../../../../src/interface-adapters/messaging/mappers/run-data.mapper.js";
 import type { Transaction } from "../../../../src/interface-adapters/persistence/interfaces.js";
 import {
   aCall,
@@ -25,10 +23,10 @@ import {
   aTurn,
 } from "../../../support/builders.js";
 import { anInstanceIn, T0 } from "../../../support/fakes.js";
+import { runDataMapper } from "../../../support/outbox.js";
 
 const TX = { id: "tx-1" };
-const KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
-const runData = new RunDataMapper(new AesGcmCipher(KEY));
+const runData = runDataMapper;
 
 class RecordingOutbox {
   readonly added: NewOutboxMessage[] = [];

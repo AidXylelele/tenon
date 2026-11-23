@@ -22,9 +22,9 @@ import {
   instanceOf,
   publish,
   relay,
-  resetRuns,
   start,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
 
 describe("a run that publishes and receives on a server its AsyncAPI document names", () => {
@@ -107,7 +107,7 @@ describe("a run that publishes and receives on a server its AsyncAPI document na
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     received.length = 0;
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));

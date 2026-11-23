@@ -52,7 +52,6 @@ describe("the retention jobs, on two instances over one lock store", () => {
   beforeEach(async () => {
     skips.length = 0;
     await truncateAll(db);
-    await db.execute(sql`truncate table nest_outbox.dead_letters`);
   });
 
   const tick = async (job: (jobs: RetentionJobs) => Promise<void>) => {

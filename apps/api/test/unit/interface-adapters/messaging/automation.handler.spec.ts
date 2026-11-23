@@ -1,14 +1,11 @@
-import {
-  NonRetryableMessageError,
-  type Outbox,
-  type OutboxHandlerContext,
-  type OutboxMessage,
-} from "@nestjs/outbox";
+import { NonRetryableMessageError, type Outbox } from "@nestjs/outbox";
 import type { TriggerCommand } from "../../../../src/application/automation/schedules/interfaces.js";
 import type { StartOnEvent } from "../../../../src/application/automation/schedules/start-on-event.js";
 import { AutomationHandler } from "../../../../src/interface-adapters/messaging/automation.handler.js";
 import { ConsumerSpan } from "../../../../src/interface-adapters/messaging/consumer-span.js";
+import { MessageTopic } from "../../../../src/interface-adapters/messaging/enums.js";
 import { PermanentFault } from "../../../../src/interface-adapters/workflows/permanent-fault.error.js";
+import { aHandlerContext } from "../../../support/outbox.js";
 
 class Recorder {
   readonly triggers: TriggerCommand[] = [];
@@ -51,32 +48,11 @@ function handlerOf(recorder: Recorder): AutomationHandler {
   );
 }
 
-function contextAt(attempt: number): OutboxHandlerContext {
-  const message = {
-    id: "message-1",
-    topic: "trigger.offered",
-    payload: {},
-    headers: {},
-    key: "order-1",
-    createdAt: 0,
-    availableAt: 0,
-    attempts: attempt - 1,
-    lastError: null,
-  } as OutboxMessage;
-  return {
-    message,
-    consumer: "triggers",
-    attempt,
-    signal: new AbortController().signal,
-    processInTransaction: () => Promise.reject(new Error("Not used")),
-  };
-}
-
 describe("a start an accepted event triggers", () => {
   it("names_its_instance_after_the_workflow_and_the_event_alone", async () => {
     const recorder = new Recorder();
     const handler = handlerOf(recorder);
-    const context = contextAt(1);
+    const context = aHandlerContext(MessageTopic.TriggerOffered, "triggers");
 
     await handler.triggered({ workflowId: "w-1", sequence: 7 }, context);
     await handler.triggered({ workflowId: "w-1", sequence: 7 }, context);
@@ -92,7 +68,7 @@ describe("a start an accepted event triggers", () => {
     const recorder = new Recorder();
     recorder.failure = new PermanentFault("The interpreter ran out of memory");
     const handler = handlerOf(recorder);
-    const context = contextAt(1);
+    const context = aHandlerContext(MessageTopic.TriggerOffered, "triggers");
 
     const handled = handler.triggered(
       { workflowId: "w-1", sequence: 7 },
@@ -107,7 +83,7 @@ describe("a start an accepted event triggers", () => {
     const recorder = new Recorder();
     recorder.failure = new Error("The database is busy");
     const handler = handlerOf(recorder);
-    const context = contextAt(1);
+    const context = aHandlerContext(MessageTopic.TriggerOffered, "triggers");
 
     const handled = handler.triggered(
       { workflowId: "w-1", sequence: 7 },

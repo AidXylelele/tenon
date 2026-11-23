@@ -1,8 +1,4 @@
-import type {
-  Outbox,
-  OutboxHandlerContext,
-  OutboxMessage,
-} from "@nestjs/outbox";
+import type { Outbox } from "@nestjs/outbox";
 import type { AnswerChildren } from "../../../../src/application/automation/instances/answer-children.js";
 import type { AnswerReceives } from "../../../../src/application/automation/instances/answer-receives.js";
 import type { AnswerTimer } from "../../../../src/application/automation/instances/answer-timer.js";
@@ -17,15 +13,16 @@ import type { RespondToEffect } from "../../../../src/application/automation/ins
 import type { StartChildForEffect } from "../../../../src/application/automation/instances/start-child-for-effect.js";
 import type { StartDetachedProcess } from "../../../../src/application/automation/instances/start-detached-process.js";
 import { EffectKind } from "../../../../src/domain/automation/instances/enums.js";
-import { AesGcmCipher } from "../../../../src/frameworks/crypto/aes-gcm.cipher.js";
 import { ConsumerSpan } from "../../../../src/interface-adapters/messaging/consumer-span.js";
+import { MessageTopic } from "../../../../src/interface-adapters/messaging/enums.js";
 import { EffectHandler } from "../../../../src/interface-adapters/messaging/effect.handler.js";
-import { RunDataMapper } from "../../../../src/interface-adapters/messaging/mappers/run-data.mapper.js";
 import { RunHandler } from "../../../../src/interface-adapters/messaging/run.handler.js";
 import { PermanentFault } from "../../../../src/interface-adapters/workflows/permanent-fault.error.js";
+import { aHandlerContext, runDataMapper } from "../../../support/outbox.js";
 
-const KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
-const runData = new RunDataMapper(new AesGcmCipher(KEY));
+const runData = runDataMapper;
+const contextAt = (attempt: number) =>
+  aHandlerContext(MessageTopic.RunBegin, "runs", attempt);
 
 class Recorder {
   readonly calls: string[] = [];
@@ -52,27 +49,6 @@ class Recorder {
     };
     return outbox as unknown as Outbox;
   }
-}
-
-function contextAt(attempt: number): OutboxHandlerContext {
-  const message = {
-    id: "message-1",
-    topic: "run.begin",
-    payload: {},
-    headers: {},
-    key: null,
-    createdAt: 0,
-    availableAt: 0,
-    attempts: attempt - 1,
-    lastError: null,
-  } as OutboxMessage;
-  return {
-    message,
-    consumer: "runs",
-    attempt,
-    signal: new AbortController().signal,
-    processInTransaction: () => Promise.reject(new Error("Not used")),
-  };
 }
 
 function runHandlerOf(recorder: Recorder): RunHandler {

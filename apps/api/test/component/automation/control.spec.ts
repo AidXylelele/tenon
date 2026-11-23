@@ -15,11 +15,11 @@ import {
   publish,
   relay,
   type RunApp,
-  resetRuns,
   start,
   statusesOf,
   tasksOf,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
 import type { Created, Page, Problem } from "../../support/bodies.js";
 
@@ -60,7 +60,7 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     crm.received.length = 0;
     unanswered.length = 0;
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
