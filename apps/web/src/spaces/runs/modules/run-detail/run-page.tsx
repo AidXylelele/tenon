@@ -7,7 +7,7 @@ import type {
   TaskRecord,
   Wait,
 } from "@/libs/data-access/types";
-import { RefreshControl } from "@/libs/live/refresh-control";
+import { LiveUpdates } from "@/libs/live/live-updates";
 import { Link } from "@/libs/routing/link";
 import { runHref, versionHref } from "@/libs/routing/routes";
 import { Countdown, Duration, Time } from "@/libs/ui/composites/time";
@@ -57,9 +57,9 @@ export function RunPage({
           ) : (
             <ViewerLine />
           )}
-          <RefreshControl activity={activity} renderedAt={records.readAt} />
         </div>
       </div>
+      <LiveUpdates activity={activity} />
       <RunView
         instance={instance}
         workflow={workflow}

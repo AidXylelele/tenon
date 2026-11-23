@@ -5,7 +5,7 @@ import type {
   ListedInstance,
   Read,
 } from "@/libs/data-access/types";
-import { RefreshControl } from "@/libs/live/refresh-control";
+import { LiveUpdates } from "@/libs/live/live-updates";
 import { HOME_HREF, runsHref } from "@/libs/routing/routes";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import {
@@ -61,13 +61,9 @@ export function HomePage({
       <PageHeader
         title="Home"
         description="Runs of every workflow, counted by the time they started. Test runs are not counted."
-        actions={
-          <>
-            <PeriodPicker period={period} hrefOf={homeHrefOf} />
-            <RefreshControl activity={activity} renderedAt={counts.readAt} />
-          </>
-        }
+        actions={<PeriodPicker period={period} hrefOf={homeHrefOf} />}
       />
+      <LiveUpdates activity={activity} />
       <section
         aria-labelledby="period-runs"
         className="flex flex-col gap-4 rounded-xl border bg-card p-4"

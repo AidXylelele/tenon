@@ -4,7 +4,7 @@ import type {
   InstancePage,
   Read,
 } from "@/libs/data-access/types";
-import { RefreshControl } from "@/libs/live/refresh-control";
+import { LiveUpdates } from "@/libs/live/live-updates";
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { periodPhrase, windowPhrase } from "@/operations/run-periods";
@@ -63,13 +63,8 @@ export function RunsPage({
 
   return (
     <>
-      <PageHeader
-        title="Runs"
-        description={description}
-        actions={
-          <RefreshControl activity={activity} renderedAt={page.readAt} />
-        }
-      />
+      <PageHeader title="Runs" description={description} />
+      <LiveUpdates activity={activity} />
       <Filters address={address} workflows={workflows} zone={zone} />
       <h2 className="text-sm font-semibold" role="status">
         {summary}

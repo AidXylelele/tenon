@@ -32,6 +32,16 @@ describe("a notification's page", () => {
     expect(screen.getByText("The address answered 503")).toBeVisible();
   });
 
+  it("its_heading_says_it_is_on_and_no_refresh_control_shows", () => {
+    show();
+
+    const heading = screen.getByRole("heading", { level: 1 });
+
+    expect(heading).toHaveTextContent("On");
+    expect(screen.queryByText(/Updated/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("deleting_asks_first_and_shows_a_refusal_in_the_dialog", async () => {
     deleteSubscriptionAction.mockResolvedValue({
       ok: false,
