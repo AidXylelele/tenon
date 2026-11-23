@@ -78,6 +78,39 @@ describe("the publish bar", () => {
     ]);
   });
 
+  it("a_refusal_with_problems_says_so_briefly_and_shows_them", async () => {
+    const session = {
+      document: () =>
+        Promise.resolve({ kind: "document", version: 3, document: {} }),
+      rangesOf: () => Promise.resolve({ version: 3, ranges: [null, POINTED] }),
+    } as unknown as WorkflowSession;
+    const onShowProblems = vi.fn();
+    render(
+      <PublishBar
+        session={session}
+        problems={0}
+        onPlatformProblems={vi.fn()}
+        publish={() => Promise.resolve({ kind: "refused", problem: refusal })}
+        onPublished={() => Promise.resolve()}
+        currentVersion={null}
+        onUseVersion={vi.fn()}
+        onShowProblems={onShowProblems}
+        {...PUBLISHING}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Publish 1\.0\.0/ }),
+    );
+
+    const told = await screen.findByText("Publishing refused — see Problems");
+    const detail = screen.queryByText(refusal.detail);
+    expect(told).toBeInTheDocument();
+    expect(detail).not.toBeInTheDocument();
+    expect(onShowProblems).toHaveBeenCalled();
+  });
+
   it("publishing_with_problems_shows_them_instead", () => {
     const session = {} as unknown as WorkflowSession;
     const publish = vi.fn(() => Promise.resolve({ kind: "held" as const }));

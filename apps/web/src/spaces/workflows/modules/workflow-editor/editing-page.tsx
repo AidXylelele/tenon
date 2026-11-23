@@ -53,6 +53,7 @@ import { EditorToolbar } from "./editor-toolbar";
 import type { SlotSources } from "./form-slots";
 import type { Aside, CodeShown, Starts, WorkflowName } from "./interfaces";
 import { marksOf } from "./marks";
+import { markPlatformProblems } from "./platform-problems";
 import { PublishBar } from "./publish-bar";
 import type { EntryAction } from "./step-catalog";
 import type { Webhook } from "./step-form";
@@ -275,12 +276,23 @@ function EditingBody({
     (update: ViewUpdate) => {
       follow(update);
 
+      if (update.docChanged) setPlatform(NO_PROBLEMS);
+
       if (!isChangedHere(update) || quiet.current) return;
 
       store.changed();
-      setPlatform(NO_PROBLEMS);
     },
     [follow, store],
+  );
+
+  const onPlatformProblems = useCallback(
+    (found: readonly Diagnostic[]) => {
+      setPlatform(found);
+      const editor = view();
+
+      if (editor !== null) markPlatformProblems(editor, found);
+    },
+    [view],
   );
 
   useEffect(() => {
@@ -489,7 +501,7 @@ function EditingBody({
         <PublishBar
           session={session}
           problems={errors.length}
-          onPlatformProblems={setPlatform}
+          onPlatformProblems={onPlatformProblems}
           publish={publishing.publish}
           onPublished={publishing.afterPublishing}
           currentVersion={currentVersion}

@@ -113,7 +113,7 @@ export function EditorToolbar({
           Code
         </ToggleGroupItem>
       </ToggleGroup>
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex min-w-0 items-center justify-end gap-2">
         {problems > 0 && (
           <Button
             variant="ghost"
