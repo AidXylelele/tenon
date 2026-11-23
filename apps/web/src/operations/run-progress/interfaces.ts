@@ -1,4 +1,8 @@
-import type { TaskRecord } from "@/libs/data-access/types";
+import type { Phase, TaskRecord } from "@/libs/data-access/types";
+
+export type StepStatus = Phase | "retrying" | "skipped";
+
+export type StepState = StepStatus | "not-reached";
 
 export interface TaskProgress {
   readonly status: TaskRecord["status"];

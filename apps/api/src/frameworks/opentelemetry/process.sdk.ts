@@ -35,6 +35,10 @@ const instrumentations = getNodeAutoInstrumentations({
     requireParentSpan: true,
     ignoreConnectSpans: true,
   },
+  "@opentelemetry/instrumentation-host-metrics": {
+    enabled: true,
+    metricGroups: ["process.cpu", "process.memory"],
+  },
   "@opentelemetry/instrumentation-nestjs-core": { enabled: false },
   "@opentelemetry/instrumentation-router": { enabled: false },
   "@opentelemetry/instrumentation-dns": { enabled: false },

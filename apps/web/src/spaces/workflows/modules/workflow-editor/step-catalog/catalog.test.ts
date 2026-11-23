@@ -208,7 +208,15 @@ describe("the step catalog of a host", () => {
       icon: "rotate-cw",
       action: {
         kind: "setFailure",
-        failure: { kind: "retry", retries: 3, seconds: 2, growing: true },
+        failure: {
+          kind: "retry",
+          retry: {
+            retries: 3,
+            milliseconds: 2000,
+            backoff: "exponential",
+            on: { kind: "any" },
+          },
+        },
       },
     });
   });

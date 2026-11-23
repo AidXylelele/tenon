@@ -11,7 +11,14 @@ const READ = { editable: false, collapsed: new Set<string>() };
 const EDIT = { editable: true, collapsed: new Set<string>() };
 
 function done(to: string | null): Transition {
-  return { on: "done", case: null, when: null, kind: "next", to };
+  return {
+    condition: null,
+    on: "done",
+    case: null,
+    when: null,
+    kind: "next",
+    to,
+  };
 }
 
 function stepOf(
@@ -22,6 +29,8 @@ function stepOf(
 ): Step {
   const name = id.split("/").at(-1) ?? id;
   return {
+    variant: null,
+    catch: null,
     id,
     pointer: id,
     name,

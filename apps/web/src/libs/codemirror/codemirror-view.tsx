@@ -25,6 +25,9 @@ interface CodeMirrorViewProps {
 
 const NO_EXTENSIONS: Extension = [];
 
+const HOST =
+  "relative grid min-w-0 grid-cols-1 grid-rows-1 has-[.cm-focused]:after:pointer-events-none has-[.cm-focused]:after:absolute has-[.cm-focused]:after:inset-0 has-[.cm-focused]:after:z-1 has-[.cm-focused]:after:ring-2 has-[.cm-focused]:after:ring-focus-ring has-[.cm-focused]:after:ring-inset";
+
 const ownerExtensions = new Compartment();
 const editability = new Compartment();
 
@@ -65,7 +68,10 @@ export function CodeMirrorView({
         doc,
         extensions: [
           baseSetup(),
-          EditorView.contentAttributes.of({ "aria-label": label }),
+          EditorView.contentAttributes.of({
+            "aria-label": label,
+            tabindex: "0",
+          }),
           EditorView.domEventHandlers({
             focus: () => {
               setFocused(true);
@@ -106,8 +112,8 @@ export function CodeMirrorView({
   }, []);
 
   return (
-    <div className={cn("relative", className)}>
-      <div ref={host} className="h-full" />
+    <div className={cn(HOST, className)}>
+      <div ref={host} className="h-full min-w-0" />
       {!readOnly && (
         <p
           id={hint}

@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { StepInspector } from "./step-inspector";
 
 const fetchLead: Step = {
+  variant: null,
+  catch: null,
   id: "/do/fetchLead",
   pointer: "/do/0/fetchLead",
   name: "fetchLead",
@@ -19,6 +21,7 @@ const fetchLead: Step = {
 };
 
 const form: StepFormResult = {
+  retry: null,
   version: 3,
   step: fetchLead.id,
   failure: "stop",
@@ -50,7 +53,15 @@ describe("the inspector of one task", () => {
     expect(onEdit).toHaveBeenCalledWith({
       kind: "setFailure",
       step: "/do/fetchLead",
-      failure: { kind: "retry", retries: 3, seconds: 5, growing: false },
+      failure: {
+        kind: "retry",
+        retry: {
+          retries: 3,
+          milliseconds: 5000,
+          backoff: "constant",
+          on: { kind: "any" },
+        },
+      },
     });
   });
 

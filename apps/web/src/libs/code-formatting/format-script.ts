@@ -1,43 +1,61 @@
-import type { ScriptLanguage } from "@/libs/codemirror/interfaces";
+import type { CodeProblem, ScriptLanguage } from "@/libs/codemirror/interfaces";
 import type {
+  Checked,
+  Failed,
+  Formatted,
   Formatting,
-  FormattingAnswer,
-  FormattingRequest,
+  Refused,
+  WorkerAnswer,
+  WorkerRequest,
 } from "./interfaces";
+
+export const FORMATTER_NAMES: Readonly<Record<ScriptLanguage, string>> = {
+  javascript: "Prettier",
+  python: "Ruff",
+};
 
 let worker: Worker | null = null;
 
 export function formatScript(
   language: ScriptLanguage,
   text: string,
+  cursor: number,
 ): Promise<Formatting> {
-  const formatter = formattingWorker();
-  const request: FormattingRequest = { language, text };
+  const request: WorkerRequest = { kind: "format", language, text, cursor };
+  return answerTo<Formatted | Refused>(request);
+}
 
-  return new Promise((resolve, reject) => {
+export async function checkScript(
+  language: ScriptLanguage,
+  text: string,
+): Promise<readonly CodeProblem[]> {
+  const request: WorkerRequest = { kind: "check", language, text };
+  const answer = await answerTo<Checked>(request);
+
+  if (answer.kind === "failed") throw new Error(answer.message);
+
+  return answer.problems;
+}
+
+function answerTo<Answer extends WorkerAnswer>(
+  request: WorkerRequest,
+): Promise<Answer | Failed> {
+  const formatter = formattingWorker();
+
+  return new Promise((resolve) => {
     const { port1, port2 } = new MessageChannel();
 
     function stop(event: ErrorEvent): void {
       port1.close();
       forget(formatter);
-      const stopped = new Error("The formatting worker stopped.", {
-        cause: event,
-      });
-      reject(stopped);
+      const message = `The formatting worker stopped: ${event.message}`;
+      resolve({ kind: "failed", message });
     }
 
-    port1.onmessage = (event: MessageEvent<FormattingAnswer>) => {
+    port1.onmessage = (event: MessageEvent<Answer | Failed>) => {
       formatter.removeEventListener("error", stop);
       port1.close();
-      const answer = event.data;
-
-      if (answer.kind === "failed") {
-        const failed = new Error(answer.message);
-        reject(failed);
-        return;
-      }
-
-      resolve(answer);
+      resolve(event.data);
     };
     formatter.addEventListener("error", stop);
     formatter.postMessage(request, [port2]);

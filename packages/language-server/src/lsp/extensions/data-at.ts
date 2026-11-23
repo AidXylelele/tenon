@@ -45,7 +45,11 @@ export function dataAtHandlerOf(
     }
 
     const speculate = (text: string) => host.speculate(document, text);
-    const request = { step: params.step, field: params.field };
+    const written = params.samples ?? {};
+    const sampled = Object.entries(written);
+    const samples = new Map(sampled);
+    const typed = params.typed ?? null;
+    const request = { step: params.step, field: params.field, samples, typed };
     const reading = dataAtOf(snapshot, request, speculate);
 
     switch (reading.kind) {

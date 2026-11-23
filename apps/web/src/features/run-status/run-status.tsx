@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import type { Phase, TaskStatus } from "@/libs/data-access/types";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
-import { phaseLabel, taskStatusLabel } from "@/operations/run-progress";
+import { phaseLabel, stepStateLabel } from "@/operations/run-progress";
 
 type Mark = Pick<StatusLook, "tone" | "icon">;
 
@@ -34,7 +34,7 @@ function phaseLook(phase: Phase): StatusLook {
 
 function taskLook(status: TaskStatus): StatusLook {
   const mark = status === "skipped" ? SKIPPED : PHASE[status];
-  const label = taskStatusLabel(status);
+  const label = stepStateLabel(status);
   return { tone: mark.tone, icon: mark.icon, label };
 }
 

@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
+import { PLAYGROUND_PORT } from "./e2e/playground-port";
 
-const PLAYGROUND_URL = "http://localhost:6007";
+const PLAYGROUND_URL = `http://localhost:${String(PLAYGROUND_PORT)}`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -19,7 +20,7 @@ export default defineConfig({
   ],
   webServer: {
     command:
-      "vite preview --config e2e/playground-server.config.ts --outDir storybook-static --port 6007 --strictPort",
+      "vite preview --config e2e/playground-server.config.ts --outDir storybook-static",
     url: PLAYGROUND_URL,
   },
 });

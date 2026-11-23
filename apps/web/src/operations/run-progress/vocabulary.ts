@@ -1,13 +1,21 @@
-import type { Phase, TaskStatus, Trigger } from "@/libs/data-access/types";
+import type { Phase, Trigger } from "@/libs/data-access/types";
+import type { StepState } from "./interfaces";
 
 const PHASE: Record<Phase, string> = {
-  pending: "Pending",
+  pending: "Queued",
   running: "Running",
   waiting: "Waiting",
-  suspended: "Suspended",
-  completed: "Completed",
-  faulted: "Faulted",
+  suspended: "Paused",
+  completed: "Succeeded",
+  faulted: "Failed",
   cancelled: "Cancelled",
+};
+
+const STEP_STATE: Record<StepState, string> = {
+  ...PHASE,
+  retrying: "Retrying",
+  skipped: "Skipped",
+  "not-reached": "Not reached",
 };
 
 export const PHASES = Object.keys(PHASE) as Phase[];
@@ -25,16 +33,8 @@ export function isUnended(phase: Phase): boolean {
   );
 }
 
-const TASK_STATUS: Record<TaskStatus, string> = {
-  running: "Running",
-  completed: "Completed",
-  faulted: "Faulted",
-  cancelled: "Cancelled",
-  skipped: "Skipped",
-};
-
-export function taskStatusLabel(status: TaskStatus): string {
-  return TASK_STATUS[status];
+export function stepStateLabel(state: StepState): string {
+  return STEP_STATE[state];
 }
 
 const TRIGGER: Record<Trigger, string> = {

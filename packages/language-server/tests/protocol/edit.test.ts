@@ -119,16 +119,77 @@ test("a failure choice answers its edit and the ids it moves", async () => {
   ]);
 });
 
-test("a retry with no number of retries is invalid", async () => {
+test("a handling with a retry answers its edit", async () => {
   useFakeClock();
   const session = await sessionWith(guardedFlow);
+  const retry = {
+    retries: 2,
+    milliseconds: 1000,
+    backoff: "linear",
+    on: { kind: "timeouts" },
+  } as const;
   const params = {
     textDocument: { uri, version: 1 },
     action: {
       kind: "setFailure",
       step: "/do/greet",
-      failure: { kind: "retry", seconds: 5, growing: false },
+      failure: { kind: "handle", retry },
     },
+  } as const;
+
+  const answered = await session.client.sendRequest(editRequest, params);
+
+  expect(answered.ids).toEqual([
+    { from: "/do/greet", to: "/do/greet/try/greet" },
+  ]);
+});
+
+test.each([
+  [
+    "a retry with no number of retries",
+    {
+      kind: "retry",
+      retry: {
+        milliseconds: 5000,
+        backoff: "constant",
+        on: { kind: "any" },
+      },
+    },
+  ],
+  [
+    "a retry with an unknown backoff",
+    {
+      kind: "retry",
+      retry: {
+        retries: 3,
+        milliseconds: 5000,
+        backoff: "growing",
+        on: { kind: "any" },
+      },
+    },
+  ],
+  [
+    "a retry on statuses that are not numbers",
+    {
+      kind: "retry",
+      retry: {
+        retries: 3,
+        milliseconds: 5000,
+        backoff: "constant",
+        on: { kind: "statuses", statuses: ["503"] },
+      },
+    },
+  ],
+  [
+    "a handling whose retry is not one",
+    { kind: "handle", retry: { retries: 3 } },
+  ],
+])("%s is invalid", async (_, failure) => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    textDocument: { uri, version: 1 },
+    action: { kind: "setFailure", step: "/do/greet", failure },
   };
 
   const refused = session.client.sendRequest(editRequest.method, params);

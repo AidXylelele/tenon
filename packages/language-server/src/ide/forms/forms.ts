@@ -3,6 +3,7 @@ import type {
   JsonValue,
   SchemaAt,
   SchemaMember,
+  SemanticModel,
 } from "interpreter/front-end";
 import {
   holderDescriptionOf,
@@ -30,11 +31,13 @@ import {
 import {
   failureOf,
   listNamesOf,
+  protectedStepOf,
   type StepNode,
   type StepTree,
   stepTreeOf,
   stepWithId,
 } from "../steps/index.js";
+import { catchPolicyOf, type RetryPlan } from "../structure/index.js";
 import type {
   FieldSources,
   FormField,
@@ -147,9 +150,24 @@ export function formOf(
   const sources = { document, schemasAt, diagnostics, suggestions, essentials };
   const fields = stepFieldsOf(node.pointer, sources);
   const failure = failureOf(node);
+  const retry = protectingRetryOf(node, model);
   const result = stepResultOf(node, document);
 
-  return { kind: "form", failure, result, fields };
+  return { kind: "form", failure, retry, result, fields };
+}
+
+function protectingRetryOf(
+  node: StepNode,
+  model: SemanticModel,
+): RetryPlan | null {
+  const inner = protectedStepOf(node);
+
+  if (inner === null) {
+    return null;
+  }
+
+  const policy = catchPolicyOf(node.task, model);
+  return policy?.retry ?? null;
 }
 
 function standingStepOf(

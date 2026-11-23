@@ -85,7 +85,14 @@ function placementFor(graph: Graph): Placement {
 }
 
 function next(to: string | null): Transition {
-  return { on: "done", case: null, when: null, kind: "next", to };
+  return {
+    condition: null,
+    on: "done",
+    case: null,
+    when: null,
+    kind: "next",
+    to,
+  };
 }
 
 function step(
@@ -98,6 +105,8 @@ function step(
   const start = { line, character: 2 };
   const range = { start, end: start };
   return {
+    variant: null,
+    catch: null,
     id,
     pointer: id,
     name,

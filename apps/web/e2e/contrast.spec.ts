@@ -231,6 +231,24 @@ const PAIRS: readonly Pair[] = [
     minimum: TEXT,
   },
   {
+    use: "runs count in the sidebar",
+    foreground: "--info-text",
+    background: "--bg-subtle",
+    minimum: TEXT,
+  },
+  {
+    use: "runs count on a hovered sidebar item",
+    foreground: "--info-strong",
+    background: "--hover",
+    minimum: TEXT,
+  },
+  {
+    use: "runs count on a pressed sidebar item",
+    foreground: "--info-strong",
+    background: "--selected",
+    minimum: TEXT,
+  },
+  {
     use: "info word on a step card",
     foreground: "--info-text",
     background: "--surface",
