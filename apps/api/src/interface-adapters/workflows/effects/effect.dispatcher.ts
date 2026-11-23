@@ -1,10 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import type { Effect, EffectOutcome } from "interpreter";
+import type { EffectCall } from "../../../application/automation/instances/interfaces.js";
+import type { EffectClient } from "../../../application/automation/instances/ports.js";
+import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type {
-  EffectClient,
+  JsonOf,
   SandboxedProcessRequest,
   StepCall,
 } from "../interfaces.js";
+import { ProtocolMapper } from "../mappers/protocol.mapper.js";
 import { A2aGateway } from "./a2a.gateway.js";
 import { AsyncApiGateway } from "./asyncapi.gateway.js";
 import { GrpcGateway } from "./grpc.gateway.js";
@@ -28,9 +32,26 @@ export class EffectDispatcher implements EffectClient {
     private readonly a2a: A2aGateway,
     private readonly asyncApi: AsyncApiGateway,
     private readonly sandbox: SandboxGateway,
+    private readonly protocol: ProtocolMapper,
   ) {}
 
-  async perform(effect: Effect, step: StepCall): Promise<EffectOutcome> {
+  async perform(request: JsonObject, call: EffectCall): Promise<JsonObject> {
+    const effect = this.#effectOf(request);
+    const step = this.#stepOf(call);
+    const outcome: JsonOf<EffectOutcome> = await this.#outcomeOf(effect, step);
+    return outcome;
+  }
+
+  async performDetached(request: JsonObject, call: EffectCall): Promise<void> {
+    const effect = this.#effectOf(request);
+    const process = this.#sandboxed(effect);
+    const step = this.#stepOf(call);
+    const context = this.#contextOf(step, null);
+    await this.sandbox.perform(process, context);
+    step.signal.throwIfAborted();
+  }
+
+  async #outcomeOf(effect: Effect, step: StepCall): Promise<EffectOutcome> {
     const left = effect.deadline === null ? null : effect.deadline - Date.now();
     const expired = left !== null && left <= 0;
 
@@ -42,16 +63,20 @@ export class EffectDispatcher implements EffectClient {
     return outcome;
   }
 
-  async performDetached(
-    request: SandboxedProcessRequest,
-    step: StepCall,
-  ): Promise<void> {
-    const context = this.#contextOf(step, null);
-    await this.sandbox.perform(request, context);
-    step.signal.throwIfAborted();
+  #effectOf(request: JsonObject): Effect {
+    return request as JsonOf<Effect>;
   }
 
-  sandboxed(effect: Effect): SandboxedProcessRequest {
+  #stepOf(call: EffectCall): StepCall {
+    const secrets = this.protocol.toObject(call.secrets.values);
+    return {
+      idempotencyKey: call.idempotencyKey,
+      signal: call.signal,
+      secrets,
+    };
+  }
+
+  #sandboxed(effect: Effect): SandboxedProcessRequest {
     const contained = this.#isSandboxed(effect);
 
     if (!contained) throw this.#unperformable("process.container");
@@ -96,7 +121,7 @@ export class EffectDispatcher implements EffectClient {
       case "asyncapi":
         return this.asyncApi.perform(effect, context);
       case "process": {
-        const request = this.sandboxed(effect);
+        const request = this.#sandboxed(effect);
         return this.sandbox.perform(request, context);
       }
       case "emit":

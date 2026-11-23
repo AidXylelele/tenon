@@ -4,27 +4,33 @@ import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { HttpClientModule } from "@nestjs/http-client";
 import { LocksModule } from "@nestjs/locks";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
-import { EmitEvent } from "../../application/automation/events/emit-event.js";
 import {
   EventOffers,
   EventRouting,
 } from "../../application/automation/events/ports.js";
 import { AnswerChildren } from "../../application/automation/instances/answer-children.js";
 import { AnswerReceives } from "../../application/automation/instances/answer-receives.js";
+import { AnswerTimer } from "../../application/automation/instances/answer-timer.js";
 import { BeginRun } from "../../application/automation/instances/begin-run.js";
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
+import { EmitForEffect } from "../../application/automation/instances/emit-for-effect.js";
 import { FailRun } from "../../application/automation/instances/fail-run.js";
+import { FindEffectKind } from "../../application/automation/instances/find-effect-kind.js";
+import { GiveUpEffect } from "../../application/automation/instances/give-up-effect.js";
 import { OfferEvent } from "../../application/automation/instances/offer-event.js";
+import { PerformEffect } from "../../application/automation/instances/perform-effect.js";
 import {
   ChildCancellations,
+  EffectClient,
   ReceivedMessages,
 } from "../../application/automation/instances/ports.js";
 import { ReceiverQueries } from "../../application/automation/instances/queries.js";
 import { ProcessPlatform } from "../../application/automation/host/queries.js";
+import { ReceiveForEffect } from "../../application/automation/instances/receive-for-effect.js";
 import { ReceiveInbound } from "../../application/automation/instances/receive-inbound.js";
 import { RespondToEffect } from "../../application/automation/instances/respond-to-effect.js";
-import { StartSubWorkflow } from "../../application/automation/instances/start-sub-workflow.js";
-import { WakeParent } from "../../application/automation/instances/wake-parent.js";
+import { StartChildForEffect } from "../../application/automation/instances/start-child-for-effect.js";
+import { StartDetachedProcess } from "../../application/automation/instances/start-detached-process.js";
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
 import { StartScheduledInstance } from "../../application/automation/schedules/start-scheduled-instance.js";
@@ -39,6 +45,9 @@ import {
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
 import { AsyncApiHandler } from "../../interface-adapters/messaging/asyncapi.handler.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
+import { ConsumerSpan } from "../../interface-adapters/messaging/consumer-span.js";
+import { EffectHandler } from "../../interface-adapters/messaging/effect.handler.js";
+import { RunHandler } from "../../interface-adapters/messaging/run.handler.js";
 import { SubscriptionClient } from "../../interface-adapters/messaging/interfaces.js";
 import { InboundMapper } from "../../interface-adapters/persistence/mappers/inbound.mapper.js";
 import { PostgresReceiverQueries } from "../../interface-adapters/persistence/queries/postgres-receiver.queries.js";
@@ -65,11 +74,8 @@ import { ProtoSchema } from "../../interface-adapters/workflows/effects/proto-sc
 import { RedisGateway } from "../../interface-adapters/workflows/effects/redis.gateway.js";
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
-import { EffectClient } from "../../interface-adapters/workflows/interfaces.js";
 import { RunController } from "../../interface-adapters/workflows/run.controller.js";
 import { DeliveryRun } from "../../interface-adapters/workflows/runners/delivery.run.js";
-import { OpenWorkflowRun } from "../../interface-adapters/workflows/runners/open-workflow.run.js";
-import { ProcessRun } from "../../interface-adapters/workflows/runners/process.run.js";
 import { ScheduleRun } from "../../interface-adapters/workflows/runners/schedule.run.js";
 import { AmqpConnection } from "../amqp/amqp.connection.js";
 import { parserOptions } from "../asyncapi/parser.options.js";
@@ -106,12 +112,17 @@ import { OutboundModule } from "./outbound.module.js";
     BeginRun,
     RespondToEffect,
     FailRun,
-    EmitEvent,
-    StartSubWorkflow,
     AnswerReceives,
     AnswerChildren,
+    FindEffectKind,
+    PerformEffect,
+    StartDetachedProcess,
+    StartChildForEffect,
+    EmitForEffect,
+    ReceiveForEffect,
+    AnswerTimer,
+    GiveUpEffect,
     ReceiveInbound,
-    WakeParent,
     CancelChildren,
     OfferEvent,
     DispatchEvent,
@@ -123,15 +134,16 @@ import { OutboundModule } from "./outbound.module.js";
     DeliverEvent,
     FailDelivery,
     RunController,
-    OpenWorkflowRun,
-    ProcessRun,
     ScheduleRun,
     DeliveryRun,
     EngineDeliveryGateway,
     { provide: Deliveries, useExisting: EngineDeliveryGateway },
     InterpreterRoutingGateway,
     { provide: EventRouting, useExisting: InterpreterRoutingGateway },
+    ConsumerSpan,
     AutomationHandler,
+    RunHandler,
+    EffectHandler,
     AsyncApiHandler,
     RetentionJobs,
     InboundMapper,

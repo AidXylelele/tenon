@@ -5,6 +5,7 @@ import { ResilienceService } from "@nestjs/resilience";
 import { EventStore } from "../../application/automation/events/ports.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import {
+  InstanceEvents,
   InstanceRuns,
   WorkflowInstanceRepository,
   WorkflowRuntime,
@@ -22,6 +23,7 @@ import { WorkflowRepository } from "../../application/automation/workflows/ports
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
 import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
 import { HttpDeliveryGateway } from "../../interface-adapters/messaging/http-delivery.gateway.js";
+import { InstanceMessagesGateway } from "../../interface-adapters/messaging/instance-messages.gateway.js";
 import {
   DeliveryAdmission,
   EventDeliveries,
@@ -44,7 +46,6 @@ import { PostgresWorkflowRepository } from "../../interface-adapters/persistence
 import { PostgresEventStore } from "../../interface-adapters/persistence/stores/postgres-event.store.js";
 import { PostgresLifecycleEventStore } from "../../interface-adapters/persistence/stores/postgres-lifecycle-event.store.js";
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
-import { EngineRunGateway } from "../../interface-adapters/workflows/gateways/engine-run.gateway.js";
 import { EngineScheduleGateway } from "../../interface-adapters/workflows/gateways/engine-schedule.gateway.js";
 import { EngineExpectedStartsQueries } from "../../interface-adapters/workflows/queries/engine-expected-starts.queries.js";
 import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
@@ -104,8 +105,9 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: WorkflowRuntime, useExisting: InterpreterRuntimeGateway },
     InterpreterFilterGateway,
     { provide: SubscriptionFilters, useExisting: InterpreterFilterGateway },
-    EngineRunGateway,
-    { provide: InstanceRuns, useExisting: EngineRunGateway },
+    InstanceMessagesGateway,
+    { provide: InstanceEvents, useExisting: InstanceMessagesGateway },
+    { provide: InstanceRuns, useExisting: InstanceMessagesGateway },
     EngineScheduleGateway,
     { provide: WorkflowSchedules, useExisting: EngineScheduleGateway },
     { provide: ScheduleQueries, useClass: EngineExpectedStartsQueries },
@@ -183,7 +185,7 @@ import { OutboundModule } from "./outbound.module.js";
     DefinitionMapper,
     WorkflowRuntime,
     SubscriptionFilters,
-    EngineRunGateway,
+    InstanceEvents,
     InstanceRuns,
     WorkflowSchedules,
     ScheduleQueries,

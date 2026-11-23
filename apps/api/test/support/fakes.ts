@@ -1,6 +1,7 @@
 import { DraftRepository } from "../../src/application/automation/drafts/ports.js";
 import type { Draft } from "../../src/domain/automation/drafts/draft.js";
 import {
+  InstanceEvents,
   InstanceRuns,
   WorkflowInstanceRepository,
 } from "../../src/application/automation/instances/ports.js";
@@ -20,11 +21,12 @@ import type {
   DefinitionSource,
 } from "../../src/application/automation/workflows/interfaces.js";
 import {
-  type Control,
+  InstanceEventKind,
   Phase,
   TriggerKind,
 } from "../../src/domain/automation/instances/enums.js";
 import type {
+  EffectAnswer,
   InstanceEvent,
   WorkflowInstanceProps,
 } from "../../src/domain/automation/instances/interfaces.js";
@@ -276,7 +278,6 @@ function instanceRow(
 
 export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository {
   readonly rows = new Map<string, WorkflowInstanceProps>();
-  readonly outbox: InstanceEvent[] = [];
   saves = 0;
 
   constructor(...instances: WorkflowInstance[]) {
@@ -354,23 +355,17 @@ export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository
     const row = instanceRow(instance, instance.version + 1);
     this.rows.set(instance.id, row);
     this.saves += 1;
-    this.#told(instance);
+    instance.clearLifecycle();
     return Promise.resolve();
   }
 
   remove(instance: WorkflowInstance): Promise<void> {
     this.rows.delete(instance.id);
-    this.#told(instance);
     return Promise.resolve();
   }
 
   phaseOf(id: string): Phase | undefined {
     return this.rows.get(id)?.phase;
-  }
-
-  #told(instance: WorkflowInstance): void {
-    for (const event of instance.events) this.outbox.push(event);
-    instance.clearEvents();
   }
 }
 
@@ -450,48 +445,60 @@ export interface StartedRun {
   readonly stored: boolean;
 }
 
-export class RecordingInstanceRuns extends InstanceRuns {
+export class RecordingInstanceEvents extends InstanceEvents {
   readonly started: StartedRun[] = [];
+  readonly dispatched: InstanceEvent[] = [];
+  readonly calls: string[] = [];
 
   constructor(private readonly instances: StoredWorkflowInstanceRepository) {
     super();
   }
 
-  readonly woken: string[] = [];
-  readonly causes: string[] = [];
-
-  start(instance: WorkflowInstance): Promise<void> {
+  dispatch(instance: WorkflowInstance): Promise<void> {
     const stored = this.instances.rows.has(instance.id);
-    this.started.push({ instance, stored });
+    const starts = instance.events.some(
+      (event) => event.kind === InstanceEventKind.Started,
+    );
+
+    if (starts) this.started.push({ instance, stored });
+
+    this.calls.push(instance.id);
+
+    for (const event of instance.events) this.dispatched.push(event);
+
+    instance.clearEvents();
     return Promise.resolve();
   }
 
-  wakeOnChild(
-    parent: WorkflowInstance,
-    child: WorkflowInstance,
-  ): Promise<void> {
-    return this.#woken(parent, `child:${child.id}`);
+  kindsOf(instanceId: string): readonly InstanceEventKind[] {
+    return this.dispatched
+      .filter((event) => event.instanceId === instanceId)
+      .map((event) => event.kind);
   }
+}
 
-  wakeOnEvent(instance: WorkflowInstance, sequence: number): Promise<void> {
-    return this.#woken(instance, `event:${String(sequence)}`);
-  }
+export interface RecordedAnswer {
+  readonly instanceId: string;
+  readonly answer: EffectAnswer;
+}
 
-  wakeOnControl(instance: WorkflowInstance, control: Control): Promise<void> {
-    return this.#woken(instance, control);
-  }
+export class RecordingInstanceRuns extends InstanceRuns {
+  readonly responded: RecordedAnswer[] = [];
+  readonly received: string[] = [];
+  readonly failed: string[] = [];
 
-  wakeOnInbound(instance: WorkflowInstance): Promise<void> {
-    return this.#woken(instance, "inbound");
-  }
-
-  #woken(instance: WorkflowInstance, cause: string): Promise<void> {
-    this.woken.push(instance.id);
-    this.causes.push(cause);
+  respond(instance: WorkflowInstance, answer: EffectAnswer): Promise<void> {
+    this.responded.push({ instanceId: instance.id, answer });
     return Promise.resolve();
   }
 
-  forget(): Promise<void> {
+  receive(instance: WorkflowInstance): Promise<void> {
+    this.received.push(instance.id);
+    return Promise.resolve();
+  }
+
+  fail(instance: WorkflowInstance): Promise<void> {
+    this.failed.push(instance.id);
     return Promise.resolve();
   }
 }

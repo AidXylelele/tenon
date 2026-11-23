@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { Outbox } from "@nestjs/outbox";
 import {
   and,
   eq,
@@ -17,7 +16,6 @@ import {
 } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
-import type { InstanceMessage } from "../../messaging/interfaces.js";
 import type { Transaction } from "../interfaces.js";
 import { WorkflowInstanceMapper } from "../mappers/workflow-instance.mapper.js";
 import {
@@ -31,7 +29,6 @@ import { PostgresLifecycleEventStore } from "../stores/postgres-lifecycle-event.
 export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepository {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly outbox: Outbox,
     private readonly lifecycle: PostgresLifecycleEventStore,
     private readonly workflowInstanceMapper: WorkflowInstanceMapper,
   ) {}
@@ -150,7 +147,6 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
 
   async remove(instance: WorkflowInstance): Promise<void> {
     await this.txHost.tx.delete(instances).where(eq(instances.id, instance.id));
-    await this.#record(instance);
   }
 
   async #receive(instance: WorkflowInstance): Promise<void> {
@@ -226,19 +222,7 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
 
   async #record(instance: WorkflowInstance): Promise<void> {
     const now = new Date();
-    const entries = instance.events.map((change) => {
-      const payload: InstanceMessage = { instanceId: change.instanceId };
-      const key = change.parentId ?? change.instanceId;
-      return {
-        topic: change.kind,
-        key,
-        payload,
-      };
-    });
     await this.lifecycle.record(instance, now);
-
-    if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
-
-    instance.clearEvents();
+    instance.clearLifecycle();
   }
 }

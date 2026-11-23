@@ -7,16 +7,16 @@ import { SchedulerRegistry } from "@nestjs/schedule";
 import { Test, type TestingModule } from "@nestjs/testing";
 import { sql } from "drizzle-orm";
 import { ApiModule } from "../../src/frameworks/di/api.module.js";
+import { EffectClient } from "../../src/application/automation/instances/ports.js";
 import { WorkerModule } from "../../src/frameworks/di/worker.module.js";
 import { IdempotencyJobs } from "../../src/interface-adapters/jobs/idempotency.jobs.js";
 import { AsyncApiHandler } from "../../src/interface-adapters/messaging/asyncapi.handler.js";
+import { EffectHandler } from "../../src/interface-adapters/messaging/effect.handler.js";
+import { RunHandler } from "../../src/interface-adapters/messaging/run.handler.js";
 import { AsyncApiGateway } from "../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { SandboxGateway } from "../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
-import { EffectClient } from "../../src/interface-adapters/workflows/interfaces.js";
 import { DeliveryRun } from "../../src/interface-adapters/workflows/runners/delivery.run.js";
-import { OpenWorkflowRun } from "../../src/interface-adapters/workflows/runners/open-workflow.run.js";
-import { ProcessRun } from "../../src/interface-adapters/workflows/runners/process.run.js";
 import { ScheduleRun } from "../../src/interface-adapters/workflows/runners/schedule.run.js";
 import { truncateAll } from "../support/db.js";
 
@@ -36,8 +36,8 @@ const WORKER_VARIABLES = [
 const RETENTION_SCHEDULES = ["0 4 * * *", "30 3 * * *"];
 
 const RUNNERS = new Set<unknown>([
-  OpenWorkflowRun,
-  ProcessRun,
+  RunHandler,
+  EffectHandler,
   ScheduleRun,
   DeliveryRun,
 ]);

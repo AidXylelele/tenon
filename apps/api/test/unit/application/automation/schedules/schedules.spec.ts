@@ -13,7 +13,7 @@ import type { WorkflowVersion } from "../../../../../src/domain/automation/workf
 import { aDefinition } from "../../../../support/builders.js";
 import {
   anInstanceIn,
-  RecordingInstanceRuns,
+  RecordingInstanceEvents,
   RecordingSchedules,
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
@@ -28,12 +28,12 @@ const name = new WorkflowName("sales", "route-lead");
 function setUp() {
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository();
-  const runs = new RecordingInstanceRuns(instances);
+  const events = new RecordingInstanceEvents(instances);
   const schedules = new RecordingSchedules();
   return {
     workflows,
     instances,
-    runs,
+    events,
     schedules,
     turnOn: new TurnWorkflowOn(workflows, unitOfWork),
     turnOff: new TurnWorkflowOff(workflows, unitOfWork),
@@ -41,7 +41,7 @@ function setUp() {
     scheduled: new StartScheduledInstance(
       workflows,
       instances,
-      runs,
+      events,
       unitOfWork,
     ),
     continued: new ContinueSchedule(
@@ -135,8 +135,8 @@ describe("an occurrence of a schedule", () => {
     await fixture.scheduled.execute(command);
 
     expect(fixture.instances.rows.size).toBe(1);
-    expect(fixture.runs.started).toHaveLength(1);
-    expect(fixture.runs.started[0]?.stored).toBe(true);
+    expect(fixture.events.started).toHaveLength(1);
+    expect(fixture.events.started[0]?.stored).toBe(true);
   });
 
   it("starts_nothing_once_the_workflow_is_off", async () => {
@@ -150,7 +150,7 @@ describe("an occurrence of a schedule", () => {
     });
 
     expect(fixture.instances.rows.size).toBe(0);
-    expect(fixture.runs.started).toEqual([]);
+    expect(fixture.events.started).toEqual([]);
   });
 
   it("a_chained_one_starts_nothing_while_the_schedules_instance_runs", async () => {
@@ -171,7 +171,7 @@ describe("an occurrence of a schedule", () => {
     });
 
     expect(fixture.instances.rows.size).toBe(1);
-    expect(fixture.runs.started).toEqual([]);
+    expect(fixture.events.started).toEqual([]);
   });
 });
 

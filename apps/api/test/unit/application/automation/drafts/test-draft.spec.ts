@@ -10,7 +10,7 @@ import { aDocument } from "../../../../support/builders.js";
 import {
   FakeDefinitionCompiler,
   FakeUnitOfWork,
-  RecordingInstanceRuns,
+  RecordingInstanceEvents,
   StoredDrafts,
   StoredSecrets,
   StoredWorkflowInstanceRepository,
@@ -31,7 +31,7 @@ async function setUp(problems: readonly InputProblem[] = []) {
   const compiler = new FakeDefinitionCompiler();
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository();
-  const runs = new RecordingInstanceRuns(instances);
+  const events = new RecordingInstanceEvents(instances);
   const source = JSON.stringify(aDocument());
   const draft = Draft.create({
     name,
@@ -51,11 +51,11 @@ async function setUp(problems: readonly InputProblem[] = []) {
     compilation,
     workflows,
     instances,
-    runs,
+    events,
     runtime,
     new FakeUnitOfWork(),
   );
-  return { draft, compiler, workflows, instances, runs, testDraft };
+  return { draft, compiler, workflows, instances, events, testDraft };
 }
 
 describe("testing a draft", () => {
@@ -69,13 +69,13 @@ describe("testing a draft", () => {
       starterId: tester.id,
     });
 
-    const ran = fixture.runs.started.map((run) => run.instance);
+    const ran = fixture.events.started.map((run) => run.instance);
     const workflow = await fixture.workflows.findByName(name);
     expect(tested).toEqual({ ok: true, value: { instanceId: ran[0]?.id } });
     expect(ran).toHaveLength(1);
     expect(ran[0]?.test).toBe(true);
     expect(ran[0]?.input).toEqual({ amount: 3 });
-    expect(fixture.runs.started[0]?.stored).toBe(true);
+    expect(fixture.events.started[0]?.stored).toBe(true);
     expect(workflow?.currentVersionId).toBeNull();
     expect(workflow?.versionToRun(null)).toBeNull();
   });
@@ -93,7 +93,9 @@ describe("testing a draft", () => {
 
     await fixture.testDraft.execute(command);
 
-    const versions = fixture.runs.started.map((run) => run.instance.versionId);
+    const versions = fixture.events.started.map(
+      (run) => run.instance.versionId,
+    );
     expect(fixture.workflows.saves).toBe(savesAfterFirst);
     expect(fixture.workflows.versions.size).toBe(1);
     expect(versions[0]).toBe(versions[1]);
@@ -113,7 +115,7 @@ describe("testing a draft", () => {
       ok: false,
       failure: { refusal: DraftRefusal.Stale, current: fixture.draft.snapshot },
     });
-    expect(fixture.runs.started).toHaveLength(0);
+    expect(fixture.events.started).toHaveLength(0);
   });
 
   it("a_workflow_without_a_draft_is_refused_as_missing", async () => {
@@ -170,6 +172,6 @@ describe("testing a draft", () => {
       failure: { inputProblems: problems },
     });
     expect(fixture.instances.rows.size).toBe(0);
-    expect(fixture.runs.started).toHaveLength(0);
+    expect(fixture.events.started).toHaveLength(0);
   });
 });

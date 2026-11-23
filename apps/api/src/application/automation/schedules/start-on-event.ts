@@ -4,7 +4,7 @@ import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { EventStore } from "../events/ports.js";
 import {
-  InstanceRuns,
+  InstanceEvents,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../instances/ports.js";
@@ -20,7 +20,7 @@ export class StartOnEvent {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
-    private readonly runs: InstanceRuns,
+    private readonly instanceEvents: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -61,7 +61,7 @@ export class StartOnEvent {
     const instance = started.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.instanceEvents.dispatch(instance);
     });
   }
 }

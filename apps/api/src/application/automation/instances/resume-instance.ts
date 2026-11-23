@@ -6,7 +6,7 @@ import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
 import type { InstanceCommand, InstanceResult } from "./interfaces.js";
 import {
-  InstanceRuns,
+  InstanceEvents,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "./ports.js";
@@ -17,7 +17,7 @@ export class ResumeInstance {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
-    private readonly runs: InstanceRuns,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -37,7 +37,7 @@ export class ResumeInstance {
     instance.advance(turn, secrets, now);
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.wakeOnControl(instance, Control.Resume);
+      await this.events.dispatch(instance);
     });
     return { ok: true, value: undefined };
   }

@@ -1,10 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
-import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
-import type { AgendaResult, RespondCommand } from "./interfaces.js";
-import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
+import type { RespondCommand } from "./interfaces.js";
+import {
+  InstanceEvents,
+  WorkflowInstanceRepository,
+  WorkflowRuntime,
+} from "./ports.js";
 
 @Injectable()
 export class RespondToEffect {
@@ -12,17 +15,18 @@ export class RespondToEffect {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async execute(command: RespondCommand): Promise<AgendaResult> {
+  async execute(command: RespondCommand): Promise<void> {
     const instance = await this.instances.find(command.instanceId);
 
-    if (instance === null) return { ok: false, failure: Missing.Instance };
+    if (instance === null) return;
 
     const awaited = instance.awaits(command.answer.effectId);
 
-    if (!awaited) return { ok: true, value: instance.agenda };
+    if (!awaited) return;
 
     const declared = await this.secrets.findDeclared(instance.versionId);
     const secrets = RunSecrets.of(declared);
@@ -35,7 +39,9 @@ export class RespondToEffect {
       command.signal,
     );
     instance.advance(turn, secrets, now);
-    await this.unitOfWork.run(() => this.instances.save(instance));
-    return { ok: true, value: instance.agenda };
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.events.dispatch(instance);
+    });
   }
 }

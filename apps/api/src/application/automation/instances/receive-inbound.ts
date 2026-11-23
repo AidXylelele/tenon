@@ -38,7 +38,7 @@ export class ReceiveInbound {
       if (position === null)
         return { ok: false, failure: InstanceRefusal.NotReceiving };
 
-      await this.runs.wakeOnInbound(instance, command.execution, position);
+      await this.runs.receive(instance);
       return { ok: true, value: undefined };
     });
   }

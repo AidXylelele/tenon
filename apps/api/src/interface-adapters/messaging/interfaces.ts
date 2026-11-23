@@ -4,6 +4,7 @@ import type {
   Failure,
   JsonObject,
 } from "interpreter";
+import type { JsonObject as DomainObject } from "../../domain/automation/interfaces.js";
 import type { StepCall } from "../workflows/interfaces.js";
 
 export interface AcceptedEventMessage {
@@ -23,6 +24,28 @@ export interface TriggerOfferedMessage {
 
 export interface InstanceMessage {
   readonly instanceId: string;
+}
+
+export interface InstanceEndedMessage {
+  readonly instanceId: string;
+  readonly parentId: string | null;
+}
+
+export interface EffectMessage {
+  readonly instanceId: string;
+  readonly effectId: string;
+}
+
+export interface TimerMessage {
+  readonly instanceId: string;
+  readonly effectId: string;
+  readonly at: number;
+}
+
+export interface RespondMessage {
+  readonly instanceId: string;
+  readonly effectId: string;
+  readonly outcome: DomainObject;
 }
 
 export interface WorkflowMessage {

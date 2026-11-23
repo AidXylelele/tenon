@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from "../interfaces.js";
 import type { RunSecrets } from "../secrets/run-secrets.js";
+import type { WaitEnd } from "./enums.js";
 import type {
   AwaitedEffect,
   EventOffer,
@@ -106,6 +107,21 @@ export class Run {
 
   awaits(effectId: string): boolean {
     return this.#awaited.some((effect) => effect.id === effectId);
+  }
+
+  effectOf(effectId: string): AwaitedEffect | null {
+    const found = this.#awaited.find((effect) => effect.id === effectId);
+    return found ?? null;
+  }
+
+  waitEndAt(effectId: string, at: number): WaitEnd | null {
+    const wait = this.effectOf(effectId)?.wait ?? null;
+
+    if (wait === null) return null;
+
+    const passed = wait.deadlines.filter((deadline) => deadline.at <= at);
+    const earliest = passed.toSorted((left, right) => left.at - right.at);
+    return earliest[0]?.end ?? null;
   }
 
   mayTake(offer: EventOffer): boolean {

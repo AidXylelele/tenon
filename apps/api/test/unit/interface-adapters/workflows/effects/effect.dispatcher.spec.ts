@@ -16,10 +16,14 @@ import { McpGateway } from "../../../../../src/interface-adapters/workflows/effe
 import { OpenApiGateway } from "../../../../../src/interface-adapters/workflows/effects/openapi.gateway.js";
 import { ResourceGateway } from "../../../../../src/interface-adapters/workflows/effects/resource.gateway.js";
 import { SandboxGateway } from "../../../../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
+import type { EffectCall } from "../../../../../src/application/automation/instances/interfaces.js";
+import type { JsonObject } from "../../../../../src/domain/automation/interfaces.js";
+import { RunSecrets } from "../../../../../src/domain/automation/secrets/run-secrets.js";
 import type {
+  JsonOf,
   SandboxedProcessRequest,
-  StepCall,
 } from "../../../../../src/interface-adapters/workflows/interfaces.js";
+import { ProtocolMapper } from "../../../../../src/interface-adapters/workflows/mappers/protocol.mapper.js";
 
 const RESPONDED: HttpOutcome = {
   kind: "responded",
@@ -56,6 +60,13 @@ const SHELL: SandboxedProcessRequest = {
 };
 
 const COMMON = { id: "do/0/call", deadline: null } as const;
+
+const DETACHED: Effect = { ...COMMON, ...SHELL };
+
+function requestOf(effect: Effect): JsonObject {
+  const request: JsonOf<Effect> = effect;
+  return request;
+}
 
 const ROUTED: readonly Effect[] = [
   {
@@ -187,6 +198,7 @@ describe("the dispatcher every effect passes through", () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         EffectDispatcher,
+        ProtocolMapper,
         { provide: HttpGateway, useValue: http },
         { provide: OpenApiGateway, useValue: others.openapi },
         { provide: ResourceGateway, useValue: others.resource },
@@ -216,14 +228,16 @@ describe("the dispatcher every effect passes through", () => {
 
   function stepOf(
     signal: AbortSignal = new AbortController().signal,
-  ): StepCall {
-    return { idempotencyKey: "run-1/do/0/charge", signal, secrets: {} };
+  ): EffectCall {
+    const secrets = RunSecrets.of([]);
+    return { idempotencyKey: "run-1/do/0/charge", signal, secrets };
   }
 
   it.each(ROUTED)("a_$kind_effect_reaches_its_own_gateway", async (effect) => {
     const step = stepOf();
 
-    await dispatcher.perform(effect, step);
+    const request = requestOf(effect);
+    await dispatcher.perform(request, step);
 
     const reached = Array.from(gateways).filter(
       ([, gateway]) => gateway.requests.length > 0,
@@ -239,7 +253,8 @@ describe("the dispatcher every effect passes through", () => {
     async (effect) => {
       const step = stepOf();
 
-      const performed = dispatcher.perform(effect, step);
+      const request = requestOf(effect);
+      const performed = dispatcher.perform(request, step);
 
       await expect(performed).rejects.toThrow(
         `The host does not perform '${effect.kind}'`,
@@ -256,7 +271,8 @@ describe("the dispatcher every effect passes through", () => {
     const effect = httpOf(past);
     const step = stepOf();
 
-    const outcome = await dispatcher.perform(effect, step);
+    const request = requestOf(effect);
+    const outcome = await dispatcher.perform(request, step);
 
     expect(outcome).toEqual({ kind: "expired" });
     expect(http.contexts).toHaveLength(0);
@@ -266,7 +282,8 @@ describe("the dispatcher every effect passes through", () => {
     const effect = httpOf(null);
     const step = stepOf();
 
-    const outcome = await dispatcher.perform(effect, step);
+    const request = requestOf(effect);
+    const outcome = await dispatcher.perform(request, step);
 
     expect(outcome).toEqual(RESPONDED);
     expect(http.contexts[0]).toMatchObject({
@@ -280,7 +297,8 @@ describe("the dispatcher every effect passes through", () => {
     const effect = httpOf(soon);
     const step = stepOf();
 
-    const outcome = await dispatcher.perform(effect, step);
+    const request = requestOf(effect);
+    const outcome = await dispatcher.perform(request, step);
 
     expect(outcome).toEqual({ kind: "expired" });
     const remaining = http.contexts[0]?.remaining ?? 0;
@@ -295,7 +313,8 @@ describe("the dispatcher every effect passes through", () => {
     const effect = httpOf(later);
     const step = stepOf(controller.signal);
 
-    const pending = dispatcher.perform(effect, step);
+    const request = requestOf(effect);
+    const pending = dispatcher.perform(request, step);
     controller.abort(reason);
 
     await expect(pending).rejects.toBe(reason);
@@ -308,7 +327,8 @@ describe("the dispatcher every effect passes through", () => {
     const effect = httpOf(far);
     const step = stepOf(controller.signal);
 
-    const pending = dispatcher.perform(effect, step);
+    const request = requestOf(effect);
+    const pending = dispatcher.perform(request, step);
     await new Promise((resolve) => setTimeout(resolve, 20));
     const aborted = http.contexts[0]?.signal.aborted;
     const ended = new Error("The step ended");
@@ -321,9 +341,10 @@ describe("the dispatcher every effect passes through", () => {
   it("a_detached_process_reaches_the_sandbox_unbounded", async () => {
     const step = stepOf();
 
-    await dispatcher.performDetached(SHELL, step);
+    const request = requestOf(DETACHED);
+    await dispatcher.performDetached(request, step);
 
-    expect(sandbox.requests).toEqual([SHELL]);
+    expect(sandbox.requests).toEqual([DETACHED]);
     expect(sandbox.contexts[0]?.remaining).toBeNull();
   });
 
@@ -333,12 +354,13 @@ describe("the dispatcher every effect passes through", () => {
     controller.abort(reason);
     const step = stepOf(controller.signal);
 
-    const pending = dispatcher.performDetached(SHELL, step);
+    const request = requestOf(DETACHED);
+    const pending = dispatcher.performDetached(request, step);
 
     await expect(pending).rejects.toBe(reason);
   });
 
-  it("a_container_process_is_refused_as_one_the_host_does_not_perform", () => {
+  it("a_container_process_is_refused_as_one_the_host_does_not_perform", async () => {
     const container: Effect = {
       id: "/do/0/build",
       deadline: null,
@@ -359,22 +381,13 @@ describe("the dispatcher every effect passes through", () => {
       await: true,
     };
 
-    expect(() => dispatcher.sandboxed(container)).toThrow(
+    const request = requestOf(container);
+    const step = stepOf();
+
+    const performed = dispatcher.performDetached(request, step);
+
+    await expect(performed).rejects.toThrow(
       "The host does not perform 'process.container'",
     );
-  });
-
-  it("a_sandboxed_process_is_handed_on_as_it_is", () => {
-    const shell: Effect = {
-      id: "/do/0/run",
-      deadline: null,
-      kind: "process",
-      process: SHELL.process,
-      await: false,
-    };
-
-    const handed = dispatcher.sandboxed(shell);
-
-    expect(handed).toBe(shell);
   });
 });

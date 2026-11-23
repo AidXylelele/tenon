@@ -1,13 +1,17 @@
 import {
   CancelReason,
   Control,
+  EffectKind,
   InstanceEventKind,
   InstanceRefusal,
   Phase,
   TaskValueKind,
   TriggerKind,
   TurnStatus,
+  WaitEnd,
+  WaitKind,
 } from "../../../../../src/domain/automation/instances/enums.js";
+import type { AwaitedEffect } from "../../../../../src/domain/automation/instances/interfaces.js";
 import { RunSecrets } from "../../../../../src/domain/automation/secrets/run-secrets.js";
 import { SecretValue } from "../../../../../src/domain/automation/secrets/secret-value.js";
 import {
@@ -27,6 +31,7 @@ function begun(requested = [aTimer("/do/0/pause")]) {
   const instance = anInstanceIn(Phase.Pending);
   const turn = aTurn({ requested });
   instance.begin(turn, noSecrets, T0);
+  instance.clearEvents();
   return instance;
 }
 
@@ -51,6 +56,117 @@ describe("a run begun on its first turn", () => {
     instance.begin(again, noSecrets, later);
 
     expect(instance.phase).toBe(Phase.Waiting);
+  });
+});
+
+const aReceiveClosing = (id: string): AwaitedEffect => ({
+  id,
+  kind: EffectKind.Receive,
+  request: { id, kind: "asyncapi" },
+  wait: {
+    effectId: id,
+    kind: WaitKind.Message,
+    until: 20_000,
+    stream: null,
+    retryOf: null,
+    execution: "/do/0/orders",
+    position: 0,
+    deadlines: [
+      { at: 20_000, end: WaitEnd.Expired },
+      { at: 10_000, end: WaitEnd.Closed },
+    ],
+  },
+});
+
+describe("what a run asks of the world", () => {
+  it("requests_each_effect_the_world_performs_and_sets_a_timer_per_deadline", () => {
+    const instance = anInstanceIn(Phase.Pending);
+    const turn = aTurn({
+      requested: [
+        aCall("/do/0/fetch"),
+        aTimer("/do/1/pause", 30_000),
+        aReceiveClosing("/do/2/orders@message[0]"),
+      ],
+    });
+
+    instance.begin(turn, noSecrets, T0);
+
+    expect(instance.events).toEqual([
+      {
+        kind: InstanceEventKind.EffectRequested,
+        instanceId: instance.id,
+        effectId: "/do/0/fetch",
+      },
+      {
+        kind: InstanceEventKind.TimerSet,
+        instanceId: instance.id,
+        effectId: "/do/1/pause",
+        at: 30_000,
+      },
+      {
+        kind: InstanceEventKind.EffectRequested,
+        instanceId: instance.id,
+        effectId: "/do/2/orders@message[0]",
+      },
+      {
+        kind: InstanceEventKind.TimerSet,
+        instanceId: instance.id,
+        effectId: "/do/2/orders@message[0]",
+        at: 20_000,
+      },
+      {
+        kind: InstanceEventKind.TimerSet,
+        instanceId: instance.id,
+        effectId: "/do/2/orders@message[0]",
+        at: 10_000,
+      },
+    ]);
+  });
+
+  it("knows_the_kind_and_request_of_an_effect_it_awaits", () => {
+    const instance = begun([aCall("/do/0/fetch")]);
+
+    expect(instance.kindOf("/do/0/fetch")).toBe(EffectKind.Call);
+    expect(instance.requestOf("/do/0/fetch")).toEqual({
+      id: "/do/0/fetch",
+      kind: "http",
+      deadline: null,
+    });
+    expect(instance.kindOf("/do/9/gone")).toBeNull();
+  });
+
+  it("asks_nothing_of_the_world_once_ended", () => {
+    const instance = begun([aCall("/do/0/fetch")]);
+    instance.cancel(later);
+
+    expect(instance.kindOf("/do/0/fetch")).toBeNull();
+    expect(instance.requestOf("/do/0/fetch")).toBeNull();
+  });
+
+  it("tells_which_wait_ended_first_at_an_instant", () => {
+    const instance = begun([aReceiveClosing("/do/2/orders@message[0]")]);
+
+    const early = instance.waitEndAt("/do/2/orders@message[0]", 9_999);
+    const closed = instance.waitEndAt("/do/2/orders@message[0]", 10_000);
+    const late = instance.waitEndAt("/do/2/orders@message[0]", 25_000);
+
+    expect(early).toBeNull();
+    expect(closed).toBe(WaitEnd.Closed);
+    expect(late).toBe(WaitEnd.Closed);
+  });
+
+  it("a_turn_that_ends_the_run_requests_none_of_its_effects", () => {
+    const instance = anInstanceIn(Phase.Pending);
+    const turn = aTurn({
+      status: TurnStatus.Faulted,
+      requested: [aCall("/do/0/fetch")],
+    });
+
+    instance.begin(turn, noSecrets, T0);
+
+    expect(instance.events.map((event) => event.kind)).toEqual([
+      InstanceEventKind.Ended,
+    ]);
   });
 });
 

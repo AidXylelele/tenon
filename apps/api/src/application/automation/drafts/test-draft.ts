@@ -3,7 +3,7 @@ import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
 import { UnitOfWork } from "../../unit-of-work.js";
 import {
-  InstanceRuns,
+  InstanceEvents,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../instances/ports.js";
@@ -17,7 +17,7 @@ export class TestDraft {
     private readonly compilation: DraftCompilation,
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
-    private readonly runs: InstanceRuns,
+    private readonly events: InstanceEvents,
     private readonly runtime: WorkflowRuntime,
     private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -74,7 +74,7 @@ export class TestDraft {
     const instance = started.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.events.dispatch(instance);
     });
     return { ok: true, value: { instanceId: instance.id } };
   }

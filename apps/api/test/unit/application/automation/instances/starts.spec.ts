@@ -2,19 +2,17 @@ import { Missing } from "../../../../../src/application/automation/enums.js";
 import type { InputProblem } from "../../../../../src/application/automation/instances/interfaces.js";
 import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
 import { StartInstance } from "../../../../../src/application/automation/instances/start-instance.js";
-import { StartSubWorkflow } from "../../../../../src/application/automation/instances/start-sub-workflow.js";
 import {
+  InstanceEventKind,
   Phase,
-  TriggerKind,
 } from "../../../../../src/domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../../../src/domain/automation/instances/workflow-instance.js";
-import { WorkflowRefusal } from "../../../../../src/domain/automation/workflows/enums.js";
 import { Workflow } from "../../../../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../../../../src/domain/automation/workflows/workflow-name.js";
 import { aDefinition } from "../../../../support/builders.js";
 import {
   anInstanceIn,
-  RecordingInstanceRuns,
+  RecordingInstanceEvents,
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
   T0,
@@ -24,7 +22,6 @@ import {
 const unitOfWork = new FakeUnitOfWork();
 
 const name = new WorkflowName("sales", "route-lead");
-const unknown = new WorkflowName("sales", "nobody");
 
 function inputsChecked(problems: readonly InputProblem[]): WorkflowRuntime {
   const checker = { inputProblemsOf: () => Promise.resolve(problems) };
@@ -38,7 +35,7 @@ async function setUp(
 ) {
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository(parent);
-  const runs = new RecordingInstanceRuns(instances);
+  const events = new RecordingInstanceEvents(instances);
   const workflow = Workflow.register(name);
   const definition = aDefinition({}, "content-1");
   workflow.publish({ definition, source: null, publisherId: "a-1", now: T0 });
@@ -48,26 +45,14 @@ async function setUp(
   await workflows.save(workflow);
   return {
     instances,
-    runs,
+    events,
     start: new StartInstance(
       workflows,
       instances,
-      runs,
+      events,
       inputsChecked(problems),
       unitOfWork,
     ),
-    child: new StartSubWorkflow(workflows, instances, runs, unitOfWork),
-  };
-}
-
-function childOf(workflow: WorkflowName, parentId = "parent-1") {
-  return {
-    parentId,
-    effectId: "/do/0/child",
-    name: workflow,
-    version: null,
-    input: {},
-    trigger: TriggerKind.Parent,
   };
 }
 
@@ -82,10 +67,26 @@ describe("starting an instance", () => {
       starterId: "author-1",
     });
 
-    const ran = fixture.runs.started.map((run) => run.instance.id);
+    const ran = fixture.events.started.map((run) => run.instance.id);
     expect(ran).toHaveLength(1);
     expect(started).toEqual({ ok: true, value: { instanceId: ran[0] } });
-    expect(fixture.runs.started[0]?.stored).toBe(true);
+    expect(fixture.events.started[0]?.stored).toBe(true);
+  });
+
+  it("dispatches_the_start_of_its_run_with_the_stored_instance", async () => {
+    const fixture = await setUp();
+
+    const started = await fixture.start.execute({
+      name,
+      version: null,
+      input: {},
+      starterId: "author-1",
+    });
+
+    const instanceId = started.ok ? started.value.instanceId : "";
+    expect(fixture.events.kindsOf(instanceId)).toEqual([
+      InstanceEventKind.Started,
+    ]);
   });
 
   it("an_unknown_version_is_refused_as_missing", async () => {
@@ -116,56 +117,6 @@ describe("starting an instance", () => {
 
     expect(started).toEqual({ ok: false, failure: problems });
     expect(fixture.instances.rows.size).toBe(1);
-    expect(fixture.runs.started).toHaveLength(0);
-  });
-});
-
-describe("starting a sub-workflow", () => {
-  it("a_repeat_answers_the_child_it_started_first", async () => {
-    const fixture = await setUp();
-
-    const first = await fixture.child.execute(childOf(name));
-    const again = await fixture.child.execute(childOf(name));
-
-    expect(again).toEqual(first);
-    expect(fixture.runs.started).toHaveLength(1);
-  });
-
-  it("an_unknown_workflow_is_refused_as_missing", async () => {
-    const fixture = await setUp();
-
-    const started = await fixture.child.execute(childOf(unknown));
-
-    expect(started).toEqual({ ok: false, failure: Missing.Workflow });
-  });
-
-  it("an_archived_workflow_is_refused_as_archived", async () => {
-    const fixture = await setUp(true);
-
-    const started = await fixture.child.execute(childOf(name));
-
-    expect(started).toEqual({ ok: false, failure: WorkflowRefusal.Archived });
-    expect(fixture.instances.rows.size).toBe(1);
-  });
-
-  it("a_child_of_a_parent_no_longer_kept_is_refused_as_missing", async () => {
-    const fixture = await setUp();
-    const orphan = childOf(name, "parent-gone");
-
-    const started = await fixture.child.execute(orphan);
-
-    expect(started).toEqual({ ok: false, failure: Missing.Instance });
-    expect(fixture.runs.started).toHaveLength(0);
-  });
-
-  it("a_child_of_a_test_run_is_a_test_run", async () => {
-    const parent = anInstanceIn(Phase.Running, { id: "parent-1", test: true });
-    const fixture = await setUp(false, [], parent);
-
-    await fixture.child.execute(childOf(name));
-
-    const child = fixture.runs.started[0]?.instance;
-    expect(child?.test).toBe(true);
-    expect(child?.originId).toBe("parent-1");
+    expect(fixture.events.started).toHaveLength(0);
   });
 });

@@ -3,7 +3,6 @@ import type {
   CloudEvent,
   Diagnostic,
   Effect,
-  EffectOutcome,
   EffectResponse,
   Ending,
   Failure,
@@ -137,30 +136,6 @@ export interface StepCall {
   readonly secrets: JsonObject;
 }
 
-export interface TimeAnswer {
-  readonly at: number;
-  readonly outcome: EffectOutcome;
-}
-
-export interface TimedWait {
-  readonly id: string;
-  readonly answers: readonly TimeAnswer[];
-}
-
-export interface RunAgendaView {
-  readonly ended: boolean;
-  readonly calls: readonly Effect[];
-  readonly processes: readonly Effect[];
-  readonly detached: readonly Effect[];
-  readonly children: readonly ChildEffect[];
-  readonly receives: readonly string[];
-  readonly waits: readonly TimedWait[];
-}
-
-export type ChildStart =
-  | { readonly kind: "started"; readonly instanceId: string }
-  | { readonly kind: "missing" };
-
 export interface Receiver {
   readonly instanceId: string;
   readonly execution: string;
@@ -247,15 +222,6 @@ export abstract class StructureClient {
     source: ProgramSource,
   ): Promise<VersionStructure | null>;
   abstract tagOf(digest: string): string;
-}
-
-export abstract class EffectClient {
-  abstract perform(effect: Effect, step: StepCall): Promise<EffectOutcome>;
-  abstract performDetached(
-    request: SandboxedProcessRequest,
-    step: StepCall,
-  ): Promise<void>;
-  abstract sandboxed(effect: Effect): SandboxedProcessRequest;
 }
 
 export type FetchedText =

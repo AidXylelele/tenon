@@ -74,9 +74,12 @@ export async function relay(t: TestApp): Promise<void> {
   }
 }
 
-export async function engineRunCount(t: TestApp, id: string): Promise<number> {
+export async function pendingRunMessages(
+  t: TestApp,
+  id: string,
+): Promise<number> {
   const result = await t.db.execute(
-    sql`select count(*)::int as count from nest_workflows.instances where id like ${`run:${id}:%`}`,
+    sql`select count(*)::int as count from nest_outbox.messages where payload ->> 'instanceId' = ${id}`,
   );
   const [row] = result.rows as { count: number }[];
   return row?.count ?? 0;

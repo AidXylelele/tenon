@@ -10,8 +10,10 @@ import type {
   TaskValue as ProtocolTaskValue,
 } from "interpreter";
 import {
+  EffectKind,
   TaskValueKind,
   TurnStatus,
+  WaitEnd,
   WaitKind,
 } from "../../../domain/automation/instances/enums.js";
 import type {
@@ -23,6 +25,7 @@ import type {
   RunTurn,
   RunWait,
   TaskValue,
+  WaitDeadline,
 } from "../../../domain/automation/instances/interfaces.js";
 import type { Run } from "../../../domain/automation/instances/run.js";
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
@@ -110,9 +113,62 @@ export class RunTurnMapper {
   }
 
   #awaitedOf(effect: Effect): AwaitedEffect {
+    const kind = this.#kindOf(effect);
     const request = this.#requestOf(effect);
     const wait = this.#waitOf(effect);
-    return { id: effect.id, request, wait };
+    return { id: effect.id, kind, request, wait };
+  }
+
+  #kindOf(effect: Effect): EffectKind {
+    switch (effect.kind) {
+      case "http":
+      case "openapi":
+      case "resource":
+      case "grpc":
+      case "mcp":
+      case "a2a":
+        return EffectKind.Call;
+      case "asyncapi":
+        return this.#exchangeKindOf(effect.exchange);
+      case "process":
+        return effect.await ? EffectKind.Process : EffectKind.Detached;
+      case "workflow":
+        return EffectKind.Child;
+      case "emit":
+        return EffectKind.Emit;
+      case "timer":
+        return EffectKind.Timer;
+      case "listen":
+        return EffectKind.Listen;
+    }
+  }
+
+  #exchangeKindOf(exchange: AsyncApiRequest["exchange"]): EffectKind {
+    if (exchange.kind === RunTurnMapper.RECEIVE) return EffectKind.Receive;
+
+    return EffectKind.Call;
+  }
+
+  #deadlinesOf(effect: Effect): readonly WaitDeadline[] {
+    const deadline = effect.deadline;
+    const expiry: WaitDeadline[] =
+      deadline === null ? [] : [{ at: deadline, end: WaitEnd.Expired }];
+    const own = this.#ownDeadlinesOf(effect);
+    return expiry.concat(own);
+  }
+
+  #ownDeadlinesOf(effect: Effect): readonly WaitDeadline[] {
+    if (effect.kind === "timer")
+      return [{ at: effect.until, end: WaitEnd.Elapsed }];
+
+    if (effect.kind !== "asyncapi" || effect.exchange.kind !== "receive")
+      return [];
+
+    const closesAt = effect.exchange.closesAt;
+
+    if (closesAt === null) return [];
+
+    return [{ at: closesAt, end: WaitEnd.Closed }];
   }
 
   #requestOf(effect: Effect): JsonObject {
@@ -132,6 +188,7 @@ export class RunTurnMapper {
   #waitOf(effect: Effect): RunWait | null {
     const effectId = effect.id;
     const until = effect.deadline;
+    const deadlines = this.#deadlinesOf(effect);
 
     switch (effect.kind) {
       case "timer":
@@ -143,6 +200,7 @@ export class RunTurnMapper {
           retryOf: this.#retriedOf(effectId),
           execution: null,
           position: null,
+          deadlines,
         };
       case "listen":
         return {
@@ -153,11 +211,12 @@ export class RunTurnMapper {
           retryOf: null,
           execution: null,
           position: null,
+          deadlines,
         };
       case "workflow":
-        return this.#childWaitOf(effect.await, effectId, until);
+        return this.#childWaitOf(effect.await, effectId, until, deadlines);
       case "asyncapi":
-        return this.#messageWaitOf(effect.exchange, effectId, until);
+        return this.#messageWaitOf(effect.exchange, effectId, until, deadlines);
       case "http":
       case "openapi":
       case "resource":
@@ -174,6 +233,7 @@ export class RunTurnMapper {
     awaited: boolean,
     effectId: string,
     until: number | null,
+    deadlines: readonly WaitDeadline[],
   ): RunWait | null {
     if (!awaited) return null;
 
@@ -185,6 +245,7 @@ export class RunTurnMapper {
       retryOf: null,
       execution: null,
       position: null,
+      deadlines,
     };
   }
 
@@ -192,6 +253,7 @@ export class RunTurnMapper {
     exchange: AsyncApiRequest["exchange"],
     effectId: string,
     until: number | null,
+    deadlines: readonly WaitDeadline[],
   ): RunWait | null {
     if (exchange.kind !== RunTurnMapper.RECEIVE) return null;
 
@@ -203,6 +265,7 @@ export class RunTurnMapper {
       retryOf: null,
       execution: exchange.subscription,
       position: exchange.position,
+      deadlines,
     };
   }
 

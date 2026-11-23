@@ -18,11 +18,6 @@ export interface AcceptEventCommand {
   readonly instanceId: string | null;
 }
 
-export interface EmitEventCommand {
-  readonly instanceId: string;
-  readonly cloudEvent: CloudEvent;
-}
-
 export interface DispatchEventCommand {
   readonly sequence: number;
   readonly signal: AbortSignal;

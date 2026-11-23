@@ -1,5 +1,7 @@
 import {
+  EffectKind,
   TurnStatus,
+  WaitEnd,
   WaitKind,
 } from "../../src/domain/automation/instances/enums.js";
 import type {
@@ -154,22 +156,25 @@ export const aCancelledEnding = (): RunEnding => {
   return { events: [event], error: null };
 };
 
-export const aTimer = (id: string): AwaitedEffect => ({
+export const aTimer = (id: string, until = 0): AwaitedEffect => ({
   id,
-  request: { id, kind: "timer", until: 0, deadline: null },
+  kind: EffectKind.Timer,
+  request: { id, kind: "timer", until, deadline: null },
   wait: {
     effectId: id,
     kind: WaitKind.Timer,
-    until: 0,
+    until,
     stream: null,
     retryOf: null,
     execution: null,
     position: null,
+    deadlines: [{ at: until, end: WaitEnd.Elapsed }],
   },
 });
 
 export const aCall = (id: string): AwaitedEffect => ({
   id,
+  kind: EffectKind.Call,
   request: { id, kind: "http", deadline: null },
   wait: null,
 });

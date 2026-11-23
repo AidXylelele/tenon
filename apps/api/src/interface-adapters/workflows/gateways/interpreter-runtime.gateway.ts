@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type {
   CloudEvent,
   Effect,
+  EffectOutcome,
   EffectResponse,
   HostEnd,
   StartContext,
@@ -10,7 +11,9 @@ import type {
   StepContext,
 } from "interpreter";
 import type { AcceptedEvent } from "../../../application/automation/events/interfaces.js";
+import { EffectResult } from "../../../application/automation/instances/enums.js";
 import type {
+  ChildRequest,
   InputProblem,
   Receipt,
 } from "../../../application/automation/instances/interfaces.js";
@@ -20,6 +23,7 @@ import { WorkflowQueries } from "../../../application/automation/workflows/queri
 import {
   TriggerKind,
   TurnStatus,
+  WaitEnd,
 } from "../../../domain/automation/instances/enums.js";
 import type {
   EffectAnswer,
@@ -31,12 +35,18 @@ import type {
 } from "../../../domain/automation/instances/interfaces.js";
 import type { Run } from "../../../domain/automation/instances/run.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
-import type { JsonValue } from "../../../domain/automation/interfaces.js";
+import type {
+  JsonObject,
+  JsonValue,
+} from "../../../domain/automation/interfaces.js";
 import type { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
+import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { WorkflowVersion } from "../../../domain/automation/workflows/workflow-version.js";
 import {
+  type ChildEffect,
   type ControlStep,
   InterpreterClient,
+  type JsonOf,
   type Played,
   type Program,
   type ProgramCall,
@@ -51,6 +61,17 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
   private static readonly ROOT_EXECUTION = "";
   private static readonly PLATFORM_FAILURE =
     "The platform could not run the instance";
+  private static readonly LATEST = "latest";
+  private static readonly OUTCOMES: Readonly<
+    Record<EffectResult | WaitEnd, EffectOutcome>
+  > = {
+    [EffectResult.Started]: { kind: "started" },
+    [EffectResult.Missing]: { kind: "missing" },
+    [EffectResult.Emitted]: { kind: "emitted" },
+    [WaitEnd.Expired]: { kind: "expired" },
+    [WaitEnd.Elapsed]: { kind: "elapsed" },
+    [WaitEnd.Closed]: { kind: "closed" },
+  };
 
   constructor(
     private readonly client: InterpreterClient,
@@ -239,6 +260,26 @@ export class InterpreterRuntimeGateway implements WorkflowRuntime {
       detail: InterpreterRuntimeGateway.PLATFORM_FAILURE,
     };
     return this.#endingOf(end);
+  }
+
+  childOf(request: JsonObject): ChildRequest {
+    const effect = request as JsonOf<ChildEffect>;
+    const name = new WorkflowName(effect.namespace, effect.name);
+    const latest = effect.version === InterpreterRuntimeGateway.LATEST;
+    const version = latest ? null : effect.version;
+    const trigger = effect.await ? TriggerKind.Parent : TriggerKind.Detached;
+    return { name, version, input: effect.input, trigger };
+  }
+
+  eventOf(request: JsonObject): JsonObject {
+    const effect = request as JsonOf<Extract<Effect, { kind: "emit" }>>;
+    return effect.event;
+  }
+
+  outcomeOf(result: EffectResult | WaitEnd): JsonObject {
+    const outcome: JsonOf<EffectOutcome> =
+      InterpreterRuntimeGateway.OUTCOMES[result];
+    return outcome;
   }
 
   async #stranded(instance: WorkflowInstance, now: Date): Promise<PlayedTurn> {

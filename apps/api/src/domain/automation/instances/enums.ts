@@ -47,9 +47,28 @@ export enum InstanceRefusal {
 }
 
 export enum InstanceEventKind {
+  Started = "instance.started",
+  EffectRequested = "instance.effect-requested",
+  TimerSet = "instance.timer-set",
   Ended = "instance.ended",
   ChildrenAbandoned = "instance.children-abandoned",
-  Deleted = "instance.deleted",
+}
+
+export enum EffectKind {
+  Call = "call",
+  Process = "process",
+  Detached = "detached",
+  Child = "child",
+  Emit = "emit",
+  Timer = "timer",
+  Listen = "listen",
+  Receive = "receive",
+}
+
+export enum WaitEnd {
+  Expired = "expired",
+  Elapsed = "elapsed",
+  Closed = "closed",
 }
 
 export enum WaitKind {

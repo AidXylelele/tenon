@@ -3,17 +3,14 @@ import { TransactionHost } from "@nestjs-cls/transactional";
 import {
   NonRetryableMessageError,
   OnOutboxMessage,
+  Outbox,
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
-import { type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
-
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import { OfferEvent } from "../../application/automation/instances/offer-event.js";
-import { InstanceRuns } from "../../application/automation/instances/ports.js";
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
-import { WakeParent } from "../../application/automation/instances/wake-parent.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
 import { SyncSchedule } from "../../application/automation/schedules/sync-schedule.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
@@ -22,6 +19,7 @@ import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
 import { WorkflowEventKind } from "../../domain/automation/workflows/enums.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { PermanentFault } from "../workflows/permanent-fault.error.js";
+import { ConsumerSpan } from "./consumer-span.js";
 import { MessageTopic } from "./enums.js";
 import type {
   AcceptedEventMessage,
@@ -33,21 +31,19 @@ import type {
 
 @Injectable()
 export class AutomationHandler {
-  readonly #tracer = trace.getTracer("tenon-api");
-
   constructor(
+    private readonly span: ConsumerSpan,
+    private readonly outbox: Outbox,
     private readonly txHost: TransactionHost<Transaction>,
     private readonly unitOfWork: UnitOfWork,
     private readonly dispatchEvent: DispatchEvent,
     private readonly offerEvent: OfferEvent,
     private readonly startOnEvent: StartOnEvent,
     private readonly matchSubscriptions: MatchSubscriptions,
-    private readonly wakeParent: WakeParent,
     private readonly cancelChildren: CancelChildren,
     private readonly cancelInstance: CancelInstance,
     private readonly continueSchedule: ContinueSchedule,
     private readonly syncSchedule: SyncSchedule,
-    private readonly runs: InstanceRuns,
   ) {}
 
   @OnOutboxMessage(MessageTopic.EventAccepted, { consumer: "dispatch" })
@@ -105,16 +101,6 @@ export class AutomationHandler {
     );
   }
 
-  @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "parents" })
-  woken(
-    message: InstanceMessage,
-    context: OutboxHandlerContext,
-  ): Promise<void> {
-    return this.#once(context, () =>
-      this.wakeParent.execute({ instanceId: message.instanceId }),
-    );
-  }
-
   @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "children" })
   ended(
     message: InstanceMessage,
@@ -160,14 +146,6 @@ export class AutomationHandler {
     );
   }
 
-  @OnOutboxMessage(InstanceEventKind.Deleted, { consumer: "engine" })
-  deleted(
-    message: InstanceMessage,
-    context: OutboxHandlerContext,
-  ): Promise<void> {
-    return this.#once(context, () => this.runs.forget(message.instanceId));
-  }
-
   @OnOutboxMessage(WorkflowEventKind.ScheduleChanged, { consumer: "schedules" })
   changed(
     message: WorkflowMessage,
@@ -178,49 +156,12 @@ export class AutomationHandler {
     );
   }
 
-  #once(
+  async #once(
     context: OutboxHandlerContext,
     work: () => Promise<void>,
   ): Promise<void> {
-    const topic = context.message.topic;
-    const name = `process ${topic}`;
-    const options = {
-      kind: SpanKind.CONSUMER,
-      attributes: {
-        "messaging.system": "outbox",
-        "messaging.operation.name": "process",
-        "messaging.operation.type": "process",
-        "messaging.destination.name": topic,
-      },
-    };
-    return this.#tracer.startActiveSpan(name, options, (span) =>
-      this.#traced(span, context, work),
-    );
-  }
-
-  async #traced(
-    span: Span,
-    context: OutboxHandlerContext,
-    work: () => Promise<void>,
-  ): Promise<void> {
-    try {
-      await this.#processed(context, work);
-    } catch (error) {
-      this.#failed(span, error);
-      throw error;
-    } finally {
-      span.end();
-    }
-  }
-
-  #failed(span: Span, error: unknown): void {
-    if (!(error instanceof Error)) {
-      span.setStatus({ code: SpanStatusCode.ERROR });
-      return;
-    }
-
-    span.recordException(error);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+    await this.span.around(context, () => this.#processed(context, work));
+    this.outbox.notify();
   }
 
   async #processed(

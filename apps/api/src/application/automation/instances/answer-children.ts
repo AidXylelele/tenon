@@ -1,10 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
-import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
-import type { AgendaResult, RunCommand } from "./interfaces.js";
-import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
+import type { RunCommand } from "./interfaces.js";
+import {
+  InstanceEvents,
+  WorkflowInstanceRepository,
+  WorkflowRuntime,
+} from "./ports.js";
 
 @Injectable()
 export class AnswerChildren {
@@ -12,26 +15,28 @@ export class AnswerChildren {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async execute(command: RunCommand): Promise<AgendaResult> {
+  async execute(command: RunCommand): Promise<void> {
     const parent = await this.instances.find(command.instanceId);
 
-    if (parent === null) return { ok: false, failure: Missing.Instance };
+    if (parent === null || parent.ended) return;
 
     const ended = await this.instances.findEndedChildren(parent);
+    const awaited = ended.filter((child) => parent.awaitsChild(child));
 
-    if (ended.length === 0) return { ok: true, value: parent.agenda };
+    if (awaited.length === 0) return;
 
     const declared = await this.secrets.findDeclared(parent.versionId);
     const secrets = RunSecrets.of(declared);
     const now = new Date();
 
-    for (const child of ended) {
-      const awaited = parent.awaitsChild(child);
+    for (const child of awaited) {
+      const answerable = parent.awaitsChild(child);
 
-      if (!awaited) continue;
+      if (!answerable) continue;
 
       const turn = await this.runtime.answerChild(
         parent,
@@ -43,7 +48,9 @@ export class AnswerChildren {
       parent.advance(turn, secrets, now);
     }
 
-    await this.unitOfWork.run(() => this.instances.save(parent));
-    return { ok: true, value: parent.agenda };
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(parent);
+      await this.events.dispatch(parent);
+    });
   }
 }

@@ -5,13 +5,16 @@ import type { NewInstance } from "../workflows/interfaces.js";
 import {
   CancelReason,
   Control,
+  EffectKind,
   InstanceEventKind,
   InstanceRefusal,
   Phase,
   TriggerKind,
   TurnStatus,
+  type WaitEnd,
 } from "./enums.js";
 import type {
+  AwaitedEffect,
   EventOffer,
   InstanceEvent,
   LifecycleEvent,
@@ -31,6 +34,14 @@ import { Run } from "./run.js";
 export class WorkflowInstance {
   static readonly #ENDED = [Phase.Completed, Phase.Faulted, Phase.Cancelled];
   static readonly #SUSPENDABLE = [Phase.Running, Phase.Waiting];
+  static readonly #OUTSIDE = [
+    EffectKind.Call,
+    EffectKind.Process,
+    EffectKind.Detached,
+    EffectKind.Child,
+    EffectKind.Emit,
+    EffectKind.Receive,
+  ];
 
   readonly #id: string;
   readonly #workflowId: string;
@@ -80,7 +91,7 @@ export class WorkflowInstance {
     workflowId: string,
     input: NewInstance,
   ): WorkflowInstance {
-    return new WorkflowInstance({
+    const instance = new WorkflowInstance({
       id,
       workflowId,
       versionId: input.version.id,
@@ -100,6 +111,8 @@ export class WorkflowInstance {
       test: WorkflowInstance.#testOf(input),
       version: 0,
     });
+    instance.#events.push({ kind: InstanceEventKind.Started, instanceId: id });
+    return instance;
   }
 
   get id(): string {
@@ -231,6 +244,9 @@ export class WorkflowInstance {
 
   clearEvents(): void {
     this.#events = [];
+  }
+
+  clearLifecycle(): void {
     this.#lifecycle = [];
     this.#taskValues = [];
   }
@@ -243,6 +259,24 @@ export class WorkflowInstance {
     if (this.ended || this.#run === null) return false;
 
     return this.#run.awaits(effectId);
+  }
+
+  kindOf(effectId: string): EffectKind | null {
+    if (this.ended || this.#run === null) return null;
+
+    return this.#run.effectOf(effectId)?.kind ?? null;
+  }
+
+  requestOf(effectId: string): JsonObject | null {
+    if (this.ended || this.#run === null) return null;
+
+    return this.#run.effectOf(effectId)?.request ?? null;
+  }
+
+  waitEndAt(effectId: string, at: number): WaitEnd | null {
+    if (this.ended || this.#run === null) return null;
+
+    return this.#run.waitEndAt(effectId, at);
   }
 
   mayTake(offer: EventOffer): boolean {
@@ -301,6 +335,7 @@ export class WorkflowInstance {
     this.#startedAt = now;
     this.#run = Run.begun(turn, secrets);
     this.#take(turn, secrets, this.#run, now);
+    this.#request(turn, this.#run);
   }
 
   advance(turn: PlayedTurn, secrets: RunSecrets, now: Date): void {
@@ -313,6 +348,7 @@ export class WorkflowInstance {
 
     this.#run = this.#run.after(turn, secrets);
     this.#take(turn, secrets, this.#run, now);
+    this.#request(turn, this.#run);
   }
 
   cancel(now: Date): void {
@@ -330,17 +366,7 @@ export class WorkflowInstance {
   }
 
   delete(): Result<void, InstanceRefusal> {
-    const admitted = this.admits(Control.Delete);
-
-    if (!admitted.ok) return admitted;
-
-    const told = this.#events.some(
-      (event) => event.kind === InstanceEventKind.Deleted,
-    );
-
-    if (!told) this.#raise(InstanceEventKind.Deleted);
-
-    return admitted;
+    return this.admits(Control.Delete);
   }
 
   #cancelStranded(ending: RunEnding, now: Date): void {
@@ -373,8 +399,7 @@ export class WorkflowInstance {
       this.#taskValues.push(masked);
     }
 
-    if (turn.abandoned.length > 0)
-      this.#raise(InstanceEventKind.ChildrenAbandoned);
+    if (turn.abandoned.length > 0) this.#abandonChildren();
 
     switch (turn.status) {
       case TurnStatus.Running:
@@ -399,6 +424,45 @@ export class WorkflowInstance {
     }
   }
 
+  #request(turn: RunTurn, run: Run): void {
+    if (this.ended) return;
+
+    for (const effect of turn.requested) {
+      const awaited = run.awaits(effect.id);
+
+      if (awaited) this.#ask(effect);
+    }
+  }
+
+  #ask(effect: AwaitedEffect): void {
+    const outside = WorkflowInstance.#OUTSIDE.includes(effect.kind);
+
+    if (outside)
+      this.#events.push({
+        kind: InstanceEventKind.EffectRequested,
+        instanceId: this.#id,
+        effectId: effect.id,
+      });
+
+    const deadlines = effect.wait?.deadlines ?? [];
+
+    for (const deadline of deadlines)
+      this.#events.push({
+        kind: InstanceEventKind.TimerSet,
+        instanceId: this.#id,
+        effectId: effect.id,
+        at: deadline.at,
+      });
+  }
+
+  #abandonChildren(): void {
+    this.#events.push({
+      kind: InstanceEventKind.ChildrenAbandoned,
+      instanceId: this.#id,
+      parentId: this.awaitedBy,
+    });
+  }
+
   #tell(ending: RunEnding): void {
     for (const event of ending.events) this.#lifecycle.push(event);
   }
@@ -406,7 +470,11 @@ export class WorkflowInstance {
   #end(phase: Phase, now: Date): void {
     this.#phase = phase;
     this.#endedAt = now;
-    this.#raise(InstanceEventKind.Ended);
+    this.#events.push({
+      kind: InstanceEventKind.Ended,
+      instanceId: this.#id,
+      parentId: this.awaitedBy,
+    });
   }
 
   static #refusalIn(phase: Phase, control: Control): InstanceRefusal | null {
@@ -457,10 +525,5 @@ export class WorkflowInstance {
     if (input.version.test) return true;
 
     return input.origin?.test === true;
-  }
-
-  #raise(kind: InstanceEventKind): void {
-    const event = { kind, instanceId: this.#id, parentId: this.awaitedBy };
-    this.#events.push(event);
   }
 }

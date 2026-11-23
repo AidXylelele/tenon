@@ -402,6 +402,7 @@ describe("PostgresInstanceQueries listing runs", () => {
           retryOf: null,
           execution: null,
           position: null,
+          deadlines: [],
         },
       ],
     });

@@ -3,4 +3,10 @@ export enum MessageTopic {
   EventOffered = "event.offered",
   TriggerOffered = "trigger.offered",
   CancelRequested = "instance.cancel-requested",
+  RunBegin = "run.begin",
+  RunRespond = "run.respond",
+  RunReceives = "run.receives",
+  RunFail = "run.fail",
+  RunEffect = "run.effect",
+  RunTimer = "run.timer",
 }

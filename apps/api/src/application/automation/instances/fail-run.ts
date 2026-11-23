@@ -1,13 +1,18 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import type { InstanceCommand } from "./interfaces.js";
-import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
+import {
+  InstanceEvents,
+  WorkflowInstanceRepository,
+  WorkflowRuntime,
+} from "./ports.js";
 
 @Injectable()
 export class FailRun {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -19,6 +24,9 @@ export class FailRun {
     const now = new Date();
     const ending = await this.runtime.faultedEnding(instance, now);
     instance.fail(ending, now);
-    await this.unitOfWork.run(() => this.instances.save(instance));
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.events.dispatch(instance);
+    });
   }
 }

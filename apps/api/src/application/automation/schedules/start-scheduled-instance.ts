@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import {
-  InstanceRuns,
+  InstanceEvents,
   WorkflowInstanceRepository,
 } from "../instances/ports.js";
 import { WorkflowRepository } from "../workflows/ports.js";
@@ -13,7 +13,7 @@ export class StartScheduledInstance {
   constructor(
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
-    private readonly runs: InstanceRuns,
+    private readonly instanceEvents: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -45,7 +45,7 @@ export class StartScheduledInstance {
     const instance = started.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.instanceEvents.dispatch(instance);
     });
   }
 }

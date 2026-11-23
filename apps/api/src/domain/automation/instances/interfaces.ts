@@ -1,12 +1,14 @@
 import type { JsonObject, JsonValue } from "../interfaces.js";
 import type {
   CancelReason,
+  EffectKind,
   InboundKind,
   InstanceEventKind,
   Phase,
   TaskValueKind,
   TriggerKind,
   TurnStatus,
+  WaitEnd,
   WaitKind,
 } from "./enums.js";
 import type { Run } from "./run.js";
@@ -32,10 +34,46 @@ export interface WorkflowInstanceProps {
   readonly version: number;
 }
 
-export interface InstanceEvent {
-  readonly kind: InstanceEventKind;
+export interface InstanceStarted {
+  readonly kind: InstanceEventKind.Started;
+  readonly instanceId: string;
+}
+
+export interface EffectRequested {
+  readonly kind: InstanceEventKind.EffectRequested;
+  readonly instanceId: string;
+  readonly effectId: string;
+}
+
+export interface TimerSet {
+  readonly kind: InstanceEventKind.TimerSet;
+  readonly instanceId: string;
+  readonly effectId: string;
+  readonly at: number;
+}
+
+export interface InstanceEnded {
+  readonly kind: InstanceEventKind.Ended;
   readonly instanceId: string;
   readonly parentId: string | null;
+}
+
+export interface ChildrenAbandoned {
+  readonly kind: InstanceEventKind.ChildrenAbandoned;
+  readonly instanceId: string;
+  readonly parentId: string | null;
+}
+
+export type InstanceEvent =
+  | InstanceStarted
+  | EffectRequested
+  | TimerSet
+  | InstanceEnded
+  | ChildrenAbandoned;
+
+export interface WaitDeadline {
+  readonly at: number;
+  readonly end: WaitEnd;
 }
 
 export interface RunWait {
@@ -46,10 +84,12 @@ export interface RunWait {
   readonly retryOf: string | null;
   readonly execution: string | null;
   readonly position: number | null;
+  readonly deadlines: readonly WaitDeadline[];
 }
 
 export interface AwaitedEffect {
   readonly id: string;
+  readonly kind: EffectKind;
   readonly request: JsonObject;
   readonly wait: RunWait | null;
 }
