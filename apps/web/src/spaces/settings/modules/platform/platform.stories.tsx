@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { PageBody } from "@/libs/ui/composites/page-body";
+import { SettingsHeader } from "../../__shared_context/settings-header";
 import { PlatformPage } from "./platform-page";
 import { PROFILE } from "./profile.test-support";
 
@@ -16,6 +17,7 @@ const meta = {
   decorators: [
     (Story) => (
       <PageBody>
+        <SettingsHeader administrator />
         <Story />
       </PageBody>
     ),

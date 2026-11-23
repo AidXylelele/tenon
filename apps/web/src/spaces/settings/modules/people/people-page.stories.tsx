@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { PageBody } from "@/libs/ui/composites/page-body";
+import { SettingsHeader } from "../../__shared_context/settings-header";
 import { PeoplePage } from "./people-page";
 
 const meta = {
@@ -17,6 +18,7 @@ const meta = {
     (Story) => (
       <TooltipProvider>
         <PageBody>
+          <SettingsHeader administrator />
           <Story />
         </PageBody>
       </TooltipProvider>
