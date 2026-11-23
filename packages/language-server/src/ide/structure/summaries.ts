@@ -23,7 +23,7 @@ export function summaryOf(task: ast.Task, document: JsonValue): string | null {
     case "fork":
       return forkSummaryOf(task);
     case "switch":
-      return countOf(task.switch.length, "case", "cases");
+      return countOf(task.switch.length, "branch", "branches");
     case "try":
     case "do":
       return null;

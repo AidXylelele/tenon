@@ -1,10 +1,10 @@
 import type { JsonValue } from "interpreter/front-end";
 import { isPathOf, pathSource } from "../conditions/index.js";
+import { isRuntimeExpression } from "../jq-text/index.js";
 import { valueAt } from "../pointers/index.js";
 import { type Snapshot, sourceOf } from "../snapshot/index.js";
 import type {
   DataPart,
-  TemplateForm,
   TemplateLookup,
   TemplatePart,
   TemplateReading,
@@ -20,21 +20,10 @@ const name = "[A-Za-z_][A-Za-z0-9_]*";
 
 const escaped = String.raw`(?:[^"\\\p{Cc}]|\\["\\/bfnrt]|\\u[0-9A-Fa-f]{4})`;
 
-const jqForm: TemplateForm = {
-  pieces: new RegExp(
-    String.raw`\\\(\s*(${pathSource})\s*\)|${escaped}+`,
-    "guy",
-  ),
-  isEscaped: true,
-};
-
-const textForm: TemplateForm = {
-  pieces: new RegExp(
-    String.raw`\$\{\s*(${pathSource})\s*\}|(?:(?!\$\{)[\s\S])+`,
-    "guy",
-  ),
-  isEscaped: false,
-};
+const jqPieces = new RegExp(
+  String.raw`\\\(\s*(${pathSource})\s*\)|${escaped}+`,
+  "guy",
+);
 
 const lastMember = new RegExp(
   String.raw`(?:^\$(${name})|\.(${name})|\["(${escaped}*)"\])$`,
@@ -88,13 +77,15 @@ export function templateOf(text: string): TemplateReading {
 }
 
 function partsOf(text: string): readonly TemplatePart[] | null {
-  const trimmed = text.trim();
-  const isExpression = trimmed.startsWith(opening) && trimmed.endsWith(closing);
-
-  if (!isExpression) {
-    return piecesOf(text, textForm);
+  if (text === "") {
+    return [];
   }
 
+  if (!isRuntimeExpression(text)) {
+    return [{ kind: "text", text }];
+  }
+
+  const trimmed = text.trim();
   const inner = trimmed.slice(opening.length, -closing.length);
   const source = inner.trim();
   const isPath = isPathOf(source);
@@ -111,14 +102,11 @@ function partsOf(text: string): readonly TemplatePart[] | null {
   }
 
   const body = source.slice(quote.length, -quote.length);
-  return piecesOf(body, jqForm);
+  return piecesOf(body);
 }
 
-function piecesOf(
-  text: string,
-  form: TemplateForm,
-): readonly TemplatePart[] | null {
-  const matches = [...text.matchAll(form.pieces)];
+function piecesOf(text: string): readonly TemplatePart[] | null {
+  const matches = [...text.matchAll(jqPieces)];
   const last = matches.at(-1);
   const end = last === undefined ? 0 : last.index + last[0].length;
 
@@ -126,17 +114,17 @@ function piecesOf(
     return null;
   }
 
-  return matches.map((match) => pieceOf(match, form));
+  return matches.map(pieceOf);
 }
 
-function pieceOf(match: RegExpExecArray, form: TemplateForm): TemplatePart {
+function pieceOf(match: RegExpExecArray): TemplatePart {
   const [written, path] = match;
 
   if (path !== undefined) {
     return dataPartOf(path);
   }
 
-  const text = form.isEscaped ? unescapedOf(written) : written;
+  const text = unescapedOf(written);
   return { kind: "text", text };
 }
 

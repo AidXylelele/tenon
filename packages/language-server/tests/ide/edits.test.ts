@@ -2504,3 +2504,18 @@ test("an authentication set on an address written as its text writes the address
   );
   expect(outcome).toMatchObject({ text: expected, ids: [] });
 });
+
+test("code of several lines is written as a block scalar", () => {
+  const text = `${inlineHeader}do:\n  - count:\n      run:\n        script:\n          language: js\n          code: "x"\n`;
+  const action: EditAction = {
+    kind: "setField",
+    pointer: "/do/0/count/run/script/code",
+    value: "const a = 1;\nconsole.log(a);\n",
+  };
+
+  const edited = editedOf(text, action);
+
+  expect(edited).toContain(
+    "          code: |\n            const a = 1;\n            console.log(a);\n",
+  );
+});

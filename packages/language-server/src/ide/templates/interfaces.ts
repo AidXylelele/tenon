@@ -21,8 +21,3 @@ export type TemplateLookup =
 export type TemplateText =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "refused"; readonly reason: string };
-
-export interface TemplateForm {
-  readonly pieces: RegExp;
-  readonly isEscaped: boolean;
-}

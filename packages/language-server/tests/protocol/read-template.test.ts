@@ -7,7 +7,8 @@ import { sessionWith, uri } from "../support/session.js";
 const digestFlow = `${inlineHeader}do:
   - greet:
       set:
-        message: 'New digest: \${ .title }'
+        message: '\${ "New digest: \\(.title)" }'
+        written: 'New digest: \${ .title }'
         count: 3
 `;
 
@@ -31,6 +32,22 @@ test("a field that mixes text and data is read as a template", async () => {
       { kind: "text", text: "New digest: " },
       { kind: "data", expression: ".title", label: "title" },
     ],
+  });
+});
+
+test("a reference written inside a text reads as that text", async () => {
+  useFakeClock();
+  const session = await sessionWith(digestFlow);
+  const params = paramsAt("/do/0/greet/set/written");
+
+  const answered = await session.client.sendRequest(
+    readTemplateRequest,
+    params,
+  );
+
+  expect(answered).toEqual({
+    kind: "template",
+    parts: [{ kind: "text", text: "New digest: ${ .title }" }],
   });
 });
 

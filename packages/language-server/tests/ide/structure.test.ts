@@ -114,7 +114,7 @@ test("a switch's cases flow before its own then", () => {
 
   const route = stepNamed(reading.workflow, "route");
   expect(route).toMatchObject({
-    summary: "2 cases",
+    summary: "2 branches",
     flow: [
       {
         on: "case",

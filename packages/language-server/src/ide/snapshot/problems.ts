@@ -1,20 +1,93 @@
-import { valueAt } from "../pointers/index.js";
-import type { AddressDiagnostic, Problem, Snapshot } from "./interfaces.js";
+import type { JsonValue } from "interpreter/front-end";
+import { holdsWrittenReference } from "../jq-text/index.js";
+import {
+  childPointerOf,
+  isJsonArray,
+  isJsonObject,
+  valueAt,
+} from "../pointers/index.js";
+import type {
+  AddressDiagnostic,
+  Problem,
+  Snapshot,
+  WrittenReferenceDiagnostic,
+} from "./interfaces.js";
 import { sourceOf } from "./reads.js";
 
 const namespacePointer = "/document/namespace";
 
 const namePointer = "/document/name";
 
+const codeFields: readonly string[] = [
+  "/run/script/code",
+  "/run/shell/command",
+];
+
+const writtenReference =
+  "This ${ … } is inside other text, so it is sent as written, not as data. Use Insert data to put data here.";
+
 export function problemsOf(snapshot: Snapshot): readonly Problem[] {
   const diagnostics = snapshot.analysis.diagnostics;
   const address = addressProblemOf(snapshot);
+  const written = writtenReferencesOf(snapshot);
+  const addressed = address === null ? [] : [address];
 
-  if (address === null) {
-    return diagnostics;
+  return [...diagnostics, ...addressed, ...written];
+}
+
+function writtenReferencesOf(
+  snapshot: Snapshot,
+): readonly WrittenReferenceDiagnostic[] {
+  const source = sourceOf(snapshot.analysis);
+
+  if (source === null) {
+    return [];
   }
 
-  return [...diagnostics, address];
+  const texts = textsIn(source.document, "");
+  const written = texts.filter(
+    ([pointer, text]) => holdsWrittenReference(text) && !isCodeField(pointer),
+  );
+
+  return written.map(([pointer, text]) => {
+    const range = source.positions?.rangeOf(pointer) ?? null;
+
+    return {
+      code: "written-reference",
+      message: writtenReference,
+      pointer,
+      range,
+      subject: text,
+      import: null,
+    };
+  });
+}
+
+function textsIn(
+  value: JsonValue,
+  pointer: string,
+): readonly (readonly [string, string])[] {
+  if (typeof value === "string") {
+    return [[pointer, value]];
+  }
+
+  if (isJsonArray(value)) {
+    return value.flatMap((item, index) =>
+      textsIn(item, childPointerOf(pointer, String(index))),
+    );
+  }
+
+  if (isJsonObject(value)) {
+    return Object.entries(value).flatMap(([key, item]) =>
+      textsIn(item, childPointerOf(pointer, key)),
+    );
+  }
+
+  return [];
+}
+
+function isCodeField(pointer: string): boolean {
+  return codeFields.some((field) => pointer.endsWith(field));
 }
 
 function addressProblemOf(snapshot: Snapshot): AddressDiagnostic | null {

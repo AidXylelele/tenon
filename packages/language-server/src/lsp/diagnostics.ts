@@ -9,7 +9,7 @@ export function lspDiagnosticOf(diagnostic: Problem): lsp.Diagnostic {
 
   return {
     range,
-    severity: DiagnosticSeverity.Error,
+    severity: severityOf(diagnostic),
     code: diagnostic.code,
     source: "workflow",
     message: diagnostic.message,
@@ -22,4 +22,12 @@ function placedRangeOf(range: Range | null): lsp.Range {
   }
 
   return lspRangeOf(range);
+}
+
+function severityOf(diagnostic: Problem): DiagnosticSeverity {
+  if (diagnostic.code === "written-reference") {
+    return DiagnosticSeverity.Warning;
+  }
+
+  return DiagnosticSeverity.Error;
 }

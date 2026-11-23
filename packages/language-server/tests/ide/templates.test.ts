@@ -62,7 +62,11 @@ function messageOf(message: string, input: JsonValue): JsonValue {
 test.each<readonly [string, string, readonly TemplatePart[]]>([
   ["an empty text", "", []],
   ["a text alone", "Hello", [{ kind: "text", text: "Hello" }]],
-  ["a reference written into a text", "New digest: ${ .title }", digest],
+  [
+    "a reference written into a text, which is sent as written",
+    "New digest: ${ .title }",
+    [{ kind: "text", text: "New digest: ${ .title }" }],
+  ],
   ["a jq string interpolation", '${ "New digest: \\(.title)" }', digest],
   ["a reference alone", "${ .title }", [title]],
   [
@@ -76,11 +80,16 @@ test.each<readonly [string, string, readonly TemplatePart[]]>([
   ],
   [
     "a reference to a step through the context",
-    "Items: ${ $context.fetch.items }",
+    '${ "Items: \\($context.fetch.items)" }',
     [
       { kind: "text", text: "Items: " },
       { kind: "data", expression: "$context.fetch.items", label: "items" },
     ],
+  ],
+  [
+    "an embedded expression that is no path, sent as written",
+    "Price: ${ 5 }",
+    [{ kind: "text", text: "Price: ${ 5 }" }],
   ],
   [
     "escapes in a jq string",
@@ -97,7 +106,6 @@ test.each([
   ["a computation", "${ .count + 1 }"],
   ["a computation in an interpolation", '${ "Total: \\(.a + .b)" }'],
   ["a join of strings", '${ "a" + .b }'],
-  ["an embedded expression that is no path", "Price: ${ 5 }"],
   ["two expressions in one text", "${ .a } and ${ .b }"],
 ])("%s is read as an expression", (_, text) => {
   const read = templateOf(text);
