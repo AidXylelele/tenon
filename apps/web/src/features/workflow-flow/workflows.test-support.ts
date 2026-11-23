@@ -14,19 +14,47 @@ type Kind = Step["kind"];
 type Part = NestedList["part"];
 
 export function next(to: string | null): Transition {
-  return { on: "done", case: null, when: null, kind: "next", to };
+  return {
+    condition: null,
+    on: "done",
+    case: null,
+    when: null,
+    kind: "next",
+    to,
+  };
 }
 
 export function goTo(to: string | null): Transition {
-  return { on: "done", case: null, when: null, kind: "jump", to };
+  return {
+    condition: null,
+    on: "done",
+    case: null,
+    when: null,
+    kind: "jump",
+    to,
+  };
 }
 
 export function ends(): Transition {
-  return { on: "done", case: null, when: null, kind: "end", to: null };
+  return {
+    condition: null,
+    on: "done",
+    case: null,
+    when: null,
+    kind: "end",
+    to: null,
+  };
 }
 
 export function leaves(): Transition {
-  return { on: "done", case: null, when: null, kind: "exit", to: null };
+  return {
+    condition: null,
+    on: "done",
+    case: null,
+    when: null,
+    kind: "exit",
+    to: null,
+  };
 }
 
 export function whenCase(
@@ -52,6 +80,8 @@ export function stepAt(
   const family = stepFamilies[kind];
 
   return {
+    variant: null,
+    catch: null,
     id,
     pointer: id,
     name,

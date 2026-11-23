@@ -5,6 +5,8 @@ import { progressOf, recordsOf } from "./progress";
 
 function stepOf(id: string, pointer: string, lists: Step["lists"] = []): Step {
   return {
+    variant: null,
+    catch: null,
     id,
     pointer,
     name: id.split("/").at(-1) ?? id,
