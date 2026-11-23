@@ -15,7 +15,6 @@ import { BeginRun } from "../../application/automation/instances/begin-run.js";
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
 import { EmitForEffect } from "../../application/automation/instances/emit-for-effect.js";
 import { FailRun } from "../../application/automation/instances/fail-run.js";
-import { FindEffectKind } from "../../application/automation/instances/find-effect-kind.js";
 import { GiveUpEffect } from "../../application/automation/instances/give-up-effect.js";
 import { OfferEvent } from "../../application/automation/instances/offer-event.js";
 import { PerformEffect } from "../../application/automation/instances/perform-effect.js";
@@ -78,7 +77,7 @@ import { ProtoSchema } from "../../interface-adapters/workflows/effects/proto-sc
 import { RedisGateway } from "../../interface-adapters/workflows/effects/redis.gateway.js";
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
-import { RunController } from "../../interface-adapters/workflows/run.controller.js";
+import { ReceiverController } from "../../interface-adapters/workflows/receiver.controller.js";
 import { AmqpConnection } from "../amqp/amqp.connection.js";
 import { parserOptions } from "../asyncapi/parser.options.js";
 import { GrpcConnection } from "../grpc/grpc.connection.js";
@@ -116,7 +115,6 @@ import { OutboundModule } from "./outbound.module.js";
     FailRun,
     AnswerReceives,
     AnswerChildren,
-    FindEffectKind,
     PerformEffect,
     StartDetachedProcess,
     StartChildForEffect,
@@ -136,7 +134,7 @@ import { OutboundModule } from "./outbound.module.js";
     MatchSubscriptions,
     DeliverEvent,
     FailDelivery,
-    RunController,
+    ReceiverController,
     DeliveryMessagesGateway,
     { provide: Deliveries, useExisting: DeliveryMessagesGateway },
     InterpreterRoutingGateway,

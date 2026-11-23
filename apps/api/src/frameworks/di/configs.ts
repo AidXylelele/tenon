@@ -1,13 +1,13 @@
 import { registerAs } from "@nestjs/config";
 import {
   databaseEnvSchema,
-  engineEnvSchema,
   httpEnvSchema,
   interpreterEnvSchema,
   linksEnvSchema,
   loggingEnvSchema,
   mailEnvSchema,
   outboundEnvSchema,
+  outboxEnvSchema,
   sandboxEnvSchema,
   secretsEnvSchema,
 } from "./env.schema.js";
@@ -36,8 +36,8 @@ export const outboundConfig = registerAs("outbound", () =>
   outboundEnvSchema.parse(process.env),
 );
 
-export const engineConfig = registerAs("engine", () =>
-  engineEnvSchema.parse(process.env),
+export const outboxConfig = registerAs("outbox", () =>
+  outboxEnvSchema.parse(process.env),
 );
 
 export const interpreterConfig = registerAs("interpreter", () =>

@@ -1,4 +1,3 @@
-import { sql } from "drizzle-orm";
 import request from "supertest";
 import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
 import { Role } from "../../../src/domain/identity/users/enums.js";
@@ -45,7 +44,6 @@ describe("the starts a schedule is expected to make", () => {
   beforeEach(async () => {
     run.clock.set(Date.UTC(2026, 0, 1));
     await resetRuns(t);
-    await t.db.execute(sql`truncate table nest_workflows.schedules cascade`);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     await createUser(t, { email: "viewer@example.com", role: Role.Viewer });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));

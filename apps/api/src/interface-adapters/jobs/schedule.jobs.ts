@@ -5,14 +5,12 @@ import { ArmSchedules } from "../../application/automation/schedules/arm-schedul
 
 @Injectable()
 export class ScheduleJobs {
-  private static readonly ARM = "schedules:arm";
-
   private readonly logger = new Logger(ScheduleJobs.name);
 
   constructor(private readonly armSchedules: ArmSchedules) {}
 
   @Timeout(0)
-  @OnOneInstance({ key: ScheduleJobs.ARM })
+  @OnOneInstance({ key: "schedules:arm" })
   async armUnarmed(): Promise<void> {
     await this.armSchedules.execute();
     this.logger.log("Armed the schedules nothing armed");

@@ -133,3 +133,8 @@ export interface ThreadPool {
   readonly policy: ResiliencePolicy;
   readonly bulkhead: BulkheadPolicy;
 }
+
+export interface InterpreterThreads {
+  readonly runs: number;
+  readonly checks: number;
+}

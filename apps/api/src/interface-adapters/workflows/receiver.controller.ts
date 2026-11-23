@@ -15,7 +15,7 @@ import type { JsonOf, Receiver } from "./interfaces.js";
 import { ProtocolMapper } from "./mappers/protocol.mapper.js";
 
 @Injectable()
-export class RunController {
+export class ReceiverController {
   constructor(
     private readonly receiveInbound: ReceiveInbound,
     private readonly receivers: ReceiverQueries,

@@ -12,7 +12,7 @@ import {
 } from "testcontainers";
 import { Role } from "../../../src/domain/identity/users/enums.js";
 import { AsyncApiHandler } from "../../../src/interface-adapters/messaging/asyncapi.handler.js";
-import { RunController } from "../../../src/interface-adapters/workflows/run.controller.js";
+import { ReceiverController } from "../../../src/interface-adapters/workflows/receiver.controller.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import type { TestApp } from "../../support/create-test-app.js";
@@ -239,7 +239,7 @@ describe("a run that publishes and receives on a server its AsyncAPI document na
     const late = { payload: { order: 2 }, headers: {}, correlationId: null };
 
     await t.app
-      .get(RunController)
+      .get(ReceiverController)
       .receive(started.id, "/do/0/collect", late, 0)
       .catch(() => undefined);
     await drain(t);

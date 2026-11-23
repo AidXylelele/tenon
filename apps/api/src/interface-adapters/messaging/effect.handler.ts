@@ -6,9 +6,11 @@ import {
 } from "@nestjs/outbox";
 import { AnswerTimer } from "../../application/automation/instances/answer-timer.js";
 import { EmitForEffect } from "../../application/automation/instances/emit-for-effect.js";
-import { FindEffectKind } from "../../application/automation/instances/find-effect-kind.js";
 import { GiveUpEffect } from "../../application/automation/instances/give-up-effect.js";
-import type { EffectCommand } from "../../application/automation/instances/interfaces.js";
+import type {
+  EffectCommand,
+  EffectReference,
+} from "../../application/automation/instances/interfaces.js";
 import { PerformEffect } from "../../application/automation/instances/perform-effect.js";
 import { ReceiveForEffect } from "../../application/automation/instances/receive-for-effect.js";
 import { StartChildForEffect } from "../../application/automation/instances/start-child-for-effect.js";
@@ -25,7 +27,6 @@ export class EffectHandler {
   constructor(
     private readonly span: ConsumerSpan,
     private readonly outbox: Outbox,
-    private readonly findEffectKind: FindEffectKind,
     private readonly performEffect: PerformEffect,
     private readonly startDetachedProcess: StartDetachedProcess,
     private readonly startChildForEffect: StartChildForEffect,
@@ -45,7 +46,9 @@ export class EffectHandler {
       effectId: message.effectId,
       signal: context.signal,
     };
-    return this.#reacted(context, message, () => this.#routed(command));
+    return this.#reacted(context, message, () =>
+      this.#routed(message.effect, command),
+    );
   }
 
   @OnOutboxMessage(MessageTopic.RunTimer, { consumer: "timers" })
@@ -55,10 +58,8 @@ export class EffectHandler {
     );
   }
 
-  async #routed(command: EffectCommand): Promise<void> {
-    const kind = await this.findEffectKind.execute(command);
-
-    switch (kind) {
+  #routed(effect: EffectKind, command: EffectCommand): Promise<void> {
+    switch (effect) {
       case EffectKind.Call:
       case EffectKind.Process:
         return this.performEffect.execute(command);
@@ -72,14 +73,13 @@ export class EffectHandler {
         return this.receiveForEffect.execute(command);
       case EffectKind.Timer:
       case EffectKind.Listen:
-      case null:
-        return;
+        return Promise.resolve();
     }
   }
 
   async #reacted(
     context: OutboxHandlerContext,
-    message: EffectMessage,
+    message: EffectReference,
     work: () => Promise<void>,
   ): Promise<void> {
     try {

@@ -51,6 +51,7 @@ import type {
 } from "../../interface-adapters/workflows/interfaces.js";
 import type {
   CompileSource,
+  InterpreterThreads,
   KeptStructure,
   PoolName,
   TaskCall,
@@ -74,8 +75,6 @@ export class PiscinaInterpreterClient
     OnModuleInit,
     OnApplicationShutdown
 {
-  static readonly RUN_THREADS = 10;
-  static readonly CHECK_THREADS = 2;
   private static readonly MOST_KEPT_STRUCTURES = 1_000;
   private static readonly NOT_STARTED =
     "The interpreter has not started its threads";
@@ -92,6 +91,7 @@ export class PiscinaInterpreterClient
   constructor(
     private readonly resilience: ResilienceService,
     private readonly options: InterpreterOptions,
+    private readonly threads: InterpreterThreads,
   ) {
     this.descriptor = this.#descriptorOf();
   }
@@ -99,13 +99,13 @@ export class PiscinaInterpreterClient
   async onModuleInit(): Promise<void> {
     const runs: ThreadPool = {
       name: "runs",
-      threads: this.#threadsOf(PiscinaInterpreterClient.RUN_THREADS),
+      threads: this.#threadsOf(this.threads.runs),
       policy: this.resilience.preset("interpreter"),
       bulkhead: this.resilience.bulkhead("interpreter"),
     };
     const checks: ThreadPool = {
       name: "checks",
-      threads: this.#threadsOf(PiscinaInterpreterClient.CHECK_THREADS),
+      threads: this.#threadsOf(this.threads.checks),
       policy: this.resilience.preset("interpreter-checks"),
       bulkhead: this.resilience.bulkhead("interpreter-checks"),
     };

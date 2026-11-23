@@ -442,6 +442,7 @@ export class WorkflowInstance {
         kind: InstanceEventKind.EffectRequested,
         instanceId: this.#id,
         effectId: effect.id,
+        effect: effect.kind,
       });
 
     const deadlines = effect.wait?.deadlines ?? [];

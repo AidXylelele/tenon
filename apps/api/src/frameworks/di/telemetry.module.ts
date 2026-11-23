@@ -4,14 +4,12 @@ import { sdk } from "../instrumentation.js";
 import { LockMetrics } from "../opentelemetry/lock.metrics.js";
 import { OpenTelemetryShutdown } from "../opentelemetry/opentelemetry.shutdown.js";
 import { OutboxMetrics } from "../opentelemetry/outbox.metrics.js";
-import { WorkflowMetrics } from "../opentelemetry/workflow.metrics.js";
 
 @Global()
 @Module({
   providers: [
     { provide: NodeSDK, useValue: sdk },
     OpenTelemetryShutdown,
-    WorkflowMetrics,
     OutboxMetrics,
     LockMetrics,
   ],

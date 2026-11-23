@@ -1,12 +1,14 @@
 import type { ResiliencePreset } from "@nestjs/resilience";
-import type { WorkflowRetryOptions } from "@nestjs/workflows";
+import type { OutboxMessage, OutboxRetryOptions } from "@nestjs/outbox";
 import {
   HostLimits,
   ProcessPlatform,
 } from "../../application/automation/host/queries.js";
 import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
 import shellPlatform from "../go-judge/shell-platform.json" with { type: "json" };
-import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
+import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.handler.js";
+import { MessageTopic } from "../../interface-adapters/messaging/enums.js";
+import type { InterpreterThreads } from "../interpreter/interfaces.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
 
 const CALL_SECONDS = 30;
@@ -17,8 +19,9 @@ const PROCESS_TIMEOUT = PROCESS_SECONDS * MILLISECONDS;
 const INTERPRETER_WORK = 5 * MILLISECONDS;
 const INTERPRETER_QUEUE_TIMEOUT = 2 * MILLISECONDS;
 const INTERPRETER_TIMEOUT = INTERPRETER_WORK + INTERPRETER_QUEUE_TIMEOUT;
-const RUN_THREADS = PiscinaInterpreterClient.RUN_THREADS;
-const CHECK_THREADS = PiscinaInterpreterClient.CHECK_THREADS;
+const RUN_BACKOFF_CAP = 60 * MILLISECONDS;
+const DELIVERY_BACKOFF_CAP = 60 * 60 * MILLISECONDS;
+const DELIVERY_TOPIC: string = MessageTopic.DeliveryRequested;
 const RESPONSE_BYTES = 1024 * 1024;
 const SANDBOX_TIME = Temporal.Duration.from({ seconds: 30 });
 const SANDBOX_MEMORY_BYTES = 256 * 1024 * 1024;
@@ -41,9 +44,21 @@ export const sandboxLimits = new SandboxLimits({
   outputBytes: SANDBOX_OUTPUT_BYTES,
 });
 
-export const workflowRetry: WorkflowRetryOptions = {
-  attempts: 10,
-  backoff: { delay: "1s", maxDelay: "1m", jitter: "equal" },
+function backoffCapOf(message: OutboxMessage): number {
+  if (message.topic === DELIVERY_TOPIC) return DELIVERY_BACKOFF_CAP;
+
+  return RUN_BACKOFF_CAP;
+}
+
+export const relayRetry: OutboxRetryOptions = {
+  attempts: DeliveryHandler.ATTEMPTS,
+  backoff: (attempt, _error, message) => {
+    const cap = backoffCapOf(message);
+    const doubled = MILLISECONDS * 2 ** (attempt - 1);
+    const delay = Math.min(cap, doubled);
+    const jitter = Math.random() * (delay / 2);
+    return delay / 2 + jitter;
+  },
 };
 
 export const resiliencePresets: Readonly<Record<string, ResiliencePreset>> = {
@@ -76,20 +91,25 @@ export const resiliencePresets: Readonly<Record<string, ResiliencePreset>> = {
     },
     bulkhead: { maxConcurrent: 8, maxQueue: 0 },
   },
+};
+
+export const interpreterPresetsOf = (
+  threads: InterpreterThreads,
+): Readonly<Record<string, ResiliencePreset>> => ({
   interpreter: {
     timeout: INTERPRETER_TIMEOUT,
     bulkhead: {
-      maxConcurrent: RUN_THREADS,
-      maxQueue: RUN_THREADS ** 2,
+      maxConcurrent: threads.runs,
+      maxQueue: threads.runs ** 2,
       queueTimeout: INTERPRETER_QUEUE_TIMEOUT,
     },
   },
   "interpreter-checks": {
     timeout: INTERPRETER_TIMEOUT,
     bulkhead: {
-      maxConcurrent: CHECK_THREADS,
-      maxQueue: CHECK_THREADS ** 2,
+      maxConcurrent: threads.checks,
+      maxQueue: threads.checks ** 2,
       queueTimeout: INTERPRETER_QUEUE_TIMEOUT,
     },
   },
-};
+});

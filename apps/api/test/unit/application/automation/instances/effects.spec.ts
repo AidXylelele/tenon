@@ -3,7 +3,6 @@ import type { EventStore } from "../../../../../src/application/automation/event
 import { AnswerTimer } from "../../../../../src/application/automation/instances/answer-timer.js";
 import { EmitForEffect } from "../../../../../src/application/automation/instances/emit-for-effect.js";
 import type { EffectResult } from "../../../../../src/application/automation/instances/enums.js";
-import { FindEffectKind } from "../../../../../src/application/automation/instances/find-effect-kind.js";
 import { GiveUpEffect } from "../../../../../src/application/automation/instances/give-up-effect.js";
 import type {
   ChildRequest,
@@ -175,7 +174,6 @@ async function setUp(
     runs,
     performer,
     accepted,
-    kind: new FindEffectKind(instances),
     perform: new PerformEffect(instances, secrets, performer, runs, unitOfWork),
     detach: new StartDetachedProcess(
       instances,
@@ -210,20 +208,6 @@ async function setUp(
 function commandOf(effectId: string) {
   return { instanceId: "parent-1", effectId, signal };
 }
-
-describe("the kind of an effect a run awaits", () => {
-  it("is_read_from_the_instance_and_is_none_once_no_longer_awaited", async () => {
-    const fixture = await setUp([anEffect("/do/0/fetch", EffectKind.Call)]);
-    const awaited = commandOf("/do/0/fetch");
-    const gone = commandOf("/do/9/gone");
-
-    const kind = await fixture.kind.execute(awaited);
-    const none = await fixture.kind.execute(gone);
-
-    expect(kind).toBe(EffectKind.Call);
-    expect(none).toBeNull();
-  });
-});
 
 describe("an effect the world performs", () => {
   it("is_performed_under_a_key_stable_across_redeliveries_and_answered_with_its_outcome", async () => {

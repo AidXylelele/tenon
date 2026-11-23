@@ -1,6 +1,7 @@
 import type { TransactionHost } from "@nestjs-cls/transactional";
 import type { NewOutboxMessage, Outbox } from "@nestjs/outbox";
 import {
+  EffectKind,
   InstanceEventKind,
   Phase,
   TaskValueKind,
@@ -72,7 +73,11 @@ describe("the outbox messages of an instance's events", () => {
       {
         topic: MessageTopic.RunEffect,
         key: "instance-1//do/0/fetch",
-        payload: { instanceId: "instance-1", effectId: "/do/0/fetch" },
+        payload: {
+          instanceId: "instance-1",
+          effectId: "/do/0/fetch",
+          effect: EffectKind.Call,
+        },
       },
       {
         topic: MessageTopic.RunTimer,

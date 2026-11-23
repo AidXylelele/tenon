@@ -5,7 +5,10 @@ import type {
   InstanceEvents,
   InstanceRuns,
 } from "../../application/automation/instances/ports.js";
-import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
+import {
+  type EffectKind,
+  InstanceEventKind,
+} from "../../domain/automation/instances/enums.js";
 import type {
   EffectAnswer,
   InstanceEvent,
@@ -68,7 +71,7 @@ export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
       case InstanceEventKind.Started:
         return this.#commandOf(MessageTopic.RunBegin, event.instanceId);
       case InstanceEventKind.EffectRequested:
-        return this.#effectOf(event.instanceId, event.effectId);
+        return this.#effectOf(event.instanceId, event.effectId, event.effect);
       case InstanceEventKind.TimerSet:
         return this.#timerOf(event.instanceId, event.effectId, event.at);
       case InstanceEventKind.Ended:
@@ -82,8 +85,12 @@ export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
     return { topic, key: instanceId, payload };
   }
 
-  #effectOf(instanceId: string, effectId: string): NewOutboxMessage {
-    const payload: EffectMessage = { instanceId, effectId };
+  #effectOf(
+    instanceId: string,
+    effectId: string,
+    effect: EffectKind,
+  ): NewOutboxMessage {
+    const payload: EffectMessage = { instanceId, effectId, effect };
     const key = `${instanceId}/${effectId}`;
     return { topic: MessageTopic.RunEffect, key, payload };
   }

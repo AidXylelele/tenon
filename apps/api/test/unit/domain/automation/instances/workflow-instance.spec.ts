@@ -96,6 +96,7 @@ describe("what a run asks of the world", () => {
         kind: InstanceEventKind.EffectRequested,
         instanceId: instance.id,
         effectId: "/do/0/fetch",
+        effect: EffectKind.Call,
       },
       {
         kind: InstanceEventKind.TimerSet,
@@ -107,6 +108,7 @@ describe("what a run asks of the world", () => {
         kind: InstanceEventKind.EffectRequested,
         instanceId: instance.id,
         effectId: "/do/2/orders@message[0]",
+        effect: EffectKind.Receive,
       },
       {
         kind: InstanceEventKind.TimerSet,

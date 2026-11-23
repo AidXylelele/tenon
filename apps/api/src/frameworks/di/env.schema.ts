@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { z } from "zod";
 
 const TRAILING_LINE_BREAKS = /[\r\n]+$/;
@@ -118,12 +119,19 @@ export const outboundEnvSchema = z.object({
   OUTBOUND_ALLOW_LIST: allowedPrivateAddresses,
 });
 
-export const engineEnvSchema = z.object({
-  ENGINE_LEASE_SECONDS: z.coerce.number().int().positive().default(30),
+export const outboxEnvSchema = z.object({
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(100),
+  OUTBOX_CONCURRENCY: z.coerce.number().int().positive().default(32),
 });
 
 export const interpreterEnvSchema = z.object({
   LEGACY_EVENT_TYPES: z.stringbool().default(false),
+  INTERPRETER_RUN_THREADS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(availableParallelism()),
+  INTERPRETER_CHECK_THREADS: z.coerce.number().int().positive().default(1),
 });
 
 export const sandboxEnvSchema = z.preprocess(

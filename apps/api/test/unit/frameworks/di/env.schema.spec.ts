@@ -1,12 +1,13 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { availableParallelism } from "node:os";
 import { join } from "node:path";
 import {
   databaseEnvSchema,
-  engineEnvSchema,
   interpreterEnvSchema,
   mailEnvSchema,
   migrationEnvSchema,
+  outboxEnvSchema,
 } from "../../../../src/frameworks/di/env.schema.js";
 
 const mail: Readonly<Record<string, string>> = {
@@ -152,22 +153,36 @@ describe("the database pool's environment", () => {
   });
 });
 
-describe("the engine's environment", () => {
-  it("a_run_holds_its_lease_for_thirty_seconds_by_default", () => {
-    const parsed = engineEnvSchema.parse({});
+describe("the outbox relay's environment", () => {
+  it("polls_every_hundred_milliseconds_with_thirty_two_keys_at_once_by_default", () => {
+    const parsed = outboxEnvSchema.parse({});
 
-    expect(parsed.ENGINE_LEASE_SECONDS).toBe(30);
+    expect(parsed.OUTBOX_POLL_INTERVAL_MS).toBe(100);
+    expect(parsed.OUTBOX_CONCURRENCY).toBe(32);
   });
 
-  it("a_run_holds_its_lease_as_long_as_set", () => {
-    const parsed = engineEnvSchema.parse({ ENGINE_LEASE_SECONDS: "120" });
+  it("a_concurrency_that_is_no_positive_number_is_refused", () => {
+    const parsed = outboxEnvSchema.safeParse({ OUTBOX_CONCURRENCY: "0" });
 
-    expect(parsed.ENGINE_LEASE_SECONDS).toBe(120);
+    expect(parsed.error?.issues[0]?.path).toEqual(["OUTBOX_CONCURRENCY"]);
+  });
+});
+
+describe("the interpreter's thread pools", () => {
+  it("run_on_every_core_and_check_on_one_thread_by_default", () => {
+    const parsed = interpreterEnvSchema.parse({});
+
+    expect(parsed.INTERPRETER_RUN_THREADS).toBe(availableParallelism());
+    expect(parsed.INTERPRETER_CHECK_THREADS).toBe(1);
   });
 
-  it("a_lease_that_is_no_positive_number_of_seconds_is_refused", () => {
-    const parsed = engineEnvSchema.safeParse({ ENGINE_LEASE_SECONDS: "0" });
+  it("take_the_sizes_they_are_given", () => {
+    const parsed = interpreterEnvSchema.parse({
+      INTERPRETER_RUN_THREADS: "4",
+      INTERPRETER_CHECK_THREADS: "2",
+    });
 
-    expect(parsed.error?.issues[0]?.path).toEqual(["ENGINE_LEASE_SECONDS"]);
+    expect(parsed.INTERPRETER_RUN_THREADS).toBe(4);
+    expect(parsed.INTERPRETER_CHECK_THREADS).toBe(2);
   });
 });

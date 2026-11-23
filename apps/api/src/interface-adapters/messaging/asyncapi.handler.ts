@@ -5,7 +5,7 @@ import { type Duration, type Lock, Locks } from "@nestjs/locks";
 import { Interval } from "@nestjs/schedule";
 import type { AsyncApiInboundMessage, Failure } from "interpreter";
 import type { Receiver } from "../workflows/interfaces.js";
-import { RunController } from "../workflows/run.controller.js";
+import { ReceiverController } from "../workflows/receiver.controller.js";
 import {
   type AsyncApiInbox,
   type Consumer,
@@ -28,7 +28,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
   #closing = false;
 
   constructor(
-    private readonly runs: RunController,
+    private readonly runs: ReceiverController,
     private readonly client: SubscriptionClient,
     private readonly locks: Locks,
   ) {}

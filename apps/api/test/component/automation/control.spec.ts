@@ -318,7 +318,7 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
       expect(namesOf(tasks)).toEqual(["before", "pause"]);
     });
 
-    it("a_cancel_the_engine_has_not_heard_of_yet_stops_the_run_before_its_next_call", async () => {
+    it("a_cancel_before_the_timer_fires_stops_the_run_before_its_next_call", async () => {
       const id = await waitingCallerInstance();
 
       await control(id, "cancel").expect(204);

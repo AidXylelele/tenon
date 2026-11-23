@@ -48,7 +48,6 @@ describe("starting workflows on a schedule and on events", () => {
 
   beforeEach(async () => {
     await resetRuns(t);
-    await t.db.execute(sql`truncate table nest_workflows.schedules cascade`);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));
   });
@@ -287,7 +286,7 @@ describe("starting workflows on a schedule and on events", () => {
     expect(await instances()).toHaveLength(2);
   });
 
-  it("a_cron_the_engine_cannot_run_is_refused_at_publish", async () => {
+  it("a_cron_that_never_matches_is_refused_at_publish", async () => {
     const response = await publishing(
       t,
       editor,

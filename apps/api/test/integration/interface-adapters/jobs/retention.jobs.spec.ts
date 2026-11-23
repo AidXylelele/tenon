@@ -52,7 +52,7 @@ describe("the retention jobs, on two instances over one lock store", () => {
   beforeEach(async () => {
     skips.length = 0;
     await truncateAll(db);
-    await db.execute(sql`truncate table nest_workflows.instances cascade`);
+    await db.execute(sql`truncate table nest_outbox.dead_letters`);
   });
 
   const tick = async (job: (jobs: RetentionJobs) => Promise<void>) => {
@@ -68,26 +68,26 @@ describe("the retention jobs, on two instances over one lock store", () => {
     return rows.map((row) => row.id).sort((a, b) => a.localeCompare(b));
   };
 
-  it("the_nightly_purge_deletes_the_instances_finished_over_30_days_ago_and_keeps_the_rest_on_one_instance", async () => {
-    const old = Date.now() - 31 * DAY_MS;
+  it("the_nightly_purge_deletes_the_dead_letters_failed_over_14_days_ago_and_keeps_the_rest_on_one_instance", async () => {
+    const old = Date.now() - 15 * DAY_MS;
     const recent = Date.now() - DAY_MS;
     await db.execute(sql`
-      insert into nest_workflows.instances (id, workflow, version, status, signal_cursor, created_at, updated_at)
+      insert into nest_outbox.dead_letters (id, seq, topic, payload, headers, key, created_at, attempts, last_error, history, reason, failed_at)
       values
-        ('completed-long-ago', 'run', 1, 'completed', 0, ${old}, ${old}),
-        ('failed-long-ago', 'run', 1, 'failed', 0, ${old}, ${old}),
-        ('completed-yesterday', 'run', 1, 'completed', 0, ${recent}, ${recent}),
-        ('waiting-for-a-person', 'run', 1, 'compensation_failed', 0, ${old}, ${old})
+        ('failed-long-ago', 1, 'delivery.requested', '{}', '{}', null, ${old}, 36, 'refused', '[]', 'exhausted', ${old}),
+        ('failed-yesterday', 2, 'delivery.requested', '{}', '{}', null, ${recent}, 36, 'refused', '[]', 'exhausted', ${recent})
     `);
 
-    await tick((jobs) => jobs.purgeWorkflows());
+    await tick((jobs) => jobs.purgeDeadLetters());
 
-    expect(await ids(sql`select id from nest_workflows.instances`)).toEqual([
-      "completed-yesterday",
-      "waiting-for-a-person",
+    expect(await ids(sql`select id from nest_outbox.dead_letters`)).toEqual([
+      "failed-yesterday",
     ]);
     expect(skipped()).toEqual([
-      { job: "RetentionJobs.purgeWorkflows", reason: "ownership-unavailable" },
+      {
+        job: "RetentionJobs.purgeDeadLetters",
+        reason: "ownership-unavailable",
+      },
     ]);
   });
 

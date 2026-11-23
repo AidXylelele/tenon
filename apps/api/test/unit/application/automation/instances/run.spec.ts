@@ -309,6 +309,7 @@ describe("a run begun from its start", () => {
         kind: InstanceEventKind.EffectRequested,
         instanceId: pending.id,
         effectId: "/do/0/fetch",
+        effect: EffectKind.Call,
       },
       {
         kind: InstanceEventKind.TimerSet,
@@ -320,6 +321,7 @@ describe("a run begun from its start", () => {
         kind: InstanceEventKind.EffectRequested,
         instanceId: pending.id,
         effectId: "/do/2/child",
+        effect: EffectKind.Child,
       },
       {
         kind: InstanceEventKind.TimerSet,
@@ -331,6 +333,7 @@ describe("a run begun from its start", () => {
         kind: InstanceEventKind.EffectRequested,
         instanceId: pending.id,
         effectId: "/do/4/orders@message[0]",
+        effect: EffectKind.Receive,
       },
     ]);
   });
@@ -428,6 +431,7 @@ describe("a run answered by effect id", () => {
         kind: InstanceEventKind.EffectRequested,
         instanceId: instance.id,
         effectId: "/do/2/notify",
+        effect: EffectKind.Call,
       },
     ]);
   });

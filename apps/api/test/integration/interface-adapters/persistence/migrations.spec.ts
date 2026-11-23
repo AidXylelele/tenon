@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PostgresOutboxStore } from "@nestjs/outbox/postgres";
-import { PostgresWorkflowStore } from "@nestjs/workflows/postgres";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -42,7 +41,7 @@ const TAKEN = {
 interface Applied {
   readonly platform: number;
   readonly outbox: number;
-  readonly engine: number;
+  readonly engine: boolean;
 }
 
 describe("the migrations applied before the API starts", () => {
@@ -75,10 +74,10 @@ describe("the migrations applied before the API starts", () => {
       select
         (select count(*)::int from drizzle.__drizzle_migrations) as platform,
         (select max(version) from nest_outbox.migrations) as outbox,
-        (select max(version) from nest_workflows.migrations) as engine
+        exists (select 1 from information_schema.schemata where schema_name = 'nest_workflows') as engine
     `);
     const [row] = result.rows as unknown as Applied[];
-    return row ?? { platform: 0, outbox: 0, engine: 0 };
+    return row ?? { platform: 0, outbox: 0, engine: false };
   }
 
   async function seedAfresh(
@@ -102,14 +101,14 @@ describe("the migrations applied before the API starts", () => {
     });
   }
 
-  it("an_empty_database_gets_the_platforms_the_outboxs_and_the_engines_migrations", async () => {
+  it("an_empty_database_gets_the_platforms_and_the_outboxs_migrations_and_no_engine", async () => {
     await migrate(db, migrations);
     const state = await applied();
 
     expect(state).toEqual({
       platform: journal.entries.length,
       outbox: PostgresOutboxStore.schemaVersion,
-      engine: PostgresWorkflowStore.schemaVersion,
+      engine: false,
     });
   });
 

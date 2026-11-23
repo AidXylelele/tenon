@@ -1,7 +1,5 @@
 import { OutboxRelay } from "@nestjs/outbox";
 import type { TestingModuleBuilder } from "@nestjs/testing";
-import { type Duration, WorkflowWorker } from "@nestjs/workflows";
-import { parseDuration } from "@nestjs/workflows/core";
 import { sql } from "drizzle-orm";
 import request, { type Response } from "supertest";
 import type { JsonObject } from "../../src/domain/automation/interfaces.js";
@@ -11,13 +9,24 @@ import { createTestApp, type TestApp } from "./create-test-app.js";
 import { truncateAll } from "./db.js";
 import type { Page } from "./bodies.js";
 
+const DURATION = /^(\d+)(ms|s|m|h|d)$/;
+const UNIT_MS: Readonly<Record<string, number>> = {
+  ms: 1,
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+};
+
 class SystemTime {
   set(time: number): void {
     vi.setSystemTime(time);
   }
 
-  advance(duration: Duration): number {
-    const moved = Date.now() + parseDuration(duration);
+  advance(duration: string): number {
+    const [, amount = "0", unit = "ms"] = DURATION.exec(duration) ?? [];
+    const unitMs = UNIT_MS[unit] ?? 1;
+    const moved = Date.now() + Number(amount) * unitMs;
     vi.setSystemTime(moved);
     return moved;
   }
@@ -43,22 +52,17 @@ export async function createRunApp(
 
 export async function resetRuns(t: TestApp): Promise<void> {
   await truncateAll(t.db);
-  await t.db.execute(
-    sql`truncate table nest_workflows.instances, nest_workflows.journal, nest_workflows.signals, nest_workflows.waits cascade`,
-  );
 }
 
 export async function drain(t: TestApp): Promise<number> {
-  const worker = t.app.get(WorkflowWorker);
   const outbox = t.app.get(OutboxRelay);
   let total = 0;
 
-  for (let pass = 0; pass < 50; pass += 1) {
-    const ran = await worker.drain();
+  for (let pass = 0; pass < 200; pass += 1) {
     const relayed = await outbox.runOnce();
-    total += ran;
+    total += relayed.published;
 
-    if (ran === 0 && relayed.claimed === 0) break;
+    if (relayed.claimed === 0) break;
   }
 
   return total;

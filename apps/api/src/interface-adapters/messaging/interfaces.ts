@@ -4,6 +4,7 @@ import type {
   Failure,
   JsonObject,
 } from "interpreter";
+import type { EffectKind } from "../../domain/automation/instances/enums.js";
 import type { JsonObject as DomainObject } from "../../domain/automation/interfaces.js";
 import type { StepCall } from "../workflows/interfaces.js";
 
@@ -34,6 +35,7 @@ export interface InstanceEndedMessage {
 export interface EffectMessage {
   readonly instanceId: string;
   readonly effectId: string;
+  readonly effect: EffectKind;
 }
 
 export interface TimerMessage {

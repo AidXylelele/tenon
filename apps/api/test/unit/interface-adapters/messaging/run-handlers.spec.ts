@@ -9,7 +9,6 @@ import type { AnswerTimer } from "../../../../src/application/automation/instanc
 import type { BeginRun } from "../../../../src/application/automation/instances/begin-run.js";
 import type { EmitForEffect } from "../../../../src/application/automation/instances/emit-for-effect.js";
 import type { FailRun } from "../../../../src/application/automation/instances/fail-run.js";
-import type { FindEffectKind } from "../../../../src/application/automation/instances/find-effect-kind.js";
 import type { GiveUpEffect } from "../../../../src/application/automation/instances/give-up-effect.js";
 import type { PerformEffect } from "../../../../src/application/automation/instances/perform-effect.js";
 import type { ReceiveForEffect } from "../../../../src/application/automation/instances/receive-for-effect.js";
@@ -82,14 +81,10 @@ function runHandlerOf(recorder: Recorder): RunHandler {
   );
 }
 
-function effectHandlerOf(recorder: Recorder, kind: EffectKind | null) {
-  const findEffectKind = {
-    execute: () => Promise.resolve(kind),
-  } as unknown as FindEffectKind;
+function effectHandlerOf(recorder: Recorder) {
   return new EffectHandler(
     new ConsumerSpan(),
     recorder.outbox(),
-    findEffectKind,
     recorder.use<PerformEffect>("perform"),
     recorder.use<StartDetachedProcess>("detach"),
     recorder.use<StartChildForEffect>("child"),
@@ -199,8 +194,12 @@ describe("the effects a run asks for", () => {
     "a_%s_effect_is_handled_by_its_%s_use_case",
     async (kind, name) => {
       const recorder = new Recorder();
-      const handler = effectHandlerOf(recorder, kind);
-      const message = { instanceId: "instance-1", effectId: "/do/0/x" };
+      const handler = effectHandlerOf(recorder);
+      const message = {
+        instanceId: "instance-1",
+        effectId: "/do/0/x",
+        effect: kind,
+      };
       const context = contextAt(1);
 
       await handler.requested(message, context);
@@ -210,10 +209,14 @@ describe("the effects a run asks for", () => {
     },
   );
 
-  it("an_effect_no_longer_awaited_is_left_alone", async () => {
+  it("a_wait_asks_nothing_of_the_world", async () => {
     const recorder = new Recorder();
-    const handler = effectHandlerOf(recorder, null);
-    const message = { instanceId: "instance-1", effectId: "/do/0/x" };
+    const handler = effectHandlerOf(recorder);
+    const message = {
+      instanceId: "instance-1",
+      effectId: "/do/0/x",
+      effect: EffectKind.Listen,
+    };
     const context = contextAt(1);
 
     await handler.requested(message, context);
@@ -224,8 +227,12 @@ describe("the effects a run asks for", () => {
   it("the_last_attempt_gives_the_effect_up", async () => {
     const recorder = new Recorder();
     recorder.failure = new Error("The sandbox is unreachable");
-    const handler = effectHandlerOf(recorder, EffectKind.Call);
-    const message = { instanceId: "instance-1", effectId: "/do/0/x" };
+    const handler = effectHandlerOf(recorder);
+    const message = {
+      instanceId: "instance-1",
+      effectId: "/do/0/x",
+      effect: EffectKind.Call,
+    };
     const context = contextAt(RunHandler.ATTEMPTS);
 
     await handler.requested(message, context);
@@ -235,7 +242,7 @@ describe("the effects a run asks for", () => {
 
   it("a_timer_answers_its_wait", async () => {
     const recorder = new Recorder();
-    const handler = effectHandlerOf(recorder, null);
+    const handler = effectHandlerOf(recorder);
     const message = {
       instanceId: "instance-1",
       effectId: "/do/0/pause",

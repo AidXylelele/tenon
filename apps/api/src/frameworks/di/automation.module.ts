@@ -155,9 +155,14 @@ import { OutboundModule } from "./outbound.module.js";
         resilience: ResilienceService,
         interpreter: ConfigType<typeof interpreterConfig>,
       ) =>
-        new PiscinaInterpreterClient(resilience, {
-          legacyEventTypes: interpreter.LEGACY_EVENT_TYPES,
-        }),
+        new PiscinaInterpreterClient(
+          resilience,
+          { legacyEventTypes: interpreter.LEGACY_EVENT_TYPES },
+          {
+            runs: interpreter.INTERPRETER_RUN_THREADS,
+            checks: interpreter.INTERPRETER_CHECK_THREADS,
+          },
+        ),
     },
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
     { provide: AuthorizationServer, useClass: OpenIdAuthorizationServer },

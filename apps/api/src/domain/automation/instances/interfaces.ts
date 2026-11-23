@@ -43,6 +43,7 @@ export interface EffectRequested {
   readonly kind: InstanceEventKind.EffectRequested;
   readonly instanceId: string;
   readonly effectId: string;
+  readonly effect: EffectKind;
 }
 
 export interface TimerSet {
