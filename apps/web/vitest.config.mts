@@ -29,13 +29,7 @@ const FEATURES_DELETED_IN_M5 = [
   "workflow-canvas",
 ];
 
-const FEATURES_WAITING_FOR_TESTS = [
-  "draft-conflict",
-  "new-password-field",
-  "problems",
-  "run-status",
-  "viewer-notice",
-];
+const FEATURES_WAITING_FOR_TESTS = ["draft-conflict", "problems", "run-status"];
 
 const FEATURES_BELOW_THE_FLOOR = FEATURES_DELETED_IN_M5.concat(
   FEATURES_WAITING_FOR_TESTS,

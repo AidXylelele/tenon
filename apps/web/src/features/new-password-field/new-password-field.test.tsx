@@ -33,4 +33,19 @@ describe("a password being chosen", () => {
     expect(unfocused).toBe(document.body);
     expect(screen.getByLabelText("Password")).toHaveFocus();
   });
+
+  it("adds_its_note_after_the_length", () => {
+    render(
+      <NewPasswordField
+        name="newPassword"
+        label="New password"
+        note="Every other session ends."
+      />,
+    );
+    const field = screen.getByLabelText("New password");
+
+    expect(field).toHaveAccessibleDescription(
+      "At least 12 characters. Every other session ends.",
+    );
+  });
 });
