@@ -26,11 +26,13 @@ export class EventMessagesGateway implements EventAnnouncements, EventOffers {
     private readonly outbox: Outbox,
   ) {}
 
-  async announce(event: AcceptedEvent, origin: EventOrigin): Promise<void> {
-    const payload: AcceptedEventMessage = { sequence: event.sequence };
-    const key = this.#laneOf(origin, event.cloudEvent);
-    const message = { topic: MessageTopic.EventAccepted, key, payload };
-    await this.outbox.add(this.txHost.tx, message);
+  async announce(
+    events: readonly AcceptedEvent[],
+    origin: EventOrigin,
+  ): Promise<void> {
+    const messages = events.map((event) => this.#acceptedOf(event, origin));
+
+    if (messages.length > 0) await this.outbox.add(this.txHost.tx, messages);
   }
 
   async offer(
@@ -51,6 +53,12 @@ export class EventMessagesGateway implements EventAnnouncements, EventOffers {
     );
 
     if (messages.length > 0) await this.outbox.add(this.txHost.tx, messages);
+  }
+
+  #acceptedOf(event: AcceptedEvent, origin: EventOrigin): NewOutboxMessage {
+    const payload: AcceptedEventMessage = { sequence: event.sequence };
+    const key = this.#laneOf(origin, event.cloudEvent);
+    return { topic: MessageTopic.EventAccepted, key, payload };
   }
 
   #offeredOf(offer: InstanceOffer, event: AcceptedEvent): NewOutboxMessage {

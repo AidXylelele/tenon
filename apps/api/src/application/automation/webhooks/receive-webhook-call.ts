@@ -24,9 +24,6 @@ export class ReceiveWebhookCall {
     const event = webhook.receive(command.call, now);
     await this.unitOfWork.run(async () => {
       const accepted = await this.events.acceptWebhookEvent(event);
-
-      if (accepted === null) return;
-
       await this.announcements.announce(accepted, EventOrigin.Webhook);
     });
     return { ok: true, value: undefined };

@@ -61,7 +61,10 @@ import type { InvitationToken } from "../../src/domain/identity/invitations/invi
 import type { User } from "../../src/domain/identity/users/user.js";
 
 export class FakeUnitOfWork extends UnitOfWork {
+  runs = 0;
+
   run<T>(work: () => Promise<T>): Promise<T> {
+    this.runs += 1;
     return work();
   }
 }
@@ -527,8 +530,13 @@ export interface RecordedAnnouncement {
 export class RecordingAnnouncements extends EventAnnouncements {
   readonly announced: RecordedAnnouncement[] = [];
 
-  announce(event: AcceptedEvent, origin: EventOrigin): Promise<void> {
-    this.announced.push({ sequence: event.sequence, origin });
+  announce(
+    events: readonly AcceptedEvent[],
+    origin: EventOrigin,
+  ): Promise<void> {
+    for (const event of events)
+      this.announced.push({ sequence: event.sequence, origin });
+
     return Promise.resolve();
   }
 }

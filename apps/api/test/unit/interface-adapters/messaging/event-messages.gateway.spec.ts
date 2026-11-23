@@ -31,10 +31,10 @@ describe("the outbox messages of accepted events", () => {
   it("an_emitted_or_lifecycle_event_keeps_its_sources_lane_and_any_other_its_own", async () => {
     const fixture = setUp();
 
-    await fixture.gateway.announce(PAID, EventOrigin.Emit);
-    await fixture.gateway.announce(PAID, EventOrigin.Lifecycle);
-    await fixture.gateway.announce(PAID, EventOrigin.Webhook);
-    await fixture.gateway.announce(PAID, EventOrigin.Intake);
+    await fixture.gateway.announce([PAID], EventOrigin.Emit);
+    await fixture.gateway.announce([PAID], EventOrigin.Lifecycle);
+    await fixture.gateway.announce([PAID], EventOrigin.Webhook);
+    await fixture.gateway.announce([PAID], EventOrigin.Intake);
 
     const keys = fixture.outbox.added.map((message) => message.key);
     expect(fixture.outbox.added[0]).toEqual({
@@ -44,6 +44,25 @@ describe("the outbox messages of accepted events", () => {
     });
     expect(keys).toEqual(["/shop", "/shop", "order-1", "order-1"]);
     expect(fixture.outbox.transactions).toEqual([TX, TX, TX, TX]);
+  });
+
+  it("a_turns_events_are_announced_in_one_write_and_none_writes_nothing", async () => {
+    const fixture = setUp();
+    const shipped = {
+      sequence: 8,
+      eventId: "order-2",
+      type: "order.paid",
+      cloudEvent,
+      acceptedAt: T0,
+      lifecycleOf: null,
+    };
+
+    await fixture.gateway.announce([PAID, shipped], EventOrigin.Lifecycle);
+    await fixture.gateway.announce([], EventOrigin.Lifecycle);
+
+    const sequences = fixture.outbox.added.map((message) => message.payload);
+    expect(sequences).toEqual([{ sequence: 7 }, { sequence: 8 }]);
+    expect(fixture.outbox.transactions).toEqual([TX]);
   });
 
   it("an_offer_goes_to_each_listening_instance_and_a_trigger_to_each_workflow", async () => {

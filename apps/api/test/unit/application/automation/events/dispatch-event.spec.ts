@@ -5,8 +5,7 @@ import type {
 } from "../../../../../src/application/automation/events/interfaces.js";
 import type { EventStore } from "../../../../../src/application/automation/events/ports.js";
 import type { RoutingMatch } from "../../../../../src/domain/automation/instances/interfaces.js";
-import { UnitOfWork } from "../../../../../src/application/unit-of-work.js";
-import { T0 } from "../../../../support/fakes.js";
+import { FakeUnitOfWork, T0 } from "../../../../support/fakes.js";
 
 const PAID: AcceptedEvent = {
   sequence: 7,
@@ -28,15 +27,6 @@ const OFFER: InstanceOffer = {
   instanceId: "instance-1",
   candidates: ["/do/0/wait"],
 };
-
-class CountingUnitOfWork extends UnitOfWork {
-  runs = 0;
-
-  run<T>(work: () => Promise<T>): Promise<T> {
-    this.runs += 1;
-    return work();
-  }
-}
 
 class RecordingOffers {
   readonly offered: (readonly InstanceOffer[])[] = [];
@@ -62,7 +52,7 @@ function setUp(matches: readonly RoutingMatch[]) {
   };
   const routing = { accepting: () => Promise.resolve(matches) };
   const offers = new RecordingOffers();
-  const unitOfWork = new CountingUnitOfWork();
+  const unitOfWork = new FakeUnitOfWork();
   const dispatch = new DispatchEvent(
     events as unknown as EventStore,
     listeners,

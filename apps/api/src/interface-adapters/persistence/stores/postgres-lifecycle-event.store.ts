@@ -8,10 +8,7 @@ import type { WorkflowInstance } from "../../../domain/automation/instances/work
 import type { InstanceNames, Transaction } from "../interfaces.js";
 import { LifecycleEventMapper } from "../mappers/lifecycle-event.mapper.js";
 import { TaskValueMapper } from "../mappers/task-value.mapper.js";
-import {
-  workflow as workflows,
-  workflowInstance as instances,
-} from "../schema/index.js";
+import { workflow as workflows } from "../schema/index.js";
 import { PostgresEventStore } from "./postgres-event.store.js";
 
 @Injectable()
@@ -20,7 +17,7 @@ export class PostgresLifecycleEventStore implements LifecycleEvents {
 
   private readonly cachedNames = new LRUCache<string, InstanceNames>({
     max: PostgresLifecycleEventStore.MOST_CACHED_NAMES,
-    fetchMethod: (instanceId) => this.#namesOf(instanceId),
+    fetchMethod: (workflowId) => this.#namesOf(workflowId),
   });
 
   constructor(
@@ -31,7 +28,9 @@ export class PostgresLifecycleEventStore implements LifecycleEvents {
   ) {}
 
   async append(instance: WorkflowInstance): Promise<AcceptedEvent[]> {
-    const names = await this.cachedNames.fetch(instance.id);
+    if (instance.lifecycle.length === 0) return [];
+
+    const names = await this.cachedNames.fetch(instance.workflowId);
 
     if (names === undefined) return [];
 
@@ -46,26 +45,17 @@ export class PostgresLifecycleEventStore implements LifecycleEvents {
         outputs,
       ),
     );
-    const appended: AcceptedEvent[] = [];
-
-    for (const each of told) {
-      const accepted = await this.events.acceptLifecycle(each, instance, at);
-
-      if (accepted !== null) appended.push(accepted);
-    }
-
-    return appended;
+    return this.events.acceptLifecycle(told, instance, at);
   }
 
-  async #namesOf(instanceId: string): Promise<InstanceNames | undefined> {
+  async #namesOf(workflowId: string): Promise<InstanceNames | undefined> {
     const [row] = await this.txHost.tx
       .select({
         namespace: workflows.namespace,
         name: workflows.name,
       })
-      .from(instances)
-      .innerJoin(workflows, eq(workflows.id, instances.workflowId))
-      .where(eq(instances.id, instanceId));
+      .from(workflows)
+      .where(eq(workflows.id, workflowId));
     return row;
   }
 }

@@ -14,10 +14,7 @@ export class InstanceEvents {
 
   async dispatch(instance: WorkflowInstance): Promise<void> {
     const appended = await this.lifecycle.append(instance);
-
-    for (const event of appended)
-      await this.announcements.announce(event, EventOrigin.Lifecycle);
-
+    await this.announcements.announce(appended, EventOrigin.Lifecycle);
     instance.clearLifecycle();
     await this.messages.dispatch(instance);
   }

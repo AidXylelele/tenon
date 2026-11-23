@@ -131,7 +131,7 @@ interface Accepted {
 class AcceptingEvents {
   readonly accepted: Accepted[] = [];
 
-  accept(event: JsonObject, origin: EventOrigin): Promise<AcceptedEvent> {
+  accept(event: JsonObject, origin: EventOrigin): Promise<AcceptedEvent[]> {
     this.accepted.push({ event, origin });
     const sequence = this.accepted.length;
     const accepted = {
@@ -142,7 +142,7 @@ class AcceptingEvents {
       acceptedAt: T0,
       lifecycleOf: null,
     };
-    return Promise.resolve(accepted);
+    return Promise.resolve([accepted]);
   }
 }
 

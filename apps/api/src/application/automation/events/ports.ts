@@ -12,10 +12,8 @@ export abstract class EventStore {
     origin: EventOrigin,
     instanceId: string | null,
     acceptedAt: Date,
-  ): Promise<AcceptedEvent | null>;
-  abstract acceptWebhookEvent(
-    event: WebhookEvent,
-  ): Promise<AcceptedEvent | null>;
+  ): Promise<AcceptedEvent[]>;
+  abstract acceptWebhookEvent(event: WebhookEvent): Promise<AcceptedEvent[]>;
   abstract find(sequence: number): Promise<AcceptedEvent | null>;
 }
 
@@ -28,7 +26,10 @@ export abstract class EventRouting {
 }
 
 export abstract class EventAnnouncements {
-  abstract announce(event: AcceptedEvent, origin: EventOrigin): Promise<void>;
+  abstract announce(
+    events: readonly AcceptedEvent[],
+    origin: EventOrigin,
+  ): Promise<void>;
 }
 
 export abstract class EventListeners {

@@ -44,10 +44,7 @@ export class EmitForEffect {
         instance.id,
         now,
       );
-
-      if (accepted !== null)
-        await this.announcements.announce(accepted, EventOrigin.Emit);
-
+      await this.announcements.announce(accepted, EventOrigin.Emit);
       await this.runs.respond(instance, answer);
     });
   }

@@ -20,9 +20,6 @@ export class AcceptEvent {
         command.instanceId,
         now,
       );
-
-      if (accepted === null) return;
-
       await this.announcements.announce(accepted, command.origin);
     });
   }

@@ -37,7 +37,7 @@ class ScheduledDeliveries {
   }
 }
 
-function setUp() {
+function setUp(accepts = true) {
   const subscription = { id: "subscription-1" } as Subscription;
   const events = {
     find: () => Promise.resolve(PAID),
@@ -47,19 +47,20 @@ function setUp() {
   } as unknown as SubscriptionRepository;
   const filters = {
     matching: (candidates: readonly Subscription[]) =>
-      Promise.resolve(candidates.slice()),
+      Promise.resolve(candidates.filter(() => accepts)),
   } as unknown as SubscriptionFilters;
   const log = new PendingLog();
   const deliveries = new ScheduledDeliveries();
+  const unitOfWork = new FakeUnitOfWork();
   const match = new MatchSubscriptions(
     events,
     subscriptions,
     filters,
     deliveries,
     log as unknown as DeliveryLog,
-    new FakeUnitOfWork(),
+    unitOfWork,
   );
-  return { match, deliveries };
+  return { match, deliveries, unitOfWork };
 }
 
 describe("matching an accepted event to the subscriptions", () => {
@@ -72,5 +73,14 @@ describe("matching an accepted event to the subscriptions", () => {
     await fixture.match.execute(command);
 
     expect(fixture.deliveries.scheduled).toEqual(["subscription-1"]);
+  });
+
+  it("an_event_no_subscription_accepts_opens_no_transaction", async () => {
+    const fixture = setUp(false);
+    const signal = new AbortController().signal;
+
+    await fixture.match.execute({ sequence: PAID.sequence, signal });
+
+    expect(fixture.unitOfWork.runs).toBe(0);
   });
 });

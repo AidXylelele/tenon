@@ -33,6 +33,8 @@ export class MatchSubscriptions {
       command.signal,
     );
 
+    if (accepting.length === 0) return;
+
     await this.unitOfWork.run(async () => {
       for (const subscription of accepting) {
         const pending = await this.log.pending(subscription, event, now);
