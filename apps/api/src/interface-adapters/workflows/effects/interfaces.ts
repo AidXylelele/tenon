@@ -2,6 +2,7 @@ import type {
   AuthenticationScheme,
   Endpoint,
   Failure,
+  HttpRequest,
   JsonObject,
   McpRequest,
   ResolvedAuthentication,
@@ -10,6 +11,11 @@ import type {
 import type { z } from "zod";
 import type { StepCall } from "../interfaces.js";
 import type { AGENT_CARD } from "./agent-card.schema.js";
+import type {
+  OPENAPI_DOCUMENT,
+  OPENAPI_OPERATION,
+  OPENAPI_PATH,
+} from "./openapi-document.schema.js";
 
 export interface CallContext extends StepCall {
   readonly remaining: number | null;
@@ -100,3 +106,40 @@ export abstract class McpConnection {
     signal: AbortSignal,
   ): Promise<McpAnswer>;
 }
+
+export interface OutboundRequest {
+  readonly method: string;
+  readonly uri: string;
+  readonly headers: Headers;
+  readonly body: string | null;
+}
+
+export interface Signed {
+  readonly response: Response;
+  readonly authorization: RevealedAuthorization | null;
+}
+
+export type ResponseOptions = Pick<
+  HttpRequest,
+  "output" | "revealAuthorization"
+>;
+
+export abstract class HttpConnection {
+  abstract admits(uri: string): Promise<boolean>;
+  abstract fetch(url: string | URL, init?: RequestInit): Promise<Response>;
+}
+
+export type OpenApiDocument = z.infer<typeof OPENAPI_DOCUMENT>;
+
+type OpenApiPath = z.infer<typeof OPENAPI_PATH>;
+
+type OpenApiOperation = z.infer<typeof OPENAPI_OPERATION>;
+
+export interface LocatedOperation {
+  readonly item: OpenApiPath;
+  readonly operation: OpenApiOperation;
+}
+
+export type OperationRequest =
+  | { readonly kind: "operation"; readonly request: OutboundRequest }
+  | Extract<Failure, { readonly kind: "misconfigured" }>;

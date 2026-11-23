@@ -12,23 +12,26 @@ import type {
   ResourceRequest,
 } from "interpreter";
 import { ResilienceModule } from "@nestjs/resilience";
-import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
-import type { HttpClient } from "../../../../src/frameworks/http-client/http.client.js";
-import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import { resiliencePresets } from "../../../../../src/frameworks/di/host.presets.js";
+import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import type { HttpGateway } from "../../../../../src/interface-adapters/workflows/effects/http.gateway.js";
+import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import { OpenApiGateway } from "../../../../../src/interface-adapters/workflows/effects/openapi.gateway.js";
+import type { ResourceGateway } from "../../../../../src/interface-adapters/workflows/effects/resource.gateway.js";
 import {
   closedPort,
   type ReceivedRequest,
   startStubServer,
   type StubServer,
-} from "../../../support/stub-server.js";
+} from "../../../../support/stub-server.js";
 import {
   callContextOf,
-  httpClientOf,
+  httpGatewayOf,
+  resourcesOf,
   SELF_SIGNED,
   trustingIdentityProvider,
-} from "../../../support/outbound.js";
+} from "../../../../support/outbound.js";
 
 type OAuth2Properties = Omit<
   Extract<Authentication, { kind: "oauth2" | "oidc" }>,
@@ -48,11 +51,13 @@ const JWT_TOKEN = [
 const OVERSIZED = "The response is larger than 1 MiB";
 const BOMB = gzipSync(Buffer.alloc(2 * 1024 * 1024));
 
-describe("a call the HTTP client performs for a run", () => {
+describe("a call the HTTP gateways perform for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let client: HttpClient;
+  let gateway: HttpGateway;
+  let openApi: OpenApiGateway;
+  let resources: ResourceGateway;
   let stub: StubServer;
   let idp: StubServer;
   let origin = "";
@@ -65,7 +70,10 @@ describe("a call the HTTP client performs for a run", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
-    client = httpClientOf(policy, resilience, trustingIdentityProvider());
+    const identity = trustingIdentityProvider();
+    gateway = httpGatewayOf(policy, resilience, identity);
+    resources = resourcesOf(policy, resilience, identity);
+    openApi = new OpenApiGateway(resources, gateway);
     stub = await startStubServer((request, response) => {
       answer(request, response);
     });
@@ -347,7 +355,7 @@ describe("a call the HTTP client performs for a run", () => {
       async (path, output, expected) => {
         const request = httpOf(path, null, output);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({ kind: "responded", content: expected });
       },
@@ -356,7 +364,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_response_answers_its_status_and_headers", async () => {
       const request = httpOf("/json");
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -369,7 +377,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_status_outside_two_hundreds_is_answered_as_a_response", async () => {
       const request = httpOf("/missing");
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -389,7 +397,7 @@ describe("a call the HTTP client performs for a run", () => {
         const path = `/typed?as=${encodeURIComponent(type)}`;
         const request = httpOf(path);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({ kind: "responded", content: expected });
       },
@@ -398,7 +406,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("every_cookie_the_response_sets_is_answered", async () => {
       const request = httpOf("/cookies");
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -409,7 +417,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_redirect_is_answered_and_not_followed", async () => {
       const request = httpOf("/moved");
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -432,7 +440,7 @@ describe("a call the HTTP client performs for a run", () => {
         revealAuthorization: false,
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -463,7 +471,7 @@ describe("a call the HTTP client performs for a run", () => {
         revealAuthorization: true,
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual(
         expect.objectContaining({
@@ -493,7 +501,7 @@ describe("a call the HTTP client performs for a run", () => {
         revealAuthorization: false,
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -504,7 +512,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("the_step_s_idempotency_key_travels_as_the_idempotency_key_header", async () => {
       const request = httpOf("/echo");
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -518,7 +526,7 @@ describe("a call the HTTP client performs for a run", () => {
         headers: { "Idempotency-Key": "author-key" },
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -532,7 +540,7 @@ describe("a call the HTTP client performs for a run", () => {
         headers: { "bad header": "x" },
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -546,7 +554,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_call_still_unanswered_at_its_deadline_expires", async () => {
       const request = httpOf("/hang");
 
-      const outcome = await client.send(request, contextOf({}, 200));
+      const outcome = await gateway.perform(request, contextOf({}, 200));
 
       expect(outcome).toEqual({ kind: "expired" });
     });
@@ -560,7 +568,7 @@ describe("a call the HTTP client performs for a run", () => {
         endpoint: { uri, authentication: null },
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -579,7 +587,7 @@ describe("a call the HTTP client performs for a run", () => {
         },
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "unreachable",
@@ -591,7 +599,7 @@ describe("a call the HTTP client performs for a run", () => {
       "a_private_destination_%s_is_refused_before_any_connection",
       async (host) => {
         const guarded = new AddressPolicy([]);
-        const guardedClient = httpClientOf(guarded, resilience);
+        const guardedGateway = httpGatewayOf(guarded, resilience);
         const request: HttpRequest = {
           ...httpOf("/json"),
           endpoint: {
@@ -600,7 +608,7 @@ describe("a call the HTTP client performs for a run", () => {
           },
         };
 
-        const outcome = await guardedClient.send(request, contextOf());
+        const outcome = await guardedGateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unreachable",
@@ -614,7 +622,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_response_larger_than_its_bound_is_unreachable", async () => {
       const request = httpOf("/large");
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "unreachable", detail: OVERSIZED });
     });
@@ -622,7 +630,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_compressed_response_larger_than_its_bound_once_decoded_is_unreachable", async () => {
       const request = httpOf("/bomb");
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "unreachable", detail: OVERSIZED });
     });
@@ -636,7 +644,7 @@ describe("a call the HTTP client performs for a run", () => {
         password: "lovelace",
       });
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -658,7 +666,7 @@ describe("a call the HTTP client performs for a run", () => {
         revealAuthorization: false,
       };
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -674,7 +682,7 @@ describe("a call the HTTP client performs for a run", () => {
         password: "Circle of Life",
       });
 
-      const sent = client.send(request, contextOf());
+      const sent = gateway.perform(request, contextOf());
 
       await expect(sent).rejects.toThrow(
         "The host does not perform 'authentication.digest'",
@@ -685,7 +693,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("bearer_authentication_is_sent_as_its_token", async () => {
       const request = httpOf("/protected", { kind: "bearer", token: TOKEN });
 
-      const outcome = await client.send(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -702,7 +710,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({
           kind: "responded",
@@ -735,7 +743,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/protected", authentication);
 
-        await client.send(request, contextOf());
+        await gateway.perform(request, contextOf());
 
         const token = tokenRequest();
         expect(token.headers.authorization).toBe(
@@ -752,7 +760,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/protected", authentication);
 
-        await client.send(request, contextOf());
+        await gateway.perform(request, contextOf());
 
         const token = tokenRequest();
         expect(token.headers["content-type"]).toBe("application/json");
@@ -786,7 +794,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/protected", authentication);
 
-        await client.send(request, contextOf());
+        await gateway.perform(request, contextOf());
 
         expect(formOf(tokenRequest())).toEqual([
           ["actor_token", "actor-token"],
@@ -813,7 +821,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
         const form = new URLSearchParams(tokenRequest().body);
@@ -850,7 +858,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/protected", authentication);
 
-        await client.send(request, contextOf());
+        await gateway.perform(request, contextOf());
 
         expect(formOf(tokenRequest())).toEqual([
           ["client_assertion", "signed.assertion.jwt"],
@@ -873,7 +881,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unauthenticated",
@@ -888,7 +896,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/echo", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({
           kind: "responded",
@@ -903,7 +911,7 @@ describe("a call the HTTP client performs for a run", () => {
         });
         const request = httpOf("/echo", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unauthenticated",
@@ -919,7 +927,7 @@ describe("a call the HTTP client performs for a run", () => {
         const authentication = oauth2Of({ issuers: ["https://other.test"] });
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({
           kind: "responded",
@@ -932,7 +940,7 @@ describe("a call the HTTP client performs for a run", () => {
         const authentication = oauth2Of({ authority: `${authority}/refusing` });
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unauthenticated",
@@ -941,13 +949,13 @@ describe("a call the HTTP client performs for a run", () => {
       });
 
       it("a_token_endpoint_at_a_refused_address_is_unreachable", async () => {
-        const guarded = httpClientOf(policy, resilience);
+        const guarded = httpGatewayOf(policy, resilience);
         const authentication = oauth2Of({
           authority: `https://localhost:${String(idp.port)}`,
         });
         const request = httpOf("/protected", authentication);
 
-        const outcome = await guarded.send(request, contextOf());
+        const outcome = await guarded.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unreachable",
@@ -961,7 +969,7 @@ describe("a call the HTTP client performs for a run", () => {
         const authentication = oauth2Of({ authority: origin });
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unauthenticated",
@@ -984,7 +992,7 @@ describe("a call the HTTP client performs for a run", () => {
           };
           const request = httpOf("/protected", authentication);
 
-          const outcome = await client.send(request, contextOf());
+          const outcome = await gateway.perform(request, contextOf());
 
           expect(outcome).toMatchObject({
             kind: "responded",
@@ -1011,7 +1019,7 @@ describe("a call the HTTP client performs for a run", () => {
         };
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
       });
@@ -1026,7 +1034,7 @@ describe("a call the HTTP client performs for a run", () => {
         };
         const request = httpOf("/echo", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toMatchObject({
           kind: "responded",
@@ -1045,7 +1053,7 @@ describe("a call the HTTP client performs for a run", () => {
         };
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unauthenticated",
@@ -1065,7 +1073,7 @@ describe("a call the HTTP client performs for a run", () => {
         };
         const request = httpOf("/protected", authentication);
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unauthenticated",
@@ -1074,7 +1082,7 @@ describe("a call the HTTP client performs for a run", () => {
       });
 
       it("a_discovery_at_a_refused_address_is_unreachable", async () => {
-        const guarded = httpClientOf(policy, resilience);
+        const guarded = httpGatewayOf(policy, resilience);
         const authentication: Authentication = {
           ...(oauth2Of() as OAuth2Properties),
           kind: "oidc",
@@ -1083,7 +1091,7 @@ describe("a call the HTTP client performs for a run", () => {
         };
         const request = httpOf("/protected", authentication);
 
-        const outcome = await guarded.send(request, contextOf());
+        const outcome = await guarded.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unreachable",
@@ -1103,7 +1111,7 @@ describe("a call the HTTP client performs for a run", () => {
           secret: "petstore",
         });
 
-        const outcome = await client.send(request, contextOf(secrets));
+        const outcome = await gateway.perform(request, contextOf(secrets));
 
         expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
       });
@@ -1116,7 +1124,7 @@ describe("a call the HTTP client performs for a run", () => {
           secret: "api",
         });
 
-        const outcome = await client.send(request, contextOf(secrets));
+        const outcome = await gateway.perform(request, contextOf(secrets));
 
         expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
       });
@@ -1135,7 +1143,7 @@ describe("a call the HTTP client performs for a run", () => {
           secret: "idp",
         });
 
-        const outcome = await client.send(request, contextOf(secrets));
+        const outcome = await gateway.perform(request, contextOf(secrets));
 
         expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
         expect(tokenRequest().url).toBe("/oauth2/token");
@@ -1160,7 +1168,7 @@ describe("a call the HTTP client performs for a run", () => {
           secret: "idp",
         });
 
-        const outcome = await client.send(request, contextOf(secrets));
+        const outcome = await gateway.perform(request, contextOf(secrets));
 
         expect(outcome).toMatchObject({ kind: "responded", statusCode: 200 });
       });
@@ -1172,7 +1180,7 @@ describe("a call the HTTP client performs for a run", () => {
           secret: "vault",
         });
 
-        const outcome = await client.send(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "forbidden",
@@ -1194,7 +1202,7 @@ describe("a call the HTTP client performs for a run", () => {
             secret: "petstore",
           });
 
-          const outcome = await client.send(
+          const outcome = await gateway.perform(
             request,
             contextOf({ petstore: value }),
           );
@@ -1214,7 +1222,7 @@ describe("a call the HTTP client performs for a run", () => {
           secret: "idp",
         });
 
-        const outcome = await client.send(
+        const outcome = await gateway.perform(
           request,
           contextOf({ idp: { authority } }),
         );
@@ -1238,7 +1246,10 @@ describe("a call the HTTP client performs for a run", () => {
           client: { id: "workflow-runtime" },
         };
 
-        const outcome = await client.send(request, contextOf({ idp: held }));
+        const outcome = await gateway.perform(
+          request,
+          contextOf({ idp: held }),
+        );
 
         expect(outcome).toEqual({
           kind: "misconfigured",
@@ -1277,7 +1288,7 @@ describe("a call the HTTP client performs for a run", () => {
         status: ["available", "sold"],
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1295,7 +1306,7 @@ describe("a call the HTTP client performs for a run", () => {
         api_key: "k-1",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1312,7 +1323,7 @@ describe("a call the HTTP client performs for a run", () => {
         body: { name: "Rex" },
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1332,7 +1343,7 @@ describe("a call the HTTP client performs for a run", () => {
         status: "sold",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1353,7 +1364,7 @@ describe("a call the HTTP client performs for a run", () => {
         body: { item: "pen", quantity: 2 },
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1384,7 +1395,7 @@ describe("a call the HTTP client performs for a run", () => {
         { kind: "bearer", token: TOKEN },
       );
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual(
         expect.objectContaining({
@@ -1408,7 +1419,7 @@ describe("a call the HTTP client performs for a run", () => {
         body: "remember",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -1421,7 +1432,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("an_openapi_document_in_yaml_is_read", async () => {
       const request = openApiOf("/v3/openapi.yaml", "listPets", {});
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1437,7 +1448,7 @@ describe("a call the HTTP client performs for a run", () => {
         { kind: "bearer", token: TOKEN },
       );
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1464,7 +1475,7 @@ describe("a call the HTTP client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toMatchObject({
         kind: "responded",
@@ -1478,7 +1489,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("an_operation_the_document_lacks_is_misconfigured", async () => {
       const request = openApiOf("/v2/swagger.json", "adoptPet", {});
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -1489,7 +1500,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_missing_required_parameter_is_misconfigured", async () => {
       const request = openApiOf("/v2/swagger.json", "getPetById", {});
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -1503,7 +1514,7 @@ describe("a call the HTTP client performs for a run", () => {
         "X-Tenant": "acme",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -1517,7 +1528,7 @@ describe("a call the HTTP client performs for a run", () => {
         color: "red",
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -1529,7 +1540,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_document_that_cannot_be_parsed_is_misconfigured", async () => {
       const request = openApiOf("/v3/broken.json", "listPets", {});
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -1540,7 +1551,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_document_the_server_does_not_have_is_rejected_with_its_status", async () => {
       const request = openApiOf("/missing", "listPets", {});
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -1554,7 +1565,7 @@ describe("a call the HTTP client performs for a run", () => {
         body: { caption: "Rex" },
       });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -1575,7 +1586,7 @@ describe("a call the HTTP client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await openApi.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });
     });
@@ -1585,7 +1596,7 @@ describe("a call the HTTP client performs for a run", () => {
     const anonymous = { kind: "anonymous" } as const;
 
     it("a_redirect_is_not_followed_unless_the_request_asks", async () => {
-      const fetch = client.fetchFor(anonymous, new AbortController().signal);
+      const fetch = gateway.fetchFor(anonymous, new AbortController().signal);
 
       const response = await fetch(`${origin}/moved`);
 
@@ -1594,7 +1605,7 @@ describe("a call the HTTP client performs for a run", () => {
     });
 
     it("a_redirect_the_request_asks_to_follow_is_followed", async () => {
-      const fetch = client.fetchFor(anonymous, new AbortController().signal);
+      const fetch = gateway.fetchFor(anonymous, new AbortController().signal);
 
       const response = await fetch(`${origin}/moved`, { redirect: "follow" });
 
@@ -1606,7 +1617,7 @@ describe("a call the HTTP client performs for a run", () => {
     });
 
     it("a_followed_redirect_to_a_refused_address_is_unreachable", async () => {
-      const fetch = client.fetchFor(anonymous, new AbortController().signal);
+      const fetch = gateway.fetchFor(anonymous, new AbortController().signal);
       const fetched = fetch(`${origin}/escape`, { redirect: "follow" });
 
       const failure = await fetched.then(
@@ -1635,7 +1646,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_resource_answers_its_document", async () => {
       const request = resourceOf("/script.js");
 
-      const outcome = await client.read(request, contextOf());
+      const outcome = await resources.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "fetched",
@@ -1650,7 +1661,7 @@ describe("a call the HTTP client performs for a run", () => {
         password: "lovelace",
       });
 
-      const outcome = await client.read(request, contextOf());
+      const outcome = await resources.perform(request, contextOf());
 
       expect(outcome).toMatchObject({ kind: "fetched" });
     });
@@ -1662,7 +1673,7 @@ describe("a call the HTTP client performs for a run", () => {
         password: "wrong",
       });
 
-      const outcome = await client.read(request, contextOf());
+      const outcome = await resources.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -1674,7 +1685,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_resource_the_server_does_not_have_is_rejected_with_its_status", async () => {
       const request = resourceOf("/missing");
 
-      const outcome = await client.read(request, contextOf());
+      const outcome = await resources.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -1686,7 +1697,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_resource_that_redirects_is_rejected_and_not_followed", async () => {
       const request = resourceOf("/moved");
 
-      const outcome = await client.read(request, contextOf());
+      const outcome = await resources.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -1708,7 +1719,7 @@ describe("a call the HTTP client performs for a run", () => {
         },
       };
 
-      const outcome = await client.read(request, contextOf());
+      const outcome = await resources.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });
     });
@@ -1716,7 +1727,7 @@ describe("a call the HTTP client performs for a run", () => {
     it("a_resource_still_unanswered_at_its_deadline_expires", async () => {
       const request = resourceOf("/hang");
 
-      const outcome = await client.read(request, contextOf({}, 200));
+      const outcome = await resources.perform(request, contextOf({}, 200));
 
       expect(outcome).toEqual({ kind: "expired" });
     });

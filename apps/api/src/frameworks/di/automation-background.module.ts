@@ -51,7 +51,6 @@ import { A2aGateway } from "../../interface-adapters/workflows/effects/a2a.gatew
 import { AsyncApiGateway } from "../../interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
 import { GrpcGateway } from "../../interface-adapters/workflows/effects/grpc.gateway.js";
-import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
 import { McpConnection } from "../../interface-adapters/workflows/effects/interfaces.js";
 import { McpGateway } from "../../interface-adapters/workflows/effects/mcp.gateway.js";
 import { OpenApiGateway } from "../../interface-adapters/workflows/effects/openapi.gateway.js";
@@ -137,7 +136,6 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: ReceivedMessages, useClass: PostgresReceivedMessageStore },
     { provide: ReceiverQueries, useClass: PostgresReceiverQueries },
     PostgresLockStore,
-    HttpGateway,
     OpenApiGateway,
     GrpcGateway,
     McpGateway,

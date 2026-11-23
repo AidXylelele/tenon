@@ -13,6 +13,7 @@ import { resiliencePresets } from "../../../../../src/frameworks/di/host.presets
 import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
 import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
 import { A2aGateway } from "../../../../../src/interface-adapters/workflows/effects/a2a.gateway.js";
+import { ResponseContent } from "../../../../../src/interface-adapters/workflows/effects/response-content.js";
 import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
@@ -24,7 +25,7 @@ import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
-  httpClientOf,
+  httpGatewayOf,
   resourcesOf,
 } from "../../../../support/outbound.js";
 
@@ -92,8 +93,9 @@ describe("a call the A2A gateway performs for a run", () => {
     const authentication = authenticationOf(fetchClientOf(guard.dispatcher));
     return new A2aGateway(
       resourcesOf(guard, resilience),
-      httpClientOf(guard, resilience),
+      httpGatewayOf(guard, resilience),
       authentication,
+      new ResponseContent(),
       new TransportFailures(),
       resilience,
     );

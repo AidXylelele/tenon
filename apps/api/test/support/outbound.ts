@@ -5,16 +5,15 @@ import { Agent } from "undici";
 import type { AsyncApiInbox } from "../../src/interface-adapters/messaging/interfaces.js";
 import { responseSizeLimit } from "../../src/frameworks/di/host.presets.js";
 import type { AddressPolicy } from "../../src/frameworks/network/address-policy.js";
-import { HttpClient } from "../../src/frameworks/http-client/http.client.js";
-import { OpenApiOperations } from "../../src/frameworks/http-client/openapi-operations.js";
-import { ResponseContent } from "../../src/frameworks/http-client/response-content.js";
 import { HOST_PROFILE } from "../../src/frameworks/interpreter/host-profile.js";
+import { OutboundHttpConnection } from "../../src/frameworks/network/outbound.http-connection.js";
 import { OpenIdAuthorizationServer } from "../../src/frameworks/oauth/openid.authorization-server.js";
 import { Authenticator } from "../../src/interface-adapters/workflows/effects/authenticator.js";
+import { HttpGateway } from "../../src/interface-adapters/workflows/effects/http.gateway.js";
 import type { CallContext } from "../../src/interface-adapters/workflows/effects/interfaces.js";
 import { ResourceGateway } from "../../src/interface-adapters/workflows/effects/resource.gateway.js";
+import { ResponseContent } from "../../src/interface-adapters/workflows/effects/response-content.js";
 import { TransportFailures } from "../../src/interface-adapters/workflows/effects/transport-failures.js";
-import type { ResourceClient } from "../../src/interface-adapters/workflows/interfaces.js";
 
 export const SELF_SIGNED = {
   cert: `-----BEGIN CERTIFICATE-----
@@ -55,17 +54,21 @@ export function authenticationOf(identity: NestHttpClient): Authenticator {
   return new Authenticator(server, HOST_PROFILE);
 }
 
-export function httpClientOf(
+export function connectionOf(policy: AddressPolicy): OutboundHttpConnection {
+  const outbound = fetchClientOf(policy.dispatcher);
+  return new OutboundHttpConnection(outbound, policy);
+}
+
+export function httpGatewayOf(
   policy: AddressPolicy,
   resilience: ResilienceService,
   identity: NestHttpClient = fetchClientOf(policy.dispatcher),
-): HttpClient {
-  return new HttpClient(
-    fetchClientOf(policy.dispatcher),
+): HttpGateway {
+  return new HttpGateway(
+    connectionOf(policy),
     authenticationOf(identity),
-    new OpenApiOperations(),
-    new TransportFailures(),
     new ResponseContent(),
+    new TransportFailures(),
     resilience,
   );
 }
@@ -73,9 +76,15 @@ export function httpClientOf(
 export function resourcesOf(
   policy: AddressPolicy,
   resilience: ResilienceService,
-): ResourceClient {
-  const client = httpClientOf(policy, resilience);
-  return new ResourceGateway(client);
+  identity: NestHttpClient = fetchClientOf(policy.dispatcher),
+): ResourceGateway {
+  return new ResourceGateway(
+    httpGatewayOf(policy, resilience, identity),
+    authenticationOf(identity),
+    new ResponseContent(),
+    new TransportFailures(),
+    resilience,
+  );
 }
 
 export function callContextOf(

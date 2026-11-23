@@ -36,7 +36,7 @@ import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
-  httpClientOf,
+  httpGatewayOf,
 } from "../../../../support/outbound.js";
 
 const TOKEN = "token-1";
@@ -91,7 +91,7 @@ describe("a call the MCP gateway performs for a run", () => {
 
   function mcpGatewayOf(guard: AddressPolicy): McpGateway {
     const authentication = authenticationOf(fetchClientOf(guard.dispatcher));
-    const http = httpClientOf(guard, resilience);
+    const http = httpGatewayOf(guard, resilience);
     return new McpGateway(
       new StreamableHttpMcpConnection(),
       authentication,

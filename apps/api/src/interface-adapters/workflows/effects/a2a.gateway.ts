@@ -8,13 +8,14 @@ import type {
   JsonValue,
   RpcOutcome,
 } from "interpreter";
-import { HttpClient } from "../../../frameworks/http-client/http.client.js";
 import { ResourceClient } from "../interfaces.js";
 import { AgentCard } from "./agent-card.js";
 import { AGENT_CARD } from "./agent-card.schema.js";
 import { Authenticator } from "./authenticator.js";
+import { HttpGateway } from "./http.gateway.js";
 import type { Agent, CallContext } from "./interfaces.js";
 import { JSON_RPC_RESPONSE } from "./json-rpc.schema.js";
+import { ResponseContent } from "./response-content.js";
 import { TransportFailures } from "./transport-failures.js";
 
 @Injectable()
@@ -25,8 +26,9 @@ export class A2aGateway {
 
   constructor(
     private readonly resources: ResourceClient,
-    private readonly http: HttpClient,
+    private readonly http: HttpGateway,
     private readonly authenticator: Authenticator,
+    private readonly content: ResponseContent,
     private readonly failures: TransportFailures,
     resilience: ResilienceService,
   ) {
@@ -99,7 +101,7 @@ export class A2aGateway {
       headers,
       body,
     });
-    const text = await response.text();
+    const text = await this.content.textOf(response);
     return this.#outcomeOf(response, text, streamed);
   }
 

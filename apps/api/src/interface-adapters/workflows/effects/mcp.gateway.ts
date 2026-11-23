@@ -14,8 +14,8 @@ import type {
   RpcOutcome,
 } from "interpreter";
 import { $ZodError } from "zod/v4/core";
-import { HttpClient } from "../../../frameworks/http-client/http.client.js";
 import { Authenticator } from "./authenticator.js";
+import { HttpGateway } from "./http.gateway.js";
 import {
   type CallContext,
   type HttpMcpRequest,
@@ -31,7 +31,7 @@ export class McpGateway {
   constructor(
     private readonly connection: McpConnection,
     private readonly authenticator: Authenticator,
-    private readonly http: HttpClient,
+    private readonly http: HttpGateway,
     private readonly failures: TransportFailures,
     resilience: ResilienceService,
   ) {
