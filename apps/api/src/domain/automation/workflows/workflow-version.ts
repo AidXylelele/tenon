@@ -35,37 +35,11 @@ export class WorkflowVersion {
   }
 
   static publish(input: NewPublication): WorkflowVersion {
-    const definition = input.definition;
-    const id = randomUUID();
-    return new WorkflowVersion({
-      id,
-      semver: definition.version,
-      dsl: definition.dsl,
-      digest: definition.digest,
-      programFingerprint: definition.programFingerprint,
-      schedule: definition.schedule,
-      secrets: definition.secrets,
-      publisherId: input.publisherId,
-      publishedAt: input.now,
-      test: false,
-    });
+    return WorkflowVersion.#of(input, false);
   }
 
   static forTest(input: NewPublication): WorkflowVersion {
-    const definition = input.definition;
-    const id = randomUUID();
-    return new WorkflowVersion({
-      id,
-      semver: definition.version,
-      dsl: definition.dsl,
-      digest: definition.digest,
-      programFingerprint: definition.programFingerprint,
-      schedule: definition.schedule,
-      secrets: definition.secrets,
-      publisherId: input.publisherId,
-      publishedAt: input.now,
-      test: true,
-    });
+    return WorkflowVersion.#of(input, true);
   }
 
   get id(): string {
@@ -128,5 +102,22 @@ export class WorkflowVersion {
     if (!same) return { ok: false, failure: WorkflowRefusal.VersionTaken };
 
     return { ok: true, value: { version: this, created: false } };
+  }
+
+  static #of(input: NewPublication, test: boolean): WorkflowVersion {
+    const definition = input.definition;
+    const id = randomUUID();
+    return new WorkflowVersion({
+      id,
+      semver: definition.version,
+      dsl: definition.dsl,
+      digest: definition.digest,
+      programFingerprint: definition.programFingerprint,
+      schedule: definition.schedule,
+      secrets: definition.secrets,
+      publisherId: input.publisherId,
+      publishedAt: input.now,
+      test,
+    });
   }
 }

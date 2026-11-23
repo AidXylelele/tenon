@@ -113,13 +113,7 @@ export class Workflow {
     if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
 
     const version = WorkflowVersion.publish(input);
-    this.#versions = this.#versions.concat([version]);
-    this.#publications.push({
-      version,
-      document: definition.document,
-      imports: definition.imports,
-      source: input.source,
-    });
+    this.#add(version, input);
     this.#currentVersionId = version.id;
 
     if (this.#on) this.#raise(WorkflowEventKind.ScheduleChanged);
@@ -145,13 +139,7 @@ export class Workflow {
       return { ok: true, value: { version: tested, created: false } };
 
     const version = WorkflowVersion.forTest(input);
-    this.#versions = this.#versions.concat([version]);
-    this.#publications.push({
-      version,
-      document: definition.document,
-      imports: definition.imports,
-      source: input.source,
-    });
+    this.#add(version, input);
     return { ok: true, value: { version, created: true } };
   }
 
@@ -273,6 +261,17 @@ export class Workflow {
       originId: previous.id,
       originEffectId: null,
       now: restart.now,
+    });
+  }
+
+  #add(version: WorkflowVersion, input: NewPublication): void {
+    const definition = input.definition;
+    this.#versions = this.#versions.concat([version]);
+    this.#publications.push({
+      version,
+      document: definition.document,
+      imports: definition.imports,
+      source: input.source,
     });
   }
 
