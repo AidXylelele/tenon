@@ -133,7 +133,7 @@ export class Workflow {
     this.#add(version, input);
     this.#currentVersionId = version.id;
 
-    if (this.#on) this.#apply(input.now);
+    if (this.#on) this.#applySchedule(input.now);
 
     return { ok: true, value: { version, created: true } };
   }
@@ -198,7 +198,7 @@ export class Workflow {
     if (this.#on) return { ok: true, value: false };
 
     this.#on = true;
-    this.#apply(now);
+    this.#applySchedule(now);
     return { ok: true, value: true };
   }
 
@@ -207,7 +207,7 @@ export class Workflow {
 
     this.#on = false;
     this.#scheduledSince = null;
-    this.#armAt(null);
+    this.#disarm();
     return true;
   }
 
@@ -389,14 +389,18 @@ export class Workflow {
     return this.scheduledVersion?.schedule ?? null;
   }
 
-  #apply(now: Date): void {
+  #applySchedule(now: Date): void {
     const at = this.#schedule()?.armedAt(now) ?? null;
     this.#scheduledSince = now;
     this.#armAt(at);
   }
 
-  #armAt(at: number | null): void {
+  #disarm(): void {
     this.#arming += 1;
+  }
+
+  #armAt(at: number | null): void {
+    this.#disarm();
 
     if (at === null) return;
 

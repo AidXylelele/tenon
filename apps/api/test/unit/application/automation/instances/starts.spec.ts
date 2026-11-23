@@ -1,6 +1,7 @@
 import { Missing } from "../../../../../src/application/automation/enums.js";
 import type { InputProblem } from "../../../../../src/application/automation/instances/interfaces.js";
 import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
+import { RestartInstance } from "../../../../../src/application/automation/instances/restart-instance.js";
 import { StartInstance } from "../../../../../src/application/automation/instances/start-instance.js";
 import {
   InstanceEventKind,
@@ -44,8 +45,10 @@ async function setUp(
 
   await workflows.save(workflow);
   return {
+    workflows,
     instances,
     events,
+    restart: new RestartInstance(workflows, instances, events, unitOfWork),
     start: new StartInstance(
       workflows,
       instances,
@@ -118,5 +121,30 @@ describe("starting an instance", () => {
     expect(started).toEqual({ ok: false, failure: problems });
     expect(fixture.instances.rows.size).toBe(1);
     expect(fixture.events.started).toHaveLength(0);
+  });
+});
+
+describe("restarting an instance", () => {
+  it("stores_a_new_instance_of_the_same_version_and_dispatches_its_start", async () => {
+    const fixture = await setUp();
+    const workflow = await fixture.workflows.findByName(name);
+    const version = workflow?.versionToRun(null);
+    const ended = anInstanceIn(Phase.Completed, {
+      id: "ended-1",
+      workflowId: workflow?.id ?? "",
+      versionId: version?.id ?? "",
+    });
+    fixture.instances.put(ended);
+
+    const restarted = await fixture.restart.execute({
+      instanceId: "ended-1",
+      starterId: "author-1",
+    });
+
+    const instanceId = restarted.ok ? restarted.value.instanceId : "";
+    expect(fixture.events.kindsOf(instanceId)).toEqual([
+      InstanceEventKind.Started,
+    ]);
+    expect(fixture.events.started[0]?.stored).toBe(true);
   });
 });

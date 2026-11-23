@@ -79,7 +79,7 @@ export class EffectHandler {
 
   async #reacted(
     context: OutboxHandlerContext,
-    message: EffectReference,
+    reference: EffectReference,
     work: () => Promise<void>,
   ): Promise<void> {
     try {
@@ -90,10 +90,6 @@ export class EffectHandler {
 
       if (!permanent && !exhausted) throw error;
 
-      const reference = {
-        instanceId: message.instanceId,
-        effectId: message.effectId,
-      };
       await this.giveUpEffect.execute(reference);
     }
 

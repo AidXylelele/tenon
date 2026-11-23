@@ -261,12 +261,6 @@ export class WorkflowInstance {
     return this.#run.awaits(effectId);
   }
 
-  kindOf(effectId: string): EffectKind | null {
-    if (this.ended || this.#run === null) return null;
-
-    return this.#run.effectOf(effectId)?.kind ?? null;
-  }
-
   requestOf(effectId: string): JsonObject | null {
     if (this.ended || this.#run === null) return null;
 
@@ -430,21 +424,27 @@ export class WorkflowInstance {
     for (const effect of turn.requested) {
       const awaited = run.awaits(effect.id);
 
-      if (awaited) this.#ask(effect);
+      if (!awaited) continue;
+
+      this.#askTheWorld(effect);
+      this.#setTimers(effect);
     }
   }
 
-  #ask(effect: AwaitedEffect): void {
+  #askTheWorld(effect: AwaitedEffect): void {
     const outside = WorkflowInstance.#OUTSIDE.includes(effect.kind);
 
-    if (outside)
-      this.#events.push({
-        kind: InstanceEventKind.EffectRequested,
-        instanceId: this.#id,
-        effectId: effect.id,
-        effect: effect.kind,
-      });
+    if (!outside) return;
 
+    this.#events.push({
+      kind: InstanceEventKind.EffectRequested,
+      instanceId: this.#id,
+      effectId: effect.id,
+      effect: effect.kind,
+    });
+  }
+
+  #setTimers(effect: AwaitedEffect): void {
     const deadlines = effect.wait?.deadlines ?? [];
 
     for (const deadline of deadlines)

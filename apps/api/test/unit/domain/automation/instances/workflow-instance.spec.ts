@@ -125,23 +125,21 @@ describe("what a run asks of the world", () => {
     ]);
   });
 
-  it("knows_the_kind_and_request_of_an_effect_it_awaits", () => {
+  it("knows_the_request_of_an_effect_it_awaits", () => {
     const instance = begun([aCall("/do/0/fetch")]);
 
-    expect(instance.kindOf("/do/0/fetch")).toBe(EffectKind.Call);
     expect(instance.requestOf("/do/0/fetch")).toEqual({
       id: "/do/0/fetch",
       kind: "http",
       deadline: null,
     });
-    expect(instance.kindOf("/do/9/gone")).toBeNull();
+    expect(instance.requestOf("/do/9/gone")).toBeNull();
   });
 
   it("asks_nothing_of_the_world_once_ended", () => {
     const instance = begun([aCall("/do/0/fetch")]);
     instance.cancel(later);
 
-    expect(instance.kindOf("/do/0/fetch")).toBeNull();
     expect(instance.requestOf("/do/0/fetch")).toBeNull();
   });
 
