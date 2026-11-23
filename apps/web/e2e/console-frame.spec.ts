@@ -187,7 +187,7 @@ test.describe("the sidebar's width", () => {
     await expect(column).toHaveAttribute("data-state", "collapsed");
   });
 
-  test("a_reload_at_1100_px_draws_the_icons_without_a_shift", async ({
+  test("a_client_render_at_1100_px_after_a_reload_draws_the_icons_with_no_shift", async ({
     page,
   }) => {
     await page.setViewportSize(COMPACT);
