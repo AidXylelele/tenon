@@ -28,7 +28,7 @@ describe("starting a run", () => {
   });
 
   function openWith(json: string) {
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
     fireEvent.change(screen.getByLabelText("Input"), {
       target: { value: json },
     });
@@ -40,6 +40,7 @@ describe("starting a run", () => {
       <StartDialog
         namespace="sales"
         name="route-lead"
+        title="Route a lead"
         versions={["1.0.0"]}
         currentVersion="1.0.0"
         inputSchema={null}
@@ -47,18 +48,18 @@ describe("starting a run", () => {
     );
     openWith('{"email": "ada@example.com"}');
 
-    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
     await screen.findByText(
       "The platform is not answering; try again in a moment",
     );
-    fireEvent.click(await screen.findByRole("button", { name: "Start run" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Run" }));
     await waitFor(() => {
       expect(startAction).toHaveBeenCalledTimes(2);
     });
     fireEvent.change(screen.getByLabelText("Input"), {
       target: { value: '{"email": "bob@example.com"}' },
     });
-    fireEvent.click(await screen.findByRole("button", { name: "Start run" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Run" }));
     await waitFor(() => {
       expect(startAction).toHaveBeenCalledTimes(3);
     });
@@ -74,6 +75,7 @@ describe("starting a run", () => {
       <StartDialog
         namespace="sales"
         name="route-lead"
+        title="Route a lead"
         versions={[]}
         currentVersion="1.0.0"
         inputSchema={null}
@@ -81,7 +83,7 @@ describe("starting a run", () => {
     );
     openWith("{}");
 
-    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith("/runs/run-1");
@@ -106,17 +108,18 @@ describe("starting a run", () => {
       <StartDialog
         namespace="sales"
         name="route-lead"
+        title="Route a lead"
         versions={[]}
         currentVersion="1.0.0"
         inputSchema={{ format: "json", document }}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
     const email = screen.getByLabelText("email (required)");
 
     fireEvent.change(email, { target: { value: "ada@example.com" } });
     fireEvent.blur(email);
-    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     await waitFor(() => {
       expect(startAction).toHaveBeenCalledWith(
@@ -157,14 +160,15 @@ describe("starting a run", () => {
       <StartDialog
         namespace="sales"
         name="route-lead"
+        title="Route a lead"
         versions={[]}
         currentVersion="1.0.0"
         inputSchema={{ format: "json", document }}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     const refusal = await screen.findByText("Email is required");
     const email = screen.getByRole("textbox", { name: "Email (required)" });
@@ -178,6 +182,7 @@ describe("starting a run", () => {
       <StartDialog
         namespace="sales"
         name="route-lead"
+        title="Route a lead"
         versions={[]}
         currentVersion="1.0.0"
         inputSchema={null}
@@ -185,12 +190,62 @@ describe("starting a run", () => {
     );
     openWith("{ not json");
 
-    fireEvent.click(screen.getByRole("button", { name: "Start run" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
 
     expect(startAction).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Input")).toHaveAttribute(
       "aria-invalid",
       "true",
     );
+  });
+});
+
+describe("the run dialog's versions", () => {
+  it("the_current_version_is_named_and_chosen_and_takes_focus", () => {
+    render(
+      <StartDialog
+        namespace="sales"
+        name="route-lead"
+        title="Route a lead"
+        versions={["1.1.0", "1.0.0"]}
+        currentVersion="1.1.0"
+        inputSchema={null}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    const version = screen.getByRole("combobox", { name: "Version" });
+    expect(version).toHaveTextContent("1.1.0 (current)");
+    expect(version).toHaveFocus();
+  });
+
+  it("a_chosen_earlier_version_runs_by_its_number", async () => {
+    startAction.mockResolvedValue({ ok: true, value: { id: "run-2" } });
+    render(
+      <StartDialog
+        namespace="sales"
+        name="route-lead"
+        title="Route a lead"
+        versions={["1.1.0", "1.0.0"]}
+        currentVersion="1.1.0"
+        inputSchema={null}
+        chosen="1.0.0"
+        label="Run this version"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Run this version" }));
+    fireEvent.click(screen.getByRole("button", { name: "Run" }));
+
+    await waitFor(() => {
+      expect(startAction).toHaveBeenCalledWith(
+        "sales",
+        "route-lead",
+        "1.0.0",
+        {},
+        expect.any(String),
+      );
+    });
   });
 });

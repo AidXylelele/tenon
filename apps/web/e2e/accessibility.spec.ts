@@ -43,6 +43,7 @@ const MODAL_STORIES = [
   "design-system-components-command--open",
   "design-system-components-fields--select-open",
   "design-system-components-sidebar--mobile-sheet-open",
+  "spaces-workflows-workflow--run-dialog",
 ];
 
 const REVIEWED_INCOMPLETE: readonly Reviewed[] = [

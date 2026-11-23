@@ -3,7 +3,6 @@
 import { PlayIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import { toast } from "sonner";
 import type { Problem } from "@/libs/data-access/problem";
 import type { InputSchema } from "@/libs/data-access/types";
 import { FieldControl } from "@/libs/forms/field-control";
@@ -49,9 +48,12 @@ import {
 interface StartDialogProps {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string;
   readonly versions: readonly string[];
   readonly currentVersion: string;
   readonly inputSchema: InputSchema | null;
+  readonly chosen?: string;
+  readonly label?: string;
   readonly defaultOpen?: boolean;
 }
 
@@ -61,20 +63,27 @@ const NO_INPUT: JsonObject = {};
 export function StartDialog({
   namespace,
   name,
+  title,
   versions,
   currentVersion,
   inputSchema,
+  chosen = currentVersion,
+  label = "Run",
   defaultOpen = false,
 }: StartDialogProps) {
   const router = useRouter();
+  const first = chosen === currentVersion ? LATEST : chosen;
   const [open, setOpen] = useState(defaultOpen);
-  const [version, setVersion] = useState(LATEST);
+  const [version, setVersion] = useState(first);
   const [json, setJson] = useState("{}");
   const [formed, setFormed] = useState(NO_INPUT);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [pending, start] = useTransition();
   const keys = useRef(new Map<string, string>());
+  const versionField = useRef<HTMLButtonElement>(null);
+  const earlier = versions.filter((each) => each !== currentVersion);
+  const currentLabel = `${currentVersion} (current)`;
   const current = version === LATEST || version === currentVersion;
   const refusals = refusalsOf(problem);
   const fields = current ? inputFieldsOf(inputSchema, formed, refusals) : null;
@@ -119,9 +128,6 @@ export function StartDialog({
       }
 
       keys.current.clear();
-      toast.success(`Started ${name}`, {
-        description: "Following the run live.",
-      });
       router.push(runHref(outcome.value.id));
     });
   }
@@ -138,16 +144,21 @@ export function StartDialog({
       <DialogTrigger asChild>
         <Button>
           <PlayIcon data-icon="inline-start" />
-          Start
+          {label}
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          versionField.current?.focus();
+        }}
+      >
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle>Start {name}</DialogTitle>
+            <DialogTitle>Run “{title}”</DialogTitle>
             <DialogDescription>
-              The run gets this input as its data. You follow it live on its
-              page.
+              The run gets this input as its data; its page opens when it
+              starts.
             </DialogDescription>
           </DialogHeader>
           <ProblemMessage problem={unplaced} />
@@ -155,12 +166,16 @@ export function StartDialog({
             <Field>
               <FieldLabel htmlFor="start-version">Version</FieldLabel>
               <Select value={version} onValueChange={setVersion}>
-                <SelectTrigger id="start-version" className="w-full">
+                <SelectTrigger
+                  ref={versionField}
+                  id="start-version"
+                  className="w-full"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={LATEST}>The current version</SelectItem>
-                  {versions.map((each) => (
+                  <SelectItem value={LATEST}>{currentLabel}</SelectItem>
+                  {earlier.map((each) => (
                     <SelectItem key={each} value={each}>
                       {each}
                     </SelectItem>
@@ -218,8 +233,12 @@ export function StartDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending && <Spinner data-icon="inline-start" />}
-              {pending ? "Starting…" : "Start run"}
+              {pending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <PlayIcon data-icon="inline-start" />
+              )}
+              {pending ? "Starting…" : "Run"}
             </Button>
           </DialogFooter>
         </form>
