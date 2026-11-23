@@ -17,7 +17,7 @@ import {
   seriesOf,
 } from "@/operations/run-periods";
 import { PeriodFigures, PeriodPicker, RunsChart } from "@/features/runs-chart";
-import { AutomaticStarts } from "./automatic-starts";
+import { StartsAutomatically } from "./automatic-starts";
 import { NeedsAttention } from "./needs-attention";
 
 const STATUS_OF: Readonly<Record<FigureKind, string | undefined>> = {
@@ -35,6 +35,8 @@ export interface HomePageProps {
   readonly failing: FailingWorkflows;
   readonly paused: readonly ListedInstance[];
   readonly expected: readonly ExpectedStarts[];
+  readonly operator: boolean;
+  readonly author: boolean;
 }
 
 export function HomePage({
@@ -45,6 +47,8 @@ export function HomePage({
   failing,
   paused,
   expected,
+  operator,
+  author,
 }: HomePageProps) {
   const figures = figuresOf(counts.total, counts.previous?.counts ?? null);
   const inProgress = inProgressOf(counts.now);
@@ -55,6 +59,7 @@ export function HomePage({
     runsHref({ status: STATUS_OF[kind], started: period });
   const inProgressHref = runsHref({ status: "in-progress" });
   const failedHref = runsHref({ status: "failed", started: period });
+  const failed = counts.total.faulted;
 
   return (
     <>
@@ -87,11 +92,13 @@ export function HomePage({
       </section>
       <NeedsAttention
         period={period}
+        failed={failed}
         failing={failing}
         paused={paused}
         failedHref={failedHref}
+        operator={operator}
       />
-      <AutomaticStarts expected={expected} />
+      <StartsAutomatically expected={expected} zone={zone} author={author} />
     </>
   );
 }

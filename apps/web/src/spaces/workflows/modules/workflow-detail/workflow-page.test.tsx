@@ -156,7 +156,7 @@ describe("a workflow's page", () => {
 
     await waitFor(() => {
       expect(success).toHaveBeenCalledWith(
-        "Automatic starts turned off for daily-digest",
+        "Automatic starts turned off for Daily digest",
         expect.objectContaining({ duration: Infinity }),
       );
     });

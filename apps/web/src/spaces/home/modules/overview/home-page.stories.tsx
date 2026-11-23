@@ -20,12 +20,12 @@ const NONE: PhaseCounts = {
 
 const DAILY = [
   [38, 2, 0],
-  [41, 6, 1],
-  [36, 3, 0],
-  [44, 12, 1],
-  [39, 4, 0],
+  [41, 3, 1],
+  [36, 2, 0],
+  [44, 6, 1],
+  [39, 3, 0],
   [27, 1, 0],
-  [22, 3, 1],
+  [22, 2, 1],
 ];
 
 const BUCKETS = WINDOWS.buckets.map((bucket, index) => {
@@ -38,7 +38,7 @@ const BUCKETS = WINDOWS.buckets.map((bucket, index) => {
 const COUNTS: InstanceCounts & { readonly readAt: number } = {
   to: NOW,
   buckets: BUCKETS,
-  total: { ...NONE, completed: 247, faulted: 31, cancelled: 3, running: 3 },
+  total: { ...NONE, completed: 247, faulted: 19, cancelled: 3, running: 3 },
   previous: {
     from: WINDOWS.previous.from,
     counts: { ...NONE, completed: 230, faulted: 18, cancelled: 3 },
@@ -122,6 +122,8 @@ const meta = {
         waits: [],
       },
     ],
+    operator: true,
+    author: true,
     expected: [
       {
         namespace: "ops",

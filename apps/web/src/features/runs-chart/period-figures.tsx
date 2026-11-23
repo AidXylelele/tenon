@@ -75,7 +75,7 @@ export function PeriodFigures({
       ))}
       <span
         aria-hidden
-        className="hidden w-px self-stretch bg-border sm:block"
+        className="hidden w-px self-stretch bg-border xl:block"
       />
       <Link href={inProgressHref} className={FIGURE}>
         <span className="flex items-center gap-1.5 text-sm text-muted-foreground">

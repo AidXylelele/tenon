@@ -35,6 +35,7 @@ import { RouteTabs } from "@/libs/ui/composites/route-tabs";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
 import { PhaseStatus } from "@/features/run-status";
 import { RunTable } from "@/features/run-table";
+import { AutomaticStarts } from "@/features/automatic-starts";
 import { ViewerLine } from "@/features/viewer-notice";
 import { WorkflowFlow } from "@/features/workflow-flow";
 import {
@@ -45,7 +46,7 @@ import {
   startWordsOf,
   workflowStartOf,
 } from "../../__shared_context/workflow-start";
-import { AutomaticStarts } from "./automatic-starts";
+import { turnAction } from "./actions";
 import { WorkflowMenu } from "./workflow-menu";
 
 export type WorkflowTab = "overview" | "runs" | "versions";
@@ -80,7 +81,8 @@ export function WorkflowPage({
   const automatic = workflowStartOf(workflow.schedule).automatic;
   const startWords =
     structure === null ? "Not published yet" : startWordsOf(structure.triggers);
-  const title = structure?.title ?? name;
+  const title = workflow.title ?? name;
+  const turn = turnAction.bind(null, namespace, name);
   const published = versions.find((version) => version.current);
   const versionNames = versions.map((version) => version.version);
   const versionCount = String(versions.length);
@@ -173,10 +175,11 @@ export function WorkflowPage({
       ) : (
         automatic && (
           <AutomaticStarts
-            namespace={namespace}
-            name={name}
+            workflow={title}
             on={workflow.on}
             disabled={!edits}
+            labelled
+            turn={turn}
           />
         )
       )}

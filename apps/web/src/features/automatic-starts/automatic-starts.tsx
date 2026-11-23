@@ -4,20 +4,14 @@ import { useId, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { Switch } from "@/libs/ui/components/switch";
-import { turnAction } from "./actions";
-
-interface AutomaticStartsProps {
-  readonly namespace: string;
-  readonly name: string;
-  readonly on: boolean;
-  readonly disabled: boolean;
-}
+import type { AutomaticStartsProps } from "./interfaces";
 
 export function AutomaticStarts({
-  namespace,
-  name,
+  workflow,
   on,
-  disabled,
+  disabled = false,
+  labelled = false,
+  turn,
 }: AutomaticStartsProps) {
   const [shown, setShown] = useOptimistic(on);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -25,12 +19,13 @@ export function AutomaticStarts({
   const label = useId();
   const reason = useId();
   const state = shown ? "On" : "Off";
+  const named = labelled ? undefined : `${workflow} starts automatically`;
 
-  function turn(next: boolean) {
+  function change(next: boolean) {
     setRefusal(null);
     start(async () => {
       setShown(next);
-      const outcome = await turnAction(namespace, name, next);
+      const outcome = await turn(next);
 
       if (!outcome.ok) {
         setRefusal(outcome.problem.detail);
@@ -38,12 +33,12 @@ export function AutomaticStarts({
       }
 
       const done = next
-        ? `Automatic starts turned on for ${name}`
-        : `Automatic starts turned off for ${name}`;
+        ? `Automatic starts turned on for ${workflow}`
+        : `Automatic starts turned off for ${workflow}`;
       const undo = {
         label: "Undo",
         onClick: () => {
-          turn(!next);
+          change(!next);
         },
       };
       toast.success(done, { duration: Infinity, action: undo });
@@ -55,14 +50,17 @@ export function AutomaticStarts({
       <div className="flex items-center gap-2">
         <Switch
           checked={shown}
-          onCheckedChange={turn}
+          onCheckedChange={change}
           disabled={disabled || pending}
-          aria-labelledby={label}
+          aria-label={named}
+          aria-labelledby={labelled ? label : undefined}
           aria-describedby={refusal === null ? undefined : reason}
         />
-        <span id={label} className="text-body font-semibold">
-          Starts automatically
-        </span>
+        {labelled && (
+          <span id={label} className="text-body font-semibold">
+            Starts automatically
+          </span>
+        )}
         <span className="text-body text-muted-foreground">{state}</span>
         {pending && <Spinner className="size-4 text-muted-foreground" />}
       </div>
