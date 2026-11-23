@@ -46,6 +46,9 @@ const MODAL_STORIES = [
   "spaces-shell-console-frame--search-open",
   "spaces-shell-console-frame--search-results",
   "spaces-shell-console-frame--narrow-drawer-open",
+];
+
+const PAGE_MODAL_STORIES = [
   "spaces-workflows-workflow--run-dialog",
   "spaces-connections-webhooks--send-a-test-event",
   "spaces-connections-webhooks--new-webhook",
@@ -73,6 +76,20 @@ const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
     target: "data-radix-focus-guard",
     reason:
       "Radix's focus guards are hidden spans that send focus back into the open modal, which traps it.",
+  },
+  {
+    rule: "aria-hidden-focus",
+    stories: PAGE_MODAL_STORIES,
+    target: "",
+    reason:
+      "A page story with its dialog open: Radix hides the page behind the modal and its focus trap keeps every hidden control out of the Tab order until the dialog closes.",
+  },
+  {
+    rule: "color-contrast",
+    stories: ["spaces-workflows-version--code"],
+    target: 'span[title="Fold line"]',
+    reason:
+      "CodeMirror's fold markers are glyphs, not text; the gutter's colours meet 3:1 in the token table.",
   },
 ];
 
