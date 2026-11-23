@@ -43,7 +43,6 @@ import type {
 } from "../interfaces.js";
 import { TaskRecordMapper } from "../mappers/task-record.mapper.js";
 import { TaskValueMapper } from "../mappers/task-value.mapper.js";
-import { WorkflowInstanceMapper } from "../mappers/workflow-instance.mapper.js";
 import {
   event as events,
   taskValue as taskValues,
@@ -72,7 +71,6 @@ export class PostgresInstanceQueries implements InstanceQueries {
 
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly workflowInstanceMapper: WorkflowInstanceMapper,
     private readonly taskRecordMapper: TaskRecordMapper,
     private readonly taskValueMapper: TaskValueMapper,
   ) {}
