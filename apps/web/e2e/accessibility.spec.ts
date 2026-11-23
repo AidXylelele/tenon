@@ -76,7 +76,11 @@ const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
   },
   {
     rule: "color-contrast",
-    stories: ["libs-codemirror--workflow", "spaces-workflows-version--code"],
+    stories: [
+      "libs-codemirror--workflow",
+      "spaces-workflows-version--code",
+      "spaces-workflows-modules-workflow-editor-publish-refusal--refused-schedule",
+    ],
     target: 'span[title="Fold line"]',
     reason:
       "CodeMirror's fold markers are glyphs, not text; the gutter's colours meet 3:1 in the token table.",

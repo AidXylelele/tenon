@@ -4,10 +4,7 @@ import { CircleXIcon, SendIcon, TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import {
-  type Diagnostic,
-  DiagnosticSeverity,
-} from "vscode-languageserver-protocol";
+import type { Diagnostic } from "vscode-languageserver-protocol";
 import { codeOf, type Outcome, type Problem } from "@/libs/data-access/problem";
 import type { Version } from "@/libs/data-access/types";
 import { workflowHref } from "@/libs/routing/routes";
@@ -16,6 +13,7 @@ import { Spinner } from "@/libs/ui/components/spinner";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import type { WorkflowSession } from "@/operations/workflow-language";
 import type { ChangeReading, PublishChoice, Publication } from "./interfaces";
+import { platformProblemsOf } from "./platform-problems";
 import { PublishDialog } from "./publish-dialog";
 import { freeVersion, writtenVersionOf } from "./version";
 
@@ -50,6 +48,12 @@ const FIRST_VERSION = "1.0.0";
 const READING: ChangeReading = { kind: "reading" };
 
 const NO_CHANGES: ChangeReading = { kind: "read", changes: [] };
+
+const REFUSED: StatusLook = {
+  tone: "danger",
+  icon: CircleXIcon,
+  label: "Publishing refused — see Problems",
+};
 
 export function PublishBar({
   session,
@@ -94,14 +98,16 @@ export function PublishBar({
   async function refuse(problem: Problem) {
     const pointers = problem.errors.map((error) => error.pointer);
     const placed = await session.rangesOf(pointers);
-    const located = problem.errors.map((error, index) => {
-      const pointed = placed.ranges[index] ?? null;
-      const range =
-        error.line === null ? pointed : rangeAt(error.line, error.column);
-      return platformProblemOf(error.detail, range, error.pointer);
-    });
+    const located = platformProblemsOf(problem, placed.ranges);
     onPlatformProblems(located);
-    setOutcome({ tone: "danger", icon: CircleXIcon, label: problem.detail });
+
+    if (located.length === 0) {
+      setOutcome({ tone: "danger", icon: CircleXIcon, label: problem.detail });
+      return;
+    }
+
+    setOutcome(REFUSED);
+    onShowProblems();
   }
 
   function openDialog() {
@@ -167,8 +173,12 @@ export function PublishBar({
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <span aria-live="polite" className="text-sm">
+    <div className="flex min-w-0 items-center justify-end gap-2">
+      <span
+        aria-live="polite"
+        title={outcome?.label}
+        className="max-w-72 min-w-0 truncate text-sm"
+      >
         {busy && (
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <Spinner />
@@ -219,24 +229,4 @@ export function PublishBar({
       )}
     </div>
   );
-}
-
-function rangeAt(line: number, column: number | null): Diagnostic["range"] {
-  const start = { line: line - 1, character: (column ?? 1) - 1 };
-  return { start, end: start };
-}
-
-function platformProblemOf(
-  detail: string,
-  range: Diagnostic["range"] | null,
-  pointer: string,
-): Diagnostic {
-  const start = { line: 0, character: 0 };
-  return {
-    range: range ?? { start, end: start },
-    severity: DiagnosticSeverity.Error,
-    source: "platform",
-    message: detail,
-    data: { pointer },
-  };
 }
