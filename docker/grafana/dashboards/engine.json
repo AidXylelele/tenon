@@ -1,6 +1,6 @@
 {
   "uid": "tenon-engine",
-  "title": "Tenon \u00b7 Workflow engine",
+  "title": "Tenon · Workflow engine",
   "description": "The durable engine: executions, step attempts with journaling, and the outbox.",
   "tags": ["tenon"],
   "editable": false,
@@ -131,7 +131,7 @@
     {
       "type": "timeseries",
       "title": "Runs ended per minute",
-      "description": "Throughput (thesis \u04133): runs ended per minute; read it against the number of worker replicas.",
+      "description": "Throughput (thesis Г3): runs ended per minute; read it against the number of worker replicas.",
       "id": 3,
       "datasource": {
         "type": "prometheus",
@@ -202,7 +202,7 @@
     {
       "type": "timeseries",
       "title": "Attempts per second",
-      "description": "RED \u00b7 rate: step attempts that ran, failed ones included (replays make no span), by kind; from the step spans.",
+      "description": "RED · rate: step attempts that ran, failed ones included (replays make no span), by kind; from the step spans.",
       "id": 5,
       "datasource": {
         "type": "prometheus",
@@ -260,7 +260,7 @@
     {
       "type": "timeseries",
       "title": "Attempt errors per second",
-      "description": "RED \u00b7 errors: attempts that threw, by kind; from the step spans with an error status.",
+      "description": "RED · errors: attempts that threw, by kind; from the step spans with an error status.",
       "id": 6,
       "datasource": {
         "type": "prometheus",
@@ -318,7 +318,7 @@
     {
       "type": "timeseries",
       "title": "Attempt duration",
-      "description": "RED \u00b7 duration: p50 and p99 of a completed step attempt without the journal write, by kind.",
+      "description": "RED · duration: p50 and p99 of a completed step attempt without the journal write, by kind.",
       "id": 7,
       "datasource": {
         "type": "prometheus",
@@ -387,7 +387,7 @@
     {
       "type": "timeseries",
       "title": "Compensation failures",
-      "description": "RED \u00b7 errors: undos that gave up halfway and need a person, by workflow.",
+      "description": "RED · errors: undos that gave up halfway and need a person, by workflow.",
       "id": 8,
       "datasource": {
         "type": "prometheus",
@@ -445,7 +445,7 @@
     {
       "type": "timeseries",
       "title": "Lock losses",
-      "description": "RED \u00b7 errors: leases another worker took over while this one held them.",
+      "description": "RED · errors: leases another worker took over while this one held them.",
       "id": 9,
       "datasource": {
         "type": "prometheus",
@@ -502,7 +502,7 @@
     },
     {
       "type": "row",
-      "title": "Journaling (thesis \u04134)",
+      "title": "Journaling (thesis Г4)",
       "collapsed": false,
       "id": 16,
       "gridPos": {
@@ -610,150 +610,6 @@
       ]
     },
     {
-      "type": "stat",
-      "title": "Journaling share of an effect step",
-      "description": "Thesis \u04134, for the whole time range: the two journal writes of an attempt over the mean effect-step attempt, which excludes them. Takes a journal write to cost the same whatever the step; read it on workflows without child runs or waits; red above 10 %.",
-      "id": 18,
-      "datasource": {
-        "type": "tempo",
-        "uid": "tempo"
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 12,
-        "y": 27
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "refId": "J",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ kind = consumer && name =~ \"execute .+\" } > { span.db.system.name = \"postgresql\" } | sum_over_time(duration)",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "W",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ kind = consumer && name =~ \"execute .+\" } > { span.db.query.text =~ `(?s)INSERT INTO \\S+\\.journal .*` } | count_over_time()",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "S",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ name = \"step effect\" } | sum_over_time(duration)",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "N",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ name = \"step effect\" } | count_over_time()",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "RJ",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "J",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "RW",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "W",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "RS",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "S",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "RN",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "N",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "X",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "math",
-          "expression": "2 * $RJ / $RW / ($RS / $RN)"
-        }
-      ]
-    },
-    {
       "type": "row",
       "title": "Outbox",
       "collapsed": false,
@@ -827,7 +683,7 @@
     {
       "type": "timeseries",
       "title": "Failures per second",
-      "description": "RED \u00b7 errors: retries and dead letters, by topic.",
+      "description": "RED · errors: retries and dead letters, by topic.",
       "id": 22,
       "datasource": {
         "type": "prometheus",
