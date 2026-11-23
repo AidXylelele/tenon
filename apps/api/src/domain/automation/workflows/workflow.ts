@@ -211,15 +211,6 @@ export class Workflow {
     return true;
   }
 
-  armSchedule(now: Date): boolean {
-    const at = this.#schedule()?.armedAt(now) ?? null;
-
-    if (at === null) return false;
-
-    this.#armAt(at);
-    return true;
-  }
-
   fireSchedule(fire: ScheduleFire): boolean {
     const schedule = this.#schedule();
 

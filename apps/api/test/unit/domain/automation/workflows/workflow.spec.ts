@@ -292,15 +292,6 @@ describe("Workflow firing its schedule", () => {
     expect(continued).toBe(false);
     expect(workflow.arming).toBe(1);
   });
-
-  it("an_unarmed_schedule_is_armed_again_on_start_up", () => {
-    const workflow = scheduled();
-
-    const rearmed = workflow.armSchedule(later);
-
-    expect(rearmed).toBe(true);
-    expect(armed(workflow)).toEqual([[2, later.getTime() + MINUTE]]);
-  });
 });
 
 describe("Workflow starting instances by itself", () => {

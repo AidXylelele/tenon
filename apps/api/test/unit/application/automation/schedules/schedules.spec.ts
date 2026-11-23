@@ -1,12 +1,10 @@
 import type { AcceptedEvent } from "../../../../../src/application/automation/events/interfaces.js";
 import type { EventStore } from "../../../../../src/application/automation/events/ports.js";
 import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
-import { ArmSchedules } from "../../../../../src/application/automation/schedules/arm-schedules.js";
 import { ContinueSchedule } from "../../../../../src/application/automation/schedules/continue-schedule.js";
 import { FireSchedule } from "../../../../../src/application/automation/schedules/fire-schedule.js";
 import { StartOnEvent } from "../../../../../src/application/automation/schedules/start-on-event.js";
 import { StartScheduledInstance } from "../../../../../src/application/automation/schedules/start-scheduled-instance.js";
-import type { WorkflowQueries } from "../../../../../src/application/automation/workflows/queries.js";
 import { TurnWorkflowOff } from "../../../../../src/application/automation/workflows/turn-workflow-off.js";
 import { TurnWorkflowOn } from "../../../../../src/application/automation/workflows/turn-workflow-on.js";
 import {
@@ -71,14 +69,11 @@ function runtimeAccepting(accepts: boolean): WorkflowRuntime {
   return runtime as unknown as WorkflowRuntime;
 }
 
-function setUp(unarmed: string[] = [], accepts = true) {
+function setUp(accepts = true) {
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository();
   const instanceEvents = new RecordingInstanceEvents(instances);
   const workflowEvents = new RecordingWorkflowEvents();
-  const queries = {
-    unarmedSchedules: () => Promise.resolve(unarmed.slice()),
-  } as unknown as WorkflowQueries;
   return {
     workflows,
     instances,
@@ -99,7 +94,6 @@ function setUp(unarmed: string[] = [], accepts = true) {
       workflowEvents,
       unitOfWork,
     ),
-    arm: new ArmSchedules(queries, workflows, workflowEvents, unitOfWork),
     startOnEvent: new StartOnEvent(
       eventsOf(PAID),
       workflows,
@@ -286,7 +280,7 @@ describe("the instance an event starts", () => {
   });
 
   it("an_event_the_workflow_does_not_accept_starts_nothing", async () => {
-    const fixture = setUp([], false);
+    const fixture = setUp(false);
     const { workflow } = await aWorkflow(fixture, true);
 
     await fixture.startOnEvent.execute({
@@ -339,19 +333,5 @@ describe("the next link of an after chain", () => {
     await fixture.continued.execute({ instanceId: "instance-1" });
 
     expect(fixture.workflowEvents.dispatched).toEqual([]);
-  });
-});
-
-describe("arming the schedules on start-up", () => {
-  it("arms_each_scheduled_workflow_nothing_armed_and_skips_one_turned_off", async () => {
-    const unarmed: string[] = [];
-    const fixture = setUp(unarmed);
-    const { workflow } = await aWorkflow(fixture, true);
-    unarmed.push(workflow.id, "gone");
-
-    await fixture.arm.execute();
-
-    expect(fixture.workflowEvents.calls).toEqual([workflow.id]);
-    expect(fixture.instanceEvents.dispatched).toEqual([]);
   });
 });

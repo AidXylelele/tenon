@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { WorkflowRepository } from "../../../../../src/application/automation/workflows/ports.js";
 import { WorkflowQueries } from "../../../../../src/application/automation/workflows/queries.js";
-import { WorkflowStatus } from "../../../../../src/domain/automation/workflows/enums.js";
+import {
+  ScheduleKind,
+  WorkflowStatus,
+} from "../../../../../src/domain/automation/workflows/enums.js";
+import { Schedule } from "../../../../../src/domain/automation/workflows/schedule.js";
 import { Workflow } from "../../../../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../../../../src/domain/automation/workflows/workflow-name.js";
 import type { WorkflowVersion } from "../../../../../src/domain/automation/workflows/workflow-version.js";
@@ -18,6 +22,7 @@ import { inTransaction, truncateAll } from "../../../../support/db.js";
 const name = new WorkflowName("sales", "route-lead");
 const now = new Date("2026-11-03T10:00:00.000Z");
 const source = "document:\n  name: route-lead\n";
+const MINUTE = 60_000;
 
 describe("workflow persistence", () => {
   let t: TestApp;
@@ -178,6 +183,38 @@ describe("workflow persistence", () => {
     expect(archived?.status).toBe(WorkflowStatus.Archived);
     expect(archived?.archivedAt?.toISOString()).toBe(now.toISOString());
     expect(archived?.versionToRun(null)?.id).toBe(version.id);
+  });
+
+  it("the_schedule_arming_and_since_round_trip_on_and_off", async () => {
+    const workflow = Workflow.register(name);
+    const everyMinute = new Schedule({
+      kind: ScheduleKind.Every,
+      interval: MINUTE,
+    });
+    const definition = aDefinition({}, "d-1", everyMinute);
+    workflow.publish({ definition, source: null, publisherId, now });
+    workflow.turnOn(now);
+    await saved(workflow);
+
+    const on = await workflows.findById(workflow.id);
+    assert.exists(on);
+    const armed = {
+      on: on.on,
+      arming: on.arming,
+      scheduledSince: on.scheduledSince,
+    };
+    on.turnOff();
+    await saved(on);
+    const off = await workflows.findById(workflow.id);
+
+    expect(armed).toEqual({
+      on: true,
+      arming: 1,
+      scheduledSince: now,
+    });
+    expect(off?.on).toBe(false);
+    expect(off?.arming).toBe(2);
+    expect(off?.scheduledSince).toBeNull();
   });
 
   it("a_stale_copy_of_a_workflow_is_refused", async () => {

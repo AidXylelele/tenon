@@ -33,7 +33,6 @@ import { StartChildForEffect } from "../../application/automation/instances/star
 import { StartDetachedProcess } from "../../application/automation/instances/start-detached-process.js";
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
-import { ArmSchedules } from "../../application/automation/schedules/arm-schedules.js";
 import { FireSchedule } from "../../application/automation/schedules/fire-schedule.js";
 import { StartScheduledInstance } from "../../application/automation/schedules/start-scheduled-instance.js";
 import { DeliverEvent } from "../../application/automation/subscriptions/deliver-event.js";
@@ -44,7 +43,6 @@ import {
   DeliveryLog,
 } from "../../application/automation/subscriptions/ports.js";
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
-import { ScheduleJobs } from "../../interface-adapters/jobs/schedule.jobs.js";
 import { AsyncApiHandler } from "../../interface-adapters/messaging/asyncapi.handler.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
 import { ConsumerSpan } from "../../interface-adapters/messaging/consumer-span.js";
@@ -132,7 +130,6 @@ import { OutboundModule } from "./outbound.module.js";
     FireSchedule,
     StartScheduledInstance,
     ContinueSchedule,
-    ArmSchedules,
     MatchSubscriptions,
     DeliverEvent,
     FailDelivery,
@@ -149,7 +146,6 @@ import { OutboundModule } from "./outbound.module.js";
     ScheduleHandler,
     AsyncApiHandler,
     RetentionJobs,
-    ScheduleJobs,
     InboundMapper,
     { provide: EventOffers, useClass: PostgresEventOfferStore },
     { provide: DeliveryLog, useClass: PostgresDeliveryLogStore },

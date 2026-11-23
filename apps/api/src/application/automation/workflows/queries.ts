@@ -43,5 +43,4 @@ export abstract class WorkflowQueries {
     slots: readonly StartSlot[],
   ): Promise<ScheduledStarts[]>;
   abstract scheduled(): Promise<ScheduledWorkflow[]>;
-  abstract unarmedSchedules(): Promise<string[]>;
 }
