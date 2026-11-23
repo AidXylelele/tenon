@@ -4,6 +4,7 @@ FROM ghcr.io/pnpm/pnpm:12.8.1@sha256:44cfd11d75b901dc7a83a16812d9134e4bf9d82f6b0
 ENV CI=true HUSKY=0
 WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN --mount=type=cache,id=pnpm,target=/var/cache/pnpm \
     pnpm fetch --store-dir /var/cache/pnpm
 
