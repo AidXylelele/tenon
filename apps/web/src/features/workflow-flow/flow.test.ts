@@ -7,8 +7,10 @@ import {
   doneExitOf,
   jumpsOf,
   sourcesOf,
+  placeOf,
   stepsIn,
   stepsUnder,
+  stepWithId,
 } from "./flow";
 import {
   DAILY_DIGEST,
@@ -338,5 +340,24 @@ describe("every step of a list, nested ones after their block", () => {
       each.name,
       "Send the invoice",
     ]);
+  });
+});
+
+describe("a step found by its id and its place in its list", () => {
+  it("a_nested_step_is_found_with_its_list_index_and_the_lists_size", () => {
+    const [prepare] = MONTH_END.steps.steps;
+    const inner = prepare?.lists[0];
+    const added = inner?.steps[1];
+
+    if (inner === undefined || added === undefined)
+      throw new Error("Month-end has no nested steps");
+
+    const found = stepWithId(MONTH_END.steps, added.id);
+    const place = placeOf(MONTH_END.steps, added.id);
+
+    expect(found).toBe(added);
+    expect(place).toEqual({ list: inner.id, index: 1, size: 2 });
+    expect(stepWithId(MONTH_END.steps, "nowhere")).toBeNull();
+    expect(placeOf(MONTH_END.steps, "nowhere")).toBeNull();
   });
 });

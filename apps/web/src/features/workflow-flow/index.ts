@@ -4,13 +4,14 @@ export type {
   FlowMode,
   InsertPlace,
   Iteration,
+  ListPlace,
   RunMode,
   RunStart,
   StepMark,
   StepRun,
   WorkflowFlowProps,
 } from "./interfaces";
-export { stepsIn, stepsUnder } from "./flow";
+export { placeOf, stepsIn, stepsUnder, stepWithId } from "./flow";
 export { START } from "./items";
 export { kindLookOf } from "./looks";
 export { WorkflowFlow } from "./workflow-flow";
