@@ -1,5 +1,6 @@
 export {
   childPointerOf,
+  isJsonArray,
   isJsonObject,
   lastTokenOf,
   parentPointerOf,

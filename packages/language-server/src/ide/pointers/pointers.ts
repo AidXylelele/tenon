@@ -94,7 +94,7 @@ export function isJsonObject(value: unknown): value is JsonObject {
   return isComposite && !Array.isArray(value);
 }
 
-function isJsonArray(value: JsonArray | JsonObject): value is JsonArray {
+export function isJsonArray(value: JsonValue | undefined): value is JsonArray {
   return Array.isArray(value);
 }
 

@@ -190,6 +190,50 @@ test.each([
   },
 );
 
+const brokenRoute = `${inlineHeader}do:
+  - route:
+      switch:
+        - known:
+            when: '\${ .a | }'
+            then: end
+        - other:
+            then: nowhere
+`;
+
+test("a problem inside a case is reported at the case, not at the switch", () => {
+  const fields = fieldsOf(brokenRoute, "/do/route");
+  const cases = fieldOf(fields, "switch");
+
+  const placed = cases?.fields.map((field) => {
+    const pointers = field.diagnostics.map((problem) => problem.pointer);
+    return [field.pointer, pointers];
+  });
+
+  expect(cases?.diagnostics).toEqual([]);
+  expect(placed).toEqual([
+    ["/do/0/route/switch/0/known", ["/do/0/route/switch/0/known/when"]],
+    ["/do/0/route/switch/1/other", ["/do/0/route/switch/1/other/then"]],
+  ]);
+});
+
+test("a case is a group of its condition and its next step", () => {
+  const fields = fieldsOf(brokenRoute, "/do/route");
+  const cases = fieldOf(fields, "switch");
+
+  const known = cases?.fields[0];
+  const keys = known?.fields.map((field) => field.key);
+
+  expect(known).toMatchObject({
+    key: "known",
+    title: "Known",
+    input: "group",
+    section: "settings",
+    written: true,
+    required: true,
+  });
+  expect(keys).toEqual(["when", "then"]);
+});
+
 test("an object of named members is a group of fields in its section", () => {
   const fields = fieldsOf(paused, "/do/pause");
 

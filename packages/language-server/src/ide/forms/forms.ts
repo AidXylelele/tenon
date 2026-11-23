@@ -20,7 +20,12 @@ import {
 } from "../variants/index.js";
 import { stepEssentialsOf, workflowEssentialsOf } from "./essentials.js";
 import { titleOf } from "./titles.js";
-import { childPointerOf, isJsonObject, valueAt } from "../pointers/index.js";
+import {
+  childPointerOf,
+  isJsonArray,
+  isJsonObject,
+  valueAt,
+} from "../pointers/index.js";
 import {
   modelOf,
   problemsOf,
@@ -59,6 +64,8 @@ const memberSections: ReadonlyMap<string, FormSection> = new Map([
   ["then", "settings"],
   ["metadata", "note"],
 ]);
+
+const casesKey = "switch";
 
 const ownMemberSections: ReadonlyMap<string, FormSection> = new Map([
   ["catch", "failure"],
@@ -302,6 +309,41 @@ function stepFieldsOf(
   return members.map((member) => {
     const section = sectionOf(member.name);
     const placed = { member, holder: pointer, section };
+    const field = sectionedFieldOf(placed, sources);
+    const isSwitch = member.name === casesKey;
+
+    return isSwitch ? casedFieldOf(field, sources) : field;
+  });
+}
+
+function casedFieldOf(field: FormField, sources: FieldSources): FormField {
+  const written = valueAt(sources.document, field.pointer);
+  const items = isJsonArray(written) ? written : [];
+  const cases = items.flatMap((item, index) =>
+    caseFieldsOf(field, item, index, sources),
+  );
+  const pointers = cases.map((branch) => branch.pointer);
+  const diagnostics = field.diagnostics.filter(
+    (diagnostic) =>
+      !pointers.some((pointer) => isAtOrUnder(diagnostic.pointer, pointer)),
+  );
+
+  return { ...field, fields: cases, diagnostics };
+}
+
+function caseFieldsOf(
+  field: FormField,
+  item: JsonValue,
+  index: number,
+  sources: FieldSources,
+): readonly FormField[] {
+  const position = String(index);
+  const holder = childPointerOf(field.pointer, position);
+  const names = isJsonObject(item) ? Object.keys(item) : [];
+
+  return names.map((name) => {
+    const member = { name, required: true, description: null };
+    const placed = { member, holder, section: field.section };
     return sectionedFieldOf(placed, sources);
   });
 }
@@ -447,12 +489,15 @@ function diagnosticsAt(
   pointer: string,
   sources: FieldSources,
 ): FieldSources["diagnostics"] {
-  const below = `${pointer}/`;
-
-  return sources.diagnostics.filter(
-    (diagnostic) =>
-      diagnostic.pointer === pointer || diagnostic.pointer.startsWith(below),
+  return sources.diagnostics.filter((diagnostic) =>
+    isAtOrUnder(diagnostic.pointer, pointer),
   );
+}
+
+function isAtOrUnder(pointer: string, holder: string): boolean {
+  const below = `${holder}/`;
+
+  return pointer === holder || pointer.startsWith(below);
 }
 
 function inputOf(
