@@ -15,13 +15,12 @@ import type { Capabilities } from "@/libs/data-access/types";
 import {
   ACCOUNT_HREF,
   HOME_HREF,
-  INVITATIONS_HREF,
   NOTIFICATIONS_HREF,
+  PEOPLE_HREF,
   PLATFORM_HREF,
   RUNS_HREF,
   SECRETS_HREF,
   SETTINGS_HREF,
-  TEST_EVENT_HREF,
   WEBHOOKS_HREF,
   WORKFLOWS_HREF,
 } from "@/libs/routing/routes";
@@ -71,7 +70,7 @@ export const PLACES: readonly Place[] = [
     icon: WebhookIcon,
     access: "author",
     group: "connect",
-    covers: [WEBHOOKS_HREF, TEST_EVENT_HREF],
+    covers: [WEBHOOKS_HREF],
   },
   {
     label: "Notifications",
@@ -103,7 +102,7 @@ export const SETTINGS_PAGES: readonly Page[] = [
   { label: "Account", href: ACCOUNT_HREF, icon: UserIcon, access: null },
   {
     label: "Invitations",
-    href: INVITATIONS_HREF,
+    href: PEOPLE_HREF,
     icon: MailIcon,
     access: "administrator",
   },

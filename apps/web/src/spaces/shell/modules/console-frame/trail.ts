@@ -3,7 +3,6 @@ import {
   NOTIFICATIONS_HREF,
   RUNS_HREF,
   SETTINGS_HREF,
-  TEST_EVENT_HREF,
   workflowHref,
   WORKFLOWS_HREF,
 } from "@/libs/routing/routes";
@@ -19,7 +18,6 @@ export interface Crumb {
   readonly href?: string;
 }
 
-const TEST_EVENT: Crumb = { label: "Send a test event" };
 const NEW_WORKFLOW: Crumb = { label: "New workflow" };
 const NEW_NOTIFICATION: Crumb = { label: "New notification" };
 const NOTIFICATION: Crumb = { label: "Notification" };
@@ -39,8 +37,6 @@ export function trailOf(pathname: string): readonly Crumb[] {
 }
 
 function belowOf(place: Place, pathname: string): readonly Crumb[] {
-  if (pathname === TEST_EVENT_HREF) return [TEST_EVENT];
-
   const after = pathname.slice(place.href.length);
   const rest = segmentsOf(after);
   const editing = isEditorPath(pathname);

@@ -44,7 +44,7 @@ describe("the addresses of the console", () => {
 
   it("a_run_and_a_notification_escape_their_ids", () => {
     expect(runHref("a/b")).toBe("/runs/a%2Fb");
-    expect(notificationHref("n 1")).toBe("/connections/notifications/n%201");
+    expect(notificationHref("n 1")).toBe("/notifications/n%201");
   });
 
   it("the_workflows_list_keeps_its_tab_and_its_page", () => {

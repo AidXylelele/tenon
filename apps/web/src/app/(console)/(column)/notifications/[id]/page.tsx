@@ -5,6 +5,6 @@ export const metadata: Metadata = { title: "Notification" };
 
 export default async function NotificationPage({
   params,
-}: PageProps<"/connections/notifications/[id]">) {
+}: PageProps<"/notifications/[id]">) {
   return <NotificationDetail params={await params} />;
 }

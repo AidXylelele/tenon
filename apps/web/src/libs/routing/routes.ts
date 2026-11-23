@@ -11,18 +11,19 @@ export const WORKFLOWS_HREF = "/workflows";
 export const NEW_WORKFLOW_HREF = "/workflows/new";
 export const RUNS_HREF = "/runs";
 
-export const CONNECTIONS_HREF = "/connections";
-export const WEBHOOKS_HREF = "/connections/webhooks";
-export const NOTIFICATIONS_HREF = "/connections/notifications";
-export const NEW_NOTIFICATION_HREF = "/connections/notifications/new";
-export const TEST_EVENT_HREF = "/connections/test-event";
+export const WEBHOOKS_HREF = "/webhooks";
+export const NEW_WEBHOOK_HREF = "/webhooks?new=1";
+export const TEST_EVENT_HREF = "/webhooks?test=1";
+export const NOTIFICATIONS_HREF = "/notifications";
+export const NEW_NOTIFICATION_HREF = "/notifications/new";
 export const SECRETS_HREF = "/secrets";
+export const NEW_SECRET_HREF = "/secrets?new=1";
 
 export const WORKFLOW_SEARCH_HREF = "/search/workflows";
 
 export const SETTINGS_HREF = "/settings";
 export const ACCOUNT_HREF = "/settings/account";
-export const INVITATIONS_HREF = "/settings/invitations";
+export const PEOPLE_HREF = "/settings/people";
 export const PLATFORM_HREF = "/settings/platform";
 
 const EDITOR_PATH = /^\/workflows\/[^/]+\/[^/]+\/edit$/;

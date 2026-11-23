@@ -32,8 +32,12 @@ import { CopyButton } from "@/libs/ui/composites/copy-button";
 import { ProblemMessage } from "@/libs/ui/composites/problem-message";
 import { createWebhookAction } from "./actions";
 
-export function CreateWebhook() {
-  const [open, setOpen] = useState(false);
+export function CreateWebhook({
+  defaultOpen = false,
+}: {
+  readonly defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [created, setCreated] = useState<CreatedWebhook | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -168,8 +172,8 @@ function Created({
         <CircleCheckIcon />
         <AlertTitle>Copy the URL now</AlertTitle>
         <AlertDescription>
-          It is shown only here; the platform keeps only its fingerprint. A lost
-          URL means a new webhook.
+          It is shown only here; Tenon keeps only its fingerprint. A lost URL
+          means a new webhook.
         </AlertDescription>
       </Alert>
       <div className="flex min-w-0 items-start gap-2 rounded-lg border bg-muted p-2">
