@@ -24,6 +24,7 @@ import {
   childPointerOf,
   isJsonArray,
   isJsonObject,
+  lastTokenOf,
   valueAt,
 } from "../pointers/index.js";
 import {
@@ -41,7 +42,11 @@ import {
   stepTreeOf,
   stepWithId,
 } from "../steps/index.js";
-import { catchPolicyOf, type RetryPlan } from "../structure/index.js";
+import {
+  catchPolicyOf,
+  type RetryPlan,
+  timeLimitOf,
+} from "../structure/index.js";
 import type {
   FieldSources,
   FormField,
@@ -66,6 +71,10 @@ const memberSections: ReadonlyMap<string, FormSection> = new Map([
 ]);
 
 const casesKey = "switch";
+
+const endpointKey = "endpoint";
+
+const authenticationKey = "authentication";
 
 const ownMemberSections: ReadonlyMap<string, FormSection> = new Map([
   ["catch", "failure"],
@@ -158,8 +167,9 @@ export function formOf(
   const failure = failureOf(node);
   const retry = protectingRetryOf(node, model);
   const result = stepResultOf(node, document);
+  const timeout = timeLimitOf(node.task, model);
 
-  return { kind: "form", failure, retry, result, fields };
+  return { kind: "form", failure, retry, result, timeout, fields };
 }
 
 function protectingRetryOf(
@@ -386,8 +396,16 @@ function groupFieldsOf(
 ): readonly FormField[] {
   const entries = sources.schemasAt(sources.document, pointer);
   const members = membersOf(entries);
+  const isEndpoint = lastTokenOf(pointer) === endpointKey;
 
-  return members.map((member) => {
+  return members.flatMap((member) => {
+    const isAuthentication = isEndpoint && member.name === authenticationKey;
+
+    if (isAuthentication) {
+      const authentication = authenticationFieldOf(pointer, section, sources);
+      return [authentication];
+    }
+
     const placed = { member, holder: pointer, section };
     const field = memberFieldOf(placed, sources);
     const isGroup = field.input === "group";
@@ -396,9 +414,42 @@ function groupFieldsOf(
     const input = isFlattened ? "structured" : field.input;
     const flat = { ...field, input };
     const fields = fieldsBelowOf(flat, section, sources);
+    const shown = { ...flat, section, fields };
+    const isAddressText = member.name === endpointKey && input === "text";
 
-    return { ...flat, section, fields };
+    if (!isAddressText) {
+      return [shown];
+    }
+
+    const authentication = authenticationFieldOf(
+      shown.pointer,
+      section,
+      sources,
+    );
+    return [shown, authentication];
   });
+}
+
+function authenticationFieldOf(
+  endpoint: string,
+  section: FormSection,
+  sources: FieldSources,
+): FormField {
+  const member = {
+    name: authenticationKey,
+    required: false,
+    description: null,
+  };
+  const placed = { member, holder: endpoint, section };
+  const field = memberFieldOf(placed, sources);
+  const entries = sources.schemasAt(sources.document, field.pointer);
+  const policies = membersOf(entries);
+  const fields = policies.map((policy) => {
+    const placedPolicy = { member: policy, holder: field.pointer, section };
+    return sectionedFieldOf(placedPolicy, sources);
+  });
+
+  return { ...field, input: "oneOf", section, fields };
 }
 
 function unitFieldsOf(

@@ -797,3 +797,98 @@ test.each<readonly [string, JsonObject, unknown]>([
 
   expect(reading).toMatchObject({ kind: "form", result });
 });
+
+const timedFetch = `${inlineHeader}use:
+  timeouts:
+    short:
+      after: PT10S
+do:
+  - fetch:
+      call: http
+      timeout:
+        after: PT30S
+      with:
+        method: get
+        endpoint: https://example.com
+`;
+
+test.each([
+  ["a step with no time limit has none", paused, "/do/pause", null],
+  [
+    "an ISO time limit is read as its milliseconds",
+    timedFetch,
+    "/do/fetch",
+    30000,
+  ],
+  [
+    "a time limit of units is read as its milliseconds",
+    timedFetch.replace("after: PT30S", "after: { seconds: 5 }"),
+    "/do/fetch",
+    5000,
+  ],
+  [
+    "a time limit named in use.timeouts is read where it is defined",
+    timedFetch.replace("timeout:\n        after: PT30S", "timeout: short"),
+    "/do/fetch",
+    10000,
+  ],
+])("%s", (_, text, step, timeout) => {
+  const reading = check(text, step);
+
+  expect(reading).toMatchObject({ kind: "form", timeout });
+});
+
+const authenticated = `${inlineHeader}do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://example.com
+          authentication:
+            bearer:
+              use: TOKEN
+`;
+
+test("an address written as its text is offered with its authentication", () => {
+  const fields = fieldsOf(fetching, "/do/fetch");
+
+  const all = flattenedOf(fields);
+  const authentication = all.find((field) => field.key === "authentication");
+  const policies = authentication?.fields.map((field) => field.key);
+  const bearer = authentication?.fields.find((field) => field.key === "bearer");
+  const bearerKeys = bearer?.fields.map((field) => field.key);
+
+  expect(authentication).toMatchObject({
+    pointer: "/do/0/fetch/with/endpoint/authentication",
+    input: "oneOf",
+    written: false,
+    value: null,
+    essentialRank: null,
+  });
+  expect(policies).toEqual(expect.arrayContaining(["basic", "bearer"]));
+  expect(bearer?.input).toBe("group");
+  expect(bearerKeys).toEqual(expect.arrayContaining(["token", "use"]));
+});
+
+test("an address written as an object is its uri, beside its authentication", () => {
+  const fields = fieldsOf(authenticated, "/do/fetch");
+
+  const all = flattenedOf(fields);
+  const essentials = essentialsOf(fields);
+  const endpoint = all.find((field) => field.key === "endpoint");
+  const uri = all.find((field) => field.key === "uri");
+  const authentication = all.find((field) => field.key === "authentication");
+
+  expect(essentials).toEqual([
+    "/do/0/fetch/with/method",
+    "/do/0/fetch/with/endpoint/uri",
+  ]);
+  expect(endpoint?.input).toBe("group");
+  expect(uri).toMatchObject({ input: "text", value: "https://example.com" });
+  expect(authentication).toMatchObject({
+    input: "oneOf",
+    written: true,
+    value: { bearer: { use: "TOKEN" } },
+  });
+});

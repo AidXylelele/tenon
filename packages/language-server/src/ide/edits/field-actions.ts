@@ -40,6 +40,10 @@ import {
   removalOf,
 } from "./collection-text.js";
 
+const endpointKey = "endpoint";
+
+const authenticationKey = "authentication";
+
 const unedited: Editing = { kind: "edited", changes: [], ids: [] };
 
 export function combinedOf(editings: readonly Editing[]): Editing {
@@ -116,6 +120,12 @@ export function fieldSettingOf(
     return { kind: "refused", reason: unheldOf(action.pointer) };
   }
 
+  const addressObject = addressObjectSettingOf(editable.document, action);
+
+  if (addressObject !== null) {
+    return fieldSettingOf(editable, addressObject);
+  }
+
   const written = valueAt(editable.document, action.pointer);
   const change =
     written === undefined
@@ -130,6 +140,24 @@ export function fieldSettingOf(
   }
 
   return { kind: "edited", changes: [change], ids: [] };
+}
+
+function addressObjectSettingOf(
+  document: JsonValue,
+  action: SetField,
+): SetField | null {
+  const endpoint = parentPointerOf(action.pointer);
+  const address = valueAt(document, endpoint);
+  const isAuthentication = lastTokenOf(action.pointer) === authenticationKey;
+  const isEndpoint = lastTokenOf(endpoint) === endpointKey;
+  const isAddressText = typeof address === "string";
+
+  if (!isAuthentication || !isEndpoint || !isAddressText) {
+    return null;
+  }
+
+  const value = { uri: address, authentication: action.value };
+  return { kind: "setField", pointer: endpoint, value };
 }
 
 export function fieldClearingOf(

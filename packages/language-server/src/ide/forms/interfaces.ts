@@ -65,6 +65,7 @@ export type StepFormReading =
       readonly failure: FailureKind;
       readonly retry: RetryPlan | null;
       readonly result: ResultReading | null;
+      readonly timeout: number | null;
       readonly fields: readonly FormField[];
     }
   | FormRefusal;

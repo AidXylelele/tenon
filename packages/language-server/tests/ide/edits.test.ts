@@ -2480,3 +2480,27 @@ test.each([
 
   expect(editing).toEqual({ kind: "refused", reason });
 });
+
+const fetchingText = `${inlineHeader}do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: https://example.com
+`;
+
+test("an authentication set on an address written as its text writes the address as an object", () => {
+  const action: EditAction = {
+    kind: "setField",
+    pointer: "/do/0/fetch/with/endpoint/authentication",
+    value: { bearer: { use: "TOKEN" } },
+  };
+
+  const outcome = outcomeOf(fetchingText, action);
+
+  const expected = fetchingText.replace(
+    "endpoint: https://example.com\n",
+    "endpoint: { uri: https://example.com, authentication: { bearer: { use: TOKEN } } }\n",
+  );
+  expect(outcome).toMatchObject({ text: expected, ids: [] });
+});
