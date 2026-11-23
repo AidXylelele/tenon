@@ -36,6 +36,7 @@ import type {
   RunView,
   StepMark,
   WorkflowFlowProps,
+  Wording,
 } from "./interfaces";
 import { END, plusItemOf, START, START_ITEM, stepItemOf } from "./items";
 import { JumpLines } from "./jump-lines";
@@ -57,6 +58,8 @@ export function WorkflowFlow({
   mode,
   selected = null,
   onSelect,
+  conditions = NO_CONDITIONS,
+  languageTerms = false,
   ref,
 }: WorkflowFlowProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -73,7 +76,8 @@ export function WorkflowFlow({
     () => (runSteps === null ? null : { steps: runSteps, ended }),
     [runSteps, ended],
   );
-  const shown = viewOf(mode, selected, itemProps, run);
+  const wording = { conditions, languageTerms };
+  const shown = viewOf(mode, selected, itemProps, run, wording);
   const [store] = useState(() => new FlowViewStore(shown));
   const steps = workflow.steps;
   const jumps = useMemo(() => jumpsOf(steps), [steps]);
@@ -173,11 +177,10 @@ function viewOf(
   selected: string | null,
   itemProps: FlowView["itemProps"],
   run: RunView | null,
+  wording: Wording,
 ): FlowView {
   const marks = mode.kind === "edit" ? mode.marks : NO_MARKS;
   const inserting = mode.kind === "edit" ? mode.inserting : null;
-  const conditions = mode.kind === "edit" ? mode.conditions : NO_CONDITIONS;
-  const languageTerms = mode.kind === "edit" && mode.languageTerms;
 
   return {
     selected,
@@ -185,8 +188,8 @@ function viewOf(
     marks,
     inserting,
     run,
-    conditions,
-    languageTerms,
+    conditions: wording.conditions,
+    languageTerms: wording.languageTerms,
   };
 }
 

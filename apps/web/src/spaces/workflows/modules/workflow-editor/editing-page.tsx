@@ -256,19 +256,8 @@ function EditingBody({
       marks,
       inserting,
       onInsert,
-      conditions,
-      languageTerms,
     };
-  }, [
-    showsRun,
-    stepRuns,
-    runEnded,
-    marks,
-    inserting,
-    onInsert,
-    conditions,
-    languageTerms,
-  ]);
+  }, [showsRun, stepRuns, runEnded, marks, inserting, onInsert]);
 
   const sources = useMemo<SlotSources>(
     () => ({
@@ -448,6 +437,8 @@ function EditingBody({
             mode={mode}
             selected={selectedId}
             onSelect={onSelect}
+            conditions={conditions}
+            languageTerms={languageTerms}
           />
         )}
       </div>

@@ -12,6 +12,7 @@ import {
   type StepMark,
   type StepRun,
   WorkflowFlow,
+  type WorkflowFlowProps,
 } from ".";
 import {
   DAILY_DIGEST,
@@ -26,6 +27,8 @@ import {
   workflowOf,
 } from "./workflows.test-support";
 
+type Wording = Pick<WorkflowFlowProps, "conditions" | "languageTerms">;
+
 interface Commit {
   readonly phase: string;
   readonly actual: number;
@@ -34,10 +37,7 @@ interface Commit {
 
 const NO_MARKS: ReadonlyMap<string, StepMark> = new Map();
 
-const NO_CONDITIONS: ReadonlyMap<
-  string,
-  ReadonlyMap<string, string>
-> = new Map();
+const NO_WORDING: Wording = {};
 
 const READING: FlowMode = { kind: "read" };
 
@@ -55,8 +55,6 @@ function editing(changes: Partial<EditMode> = {}): EditMode {
     marks: NO_MARKS,
     inserting: null,
     onInsert: vi.fn(),
-    conditions: NO_CONDITIONS,
-    languageTerms: false,
     ...changes,
   };
 }
@@ -84,6 +82,7 @@ function draw(
   workflow: WorkflowStructure,
   mode: FlowMode,
   selected: string | null = null,
+  wording: Wording = NO_WORDING,
 ) {
   const onSelect = vi.fn();
   const flow = (
@@ -92,6 +91,8 @@ function draw(
       mode={mode}
       selected={selected}
       onSelect={onSelect}
+      conditions={wording.conditions}
+      languageTerms={wording.languageTerms}
     />
   );
   const shown = render(<TooltipProvider>{flow}</TooltipProvider>);
@@ -406,8 +407,8 @@ describe("branches and jumps", () => {
       ["A licence", "Read the order › kind is “licence”"],
     ]);
     const conditions = new Map([[CHOICE, words]]);
-    const mode = editing({ conditions });
-    draw(ORDER_ROUTER, mode);
+    const mode = editing();
+    draw(ORDER_ROUTER, mode, null, { conditions });
 
     const licence = stepButton("A licence");
 
@@ -416,9 +417,35 @@ describe("branches and jumps", () => {
     );
   });
 
+  it("a_run_says_a_branch's_condition_in_the_same_words", () => {
+    const words = new Map([
+      ["A licence", "Read the order › kind is “licence”"],
+    ]);
+    const conditions = new Map([[CHOICE, words]]);
+    const mode = running();
+    draw(ORDER_ROUTER, mode, null, { conditions });
+
+    const licence = stepButton("A licence");
+
+    expect(licence).toHaveTextContent(
+      "A licenceRead the order › kind is “licence”go to Send the licence",
+    );
+  });
+
+  it("a_run_shows_a_branch's_jq_only_with_the_language_terms", () => {
+    const mode = running();
+    draw(ORDER_ROUTER, mode, null, { languageTerms: true });
+
+    const licence = stepButton("A licence");
+
+    expect(licence).toHaveTextContent(
+      'A licence${ .kind == "licence" }go to Send the licence',
+    );
+  });
+
   it("a_branch_shows_its_jq_only_with_the_language_terms", () => {
-    const mode = editing({ languageTerms: true });
-    draw(ORDER_ROUTER, mode);
+    const mode = editing();
+    draw(ORDER_ROUTER, mode, null, { languageTerms: true });
 
     const licence = stepButton("A licence");
 

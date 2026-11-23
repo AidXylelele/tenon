@@ -58,8 +58,6 @@ export interface EditMode {
   readonly marks: ReadonlyMap<string, StepMark>;
   readonly inserting: InsertPlace | null;
   readonly onInsert: (place: InsertPlace) => void;
-  readonly conditions: ConditionWords;
-  readonly languageTerms: boolean;
 }
 
 export interface RunMode {
@@ -82,6 +80,8 @@ export interface WorkflowFlowProps {
   readonly mode: FlowMode;
   readonly selected?: string | null;
   readonly onSelect?: (target: string | null) => void;
+  readonly conditions?: ConditionWords;
+  readonly languageTerms?: boolean;
   readonly ref?: Ref<FlowHandle>;
 }
 
@@ -192,14 +192,17 @@ export interface RunView {
   readonly ended: boolean;
 }
 
-export interface FlowView {
+export interface Wording {
+  readonly conditions: ConditionWords;
+  readonly languageTerms: boolean;
+}
+
+export interface FlowView extends Wording {
   readonly selected: string | null;
   readonly itemProps: (item: string) => RovingItemProps;
   readonly marks: ReadonlyMap<string, StepMark>;
   readonly inserting: InsertPlace | null;
   readonly run: RunView | null;
-  readonly conditions: ConditionWords;
-  readonly languageTerms: boolean;
 }
 
 export interface FlowState {
