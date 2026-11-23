@@ -1,4 +1,9 @@
-import { type AddressInfo, createServer, type Socket } from "node:net";
+import {
+  type AddressInfo,
+  connect as connectTcp,
+  createServer,
+  type Socket,
+} from "node:net";
 import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceModule, ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
@@ -44,6 +49,7 @@ import { KafkaChannel } from "../../../../../src/interface-adapters/workflows/ef
 import { MqttChannel } from "../../../../../src/interface-adapters/workflows/effects/mqtt.channel.js";
 import { NatsChannel } from "../../../../../src/interface-adapters/workflows/effects/nats.channel.js";
 import { RedisChannel } from "../../../../../src/interface-adapters/workflows/effects/redis.channel.js";
+import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
 import {
   closedPort,
   startStubServer,
@@ -211,6 +217,7 @@ describe("the AsyncAPI gateway publishing on the servers a document names", () =
       authentication,
       new AsyncApiDocuments(),
       responseSizeLimit,
+      new TransportFailures(),
       new AmqpChannel(amqp),
       new KafkaChannel(kafka),
       new MqttChannel(mqtt),
@@ -724,6 +731,47 @@ describe("the AsyncAPI gateway publishing on the servers a document names", () =
       });
     });
 
+    it("a_message_of_exactly_the_host_limit_is_sent", async () => {
+      served["limit.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders-limit",
+      });
+      const text = "x".repeat(responseSizeLimit.bytes - 2);
+      const request = requestOf(
+        "limit.json",
+        { operation: "announce" },
+        { kind: "publish", message: { payload: text, headers: {} } },
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-24"));
+
+      expect(outcome).toEqual({ kind: "published" });
+    });
+
+    it("a_text_payload_on_a_text_channel_is_sent_as_it_is", async () => {
+      served["text.json"] = v3Document("redis", at(redis, 6379), {
+        address: "orders-text",
+        messages: { note: { contentType: "text/plain", payload: {} } },
+      });
+      const subscriber = createClient({ url: `redis://${at(redis, 6379)}` });
+      const notes: string[] = [];
+      await subscriber.connect();
+      await subscriber.subscribe("orders-text", (body: string) => {
+        notes.push(body);
+      });
+      const request = requestOf(
+        "text.json",
+        { channel: "orders" },
+        { kind: "publish", message: { payload: "paid", headers: {} } },
+      );
+
+      const outcome = await gateway.perform(request, callContextOf("step-25"));
+      const note = await eventuallyOne(notes);
+      await subscriber.close();
+
+      expect(outcome).toEqual({ kind: "published" });
+      expect(note).toBe("paid");
+    });
+
     it("headers_on_mqtt_3_1_1_are_misconfigured", async () => {
       served["mqtt-3.json"] = {
         asyncapi: "3.0.0",
@@ -942,6 +990,138 @@ describe("the AsyncAPI gateway publishing on the servers a document names", () =
         { payload: { order: 4 }, headers: {}, correlationId: null },
         { payload: { order: 5 }, headers: {}, correlationId: null },
       ]);
+    });
+
+    it("a_receive_refuses_a_login_other_than_basic_and_a_protocol_the_host_does_not_receive_over", async () => {
+      served["stomp-in.json"] = v3Document("stomp", `${HOST}:61613`, {
+        address: "orders",
+      });
+      const bearer = requestOf(
+        "redis-in.json",
+        { channel: "orders" },
+        receive,
+        { kind: "bearer", token: "t-1" },
+      );
+      const stomp = requestOf("stomp-in.json", { channel: "orders" }, receive);
+      const inbox = inboxOf(() => Promise.resolve());
+
+      const refused = await gateway.subscribe(
+        bearer,
+        callContextOf("receiver-bearer"),
+        inbox,
+      );
+      const unspoken = await gateway.subscribe(
+        stomp,
+        callContextOf("receiver-stomp"),
+        inbox,
+      );
+
+      expect(refused).toEqual({
+        kind: "misconfigured",
+        detail: "A broker is authenticated with basic credentials only",
+      });
+      expect(unspoken).toEqual({
+        kind: "misconfigured",
+        detail: "The host does not receive over the protocol 'stomp'",
+      });
+    });
+
+    it("an_mqtt_receive_reads_json_by_the_content_type_of_each_message", async () => {
+      served["mqtt-typed.json"] = v3Document("mqtt", at(mosquitto, 1883), {
+        address: "orders/typed",
+      });
+      const inbox: AsyncApiInboundMessage[] = [];
+      const request = requestOf(
+        "mqtt-typed.json",
+        { channel: "orders" },
+        receive,
+      );
+      await subscribed(request, collectedIn(inbox));
+      const publisher = await connectAsync(`mqtt://${at(mosquitto, 1883)}`, {
+        protocolVersion: 5,
+      });
+      const vendor = { contentType: "application/vnd.order+json" };
+      const plain = { contentType: "text/plain" };
+
+      await publisher.publishAsync("orders/typed", '{"order":1}', {
+        qos: 1,
+        properties: vendor,
+      });
+      await publisher.publishAsync("orders/typed", '{"order":2}', {
+        qos: 1,
+        properties: plain,
+      });
+      await publisher.endAsync();
+      await twoOf(inbox);
+
+      expect(inbox.map((message) => message.payload)).toEqual([
+        { order: 1 },
+        '{"order":2}',
+      ]);
+    });
+
+    it("a_receive_ended_while_its_broker_answers_late_closes_the_subscription_that_arrives", async () => {
+      const relayed = { held: false, subscribed: false, closed: false };
+      const release = new AbortController();
+      const relay = createServer((socket) => {
+        relayed.held = true;
+        socket.pause();
+        release.signal.addEventListener("abort", () => {
+          const upstream = connectTcp(redis.getMappedPort(6379), HOST);
+          socket.on("data", (chunk: Buffer) => {
+            if (/subscribe/i.test(chunk.toString())) relayed.subscribed = true;
+            upstream.write(chunk);
+          });
+          socket.on("close", () => {
+            relayed.closed = true;
+            upstream.destroy();
+          });
+          upstream.pipe(socket);
+          socket.resume();
+        });
+      });
+      await new Promise<void>((resolve) => {
+        relay.listen(0, HOST, resolve);
+      });
+      const port = String((relay.address() as AddressInfo).port);
+      served["redis-late.json"] = v3Document("redis", `${HOST}:${port}`, {
+        address: "orders-late",
+      });
+      const request = requestOf(
+        "redis-late.json",
+        { channel: "orders" },
+        receive,
+      );
+      const ended = new AbortController();
+      const inbox = {
+        ...inboxOf(() => Promise.resolve()),
+        ended: ended.signal,
+      };
+
+      const subscribing = gateway.subscribe(
+        request,
+        callContextOf("receiver-late"),
+        inbox,
+      );
+      await vi.waitFor(
+        () => {
+          expect(relayed.held).toBe(true);
+        },
+        { timeout: 5_000, interval: 20 },
+      );
+      ended.abort();
+      const subscribed = await subscribing;
+      release.abort();
+      await vi.waitFor(
+        () => {
+          expect(relayed.closed).toBe(true);
+        },
+        { timeout: 5_000, interval: 20 },
+      );
+      await new Promise((resolve) => relay.close(resolve));
+
+      expect(subscribed).toEqual({ kind: "expired" });
+      expect(relayed.subscribed).toBe(true);
     });
 
     it("a_received_message_larger_than_the_host_takes_fails_the_receive", async () => {

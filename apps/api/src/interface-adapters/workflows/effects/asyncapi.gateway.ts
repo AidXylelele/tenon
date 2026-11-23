@@ -1,10 +1,6 @@
 import { aborted } from "node:util";
 import { Injectable } from "@nestjs/common";
-import {
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from "@nestjs/resilience";
+import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type {
   AsyncApiOutcome,
   AsyncApiRequest,
@@ -40,6 +36,7 @@ import { KafkaChannel } from "./kafka.channel.js";
 import { MqttChannel } from "./mqtt.channel.js";
 import { NatsChannel } from "./nats.channel.js";
 import { RedisChannel } from "./redis.channel.js";
+import { TransportFailures } from "./transport-failures.js";
 
 @Injectable()
 export class AsyncApiGateway implements SubscriptionClient {
@@ -54,6 +51,7 @@ export class AsyncApiGateway implements SubscriptionClient {
     private readonly authentication: Authenticator,
     private readonly documents: AsyncApiDocuments,
     private readonly limit: ResponseSizeLimit,
+    private readonly failures: TransportFailures,
     amqp: AmqpChannel,
     kafka: KafkaChannel,
     mqtt: MqttChannel,
@@ -188,7 +186,7 @@ export class AsyncApiGateway implements SubscriptionClient {
     try {
       return await this.#within(publishing, signal);
     } catch (error) {
-      return this.#expiredOf(error, signal);
+      return this.failures.of(error, signal);
     }
   }
 
@@ -292,12 +290,5 @@ export class AsyncApiGateway implements SubscriptionClient {
     const text =
       typeof payload === "string" && !json ? payload : JSON.stringify(payload);
     return Buffer.from(text, "utf8");
-  }
-
-  #expiredOf(error: unknown, signal: AbortSignal): Expired {
-    if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return AsyncApiGateway.EXPIRED;
-
-    throw error;
   }
 }

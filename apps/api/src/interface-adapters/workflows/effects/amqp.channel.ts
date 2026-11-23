@@ -97,9 +97,9 @@ export class AmqpChannel implements BrokerChannel {
       contentType: message.contentType,
       persistent: true,
     };
-    const exchange = binding.exchange.name;
+    const exchange = this.#exchangeOf(binding);
 
-    if (binding.is === "routingKey" && exchange !== undefined) {
+    if (exchange !== null) {
       channel.publish(exchange, address, message.body, options);
       return;
     }
@@ -168,9 +168,9 @@ export class AmqpChannel implements BrokerChannel {
     address: string,
     inbox: BrokerInbox,
   ): Promise<AmqpQueue> {
-    const exchange = binding.exchange.name;
+    const exchange = this.#exchangeOf(binding);
 
-    if (binding.is !== "routingKey" || exchange === undefined)
+    if (exchange === null)
       return { name: binding.queue.name ?? address, shared: true };
 
     const name = `${AmqpChannel.QUEUE_PREFIX}${inbox.subscriber}`;
@@ -178,6 +178,14 @@ export class AmqpChannel implements BrokerChannel {
     await channel.assertQueue(name, options);
     await channel.bindQueue(name, exchange, address);
     return { name, shared: false };
+  }
+
+  #exchangeOf(binding: AmqpBinding): string | null {
+    const exchange = binding.exchange.name;
+
+    if (binding.is !== "routingKey" || exchange === undefined) return null;
+
+    return exchange;
   }
 
   #textOf(value: unknown): string | null {

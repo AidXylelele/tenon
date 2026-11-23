@@ -80,6 +80,17 @@ describe("the broker connections a host keeps", () => {
     expect(open).toHaveBeenCalledTimes(2);
   });
 
+  it("another_server_with_the_same_login_opens_its_own_connection", async () => {
+    const open = vi.fn(opened);
+    const other = serverAt("8.8.8.8");
+
+    const first = await connections.of(server, LOGIN, open);
+    const second = await connections.of(other, LOGIN, open);
+
+    expect(second).not.toBe(first);
+    expect(open).toHaveBeenCalledTimes(2);
+  });
+
   it("an_opening_that_fails_is_not_kept_and_the_next_call_opens_again", async () => {
     const open = vi
       .fn(opened)

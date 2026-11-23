@@ -37,6 +37,7 @@ import { KafkaChannel } from "../../../../../src/interface-adapters/workflows/ef
 import { MqttChannel } from "../../../../../src/interface-adapters/workflows/effects/mqtt.channel.js";
 import { NatsChannel } from "../../../../../src/interface-adapters/workflows/effects/nats.channel.js";
 import { RedisChannel } from "../../../../../src/interface-adapters/workflows/effects/redis.channel.js";
+import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
 import {
   startStubServer,
   type StubServer,
@@ -105,6 +106,7 @@ describe("the AsyncAPI gateway on a Kafka cluster a document names", () => {
       authenticationOf(fetchClientOf(policy.dispatcher)),
       new AsyncApiDocuments(),
       responseSizeLimit,
+      new TransportFailures(),
       new AmqpChannel(new AmqpConnection(policy)),
       new KafkaChannel(kafkaOn),
       new MqttChannel(new MqttConnection(policy)),
