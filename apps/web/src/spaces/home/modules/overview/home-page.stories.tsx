@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { InstanceCounts, PhaseCounts } from "@/libs/data-access/types";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { PageBody } from "@/libs/ui/composites/page-body";
 import { windowsOf } from "@/operations/run-periods";
 import { HomePage } from "./home-page";
@@ -56,9 +57,11 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <PageBody>
-        <Story />
-      </PageBody>
+      <TooltipProvider>
+        <PageBody>
+          <Story />
+        </PageBody>
+      </TooltipProvider>
     ),
   ],
   args: {
