@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   databaseEnvSchema,
+  engineEnvSchema,
   interpreterEnvSchema,
   mailEnvSchema,
   migrationEnvSchema,
@@ -116,5 +117,57 @@ describe("the interpreter's environment", () => {
     });
 
     expect(parsed.error?.issues[0]?.path).toEqual(["LEGACY_EVENT_TYPES"]);
+  });
+});
+
+describe("the database pool's environment", () => {
+  const url = "postgres://localhost/tenon";
+
+  it("the_pool_keeps_five_connections_open_by_default", () => {
+    const parsed = databaseEnvSchema.parse({ DATABASE_URL: url });
+
+    expect(parsed.DATABASE_POOL_MIN).toBe(5);
+  });
+
+  it("the_pool_keeps_as_many_connections_open_as_set", () => {
+    const parsed = databaseEnvSchema.parse({
+      DATABASE_URL: url,
+      DATABASE_POOL_MIN: "0",
+    });
+
+    expect(parsed.DATABASE_POOL_MIN).toBe(0);
+  });
+
+  it("a_pool_minimum_above_its_size_is_refused", () => {
+    const parsed = databaseEnvSchema.safeParse({
+      DATABASE_URL: url,
+      DATABASE_POOL_SIZE: "4",
+      DATABASE_POOL_MIN: "5",
+    });
+
+    expect(parsed.error?.issues[0]).toMatchObject({
+      path: ["DATABASE_POOL_MIN"],
+      message: "must not exceed DATABASE_POOL_SIZE",
+    });
+  });
+});
+
+describe("the engine's environment", () => {
+  it("a_run_holds_its_lease_for_thirty_seconds_by_default", () => {
+    const parsed = engineEnvSchema.parse({});
+
+    expect(parsed.ENGINE_LEASE_SECONDS).toBe(30);
+  });
+
+  it("a_run_holds_its_lease_as_long_as_set", () => {
+    const parsed = engineEnvSchema.parse({ ENGINE_LEASE_SECONDS: "120" });
+
+    expect(parsed.ENGINE_LEASE_SECONDS).toBe(120);
+  });
+
+  it("a_lease_that_is_no_positive_number_of_seconds_is_refused", () => {
+    const parsed = engineEnvSchema.safeParse({ ENGINE_LEASE_SECONDS: "0" });
+
+    expect(parsed.error?.issues[0]?.path).toEqual(["ENGINE_LEASE_SECONDS"]);
   });
 });

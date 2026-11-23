@@ -39,17 +39,21 @@ export class PostgresEventStore implements EventStore {
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
     const type = cloudEvent.type as string;
-    return this.#inserted({
-      source,
-      eventId,
-      type,
-      origin,
-      instanceId,
-      execution: null,
-      lifecycle: null,
-      cloudEvent,
-      acceptedAt,
-    });
+    const lane = origin === EventOrigin.Emit ? source : eventId;
+    return this.#inserted(
+      {
+        source,
+        eventId,
+        type,
+        origin,
+        instanceId,
+        execution: null,
+        lifecycle: null,
+        cloudEvent,
+        acceptedAt,
+      },
+      lane,
+    );
   }
 
   acceptLifecycle(
@@ -62,17 +66,20 @@ export class PostgresEventStore implements EventStore {
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
     const type = cloudEvent.type as string;
-    return this.#inserted({
+    return this.#inserted(
+      {
+        source,
+        eventId,
+        type,
+        origin: EventOrigin.Lifecycle,
+        instanceId,
+        execution,
+        lifecycle: told.lifecycle,
+        cloudEvent,
+        acceptedAt,
+      },
       source,
-      eventId,
-      type,
-      origin: EventOrigin.Lifecycle,
-      instanceId,
-      execution,
-      lifecycle: told.lifecycle,
-      cloudEvent,
-      acceptedAt,
-    });
+    );
   }
 
   acceptWebhookEvent(event: WebhookEvent): Promise<number | null> {
@@ -80,7 +87,7 @@ export class PostgresEventStore implements EventStore {
     return this.accept(cloudEvent, EventOrigin.Webhook, null, event.at);
   }
 
-  async #inserted(row: EventRow): Promise<number | null> {
+  async #inserted(row: EventRow, lane: string): Promise<number | null> {
     const [accepted] = await this.txHost.tx
       .insert(events)
       .values(row)
@@ -94,7 +101,7 @@ export class PostgresEventStore implements EventStore {
     await this.outbox.add(this.txHost.tx, [
       {
         topic: MessageTopic.EventAccepted,
-        key: row.source,
+        key: lane,
         payload,
       },
     ]);

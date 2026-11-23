@@ -1,8 +1,10 @@
 import { Module } from "@nestjs/common";
+import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { OutboxModule } from "@nestjs/outbox";
 import { AesGcmPayloadCodec, WorkflowsModule } from "@nestjs/workflows";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
 import { AutomationBackgroundModule } from "./automation-background.module.js";
+import { engineConfig } from "./configs.js";
 import { CoreModule } from "./core.module.js";
 import { DurableStoresModule } from "./durable-stores.module.js";
 import { workflowRetry } from "./host.presets.js";
@@ -15,15 +17,18 @@ import { TelemetryModule } from "./telemetry.module.js";
     TelemetryModule,
     CoreModule,
     WorkflowsModule.forRootAsync({
-      imports: [PayloadCodecModule],
-      inject: [AesGcmPayloadCodec],
-      useFactory: (codec: AesGcmPayloadCodec) => ({
+      imports: [PayloadCodecModule, ConfigModule.forFeature(engineConfig)],
+      inject: [AesGcmPayloadCodec, engineConfig.KEY],
+      useFactory: (
+        codec: AesGcmPayloadCodec,
+        engine: ConfigType<typeof engineConfig>,
+      ) => ({
         retry: workflowRetry,
         codec,
         worker: {
           concurrency: PiscinaInterpreterClient.RUN_THREADS,
           pollInterval: "100ms",
-          leaseDuration: "120s",
+          leaseDuration: `${engine.ENGINE_LEASE_SECONDS}s` as const,
           shutdownTimeout: "90s",
         },
       }),

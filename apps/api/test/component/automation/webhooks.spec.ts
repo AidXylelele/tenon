@@ -171,6 +171,22 @@ describe("webhooks: secret URLs other applications call", () => {
     expect(await storedEvents()).toHaveLength(1);
   });
 
+  it("the_calls_of_one_webhook_are_relayed_each_in_a_lane_of_its_own", async () => {
+    const webhook = await createWebhook();
+
+    for (let call = 0; call < 2; call += 1)
+      await request(t.server).post(webhook.path).send({ call }).expect(202);
+    const accepted = await t.db.execute(
+      sql`select event_id as key from event where origin = 'webhook' order by sequence`,
+    );
+    const relayed = await t.db.execute(
+      sql`select key from nest_outbox.messages where topic = 'event.accepted' order by seq`,
+    );
+
+    expect(accepted.rows).toHaveLength(2);
+    expect(relayed.rows).toEqual(accepted.rows);
+  });
+
   it("a_deleted_webhook_and_an_unknown_url_answer_alike_and_accept_nothing", async () => {
     const webhook = await createWebhook();
     await request(t.server)

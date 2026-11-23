@@ -1,10 +1,11 @@
-import { Global, Module } from "@nestjs/common";
+import { Global, Module, type OnModuleInit } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
-import { DrizzleModule, getDrizzleToken } from "@nestjs/drizzle";
+import { DrizzleModule, getDrizzleToken, InjectDrizzle } from "@nestjs/drizzle";
 import { ClsPluginTransactional } from "@nestjs-cls/transactional";
 import { TransactionalAdapterDrizzleOrm } from "@nestjs-cls/transactional-adapter-drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { ClsModule } from "nestjs-cls";
+import type { Pool } from "pg";
 import { UnitOfWork } from "../../application/unit-of-work.js";
 import type { Database } from "../../interface-adapters/persistence/interfaces.js";
 import { PostgresUnitOfWork } from "../../interface-adapters/persistence/postgres-unit-of-work.js";
@@ -22,6 +23,7 @@ import { databaseConfig } from "./configs.js";
         connection: {
           connectionString: database.DATABASE_URL,
           max: database.DATABASE_POOL_SIZE,
+          min: database.DATABASE_POOL_MIN,
           connectionTimeoutMillis: 10_000,
           keepAlive: true,
         },
@@ -44,4 +46,17 @@ import { databaseConfig } from "./configs.js";
   providers: [{ provide: UnitOfWork, useClass: PostgresUnitOfWork }],
   exports: [UnitOfWork],
 })
-export class DatabaseModule {}
+export class DatabaseModule implements OnModuleInit {
+  constructor(
+    @InjectDrizzle() private readonly db: Database & { readonly $client: Pool },
+  ) {}
+
+  async onModuleInit(): Promise<void> {
+    const pool = this.db.$client;
+    const minimum = pool.options.min ?? 0;
+    const connecting = Array.from({ length: minimum }, () => pool.connect());
+    const opened = await Promise.all(connecting);
+
+    for (const client of opened) client.release();
+  }
+}

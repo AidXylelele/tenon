@@ -108,7 +108,7 @@ export class PostgresEventOfferStore implements EventOffers {
       .where(and(eq(workflows.on, true), startsOnEvents, or(...matching)));
     const entries = rows.map((row) => ({
       topic: MessageTopic.TriggerOffered,
-      key: row.workflowId,
+      key: event.eventId,
       payload: this.#triggered(row.workflowId, event),
     }));
 

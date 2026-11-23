@@ -74,6 +74,7 @@ function withSecretFiles(
 const databaseVariables = z.object({
   DATABASE_URL: z.string().min(1),
   DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(20),
+  DATABASE_POOL_MIN: z.coerce.number().int().nonnegative().default(5),
 });
 
 export const loggingEnvSchema = z.object({
@@ -87,7 +88,13 @@ export const loggingEnvSchema = z.object({
 
 export const databaseEnvSchema = z.preprocess(
   (input, context) => withSecretFiles(input, context, ["DATABASE_URL"]),
-  databaseVariables,
+  databaseVariables.refine(
+    (database) => database.DATABASE_POOL_MIN <= database.DATABASE_POOL_SIZE,
+    {
+      path: ["DATABASE_POOL_MIN"],
+      message: "must not exceed DATABASE_POOL_SIZE",
+    },
+  ),
 );
 
 export const secretsEnvSchema = z.preprocess(
@@ -109,6 +116,10 @@ export const httpEnvSchema = z.object({
 
 export const outboundEnvSchema = z.object({
   OUTBOUND_ALLOW_LIST: allowedPrivateAddresses,
+});
+
+export const engineEnvSchema = z.object({
+  ENGINE_LEASE_SECONDS: z.coerce.number().int().positive().default(30),
 });
 
 export const interpreterEnvSchema = z.object({
