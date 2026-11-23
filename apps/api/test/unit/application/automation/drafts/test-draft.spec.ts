@@ -9,6 +9,7 @@ import { WorkflowName } from "../../../../../src/domain/automation/workflows/wor
 import { aDocument } from "../../../../support/builders.js";
 import {
   FakeDefinitionCompiler,
+  FakeUnitOfWork,
   RecordingInstanceRuns,
   StoredDrafts,
   StoredSecrets,
@@ -52,6 +53,7 @@ async function setUp(problems: readonly InputProblem[] = []) {
     instances,
     runs,
     runtime,
+    new FakeUnitOfWork(),
   );
   return { draft, compiler, workflows, instances, runs, testDraft };
 }

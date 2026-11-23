@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
+import { UnitOfWork } from "../../unit-of-work.js";
 import {
   InstanceRuns,
   WorkflowInstanceRepository,
@@ -19,9 +19,9 @@ export class TestDraft {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runs: InstanceRuns,
     private readonly runtime: WorkflowRuntime,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: TestDraftCommand): Promise<TestDraftResult> {
     const compiled = await this.compilation.compile(
       command.name,
@@ -47,7 +47,8 @@ export class TestDraft {
 
     const version = tested.value.version;
 
-    if (tested.value.created) await this.workflows.save(workflow);
+    if (tested.value.created)
+      await this.unitOfWork.run(() => this.workflows.save(workflow));
 
     const inputProblems = await this.runtime.inputProblemsOf(
       version,
@@ -71,8 +72,10 @@ export class TestDraft {
     if (!started.ok) return started;
 
     const instance = started.value;
-    await this.instances.save(instance);
-    await this.runs.start(instance);
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.runs.start(instance);
+    });
     return { ok: true, value: { instanceId: instance.id } };
   }
 }
