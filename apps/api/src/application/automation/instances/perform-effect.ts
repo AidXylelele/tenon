@@ -27,8 +27,12 @@ export class PerformEffect {
 
     const declared = await this.secrets.findDeclared(instance.versionId);
     const secrets = RunSecrets.of(declared);
-    const idempotencyKey = `${instance.id}:${command.effectId}`;
-    const call = { idempotencyKey, signal: command.signal, secrets };
+    const call = {
+      instanceId: instance.id,
+      effectId: command.effectId,
+      signal: command.signal,
+      secrets,
+    };
     const outcome = await this.performer.perform(request, call);
     const answer = { effectId: command.effectId, outcome };
     await this.unitOfWork.run(() => this.runs.respond(instance, answer));

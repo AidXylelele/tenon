@@ -230,7 +230,7 @@ describe("the dispatcher every effect passes through", () => {
     signal: AbortSignal = new AbortController().signal,
   ): EffectCall {
     const secrets = RunSecrets.of([]);
-    return { idempotencyKey: "run-1/do/0/charge", signal, secrets };
+    return { instanceId: "run-1", effectId: "/do/0/charge", signal, secrets };
   }
 
   it.each(ROUTED)("a_$kind_effect_reaches_its_own_gateway", async (effect) => {
@@ -287,7 +287,7 @@ describe("the dispatcher every effect passes through", () => {
 
     expect(outcome).toEqual(RESPONDED);
     expect(http.contexts[0]).toMatchObject({
-      idempotencyKey: "run-1/do/0/charge",
+      idempotencyKey: "run-1:/do/0/charge",
       remaining: null,
     });
   });

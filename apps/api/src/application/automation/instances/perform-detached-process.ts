@@ -14,8 +14,12 @@ export class PerformDetachedProcess {
   async execute(command: DetachedProcessCommand): Promise<void> {
     const declared = await this.secrets.findDeclared(command.versionId);
     const secrets = RunSecrets.of(declared);
-    const idempotencyKey = `${command.instanceId}:${command.effectId}`;
-    const call = { idempotencyKey, signal: command.signal, secrets };
+    const call = {
+      instanceId: command.instanceId,
+      effectId: command.effectId,
+      signal: command.signal,
+      secrets,
+    };
     await this.performer.performDetached(command.request, call);
   }
 }

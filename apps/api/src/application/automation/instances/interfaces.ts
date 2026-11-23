@@ -87,8 +87,7 @@ export interface DetachedProcessCommand extends EffectCommand {
   readonly request: JsonObject;
 }
 
-export interface EffectCall {
-  readonly idempotencyKey: string;
+export interface EffectCall extends EffectReference {
   readonly signal: AbortSignal;
   readonly secrets: RunSecrets;
 }

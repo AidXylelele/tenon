@@ -69,8 +69,9 @@ export class EffectDispatcher implements EffectClient {
 
   #stepOf(call: EffectCall): StepCall {
     const secrets = this.protocol.toObject(call.secrets.values);
+    const idempotencyKey = `${call.instanceId}:${call.effectId}`;
     return {
-      idempotencyKey: call.idempotencyKey,
+      idempotencyKey,
       signal: call.signal,
       secrets,
     };

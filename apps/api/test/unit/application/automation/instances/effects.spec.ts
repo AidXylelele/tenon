@@ -81,17 +81,17 @@ const aClosingReceive = (id: string): AwaitedEffect => ({
 class RecordingPerformer extends EffectClient {
   readonly performed: string[] = [];
   readonly detached: string[] = [];
-  readonly keys: string[] = [];
+  readonly references: string[] = [];
 
   perform(request: JsonObject, call: EffectCall): Promise<JsonObject> {
     this.performed.push(JSON.stringify(request.id));
-    this.keys.push(call.idempotencyKey);
+    this.references.push(`${call.instanceId} ${call.effectId}`);
     return Promise.resolve({ kind: "responded", statusCode: 200 });
   }
 
   performDetached(request: JsonObject, call: EffectCall): Promise<void> {
     this.detached.push(JSON.stringify(request.id));
-    this.keys.push(call.idempotencyKey);
+    this.references.push(`${call.instanceId} ${call.effectId}`);
     return Promise.resolve();
   }
 }
@@ -212,7 +212,7 @@ describe("an effect the world performs", () => {
     await fixture.perform.execute(command);
 
     expect(fixture.performer.performed).toEqual(['"/do/0/fetch"']);
-    expect(fixture.performer.keys).toEqual(["parent-1:/do/0/fetch"]);
+    expect(fixture.performer.references).toEqual(["parent-1 /do/0/fetch"]);
     expect(fixture.runs.responded).toEqual([
       {
         instanceId: "parent-1",
@@ -289,7 +289,7 @@ describe("an effect the world performs", () => {
     });
 
     expect(fixture.performer.detached).toEqual(['"/do/0/report"']);
-    expect(fixture.performer.keys).toEqual(["parent-1:/do/0/report"]);
+    expect(fixture.performer.references).toEqual(["parent-1 /do/0/report"]);
   });
 
   it("an_effect_given_up_on_fails_the_run_once_it_is_still_awaited", async () => {
