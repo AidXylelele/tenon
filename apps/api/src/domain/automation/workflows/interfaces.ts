@@ -98,6 +98,16 @@ export interface NewInstance {
   readonly now: Date;
 }
 
+export interface ChildStart {
+  readonly instanceId: string | null;
+  readonly version: string | null;
+  readonly input: JsonValue;
+  readonly trigger: TriggerKind;
+  readonly parent: WorkflowInstance;
+  readonly effectId: string;
+  readonly now: Date;
+}
+
 export interface InstanceRestart {
   readonly previous: WorkflowInstance;
   readonly version: WorkflowVersion;

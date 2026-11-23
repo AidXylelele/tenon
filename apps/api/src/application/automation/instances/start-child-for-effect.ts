@@ -36,40 +36,32 @@ export class StartChildForEffect {
 
     const requested = this.runtime.childOf(request);
     const workflow = await this.workflows.findByName(requested.name);
-    const version = workflow?.versionToRun(requested.version) ?? null;
-    const missingOutcome = this.runtime.outcomeOf(EffectResult.Missing);
-    const missing = { effectId: command.effectId, outcome: missingOutcome };
-
-    if (workflow === null || version === null) {
-      await this.unitOfWork.run(() => this.runs.respond(parent, missing));
-      return;
-    }
-
     const now = new Date();
-    const started = workflow.startInstance({
+    const started = workflow?.startChild({
       instanceId: null,
-      version,
+      version: requested.version,
       input: requested.input,
       trigger: requested.trigger,
-      starterId: null,
-      origin: parent,
-      originEffectId: command.effectId,
+      parent,
+      effectId: command.effectId,
       now,
     });
 
-    if (!started.ok) {
+    if (started?.ok !== true) {
+      const outcome = this.runtime.outcomeOf(EffectResult.Missing);
+      const missing = { effectId: command.effectId, outcome };
       await this.unitOfWork.run(() => this.runs.respond(parent, missing));
       return;
     }
 
     const child = started.value;
-    const startedOutcome = this.runtime.outcomeOf(EffectResult.Started);
-    const answer = { effectId: command.effectId, outcome: startedOutcome };
+    const outcome = this.runtime.outcomeOf(EffectResult.Started);
+    const answer = { effectId: command.effectId, outcome };
     await this.unitOfWork.run(async () => {
       await this.instances.save(child);
       await this.events.dispatch(child);
 
-      if (child.awaitedBy !== null) return;
+      if (parent.awaitsChild(child)) return;
 
       await this.runs.respond(parent, answer);
     });

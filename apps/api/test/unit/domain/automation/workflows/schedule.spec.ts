@@ -80,6 +80,17 @@ describe("a schedule", () => {
     expect(passed).toEqual({ from: since, to: since, count: 0 });
   });
 
+  it("misses_the_passed_slots_no_instance_started_and_never_less_than_none", () => {
+    const schedule = new Schedule({
+      kind: ScheduleKind.Every,
+      interval: MINUTE,
+    });
+    const passed = { from: 0, to: 4 * MINUTE, count: 4 };
+
+    expect(schedule.missedOf(passed, 1)).toBe(3);
+    expect(schedule.missedOf(passed, 6)).toBe(0);
+  });
+
   it("passed_slots_count_at_most_the_latest_thousand", () => {
     const schedule = new Schedule({
       kind: ScheduleKind.Every,

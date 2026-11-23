@@ -349,6 +349,23 @@ describe("a child a run asks for", () => {
       kind: "missing",
     });
   });
+
+  it("an_unpublished_version_is_answered_missing", async () => {
+    const request = {
+      name,
+      version: "9.9.9",
+      input: null,
+      trigger: TriggerKind.Parent,
+    };
+    const fixture = await setUp([anEffect(CHILD, EffectKind.Child)], request);
+
+    await fixture.startChild.execute(commandOf(CHILD));
+
+    expect(fixture.messages.started).toEqual([]);
+    expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
+      kind: "missing",
+    });
+  });
 });
 
 describe("an event a run emits", () => {

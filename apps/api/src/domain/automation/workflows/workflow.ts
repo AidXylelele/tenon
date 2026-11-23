@@ -4,6 +4,7 @@ import { Control, TriggerKind } from "../instances/enums.js";
 import { WorkflowInstance } from "../instances/workflow-instance.js";
 import { WorkflowEventKind, WorkflowRefusal, WorkflowStatus } from "./enums.js";
 import type {
+  ChildStart,
   InstanceRestart,
   NewInstance,
   NewPublication,
@@ -270,6 +271,24 @@ export class Workflow {
     const id = input.instanceId ?? randomUUID();
     const instance = WorkflowInstance.start(id, this.#id, input);
     return { ok: true, value: instance };
+  }
+
+  startChild(start: ChildStart): Result<WorkflowInstance, WorkflowRefusal> {
+    const version = this.versionToRun(start.version);
+
+    if (version === null)
+      return { ok: false, failure: WorkflowRefusal.Unpublished };
+
+    return this.startInstance({
+      instanceId: start.instanceId,
+      version,
+      input: start.input,
+      trigger: start.trigger,
+      starterId: null,
+      origin: start.parent,
+      originEffectId: start.effectId,
+      now: start.now,
+    });
   }
 
   get scheduledVersion(): WorkflowVersion | null {

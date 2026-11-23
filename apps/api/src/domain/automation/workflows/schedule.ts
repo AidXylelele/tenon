@@ -66,6 +66,11 @@ export class Schedule {
     return { from: first, to, count: passed.length };
   }
 
+  missedOf(passed: PassedSlots, starts: number): number {
+    const unstarted = passed.count - starts;
+    return Math.max(0, unstarted);
+  }
+
   upcoming(after: number, until: number, count: number): number[] {
     const next = this.#occurrencesAfter(after, count);
     return next.filter((at) => at <= until);

@@ -25,7 +25,7 @@ export class ListExpectedStarts {
       const since = Math.max(windowStart, workflow.since.getTime());
       const passed = schedule.passedSlots(since, due);
       const next = schedule.upcoming(now, horizon, ListExpectedStarts.NEXT);
-      return { workflowId: workflow.workflowId, passed, next };
+      return { workflowId: workflow.workflowId, schedule, passed, next };
     });
     const slots = plans.map((plan) => ({
       workflowId: plan.workflowId,
@@ -33,28 +33,28 @@ export class ListExpectedStarts {
       to: new Date(plan.passed.to),
     }));
     const started = await this.workflows.scheduledStarts(slots);
-    return started.map((workflow) => {
-      const plan = plans.find(
-        (each) => each.workflowId === workflow.workflowId,
+    return plans.flatMap((plan) => {
+      const workflow = started.find(
+        (each) => each.workflowId === plan.workflowId,
       );
 
-      if (plan === undefined)
-        throw new TypeError(`No schedule plans ${workflow.workflowId}`);
+      if (workflow === undefined) return [];
 
-      const unstarted = plan.passed.count - workflow.starts;
-      const missed = Math.max(0, unstarted);
+      const missed = plan.schedule.missedOf(plan.passed, workflow.starts);
       const next = plan.next.map((at) => new Date(at));
       const missedSince = new Date(plan.passed.from);
-      return {
-        namespace: workflow.namespace,
-        name: workflow.name,
-        title: workflow.title,
-        lastRun: workflow.lastRun,
-        schedule: workflow.schedule,
-        next,
-        missed,
-        missedSince,
-      };
+      return [
+        {
+          namespace: workflow.namespace,
+          name: workflow.name,
+          title: workflow.title,
+          lastRun: workflow.lastRun,
+          schedule: workflow.schedule,
+          next,
+          missed,
+          missedSince,
+        },
+      ];
     });
   }
 }

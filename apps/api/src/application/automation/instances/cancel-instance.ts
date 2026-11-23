@@ -29,24 +29,20 @@ export class CancelInstance {
 
     const now = new Date();
 
-    if (instance.pending) {
-      instance.cancel(now);
-      await this.unitOfWork.run(async () => {
-        await this.instances.save(instance);
-        await this.events.dispatch(instance);
-      });
-      return { ok: true, value: undefined };
+    if (instance.pending) instance.cancel(now);
+
+    if (!instance.ended) {
+      const declared = await this.secrets.findDeclared(instance.versionId);
+      const secrets = RunSecrets.of(declared);
+      const turn = await this.runtime.cancel(
+        instance,
+        secrets,
+        now,
+        command.signal,
+      );
+      instance.advance(turn, secrets, now);
     }
 
-    const declared = await this.secrets.findDeclared(instance.versionId);
-    const secrets = RunSecrets.of(declared);
-    const turn = await this.runtime.cancel(
-      instance,
-      secrets,
-      now,
-      command.signal,
-    );
-    instance.advance(turn, secrets, now);
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
       await this.events.dispatch(instance);
