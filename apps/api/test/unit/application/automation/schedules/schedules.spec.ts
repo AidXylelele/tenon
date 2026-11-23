@@ -1,6 +1,10 @@
+import type { AcceptedEvent } from "../../../../../src/application/automation/events/interfaces.js";
+import type { EventStore } from "../../../../../src/application/automation/events/ports.js";
+import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
 import { ArmSchedules } from "../../../../../src/application/automation/schedules/arm-schedules.js";
 import { ContinueSchedule } from "../../../../../src/application/automation/schedules/continue-schedule.js";
 import { FireSchedule } from "../../../../../src/application/automation/schedules/fire-schedule.js";
+import { StartOnEvent } from "../../../../../src/application/automation/schedules/start-on-event.js";
 import { StartScheduledInstance } from "../../../../../src/application/automation/schedules/start-scheduled-instance.js";
 import type { WorkflowQueries } from "../../../../../src/application/automation/workflows/queries.js";
 import { TurnWorkflowOff } from "../../../../../src/application/automation/workflows/turn-workflow-off.js";
@@ -25,6 +29,7 @@ import {
   FakeUnitOfWork,
   RecordingInstanceEvents,
   RecordingWorkflowEvents,
+  StoredSecrets,
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
   T0,
@@ -42,7 +47,31 @@ const AFTER_A_MINUTE: ScheduleSpec = {
   delay: MINUTE,
 };
 
-function setUp(unarmed: string[] = []) {
+const PAID: AcceptedEvent = {
+  sequence: 7,
+  eventId: "order-1",
+  type: "com.example.order.paid",
+  cloudEvent: { id: "order-1", type: "com.example.order.paid" },
+  acceptedAt: T0,
+  lifecycleOf: null,
+};
+
+function eventsOf(...accepted: AcceptedEvent[]): EventStore {
+  const events = {
+    find: (sequence: number) => {
+      const found = accepted.find((event) => event.sequence === sequence);
+      return Promise.resolve(found ?? null);
+    },
+  };
+  return events as unknown as EventStore;
+}
+
+function runtimeAccepting(accepts: boolean): WorkflowRuntime {
+  const runtime = { accepts: () => Promise.resolve(accepts) };
+  return runtime as unknown as WorkflowRuntime;
+}
+
+function setUp(unarmed: string[] = [], accepts = true) {
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository();
   const instanceEvents = new RecordingInstanceEvents(instances);
@@ -71,6 +100,15 @@ function setUp(unarmed: string[] = []) {
       unitOfWork,
     ),
     arm: new ArmSchedules(queries, workflows, workflowEvents, unitOfWork),
+    startOnEvent: new StartOnEvent(
+      eventsOf(PAID),
+      workflows,
+      instances,
+      runtimeAccepting(accepts),
+      new StoredSecrets(),
+      instanceEvents,
+      unitOfWork,
+    ),
   };
 }
 
@@ -217,6 +255,49 @@ describe("the instance of a fired slot", () => {
 
     expect(fixture.instances.rows.size).toBe(1);
     expect(fixture.instanceEvents.started).toEqual([]);
+  });
+});
+
+describe("the instance an event starts", () => {
+  const STARTED = "0b7c2f7e-0000-4000-8000-000000000002";
+  const signal = new AbortController().signal;
+
+  it("starts_once_per_event_and_dispatches_its_run", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, true);
+    const command = {
+      workflowId: workflow.id,
+      sequence: PAID.sequence,
+      instanceId: STARTED,
+      signal,
+    };
+
+    await fixture.startOnEvent.execute(command);
+    await fixture.startOnEvent.execute(command);
+
+    const started = await fixture.instances.find(STARTED);
+    expect(fixture.instances.rows.size).toBe(1);
+    expect(started?.trigger).toBe(TriggerKind.Event);
+    expect(started?.input).toEqual([PAID.cloudEvent]);
+    expect(fixture.instanceEvents.started[0]?.stored).toBe(true);
+    expect(fixture.instanceEvents.kindsOf(STARTED)).toEqual([
+      InstanceEventKind.Started,
+    ]);
+  });
+
+  it("an_event_the_workflow_does_not_accept_starts_nothing", async () => {
+    const fixture = setUp([], false);
+    const { workflow } = await aWorkflow(fixture, true);
+
+    await fixture.startOnEvent.execute({
+      workflowId: workflow.id,
+      sequence: PAID.sequence,
+      instanceId: STARTED,
+      signal,
+    });
+
+    expect(fixture.instances.rows.size).toBe(0);
+    expect(fixture.instanceEvents.calls).toEqual([]);
   });
 });
 

@@ -25,6 +25,10 @@ export class StartOnEvent {
   ) {}
 
   async execute(command: TriggerCommand): Promise<void> {
+    const existing = await this.instances.find(command.instanceId);
+
+    if (existing !== null) return;
+
     const event = await this.events.find(command.sequence);
     const workflow = await this.workflows.findById(command.workflowId);
     const version = workflow?.scheduledVersion ?? null;
@@ -46,7 +50,7 @@ export class StartOnEvent {
 
     const consumed = [event.cloudEvent];
     const started = workflow.startScheduledInstance({
-      instanceId: null,
+      instanceId: command.instanceId,
       version,
       input: consumed,
       trigger: TriggerKind.Event,

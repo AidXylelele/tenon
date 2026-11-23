@@ -35,7 +35,10 @@ export class MatchSubscriptions {
 
     await this.unitOfWork.run(async () => {
       for (const subscription of accepting) {
-        await this.log.pending(subscription, event, now);
+        const pending = await this.log.pending(subscription, event, now);
+
+        if (!pending) continue;
+
         await this.deliveries.schedule(subscription, event);
       }
     });

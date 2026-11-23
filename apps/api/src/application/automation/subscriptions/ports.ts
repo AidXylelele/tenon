@@ -45,7 +45,7 @@ export abstract class DeliveryLog {
     subscription: Subscription,
     event: AcceptedEvent,
     at: Date,
-  ): Promise<void>;
+  ): Promise<boolean>;
   abstract delivered(
     subscription: Subscription,
     event: AcceptedEvent,

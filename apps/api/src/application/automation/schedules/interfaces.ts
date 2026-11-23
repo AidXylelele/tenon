@@ -21,6 +21,7 @@ export interface ScheduledWorkflow {
 export interface TriggerCommand {
   readonly workflowId: string;
   readonly sequence: number;
+  readonly instanceId: string;
   readonly signal: AbortSignal;
 }
 

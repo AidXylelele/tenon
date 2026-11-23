@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { TransactionHost } from "@nestjs-cls/transactional";
 import {
   NonRetryableMessageError,
   OnOutboxMessage,
@@ -13,12 +12,11 @@ import { OfferEvent } from "../../application/automation/instances/offer-event.j
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
-import { UnitOfWork } from "../../application/unit-of-work.js";
 import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
-import type { Transaction } from "../persistence/interfaces.js";
 import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { ConsumerSpan } from "./consumer-span.js";
 import { MessageTopic } from "./enums.js";
+import { instanceIdOf } from "./instance-id.js";
 import type {
   AcceptedEventMessage,
   EventOfferedMessage,
@@ -31,8 +29,6 @@ export class AutomationHandler {
   constructor(
     private readonly span: ConsumerSpan,
     private readonly outbox: Outbox,
-    private readonly txHost: TransactionHost<Transaction>,
-    private readonly unitOfWork: UnitOfWork,
     private readonly dispatchEvent: DispatchEvent,
     private readonly offerEvent: OfferEvent,
     private readonly startOnEvent: StartOnEvent,
@@ -47,12 +43,8 @@ export class AutomationHandler {
     message: AcceptedEventMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, () =>
-      this.dispatchEvent.execute({
-        sequence: message.sequence,
-        signal: context.signal,
-      }),
-    );
+    const command = { sequence: message.sequence, signal: context.signal };
+    return this.#handled(context, () => this.dispatchEvent.execute(command));
   }
 
   @OnOutboxMessage(MessageTopic.EventAccepted, { consumer: "subscriptions" })
@@ -60,11 +52,9 @@ export class AutomationHandler {
     message: AcceptedEventMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, () =>
-      this.matchSubscriptions.execute({
-        sequence: message.sequence,
-        signal: context.signal,
-      }),
+    const command = { sequence: message.sequence, signal: context.signal };
+    return this.#handled(context, () =>
+      this.matchSubscriptions.execute(command),
     );
   }
 
@@ -73,14 +63,13 @@ export class AutomationHandler {
     message: EventOfferedMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, () =>
-      this.offerEvent.execute({
-        instanceId: message.instanceId,
-        sequence: message.sequence,
-        candidates: message.candidates,
-        signal: context.signal,
-      }),
-    );
+    const command = {
+      instanceId: message.instanceId,
+      sequence: message.sequence,
+      candidates: message.candidates,
+      signal: context.signal,
+    };
+    return this.#handled(context, () => this.offerEvent.execute(command));
   }
 
   @OnOutboxMessage(MessageTopic.TriggerOffered, { consumer: "triggers" })
@@ -88,13 +77,15 @@ export class AutomationHandler {
     message: TriggerOfferedMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, () =>
-      this.startOnEvent.execute({
-        workflowId: message.workflowId,
-        sequence: message.sequence,
-        signal: context.signal,
-      }),
-    );
+    const slot = `${message.workflowId}#${String(message.sequence)}`;
+    const instanceId = instanceIdOf(slot);
+    const command = {
+      workflowId: message.workflowId,
+      sequence: message.sequence,
+      instanceId,
+      signal: context.signal,
+    };
+    return this.#handled(context, () => this.startOnEvent.execute(command));
   }
 
   @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "children" })
@@ -102,9 +93,8 @@ export class AutomationHandler {
     message: InstanceMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, () =>
-      this.cancelChildren.execute({ instanceId: message.instanceId }),
-    );
+    const command = { instanceId: message.instanceId };
+    return this.#handled(context, () => this.cancelChildren.execute(command));
   }
 
   @OnOutboxMessage(InstanceEventKind.ChildrenAbandoned, {
@@ -114,9 +104,8 @@ export class AutomationHandler {
     message: InstanceMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, () =>
-      this.cancelChildren.execute({ instanceId: message.instanceId }),
-    );
+    const command = { instanceId: message.instanceId };
+    return this.#handled(context, () => this.cancelChildren.execute(command));
   }
 
   @OnOutboxMessage(MessageTopic.CancelRequested, { consumer: "runs" })
@@ -124,11 +113,9 @@ export class AutomationHandler {
     message: InstanceMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, async () => {
-      await this.cancelInstance.execute({
-        instanceId: message.instanceId,
-        signal: context.signal,
-      });
+    const command = { instanceId: message.instanceId, signal: context.signal };
+    return this.#handled(context, async () => {
+      await this.cancelInstance.execute(command);
     });
   }
 
@@ -137,32 +124,23 @@ export class AutomationHandler {
     message: InstanceMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#once(context, () =>
-      this.continueSchedule.execute({ instanceId: message.instanceId }),
-    );
+    const command = { instanceId: message.instanceId };
+    return this.#handled(context, () => this.continueSchedule.execute(command));
   }
 
-  async #once(
-    context: OutboxHandlerContext,
-    work: () => Promise<void>,
-  ): Promise<void> {
-    await this.span.around(context, () => this.#processed(context, work));
-    this.outbox.notify();
-  }
-
-  async #processed(
+  async #handled(
     context: OutboxHandlerContext,
     work: () => Promise<void>,
   ): Promise<void> {
     try {
-      await this.unitOfWork.run(async () => {
-        await context.processInTransaction(this.txHost.tx, work);
-      });
+      await this.span.around(context, work);
     } catch (error) {
       if (error instanceof PermanentFault)
         throw new NonRetryableMessageError(error.message, { cause: error });
 
       throw error;
     }
+
+    this.outbox.notify();
   }
 }
