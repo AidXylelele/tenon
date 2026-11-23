@@ -4,7 +4,6 @@ import type {
   EditAction,
 } from "language-server/protocol";
 import type { ReactNode } from "react";
-import type { Json } from "../form-fields";
 import type { ConditionSlot } from "../step-form";
 
 export interface PickedData {
@@ -21,7 +20,6 @@ export interface PickerSlot {
 export interface ConditionBuilderProps extends ConditionSlot {
   readonly reading: ConditionReading | null;
   readonly data: DataAtResult | null;
-  readonly samples?: ReadonlyMap<string, Json>;
   readonly renderPicker: (slot: PickerSlot) => ReactNode;
   readonly onEdit: (actions: readonly EditAction[]) => void;
 }

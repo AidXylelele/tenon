@@ -29,9 +29,8 @@ import {
 } from "../condition-builder/readings.test-support";
 import { DataField, DataPicker } from "../data-picker";
 import {
-  AFTER_FETCH,
   AT_AN_ADDRESS,
-  SAMPLES,
+  AFTER_A_TEST,
 } from "../data-picker/data-choices/data.test-support";
 import type { ConditionSlot, DataSlot } from "./interfaces";
 import { StepForm } from "./step-form";
@@ -53,13 +52,7 @@ const ROUTED_BY_AN_EXPRESSION = formWith(SWITCH_FORM, "switch", [
 
 function picker({ label, onPick }: PickerSlot) {
   return (
-    <DataPicker
-      data={AFTER_FETCH}
-      samples={SAMPLES}
-      onlyPaths
-      label={label}
-      onPick={onPick}
-    />
+    <DataPicker data={AFTER_A_TEST} onlyPaths label={label} onPick={onPick} />
   );
 }
 
@@ -70,8 +63,7 @@ function builder(slot: ConditionSlot) {
     <ConditionBuilder
       {...slot}
       reading={reading}
-      data={AFTER_FETCH}
-      samples={SAMPLES}
+      data={AFTER_A_TEST}
       renderPicker={picker}
       onEdit={fn()}
     />

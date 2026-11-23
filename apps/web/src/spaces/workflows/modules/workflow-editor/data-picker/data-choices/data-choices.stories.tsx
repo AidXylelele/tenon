@@ -2,24 +2,22 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { DataAtResult } from "language-server/protocol";
 import { type ChangeEvent, useState } from "react";
 import { choicesOf } from ".";
-import type { Json } from "./interfaces";
 import {
+  AFTER_A_TEST,
   AFTER_FETCH,
   AT_AN_ADDRESS,
   FIRST_STEP,
   IN_A_LOOP,
-  SAMPLES,
 } from "./data.test-support";
 
 interface ChoicesProbeProps {
   readonly data: DataAtResult;
-  readonly samples: ReadonlyMap<string, Json>;
   readonly onlyPaths: boolean;
 }
 
-function ChoicesProbe({ data, samples, onlyPaths }: ChoicesProbeProps) {
+function ChoicesProbe({ data, onlyPaths }: ChoicesProbeProps) {
   const [query, setQuery] = useState("");
-  const choices = choicesOf(data, samples, query, onlyPaths);
+  const choices = choicesOf(data, query, onlyPaths);
   const count = `${String(choices.count)} pieces of data`;
 
   function search(event: ChangeEvent<HTMLInputElement>) {
@@ -63,11 +61,9 @@ function ChoicesProbe({ data, samples, onlyPaths }: ChoicesProbeProps) {
   );
 }
 
-const NO_SAMPLES: ReadonlyMap<string, Json> = new Map<string, Json>();
-
 const meta = {
   component: ChoicesProbe,
-  args: { data: AFTER_FETCH, samples: NO_SAMPLES, onlyPaths: false },
+  args: { data: AFTER_FETCH, onlyPaths: false },
 } satisfies Meta<typeof ChoicesProbe>;
 
 export default meta;
@@ -77,7 +73,7 @@ type Story = StoryObj<typeof meta>;
 export const BeforeATest: Story = {};
 
 export const AfterATest: Story = {
-  args: { samples: SAMPLES },
+  args: { data: AFTER_A_TEST },
 };
 
 export const FirstStep: Story = {

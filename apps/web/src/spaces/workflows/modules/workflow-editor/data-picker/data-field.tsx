@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
 import { blurOnEnter } from "../step-form";
-import { choiceOfValue, type DataChoice, NO_SAMPLES } from "./data-choices";
+import { choiceOfValue, type DataChoice } from "./data-choices";
 import { ChoiceIcon } from "./choice-icon";
 import { DataPicker } from "./data-picker";
 import type { DataFieldProps, DataPick } from "./interfaces";
@@ -27,7 +27,6 @@ export function DataField({
   onUse,
   onClear,
   data,
-  samples = NO_SAMPLES,
   onOpenChange,
 }: DataFieldProps) {
   const [open, setOpen] = useState(false);
@@ -35,7 +34,7 @@ export function DataField({
   const input = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const reference =
-    writing || data === null ? null : choiceOfValue(value, data, samples);
+    writing || data === null ? null : choiceOfValue(value, data);
   const text = typeof value === "string" ? value : "";
   const isExpression = writing || text.startsWith("${");
 
@@ -116,7 +115,6 @@ export function DataField({
       <DataPicker
         ref={trigger}
         data={data}
-        samples={samples}
         describedBy={labelId}
         open={open}
         onOpenChange={change}

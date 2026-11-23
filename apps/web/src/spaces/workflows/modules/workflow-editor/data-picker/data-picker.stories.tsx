@@ -4,7 +4,7 @@ import {
   AFTER_FETCH,
   AT_AN_ADDRESS,
   FIRST_STEP,
-  SAMPLES,
+  AFTER_A_TEST,
 } from "./data-choices/data.test-support";
 import { Announcer } from "@/libs/ui/composites/announcer";
 import { DataPicker } from "./data-picker";
@@ -38,7 +38,7 @@ type Story = StoryObj<typeof meta>;
 export const BeforeATest: Story = {};
 
 export const FieldsAfterATest: Story = {
-  args: { samples: SAMPLES },
+  args: { data: AFTER_A_TEST },
 };
 
 export const NoStepBefore: Story = {
@@ -50,7 +50,7 @@ export const SecretsForAnAddress: Story = {
 };
 
 export const FilteredByTyping: Story = {
-  args: { samples: SAMPLES },
+  args: { data: AFTER_A_TEST },
   play: async ({ canvas, userEvent }) => {
     const insert = await canvas.findByRole("button", { name: "Insert data" });
     await userEvent.click(insert);

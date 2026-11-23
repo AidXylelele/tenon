@@ -2,11 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { Announcer } from "@/libs/ui/composites/announcer";
-import {
-  AFTER_FETCH,
-  AT_AN_ADDRESS,
-  SAMPLES,
-} from "./data-choices/data.test-support";
+import { AT_AN_ADDRESS, AFTER_A_TEST } from "./data-choices/data.test-support";
 import { DataField } from "./data-field";
 
 const meta = {
@@ -55,8 +51,7 @@ export const TypedText: Story = {
 export const DataReference: Story = {
   args: {
     value: "${ .slideshow.slides }",
-    data: AFTER_FETCH,
-    samples: SAMPLES,
+    data: AFTER_A_TEST,
   },
 };
 

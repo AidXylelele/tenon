@@ -8,10 +8,9 @@ import {
   FIRST_STEP,
   GREET_ENTRY,
   IN_A_LOOP,
-  SAMPLES,
+  AFTER_A_TEST,
+  typedAs,
 } from "./data.test-support";
-
-const NONE = new Map();
 
 function titlesOf(groups: readonly { readonly title: string }[]) {
   return groups.map((group) => group.title);
@@ -26,7 +25,7 @@ function labelsOf(
 
 describe("the data offered at a field", () => {
   it("is_grouped_by_the_steps_before_then_input_then_times", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "", false);
+    const choices = choicesOf(AFTER_FETCH, "", false);
 
     const titles = titlesOf(choices.groups);
 
@@ -39,7 +38,7 @@ describe("the data offered at a field", () => {
   });
 
   it("an_answer_not_seen_yet_says_to_run_a_test_or_type_a_field", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "", false);
+    const choices = choicesOf(AFTER_FETCH, "", false);
     const [fetch] = choices.groups;
 
     const labels = labelsOf(fetch);
@@ -50,7 +49,7 @@ describe("the data offered at a field", () => {
   });
 
   it("fields_known_before_the_run_come_before_the_whole_answer", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "", false);
+    const choices = choicesOf(AFTER_FETCH, "", false);
     const greet = choices.groups[1];
 
     expect(greet?.choices).toEqual([
@@ -71,11 +70,11 @@ describe("the data offered at a field", () => {
     ]);
   });
 
-  it("after_a_test_the_answer's_fields_come_from_its_sample", () => {
-    const choices = choicesOf(AFTER_FETCH, SAMPLES, "", false);
+  it("after_a_test_the_answer's_fields_are_the_ones_the_server_read_from_it", () => {
+    const choices = choicesOf(AFTER_A_TEST, "", false);
     const [fetch] = choices.groups;
 
-    expect(fetch?.title).toBe("From Fetch the digest · the last test run");
+    expect(fetch?.title).toBe("From Fetch the digest");
     const labels = labelsOf(fetch);
     expect(labels).toEqual([
       "Fetch the digest › slideshow",
@@ -91,7 +90,7 @@ describe("the data offered at a field", () => {
   });
 
   it("with_no_step_before_it_says_the_first_step_gets_the_input", () => {
-    const choices = choicesOf(FIRST_STEP, NONE, "", false);
+    const choices = choicesOf(FIRST_STEP, "", false);
     const [steps] = choices.groups;
 
     expect(steps).toEqual({
@@ -103,7 +102,7 @@ describe("the data offered at a field", () => {
   });
 
   it("secrets_are_offered_where_the_language_server_offers_them", () => {
-    const choices = choicesOf(AT_AN_ADDRESS, NONE, "", false);
+    const choices = choicesOf(AT_AN_ADDRESS, "", false);
     const secrets = choices.groups.at(-1);
 
     expect(secrets?.title).toBe("Secrets · kept out of run records");
@@ -114,14 +113,14 @@ describe("the data offered at a field", () => {
   });
 
   it("a_loop's_item_is_a_variable", () => {
-    const choices = choicesOf(IN_A_LOOP, NONE, "", false);
+    const choices = choicesOf(IN_A_LOOP, "", false);
     const titles = titlesOf(choices.groups);
 
     expect(titles).toContain("Variables");
   });
 
   it("only_paths_leave_out_the_times", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "", true);
+    const choices = choicesOf(AFTER_FETCH, "", true);
     const titles = titlesOf(choices.groups);
 
     expect(titles).not.toContain("Dates and times");
@@ -137,7 +136,7 @@ describe("the data offered at a field", () => {
       ],
     );
 
-    const choices = choicesOf(data, NONE, "", false);
+    const choices = choicesOf(data, "", false);
 
     expect(choices.groups[0]?.note).toBe(
       "It holds nothing when “Greet” is skipped.",
@@ -148,15 +147,21 @@ describe("the data offered at a field", () => {
 
 describe("finding data by typing", () => {
   it("keeps_what_matches_and_drops_the_notes", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "MESSAGE", false);
+    const data = typedAs(AFTER_FETCH, "MESSAGE", {
+      "Fetch the digest": ".MESSAGE",
+    });
+    const choices = choicesOf(data, "MESSAGE", false);
 
     const titles = titlesOf(choices.groups);
     expect(titles).toEqual(["From Greet", "Use as a field of the answer"]);
     expect(choices.groups[0]?.note).toBeNull();
   });
 
-  it("a_typed_field_name_is_offered_on_each_answer_not_seen_yet", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "slideshow.title", false);
+  it("a_typed_field_name_is_offered_where_the_language_server_names_it", () => {
+    const data = typedAs(AFTER_FETCH, "slideshow.title", {
+      "Fetch the digest": ".slideshow.title",
+    });
+    const choices = choicesOf(data, "slideshow.title", false);
     const typed = choices.groups.at(-1);
 
     expect(typed).toEqual({
@@ -174,29 +179,35 @@ describe("finding data by typing", () => {
   });
 
   it("a_field_already_offered_is_not_offered_again", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "message", false);
+    const data = typedAs(AFTER_FETCH, "message", {
+      "Fetch the digest": ".message",
+      Greet: "$context.Greet.message",
+    });
+    const choices = choicesOf(data, "message", false);
     const typed = choices.groups.at(-1);
 
     const labels = labelsOf(typed);
     expect(labels).toEqual(["Fetch the digest › message"]);
   });
 
-  it("a_typed_name_is_not_offered_on_an_answer_whose_fields_are_known", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "title", false);
-    const typed = choices.groups.at(-1);
+  it("an_answer_for_another_typed_name_is_not_offered", () => {
+    const data = typedAs(AFTER_FETCH, "title", {
+      "Fetch the digest": ".title",
+    });
+    const choices = choicesOf(data, "titles", false);
+    const titles = titlesOf(choices.groups);
 
-    const labels = labelsOf(typed);
-    expect(labels).toEqual(["Fetch the digest › title"]);
+    expect(titles).not.toContain("Use as a field of the answer");
   });
 
   it("text_that_is_no_field_name_offers_nothing_typed", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "a b", false);
+    const choices = choicesOf(AFTER_FETCH, "a b", false);
 
     expect(choices).toEqual({ groups: [], count: 0, notes: [] });
   });
 
   it("counts_what_it_shows", () => {
-    const choices = choicesOf(AFTER_FETCH, NONE, "", false);
+    const choices = choicesOf(AFTER_FETCH, "", false);
 
     expect(choices.count).toBe(6);
   });
@@ -204,11 +215,7 @@ describe("finding data by typing", () => {
 
 describe("the data a value holds", () => {
   it("a_value_of_an_offered_choice_is_that_choice", () => {
-    const choice = choiceOfValue(
-      "${ $context.Greet.message }",
-      AFTER_FETCH,
-      NONE,
-    );
+    const choice = choiceOfValue("${ $context.Greet.message }", AFTER_FETCH);
 
     expect(choice?.label).toBe("Greet › message");
   });
@@ -217,13 +224,13 @@ describe("the data a value holds", () => {
     ["typed_text", "https://example.com"],
     ["a_number", 3],
   ])("%s_is_no_choice", (_, value) => {
-    const choice = choiceOfValue(value, AFTER_FETCH, NONE);
+    const choice = choiceOfValue(value, AFTER_FETCH);
 
     expect(choice).toBeNull();
   });
 
   it("the_whole_answer_of_the_step_before_reads_as_dot", () => {
-    const choice = choiceOfValue("${ . }", AFTER_FETCH, NONE);
+    const choice = choiceOfValue("${ . }", AFTER_FETCH);
 
     expect(choice?.label).toBe(`${FETCH_ENTRY.name} › the whole answer`);
   });

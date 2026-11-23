@@ -11,18 +11,9 @@ import type {
   DataChoice,
   DataChoices,
   Json,
-  SampleMember,
 } from "./interfaces";
-import { isPath, memberPathOf, typedNamesOf, valueOf } from "./paths";
-import { sampleMembersOf } from "./samples";
-
-type Samples = ReadonlyMap<string, Json>;
-
-export const NO_SAMPLES: Samples = new Map<string, Json>();
 
 const SEPARATOR = " › ";
-
-const FIELDED: ReadonlySet<DataShape> = new Set(["object", "unknown"]);
 
 const WHOLE_ANSWER = "the whole answer";
 
@@ -55,13 +46,14 @@ const UNSEEN =
 
 const TYPED_NOTE = "The test run shows whether the answer has it.";
 
+const TYPED_SHAPE = "a field of the answer";
+
 export function choicesOf(
   data: DataAtResult,
-  samples: Samples,
   query: string,
   onlyPaths: boolean,
 ): DataChoices {
-  const all = groupsOf(data, samples);
+  const all = groupsOf(data);
   const typed = typedGroupOf(data, all, query);
   const offered = typed === null ? all : all.concat([typed]);
   const shown = offered
@@ -76,11 +68,10 @@ export function choicesOf(
 export function choiceOfValue(
   value: Json,
   data: DataAtResult,
-  samples: Samples,
 ): DataChoice | null {
   if (typeof value !== "string") return null;
 
-  const groups = groupsOf(data, samples);
+  const groups = groupsOf(data);
   const choices = groups.flatMap((group) => group.choices);
 
   return choices.find((choice) => choice.value === value.trim()) ?? null;
@@ -89,19 +80,16 @@ export function choiceOfValue(
 export function choiceOfExpression(
   expression: string,
   data: DataAtResult,
-  samples: Samples,
 ): DataChoice | null {
-  const groups = groupsOf(data, samples);
+  const groups = groupsOf(data);
   const choices = groups.flatMap((group) => group.choices);
 
   return choices.find((choice) => choice.expression === expression) ?? null;
 }
 
-function groupsOf(data: DataAtResult, samples: Samples): ChoiceGroup[] {
+function groupsOf(data: DataAtResult): ChoiceGroup[] {
   const steps = data.entries.filter((entry) => entry.source === "step");
-  const stepGroups = steps.map((entry) =>
-    stepGroupOf(entry, samples, data.warnings),
-  );
+  const stepGroups = steps.map((entry) => stepGroupOf(entry, data.warnings));
   const before = stepGroups.length > 0 ? stepGroups : [NO_STEP_BEFORE];
   const inputs = entriesOf(data, "workflowInput").flatMap((entry) =>
     choicesOfEntry(entry, WORKFLOW_INPUT, "data", null),
@@ -140,23 +128,16 @@ function groupOf(
 
 function stepGroupOf(
   entry: DataEntry,
-  samples: Samples,
   warnings: readonly DataWarning[],
 ): ChoiceGroup {
-  const sample = entry.step === null ? undefined : samples.get(entry.step);
-  const hasSample = sample !== undefined && entry.members.length === 0;
-  const members = hasSample
-    ? sampleMembersOf(entry.expression, sample)
-    : entry.members;
   const exported = entry.needsExport ? entry.step : null;
   const whole = `${entry.name}${SEPARATOR}${WHOLE_ANSWER}`;
   const own = choiceOf(entry, whole, "data", exported);
-  const inner = members.flatMap((member) =>
+  const inner = entry.members.flatMap((member) =>
     memberChoicesOf(member, entry.name, exported),
   );
-  const seen = hasSample ? " · the last test run" : "";
-  const title = `From ${entry.name}${seen}`;
-  const note = stepNoteOf(entry, members.length, warnings);
+  const title = `From ${entry.name}`;
+  const note = stepNoteOf(entry, entry.members.length, warnings);
   const choices = inner.concat([own]);
 
   return { id: entry.step ?? entry.name, title, choices, note };
@@ -194,7 +175,7 @@ function choicesOfEntry(
 }
 
 function memberChoicesOf(
-  member: DataMember | SampleMember,
+  member: DataMember,
   parent: string,
   exported: string | null,
 ): DataChoice[] {
@@ -207,12 +188,12 @@ function memberChoicesOf(
 }
 
 function choiceOf(
-  member: DataMember | SampleMember,
+  member: DataMember,
   label: string,
   kind: ChoiceKind,
   exported: string | null,
 ): DataChoice {
-  const size = "size" in member ? member.size : null;
+  const size = member.size;
   const shapeWord = SHAPE_WORDS[member.shape];
   const shape = size === null ? shapeWord : `list of ${String(size)}`;
   return {
@@ -223,7 +204,7 @@ function choiceOf(
     export: exported,
     kind,
     shape,
-    isPath: isPath(member.expression),
+    isPath: member.isPath,
   };
 }
 
@@ -232,21 +213,12 @@ function typedGroupOf(
   groups: readonly ChoiceGroup[],
   query: string,
 ): ChoiceGroup | null {
-  const names = typedNamesOf(query);
-
-  if (names === null) return null;
-
+  const typed = query.trim();
   const known = new Set(
     groups.flatMap((group) => group.choices.map((choice) => choice.expression)),
   );
-  const steps = data.entries.filter(
-    (entry) =>
-      entry.source === "step" &&
-      FIELDED.has(entry.shape) &&
-      entry.members.length === 0,
-  );
-  const choices = steps
-    .map((entry) => typedChoiceOf(entry, names))
+  const choices = data.entries
+    .flatMap((entry) => typedChoicesOf(entry, typed))
     .filter((choice) => !known.has(choice.expression));
 
   if (choices.length === 0) return null;
@@ -259,20 +231,18 @@ function typedGroupOf(
   };
 }
 
-function typedChoiceOf(entry: DataEntry, names: readonly string[]): DataChoice {
-  const expression = names.reduce(memberPathOf, entry.expression);
-  const label = [entry.name].concat(names).join(SEPARATOR);
+function typedChoicesOf(entry: DataEntry, typed: string): DataChoice[] {
+  const member = entry.typed;
+
+  if (member === null || member.name !== typed) return [];
+
+  const owner = entry.source === "workflowInput" ? WORKFLOW_INPUT : entry.name;
+  const names = member.name.split(".");
+  const label = [owner].concat(names).join(SEPARATOR);
   const exported = entry.needsExport ? entry.step : null;
-  return {
-    id: `typed:${expression}`,
-    label,
-    value: valueOf(expression),
-    expression,
-    export: exported,
-    kind: "data",
-    shape: "a field of the answer",
-    isPath: true,
-  };
+  const choice = choiceOf(member, label, "data", exported);
+
+  return [{ ...choice, id: `typed:${member.expression}`, shape: TYPED_SHAPE }];
 }
 
 function shownGroupOf(

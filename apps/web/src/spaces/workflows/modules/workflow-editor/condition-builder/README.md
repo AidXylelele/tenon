@@ -9,7 +9,7 @@ Owner: web — editor. Sources: research D9 of the console redesign (005); desig
 `ConditionBuilder` (`ConditionBuilderProps`): the step form's `ConditionSlot` (`pointer`, `text`, `required`, `labelledBy`, `describedBy`, `invalid`) plus:
 
 - `reading`: `workflow/readCondition` of `text`, or `null` while it is read; "Reading the condition…" shows only before the first reading, and the last one stays on screen while the text is read again. A `condition` opens as rows (no row yet: one row to fill); an `expression` opens as the expression, as written, with no way back to rows until it reads as one.
-- `data`, `samples`: `workflow/dataAt` for the field and the last test run's outputs, to name each value in words ("Fetch the digest › slideshow › slides"); a path not offered is shown as written.
+- `data`: `workflow/dataAt` for the field (asked with the last test run's outputs as `samples`), to name each value in words ("Fetch the digest › slideshow › slides"); a path not offered is shown as written.
 - `renderPicker(slot)`: the module renders the data picker with `onlyPaths` (`PickerSlot`: `label`, "Choose data" or "Choose data to compare with", and `onPick({ value, expression, export })`).
 - `onEdit(actions)`: once every row is complete, `useData` for each step to export, then `setCondition`; an expression (a mono text area, kept as typed) is `setField` when it changed, or `clearField` when an optional condition is emptied.
 

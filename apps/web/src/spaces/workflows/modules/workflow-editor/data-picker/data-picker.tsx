@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/libs/ui/components/popover";
 import { useAnnounce } from "@/libs/ui/composites/announcer";
-import { choicesOf, type DataChoice, NO_SAMPLES } from "./data-choices";
+import { choicesOf, type DataChoice } from "./data-choices";
 import { ChoiceIcon } from "./choice-icon";
 import type { DataPick, DataPickerProps } from "./interfaces";
 
@@ -25,12 +25,12 @@ const SEARCH = "Find data, or type a field name";
 
 export function DataPicker({
   data,
-  samples = NO_SAMPLES,
   onlyPaths = false,
   label = "Insert data",
   describedBy,
   open,
   onOpenChange,
+  onSearch,
   onPick,
   onWriteExpression,
   ref,
@@ -96,8 +96,8 @@ export function DataPicker({
         ) : (
           <ChoiceList
             data={data}
-            samples={samples}
             onlyPaths={onlyPaths}
+            onSearch={onSearch}
             onPick={pick}
           />
         )}
@@ -124,19 +124,19 @@ export function DataPicker({
 
 function ChoiceList({
   data,
-  samples,
   onlyPaths,
+  onSearch,
   onPick,
 }: {
   readonly data: NonNullable<DataPickerProps["data"]>;
-  readonly samples: NonNullable<DataPickerProps["samples"]>;
   readonly onlyPaths: boolean;
+  readonly onSearch: DataPickerProps["onSearch"];
   readonly onPick: (choice: DataChoice) => void;
 }) {
   const announce = useAnnounce();
   const id = useId();
   const [query, setQuery] = useState("");
-  const choices = choicesOf(data, samples, query, onlyPaths);
+  const choices = choicesOf(data, query, onlyPaths);
   const typed = query.trim();
   const groupNotes = choices.groups.flatMap((group) =>
     group.note === null ? [] : [`${group.title}: ${group.note}`],
@@ -150,10 +150,11 @@ function ChoiceList({
     setQuery(next);
 
     const words = next.trim();
+    onSearch?.(words);
 
     if (words === "") return;
 
-    const found = choicesOf(data, samples, next, onlyPaths);
+    const found = choicesOf(data, next, onlyPaths);
     const told = foundText(found.count, words);
     announce(told);
   }

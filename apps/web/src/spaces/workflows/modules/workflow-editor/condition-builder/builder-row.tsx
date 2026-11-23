@@ -23,7 +23,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
-import { choiceOfExpression, NO_SAMPLES } from "../data-picker";
+import { choiceOfExpression } from "../data-picker";
 import { blurOnEnter } from "../step-form";
 import {
   COMPARISONS,
@@ -48,13 +48,10 @@ import type {
 
 type Offered = Pick<ConditionBuilderProps, "data" | "renderPicker">;
 
-type Samples = NonNullable<ConditionBuilderProps["samples"]>;
-
 interface RowProps extends Offered {
   readonly draft: Draft;
   readonly row: DraftRow;
   readonly position: number;
-  readonly samples?: Samples;
   readonly onDraft: (next: Draft) => void;
 }
 
@@ -66,7 +63,6 @@ export function BuilderRow({
   row,
   position,
   data,
-  samples = NO_SAMPLES,
   renderPicker,
   onDraft,
 }: RowProps) {
@@ -117,7 +113,7 @@ export function BuilderRow({
             aria-labelledby={valueId}
             className="flex flex-wrap items-center gap-2"
           >
-            <DataName path={row.left} data={data} samples={samples} />
+            <DataName path={row.left} data={data} />
             {leftPicker}
           </div>
         </Field>
@@ -157,7 +153,6 @@ export function BuilderRow({
             row={row}
             offersOperand={offersOperand}
             data={data}
-            samples={samples}
             renderPicker={renderPicker}
             onRight={setRight}
           />
@@ -176,11 +171,9 @@ function exportOf(pick: PickedData): DataExport | null {
 function DataName({
   path,
   data,
-  samples,
 }: {
   readonly path: string | null;
   readonly data: ConditionBuilderProps["data"];
-  readonly samples: Samples;
 }) {
   if (path === null)
     return (
@@ -189,7 +182,7 @@ function DataName({
       </span>
     );
 
-  const choice = data === null ? null : choiceOfExpression(path, data, samples);
+  const choice = data === null ? null : choiceOfExpression(path, data);
 
   if (choice === null)
     return <code className="font-mono text-code">{path}</code>;
@@ -205,13 +198,11 @@ function ComparedWith({
   row,
   offersOperand,
   data,
-  samples,
   renderPicker,
   onRight,
 }: Offered & {
   readonly row: DraftRow;
   readonly offersOperand: boolean;
-  readonly samples: Samples;
   readonly onRight: (right: DraftOperand) => void;
 }) {
   const id = useId();
@@ -272,7 +263,7 @@ function ComparedWith({
       )}
       {row.right.kind === "data" && (
         <div className="flex flex-wrap items-center gap-2">
-          <DataName path={row.right.path} data={data} samples={samples} />
+          <DataName path={row.right.path} data={data} />
           {rightPicker}
         </div>
       )}

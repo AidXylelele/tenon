@@ -312,7 +312,10 @@ describe("whether a reading is what the builder holds", () => {
     const draft = draftOf(PAID);
 
     const other = holdsReading(draft, { kind: "condition", condition: EMPTY });
-    const expression = holdsReading(draft, { kind: "expression" });
+    const expression = holdsReading(draft, {
+      kind: "expression",
+      text: "${ .paid }",
+    });
 
     expect([other, expression]).toEqual([false, false]);
   });

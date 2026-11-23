@@ -3,7 +3,6 @@ import type {
   DataEntry,
   DataMember,
 } from "language-server/protocol";
-import type { Json } from "./interfaces";
 
 type EntryShape = Partial<DataEntry> &
   Pick<DataEntry, "source" | "name" | "expression">;
@@ -12,9 +11,12 @@ export function entryOf(shape: EntryShape): DataEntry {
   return {
     step: null,
     value: `\${ ${shape.expression} }`,
+    isPath: true,
     shape: "unknown",
+    size: null,
     needsExport: false,
     members: [],
+    typed: null,
     ...shape,
   };
 }
@@ -23,8 +25,18 @@ function memberOf(
   name: string,
   expression: string,
   shape: DataMember["shape"],
-) {
-  return { name, expression, value: `\${ ${expression} }`, shape, members: [] };
+  members: readonly DataMember[] = [],
+  size: number | null = null,
+): DataMember {
+  return {
+    name,
+    expression,
+    value: `\${ ${expression} }`,
+    isPath: true,
+    shape,
+    size,
+    members,
+  };
 }
 
 export const FETCH_ENTRY = entryOf({
@@ -61,12 +73,14 @@ export const TIME_ENTRIES = [
     source: "time",
     name: "now",
     expression: "now | todate",
+    isPath: false,
     shape: "text",
   }),
   entryOf({
     source: "time",
     name: "today",
     expression: 'now | strftime("%Y-%m-%dT00:00:00Z")',
+    isPath: false,
     shape: "text",
   }),
 ];
@@ -103,13 +117,41 @@ export const FIRST_STEP = dataOf([INPUT_ENTRY, ...TIME_ENTRIES]);
 
 export const IN_A_LOOP = dataOf([FETCH_ENTRY, INPUT_ENTRY, ITEM_ENTRY]);
 
-export const DIGEST_SAMPLE: Json = {
-  slideshow: {
-    title: "Sample Slide Show",
-    slides: [{ title: "Wake up" }, { title: "Overview" }],
-  },
+export const TESTED_FETCH_ENTRY: DataEntry = {
+  ...FETCH_ENTRY,
+  shape: "object",
+  members: [
+    memberOf("slideshow", ".slideshow", "object", [
+      memberOf("title", ".slideshow.title", "text"),
+      memberOf("slides", ".slideshow.slides", "list", [], 2),
+    ]),
+  ],
 };
 
-export const SAMPLES: ReadonlyMap<string, Json> = new Map([
-  ["/do/Fetch the digest", DIGEST_SAMPLE],
+export const AFTER_A_TEST = dataOf([
+  TESTED_FETCH_ENTRY,
+  GREET_ENTRY,
+  INPUT_ENTRY,
+  ...TIME_ENTRIES,
 ]);
+
+export const ADDRESS_AFTER_A_TEST = dataOf([
+  TESTED_FETCH_ENTRY,
+  INPUT_ENTRY,
+  ...TIME_ENTRIES,
+  SECRET_ENTRY,
+]);
+
+export function typedAs(
+  data: DataAtResult,
+  name: string,
+  expressions: Readonly<Record<string, string>>,
+): DataAtResult {
+  const entries = data.entries.map((entry) => {
+    const expression = expressions[entry.name];
+    const typed =
+      expression === undefined ? null : memberOf(name, expression, "unknown");
+    return { ...entry, typed };
+  });
+  return { ...data, entries };
+}

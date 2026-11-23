@@ -2,10 +2,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import type { EditAction } from "language-server/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
-import {
-  AFTER_FETCH,
-  SAMPLES,
-} from "../data-picker/data-choices/data.test-support";
+import { AFTER_A_TEST } from "../data-picker/data-choices/data.test-support";
 import { ConditionBuilder } from "./condition-builder";
 import type {
   ConditionBuilderProps,
@@ -60,8 +57,7 @@ function propsOf(
     describedBy: undefined,
     invalid: false,
     reading: TWO_ROWS_ALL,
-    data: AFTER_FETCH,
-    samples: SAMPLES,
+    data: AFTER_A_TEST,
     renderPicker: ({ label, onPick }: PickerSlot) => (
       <button
         type="button"

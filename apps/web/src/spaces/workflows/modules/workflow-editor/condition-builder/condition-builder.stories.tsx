@@ -1,10 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
-import {
-  AFTER_FETCH,
-  SAMPLES,
-} from "../data-picker/data-choices/data.test-support";
+import { AFTER_A_TEST } from "../data-picker/data-choices/data.test-support";
 import { ConditionBuilder } from "./condition-builder";
 import type { PickerSlot } from "./interfaces";
 import {
@@ -63,8 +60,7 @@ const meta = {
     describedBy: undefined,
     invalid: false,
     reading: TWO_ROWS_ALL,
-    data: AFTER_FETCH,
-    samples: SAMPLES,
+    data: AFTER_A_TEST,
     renderPicker: (slot: PickerSlot) => <StandInPicker {...slot} />,
     onEdit: fn(),
   },

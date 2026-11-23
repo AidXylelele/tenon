@@ -6,7 +6,8 @@ import {
   AFTER_FETCH,
   AT_AN_ADDRESS,
   FIRST_STEP,
-  SAMPLES,
+  AFTER_A_TEST,
+  typedAs,
 } from "./data-choices/data.test-support";
 import { DataField } from "./data-field";
 import { DataPicker } from "./data-picker";
@@ -131,8 +132,21 @@ describe("the data picker", () => {
     );
   });
 
+  it("typing_asks_for_the_typed_field_name", () => {
+    const onSearch = vi.fn();
+    picker({ onSearch });
+    openPicker();
+
+    type(" items.title ");
+
+    expect(onSearch).toHaveBeenCalledWith("items.title");
+  });
+
   it("typing_keeps_what_matches_and_says_how_much", () => {
-    picker({ samples: SAMPLES });
+    const data = typedAs(AFTER_A_TEST, "title", {
+      "Fetch the digest": ".title",
+    });
+    picker({ data });
     openPicker();
 
     type("title");
@@ -148,7 +162,7 @@ describe("the data picker", () => {
   });
 
   it("one_match_is_said_as_one_piece", () => {
-    picker({ samples: SAMPLES });
+    picker({ data: AFTER_A_TEST });
     openPicker();
 
     type("slideshow › slides");
@@ -247,8 +261,7 @@ describe("a field that takes data", () => {
   it("a_value_holding_offered_data_is_a_chip_named_in_words", () => {
     field({
       value: "${ .slideshow.slides }",
-      data: AFTER_FETCH,
-      samples: SAMPLES,
+      data: AFTER_A_TEST,
     });
 
     const chip = screen.getByRole("button", {

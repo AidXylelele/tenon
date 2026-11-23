@@ -1,5 +1,3 @@
-import type { DataShape } from "language-server/protocol";
-
 export type { Json } from "../../form-fields";
 
 export type ChoiceKind = "data" | "time" | "secret";
@@ -26,13 +24,4 @@ export interface DataChoices {
   readonly groups: readonly ChoiceGroup[];
   readonly count: number;
   readonly notes: readonly string[];
-}
-
-export interface SampleMember {
-  readonly name: string;
-  readonly expression: string;
-  readonly value: string;
-  readonly shape: DataShape;
-  readonly size: number | null;
-  readonly members: readonly SampleMember[];
 }

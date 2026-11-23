@@ -69,7 +69,6 @@ function ConditionEditor({
   describedBy,
   reading,
   data,
-  samples,
   renderPicker,
   onEdit,
 }: ConditionBuilderProps & { readonly reading: ConditionReading }) {
@@ -135,7 +134,6 @@ function ConditionEditor({
         <Rows
           draft={draft}
           data={data}
-          samples={samples}
           renderPicker={renderPicker}
           onDraft={apply}
         />
@@ -147,10 +145,9 @@ function ConditionEditor({
 function Rows({
   draft,
   data,
-  samples,
   renderPicker,
   onDraft,
-}: Pick<ConditionBuilderProps, "data" | "samples" | "renderPicker"> & {
+}: Pick<ConditionBuilderProps, "data" | "renderPicker"> & {
   readonly draft: Draft;
   readonly onDraft: (next: Draft) => void;
 }) {
@@ -203,7 +200,6 @@ function Rows({
               row={row}
               position={position}
               data={data}
-              samples={samples}
               renderPicker={renderPicker}
               onDraft={onDraft}
             />
