@@ -2,9 +2,11 @@ import { describe, expect, test } from "vitest";
 import {
   type CloudEvent,
   type EventFilter,
+  createInterpreter,
   createSecretPolicies,
   endingOf,
   lifecycleEventCatalogue,
+  lifecycleEventTypesOf,
   stateFormatVersion,
 } from "../src/index.js";
 import { analyzer } from "./support/analyzer.js";
@@ -353,10 +355,7 @@ describe("a run the host ends itself", () => {
         {
           subject: "workflow",
           name: "workflow.faulted",
-          types: [
-            "org.open-workflow-specification.workflow.faulted.v1",
-            "io.serverlessworkflow.workflow.faulted.v1",
-          ],
+          types: ["org.open-workflow-specification.workflow.faulted.v1"],
           data: {
             name: "report-instance-1.test",
             faultedAt: "2026-01-01T00:00:00.000Z",
@@ -381,10 +380,7 @@ describe("a run the host ends itself", () => {
         {
           subject: "workflow",
           name: "workflow.cancelled",
-          types: [
-            "org.open-workflow-specification.workflow.cancelled.v1",
-            "io.serverlessworkflow.workflow.cancelled.v1",
-          ],
+          types: ["org.open-workflow-specification.workflow.cancelled.v1"],
           data: {
             name: "report-instance-1.test",
             cancelledAt: "2026-01-01T00:00:00.000Z",
@@ -394,18 +390,30 @@ describe("a run the host ends itself", () => {
       error: null,
     });
   });
+
+  test("gives its event the legacy type too when the host asks for it", () => {
+    const end = {
+      identity,
+      instance: "instance-1",
+      phase: "cancelled",
+      now: startContext.now,
+    } as const;
+
+    const ending = endingOf(end, { legacyEventTypes: true });
+
+    expect(ending.events[0]?.types).toEqual([
+      "org.open-workflow-specification.workflow.cancelled.v1",
+      "io.serverlessworkflow.workflow.cancelled.v1",
+    ]);
+  });
 });
 
 describe("the lifecycle event catalogue", () => {
-  test("names each event's types and the data field of its moment", () => {
+  test("names the data field of each event's moment", () => {
     expect(lifecycleEventCatalogue["task.started"]).toEqual({
       at: "startedAt",
       once: false,
       ending: false,
-      types: [
-        "org.open-workflow-specification.task.started.v1",
-        "io.serverlessworkflow.task.started.v1",
-      ],
     });
   });
 
@@ -459,6 +467,75 @@ describe("the lifecycle event catalogue", () => {
       "task.cancelled",
       "task.faulted",
       "task.completed",
+    ]);
+  });
+});
+
+describe("the lifecycle event types", () => {
+  test("are the standard's alone by default", () => {
+    const types = lifecycleEventTypesOf({});
+
+    expect(types["task.started"]).toEqual([
+      "org.open-workflow-specification.task.started.v1",
+    ]);
+  });
+
+  test("add the legacy namespace when the host asks for it", () => {
+    const types = lifecycleEventTypesOf({ legacyEventTypes: true });
+
+    expect(types["task.started"]).toEqual([
+      "org.open-workflow-specification.task.started.v1",
+      "io.serverlessworkflow.task.started.v1",
+    ]);
+  });
+
+  test("type each event a run reports by the standard alone by default", () => {
+    const program = programOf(greet);
+
+    const step = program.start(null, startContext);
+    const types = step.events.flatMap((event) => event.types);
+
+    expect(types).toEqual([
+      "org.open-workflow-specification.workflow.started.v1",
+      "org.open-workflow-specification.task.created.v1",
+      "org.open-workflow-specification.task.started.v1",
+      "org.open-workflow-specification.task.completed.v1",
+      "org.open-workflow-specification.workflow.completed.v1",
+    ]);
+  });
+
+  test("type each event a run reports in both namespaces when the host asks for it", async () => {
+    const legacy = await createInterpreter({ legacyEventTypes: true });
+    const compilation = legacy.compile(greet, fullOptions);
+
+    if (compilation.kind === "refused") {
+      throw new Error("The interpreter refused the document.");
+    }
+
+    const step = compilation.program.start(null, startContext);
+    const types = step.events.map((event) => event.types);
+
+    expect(types).toEqual([
+      [
+        "org.open-workflow-specification.workflow.started.v1",
+        "io.serverlessworkflow.workflow.started.v1",
+      ],
+      [
+        "org.open-workflow-specification.task.created.v1",
+        "io.serverlessworkflow.task.created.v1",
+      ],
+      [
+        "org.open-workflow-specification.task.started.v1",
+        "io.serverlessworkflow.task.started.v1",
+      ],
+      [
+        "org.open-workflow-specification.task.completed.v1",
+        "io.serverlessworkflow.task.completed.v1",
+      ],
+      [
+        "org.open-workflow-specification.workflow.completed.v1",
+        "io.serverlessworkflow.workflow.completed.v1",
+      ],
     ]);
   });
 });
@@ -556,7 +633,7 @@ describe("a policy a secret holds", () => {
 });
 
 describe("the entry", () => {
-  test("exports at run time the interpreter, the secret policies, the host's ending, the event catalogue and the state format alone", async () => {
+  test("exports at run time the interpreter, the secret policies, the host's ending, the event catalogue and types and the state format alone", async () => {
     const entry = await import("../src/index.js");
     const names = Object.keys(entry).toSorted();
 
@@ -565,6 +642,7 @@ describe("the entry", () => {
       "createSecretPolicies",
       "endingOf",
       "lifecycleEventCatalogue",
+      "lifecycleEventTypesOf",
       "stateFormatVersion",
     ]);
   });

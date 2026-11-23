@@ -854,7 +854,9 @@ describe("running a workflow and following its execution over HTTP", () => {
       expect(types).toContain(
         "org.open-workflow-specification.workflow.completed.v1",
       );
-      expect(types).toContain("io.serverlessworkflow.workflow.completed.v1");
+      expect(types).not.toContain(
+        "io.serverlessworkflow.workflow.completed.v1",
+      );
     });
 
     it("a_call_hanging_past_its_deadline_faults_the_run_with_the_standards_timeout_error", async () => {

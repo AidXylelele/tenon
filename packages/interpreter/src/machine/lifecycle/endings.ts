@@ -1,6 +1,7 @@
 import type {
   Ending,
   HostEnd,
+  InterpreterOptions,
   JsonObject,
   WorkflowError,
 } from "../../api/index.js";
@@ -9,6 +10,7 @@ import {
   type StatusPhase,
   type TaskEventName,
   type WorkflowEventName,
+  lifecycleEventTypesOf,
   standardErrorOf,
 } from "../../standard/index.js";
 import type { Address } from "../registers/index.js";
@@ -79,15 +81,21 @@ export function workflowEndedOf(
   return [ended, ...phase, release];
 }
 
-export function endingOf(end: HostEnd): Ending {
+export function endingOf(
+  end: HostEnd,
+  options: InterpreterOptions = {},
+): Ending {
+  const eventTypes = lifecycleEventTypesOf(options);
+
   switch (end.phase) {
     case "faulted": {
       const error = hostFaultOf(end.detail);
-      const event = markedEventOf("workflow.faulted", end, { error });
+      const details = { error };
+      const event = markedEventOf("workflow.faulted", end, details, eventTypes);
       return { events: [event], error };
     }
     case "cancelled": {
-      const event = markedEventOf("workflow.cancelled", end, {});
+      const event = markedEventOf("workflow.cancelled", end, {}, eventTypes);
       return { events: [event], error: null };
     }
   }

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   databaseEnvSchema,
+  interpreterEnvSchema,
   mailEnvSchema,
   migrationEnvSchema,
 } from "../../../../src/frameworks/di/env.schema.js";
@@ -93,5 +94,27 @@ describe("the environment, with Docker's _FILE secrets", () => {
     const parsed = migrationEnvSchema.parse({});
 
     expect(parsed.DATABASE_URL).toBeUndefined();
+  });
+});
+
+describe("the interpreter's environment", () => {
+  it("the_legacy_event_types_are_off_by_default", () => {
+    const parsed = interpreterEnvSchema.parse({});
+
+    expect(parsed.LEGACY_EVENT_TYPES).toBe(false);
+  });
+
+  it("the_legacy_event_types_are_on_when_set_to_true", () => {
+    const parsed = interpreterEnvSchema.parse({ LEGACY_EVENT_TYPES: "true" });
+
+    expect(parsed.LEGACY_EVENT_TYPES).toBe(true);
+  });
+
+  it("a_legacy_event_types_value_that_is_no_boolean_is_refused", () => {
+    const parsed = interpreterEnvSchema.safeParse({
+      LEGACY_EVENT_TYPES: "sometimes",
+    });
+
+    expect(parsed.error?.issues[0]?.path).toEqual(["LEGACY_EVENT_TYPES"]);
   });
 });

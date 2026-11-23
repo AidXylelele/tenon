@@ -309,10 +309,7 @@ describe("the reads the web console asks for", () => {
       expect.arrayContaining([
         {
           name: "workflow.faulted",
-          types: [
-            "org.open-workflow-specification.workflow.faulted.v1",
-            "io.serverlessworkflow.workflow.faulted.v1",
-          ],
+          types: ["org.open-workflow-specification.workflow.faulted.v1"],
         },
       ]),
     );

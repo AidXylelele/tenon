@@ -26,6 +26,10 @@ export interface HostProfile {
 
 export type Imports = Readonly<Record<string, string>>;
 
+export interface InterpreterOptions {
+  readonly legacyEventTypes?: boolean;
+}
+
 export interface AnalysisOptions {
   readonly profile: HostProfile;
   readonly imports: Imports;

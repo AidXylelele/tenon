@@ -1,12 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { metrics, trace } from "@opentelemetry/api";
-import type { SecretPolicies } from "./api/index.js";
+import type { InterpreterOptions, SecretPolicies } from "./api/index.js";
 import { Compiler } from "./compiler.js";
 import { Translator } from "./core/index.js";
 import type { Interpreter } from "./interpreter.js";
 import type { MachineServices } from "./machine/index.js";
 import { jqLanguageOf, JsonSchemas } from "./runtime/index.js";
 import { Analyzer } from "./semantics/index.js";
+import { lifecycleEventTypesOf } from "./standard/index.js";
 import { GrammarCheck, SecretPolicyCheck } from "./syntax/index.js";
 import { Telemetry } from "./telemetry/index.js";
 
@@ -35,6 +36,7 @@ export type {
   HttpOutcome,
   HttpRequest,
   InputProblem,
+  InterpreterOptions,
   JsonObject,
   JsonValue,
   LifecycleEvent,
@@ -68,10 +70,16 @@ export type {
 } from "./api/index.js";
 export { stateFormatVersion } from "./core/index.js";
 export { endingOf } from "./machine/index.js";
-export { lifecycleEventCatalogue } from "./standard/index.js";
+export {
+  lifecycleEventCatalogue,
+  lifecycleEventTypesOf,
+} from "./standard/index.js";
+export type { LifecycleEventTypes } from "./standard/index.js";
 export type { Interpreter } from "./interpreter.js";
 
-export async function createInterpreter(): Promise<Interpreter> {
+export async function createInterpreter(
+  options: InterpreterOptions = {},
+): Promise<Interpreter> {
   const location = import.meta.resolve("jq-wasm/jq.wasm");
   const engineFile = new URL(location);
   const engine = await readFile(engineFile);
@@ -80,7 +88,8 @@ export async function createInterpreter(): Promise<Interpreter> {
   const schemas = new JsonSchemas([]);
   const analyzer = new Analyzer(expressions, grammar, schemas);
   const translator = new Translator(expressions, schemas);
-  const services: MachineServices = { expressions, schemas };
+  const eventTypes = lifecycleEventTypesOf(options);
+  const services: MachineServices = { expressions, schemas, eventTypes };
   const tracer = trace.getTracer(Telemetry.scope);
   const meter = metrics.getMeter(Telemetry.scope);
   const telemetry = new Telemetry(tracer, meter);
