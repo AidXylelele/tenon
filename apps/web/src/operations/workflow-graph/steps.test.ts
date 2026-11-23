@@ -13,6 +13,8 @@ function step(
     end: { line: to, character: 0 },
   };
   return {
+    variant: null,
+    catch: null,
     id,
     pointer: id,
     name: id.split("/").at(-1) ?? id,

@@ -37,9 +37,12 @@ const FAILURES: readonly {
 
 const FIRST_RETRY: Failure = {
   kind: "retry",
-  retries: 3,
-  seconds: 5,
-  growing: false,
+  retry: {
+    retries: 3,
+    milliseconds: 5000,
+    backoff: "constant",
+    on: { kind: "any" },
+  },
 };
 
 export function StepInspector({

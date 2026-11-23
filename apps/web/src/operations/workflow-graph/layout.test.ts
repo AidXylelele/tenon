@@ -20,11 +20,18 @@ interface Box extends Point {
 }
 
 function next(to: string | null): Transition {
-  return { on: "done", case: null, when: null, kind: "next", to };
+  return {
+    condition: null,
+    on: "done",
+    case: null,
+    when: null,
+    kind: "next",
+    to,
+  };
 }
 
 function jump(name: string, when: string | null, to: string): Transition {
-  return { on: "case", case: name, when, kind: "jump", to };
+  return { condition: null, on: "case", case: name, when, kind: "jump", to };
 }
 
 function step(
@@ -37,6 +44,8 @@ function step(
   const range = null;
   const base = { id, pointer: id, name, kind, family: "data" } as const;
   return {
+    variant: null,
+    catch: null,
     ...base,
     summary: null,
     milliseconds: null,
@@ -115,7 +124,14 @@ const pipeline: WorkflowStructure = {
         ],
       ),
       step("/do/archive", "set", [
-        { on: "done", case: null, when: null, kind: "end", to: null },
+        {
+          condition: null,
+          on: "done",
+          case: null,
+          when: null,
+          kind: "end",
+          to: null,
+        },
       ]),
     ],
   },
