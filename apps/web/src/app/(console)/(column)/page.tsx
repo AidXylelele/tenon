@@ -3,6 +3,6 @@ import { Overview } from "@/spaces/home/modules/overview";
 
 export const metadata: Metadata = { title: "Home" };
 
-export default function HomePage() {
-  return <Overview />;
+export default async function HomePage({ searchParams }: PageProps<"/">) {
+  return <Overview query={await searchParams} />;
 }
