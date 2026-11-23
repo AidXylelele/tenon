@@ -6,26 +6,16 @@ import {
 } from "@nestjs/workflows";
 import { EffectClient } from "../interfaces.js";
 import type { ProcessRunInput } from "./interfaces.js";
-import { RunTracer } from "./run.tracer.js";
 
 @Workflow("process", { version: 2 })
 export class ProcessRun implements WorkflowRunner<ProcessRunInput, void> {
   private static readonly STEP = "run";
 
-  constructor(
-    private readonly performer: EffectClient,
-    private readonly tracer: RunTracer,
-  ) {}
+  constructor(private readonly performer: EffectClient) {}
 
-  run(ctx: WorkflowContext, input: ProcessRunInput): Promise<void> {
-    return this.tracer.execution(ctx, () => this.#executed(ctx, input));
-  }
-
-  async #executed(ctx: WorkflowContext, input: ProcessRunInput): Promise<void> {
+  async run(ctx: WorkflowContext, input: ProcessRunInput): Promise<void> {
     await ctx.step(ProcessRun.STEP, (attempt) =>
-      this.tracer.attempt(ProcessRun.STEP, attempt, () =>
-        this.#performed(input, attempt),
-      ),
+      this.#performed(input, attempt),
     );
   }
 

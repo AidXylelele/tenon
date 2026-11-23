@@ -5,6 +5,7 @@ import {
   OnOutboxMessage,
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
+import { type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { DispatchEvent } from "../../application/automation/events/dispatch-event.js";
 
 import { CancelChildren } from "../../application/automation/instances/cancel-children.js";
@@ -16,12 +17,12 @@ import { WakeParent } from "../../application/automation/instances/wake-parent.j
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
 import { SyncSchedule } from "../../application/automation/schedules/sync-schedule.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
+import { UnitOfWork } from "../../application/unit-of-work.js";
 import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
 import { WorkflowEventKind } from "../../domain/automation/workflows/enums.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { MessageTopic } from "./enums.js";
-import { OutboxTracer } from "./outbox.tracer.js";
 import type {
   AcceptedEventMessage,
   EventOfferedMessage,
@@ -32,8 +33,11 @@ import type {
 
 @Injectable()
 export class AutomationHandler {
+  readonly #tracer = trace.getTracer("tenon-api");
+
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
+    private readonly unitOfWork: UnitOfWork,
     private readonly dispatchEvent: DispatchEvent,
     private readonly offerEvent: OfferEvent,
     private readonly startOnEvent: StartOnEvent,
@@ -44,7 +48,6 @@ export class AutomationHandler {
     private readonly continueSchedule: ContinueSchedule,
     private readonly syncSchedule: SyncSchedule,
     private readonly runs: InstanceRuns,
-    private readonly tracer: OutboxTracer,
   ) {}
 
   @OnOutboxMessage(MessageTopic.EventAccepted, { consumer: "dispatch" })
@@ -179,7 +182,45 @@ export class AutomationHandler {
     context: OutboxHandlerContext,
     work: () => Promise<void>,
   ): Promise<void> {
-    return this.tracer.processed(context, () => this.#processed(context, work));
+    const topic = context.message.topic;
+    const name = `process ${topic}`;
+    const options = {
+      kind: SpanKind.CONSUMER,
+      attributes: {
+        "messaging.system": "outbox",
+        "messaging.operation.name": "process",
+        "messaging.operation.type": "process",
+        "messaging.destination.name": topic,
+      },
+    };
+    return this.#tracer.startActiveSpan(name, options, (span) =>
+      this.#traced(span, context, work),
+    );
+  }
+
+  async #traced(
+    span: Span,
+    context: OutboxHandlerContext,
+    work: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await this.#processed(context, work);
+    } catch (error) {
+      this.#failed(span, error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+
+  #failed(span: Span, error: unknown): void {
+    if (!(error instanceof Error)) {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      return;
+    }
+
+    span.recordException(error);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
   }
 
   async #processed(
@@ -187,7 +228,7 @@ export class AutomationHandler {
     work: () => Promise<void>,
   ): Promise<void> {
     try {
-      await this.txHost.withTransaction(async () => {
+      await this.unitOfWork.run(async () => {
         await context.processInTransaction(this.txHost.tx, work);
       });
     } catch (error) {

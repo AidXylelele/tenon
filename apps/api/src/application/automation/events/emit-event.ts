@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { WorkflowInstanceRepository } from "../instances/ports.js";
 import { SecretRepository } from "../secrets/ports.js";
@@ -13,9 +13,9 @@ export class EmitEvent {
     private readonly instances: WorkflowInstanceRepository,
     private readonly secrets: SecretRepository,
     private readonly events: EventStore,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: EmitEventCommand): Promise<void> {
     const now = new Date();
     const instance = await this.instances.find(command.instanceId);
@@ -25,6 +25,8 @@ export class EmitEvent {
     const declared = await this.secrets.findDeclared(instance.versionId);
     const secrets = RunSecrets.of(declared);
     const masked = instance.masked(command.cloudEvent, secrets);
-    await this.events.accept(masked, EventOrigin.Emit, instance.id, now);
+    await this.unitOfWork.run(() =>
+      this.events.accept(masked, EventOrigin.Emit, instance.id, now),
+    );
   }
 }

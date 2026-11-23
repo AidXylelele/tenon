@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { AccountRefusal } from "../../../domain/identity/accounts/enums.js";
 import type { ChangePasswordCommand, PasswordResult } from "./interfaces.js";
 import { AccountRepository, PasswordHasher, Sessions } from "./ports.js";
@@ -10,9 +10,9 @@ export class ChangePassword {
     private readonly accounts: AccountRepository,
     private readonly passwords: PasswordHasher,
     private readonly sessions: Sessions,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: ChangePasswordCommand): Promise<PasswordResult> {
     const account = await this.accounts.findByUserId(command.userId);
     const stored = account?.passwordHash ?? null;
@@ -27,8 +27,10 @@ export class ChangePassword {
     const passwordHash = await this.passwords.hash(command.newPassword);
     const now = new Date();
     account.changePassword(passwordHash, now);
-    await this.accounts.save(account);
-    await this.sessions.endAll(command.userId, command.sessionId);
+    await this.unitOfWork.run(async () => {
+      await this.accounts.save(account);
+      await this.sessions.endAll(command.userId, command.sessionId);
+    });
     return { ok: true, value: undefined };
   }
 }

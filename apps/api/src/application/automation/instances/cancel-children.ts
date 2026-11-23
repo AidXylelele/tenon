@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { ChildCancellations, WorkflowInstanceRepository } from "./ports.js";
 import type { InstanceCommand } from "./interfaces.js";
 
@@ -8,9 +8,9 @@ export class CancelChildren {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
     private readonly cancellations: ChildCancellations,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: InstanceCommand): Promise<void> {
     const parent = await this.instances.find(command.instanceId);
 
@@ -18,6 +18,6 @@ export class CancelChildren {
 
     const children = await this.instances.findAwaitedChildren(parent.id);
     const abandoned = children.filter((child) => parent.abandons(child));
-    await this.cancellations.request(abandoned);
+    await this.unitOfWork.run(() => this.cancellations.request(abandoned));
   }
 }

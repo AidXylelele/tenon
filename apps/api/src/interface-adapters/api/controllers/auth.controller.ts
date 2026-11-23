@@ -28,7 +28,6 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import { Transactional } from "@nestjs-cls/transactional";
 import { minutes, Throttle } from "@nestjs/throttler";
 import { AuthenticateUser } from "../../../application/identity/accounts/authenticate-user.js";
 import { ChangePassword } from "../../../application/identity/accounts/change-password.js";
@@ -113,7 +112,6 @@ export class AuthController {
 
   @Post("password-recovery/complete")
   @Public()
-  @Transactional()
   @HttpCode(204)
   @ApiNoContentResponse()
   @ApiBadRequestResponse()

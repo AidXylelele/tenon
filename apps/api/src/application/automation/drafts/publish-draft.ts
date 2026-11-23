@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { DraftRefusal } from "../../../domain/automation/drafts/enums.js";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
 import { Missing } from "../enums.js";
@@ -18,9 +18,9 @@ export class PublishDraft {
     private readonly workflows: WorkflowRepository,
     private readonly secrets: SecretRepository,
     private readonly schedules: WorkflowSchedules,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: PublishDraftCommand): Promise<PublishDraftResult> {
     const draft = await this.drafts.findByName(command.name);
 
@@ -63,7 +63,8 @@ export class PublishDraft {
 
     const publication = published.value;
 
-    if (publication.created) await this.workflows.save(workflow);
+    if (publication.created)
+      await this.unitOfWork.run(() => this.workflows.save(workflow));
 
     const version = {
       namespace: workflow.name.namespace,

@@ -1,14 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import type { TurnResult, TurnWorkflowCommand } from "./interfaces.js";
 import { WorkflowRepository } from "./ports.js";
 
 @Injectable()
 export class TurnWorkflowOn {
-  constructor(private readonly workflows: WorkflowRepository) {}
+  constructor(
+    private readonly workflows: WorkflowRepository,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  @Transactional()
   async execute(command: TurnWorkflowCommand): Promise<TurnResult> {
     const workflow = await this.workflows.findByName(command.name);
 
@@ -18,7 +20,8 @@ export class TurnWorkflowOn {
 
     if (!turned.ok) return turned;
 
-    if (turned.value) await this.workflows.save(workflow);
+    if (turned.value)
+      await this.unitOfWork.run(() => this.workflows.save(workflow));
 
     return { ok: true, value: undefined };
   }

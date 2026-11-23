@@ -15,7 +15,6 @@ import type { BulkheadPolicy, ResiliencePolicy } from "@nestjs/resilience";
 import type { Piscina } from "piscina";
 import type {
   NamedFilter,
-  StepCall,
   VersionStructure,
 } from "../../interface-adapters/workflows/interfaces.js";
 import type * as thread from "./interpreter.thread.js";
@@ -133,8 +132,4 @@ export interface ThreadPool {
   readonly threads: Piscina;
   readonly policy: ResiliencePolicy;
   readonly bulkhead: BulkheadPolicy;
-}
-
-export interface CallContext extends StepCall {
-  readonly remaining: number | null;
 }

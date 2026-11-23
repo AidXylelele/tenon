@@ -9,6 +9,7 @@ const context = await NestFactory.createApplicationContext(
 );
 const tasks = context.get(InterpreterTasks);
 
+export const ready = tasks.ready.bind(tasks);
 export const compile = tasks.compile.bind(tasks);
 export const structure = tasks.structure.bind(tasks);
 export const filter = tasks.filter.bind(tasks);

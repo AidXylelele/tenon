@@ -17,7 +17,10 @@ import {
   RecordingSchedules,
   StoredWorkflowRepository,
   T0,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 const later = new Date("2026-11-03T12:00:00.000Z");
 const name = new WorkflowName("sales", "route-lead");
@@ -38,6 +41,7 @@ function setUp() {
     workflows,
     secrets,
     schedules,
+    unitOfWork,
   );
   const publish = {
     execute: async (command: DraftPublication) => {
@@ -57,7 +61,7 @@ function setUp() {
       });
     },
   };
-  const archive = new ArchiveWorkflow(workflows);
+  const archive = new ArchiveWorkflow(workflows, unitOfWork);
   return { compiler, workflows, check, publish, archive };
 }
 

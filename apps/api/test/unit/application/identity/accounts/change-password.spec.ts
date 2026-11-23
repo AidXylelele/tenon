@@ -8,12 +8,15 @@ import {
 import {
   InMemoryAccountRepository,
   RecordingSessions,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 const changingWith = (
   accounts: InMemoryAccountRepository,
   sessions: RecordingSessions,
-) => new ChangePassword(accounts, passwords, sessions);
+) => new ChangePassword(accounts, passwords, sessions, unitOfWork);
 
 describe("ChangePassword", () => {
   it("the_correct_current_password_lets_the_new_one_replace_it", async () => {

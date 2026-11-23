@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq, lte, sql } from "drizzle-orm";
 import type { Receipt } from "../../../application/automation/instances/interfaces.js";
 import type { ReceivedMessages } from "../../../application/automation/instances/ports.js";
@@ -24,7 +20,6 @@ export class PostgresReceivedMessageStore implements ReceivedMessages {
     private readonly inboundMapper: InboundMapper,
   ) {}
 
-  @Transactional(Propagation.Mandatory)
   async append(
     instance: WorkflowInstance,
     execution: string,
@@ -85,7 +80,6 @@ export class PostgresReceivedMessageStore implements ReceivedMessages {
     return receipts;
   }
 
-  @Transactional(Propagation.Mandatory)
   async forget(
     instance: WorkflowInstance,
     receipts: readonly Receipt[],

@@ -4,10 +4,10 @@ import {
   HostLimits,
   ProcessPlatform,
 } from "../../application/automation/host/queries.js";
-import { SandboxLimits } from "../go-judge/sandbox-limits.js";
+import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
 import shellPlatform from "../go-judge/shell-platform.json" with { type: "json" };
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
-import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
+import { ResponseSizeLimit } from "../network/response-size-limit.js";
 
 const CALL_SECONDS = 30;
 const PROCESS_SECONDS = 35;

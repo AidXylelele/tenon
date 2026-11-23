@@ -1,14 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import type { ReplaceSecretResult, SecretValueCommand } from "./interfaces.js";
 import { SecretRepository } from "./ports.js";
 
 @Injectable()
 export class ReplaceSecret {
-  constructor(private readonly secrets: SecretRepository) {}
+  constructor(
+    private readonly secrets: SecretRepository,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  @Transactional()
   async execute(command: SecretValueCommand): Promise<ReplaceSecretResult> {
     const now = new Date();
     const secret = await this.secrets.find(command.ownerId, command.name);
@@ -19,7 +21,7 @@ export class ReplaceSecret {
 
     if (!replaced.ok) return replaced;
 
-    await this.secrets.save(secret);
+    await this.unitOfWork.run(() => this.secrets.save(secret));
     return replaced;
   }
 }

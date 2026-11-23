@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
@@ -17,9 +17,9 @@ export class AnswerReceives {
     private readonly messages: ReceivedMessages,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: RunCommand): Promise<AgendaResult> {
     const instance = await this.instances.find(command.instanceId);
 
@@ -51,8 +51,10 @@ export class AnswerReceives {
       answered.push(receipt);
     }
 
-    await this.messages.forget(instance, answered);
-    await this.instances.save(instance);
+    await this.unitOfWork.run(async () => {
+      await this.messages.forget(instance, answered);
+      await this.instances.save(instance);
+    });
     return { ok: true, value: instance.agenda };
   }
 }
