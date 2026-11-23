@@ -79,7 +79,13 @@ export class InstancePresenter {
       until: wait.until?.toISOString() ?? null,
       stream: wait.stream,
     }));
-    return { ...summary, startedBy, durationMs: item.durationMs, waits };
+    return {
+      ...summary,
+      title: item.title,
+      startedBy,
+      durationMs: item.durationMs,
+      waits,
+    };
   }
 
   output(output: TaskOutput): string {
@@ -114,6 +120,7 @@ export class InstancePresenter {
     const items = failing.items.map((workflow) => ({
       namespace: workflow.namespace,
       name: workflow.name,
+      title: workflow.title,
       failed: workflow.failed,
       runs: workflow.runs,
       firstFailedAt: workflow.firstFailedAt.toISOString(),

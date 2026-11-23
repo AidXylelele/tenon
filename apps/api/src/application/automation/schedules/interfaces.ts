@@ -1,4 +1,5 @@
 import type { Schedule } from "../../../domain/automation/workflows/interfaces.js";
+import type { LastRun } from "../workflows/interfaces.js";
 
 export interface SyncScheduleCommand {
   readonly workflowId: string;
@@ -26,6 +27,8 @@ export interface ScheduledStarts {
   readonly workflowId: string;
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
+  readonly lastRun: LastRun | null;
   readonly schedule: Schedule | null;
   readonly starts: number;
 }
@@ -33,6 +36,8 @@ export interface ScheduledStarts {
 export interface ExpectedStarts {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
+  readonly lastRun: LastRun | null;
   readonly schedule: Schedule | null;
   readonly next: readonly Date[];
   readonly missed: number;

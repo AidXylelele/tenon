@@ -71,6 +71,7 @@ const meta = {
         {
           namespace: "billing",
           name: "legacy-sync",
+          title: "Legacy sync",
           failed: 12,
           runs: 40,
           firstFailedAt: "2026-11-20T08:12:00.000Z",
@@ -86,6 +87,7 @@ const meta = {
         {
           namespace: "sales",
           name: "order-router",
+          title: "Order router",
           failed: 7,
           runs: 120,
           firstFailedAt: "2026-11-19T10:02:00.000Z",
@@ -107,6 +109,7 @@ const meta = {
         id: "5b0e9a13-0000-4000-8000-000000000009",
         namespace: "ops",
         name: "cool-down",
+        title: "Wait out the cool-down, then report",
         version: "1.0.0",
         phase: "suspended",
         trigger: "manual",
@@ -123,6 +126,12 @@ const meta = {
       {
         namespace: "ops",
         name: "health-check",
+        title: "Health check",
+        lastRun: {
+          id: "6c1f0b24-0000-4000-8000-000000000010",
+          phase: "completed",
+          createdAt: "2026-11-22T23:35:00.000Z",
+        },
         schedule: { kind: "every", interval: 300_000 },
         next: ["2026-11-23T03:40:00.000Z"],
         missed: 1,
@@ -131,6 +140,12 @@ const meta = {
       {
         namespace: "news",
         name: "daily-digest",
+        title: "Daily digest",
+        lastRun: {
+          id: "6c1f0b24-0000-4000-8000-000000000011",
+          phase: "completed",
+          createdAt: "2026-11-22T09:00:02.000Z",
+        },
         schedule: { kind: "cron", cron: "0 9 * * *" },
         next: ["2026-11-24T09:00:00.000Z"],
         missed: 0,

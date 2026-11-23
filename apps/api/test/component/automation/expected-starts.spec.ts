@@ -92,6 +92,8 @@ describe("the starts a schedule is expected to make", () => {
     expect(expected).toMatchObject({
       namespace: "sales",
       name: "every-minute",
+      title: null,
+      lastRun: { phase: "completed" },
       missed: 4,
       missedSince: "2026-01-01T00:01:00.000Z",
     });

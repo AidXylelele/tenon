@@ -149,6 +149,8 @@ export class EngineExpectedStartsQueries implements ScheduleQueries {
     return {
       namespace: workflow.namespace,
       name: workflow.name,
+      title: workflow.title,
+      lastRun: workflow.lastRun,
       schedule: workflow.schedule,
       next: plan.next,
       missed,

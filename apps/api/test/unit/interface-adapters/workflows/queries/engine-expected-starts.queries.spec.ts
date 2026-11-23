@@ -35,6 +35,8 @@ class Starts {
       workflowId: "w-1",
       namespace: "sales",
       name: "daily",
+      title: null,
+      lastRun: null,
       schedule: null,
       starts: 0,
     };

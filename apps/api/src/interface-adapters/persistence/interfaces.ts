@@ -63,6 +63,7 @@ export interface ListedInstanceRow {
   readonly id: string;
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
   readonly version: string;
   readonly phase: Phase;
   readonly trigger: TriggerKind;
@@ -79,6 +80,7 @@ export interface ListedInstanceRow {
 export interface FailingRow {
   readonly namespace: string;
   readonly name: string;
+  readonly workflowTitle: string | null;
   readonly failed: number;
   readonly runs: number;
   readonly firstFailedAt: Date;
@@ -147,7 +149,13 @@ export interface SealedRun {
   readonly error: JsonObject | null;
 }
 
-export interface WorkflowSummaryRow {
+export interface LastRunColumns {
+  readonly lastRunId: string | null;
+  readonly lastRunPhase: Phase | null;
+  readonly lastRunAt: Date | null;
+}
+
+export interface WorkflowSummaryRow extends LastRunColumns {
   readonly namespace: string;
   readonly name: string;
   readonly title: string | null;
@@ -155,10 +163,17 @@ export interface WorkflowSummaryRow {
   readonly on: boolean;
   readonly currentVersion: string | null;
   readonly schedule: Schedule | null;
+  readonly weekRuns: number;
+  readonly weekFailed: number;
+}
+
+export interface ScheduledStartsRow extends LastRunColumns {
+  readonly workflowId: string;
+  readonly namespace: string;
+  readonly name: string;
+  readonly title: string | null;
+  readonly schedule: Schedule | null;
   readonly starts: number;
-  readonly lastRunId: string | null;
-  readonly lastRunPhase: Phase | null;
-  readonly lastRunAt: Date | null;
 }
 
 export interface VersionSummaryRow {
@@ -170,6 +185,7 @@ export interface VersionSummaryRow {
   readonly publisherId: string;
   readonly publisherName: string;
   readonly publishedAt: Date;
+  readonly runs: number;
 }
 
 export abstract class Cipher {

@@ -15,7 +15,10 @@ import type {
   ScheduledStarts,
   StartSlot,
 } from "../../../application/automation/schedules/interfaces.js";
-import { TriggerKind } from "../../../domain/automation/instances/enums.js";
+import {
+  Phase,
+  TriggerKind,
+} from "../../../domain/automation/instances/enums.js";
 import type {
   LastRun,
   VersionIdentity,
@@ -32,6 +35,8 @@ import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type { WorkflowStatus } from "../../../domain/automation/workflows/enums.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type {
+  LastRunColumns,
+  ScheduledStartsRow,
   Transaction,
   WorkflowSummaryRow,
   VersionSummaryRow,
@@ -42,10 +47,12 @@ import {
   workflowInstance as instances,
   workflowVersion as versions,
 } from "../schema/index.js";
+import { versionTitle } from "./version-title.js";
 
 @Injectable()
 export class PostgresWorkflowQueries implements WorkflowQueries {
   private static readonly LIKE_SPECIALS = /[\\%_]/g;
+  private static readonly WEEK_MS = 7 * 24 * 60 * 60 * 1_000;
 
   constructor(private readonly txHost: TransactionHost<Transaction>) {}
 
@@ -160,13 +167,16 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
     return row ?? null;
   }
 
-  scheduledStarts(slots: readonly StartSlot[]): Promise<ScheduledStarts[]> {
+  async scheduledStarts(
+    slots: readonly StartSlot[],
+  ): Promise<ScheduledStarts[]> {
     const rows = slots.map((slot) => ({
       workflow_id: slot.workflowId,
       first_at: slot.from.toISOString(),
       end_at: slot.to.toISOString(),
     }));
     const json = JSON.stringify(rows);
+    const lastRun = this.#lastRun();
     const slotted = sql`jsonb_to_recordset(${json}::jsonb) as slot(workflow_id uuid, first_at timestamptz, end_at timestamptz)`;
     const workflowId = sql<string>`slot.workflow_id`;
     const count = sql<number>`count(*)::int`;
@@ -182,19 +192,74 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
         ),
       )
       .as("started");
-    return this.txHost.tx
+    const scheduled = await this.txHost.tx
       .select({
         workflowId: workflows.id,
         namespace: workflows.namespace,
         name: workflows.name,
+        title: versionTitle(),
         schedule: versions.schedule,
         starts: started.starts,
+        lastRunId: lastRun.id,
+        lastRunPhase: lastRun.phase,
+        lastRunAt: lastRun.createdAt,
       })
       .from(slotted)
       .innerJoin(workflows, eq(workflows.id, workflowId))
       .innerJoin(versions, eq(versions.id, workflows.currentVersionId))
       .leftJoinLateral(started, sql`true`)
+      .leftJoinLateral(lastRun, sql`true`)
       .orderBy(asc(workflows.namespace), asc(workflows.name));
+    return scheduled.map((row) => this.#scheduledOf(row));
+  }
+
+  #scheduledOf(row: ScheduledStartsRow): ScheduledStarts {
+    return {
+      workflowId: row.workflowId,
+      namespace: row.namespace,
+      name: row.name,
+      title: row.title,
+      schedule: row.schedule,
+      starts: row.starts,
+      lastRun: this.#lastRunOf(row),
+    };
+  }
+
+  #lastRun() {
+    return this.txHost.tx
+      .select({
+        id: instances.id,
+        phase: instances.phase,
+        createdAt: instances.createdAt,
+      })
+      .from(instances)
+      .where(
+        and(eq(instances.workflowId, workflows.id), eq(instances.test, false)),
+      )
+      .orderBy(desc(instances.createdAt), desc(instances.id))
+      .limit(1)
+      .as("last_run");
+  }
+
+  #week() {
+    const since = new Date(Date.now() - PostgresWorkflowQueries.WEEK_MS);
+    const faulted = sql`${instances.phase} = ${Phase.Faulted}`;
+    return this.txHost.tx
+      .select({
+        runs: sql<number>`count(*)::int`.as("runs"),
+        failed: sql<number>`(count(*) filter (where ${faulted}))::int`.as(
+          "failed",
+        ),
+      })
+      .from(instances)
+      .where(
+        and(
+          eq(instances.workflowId, workflows.id),
+          eq(instances.test, false),
+          gte(instances.startedAt, since),
+        ),
+      )
+      .as("week");
   }
 
   #programs() {
@@ -211,39 +276,26 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
   }
 
   #summaries() {
-    const lastRun = this.txHost.tx
-      .select({
-        id: instances.id,
-        phase: instances.phase,
-        createdAt: instances.createdAt,
-      })
-      .from(instances)
-      .where(
-        and(eq(instances.workflowId, workflows.id), eq(instances.test, false)),
-      )
-      .orderBy(desc(instances.createdAt), desc(instances.id))
-      .limit(1)
-      .as("last_run");
-    const starts = sql<number>`(select count(*)::int from ${instances} where ${instances.workflowId} = ${workflows.id} and not ${instances.test})`;
-    const title = sql<
-      string | null
-    >`${versions.document} -> 'document' ->> 'title'`;
+    const lastRun = this.#lastRun();
+    const week = this.#week();
     return this.txHost.tx
       .select({
         namespace: workflows.namespace,
         name: workflows.name,
-        title,
+        title: versionTitle(),
         status: workflows.status,
         on: workflows.on,
         currentVersion: versions.semver,
         schedule: versions.schedule,
-        starts,
+        weekRuns: week.runs,
+        weekFailed: week.failed,
         lastRunId: lastRun.id,
         lastRunPhase: lastRun.phase,
         lastRunAt: lastRun.createdAt,
       })
       .from(workflows)
       .leftJoin(versions, eq(versions.id, workflows.currentVersionId))
+      .crossJoinLateral(week)
       .leftJoinLateral(lastRun, sql`true`)
       .$dynamic();
   }
@@ -257,12 +309,12 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
       on: row.on,
       currentVersion: row.currentVersion,
       schedule: row.schedule,
-      starts: row.starts,
+      week: { runs: row.weekRuns, failed: row.weekFailed },
       lastRun: this.#lastRunOf(row),
     };
   }
 
-  #lastRunOf(row: WorkflowSummaryRow): LastRun | null {
+  #lastRunOf(row: LastRunColumns): LastRun | null {
     if (row.lastRunId === null || row.lastRunPhase === null) return null;
 
     if (row.lastRunAt === null) return null;
@@ -275,6 +327,7 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
   }
 
   #versions() {
+    const runs = sql<number>`(select count(*)::int from ${instances} where ${instances.versionId} = ${versions.id} and not ${instances.test})`;
     return this.txHost.tx
       .select({
         namespace: workflows.namespace,
@@ -285,6 +338,7 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
         publisherId: versions.publisherId,
         publisherName: users.name,
         publishedAt: versions.publishedAt,
+        runs,
       })
       .from(versions)
       .innerJoin(workflows, eq(workflows.id, versions.workflowId))
@@ -302,6 +356,7 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
       current: row.current,
       publishedBy,
       publishedAt: row.publishedAt,
+      runs: row.runs,
     };
   }
 
@@ -313,7 +368,8 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
       "\\$&",
     );
     const pattern = `%${escaped}%`;
-    return sql`(${workflows.namespace} || '/' || ${workflows.name}) ilike ${pattern}`;
+    const title = versionTitle();
+    return sql`((${workflows.namespace} || '/' || ${workflows.name}) ilike ${pattern} or ${title} ilike ${pattern})`;
   }
 
   #numbered(name: WorkflowName, version: string): SQL | undefined {

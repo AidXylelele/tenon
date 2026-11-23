@@ -52,6 +52,7 @@ export const VersionResponse = z.object({
   current: z.boolean(),
   publishedBy: PersonResponse,
   publishedAt: z.iso.datetime(),
+  runs: z.number().int(),
 });
 
 export type VersionResponse = z.infer<typeof VersionResponse>;
@@ -74,7 +75,7 @@ export const WorkflowResponse = z.object({
   on: z.boolean(),
   currentVersion: z.string().nullable(),
   schedule: ScheduleResponse.nullable(),
-  starts: z.number().int(),
+  week: z.object({ runs: z.number().int(), failed: z.number().int() }),
   lastRun: LastRunResponse.nullable(),
 });
 
@@ -142,6 +143,8 @@ export const ExpectedStartsResponse = z.array(
   z.object({
     namespace: z.string(),
     name: z.string(),
+    title: z.string().nullable(),
+    lastRun: LastRunResponse.nullable(),
     schedule: ScheduleResponse.nullable(),
     next: z.array(z.iso.datetime()),
     missed: z.number().int(),

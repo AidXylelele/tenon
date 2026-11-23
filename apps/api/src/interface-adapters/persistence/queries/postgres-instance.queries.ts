@@ -64,6 +64,7 @@ import {
   workflowInstance as instances,
   workflowVersion as versions,
 } from "../schema/index.js";
+import { versionTitle } from "./version-title.js";
 
 @Injectable()
 export class PostgresInstanceQueries implements InstanceQueries {
@@ -123,6 +124,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
         id: instances.id,
         namespace: workflows.namespace,
         name: workflows.name,
+        title: versionTitle(),
         version: versions.semver,
         phase: instances.phase,
         trigger: instances.trigger,
@@ -197,6 +199,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
       id: row.id,
       namespace: row.namespace,
       name: row.name,
+      title: row.title,
       version: row.version,
       phase: row.phase,
       trigger: row.trigger,
@@ -373,6 +376,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
     const items = rows.map((row) => ({
       namespace: row.namespace,
       name: row.name,
+      title: row.workflowTitle,
       failed: row.failed,
       runs: row.runs,
       firstFailedAt: row.firstFailedAt,
@@ -455,6 +459,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
       .select({
         namespace: workflows.namespace,
         name: workflows.name,
+        workflowTitle: versionTitle(),
         failed: failing.failed,
         runs: failing.runs,
         firstFailedAt: failing.firstFailedAt,
@@ -469,6 +474,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
       })
       .from(failing)
       .innerJoin(workflows, eq(workflows.id, failing.workflowId))
+      .leftJoin(versions, eq(versions.id, workflows.currentVersionId))
       .leftJoinLateral(lastFailure, sql`true`)
       .leftJoinLateral(latest, sql`true`)
       .orderBy(

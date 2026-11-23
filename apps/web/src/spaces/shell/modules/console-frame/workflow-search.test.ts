@@ -18,7 +18,7 @@ function workflowOf(status: WorkflowStatus, name: string): Workflow {
     on,
     currentVersion: "1.2.0",
     schedule: null,
-    starts: 0,
+    week: { runs: 0, failed: 0 },
     lastRun: null,
   };
 }

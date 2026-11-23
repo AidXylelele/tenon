@@ -74,7 +74,9 @@ function RunRow({
   const phase = phaseLabel(run.phase);
   const started = run.startedAt ?? run.createdAt;
   const startedText = utcText(started);
-  const name = `, open the ${phase} run of ${run.name} started ${startedText}`;
+  const title = run.title ?? run.name;
+  const named = `${run.namespace}/${run.name}`;
+  const name = `, open the ${phase} run of ${title} started ${startedText}`;
   const href = runHref(run.id);
   const starter = run.startedBy?.name ?? triggerLabel(run.trigger);
 
@@ -95,9 +97,9 @@ function RunRow({
       </TableCell>
       {showWorkflow && (
         <TableCell>
-          <span className="block font-medium">{run.name}</span>
-          <span className="block text-xs text-muted-foreground">
-            {run.namespace}
+          <span className="block font-medium">{title}</span>
+          <span className="block font-mono text-xs text-muted-foreground">
+            {named}
           </span>
         </TableCell>
       )}

@@ -21,6 +21,7 @@ const finished: ListedInstance = {
   id: "run-1",
   namespace: "sales",
   name: "route-lead",
+  title: "Route a lead",
   version: "1.2.0",
   phase: "completed",
   trigger: "schedule",
@@ -37,6 +38,7 @@ const pending: ListedInstance = {
   id: "run-2",
   namespace: "billing",
   name: "charge-card",
+  title: null,
   version: "0.1.0",
   phase: "pending",
   trigger: "manual",
@@ -88,7 +90,7 @@ describe("runs as a table", () => {
       </TooltipProvider>,
     );
     const first = screen.getByRole("link", {
-      name: /open the Succeeded run of route-lead started 2026-11-03 09:00 UTC$/,
+      name: /open the Succeeded run of Route a lead started 2026-11-03 09:00 UTC$/,
     });
     const second = screen.getByRole("link", {
       name: /open the Queued run of charge-card started 2026-11-03 10:00 UTC$/,
@@ -109,8 +111,7 @@ describe("runs as a table", () => {
     const cells = within(row);
 
     expect(cells.getByText("completed")).toBeInTheDocument();
-    expect(cells.getByText("route-lead")).toBeInTheDocument();
-    expect(cells.getByText("sales")).toBeInTheDocument();
+    expect(cells.getByText("Route a lead")).toBeInTheDocument();
     expect(cells.getByText("1.2.0")).toBeInTheDocument();
     expect(cells.getByText("Schedule")).toBeInTheDocument();
   });
@@ -182,6 +183,31 @@ describe("runs as a table", () => {
 
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  it("the_workflow_is_its_title_over_its_namespace_and_name_and_columns_read_status_workflow_started", () => {
+    render(
+      <TooltipProvider>
+        <RunTable
+          runs={[finished, pending]}
+          Status={PhaseWord}
+          empty={nothing}
+        />
+      </TooltipProvider>,
+    );
+    const headers = screen
+      .getAllByRole("columnheader")
+      .slice(0, 3)
+      .map((header) => header.textContent);
+    const [titled, untitled] = rows();
+
+    if (titled === undefined || untitled === undefined)
+      throw new Error("The table has not two rows");
+
+    expect(headers).toEqual(["Status", "Workflow", "Started"]);
+    expect(within(titled).getByText("Route a lead")).toBeInTheDocument();
+    expect(within(titled).getByText("sales/route-lead")).toBeInTheDocument();
+    expect(within(untitled).getByText("charge-card")).toBeInTheDocument();
   });
 
   it("a_test_run_is_marked_and_says_who_started_it", () => {
