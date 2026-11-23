@@ -44,7 +44,7 @@ test.describe("the step form playground", () => {
     await page.goto(SCHEDULE);
 
     const utc = page.getByText("Every day at 09:00 UTC");
-    const local = page.getByText("11:00 your time", { exact: true });
+    const local = page.getByText("11:00 your time, Europe/Kyiv");
     const nextStarts = page.getByText("Next starts");
 
     await expect(utc).toBeVisible();

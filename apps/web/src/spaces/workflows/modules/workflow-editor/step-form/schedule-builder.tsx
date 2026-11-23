@@ -6,6 +6,7 @@ import { useId, useState } from "react";
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
 } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
@@ -53,6 +54,10 @@ interface RepeatProps<Kind extends Repeat["kind"]> {
 
 const NEXT_STARTS = 3;
 
+const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const REFUSED_TIME = "Write the time as HH:MM, from 00:00 to 23:59.";
+
 const CUSTOM = "custom";
 
 const EVERY_MINUTES = [5, 10, 15, 20, 30];
@@ -96,6 +101,7 @@ export function ScheduleBuilder({
   const words = cronText(cron);
   const local = localTimeText(cron, now, zone);
   const shift = daylightNote(cron, now, zone);
+  const localLine = `${local ?? ""}, ${zone}`;
   const starts = nextStartsOf(cron, now, NEXT_STARTS);
   const startLines = starts.map((start) => startText(start, zone));
   const summary = `cron ${cron}`;
@@ -153,9 +159,13 @@ export function ScheduleBuilder({
           />
           {words}
         </p>
-        {local !== null && <p className="text-caption">{local}</p>}
-        {shift !== null && (
-          <p className="text-caption text-muted-foreground">{shift}</p>
+        {local !== null && (
+          <p className="text-caption">
+            {localLine}
+            {shift !== null && (
+              <span className="text-muted-foreground"> · {shift}</span>
+            )}
+          </p>
         )}
         {startLines.length > 0 && (
           <>
@@ -235,36 +245,40 @@ function TimeField({
   readonly onTime: (at: TimeOfDay) => void;
 }) {
   const id = useId();
+  const errorId = `${id}-error`;
+  const [refused, setRefused] = useState(false);
   const written = `${twoDigits(at.hour)}:${twoDigits(at.minute)}`;
+  const describedBy = refused ? errorId : undefined;
 
   function commit(text: string) {
-    const [hour, minute] = text.split(":").map(Number);
-    const isTime =
-      hour !== undefined &&
-      minute !== undefined &&
-      !Number.isNaN(hour) &&
-      !Number.isNaN(minute);
+    const typed = text.trim();
+    const isTime = TIME_OF_DAY.test(typed);
+    setRefused(!isTime);
 
-    if (!isTime) return;
+    if (!isTime || typed === written) return;
 
+    const [hour = 0, minute = 0] = typed.split(":").map(Number);
     onTime({ hour, minute });
   }
 
   return (
-    <Field>
+    <Field data-invalid={refused}>
       <FieldLabel htmlFor={id}>At, in UTC</FieldLabel>
       <Input
         key={written}
         id={id}
-        type="time"
-        step={60}
-        className="w-32"
+        inputMode="numeric"
+        className="w-24 font-mono placeholder:text-faint"
+        placeholder="09:00"
         defaultValue={written}
+        aria-describedby={describedBy}
+        aria-invalid={refused}
         onBlur={(event) => {
           commit(event.currentTarget.value);
         }}
         onKeyDown={blurOnEnter}
       />
+      {refused && <FieldError id={errorId}>{REFUSED_TIME}</FieldError>}
     </Field>
   );
 }

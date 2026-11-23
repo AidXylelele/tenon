@@ -83,7 +83,7 @@ describe("how the workflow starts", () => {
     expect(way).toHaveAttribute("aria-checked", "true");
     const everyDayAt = screen.getByText("Every day at 09:00 UTC");
     expect(everyDayAt).toBeInTheDocument();
-    const yourTime = screen.getByText("11:00 your time");
+    const yourTime = screen.getByText("11:00 your time, Europe/Kyiv");
     expect(yourTime).toBeInTheDocument();
     const monNovUtc = screen.getByText(
       "Mon 23 Nov 09:00 UTC · 11:00 your time",
@@ -226,7 +226,7 @@ describe("a start by webhook or event", () => {
 
     expect(address).toHaveValue(SIGN_UPS.address);
     const copyTheAddress = screen.getByRole("button", {
-      name: "Copy the address",
+      name: "Copy",
     });
     expect(copyTheAddress).toBeInTheDocument();
   });
@@ -315,6 +315,20 @@ describe("schedule values that are not taken", () => {
     leave(cron, "0 2 1 * *");
     leave(cron, " ");
 
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it("a_time_not_written_as_24_hours_is_refused_beside_it", () => {
+    const { onEdit } = shown();
+    const time = screen.getByRole("textbox", { name: "At, in UTC" });
+
+    leave(time, "9am");
+
+    const error = screen.getByRole("alert");
+    expect(error).toHaveTextContent(
+      "Write the time as HH:MM, from 00:00 to 23:59.",
+    );
+    expect(time).toHaveAttribute("aria-invalid", "true");
     expect(onEdit).not.toHaveBeenCalled();
   });
 

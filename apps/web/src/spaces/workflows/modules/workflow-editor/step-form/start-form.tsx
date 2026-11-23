@@ -281,7 +281,7 @@ function WebhookChoice({
               className="font-mono"
               value={chosen.address}
             />
-            <CopyButton value={chosen.address} label="Copy the address" />
+            <CopyButton value={chosen.address} label="Copy" size="sm" />
           </div>
         </Field>
       )}
