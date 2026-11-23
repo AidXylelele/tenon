@@ -126,10 +126,10 @@ export const outboxEnvSchema = z.object({
 
 export const interpreterEnvSchema = z.object({
   LEGACY_EVENT_TYPES: z.stringbool().default(false),
-  INTERPRETER_RUN_THREADS: z.coerce
-    .number()
-    .int()
-    .positive()
+  INTERPRETER_RUN_THREADS: z
+    .literal("")
+    .transform(() => availableParallelism())
+    .or(z.coerce.number().int().positive())
     .default(availableParallelism()),
   INTERPRETER_CHECK_THREADS: z.coerce.number().int().positive().default(1),
 });

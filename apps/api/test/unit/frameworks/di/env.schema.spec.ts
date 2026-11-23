@@ -176,6 +176,20 @@ describe("the interpreter's thread pools", () => {
     expect(parsed.INTERPRETER_CHECK_THREADS).toBe(1);
   });
 
+  it("run_on_every_core_when_their_size_is_left_empty", () => {
+    const parsed = interpreterEnvSchema.parse({ INTERPRETER_RUN_THREADS: "" });
+
+    expect(parsed.INTERPRETER_RUN_THREADS).toBe(availableParallelism());
+  });
+
+  it("refuse_a_run_size_that_is_no_positive_number", () => {
+    const parsed = interpreterEnvSchema.safeParse({
+      INTERPRETER_RUN_THREADS: "0",
+    });
+
+    expect(parsed.success).toBe(false);
+  });
+
   it("take_the_sizes_they_are_given", () => {
     const parsed = interpreterEnvSchema.parse({
       INTERPRETER_RUN_THREADS: "4",

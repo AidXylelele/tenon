@@ -113,6 +113,8 @@ services:
       SECRETS_KEY_FILE: /run/secrets/secrets-key
       OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST?set OUTBOUND_ALLOW_LIST in .env}
       LEGACY_EVENT_TYPES: ${LEGACY_EVENT_TYPES:-false}
+      INTERPRETER_RUN_THREADS: ${INTERPRETER_RUN_THREADS:-}
+      INTERPRETER_CHECK_THREADS: ${INTERPRETER_CHECK_THREADS:-1}
       LOG_LEVEL: ${LOG_LEVEL:?set LOG_LEVEL in .env}
     secrets: [api-database-url, secrets-key]
     extra_hosts: [host.docker.internal:host-gateway]
@@ -162,6 +164,10 @@ services:
       SECRETS_KEY_FILE: /run/secrets/secrets-key
       OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST?set OUTBOUND_ALLOW_LIST in .env}
       LEGACY_EVENT_TYPES: ${LEGACY_EVENT_TYPES:-false}
+      INTERPRETER_RUN_THREADS: ${INTERPRETER_RUN_THREADS:-}
+      INTERPRETER_CHECK_THREADS: ${INTERPRETER_CHECK_THREADS:-1}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-100}
+      OUTBOX_CONCURRENCY: ${OUTBOX_CONCURRENCY:-32}
       SANDBOX_URL: http://go-judge:5050
       SANDBOX_TOKEN_FILE: /run/secrets/sandbox-token
       SMTP_HOST: mailpit
@@ -188,8 +194,8 @@ services:
     tmpfs: [/tmp]
     init: true
     restart: unless-stopped
-    # On SIGTERM the engine stops claiming, aborts running steps and hands their instances back (it waits up to 90 s for steps that ignore the abort), then the relay drains (up to 60 s).
-    stop_grace_period: 170s
+    # On SIGTERM the relay stops claiming, waits up to 60 s for the messages in flight and gives back the leases of the rest.
+    stop_grace_period: 75s
     <<: *hardening
 
   web:
