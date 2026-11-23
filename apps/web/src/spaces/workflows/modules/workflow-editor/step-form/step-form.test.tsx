@@ -659,6 +659,15 @@ describe("how a call sends its data", () => {
     expect(name).toHaveValue("name");
   });
 
+  it("a_get_call_offers_no_data_to_send", () => {
+    shown();
+    open("More options");
+
+    const message = screen.queryByRole("radio", { name: "Message" });
+
+    expect(message).toBeNull();
+  });
+
   it("form_fields_write_their_content_type", () => {
     const { onEdit } = shown({ step: POST_STEP, form: POST_FORM });
     const form = screen.getByRole("radio", { name: "Form fields" });

@@ -7,20 +7,20 @@ Owner: web — editor. Decisions: research D1, D9, D10 and D12 of the console re
 ## API
 
 - `stepsIn(list)`, `stepsUnder(step)`: every step of a list, a block followed by the steps inside it. `stepWithId(list, id)`: the step with that id, or `null`. `placeOf(list, id)`: a step's `ListPlace` — the id of its list, its index and the list's size — or `null`. `kindLookOf(kind)`: a step kind's word and icon. `<KindTile icon />`: the card's 32 px tile of that icon, for a header that names a step (the step panel's).
-  `<WorkflowFlow workflow mode selected onSelect ref />`, filling its container; the canvas scrolls inside it, never the page. Pass stable callbacks (`useCallback`) and keep `marks`, `steps` and `start` by identity between renders: the view then redraws only the cards whose state changed.
+  `<WorkflowFlow workflow mode selected onSelect conditions languageTerms ref />`, filling its container; the canvas scrolls inside it, never the page. Pass stable callbacks (`useCallback`) and keep `marks`, `steps` and `start` by identity between renders: the view then redraws only the cards whose state changed.
 
 - `workflow`: the language server's `WorkflowStructure` (`workflow/structure`).
 - `selected`: the step id on show, or `START` for the start; `onSelect(target)` with a step id, `START`, or `null` (Escape). Without `onSelect` the cards are not controls (a version read on its own).
 - `mode`, one of:
   - `{ kind: "read" }`: no "+".
-  - `{ kind: "edit", marks, inserting, onInsert, conditions, languageTerms }`:
+  - `{ kind: "edit", marks, inserting, onInsert }`:
     - `marks`: by step id, `{ kind: "problem", count, message, missing }` ("1 problem: the address is missing", a red outline) or `{ kind: "fill", missing }` ("Fill in: the address", amber until the module turns it into a problem). `missing` is the field still empty, a noun ("address"); the card's line then reads "POST · address to fill in".
-    - `conditions`: by step id, then by case name, a branch's condition in words, the condition builder's sentence ("Fetch the digest › slideshow › slides is not empty"). `languageTerms` ("Show language terms") shows each branch's jq instead. A branch with no words, and every branch outside editing, reads "when its condition holds": the canvas shows jq only with the language terms.
     - `onInsert(place)` from every "+": `{ kind: "list", list, index, above }` for `insertStep` (`above` is the name of the step above it, the step catalog's `stepAbove`), or `{ kind: "branch", switch, case }` for `insertStepOnBranch`. `inserting` is the place whose catalog is open; its "+" is marked.
   - `{ kind: "run", start, steps, ended, onIteration }`:
     - `start`: how this run started, `{ trigger, detail }`: the card says run-progress's words for the trigger ("Started by hand") with its icon (hand, calendar-clock, webhook), and `detail` under them.
     - `steps`: by step id, `{ status, detail, branch?, iteration? }`. `status` is run-progress's `StepStatus`, shown in run-progress's words (Queued, Running, Waiting, Paused, Succeeded, Failed, Cancelled, Retrying, Skipped); `detail` follows it ("189 ms", "attempt 2 of 3"). A step with no entry was not reached: its card is dashed and muted and the connector into it is dashed. `branch` is the case a choice took; `iteration` (`shown`, `count`) puts "Iteration ‹ 3 of 3 ›" on a repeat, and `onIteration(step, n)` asks for another.
     - `ended`: the run reached the end; otherwise the end reads "Not reached".
+- `conditions`: by step id, then by case name, a branch's condition in words, the condition builder's sentence ("Fetch the digest › slideshow › slides is not empty"), in any mode. `languageTerms` ("Show language terms") shows each branch's jq instead. A branch with no words (a page without the language client: a version, a run) reads "when its condition holds": the canvas shows jq only with the language terms.
 - `ref`: a `FlowHandle` whose `focusAfterRemoving(step)` the module calls when it removes a step (from the step panel's menu): once the step is gone, focus moves to the "+" above it, else to a neighbour.
 - `START`: the start's id.
 

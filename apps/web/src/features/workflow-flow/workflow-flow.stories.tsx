@@ -29,6 +29,7 @@ interface FlowStoryProps {
   readonly mode: FlowMode;
   readonly selected: string | null;
   readonly selectable: boolean;
+  readonly conditions?: ConditionWords;
 }
 
 const EDITOR_CANVAS_AT_1024 = { width: 608, height: 720 };
@@ -47,7 +48,13 @@ const BY_EVENT: RunStart = {
 
 const SEND_TIMES = ["140 ms", "151 ms", "150 ms"];
 
-function FlowStory({ workflow, mode, selected, selectable }: FlowStoryProps) {
+function FlowStory({
+  workflow,
+  mode,
+  selected,
+  selectable,
+  conditions,
+}: FlowStoryProps) {
   const [shown, setShown] = useState(selected);
   const choose = fn((target: string | null) => {
     setShown(target);
@@ -60,6 +67,7 @@ function FlowStory({ workflow, mode, selected, selectable }: FlowStoryProps) {
       mode={mode}
       selected={shown}
       onSelect={onSelect}
+      conditions={conditions}
     />
   );
 }
@@ -97,17 +105,12 @@ const ORDER_WORDS: ConditionWords = new Map([
   ],
 ]);
 
-function editing(
-  marks: ReadonlyMap<string, StepMark> = new Map(),
-  conditions: ConditionWords = new Map(),
-): EditMode {
+function editing(marks: ReadonlyMap<string, StepMark> = new Map()): EditMode {
   return {
     kind: "edit",
     marks,
     inserting: null,
     onInsert: fn(),
-    conditions,
-    languageTerms: false,
   };
 }
 
@@ -237,9 +240,10 @@ export const EmptyBlock: Story = {
 export const BranchesAndJumps: Story = {
   args: {
     workflow: ORDER_ROUTER,
-    mode: editing(new Map(), ORDER_WORDS),
+    mode: editing(),
     selected: "/do/Which kind?",
     selectable: true,
+    conditions: ORDER_WORDS,
   },
 };
 
@@ -289,6 +293,7 @@ export const RunInProgress: Story = {
     ),
     selected: null,
     selectable: true,
+    conditions: ORDER_WORDS,
   },
 };
 
