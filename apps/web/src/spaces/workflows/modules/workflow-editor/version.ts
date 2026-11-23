@@ -1,7 +1,12 @@
+import type { EditAction } from "language-server/protocol";
 import { PublishedVersion } from "./form";
 import type { VersionChoice } from "./interfaces";
 
-export const VERSION_POINTER = "/document/version";
+const VERSION_POINTER = "/document/version";
+
+export function versionEdit(value: string): EditAction {
+  return { kind: "setField", pointer: VERSION_POINTER, value };
+}
 
 export function nextVersion(version: string): string {
   const parts = partsOf(version);
@@ -17,8 +22,8 @@ export function versionChoicesOf(current: string): VersionChoice[] {
 
   if (parts === null) return [];
 
-  const [major, minor, patch] = parts;
-  const fix = `${String(major)}.${String(minor)}.${String(patch + 1)}`;
+  const [major, minor] = parts;
+  const fix = nextVersion(current);
   const feature = `${String(major)}.${String(minor + 1)}.0`;
   const breaking = `${String(major + 1)}.0.0`;
   return [

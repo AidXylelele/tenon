@@ -43,7 +43,7 @@ export interface EditingSession {
   readonly edit: (
     actions: readonly EditAction[],
     remembered?: boolean,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
 }
 
 export type FormReading =

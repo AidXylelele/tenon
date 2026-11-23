@@ -108,6 +108,6 @@ export function DraftResolution({
   );
 }
 
-function useDraftState(store: DraftStore): DraftState {
+export function useDraftState(store: DraftStore): DraftState {
   return useSyncExternalStore(store.subscribe, store.read, store.read);
 }

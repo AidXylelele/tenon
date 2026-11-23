@@ -118,8 +118,12 @@ export function WorkflowFlow({
         const targets = removalFocusOf(steps, step);
         removal.current = { step, focus: targets };
       },
+      focusStep: (step: string) => {
+        const item = stepItemOf(step);
+        focus([item]);
+      },
     }),
-    [steps],
+    [steps, focus],
   );
 
   function press(event: KeyboardEvent<HTMLElement>) {

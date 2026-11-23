@@ -199,7 +199,7 @@ export function useEditingSession(
       setRefusal(null);
       const editor = view.current;
 
-      if (editor === null) return;
+      if (editor === null) return false;
 
       try {
         for (const action of actions) {
@@ -208,8 +208,11 @@ export function useEditingSession(
           client.sync();
           setSelectedId((before) => selectionAfter(action, result.ids, before));
         }
+        return true;
       } catch (failure) {
         if (!isOutdated(failure)) setRefusal(reasonOf(failure));
+
+        return false;
       }
     },
     [client, session],

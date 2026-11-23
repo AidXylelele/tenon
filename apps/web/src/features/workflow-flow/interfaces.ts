@@ -70,6 +70,7 @@ export type FlowMode = { readonly kind: "read" } | EditMode | RunMode;
 
 export interface FlowHandle {
   readonly focusAfterRemoving: (step: string) => void;
+  readonly focusStep: (step: string) => void;
 }
 
 export interface WorkflowFlowProps {
