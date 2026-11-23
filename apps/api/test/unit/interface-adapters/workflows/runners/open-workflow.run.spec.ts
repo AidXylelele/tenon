@@ -92,6 +92,18 @@ class ScriptedRuns {
   }
 }
 
+class ExhaustedRuns extends ScriptedRuns {
+  responses = 0;
+
+  override respond(): Promise<RunAgendaView> {
+    this.responses += 1;
+    const fault = new PermanentFault(
+      "The interpreter ran out of time or memory",
+    );
+    return Promise.reject(fault);
+  }
+}
+
 class TimedPerformer {
   constructor(private readonly delays: Readonly<Record<string, number>>) {}
 
@@ -150,7 +162,7 @@ describe("the run of an instance on the engine", () => {
         WorkflowsModule.forRoot({
           worker: { enabled: false },
           allowInMemoryStorage: true,
-          retry: false,
+          retry: { attempts: 2, backoff: { delay: 0 } },
         }),
       ],
       providers: [
@@ -319,7 +331,7 @@ describe("the run of an instance on the engine", () => {
     expect(runs.answers).toEqual([]);
   });
 
-  it("fails_its_instance_when_a_call_fails_permanently", async () => {
+  it("fails_its_instance_when_the_interpreter_runs_out_of_time_or_memory", async () => {
     const agenda = {
       ended: false,
       calls: [aCall("/do/0/fetch")],
@@ -329,14 +341,12 @@ describe("the run of an instance on the engine", () => {
       receives: [],
       waits: [],
     };
-    const runs = new ScriptedRuns(agenda);
-    const refusing = new ScriptedPerformer(() =>
-      Promise.reject(new PermanentFault("The host does not perform it")),
-    );
-    const worker = await started(runs, refusing);
+    const runs = new ExhaustedRuns(agenda);
+    const worker = await started(runs);
 
     await worker.drain();
 
+    expect(runs.responses).toBe(1);
     expect(runs.failed).toEqual(["instance-1"]);
   });
 
