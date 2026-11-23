@@ -1,4 +1,9 @@
-import type { Subscription, Webhook } from "@/libs/data-access/types";
+import type {
+  Read,
+  Subscription,
+  SubscriptionDetail,
+  Webhook,
+} from "@/libs/data-access/types";
 
 export const WEBHOOKS: readonly Webhook[] = [
   {
@@ -37,3 +42,26 @@ export const BILLING: Subscription = {
 };
 
 export const SUBSCRIPTIONS: readonly Subscription[] = [ON_CALL, BILLING];
+
+export const ON_CALL_DETAIL: Read<SubscriptionDetail> = {
+  ...ON_CALL,
+  deliveries: [
+    {
+      eventId: "3f2a91c0-0001",
+      type: "org.open-workflow-specification.workflow.faulted.v1",
+      status: "delivered",
+      attempts: 1,
+      lastError: null,
+      lastAttemptAt: "2026-11-23T15:28:23.000Z",
+    },
+    {
+      eventId: "3f2a91c0-0002",
+      type: "org.open-workflow-specification.workflow.faulted.v1",
+      status: "pending",
+      attempts: 3,
+      lastError: "The address answered 503",
+      lastAttemptAt: "2026-11-23T15:40:00.000Z",
+    },
+  ],
+  readAt: Date.parse("2026-11-23T15:41:00.000Z"),
+};

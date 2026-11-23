@@ -47,6 +47,8 @@ const MODAL_STORIES = [
   "spaces-shell-console-frame--search-results",
   "spaces-shell-console-frame--narrow-drawer-open",
   "spaces-workflows-workflow--run-dialog",
+  "spaces-connections-webhooks--send-a-test-event",
+  "spaces-connections-webhooks--new-webhook",
 ];
 
 const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
