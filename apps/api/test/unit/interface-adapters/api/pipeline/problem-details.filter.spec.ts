@@ -68,21 +68,18 @@ describe("the problem details filter", () => {
   });
 
   it("a_text_answer_is_the_detail_under_the_status_phrase", () => {
-    const refused = new HttpException(
-      "Slow down",
-      HttpStatus.TOO_MANY_REQUESTS,
-    );
+    const refused = new HttpException("Already taken", HttpStatus.CONFLICT);
 
     filter.catch(refused, host);
 
     expect(reply).toHaveBeenCalledWith(
       response,
       expect.objectContaining({
-        title: "Too Many Requests",
-        status: HttpStatus.TOO_MANY_REQUESTS,
-        detail: "Slow down",
+        title: "Conflict",
+        status: HttpStatus.CONFLICT,
+        detail: "Already taken",
       }),
-      HttpStatus.TOO_MANY_REQUESTS,
+      HttpStatus.CONFLICT,
     );
   });
 

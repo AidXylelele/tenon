@@ -8,7 +8,6 @@ import { OutboxRelay } from "@nestjs/outbox";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { Test, type TestingModuleBuilder } from "@nestjs/testing";
-import { getStorageToken } from "@nestjs/throttler";
 import {
   filter,
   firstValueFrom,
@@ -27,7 +26,6 @@ import { getDrizzleToken } from "@nestjs/drizzle";
 import { queuedMailCount } from "./db.js";
 import { Mailbox } from "./mailbox.js";
 import { ProbeController } from "./probe.controller.js";
-import { UncountedRequests } from "./uncounted-requests.js";
 import { ApiRoute } from "../../src/interface-adapters/api/enums.js";
 
 export interface TestApp {
@@ -64,9 +62,7 @@ export async function createTestApp(
     controllers: [ProbeController],
   })
     .overrideProvider(MailTransport)
-    .useValue(mail)
-    .overrideProvider(getStorageToken())
-    .useValue(new UncountedRequests());
+    .useValue(mail);
   const customised = customise(builder);
   const moduleRef = await customised.compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({

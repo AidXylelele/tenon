@@ -25,10 +25,8 @@ import {
   ApiNoContentResponse,
   ApiOkResponse,
   ApiTags,
-  ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
-import { minutes, Throttle } from "@nestjs/throttler";
 import { AuthenticateUser } from "../../../application/identity/accounts/authenticate-user.js";
 import { ChangePassword } from "../../../application/identity/accounts/change-password.js";
 import type { User } from "../../../domain/identity/users/user.js";
@@ -56,15 +54,10 @@ export class AuthController {
 
   @Post("session")
   @Public()
-  @Throttle({
-    default: { limit: 30, ttl: minutes(15) },
-    account: { limit: 10, ttl: minutes(15) },
-  })
   @HttpCode(200)
   @ApiOkResponse({ standardSchema: SessionResponse })
   @ApiUnauthorizedResponse()
   @ApiForbiddenResponse()
-  @ApiTooManyRequestsResponse()
   async signIn(
     @Body({ schema: SignInBody }) body: SignInBody,
   ): Promise<SessionResponse> {
@@ -97,13 +90,8 @@ export class AuthController {
 
   @Post("password-recovery")
   @Public()
-  @Throttle({
-    default: { limit: 10, ttl: minutes(15) },
-    account: { limit: 3, ttl: minutes(15) },
-  })
   @HttpCode(202)
   @ApiAcceptedResponse()
-  @ApiTooManyRequestsResponse()
   requestRecovery(
     @Body({ schema: PasswordRecoveryBody }) body: PasswordRecoveryBody,
   ): void {

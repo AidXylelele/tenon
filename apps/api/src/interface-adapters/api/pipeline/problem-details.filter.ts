@@ -49,7 +49,6 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       HttpStatus.UNSUPPORTED_MEDIA_TYPE,
       "The request's content type is not accepted",
     ],
-    [HttpStatus.TOO_MANY_REQUESTS, "Too many requests; try again later"],
     [
       HttpStatus.SERVICE_UNAVAILABLE,
       "The platform is busy; try again in a moment",

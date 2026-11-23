@@ -7,18 +7,14 @@ import {
 import { AuthenticationModule } from "@nestjs/authentication";
 import { AuthorizationModule } from "@nestjs/authorization";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
-import { APP_FILTER, APP_GUARD, APP_PIPE } from "@nestjs/core";
+import { APP_FILTER, APP_PIPE } from "@nestjs/core";
 import { IdempotencyModule } from "@nestjs/idempotency";
 import { TerminusModule } from "@nestjs/terminus";
-import { minutes, ThrottlerModule } from "@nestjs/throttler";
-import type { Request } from "express";
 import type { User } from "../../domain/identity/users/user.js";
 import { HealthController } from "../../interface-adapters/api/controllers/health.controller.js";
 import { JsonOnlyMiddleware } from "../../interface-adapters/api/pipeline/json-only.middleware.js";
 import { ProblemDetailsFilter } from "../../interface-adapters/api/pipeline/problem-details.filter.js";
-import { RetryAfterThrottlerGuard } from "../../interface-adapters/api/pipeline/retry-after-throttler.guard.js";
 import { ProblemPresenter } from "../../interface-adapters/api/presenters/problem.presenter.js";
-import { AccountTracker } from "../../interface-adapters/api/schemas/auth.schema.js";
 import { IdempotencyJobs } from "../../interface-adapters/jobs/idempotency.jobs.js";
 import { PostgresIdempotencyStore } from "../../interface-adapters/persistence/stores/postgres-idempotency.store.js";
 import { httpConfig, linksConfig } from "./configs.js";
@@ -53,23 +49,6 @@ import { httpConfig, linksConfig } from "./configs.js";
       }),
     }),
     AuthorizationModule.forRoot(),
-    ThrottlerModule.forRoot([
-      { name: "default", ttl: minutes(1), limit: 1_000 },
-      {
-        name: "account",
-        ttl: minutes(15),
-        limit: 10,
-        skipIf: (context) => {
-          const request = context.switchToHttp().getRequest<Request>();
-          const account = AccountTracker.parse(request.body);
-          return account === "";
-        },
-        getTracker: (_request, context) => {
-          const request = context.switchToHttp().getRequest<Request>();
-          return AccountTracker.parse(request.body);
-        },
-      },
-    ]),
     IdempotencyModule.forRoot({
       scope: (request: { readonly user?: User }) => request.user?.id,
     }),
@@ -86,7 +65,6 @@ import { httpConfig, linksConfig } from "./configs.js";
         validateCustomDecorators: true,
       }),
     },
-    { provide: APP_GUARD, useClass: RetryAfterThrottlerGuard },
     { provide: APP_FILTER, useClass: ProblemDetailsFilter },
   ],
   exports: [ProblemPresenter],
