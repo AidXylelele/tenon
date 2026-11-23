@@ -17,7 +17,7 @@ const journal = JSON.parse(
 
 const ADMIN_EMAIL = "Owner@Example.COM";
 
-const FIRST_ADMINISTRATOR = join(MIGRATIONS, "0034_first_administrator.sql");
+const FIRST_ADMINISTRATOR = join(MIGRATIONS, "0003_first_administrator.sql");
 
 const firstAdministrator = readFileSync(FIRST_ADMINISTRATOR, "utf8");
 

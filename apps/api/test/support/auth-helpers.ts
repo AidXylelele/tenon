@@ -26,7 +26,7 @@ export { PASSWORD };
 export const SEED_ADMIN_EMAIL = "first-admin@example.com";
 
 const FIRST_ADMINISTRATOR = fileURLToPath(
-  new URL("../../drizzle/0034_first_administrator.sql", import.meta.url),
+  new URL("../../drizzle/0003_first_administrator.sql", import.meta.url),
 );
 
 export async function createUser(
