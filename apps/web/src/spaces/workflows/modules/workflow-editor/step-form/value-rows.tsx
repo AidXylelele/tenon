@@ -36,7 +36,7 @@ import {
   useFieldProblems,
 } from "./field-shell";
 import { useFormSettings } from "./form-settings";
-import type { DataUse } from "./interfaces";
+import type { DataSlot, DataUse } from "./interfaces";
 import { JsonControl } from "./value-controls";
 
 interface ValueRowsProps {
@@ -78,14 +78,17 @@ export function ValueRows({ field, words, path }: ValueRowsProps) {
       {words.help !== null && <FieldDescription>{words.help}</FieldDescription>}
       {rows.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {rows.map((row, index) => (
-            <ValueRowView
-              key={row.name}
-              holder={field}
-              row={row}
-              position={index + 1}
-            />
-          ))}
+          {rows.map((row, index) => {
+            const position = index + 1;
+            return (
+              <ValueRowView
+                key={row.name}
+                holder={field}
+                row={row}
+                position={position}
+              />
+            );
+          })}
         </ul>
       )}
       <ProblemLines problems={problems} />
@@ -107,6 +110,7 @@ function ValueRowView({ holder, row, position }: RowProps) {
   const { renderData, onEdit } = useFormSettings();
   const id = useId();
   const valueId = `${id}-value`;
+  const valueLabelId = `${id}-value-label`;
   const errorId = `${id}-error`;
   const [refusal, setRefusal] = useState<string | null>(null);
   const pointer = memberPointerOf(holder.pointer, row.name);
@@ -157,10 +161,11 @@ function ValueRowView({ holder, row, position }: RowProps) {
     onEdit(edits);
   }
 
-  const slot = {
+  const slot: DataSlot = {
     pointer,
     value: row.value,
     inputId: valueId,
+    labelId: valueLabelId,
     describedBy,
     invalid,
     placeholder: "",
@@ -200,7 +205,7 @@ function ValueRowView({ holder, row, position }: RowProps) {
           }}
         />
         <div className="min-w-0">
-          <label htmlFor={valueId} className="sr-only">
+          <label id={valueLabelId} htmlFor={valueId} className="sr-only">
             {valueLabel}
           </label>
           {valueControl}

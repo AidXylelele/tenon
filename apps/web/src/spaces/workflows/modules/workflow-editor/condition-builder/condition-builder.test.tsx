@@ -57,6 +57,8 @@ function propsOf(
     text: TWO_ROWS_TEXT,
     required: true,
     labelledBy: "branch",
+    describedBy: undefined,
+    invalid: false,
     reading: TWO_ROWS_ALL,
     data: AFTER_FETCH,
     samples: SAMPLES,
@@ -369,6 +371,28 @@ describe("a condition in the builder", () => {
     expect(due).toBeInTheDocument();
   });
 
+  it("reading_again_keeps_the_rows_on_screen", () => {
+    const { rerender } = shown();
+
+    rerender({ reading: null });
+
+    const first = row(1);
+    const waiting = screen.queryByText("Reading the condition…");
+    expect(first).toBeInTheDocument();
+    expect(waiting).toBeNull();
+  });
+
+  it("an_expression_it_cannot_show_says_so_to_the_field", () => {
+    shown({ text: NON_CANONICAL_TEXT, reading: AN_EXPRESSION });
+
+    const expression = screen.getByRole("textbox", {
+      name: "Condition as an expression",
+    });
+
+    const note = /cannot show this expression/;
+    expect(expression).toHaveAccessibleDescription(note);
+  });
+
   it("while_the_condition_is_read_it_says_so", () => {
     shown({ reading: null });
 
@@ -411,7 +435,24 @@ describe("a condition as an expression", () => {
     expect(back).toHaveFocus();
   });
 
-  it("a_typed_expression_is_set_at_the_field", () => {
+  it("a_typed_expression_is_set_at_the_field_as_written", () => {
+    const { onEdit } = shown({
+      text: NON_CANONICAL_TEXT,
+      reading: AN_EXPRESSION,
+    });
+    const expression = screen.getByRole("textbox", {
+      name: "Condition as an expression",
+    });
+    const written = "${ .ok and\n  .ready }";
+
+    leave(expression, written);
+
+    expect(onEdit).toHaveBeenCalledWith([
+      { kind: "setField", pointer: POINTER, value: written },
+    ]);
+  });
+
+  it("an_expression_left_as_written_sends_nothing", () => {
     const { onEdit } = shown({
       text: NON_CANONICAL_TEXT,
       reading: AN_EXPRESSION,
@@ -420,11 +461,9 @@ describe("a condition as an expression", () => {
       name: "Condition as an expression",
     });
 
-    leave(expression, " ${ .ok } ");
+    leave(expression, NON_CANONICAL_TEXT);
 
-    expect(onEdit).toHaveBeenCalledWith([
-      { kind: "setField", pointer: POINTER, value: "${ .ok }" },
-    ]);
+    expect(onEdit).not.toHaveBeenCalled();
   });
 
   it("an_optional_condition_emptied_is_cleared", () => {

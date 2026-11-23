@@ -292,11 +292,14 @@ function WeekdaysField({ repeat, onRepeat }: RepeatProps<"weekly">) {
           onValueChange={choose}
           aria-labelledby={id}
         >
-          {DAYS.map((each) => (
-            <ToggleGroupItem key={each.day} value={String(each.day)}>
-              {each.text}
-            </ToggleGroupItem>
-          ))}
+          {DAYS.map((each) => {
+            const day = String(each.day);
+            return (
+              <ToggleGroupItem key={each.day} value={day}>
+                {each.text}
+              </ToggleGroupItem>
+            );
+          })}
         </ToggleGroup>
       </div>
     </Field>
@@ -352,11 +355,14 @@ function EveryField({ repeat, onRepeat }: RepeatProps<"minutes">) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {EVERY_MINUTES.map((minutes) => (
-            <SelectItem key={minutes} value={String(minutes)}>
-              {minutes} minutes
-            </SelectItem>
-          ))}
+          {EVERY_MINUTES.map((minutes) => {
+            const every = String(minutes);
+            return (
+              <SelectItem key={minutes} value={every}>
+                {minutes} minutes
+              </SelectItem>
+            );
+          })}
         </SelectContent>
       </Select>
     </Field>

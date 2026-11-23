@@ -1,7 +1,7 @@
 "use client";
 
 import { BracesIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Button } from "@/libs/ui/components/button";
 import {
   Command,
@@ -17,19 +17,18 @@ import {
   PopoverTrigger,
 } from "@/libs/ui/components/popover";
 import { useAnnounce } from "@/libs/ui/composites/announcer";
-import { choicesOf, type DataChoice } from "./data-choices";
+import { choicesOf, type DataChoice, NO_SAMPLES } from "./data-choices";
 import { ChoiceIcon } from "./choice-icon";
-import type { DataPick, DataPickerProps, Json } from "./interfaces";
+import type { DataPick, DataPickerProps } from "./interfaces";
 
 const SEARCH = "Find data, or type a field name";
-
-const NO_SAMPLES: ReadonlyMap<string, Json> = new Map<string, Json>();
 
 export function DataPicker({
   data,
   samples = NO_SAMPLES,
   onlyPaths = false,
   label = "Insert data",
+  describedBy,
   open,
   onOpenChange,
   onPick,
@@ -73,7 +72,13 @@ export function DataPicker({
   return (
     <Popover open={shown} onOpenChange={change}>
       <PopoverTrigger asChild>
-        <Button ref={ref} type="button" variant="outline" className="shrink-0">
+        <Button
+          ref={ref}
+          type="button"
+          variant="outline"
+          className="shrink-0"
+          aria-describedby={describedBy}
+        >
           <BracesIcon data-icon="inline-start" />
           {label}
         </Button>
@@ -96,8 +101,8 @@ export function DataPicker({
             onPick={pick}
           />
         )}
-        <div className="flex items-center justify-between gap-2 border-t px-2 py-1.5">
-          {onWriteExpression !== undefined ? (
+        <div className="flex items-center gap-2 border-t px-2 py-1.5">
+          {onWriteExpression !== undefined && (
             <Button
               type="button"
               variant="link"
@@ -107,10 +112,10 @@ export function DataPicker({
             >
               Write an expression
             </Button>
-          ) : (
-            <span />
           )}
-          <span className="text-caption text-muted-foreground">Esc closes</span>
+          <span className="ml-auto text-caption text-muted-foreground">
+            Esc closes
+          </span>
         </div>
       </PopoverContent>
     </Popover>
@@ -129,9 +134,17 @@ function ChoiceList({
   readonly onPick: (choice: DataChoice) => void;
 }) {
   const announce = useAnnounce();
+  const id = useId();
   const [query, setQuery] = useState("");
   const choices = choicesOf(data, samples, query, onlyPaths);
   const typed = query.trim();
+  const groupNotes = choices.groups.flatMap((group) =>
+    group.note === null ? [] : [`${group.title}: ${group.note}`],
+  );
+  const notes = groupNotes.concat(choices.notes);
+  const listed = choices.groups.filter((group) => group.choices.length > 0);
+  const noteIds = notes.map((_, index) => `${id}-note-${String(index)}`);
+  const describedBy = noteIds.length > 0 ? noteIds.join(" ") : undefined;
 
   function search(next: string) {
     setQuery(next);
@@ -147,25 +160,26 @@ function ChoiceList({
 
   return (
     <Command shouldFilter={false} label={SEARCH}>
-      <CommandInput placeholder={SEARCH} value={query} onValueChange={search} />
+      <CommandInput
+        placeholder={SEARCH}
+        value={query}
+        aria-describedby={describedBy}
+        onValueChange={search}
+      />
       <CommandList className="max-h-80">
         <CommandEmpty>Nothing matches “{typed}”.</CommandEmpty>
-        {choices.groups.map((group) => (
+        {listed.map((group) => (
           <CommandGroup key={group.id} heading={group.title}>
             {group.choices.map((choice) => (
               <ChoiceItem key={choice.id} choice={choice} onPick={onPick} />
             ))}
-            {group.note !== null && (
-              <p className="px-2 pb-1.5 text-caption text-muted-foreground">
-                {group.note}
-              </p>
-            )}
           </CommandGroup>
         ))}
       </CommandList>
-      {choices.notes.map((note) => (
+      {notes.map((note, index) => (
         <p
           key={note}
+          id={noteIds[index]}
           className="border-t px-3 py-2 text-caption text-muted-foreground"
         >
           {note}

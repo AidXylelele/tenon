@@ -168,11 +168,6 @@ describe("finding data by typing", () => {
           expression: ".slideshow.title",
           export: null,
         }),
-        expect.objectContaining({
-          label: "Greet › slideshow › title",
-          expression: "$context.Greet.slideshow.title",
-          export: "/do/Greet",
-        }),
       ],
       note: "The test run shows whether the answer has it.",
     });
@@ -184,6 +179,14 @@ describe("finding data by typing", () => {
 
     const labels = labelsOf(typed);
     expect(labels).toEqual(["Fetch the digest › message"]);
+  });
+
+  it("a_typed_name_is_not_offered_on_an_answer_whose_fields_are_known", () => {
+    const choices = choicesOf(AFTER_FETCH, NONE, "title", false);
+    const typed = choices.groups.at(-1);
+
+    const labels = labelsOf(typed);
+    expect(labels).toEqual(["Fetch the digest › title"]);
   });
 
   it("text_that_is_no_field_name_offers_nothing_typed", () => {

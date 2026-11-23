@@ -2,14 +2,14 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { Comparison, Condition } from "language-server/protocol";
 import { type ChangeEvent, useState } from "react";
 import {
-  COMPARISONS,
   conditionOf,
   draftOf,
   editsOf,
   rowProblemOf,
   withComparison,
   withRight,
-} from ".";
+} from "./draft";
+import { COMPARISONS } from "./words";
 
 interface RowProbeProps {
   readonly condition: Condition;
@@ -41,7 +41,7 @@ function RowProbe({ condition }: RowProbeProps) {
     if (first === undefined) return;
 
     const right = { kind: "value" as const, text: event.target.value };
-    const next = withRight(draft, first.id, right, null);
+    const next = withRight(draft, first.id, right);
     setDraft(next);
   }
 

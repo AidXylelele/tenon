@@ -14,23 +14,21 @@ import {
   FieldDescription,
   FieldLabel,
 } from "@/libs/ui/components/field";
-import { Input } from "@/libs/ui/components/input";
+import { Textarea } from "@/libs/ui/components/textarea";
 import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/libs/ui/components/toggle-group";
 import { textEditsOf } from "../form-fields";
-import { blurOnEnter } from "../step-form";
 import {
   type Draft,
   draftOf,
   editsOf,
   holdsReading,
-  settledOf,
   withJoin,
   withRowAdded,
 } from "./condition-rows";
-import { ConditionRowView } from "./condition-row";
+import { BuilderRow } from "./builder-row";
 import type { ConditionBuilderProps } from "./interfaces";
 
 const NO_ROWS: Condition = { join: "all", rows: [] };
@@ -44,14 +42,18 @@ const CANNOT_SHOW =
   "The builder cannot show this expression; it stays exactly as written.";
 
 export function ConditionBuilder(props: ConditionBuilderProps) {
-  if (props.reading === null)
+  const [last, setLast] = useState(props.reading);
+
+  if (props.reading !== null && props.reading !== last) setLast(props.reading);
+
+  if (last === null)
     return (
       <p className="text-caption text-muted-foreground">
         Reading the condition…
       </p>
     );
 
-  return <ConditionEditor {...props} reading={props.reading} />;
+  return <ConditionEditor {...props} reading={last} />;
 }
 
 function draftOfReading(reading: ConditionReading): Draft {
@@ -64,6 +66,7 @@ function ConditionEditor({
   text,
   required,
   labelledBy,
+  describedBy,
   reading,
   data,
   samples,
@@ -80,17 +83,17 @@ function ConditionEditor({
 
     if (!canBuild) setWriting(true);
 
-    if (canBuild && !holdsReading(draft, reading))
-      setDraft(draftOfReading(reading));
+    if (canBuild && !holdsReading(draft, reading)) {
+      const read = draftOfReading(reading);
+      setDraft(read);
+    }
   }
 
   function apply(next: Draft) {
     const edits = editsOf(pointer, next);
-    const written = edits.length > 0;
-    const kept = written ? settledOf(next) : next;
-    setDraft(kept);
+    setDraft(next);
 
-    if (written) onEdit(edits);
+    if (edits.length > 0) onEdit(edits);
   }
 
   function toggle() {
@@ -104,6 +107,7 @@ function ConditionEditor({
     <div
       role="group"
       aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
       className="flex flex-col gap-3"
     >
       {showsToggle && (
@@ -190,18 +194,21 @@ function Rows({
         </Field>
       )}
       <ol className="flex flex-col gap-3">
-        {draft.rows.map((row, index) => (
-          <ConditionRowView
-            key={row.id}
-            draft={draft}
-            row={row}
-            position={index + 1}
-            data={data}
-            samples={samples}
-            renderPicker={renderPicker}
-            onDraft={onDraft}
-          />
-        ))}
+        {draft.rows.map((row, index) => {
+          const position = index + 1;
+          return (
+            <BuilderRow
+              key={row.id}
+              draft={draft}
+              row={row}
+              position={position}
+              data={data}
+              samples={samples}
+              renderPicker={renderPicker}
+              onDraft={onDraft}
+            />
+          );
+        })}
       </ol>
       <Button
         type="button"
@@ -232,10 +239,14 @@ function ExpressionField({
 }) {
   const id = useId();
   const helpId = `${id}-help`;
-  const field = { pointer, required, written: true, value: text };
+  const noteId = `${id}-note`;
+  const describedBy = canBuild ? helpId : `${helpId} ${noteId}`;
+  const field = { pointer, required, written: text !== "", value: text };
 
   function commit(typed: string) {
-    const edits = textEditsOf(field, typed.trim());
+    if (typed === text) return;
+
+    const edits = textEditsOf(field, typed);
 
     if (edits.length > 0) onEdit(edits);
   }
@@ -246,20 +257,23 @@ function ExpressionField({
       <FieldDescription id={helpId}>
         Written in jq inside {"${ }"}; it holds when its result is true.
       </FieldDescription>
-      <Input
+      <Textarea
         key={text}
         id={id}
+        rows={2}
+        spellCheck={false}
         className="font-mono"
         placeholder="${ .items | length > 0 }"
         defaultValue={text}
-        aria-describedby={helpId}
+        aria-describedby={describedBy}
         onBlur={(event) => {
           commit(event.currentTarget.value);
         }}
-        onKeyDown={blurOnEnter}
       />
       {!canBuild && (
-        <p className="text-caption text-muted-foreground">{CANNOT_SHOW}</p>
+        <p id={noteId} className="text-caption text-muted-foreground">
+          {CANNOT_SHOW}
+        </p>
       )}
     </Field>
   );

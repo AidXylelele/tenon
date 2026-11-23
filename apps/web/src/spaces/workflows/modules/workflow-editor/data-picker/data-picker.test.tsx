@@ -5,11 +5,14 @@ import { Announcer } from "@/libs/ui/composites/announcer";
 import {
   AFTER_FETCH,
   AT_AN_ADDRESS,
+  FIRST_STEP,
   SAMPLES,
 } from "./data-choices/data.test-support";
 import { DataField } from "./data-field";
 import { DataPicker } from "./data-picker";
 import type { DataFieldProps, DataPickerProps } from "./interfaces";
+
+const SEARCH = "Find data, or type a field name";
 
 function picker(props: Partial<DataPickerProps> = {}) {
   const onPick = vi.fn();
@@ -54,11 +57,14 @@ function field(props: Partial<DataFieldProps> = {}) {
   render(
     <Announcer>
       <TooltipProvider>
-        <label htmlFor="address">Address</label>
+        <label id="address-label" htmlFor="address">
+          Address
+        </label>
         <DataField
           pointer="/do/2/post/with/endpoint"
           value=""
           inputId="address"
+          labelId="address-label"
           describedBy={undefined}
           invalid={false}
           placeholder="https://"
@@ -136,10 +142,9 @@ describe("the data picker", () => {
     expect(texts).toEqual([
       "Fetch the digest › slideshow › titletext",
       "Fetch the digest › titlea field of the answer",
-      "Greet › titlea field of the answer",
     ]);
     const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("3 pieces of data");
+    expect(status).toHaveTextContent("2 pieces of data");
   });
 
   it("one_match_is_said_as_one_piece", () => {
@@ -150,6 +155,16 @@ describe("the data picker", () => {
 
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent("1 piece of data");
+  });
+
+  it("a_group's_note_is_heard_from_the_search", () => {
+    picker({ data: FIRST_STEP });
+    openPicker();
+
+    const search = screen.getByRole("combobox", { name: SEARCH });
+
+    const note = /No step runs before this one/;
+    expect(search).toHaveAccessibleDescription(note);
   });
 
   it("nothing_that_matches_is_said", () => {
@@ -237,19 +252,21 @@ describe("a field that takes data", () => {
     });
 
     const chip = screen.getByRole("button", {
-      name: "Fetch the digest › slideshow › slides, change",
+      name: "Address Fetch the digest › slideshow › slides, change",
     });
 
-    expect(chip).toHaveTextContent("Fetch the digest › slideshow › slides");
     const textbox = screen.queryByRole("textbox");
+    const insert = screen.getByRole("button", { name: "Insert data" });
+    expect(chip).toHaveTextContent("Fetch the digest › slideshow › slides");
     expect(textbox).toBeNull();
+    expect(insert).toHaveAccessibleDescription("Address");
   });
 
   it("a_secret_chip_is_masked_and_says_it_stays_out_of_run_records", () => {
     field({ value: "${ $secrets.SLACK_WEBHOOK_URL }" });
 
     const chip = screen.getByRole("button", {
-      name: "SLACK_WEBHOOK_URL, a secret kept out of run records, change",
+      name: "Address SLACK_WEBHOOK_URL, a secret kept out of run records, change",
     });
 
     expect(chip).toHaveTextContent("•••• SLACK_WEBHOOK_URL");
@@ -258,7 +275,7 @@ describe("a field that takes data", () => {
   it("the_chip_opens_the_picker_to_change_it", () => {
     field({ value: "${ $secrets.SLACK_WEBHOOK_URL }" });
     const chip = screen.getByRole("button", {
-      name: "SLACK_WEBHOOK_URL, a secret kept out of run records, change",
+      name: "Address SLACK_WEBHOOK_URL, a secret kept out of run records, change",
     });
 
     act(() => {

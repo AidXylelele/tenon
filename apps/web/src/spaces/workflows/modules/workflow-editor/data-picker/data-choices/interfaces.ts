@@ -1,6 +1,6 @@
-import type { DataShape, FormField } from "language-server/protocol";
+import type { DataShape } from "language-server/protocol";
 
-export type Json = FormField["value"];
+export type { Json } from "../../form-fields";
 
 export type ChoiceKind = "data" | "time" | "secret";
 

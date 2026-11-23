@@ -19,6 +19,7 @@ export interface DataSlot {
   readonly pointer: string;
   readonly value: Json;
   readonly inputId: string;
+  readonly labelId: string;
   readonly describedBy: string | undefined;
   readonly invalid: boolean;
   readonly placeholder: string;

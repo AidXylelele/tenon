@@ -38,7 +38,7 @@ test.describe("the data picker playground", () => {
   test("a_secret_chip_is_masked_and_reopens_the_picker", async ({ page }) => {
     await page.goto(SECRET_CHIP);
     const chip = page.getByRole("button", {
-      name: "SLACK_WEBHOOK_URL, a secret kept out of run records, change",
+      name: "Address SLACK_WEBHOOK_URL, a secret kept out of run records, change",
     });
     await expect(chip).toHaveText("•••• SLACK_WEBHOOK_URL");
 

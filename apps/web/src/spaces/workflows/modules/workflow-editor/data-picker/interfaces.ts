@@ -1,7 +1,7 @@
-import type { DataAtResult, FormField } from "language-server/protocol";
+import type { DataAtResult } from "language-server/protocol";
 import type { Ref } from "react";
-
-export type Json = FormField["value"];
+import type { Json } from "../form-fields";
+import type { DataSlot } from "../step-form";
 
 export interface DataPick {
   readonly label: string;
@@ -16,6 +16,7 @@ export interface DataPickerProps {
   readonly samples?: ReadonlyMap<string, Json>;
   readonly onlyPaths?: boolean;
   readonly label?: string;
+  readonly describedBy?: string;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
   readonly onPick: (pick: DataPick) => void;
@@ -23,21 +24,7 @@ export interface DataPickerProps {
   readonly ref?: Ref<HTMLButtonElement>;
 }
 
-export interface DataUse {
-  readonly value: string;
-  readonly export: string | null;
-}
-
-export interface DataFieldProps {
-  readonly pointer: string;
-  readonly value: Json;
-  readonly inputId: string;
-  readonly describedBy: string | undefined;
-  readonly invalid: boolean;
-  readonly placeholder: string;
-  readonly onText: (text: string) => void;
-  readonly onUse: (use: DataUse) => void;
-  readonly onClear: () => void;
+export interface DataFieldProps extends DataSlot {
   readonly data: DataAtResult | null;
   readonly samples?: ReadonlyMap<string, Json>;
   readonly onOpenChange?: (open: boolean) => void;

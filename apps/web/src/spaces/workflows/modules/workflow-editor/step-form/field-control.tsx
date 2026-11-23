@@ -103,6 +103,7 @@ function DataControl(props: ControlProps) {
     pointer: field.pointer,
     value: field.value,
     inputId: wiring.id,
+    labelId: wiring.labelId,
     describedBy: wiring.describedBy,
     invalid: wiring.invalid,
     placeholder: words.placeholder,

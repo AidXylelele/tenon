@@ -1,4 +1,5 @@
 import type { Condition } from "language-server/protocol";
+import type { DraftOperand } from "./interfaces";
 import { describe, expect, it } from "vitest";
 import {
   conditionOf,
@@ -6,7 +7,6 @@ import {
   editsOf,
   holdsReading,
   rowProblemOf,
-  settledOf,
   withComparison,
   withJoin,
   withLeft,
@@ -42,12 +42,14 @@ describe("a condition opened in the builder", () => {
       {
         id: 0,
         left: ".status",
+        leftExport: null,
         comparison: "is",
         right: { kind: "value", text: "paid" },
       },
       {
         id: 1,
         left: ".items",
+        leftExport: null,
         comparison: "isNotEmpty",
         right: { kind: "none" },
       },
@@ -58,7 +60,13 @@ describe("a condition opened in the builder", () => {
     const draft = draftOf(EMPTY);
 
     expect(draft.rows).toEqual([
-      { id: 0, left: null, comparison: "isNotEmpty", right: { kind: "none" } },
+      {
+        id: 0,
+        left: null,
+        leftExport: null,
+        comparison: "isNotEmpty",
+        right: { kind: "none" },
+      },
     ]);
   });
 
@@ -112,7 +120,7 @@ describe("changing the rows", () => {
   it("a_comparison_that_needs_a_number_takes_one", () => {
     const opened = draftOf(PAID);
     const greater = withComparison(opened, 0, "isGreaterThan");
-    const typed = withRight(greater, 0, { kind: "value", text: "100" }, null);
+    const typed = withRight(greater, 0, { kind: "value", text: "100" });
 
     const condition = conditionOf(typed);
 
@@ -143,12 +151,11 @@ describe("changing the rows", () => {
   });
 
   it("data_not_chosen_yet_waits", () => {
-    const pending = withRight(
-      draftOf(PAID),
-      0,
-      { kind: "data", path: null },
-      null,
-    );
+    const pending = withRight(draftOf(PAID), 0, {
+      kind: "data",
+      path: null,
+      export: null,
+    });
 
     const condition = conditionOf(pending);
     expect(condition).toBeNull();
@@ -161,12 +168,11 @@ describe("changing the rows", () => {
   });
 
   it("contains_keeps_a_typed_value_and_drops_data", () => {
-    const data = withRight(
-      draftOf(PAID),
-      0,
-      { kind: "data", path: ".b" },
-      null,
-    );
+    const data = withRight(draftOf(PAID), 0, {
+      kind: "data",
+      path: ".b",
+      export: null,
+    });
     const kept = withComparison(draftOf(PAID), 0, "contains");
     const dropped = withComparison(data, 0, "contains");
 
@@ -192,7 +198,13 @@ describe("changing the rows", () => {
     const draft = withRowRemoved(one, 0);
 
     expect(draft.rows).toEqual([
-      { id: 1, left: null, comparison: "isNotEmpty", right: { kind: "none" } },
+      {
+        id: 1,
+        left: null,
+        leftExport: null,
+        comparison: "isNotEmpty",
+        right: { kind: "none" },
+      },
     ]);
   });
 
@@ -245,17 +257,39 @@ describe("the edits a condition sends", () => {
     ]);
   });
 
-  it("a_settled_draft_exports_nothing_again", () => {
-    const draft = withRight(
-      draftOf(PAID),
-      0,
-      { kind: "data", path: "$context.Greet" },
-      GREET,
-    );
+  it("data_picked_again_without_the_context_exports_nothing", () => {
+    const greeted = withLeft(draftOf(EMPTY), 0, "$context.Greet", GREET);
+    const replaced = withLeft(greeted, 0, ".total", null);
 
-    const edits = editsOf(POINTER, settledOf(draft));
+    const edits = editsOf(POINTER, replaced);
 
-    expect(edits).toHaveLength(1);
+    const kinds = edits.map((edit) => edit.kind);
+    expect(kinds).toEqual(["setCondition"]);
+  });
+
+  it("a_removed_row_takes_its_export_with_it", () => {
+    const rows = withRowAdded(draftOf(PAID));
+    const greeted = withLeft(rows, 2, "$context.Greet", GREET);
+    const removed = withRowRemoved(greeted, 2);
+
+    const edits = editsOf(POINTER, removed);
+
+    const kinds = edits.map((edit) => edit.kind);
+    expect(kinds).toEqual(["setCondition"]);
+  });
+
+  it("data_compared_with_exports_its_step_once_per_row", () => {
+    const right: DraftOperand = {
+      kind: "data",
+      path: "$context.Greet",
+      export: GREET,
+    };
+    const compared = withRight(draftOf(PAID), 0, right);
+
+    const edits = editsOf(POINTER, compared);
+
+    const kinds = edits.map((edit) => edit.kind);
+    expect(kinds).toEqual(["useData", "setCondition"]);
   });
 
   it("an_incomplete_condition_sends_nothing", () => {

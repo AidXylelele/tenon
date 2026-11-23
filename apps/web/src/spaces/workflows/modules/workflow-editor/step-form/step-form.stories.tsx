@@ -68,10 +68,7 @@ function builder(slot: ConditionSlot) {
     slot.text === NON_CANONICAL_TEXT ? AN_EXPRESSION : HAS_ITEMS_READING;
   return (
     <ConditionBuilder
-      pointer={slot.pointer}
-      text={slot.text}
-      required={slot.required}
-      labelledBy={slot.labelledBy}
+      {...slot}
       reading={reading}
       data={AFTER_FETCH}
       samples={SAMPLES}

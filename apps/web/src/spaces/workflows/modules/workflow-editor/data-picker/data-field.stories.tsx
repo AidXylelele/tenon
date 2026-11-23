@@ -16,7 +16,11 @@ const meta = {
       <Announcer>
         <TooltipProvider>
           <div className="flex w-[400px] flex-col gap-2 p-4">
-            <label htmlFor="address" className="font-semibold">
+            <label
+              id="address-label"
+              htmlFor="address"
+              className="font-semibold"
+            >
               Address
             </label>
             <Story />
@@ -29,6 +33,7 @@ const meta = {
     pointer: "/do/2/Post the items/with/endpoint",
     value: "",
     inputId: "address",
+    labelId: "address-label",
     describedBy: undefined,
     invalid: false,
     placeholder: "https://",

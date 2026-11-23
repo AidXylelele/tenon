@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { DataAtResult } from "language-server/protocol";
 import { type ChangeEvent, useState } from "react";
-import { choicesOf, type Json } from ".";
+import { choicesOf } from ".";
+import type { Json } from "./interfaces";
 import {
   AFTER_FETCH,
   AT_AN_ADDRESS,

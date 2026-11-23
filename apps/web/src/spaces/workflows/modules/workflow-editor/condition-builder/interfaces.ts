@@ -2,11 +2,10 @@ import type {
   ConditionReading,
   DataAtResult,
   EditAction,
-  FormField,
 } from "language-server/protocol";
 import type { ReactNode } from "react";
-
-export type Json = FormField["value"];
+import type { Json } from "../form-fields";
+import type { ConditionSlot } from "../step-form";
 
 export interface PickedData {
   readonly value: string;
@@ -19,11 +18,7 @@ export interface PickerSlot {
   readonly onPick: (pick: PickedData) => void;
 }
 
-export interface ConditionBuilderProps {
-  readonly pointer: string;
-  readonly text: string;
-  readonly required: boolean;
-  readonly labelledBy: string;
+export interface ConditionBuilderProps extends ConditionSlot {
   readonly reading: ConditionReading | null;
   readonly data: DataAtResult | null;
   readonly samples?: ReadonlyMap<string, Json>;

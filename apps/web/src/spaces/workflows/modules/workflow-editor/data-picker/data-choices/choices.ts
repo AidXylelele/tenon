@@ -1,6 +1,7 @@
 import type {
   DataAtResult,
   DataEntry,
+  DataMember,
   DataShape,
   DataWarning,
 } from "language-server/protocol";
@@ -17,14 +18,7 @@ import { sampleMembersOf } from "./samples";
 
 type Samples = ReadonlyMap<string, Json>;
 
-interface Member {
-  readonly name: string;
-  readonly expression: string;
-  readonly value: string;
-  readonly shape: DataShape;
-  readonly members: readonly Member[];
-  readonly size?: number | null;
-}
+export const NO_SAMPLES: Samples = new Map<string, Json>();
 
 const SEPARATOR = " › ";
 
@@ -92,6 +86,17 @@ export function choiceOfValue(
   return choices.find((choice) => choice.value === value.trim()) ?? null;
 }
 
+export function choiceOfExpression(
+  expression: string,
+  data: DataAtResult,
+  samples: Samples,
+): DataChoice | null {
+  const groups = groupsOf(data, samples);
+  const choices = groups.flatMap((group) => group.choices);
+
+  return choices.find((choice) => choice.expression === expression) ?? null;
+}
+
 function groupsOf(data: DataAtResult, samples: Samples): ChoiceGroup[] {
   const steps = data.entries.filter((entry) => entry.source === "step");
   const stepGroups = steps.map((entry) =>
@@ -140,10 +145,9 @@ function stepGroupOf(
 ): ChoiceGroup {
   const sample = entry.step === null ? undefined : samples.get(entry.step);
   const hasSample = sample !== undefined && entry.members.length === 0;
-  const members =
-    sample !== undefined && hasSample
-      ? sampleMembersOf(entry.expression, sample)
-      : entry.members;
+  const members = hasSample
+    ? sampleMembersOf(entry.expression, sample)
+    : entry.members;
   const exported = entry.needsExport ? entry.step : null;
   const whole = `${entry.name}${SEPARATOR}${WHOLE_ANSWER}`;
   const own = choiceOf(entry, whole, "data", exported);
@@ -190,7 +194,7 @@ function choicesOfEntry(
 }
 
 function memberChoicesOf(
-  member: Member | SampleMember,
+  member: DataMember | SampleMember,
   parent: string,
   exported: string | null,
 ): DataChoice[] {
@@ -203,15 +207,14 @@ function memberChoicesOf(
 }
 
 function choiceOf(
-  member: Member | SampleMember | DataEntry,
+  member: DataMember | SampleMember,
   label: string,
   kind: ChoiceKind,
   exported: string | null,
 ): DataChoice {
   const size = "size" in member ? member.size : null;
   const shapeWord = SHAPE_WORDS[member.shape];
-  const shape =
-    size === null || size === undefined ? shapeWord : `list of ${String(size)}`;
+  const shape = size === null ? shapeWord : `list of ${String(size)}`;
   return {
     id: member.expression,
     label,
@@ -237,7 +240,10 @@ function typedGroupOf(
     groups.flatMap((group) => group.choices.map((choice) => choice.expression)),
   );
   const steps = data.entries.filter(
-    (entry) => entry.source === "step" && FIELDED.has(entry.shape),
+    (entry) =>
+      entry.source === "step" &&
+      FIELDED.has(entry.shape) &&
+      entry.members.length === 0,
   );
   const choices = steps
     .map((entry) => typedChoiceOf(entry, names))

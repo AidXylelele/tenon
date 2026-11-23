@@ -60,6 +60,8 @@ const meta = {
     text: TWO_ROWS_TEXT,
     required: true,
     labelledBy: "branch",
+    describedBy: undefined,
+    invalid: false,
     reading: TWO_ROWS_ALL,
     data: AFTER_FETCH,
     samples: SAMPLES,

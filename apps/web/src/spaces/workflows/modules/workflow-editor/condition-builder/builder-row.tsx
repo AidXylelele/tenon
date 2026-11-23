@@ -3,7 +3,13 @@
 import { XIcon } from "lucide-react";
 import { useId } from "react";
 import { Button } from "@/libs/ui/components/button";
-import { Field, FieldError, FieldLabel } from "@/libs/ui/components/field";
+import {
+  Field,
+  FieldError,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
 import {
   Select,
@@ -17,39 +23,45 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
-import { choiceOfValue, valueOf } from "../data-picker/data-choices";
+import { choiceOfExpression, NO_SAMPLES } from "../data-picker";
 import { blurOnEnter } from "../step-form";
 import {
   COMPARISONS,
+  type DataExport,
   type Draft,
   type DraftOperand,
   type DraftRow,
   rowProblemOf,
   secondOf,
   TIMES,
+  type TimeName,
   withComparison,
   withLeft,
   withRight,
   withRowRemoved,
 } from "./condition-rows";
-import type { ConditionBuilderProps, PickedData } from "./interfaces";
-
-interface RowProps extends Pick<
+import type {
   ConditionBuilderProps,
-  "data" | "samples" | "renderPicker"
-> {
+  PickedData,
+  PickerSlot,
+} from "./interfaces";
+
+type Offered = Pick<ConditionBuilderProps, "data" | "renderPicker">;
+
+type Samples = NonNullable<ConditionBuilderProps["samples"]>;
+
+interface RowProps extends Offered {
   readonly draft: Draft;
   readonly row: DraftRow;
   readonly position: number;
+  readonly samples?: Samples;
   readonly onDraft: (next: Draft) => void;
 }
 
 const TYPED = "value";
 const DATA = "data";
 
-const NO_SAMPLES: ReadonlyMap<string, never> = new Map<string, never>();
-
-export function ConditionRowView({
+export function BuilderRow({
   draft,
   row,
   position,
@@ -64,6 +76,7 @@ export function ConditionRowView({
   const legend = `Condition ${String(position)}`;
   const removal = `Remove condition ${String(position)}`;
   const second = secondOf(row.comparison);
+  const offersOperand = second === "operand";
 
   function pickLeft(pick: PickedData) {
     const exported = exportOf(pick);
@@ -85,18 +98,18 @@ export function ConditionRowView({
     onDraft(next);
   }
 
-  function setRight(right: DraftOperand, pick: PickedData | null) {
-    const exported = pick === null ? null : exportOf(pick);
-    const next = withRight(draft, row.id, right, exported);
+  function setRight(right: DraftOperand) {
+    const next = withRight(draft, row.id, right);
     onDraft(next);
   }
 
-  const leftPicker = renderPicker({ label: "Choose data", onPick: pickLeft });
+  const leftSlot: PickerSlot = { label: "Choose data", onPick: pickLeft };
+  const leftPicker = renderPicker(leftSlot);
 
   return (
     <li>
-      <fieldset className="flex flex-col gap-3 rounded-md border p-3">
-        <legend className="sr-only">{legend}</legend>
+      <FieldSet className="gap-3 rounded-md border p-3">
+        <FieldLegend className="sr-only">{legend}</FieldLegend>
         <Field>
           <FieldLabel id={valueId}>Value</FieldLabel>
           <div
@@ -140,22 +153,24 @@ export function ConditionRowView({
           </Tooltip>
         </div>
         {second !== "none" && (
-          <SecondValue
+          <ComparedWith
             row={row}
-            offersOperand={second === "operand"}
+            offersOperand={offersOperand}
             data={data}
             samples={samples}
             renderPicker={renderPicker}
             onRight={setRight}
           />
         )}
-      </fieldset>
+      </FieldSet>
     </li>
   );
 }
 
-function exportOf(pick: PickedData) {
-  return pick.export === null ? null : { step: pick.export, value: pick.value };
+function exportOf(pick: PickedData): DataExport | null {
+  if (pick.export === null) return null;
+
+  return { step: pick.export, value: pick.value };
 }
 
 function DataName({
@@ -165,7 +180,7 @@ function DataName({
 }: {
   readonly path: string | null;
   readonly data: ConditionBuilderProps["data"];
-  readonly samples: NonNullable<ConditionBuilderProps["samples"]>;
+  readonly samples: Samples;
 }) {
   if (path === null)
     return (
@@ -174,8 +189,7 @@ function DataName({
       </span>
     );
 
-  const value = valueOf(path);
-  const choice = data === null ? null : choiceOfValue(value, data, samples);
+  const choice = data === null ? null : choiceOfExpression(path, data, samples);
 
   if (choice === null)
     return <code className="font-mono text-code">{path}</code>;
@@ -187,37 +201,50 @@ function DataName({
   );
 }
 
-function SecondValue({
+function ComparedWith({
   row,
   offersOperand,
   data,
   samples,
   renderPicker,
   onRight,
-}: Pick<ConditionBuilderProps, "data" | "renderPicker"> & {
+}: Offered & {
   readonly row: DraftRow;
   readonly offersOperand: boolean;
-  readonly samples: NonNullable<ConditionBuilderProps["samples"]>;
-  readonly onRight: (right: DraftOperand, pick: PickedData | null) => void;
+  readonly samples: Samples;
+  readonly onRight: (right: DraftOperand) => void;
 }) {
   const id = useId();
   const kindId = `${id}-kind`;
+  const shownKind = kindOf(row.right);
+  const problem = rowProblemOf(row);
 
   function chooseKind(chosen: string) {
     const time = TIMES.find((each) => each.time === chosen);
     const right = time === undefined ? untimedOf(chosen) : timedOf(time.time);
-    onRight(right, null);
+    onRight(right);
   }
 
   function pickRight(pick: PickedData) {
-    onRight({ kind: "data", path: pick.expression }, pick);
+    const exported = exportOf(pick);
+    const right: DraftOperand = {
+      kind: "data",
+      path: pick.expression,
+      export: exported,
+    };
+    onRight(right);
   }
 
-  const shownKind = kindOf(row.right);
-  const rightPicker = renderPicker({
+  function type(text: string) {
+    const right: DraftOperand = { kind: "value", text };
+    onRight(right);
+  }
+
+  const rightSlot: PickerSlot = {
     label: "Choose data to compare with",
     onPick: pickRight,
-  });
+  };
+  const rightPicker = renderPicker(rightSlot);
 
   return (
     <>
@@ -241,13 +268,7 @@ function SecondValue({
         </Field>
       )}
       {row.right.kind === "value" && (
-        <TypedValue
-          text={row.right.text}
-          problem={rowProblemOf(row)}
-          onText={(text) => {
-            onRight({ kind: "value", text }, null);
-          }}
-        />
+        <TypedValue text={row.right.text} problem={problem} onText={type} />
       )}
       {row.right.kind === "data" && (
         <div className="flex flex-wrap items-center gap-2">
@@ -273,11 +294,11 @@ function kindOf(right: DraftOperand): string {
 
 function untimedOf(chosen: string): DraftOperand {
   return chosen === DATA
-    ? { kind: "data", path: null }
+    ? { kind: "data", path: null, export: null }
     : { kind: "value", text: "" };
 }
 
-function timedOf(time: (typeof TIMES)[number]["time"]): DraftOperand {
+function timedOf(time: TimeName): DraftOperand {
   return { kind: "time", time };
 }
 

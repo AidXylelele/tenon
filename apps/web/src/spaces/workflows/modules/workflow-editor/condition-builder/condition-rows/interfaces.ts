@@ -13,12 +13,17 @@ export interface ComparisonWords {
 export type DraftOperand =
   | { readonly kind: "none" }
   | { readonly kind: "value"; readonly text: string }
-  | { readonly kind: "data"; readonly path: string | null }
+  | {
+      readonly kind: "data";
+      readonly path: string | null;
+      readonly export: DataExport | null;
+    }
   | { readonly kind: "time"; readonly time: TimeName };
 
 export interface DraftRow {
   readonly id: number;
   readonly left: string | null;
+  readonly leftExport: DataExport | null;
   readonly comparison: Comparison;
   readonly right: DraftOperand;
 }
@@ -32,7 +37,6 @@ export interface Draft {
   readonly join: Join;
   readonly rows: readonly DraftRow[];
   readonly next: number;
-  readonly exports: readonly DataExport[];
 }
 
 export type Typed =

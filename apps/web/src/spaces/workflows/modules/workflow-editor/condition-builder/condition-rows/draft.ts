@@ -15,19 +15,26 @@ const NOTHING: DraftOperand = { kind: "none" };
 const NO_TEXT: DraftOperand = { kind: "value", text: "" };
 
 function emptyRowOf(id: number): DraftRow {
-  return { id, left: null, comparison: "isNotEmpty", right: NOTHING };
+  return {
+    id,
+    left: null,
+    leftExport: null,
+    comparison: "isNotEmpty",
+    right: NOTHING,
+  };
 }
 
 export function draftOf(condition: Condition): Draft {
   const read = condition.rows.map((row, index) => ({
     id: index,
     left: row.left,
+    leftExport: null,
     comparison: row.comparison,
     right: operandOf(row.right),
   }));
   const rows = read.length > 0 ? read : [emptyRowOf(0)];
 
-  return { join: condition.join, rows, next: rows.length, exports: [] };
+  return { join: condition.join, rows, next: rows.length };
 }
 
 function operandOf(right: ConditionRow["right"]): DraftOperand {
@@ -37,7 +44,7 @@ function operandOf(right: ConditionRow["right"]): DraftOperand {
     case "value":
       return { kind: "value", text: literalText(right.value) };
     case "data":
-      return { kind: "data", path: right.path };
+      return { kind: "data", path: right.path, export: null };
     case "time":
       return { kind: "time", time: right.time };
   }
@@ -125,13 +132,6 @@ function changedRowOf(
   return { ...draft, rows };
 }
 
-function withExport(draft: Draft, exported: DataExport | null): Draft {
-  if (exported === null) return draft;
-
-  const exports = draft.exports.concat([exported]);
-  return { ...draft, exports };
-}
-
 export function withRowAdded(draft: Draft): Draft {
   const row = emptyRowOf(draft.next);
   const rows = draft.rows.concat([row]);
@@ -152,8 +152,11 @@ export function withLeft(
   left: string,
   exported: DataExport | null,
 ): Draft {
-  const changed = changedRowOf(draft, id, (row) => ({ ...row, left }));
-  return withExport(changed, exported);
+  return changedRowOf(draft, id, (row) => ({
+    ...row,
+    left,
+    leftExport: exported,
+  }));
 }
 
 export function withComparison(
@@ -182,10 +185,8 @@ export function withRight(
   draft: Draft,
   id: number,
   right: DraftOperand,
-  exported: DataExport | null,
 ): Draft {
-  const changed = changedRowOf(draft, id, (row) => ({ ...row, right }));
-  return withExport(changed, exported);
+  return changedRowOf(draft, id, (row) => ({ ...row, right }));
 }
 
 export function withJoin(draft: Draft, join: Join): Draft {
@@ -197,7 +198,8 @@ export function editsOf(pointer: string, draft: Draft): EditAction[] {
 
   if (condition === null) return [];
 
-  const uses: EditAction[] = draft.exports.map((exported) => ({
+  const exports = draft.rows.flatMap(exportsOf);
+  const uses: EditAction[] = exports.map((exported) => ({
     kind: "useData",
     pointer,
     value: exported.value,
@@ -208,8 +210,11 @@ export function editsOf(pointer: string, draft: Draft): EditAction[] {
   return uses.concat([setting]);
 }
 
-export function settledOf(draft: Draft): Draft {
-  return { ...draft, exports: [] };
+function exportsOf(row: DraftRow): DataExport[] {
+  const right = row.right.kind === "data" ? row.right.export : null;
+  const both = [row.leftExport, right];
+
+  return both.filter((exported) => exported !== null);
 }
 
 export function holdsReading(draft: Draft, reading: ConditionReading): boolean {
