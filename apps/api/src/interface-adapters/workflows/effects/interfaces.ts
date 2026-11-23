@@ -1,9 +1,7 @@
-import type { ServiceError } from "@grpc/grpc-js";
 import type { MethodDefinition } from "@grpc/proto-loader";
 import type {
   AuthenticationScheme,
   Failure,
-  GrpcOutcome,
   JsonValue,
   ProcessOutcome,
   ResolvedAuthentication,
@@ -61,10 +59,6 @@ export interface PreparedCall {
 
 export type ParsedProto =
   { readonly kind: "root"; readonly root: Root } | Misconfigured;
-
-export type GrpcReply =
-  | Extract<GrpcOutcome, { readonly kind: "replied" | "status" }>
-  | { readonly kind: "failed"; readonly error: ServiceError };
 
 export interface SandboxLimitsProps {
   readonly time: Temporal.Duration;

@@ -1,24 +1,18 @@
-import {
-  type CallOptions,
-  type Client,
-  connectivityState,
-  Metadata,
-  type ServiceError,
-  status,
-} from "@grpc/grpc-js";
+import { type CallOptions, Metadata, status } from "@grpc/grpc-js";
 import { Injectable } from "@nestjs/common";
 import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type { GrpcOutcome, GrpcRequest, JsonValue } from "interpreter";
 import { GrpcConnection } from "../../../frameworks/grpc/grpc.connection.js";
+import type {
+  FailedAnswer,
+  GrpcAnswer,
+  GrpcCall,
+  MessageCheck,
+} from "../../../frameworks/grpc/interfaces.js";
 import { ResponseSizeLimit } from "../../../frameworks/network/response-size-limit.js";
 import { ResourceClient } from "../interfaces.js";
 import { Authenticator } from "./authenticator.js";
-import type {
-  Authorization,
-  CallContext,
-  GrpcReply,
-  PreparedCall,
-} from "./interfaces.js";
+import type { Authorization, CallContext, PreparedCall } from "./interfaces.js";
 import { ProtoSchema } from "./proto-schema.js";
 import { TransportFailures } from "./transport-failures.js";
 
@@ -66,16 +60,16 @@ export class GrpcGateway {
     context: CallContext,
     signal: AbortSignal,
   ): Promise<GrpcOutcome> {
-    const service = request.service;
-    const channel = await this.connection.channelTo(service.host, service.port);
+    const address = request.service;
+    const service = await this.connection.serviceOf(address.host, address.port);
 
-    if (channel === null)
+    if (service === null)
       return {
         kind: "unreachable",
         detail: "The host name could not be resolved",
       };
 
-    if (channel.plaintext && request.authentication !== null)
+    if (service.plaintext && request.authentication !== null)
       return {
         kind: "misconfigured",
         detail:
@@ -93,13 +87,24 @@ export class GrpcGateway {
     if (authorization.kind === "misconfigured") return authorization;
 
     signal.throwIfAborted();
-    const client = channel.client;
+    const call = this.#callOf(prepared, context, authorization);
+    const bound = this.#boundOf();
+    const answer = prepared.method.responseStream
+      ? await this.connection.streamed(service, call, signal, bound)
+      : await this.connection.unary(service, call, signal);
+    return this.#outcomeOf(answer, signal);
+  }
+
+  #callOf(
+    prepared: PreparedCall,
+    context: CallContext,
+    authorization: Authorization,
+  ): GrpcCall {
     const metadata = this.#metadataOf(context.idempotencyKey, authorization);
     const options = this.#optionsOf(context.remaining);
-    const reply = prepared.method.responseStream
-      ? await this.#streamed(client, prepared, metadata, options, signal)
-      : await this.#unary(client, prepared, metadata, options, signal);
-    return this.#outcomeOf(reply, client, signal);
+    const method = prepared.method;
+    const argument = prepared.argument;
+    return { method, argument, metadata, options };
   }
 
   #metadataOf(idempotencyKey: string, authorization: Authorization): Metadata {
@@ -120,102 +125,43 @@ export class GrpcGateway {
     return { deadline: Date.now() + remaining };
   }
 
-  #unary(
-    client: Client,
-    prepared: PreparedCall,
-    metadata: Metadata,
-    options: CallOptions,
-    signal: AbortSignal,
-  ): Promise<GrpcReply> {
-    const method = prepared.method;
-    return new Promise((resolve) => {
-      const call = client.makeUnaryRequest(
-        method.path,
-        method.requestSerialize,
-        method.responseDeserialize,
-        prepared.argument,
-        metadata,
-        options,
-        (error, response) => {
-          signal.removeEventListener("abort", cancel);
-
-          if (error !== null) {
-            resolve({ kind: "failed", error });
-            return;
-          }
-
-          const message = this.#jsonOf(response);
-          resolve({ kind: "replied", message });
-        },
-      );
-      const cancel = (): void => {
-        call.cancel();
-      };
-      signal.addEventListener("abort", cancel, { once: true });
-    });
-  }
-
-  #streamed(
-    client: Client,
-    prepared: PreparedCall,
-    metadata: Metadata,
-    options: CallOptions,
-    signal: AbortSignal,
-  ): Promise<GrpcReply> {
-    const method = prepared.method;
-    const stream = client.makeServerStreamRequest(
-      method.path,
-      method.requestSerialize,
-      method.responseDeserialize,
-      prepared.argument,
-      metadata,
-      options,
-    );
-    const messages: JsonValue[] = [];
+  #boundOf(): MessageCheck {
     let received = 0;
-    return new Promise((resolve) => {
-      const cancel = (): void => {
-        stream.cancel();
-      };
-      signal.addEventListener("abort", cancel, { once: true });
-      stream.on("data", (message: object) => {
-        const json = this.#jsonOf(message);
-        const text = JSON.stringify(json);
-        received += Buffer.byteLength(text);
-
-        if (received <= this.limit.bytes) {
-          messages.push(json);
-          return;
-        }
-
-        const exhausted = this.#exhausted();
-        resolve(exhausted);
-        stream.cancel();
-      });
-      stream.on("error", (error: ServiceError) => {
-        signal.removeEventListener("abort", cancel);
-        resolve({ kind: "failed", error });
-      });
-      stream.on("end", () => {
-        signal.removeEventListener("abort", cancel);
-        resolve({ kind: "replied", message: messages });
-      });
-    });
+    return (message) => {
+      const text = JSON.stringify(message);
+      received += Buffer.byteLength(text);
+      return received <= this.limit.bytes;
+    };
   }
 
-  #outcomeOf(
-    reply: GrpcReply,
-    client: Client,
-    signal: AbortSignal,
-  ): GrpcOutcome {
-    if (reply.kind !== "failed") return reply;
+  #outcomeOf(answer: GrpcAnswer, signal: AbortSignal): GrpcOutcome {
+    switch (answer.kind) {
+      case "message": {
+        const message = this.#jsonOf(answer.message);
+        return { kind: "replied", message };
+      }
+      case "messages": {
+        const message = answer.messages.map((each) => this.#jsonOf(each));
+        return { kind: "replied", message };
+      }
+      case "stopped": {
+        const size = this.limit.inMebibytes();
+        return {
+          kind: "status",
+          code: status.RESOURCE_EXHAUSTED,
+          message: `The response is larger than ${size}`,
+        };
+      }
+      case "failed":
+        return this.#failureOf(answer, signal);
+    }
+  }
 
-    if (signal.aborted) throw reply.error;
+  #failureOf(answer: FailedAnswer, signal: AbortSignal): GrpcOutcome {
+    if (signal.aborted) throw answer.error;
 
-    const error = reply.error;
-    const state = client.getChannel().getConnectivityState(false);
-    const unconnected =
-      error.code === status.UNAVAILABLE && state !== connectivityState.READY;
+    const error = answer.error;
+    const unconnected = error.code === status.UNAVAILABLE && !answer.connected;
 
     if (unconnected)
       return {
@@ -224,15 +170,6 @@ export class GrpcGateway {
       };
 
     return { kind: "status", code: error.code, message: error.details };
-  }
-
-  #exhausted(): GrpcReply {
-    const size = this.limit.inMebibytes();
-    return {
-      kind: "status",
-      code: status.RESOURCE_EXHAUSTED,
-      message: `The response is larger than ${size}`,
-    };
   }
 
   #jsonOf(message: object | undefined): JsonValue {

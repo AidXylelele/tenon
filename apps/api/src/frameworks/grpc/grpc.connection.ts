@@ -1,10 +1,21 @@
 import type { LookupAddress } from "node:dns";
-import { Client, credentials } from "@grpc/grpc-js";
+import {
+  Client,
+  connectivityState,
+  credentials,
+  type ServiceError,
+} from "@grpc/grpc-js";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { LRUCache } from "lru-cache";
 import { AddressPolicy } from "../network/address-policy.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
-import type { ServiceAddress, ServiceChannel } from "./interfaces.js";
+import type {
+  FailedAnswer,
+  GrpcAnswer,
+  GrpcCall,
+  MessageCheck,
+  ServiceAddress,
+} from "./interfaces.js";
 
 @Injectable()
 export class GrpcConnection implements OnApplicationShutdown {
@@ -28,24 +39,7 @@ export class GrpcConnection implements OnApplicationShutdown {
     private readonly limit: ResponseSizeLimit,
   ) {}
 
-  async channelTo(
-    host: string,
-    port: number | null,
-  ): Promise<ServiceChannel | null> {
-    const service = await this.#serviceOf(host, port);
-
-    if (service === null) return null;
-
-    const key = `${service.target} ${service.host}`;
-    const client = this.channels.memo(key, { context: service });
-    return { client, plaintext: service.plaintext };
-  }
-
-  onApplicationShutdown(): void {
-    this.channels.clear();
-  }
-
-  async #serviceOf(
+  async serviceOf(
     host: string,
     given: number | null,
   ): Promise<ServiceAddress | null> {
@@ -61,12 +55,106 @@ export class GrpcConnection implements OnApplicationShutdown {
     return { target, host, port, plaintext };
   }
 
+  unary(
+    service: ServiceAddress,
+    call: GrpcCall,
+    signal: AbortSignal,
+  ): Promise<GrpcAnswer> {
+    const channel = this.#channelFor(service);
+    const method = call.method;
+    return new Promise((resolve) => {
+      const unary = channel.makeUnaryRequest(
+        method.path,
+        method.requestSerialize,
+        method.responseDeserialize,
+        call.argument,
+        call.metadata,
+        call.options,
+        (error, message) => {
+          signal.removeEventListener("abort", cancel);
+
+          if (error !== null) {
+            const failed = this.#failedOf(error, channel);
+            resolve(failed);
+            return;
+          }
+
+          resolve({ kind: "message", message });
+        },
+      );
+      const cancel = (): void => {
+        unary.cancel();
+      };
+      signal.addEventListener("abort", cancel, { once: true });
+    });
+  }
+
+  streamed(
+    service: ServiceAddress,
+    call: GrpcCall,
+    signal: AbortSignal,
+    admits: MessageCheck,
+  ): Promise<GrpcAnswer> {
+    const channel = this.#channelFor(service);
+    const method = call.method;
+    const stream = channel.makeServerStreamRequest(
+      method.path,
+      method.requestSerialize,
+      method.responseDeserialize,
+      call.argument,
+      call.metadata,
+      call.options,
+    );
+    const messages: object[] = [];
+    return new Promise((resolve) => {
+      const cancel = (): void => {
+        stream.cancel();
+      };
+      signal.addEventListener("abort", cancel, { once: true });
+      stream.on("data", (message: object) => {
+        const admitted = admits(message);
+
+        if (admitted) {
+          messages.push(message);
+          return;
+        }
+
+        resolve({ kind: "stopped" });
+        stream.cancel();
+      });
+      stream.on("error", (error: ServiceError) => {
+        signal.removeEventListener("abort", cancel);
+        const failed = this.#failedOf(error, channel);
+        resolve(failed);
+      });
+      stream.on("end", () => {
+        signal.removeEventListener("abort", cancel);
+        resolve({ kind: "messages", messages });
+      });
+    });
+  }
+
+  onApplicationShutdown(): void {
+    this.channels.clear();
+  }
+
+  #failedOf(error: ServiceError, channel: Client): FailedAnswer {
+    const state = channel.getChannel().getConnectivityState(false);
+    const connected = state === connectivityState.READY;
+    return { kind: "failed", error, connected };
+  }
+
   #targetOf(address: LookupAddress, port: number): string {
     const at = String(port);
 
     if (address.family === 6) return `ipv6:[${address.address}]:${at}`;
 
     return `ipv4:${address.address}:${at}`;
+  }
+
+  #channelFor(service: ServiceAddress): Client {
+    const key = `${service.target} ${service.host}`;
+    return this.channels.memo(key, { context: service });
   }
 
   #channelOf(service: ServiceAddress): Client {

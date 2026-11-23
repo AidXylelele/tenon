@@ -277,6 +277,11 @@ describe("a call the gRPC gateway performs for a run", () => {
     record("SayHellos", call);
     const request = call.request;
 
+    if (request.name === "hang") {
+      call.write({ message: "Hello, and then nothing" });
+      return;
+    }
+
     if (request.name === "flood") {
       for (let index = 0; index < 3; index += 1)
         call.write({ message: "x".repeat(512 * 1024) });
@@ -791,6 +796,15 @@ describe("a call the gRPC gateway performs for a run", () => {
         detail: "The host name could not be resolved",
       });
       await addresses.onApplicationShutdown();
+    });
+
+    it("a_stream_still_open_at_its_deadline_expires", async () => {
+      const outcome = await gateway.perform(
+        grpcOf("SayHellos", { name: "hang" }),
+        contextOf({}, 300),
+      );
+
+      expect(outcome).toEqual({ kind: "expired" });
     });
 
     it("a_port_nobody_listens_on_is_unreachable", async () => {
