@@ -161,7 +161,10 @@ export class RunTurnMapper {
     if (effect.kind === "timer")
       return [{ at: effect.until, end: WaitEnd.Elapsed }];
 
-    if (effect.kind !== "asyncapi" || effect.exchange.kind !== "receive")
+    if (
+      effect.kind !== "asyncapi" ||
+      effect.exchange.kind !== RunTurnMapper.RECEIVE
+    )
       return [];
 
     const closesAt = effect.exchange.closesAt;

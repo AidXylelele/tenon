@@ -13,6 +13,6 @@ export class ScheduleJobs {
   @OnOneInstance({ key: "schedules:arm" })
   async armUnarmed(): Promise<void> {
     await this.armSchedules.execute();
-    this.logger.log("Armed the schedules nothing armed");
+    this.logger.log("Armed the unarmed schedules");
   }
 }

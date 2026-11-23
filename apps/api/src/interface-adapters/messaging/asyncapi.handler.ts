@@ -28,7 +28,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
   #closing = false;
 
   constructor(
-    private readonly runs: ReceiverController,
+    private readonly receivers: ReceiverController,
     private readonly client: SubscriptionClient,
     private readonly locks: Locks,
   ) {}
@@ -37,8 +37,8 @@ export class AsyncApiHandler implements OnModuleDestroy {
   async sync(): Promise<void> {
     if (this.#closing) return;
 
-    const receivers = await this.runs.openReceivers();
-    const keyed = receivers.map(
+    const opened = await this.receivers.openReceivers();
+    const keyed = opened.map(
       (receiver) => [this.#keyOf(receiver), receiver] as const,
     );
     const open = new Map(keyed);
@@ -106,7 +106,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
     const lost = new AbortController();
     const answered = new AbortController();
     const ended = AbortSignal.any([held, lost.signal, answered.signal]);
-    const secrets = await this.runs.secretsOf(receiver.instanceId);
+    const secrets = await this.receivers.secretsOf(receiver.instanceId);
     const step = { idempotencyKey: key, signal: ended, secrets };
     const fence = lock.fencingToken;
     let delivered = Promise.resolve();
@@ -155,7 +155,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
     const execution = receiver.execution;
 
     for (;;) {
-      const demanded = await this.runs.demands(instanceId, execution);
+      const demanded = await this.receivers.demands(instanceId, execution);
 
       if (demanded) return;
 
@@ -171,7 +171,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
     fence: number,
     lost: AbortController,
   ): Promise<void> {
-    const taken = await this.runs
+    const taken = await this.receivers
       .receive(receiver.instanceId, receiver.execution, message, fence)
       .catch((error: unknown) => {
         lost.abort();
@@ -191,7 +191,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
     fence: number,
     answered: AbortController,
   ): Promise<void> {
-    await this.runs.failReceive(
+    await this.receivers.failReceive(
       receiver.instanceId,
       receiver.execution,
       failure,
@@ -211,7 +211,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
     const retried = AsyncApiHandler.RETRIED.includes(failure.kind);
 
     if (!retried) {
-      await this.runs.failReceive(
+      await this.receivers.failReceive(
         receiver.instanceId,
         receiver.execution,
         failure,
