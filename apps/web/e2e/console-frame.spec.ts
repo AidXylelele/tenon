@@ -333,3 +333,42 @@ test.describe("the highlighted result of the search", () => {
     });
   }
 });
+
+function fillOf(element: Element): string {
+  return getComputedStyle(element).backgroundColor;
+}
+
+test.describe("the button that shows the navigation", () => {
+  test("below_1024_px_it_shows_the_menu_icon", async ({ page }) => {
+    await page.setViewportSize(NARROW);
+    await open(page, "narrow");
+
+    const trigger = page.getByRole("button", { name: "Navigation" });
+
+    await expect(trigger.locator(".lucide-menu")).toBeVisible();
+    await expect(trigger.locator(".lucide-panel-left")).toBeHidden();
+  });
+
+  test("from_1024_px_it_shows_the_panel_icon", async ({ page }) => {
+    await page.setViewportSize(WIDE);
+    await open(page, "expanded");
+
+    const trigger = page.getByRole("button", { name: "Navigation" });
+
+    await expect(trigger.locator(".lucide-panel-left")).toBeVisible();
+    await expect(trigger.locator(".lucide-menu")).toBeHidden();
+  });
+
+  test("is_filled_only_on_hover", async ({ page }) => {
+    await page.setViewportSize(WIDE);
+    await open(page, "expanded");
+    const trigger = page.getByRole("button", { name: "Navigation" });
+    const resting = await trigger.evaluate(fillOf);
+
+    await trigger.hover();
+
+    const hovered = await trigger.evaluate(fillOf);
+    expect(resting).toBe("rgba(0, 0, 0, 0)");
+    expect(hovered).not.toBe(resting);
+  });
+});

@@ -1,5 +1,6 @@
-import { SidebarInset, SidebarTrigger } from "@/libs/ui/components/sidebar";
+import { SidebarInset } from "@/libs/ui/components/sidebar";
 import { BreadcrumbTrail } from "./breadcrumb-trail";
+import { NavigationTrigger } from "./navigation-trigger";
 
 export const CONTENT_ID = "content";
 
@@ -24,7 +25,7 @@ export function Frame({ sidebar, search, notice, children }: FrameProps) {
       {sidebar}
       <SidebarInset className="min-w-0 has-data-[frame=canvas]:h-svh">
         <header className="sticky top-0 z-30 flex h-(--topbar-height) shrink-0 items-center gap-3 border-b bg-background px-4">
-          <SidebarTrigger />
+          <NavigationTrigger />
           <BreadcrumbTrail />
           {search}
         </header>
