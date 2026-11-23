@@ -90,6 +90,12 @@ export function runsHrefOf(address: RunsAddress): string {
   });
 }
 
+export function hasFilters(address: RunsAddress): boolean {
+  const chosen = [address.namespace, address.version];
+  const named = chosen.some((value) => value !== undefined);
+  return named || address.statuses.length > 0 || address.between !== null;
+}
+
 export function isFiltered(address: RunsAddress): boolean {
   const chosen = [address.namespace, address.version];
   const named = chosen.some((value) => value !== undefined);

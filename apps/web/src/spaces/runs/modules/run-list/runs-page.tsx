@@ -66,9 +66,9 @@ export function RunsPage({
       <PageHeader title="Runs" description={description} />
       <LiveUpdates activity={activity} />
       <Filters address={address} workflows={workflows} zone={zone} />
-      <h2 className="text-sm font-semibold" role="status">
-        {summary}
-      </h2>
+      <div role="status">
+        <h2 className="text-sm font-semibold">{summary}</h2>
+      </div>
       <RunTable
         runs={page.items}
         Status={PhaseStatus}
