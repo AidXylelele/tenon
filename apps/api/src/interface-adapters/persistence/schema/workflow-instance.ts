@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -54,7 +55,32 @@ export const workflowInstance = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
-    index("workflow_instance_created_idx").on(table.createdAt, table.id),
+    index("workflow_instance_started_idx").on(
+      table.startedAt,
+      table.createdAt,
+      table.id,
+      table.phase,
+      table.workflowId,
+      table.test,
+      table.endedAt,
+    ),
+    index("workflow_instance_workflow_started_idx").on(
+      table.workflowId,
+      table.startedAt,
+      table.createdAt,
+      table.id,
+      table.phase,
+      table.test,
+      table.endedAt,
+    ),
+    index("workflow_instance_live_idx")
+      .on(table.phase, table.workflowId, table.test)
+      .where(
+        sql`${table.phase} in ('pending', 'running', 'waiting', 'suspended')`,
+      ),
+    index("workflow_instance_scheduled_idx")
+      .on(table.workflowId, table.createdAt)
+      .where(sql`${table.trigger} = 'schedule'`),
     index("workflow_instance_workflow_idx").on(
       table.workflowId,
       table.createdAt,

@@ -67,7 +67,7 @@ export class InstancePresenter {
 
   page(page: InstancePage): InstancePageResponse {
     const items = page.items.map((item) => this.#listedOf(item));
-    return { items, total: page.total };
+    return { items, total: page.total, exact: page.exact };
   }
 
   #listedOf(item: ListedInstance): InstancePageResponse["items"][number] {

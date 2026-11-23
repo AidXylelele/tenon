@@ -23,6 +23,7 @@ import type {
   InstanceFilter,
   InstancePage,
   InstancePageRequest,
+  InstanceTotal,
   InstanceWait,
   ListedInstance,
   PhaseCount,
@@ -66,6 +67,7 @@ import {
 
 @Injectable()
 export class PostgresInstanceQueries implements InstanceQueries {
+  private static readonly MOST_COUNTED = 10_000;
   private static readonly OPENINGS: LifecycleEventName[] = [
     "task.started",
     "task.completed",
@@ -91,12 +93,12 @@ export class PostgresInstanceQueries implements InstanceQueries {
   async list(request: InstancePageRequest): Promise<InstancePage> {
     const now = new Date();
     const filtered = this.#filtered(request.filter);
-    const [rows, total] = await Promise.all([
+    const [rows, counted] = await Promise.all([
       this.#listedRowsOf(request, filtered, now),
       this.#totalOf(filtered),
     ]);
     const items = rows.map((row) => this.#listedOf(row));
-    return { items, total };
+    return { items, total: counted.total, exact: counted.exact };
   }
 
   #listedRowsOf(
@@ -144,13 +146,21 @@ export class PostgresInstanceQueries implements InstanceQueries {
       .offset(skipped);
   }
 
-  async #totalOf(filtered: SQL | undefined): Promise<number> {
-    const count = sql<number>`count(*)::int`;
-    const [row] = await this.txHost.tx
-      .select({ count })
+  async #totalOf(filtered: SQL | undefined): Promise<InstanceTotal> {
+    const most = PostgresInstanceQueries.MOST_COUNTED;
+    const beyond = most + 1;
+    const matching = this.txHost.tx
+      .select({ id: instances.id })
       .from(instances)
-      .where(filtered);
-    return row?.count ?? 0;
+      .where(filtered)
+      .limit(beyond)
+      .as("matching");
+    const count = sql<number>`count(*)::int`;
+    const [row] = await this.txHost.tx.select({ count }).from(matching);
+    const counted = row?.count ?? 0;
+    const exact = counted <= most;
+    const total = Math.min(counted, most);
+    return { total, exact };
   }
 
   #filtered(filter: InstanceFilter): SQL | undefined {
@@ -355,7 +365,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
   ): WindowCount | null {
     if (from === null) return null;
 
-    const counts = this.#previousTotalsOf(rows);
+    const counts = this.#countsIn(rows, 0);
     return { from, counts };
   }
 
@@ -477,15 +487,11 @@ export class PostgresInstanceQueries implements InstanceQueries {
     const edges = window.buckets.map((start) => start.toISOString());
     const thresholds = sql`${sql.param(edges)}::timestamptz[]`;
     const bucket = sql<number>`width_bucket(${instances.startedAt}, ${thresholds})`;
-    const current = sql<boolean>`${instances.startedAt} >= ${first}`;
+    const count = sql<number>`count(*)::int`;
     const workflow = this.#ofWorkflow(window.namespace, window.name);
     const tests = this.#tests(window.tests);
-    const started = this.txHost.tx
-      .select({
-        bucket: bucket.as("bucket"),
-        current: current.as("current"),
-        phase: instances.phase,
-      })
+    return this.txHost.tx
+      .select({ bucket, phase: instances.phase, count })
       .from(instances)
       .where(
         and(
@@ -495,19 +501,7 @@ export class PostgresInstanceQueries implements InstanceQueries {
           tests,
         ),
       )
-      .as("started");
-    const count = sql<number>`count(*)::int`;
-    return this.txHost.tx
-      .select({
-        bucket: started.bucket,
-        current: started.current,
-        phase: started.phase,
-        count,
-      })
-      .from(started)
-      .groupBy(
-        sql`grouping sets ((${started.bucket}, ${started.phase}), (${started.current}, ${started.phase}))`,
-      );
+      .groupBy(sql`1`, sql`2`);
   }
 
   #live(window: CountWindow): Promise<PhaseCount[]> {
@@ -528,21 +522,16 @@ export class PostgresInstanceQueries implements InstanceQueries {
   }
 
   #windowTotalsOf(rows: readonly CountRow[]): PhaseCount[] {
-    const totals = rows.filter((row) => {
-      const total = row.bucket === null;
-      const inWindow = row.current === true;
-      return total && inWindow;
-    });
-    return totals.map((row) => ({ phase: row.phase, count: row.count }));
-  }
+    const totals = new Map<Phase, number>();
 
-  #previousTotalsOf(rows: readonly CountRow[]): PhaseCount[] {
-    const totals = rows.filter((row) => {
-      const total = row.bucket === null;
-      const before = row.current === false;
-      return total && before;
-    });
-    return totals.map((row) => ({ phase: row.phase, count: row.count }));
+    for (const row of rows) {
+      if (row.bucket === 0) continue;
+
+      const sum = (totals.get(row.phase) ?? 0) + row.count;
+      totals.set(row.phase, sum);
+    }
+
+    return Array.from(totals, ([phase, count]) => ({ phase, count }));
   }
 
   #ofWorkflow(namespace: string | null, name: string | null): SQL | undefined {

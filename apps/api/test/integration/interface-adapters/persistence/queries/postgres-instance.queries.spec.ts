@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { InstanceOrder } from "../../../../../src/application/automation/instances/enums.js";
 import type {
   CountWindow,
@@ -293,7 +294,23 @@ describe("PostgresInstanceQueries listing runs", () => {
     expect(firstIds).toEqual([pending, newer]);
     expect(secondIds).toEqual([older]);
     expect(first.total).toBe(3);
+    expect(first.exact).toBe(true);
     expect(second.total).toBe(3);
+  });
+
+  it("a_total_past_ten_thousand_is_given_as_ten_thousand_and_not_exact", async () => {
+    await t.db.execute(
+      sql`insert into workflow_instance (id, workflow_id, version_id, trigger, input, phase, created_at, started_at, ended_at)
+        select gen_random_uuid(), ${workflow.workflowId}, ${workflow.versionId}, 'manual', '{}', 'completed', now(), now(), now()
+        from generate_series(1, 10001)`,
+    );
+    const request = pageOf({}, { limit: 1 });
+
+    const listed = await queries.list(request);
+
+    expect(listed.total).toBe(10_000);
+    expect(listed.exact).toBe(false);
+    expect(listed.items).toHaveLength(1);
   });
 
   it("filters_by_several_phases_a_half_open_start_window_and_leaves_out_test_runs", async () => {

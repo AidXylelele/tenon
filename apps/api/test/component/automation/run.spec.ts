@@ -27,6 +27,7 @@ const STRUCTURED = "application/cloudevents+json";
 interface RunPage {
   readonly items: { readonly id: string }[];
   readonly total: number;
+  readonly exact: boolean;
 }
 
 const SUMMARY_KEYS = [
@@ -1035,6 +1036,7 @@ describe("running a workflow and following its execution over HTTP", () => {
       expect(idsOf(firstPage)).toEqual([ids.o1, ids.b1, ids.a2]);
       expect(idsOf(secondPage)).toEqual([ids.a1]);
       expect(firstPage.total).toBe(4);
+      expect(firstPage.exact).toBe(true);
       expect(secondPage.total).toBe(4);
       const [summary] = firstPage.items;
       const keys = Object.keys(summary ?? {}).sort();

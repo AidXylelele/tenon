@@ -95,6 +95,7 @@ const ListedInstanceResponse = InstanceSummaryResponse.extend({
 export const InstancePageResponse = z.object({
   items: z.array(ListedInstanceResponse),
   total: z.number().int(),
+  exact: z.boolean(),
 });
 
 export type InstancePageResponse = z.infer<typeof InstancePageResponse>;

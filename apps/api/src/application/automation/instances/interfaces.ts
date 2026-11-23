@@ -208,9 +208,13 @@ export interface ListedInstance extends InstanceSummary {
   readonly waits: readonly ListedWait[];
 }
 
-export interface InstancePage {
-  readonly items: readonly ListedInstance[];
+export interface InstanceTotal {
   readonly total: number;
+  readonly exact: boolean;
+}
+
+export interface InstancePage extends InstanceTotal {
+  readonly items: readonly ListedInstance[];
 }
 
 export interface TaskRecordView {

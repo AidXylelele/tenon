@@ -93,8 +93,7 @@ export interface FailingRow {
 }
 
 export interface CountRow {
-  readonly bucket: number | null;
-  readonly current: boolean | null;
+  readonly bucket: number;
   readonly phase: Phase;
   readonly count: number;
 }
