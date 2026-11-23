@@ -6,7 +6,7 @@ for as data, and the embedder performs them and answers by their ids. The state 
 
 ## Entries
 
-`interpreter` — `createInterpreter()` gives an `Interpreter`:
+`interpreter` — `createInterpreter(options)` gives an `Interpreter`:
 
 - `compile(source, { profile, imports })` gives `{ kind: 'compiled', program, analysis }` or
   `{ kind: 'refused', diagnostics, analysis }`, the analysis holding the document as read;
@@ -14,8 +14,11 @@ for as data, and the embedder performs them and answers by their ids. The state 
 
 The profile's `triggers: 'one'` refuses a schedule of more than one trigger, and an MCP transport option outside
 its `mcpTransportOptions` is refused. `createSecretPolicies()` decodes an
-authentication policy a secret holds; `endingOf(end)` gives the standard's events and error for a run the host
-ends itself; `lifecycleEventCatalogue` gives each event name's types and the data field of its moment.
+authentication policy a secret holds; `endingOf(end, options)` gives the standard's events and error for a run the
+host ends itself; `lifecycleEventCatalogue` gives each event name's data field of its moment and whether it is
+reported once or ends its workflow or task; `lifecycleEventTypesOf(options)` gives each event name's CloudEvent
+types. A lifecycle event is typed `org.open-workflow-specification.<name>.v1`; the options' `legacyEventTypes: true`
+types it `io.serverlessworkflow.<name>.v1` too, and is off when left out.
 
 A `Program` holds its `manifest` (identity, effects, secrets, schedules, routing filters) and its `fingerprint`;
 `start`, `correlate`, `respond`, `suspend`, `resume` and `cancel` each give the next `Step`: its `status`, the

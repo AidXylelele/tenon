@@ -24,6 +24,7 @@ export type {
   AuthenticationScheme,
   HostProfile,
   Imports,
+  InterpreterOptions,
 } from "./host-profile.js";
 export type { JsonArray, JsonObject, JsonValue } from "./json.js";
 export type {

@@ -2,6 +2,7 @@ import type { JsonObject, LifecycleEvent, RunMark } from "../../api/index.js";
 import { instantTextOf } from "../../runtime/index.js";
 import {
   type LifecycleEventName,
+  type LifecycleEventTypes,
   type TaskEventName,
   type WorkflowEventName,
   lifecycleEventCatalogue,
@@ -22,15 +23,17 @@ export function workflowEventOf(
   details: JsonObject,
 ): LifecycleEvent {
   const mark = markOf(view);
-  return markedEventOf(name, mark, details);
+  const eventTypes = view.services.eventTypes;
+  return markedEventOf(name, mark, details, eventTypes);
 }
 
 export function markedEventOf(
   name: WorkflowEventName,
   mark: RunMark,
   details: JsonObject,
+  eventTypes: LifecycleEventTypes,
 ): LifecycleEvent {
-  const types = lifecycleEventCatalogue[name].types;
+  const types = eventTypes[name];
   const workflow = qualifiedNameOf(mark);
   const moment = momentOf(name, mark);
   const data = { name: workflow, ...moment, ...details };
@@ -65,7 +68,7 @@ export function correlationCompletedOf(
 
 export function taskEventOf(report: TaskReport, view: View): LifecycleEvent {
   const name = report.name;
-  const types = lifecycleEventCatalogue[name].types;
+  const types = view.services.eventTypes[name];
   const mark = markOf(view);
   const workflow = qualifiedNameOf(mark);
   const task = report.cell.descriptor.reference;
