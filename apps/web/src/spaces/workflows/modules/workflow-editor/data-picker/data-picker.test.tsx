@@ -185,6 +185,27 @@ describe("the data picker", () => {
     expect(search).toHaveAccessibleDescription(note);
   });
 
+  it("a_group's_note_sits_under_its_own_group", () => {
+    picker({ data: AFTER_FETCH });
+    openPicker();
+
+    const note = screen.getByText(/Run a test to see the fields/);
+    const group = note.closest("[cmdk-group]");
+
+    expect(group).toHaveTextContent("From Fetch the digest");
+  });
+
+  it("the_picker_is_never_taller_than_the_room_it_has", () => {
+    picker();
+    openPicker();
+
+    const dialog = screen.getByRole("dialog");
+
+    expect(dialog.className).toContain(
+      "max-h-(--radix-popover-content-available-height)",
+    );
+  });
+
   it("nothing_that_matches_is_said", () => {
     picker();
     openPicker();
