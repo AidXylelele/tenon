@@ -10,14 +10,17 @@ import {
 } from "@/libs/ui/components/dropdown-menu";
 import { IconButton } from "@/libs/ui/composites/icon-button";
 
-export interface SourceFile {
+export interface VersionSource {
   readonly text: string;
   readonly kind: "YAML" | "JSON";
-  readonly href: string;
-  readonly name: string;
 }
 
-export function VersionMenu({ file }: { readonly file: SourceFile }) {
+interface VersionMenuProps {
+  readonly file: VersionSource;
+  readonly download: string;
+}
+
+export function VersionMenu({ file, download }: VersionMenuProps) {
   const copyLabel = `Copy ${file.kind}`;
   const downloadLabel = `Download ${file.kind}`;
 
@@ -39,7 +42,7 @@ export function VersionMenu({ file }: { readonly file: SourceFile }) {
           {copyLabel}
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <a href={file.href} download={file.name}>
+          <a href={download} download>
             <DownloadIcon aria-hidden />
             {downloadLabel}
           </a>

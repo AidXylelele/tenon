@@ -10,7 +10,7 @@ import { RouteTabs } from "@/libs/ui/composites/route-tabs";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
 
 const ACCOUNT = { href: ACCOUNT_HREF, label: "Account" };
-const INVITATIONS = { href: PEOPLE_HREF, label: "Invitations" };
+const PEOPLE = { href: PEOPLE_HREF, label: "People" };
 const PLATFORM = { href: PLATFORM_HREF, label: "Platform" };
 
 export async function SettingsFrame({
@@ -24,7 +24,7 @@ export async function SettingsFrame({
 
   const administrator = session?.capabilities.administrator === true;
   const tabs = administrator
-    ? [ACCOUNT, INVITATIONS, PLATFORM]
+    ? [ACCOUNT, PEOPLE, PLATFORM]
     : [ACCOUNT, PLATFORM];
 
   return (

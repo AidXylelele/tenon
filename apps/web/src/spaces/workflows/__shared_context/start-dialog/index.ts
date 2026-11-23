@@ -1,1 +1,1 @@
-export { StartDialog } from "./start-dialog";
+export { RunVersionButton, StartDialog } from "./start-dialog";

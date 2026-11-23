@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { visit } from "@/libs/routing/navigation.test-support";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { SecretsPage, type SecretsPageProps } from "./secrets-page";
 import { SECRETS } from "./secrets.test-support";
@@ -13,6 +14,10 @@ const { createSecretAction, replaceSecretAction, deleteSecretAction, success } =
   }));
 
 vi.mock("sonner", () => ({ toast: { success } }));
+vi.mock(
+  "next/navigation",
+  () => import("@/libs/routing/navigation.test-support"),
+);
 vi.mock("./actions", () => ({
   createSecretAction,
   replaceSecretAction,
@@ -24,7 +29,7 @@ const DONE = { ok: true, value: undefined };
 function show(props: Partial<SecretsPageProps> = {}) {
   render(
     <TooltipProvider>
-      <SecretsPage secrets={SECRETS} creating={false} {...props} />
+      <SecretsPage secrets={SECRETS} {...props} />
     </TooltipProvider>,
   );
 }
@@ -36,6 +41,7 @@ function openActionsOf(name: string) {
 
 describe("the secrets page", () => {
   beforeEach(() => {
+    visit("/secrets");
     createSecretAction.mockReset();
     replaceSecretAction.mockReset();
     deleteSecretAction.mockReset();
@@ -54,7 +60,8 @@ describe("the secrets page", () => {
 
   it("a_new_secret_is_typed_hidden_and_saved_by_its_name", async () => {
     createSecretAction.mockResolvedValue(DONE);
-    show({ creating: true });
+    visit("/secrets?new=1");
+    show();
 
     const name = screen.getByLabelText(/^Name/);
     const value = screen.getByLabelText("Value");
@@ -74,7 +81,8 @@ describe("the secrets page", () => {
 
   it("a_username_and_password_are_kept_as_json", async () => {
     createSecretAction.mockResolvedValue(DONE);
-    show({ creating: true });
+    visit("/secrets?new=1");
+    show();
 
     fireEvent.change(screen.getByLabelText(/^Name/), {
       target: { value: "CRM_LOGIN" },
@@ -127,6 +135,30 @@ describe("the secrets page", () => {
 
     await waitFor(() => {
       expect(success).toHaveBeenCalledWith("CRM_API_TOKEN deleted");
+    });
+  });
+
+  it("closing_the_new_secret_takes_its_flag_out_of_the_address", () => {
+    visit("/secrets?new=1");
+    show();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(window.location.search).toBe("");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keep_it_gives_the_focus_back_to_the_row_actions", async () => {
+    show();
+
+    openActionsOf("CRM_API_TOKEN");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete…" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Keep it" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Actions for CRM_API_TOKEN" }),
+      ).toHaveFocus();
     });
   });
 

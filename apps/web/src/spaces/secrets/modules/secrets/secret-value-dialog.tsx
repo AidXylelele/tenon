@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/libs/ui/components/dialog";
 import {
   Field,
@@ -37,6 +38,8 @@ interface SecretValueDialogProps {
   readonly name?: string;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly trigger?: React.ReactNode;
+  readonly returnFocus?: () => HTMLElement | null;
 }
 
 function isShape(value: string): value is Shape {
@@ -60,6 +63,8 @@ export function SecretValueDialog({
   name,
   open,
   onOpenChange,
+  trigger,
+  returnFocus,
 }: SecretValueDialogProps) {
   const replacing = name !== undefined;
   const [chosen, setChosen] = useState("");
@@ -113,10 +118,21 @@ export function SecretValueDialog({
 
   return (
     <Dialog open={open} onOpenChange={change}>
+      {trigger !== undefined && (
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
+      )}
       <DialogContent
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           first.current?.focus();
+        }}
+        onCloseAutoFocus={(event) => {
+          const opener = returnFocus?.();
+
+          if (opener === null || opener === undefined) return;
+
+          event.preventDefault();
+          opener.focus();
         }}
       >
         <form onSubmit={submit} className="flex flex-col gap-4">
@@ -202,6 +218,9 @@ export function SecretValueDialog({
             ) : (
               <Field>
                 <FieldLabel htmlFor="secret-value">{textLabel}</FieldLabel>
+                <FieldDescription>
+                  Hidden as you type; Tenon never shows it again.
+                </FieldDescription>
                 <Input
                   ref={replacing ? first : undefined}
                   id="secret-value"
@@ -215,9 +234,6 @@ export function SecretValueDialog({
                   autoComplete="new-password"
                   className="font-mono"
                 />
-                <FieldDescription>
-                  Hidden as you type; Tenon never shows it again.
-                </FieldDescription>
               </Field>
             )}
           </FieldGroup>

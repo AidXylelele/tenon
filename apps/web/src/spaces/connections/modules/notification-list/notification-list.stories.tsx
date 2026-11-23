@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { PageBody } from "@/libs/ui/composites/page-body";
 import { SUBSCRIPTIONS } from "../../__shared_context/connections.test-support";
 import { RUN_EVENTS } from "../../__shared_context/run-events.test-support";
@@ -13,9 +14,11 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <PageBody>
-        <Story />
-      </PageBody>
+      <TooltipProvider delayDuration={300}>
+        <PageBody>
+          <Story />
+        </PageBody>
+      </TooltipProvider>
     ),
   ],
   args: { subscriptions: SUBSCRIPTIONS, runEvents: RUN_EVENTS },

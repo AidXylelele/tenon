@@ -65,14 +65,14 @@ const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
   },
   {
     rule: "color-contrast",
-    stories: ["libs-codemirror--workflow"],
+    stories: ["libs-codemirror--workflow", "spaces-workflows-version--code"],
     target: 'span[title="Fold line"]',
     reason:
       "CodeMirror's fold markers are glyphs, not text; the gutter's colours meet 3:1 in the token table.",
   },
   {
     rule: "aria-hidden-focus",
-    stories: MODAL_STORIES,
+    stories: MODAL_STORIES.concat(PAGE_MODAL_STORIES),
     target: "data-radix-focus-guard",
     reason:
       "Radix's focus guards are hidden spans that send focus back into the open modal, which traps it.",
@@ -80,16 +80,9 @@ const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
   {
     rule: "aria-hidden-focus",
     stories: PAGE_MODAL_STORIES,
-    target: "",
+    target: "#storybook-root",
     reason:
       "A page story with its dialog open: Radix hides the page behind the modal and its focus trap keeps every hidden control out of the Tab order until the dialog closes.",
-  },
-  {
-    rule: "color-contrast",
-    stories: ["spaces-workflows-version--code"],
-    target: 'span[title="Fold line"]',
-    reason:
-      "CodeMirror's fold markers are glyphs, not text; the gutter's colours meet 3:1 in the token table.",
   },
 ];
 

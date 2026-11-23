@@ -14,11 +14,11 @@ import {
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
 import { PageHeader } from "@/libs/ui/composites/page-header";
-import { Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { SourceView } from "@/features/code-editor";
 import { WorkflowFlow } from "@/features/workflow-flow";
 import { StartDialog } from "../../__shared_context/start-dialog";
-import { type SourceFile, VersionMenu } from "./version-menu";
+import { type VersionSource, VersionMenu } from "./version-menu";
 import { ViewChoice, type VersionView } from "./view-choice";
 
 export interface VersionPageProps {
@@ -26,7 +26,8 @@ export interface VersionPageProps {
   readonly version: string;
   readonly versions: readonly Version[];
   readonly structure: VersionStructure | null;
-  readonly file: SourceFile;
+  readonly file: VersionSource;
+  readonly download: string;
   readonly view: VersionView;
   readonly hrefs: Readonly<Record<VersionView, string>>;
   readonly author: boolean;
@@ -43,6 +44,7 @@ export function VersionPage({
   versions,
   structure,
   file,
+  download,
   view,
   hrefs,
   author,
@@ -76,7 +78,7 @@ export function VersionPage({
             {facts !== undefined && (
               <span>
                 Published by {facts.publishedBy.name}{" "}
-                <Time value={facts.publishedAt} /> ·
+                <AbsoluteTime value={facts.publishedAt} /> ·
               </span>
             )}
             <span className="font-mono">
@@ -112,12 +114,12 @@ export function VersionPage({
                 label="Run this version"
               />
             )}
-            <VersionMenu file={file} />
+            <VersionMenu file={file} download={download} />
           </>
         }
       />
       {flowShown ? (
-        <div className="h-[calc(100dvh-14rem)] min-h-96 overflow-hidden rounded-lg border bg-canvas">
+        <div className="overflow-hidden rounded-lg border bg-canvas">
           <WorkflowFlow workflow={structure} mode={READ} />
         </div>
       ) : (

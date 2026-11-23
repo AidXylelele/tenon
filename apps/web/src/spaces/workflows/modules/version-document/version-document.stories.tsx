@@ -47,9 +47,8 @@ const meta = {
     file: {
       text: YAML,
       kind: "YAML",
-      href: "data:application/yaml,",
-      name: "order-router-1.2.0.yaml",
     },
+    download: `${PAGE}/source`,
     view: "flow",
     hrefs: { flow: PAGE, code: `${PAGE}?view=code` },
     author: true,

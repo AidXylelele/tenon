@@ -12,11 +12,6 @@ import {
 } from "../../__shared_context/workflows.test-support";
 import { WorkflowPage } from "./workflow-page";
 
-const YAML = {
-  href: "data:application/yaml;charset=utf-8,document%3A%20%7B%7D",
-  name: "order-router-1.2.0.yaml",
-};
-
 const meta = {
   title: "Spaces/Workflows/Workflow",
   component: WorkflowPage,
@@ -42,10 +37,8 @@ const meta = {
     versions: ROUTER_VERSIONS,
     runs: ROUTER_RUNS,
     structure: ROUTER_STRUCTURE,
-    yaml: YAML,
     author: true,
     operator: true,
-    starting: false,
   },
 } satisfies Meta<typeof WorkflowPage>;
 
@@ -73,7 +66,6 @@ export const NeverPublished: Story = {
     versions: [],
     runs: NO_RUNS,
     structure: null,
-    yaml: null,
   },
 };
 
@@ -86,5 +78,14 @@ export const ForAViewer: Story = {
 };
 
 export const RunDialog: Story = {
-  args: { starting: true },
+  args: { tab: "versions" },
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: {
+        pathname: "/workflows/sales/order-router",
+        query: { start: "1" },
+      },
+    },
+  },
 };

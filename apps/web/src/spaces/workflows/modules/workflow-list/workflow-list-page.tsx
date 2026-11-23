@@ -1,4 +1,5 @@
 import { ArchiveIcon, PlusIcon, SearchIcon, WorkflowIcon } from "lucide-react";
+import { Fragment } from "react";
 import type { Workflow, WorkflowStatus } from "@/libs/data-access/types";
 import { Link } from "@/libs/routing/link";
 import {
@@ -26,9 +27,13 @@ import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { RouteTabs } from "@/libs/ui/composites/route-tabs";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { PhaseStatus } from "@/features/run-status";
-import { workflowStartOf } from "../../__shared_context/workflow-start";
+import {
+  type WorkflowStart,
+  workflowStartOf,
+} from "../../__shared_context/workflow-start";
+import { TemplateGallery } from "./template-gallery";
 
 export interface WorkflowListPageProps {
   readonly status: WorkflowStatus;
@@ -54,7 +59,7 @@ export function WorkflowListPage({
 }: WorkflowListPageProps) {
   const none = workflows.length === 0;
   const first = none && status === "active" && q === undefined;
-  const creates = author && !first;
+  const creates = author;
   const archivedHref = workflowsHref({ status: "archived" });
   const tabs = [
     { href: WORKFLOWS_HREF, label: "Active", current: status === "active" },
@@ -91,8 +96,8 @@ export function WorkflowListPage({
                   type="search"
                   name="q"
                   defaultValue={q}
-                  placeholder="Find by namespace or name"
-                  aria-label="Find a workflow by namespace or name"
+                  placeholder="Find by title or name"
+                  aria-label="Find a workflow by title or name"
                 />
               </InputGroup>
             </form>
@@ -132,25 +137,24 @@ function NewWorkflow() {
 }
 
 function FirstWorkflow({ author }: { readonly author: boolean }) {
-  const action = author ? (
-    <Button size="lg" asChild>
-      <Link href={NEW_WORKFLOW_HREF}>
-        <PlusIcon data-icon="inline-start" />
-        Create your first workflow
-      </Link>
-    </Button>
-  ) : undefined;
   const description = author
-    ? FIRST_WORKFLOW
+    ? `${FIRST_WORKFLOW} Start from a template and fill in a few fields.`
     : `${FIRST_WORKFLOW} They show here once an editor publishes one.`;
 
   return (
-    <EmptyState
-      icon={<WorkflowIcon />}
-      title="Build your first workflow"
-      description={description}
-      action={action}
-    />
+    <section
+      aria-labelledby="first-workflow"
+      className="flex flex-col gap-6 rounded-lg border bg-card p-6"
+    >
+      <div className="mx-auto flex max-w-xl flex-col items-center gap-2 text-center">
+        <WorkflowIcon className="size-5 text-muted-foreground" aria-hidden />
+        <h2 id="first-workflow" className="text-body font-semibold">
+          Build your first workflow
+        </h2>
+        <p className="text-body text-muted-foreground">{description}</p>
+      </div>
+      {author && <TemplateGallery />}
+    </section>
   );
 }
 
@@ -240,9 +244,12 @@ function WorkflowRow({ workflow }: { readonly workflow: Workflow }) {
         </span>
       </TableCell>
       <TableCell>
-        <span className="flex flex-wrap items-center gap-1.5">
-          <StartIcon className="size-4 text-muted-foreground" aria-hidden />
-          <span className="min-w-0">{start.words}</span>
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <StartIcon
+            className="size-4 shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <StartWords start={start} />
           {archived ? (
             <Badge variant="secondary">Archived</Badge>
           ) : (
@@ -260,7 +267,7 @@ function WorkflowRow({ workflow }: { readonly workflow: Workflow }) {
           <span className="flex flex-col">
             <PhaseStatus phase={lastRun.phase} />
             <span className="text-caption text-muted-foreground">
-              <Time value={lastRun.createdAt} />
+              <AbsoluteTime value={lastRun.createdAt} />
             </span>
           </span>
         )}
@@ -273,6 +280,25 @@ function WorkflowRow({ workflow }: { readonly workflow: Workflow }) {
         )}
       </TableCell>
     </TableRow>
+  );
+}
+
+function StartWords({ start }: { readonly start: WorkflowStart }) {
+  const event = start.event;
+
+  if (event === null) return <span className="min-w-0">{start.words}</span>;
+
+  const parts = start.words.split(event);
+
+  return (
+    <span className="min-w-0 wrap-anywhere">
+      {parts.map((part, index) => (
+        <Fragment key={part}>
+          {index > 0 && <span className="font-mono">{event}</span>}
+          {part}
+        </Fragment>
+      ))}
+    </span>
   );
 }
 

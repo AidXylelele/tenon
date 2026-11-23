@@ -5,7 +5,6 @@ import type {
   Read,
   SubscriptionDetail,
 } from "@/libs/data-access/types";
-import { RefreshControl } from "@/libs/live/refresh-control";
 import {
   Table,
   TableBody,
@@ -18,7 +17,7 @@ import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { type RunEvent, whenOf } from "../../__shared_context/notifications";
 import { NotificationMenu } from "./notification-menu";
 
@@ -40,8 +39,6 @@ export function NotificationPage({
   runEvents,
 }: NotificationPageProps) {
   const deliveries = subscription.deliveries;
-  const live = deliveries.some((delivery) => delivery.status === "pending");
-  const activity = live ? "in-flight" : "open";
   const when = whenOf(subscription.filter, runEvents);
   const type = subscription.filter.with["type"];
   const typeText = typeof type === "string" ? type : null;
@@ -57,7 +54,7 @@ export function NotificationPage({
         title={subscription.name}
         description={
           <>
-            Created <Time value={subscription.createdAt} />
+            Created <AbsoluteTime value={subscription.createdAt} />
           </>
         }
         actions={
@@ -90,15 +87,9 @@ export function NotificationPage({
         </dl>
       </section>
       <section aria-labelledby="deliveries" className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="deliveries" className="text-body font-semibold">
-            Recent deliveries
-          </h2>
-          <RefreshControl
-            activity={activity}
-            renderedAt={subscription.readAt}
-          />
-        </div>
+        <h2 id="deliveries" className="text-body font-semibold">
+          Recent deliveries
+        </h2>
         {deliveries.length === 0 ? (
           <EmptyState
             title="Nothing delivered yet"
@@ -164,7 +155,7 @@ function DeliveryRow({ delivery }: { readonly delivery: Delivery }) {
         {delivery.lastAttemptAt === null ? (
           <span className="text-muted-foreground">Not yet</span>
         ) : (
-          <Time value={delivery.lastAttemptAt} />
+          <AbsoluteTime value={delivery.lastAttemptAt} />
         )}
       </TableCell>
       <TableCell

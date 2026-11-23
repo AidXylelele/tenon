@@ -1,14 +1,11 @@
 import { webhooks } from "@/libs/data-access/automation";
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
-import type { Query } from "@/libs/routing/segment";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
 import { ViewerNotice } from "@/features/viewer-notice";
-import { WebhooksQuery } from "./query";
 import { WebhooksPage } from "./webhooks-page";
 
-export async function Webhooks({ query }: { readonly query: Query }) {
-  const address = WebhooksQuery.parse(query);
+export async function Webhooks() {
   const session = await available(currentSession());
 
   if (session === UNAVAILABLE) return <Unavailable />;
@@ -20,11 +17,5 @@ export async function Webhooks({ query }: { readonly query: Query }) {
 
   if (list === UNAVAILABLE) return <Unavailable />;
 
-  return (
-    <WebhooksPage
-      webhooks={list}
-      testing={address.test}
-      creating={address.new}
-    />
-  );
+  return <WebhooksPage webhooks={list} />;
 }

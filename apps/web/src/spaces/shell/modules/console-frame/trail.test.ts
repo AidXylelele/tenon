@@ -66,7 +66,7 @@ describe("the breadcrumb an address shows", () => {
     ],
     [
       "/settings/people",
-      [{ label: "Settings", href: "/settings" }, { label: "Invitations" }],
+      [{ label: "Settings", href: "/settings" }, { label: "People" }],
     ],
     [
       "/settings/platform",

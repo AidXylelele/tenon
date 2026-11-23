@@ -40,6 +40,7 @@ const nextConfig: NextConfig = {
     root: monorepoRoot,
     rules: {
       "*.wasm": { type: "asset" },
+      "*.yaml": { type: "raw" },
     },
   },
   poweredByHeader: false,

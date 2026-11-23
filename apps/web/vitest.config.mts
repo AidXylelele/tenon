@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { yamlText } from "./vite-yaml-text.mjs";
 
 const OPERATION_FLOOR = {
   lines: 75,
@@ -95,7 +96,7 @@ const floors = operationFloors.concat(
 const thresholds = Object.fromEntries(floors);
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), yamlText()],
   resolve: {
     tsconfigPaths: true,
   },

@@ -1,25 +1,7 @@
 "use client";
 
-import {
-  ArchiveIcon,
-  DownloadIcon,
-  EllipsisIcon,
-  PauseIcon,
-  PlayIcon,
-} from "lucide-react";
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
-import type { Problem } from "@/libs/data-access/problem";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/libs/ui/components/alert-dialog";
+import { ArchiveIcon, DownloadIcon, EllipsisIcon } from "lucide-react";
+import { useRef, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,66 +9,47 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/libs/ui/components/dropdown-menu";
-import { Spinner } from "@/libs/ui/components/spinner";
+import { ConfirmDialog } from "@/libs/ui/composites/confirm-dialog";
 import { IconButton } from "@/libs/ui/composites/icon-button";
-import { ProblemMessage } from "@/libs/ui/composites/problem-message";
-import type { YamlFile } from "../../__shared_context/yaml-file";
 import { archiveAction } from "./actions";
-import { useAutomaticStarts } from "./use-automatic-starts";
 
 interface WorkflowMenuProps {
   readonly namespace: string;
   readonly name: string;
-  readonly on: boolean;
-  readonly automatic: boolean;
-  readonly author: boolean;
-  readonly yaml: YamlFile | null;
+  readonly archives: boolean;
+  readonly download: string | null;
 }
 
 export function WorkflowMenu({
   namespace,
   name,
-  on,
-  automatic,
-  author,
-  yaml,
+  archives,
+  download,
 }: WorkflowMenuProps) {
-  const { shown, turn } = useAutomaticStarts(namespace, name, on);
   const [archiving, setArchiving] = useState(false);
-  const turns = author && automatic;
-  const TurnIcon = shown ? PauseIcon : PlayIcon;
-  const turnLabel = shown
-    ? "Turn off automatic starts"
-    : "Turn on automatic starts";
+  const trigger = useRef<HTMLButtonElement>(null);
+  const title = `Archive ${name}?`;
+  const archive = archiveAction.bind(null, namespace, name);
+  const archived = `${name} archived`;
 
   return (
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <IconButton label="More actions" icon={EllipsisIcon} />
+          <IconButton ref={trigger} label="More actions" icon={EllipsisIcon} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {turns && (
-            <DropdownMenuItem
-              onSelect={() => {
-                turn(!shown);
-              }}
-            >
-              <TurnIcon aria-hidden />
-              {turnLabel}
-            </DropdownMenuItem>
-          )}
-          {yaml !== null && (
+          {download !== null && (
             <DropdownMenuItem asChild>
-              <a href={yaml.href} download={yaml.name}>
+              <a href={download} download>
                 <DownloadIcon aria-hidden />
                 Download YAML
               </a>
             </DropdownMenuItem>
           )}
-          {author && (
+          {archives && (
             <>
-              <DropdownMenuSeparator />
+              {download !== null && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 variant="destructive"
                 onSelect={() => {
@@ -100,80 +63,17 @@ export function WorkflowMenu({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <ArchiveDialog
-        namespace={namespace}
-        name={name}
+      <ConfirmDialog
         open={archiving}
         onOpenChange={setArchiving}
+        title={title}
+        description="It starts no run and takes no version. Its versions and runs stay readable. Archiving cannot be undone."
+        actionLabel="Archive workflow"
+        icon={<ArchiveIcon data-icon="inline-start" />}
+        action={archive}
+        success={archived}
+        returnFocus={() => trigger.current}
       />
     </>
-  );
-}
-
-function ArchiveDialog({
-  namespace,
-  name,
-  open,
-  onOpenChange,
-}: {
-  readonly namespace: string;
-  readonly name: string;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-}) {
-  const [refusal, setRefusal] = useState<Problem | null>(null);
-  const [pending, start] = useTransition();
-  const title = `Archive ${name}?`;
-
-  function change(next: boolean) {
-    onOpenChange(next);
-
-    if (!next) setRefusal(null);
-  }
-
-  function archive(event: React.MouseEvent) {
-    event.preventDefault();
-    start(async () => {
-      const outcome = await archiveAction(namespace, name);
-
-      if (!outcome.ok) {
-        setRefusal(outcome.problem);
-        return;
-      }
-
-      onOpenChange(false);
-      toast.success(`${name} archived`);
-    });
-  }
-
-  return (
-    <AlertDialog open={open} onOpenChange={change}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>
-            It starts no run and takes no version. Its versions and runs stay
-            readable. Archiving cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <ProblemMessage problem={refusal} />
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Keep it</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={archive}
-            disabled={pending}
-            aria-busy={pending}
-          >
-            {pending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <ArchiveIcon data-icon="inline-start" />
-            )}
-            Archive workflow
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }

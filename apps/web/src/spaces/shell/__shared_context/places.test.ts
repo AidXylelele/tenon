@@ -99,7 +99,7 @@ describe("the places of the console", () => {
         "Secrets",
         "Settings",
         "Settings › Account",
-        "Settings › Invitations",
+        "Settings › People",
         "Settings › Platform",
       ],
     ],

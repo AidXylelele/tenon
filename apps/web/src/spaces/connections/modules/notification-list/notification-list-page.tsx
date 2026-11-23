@@ -14,7 +14,7 @@ import {
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { type RunEvent, whenOf } from "../../__shared_context/notifications";
 
 export interface NotificationListPageProps {
@@ -104,7 +104,7 @@ function NotificationRow({
         {subscription.endpoint.uri}
       </TableCell>
       <TableCell>
-        <Time value={subscription.createdAt} />
+        <AbsoluteTime value={subscription.createdAt} />
       </TableCell>
     </TableRow>
   );

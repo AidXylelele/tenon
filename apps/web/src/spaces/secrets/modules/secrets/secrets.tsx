@@ -1,14 +1,11 @@
 import { secrets } from "@/libs/data-access/automation";
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
-import type { Query } from "@/libs/routing/segment";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
 import { ViewerNotice } from "@/features/viewer-notice";
-import { SecretsQuery } from "./query";
 import { SecretsPage } from "./secrets-page";
 
-export async function Secrets({ query }: { readonly query: Query }) {
-  const creating = SecretsQuery.parse(query).new;
+export async function Secrets() {
   const session = await available(currentSession());
 
   if (session === UNAVAILABLE) return <Unavailable />;
@@ -22,5 +19,5 @@ export async function Secrets({ query }: { readonly query: Query }) {
 
   if (list === UNAVAILABLE) return <Unavailable />;
 
-  return <SecretsPage secrets={list} creating={creating} />;
+  return <SecretsPage secrets={list} />;
 }

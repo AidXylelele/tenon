@@ -30,14 +30,15 @@ import { Input } from "@/libs/ui/components/input";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { CopyButton } from "@/libs/ui/composites/copy-button";
 import { ProblemMessage } from "@/libs/ui/composites/problem-message";
+import { useAddressState } from "@/libs/routing/address-state";
+import { FLAG } from "@/libs/routing/flag";
 import { createWebhookAction } from "./actions";
 
-export function CreateWebhook({
-  defaultOpen = false,
-}: {
-  readonly defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
+const NEW = "new";
+
+export function CreateWebhook() {
+  const address = useAddressState();
+  const open = address.flagged(NEW);
   const [created, setCreated] = useState<CreatedWebhook | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -57,7 +58,8 @@ export function CreateWebhook({
   }
 
   function change(next: boolean) {
-    setOpen(next);
+    const flag = next ? FLAG : null;
+    address.change({ [NEW]: flag });
 
     if (next) return;
 
@@ -110,17 +112,17 @@ export function CreateWebhook({
               </Field>
               <Field>
                 <FieldLabel htmlFor="webhook-type">Event type</FieldLabel>
+                <FieldDescription>
+                  Workflows that start or wait on this type receive the calls.
+                </FieldDescription>
                 <Input
                   id="webhook-type"
                   name="eventType"
                   required
                   maxLength={255}
                   placeholder="com.example.form.submitted"
-                  className="font-mono text-xs"
+                  className="font-mono"
                 />
-                <FieldDescription>
-                  Workflows that start or wait on this type receive the calls.
-                </FieldDescription>
               </Field>
             </FieldGroup>
             <DialogFooter>

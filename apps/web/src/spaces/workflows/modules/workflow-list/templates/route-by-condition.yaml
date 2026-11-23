@@ -1,0 +1,21 @@
+document:
+  dsl: "1.1.0"
+  namespace: default
+  name: route-by-condition
+  version: "1.0.0"
+  title: Route by a condition
+do:
+  - choosePath:
+      switch:
+        - large:
+            when: ${ .amount > 100 }
+            then: markLarge
+        - otherwise:
+            then: markSmall
+  - markLarge:
+      set:
+        size: large
+      then: end
+  - markSmall:
+      set:
+        size: small

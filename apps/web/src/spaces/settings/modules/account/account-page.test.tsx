@@ -25,3 +25,17 @@ describe("the account page", () => {
     ).toBeVisible();
   });
 });
+
+describe("the account page's outline", () => {
+  it("its_sections_sit_under_the_page_heading", () => {
+    render(
+      <AccountPage
+        user={{ id: "u", email: "a@example.com", name: "Ada", role: "admin" }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Password" }),
+    ).toBeVisible();
+  });
+});

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import {
@@ -10,6 +16,7 @@ import {
   ROUTER_STRUCTURE,
   ROUTER_VERSIONS,
 } from "../../__shared_context/workflows.test-support";
+import { visit } from "@/libs/routing/navigation.test-support";
 import { WorkflowPage, type WorkflowPageProps } from "./workflow-page";
 
 const { turnAction, archiveAction, success } = vi.hoisted(() => ({
@@ -18,10 +25,10 @@ const { turnAction, archiveAction, success } = vi.hoisted(() => ({
   success: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({
-  usePathname: () => "/workflows/sales/order-router",
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-}));
+vi.mock("next/navigation", async () => {
+  const address = await import("@/libs/routing/navigation.test-support");
+  return { ...address, useRouter: () => ({ push: vi.fn() }) };
+});
 vi.mock("sonner", () => ({ toast: { success, error: vi.fn() } }));
 vi.mock("./actions", () => ({ turnAction, archiveAction }));
 vi.mock("../../__shared_context/start-dialog/actions", () => ({
@@ -37,10 +44,8 @@ const PAGE: WorkflowPageProps = {
   versions: ROUTER_VERSIONS,
   runs: ROUTER_RUNS,
   structure: ROUTER_STRUCTURE,
-  yaml: { href: "data:application/yaml,a", name: "order-router-1.2.0.yaml" },
   author: true,
   operator: true,
-  starting: false,
 };
 
 function show(props: Partial<WorkflowPageProps> = {}) {
@@ -58,6 +63,7 @@ function openMenu() {
 
 describe("a workflow's page", () => {
   beforeEach(() => {
+    visit("/workflows/sales/order-router");
     turnAction.mockReset();
     archiveAction.mockReset();
     success.mockReset();
@@ -103,7 +109,10 @@ describe("a workflow's page", () => {
     openMenu();
     expect(
       screen.getByRole("menuitem", { name: "Download YAML" }),
-    ).toBeVisible();
+    ).toHaveAttribute(
+      "href",
+      "/workflows/sales/order-router/versions/1.2.0/source",
+    );
     expect(screen.queryByRole("menuitem", { name: "Archive…" })).toBeNull();
   });
 
@@ -113,11 +122,10 @@ describe("a workflow's page", () => {
       versions: [],
       runs: NO_RUNS,
       structure: null,
-      yaml: null,
     });
 
     expect(screen.getByText("Nothing is published yet")).toBeVisible();
-    expect(screen.getByText(/not published yet/)).toBeVisible();
+    expect(screen.getByText(/Not published yet/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Run" })).toBeNull();
   });
 
@@ -170,7 +178,34 @@ describe("a workflow's page", () => {
     expect(why).toHaveTextContent("Only editors turn starts on and off.");
   });
 
-  it("archiving_asks_first_and_keeps_it_on_keep_it", async () => {
+  it("keep_it_gives_the_focus_back_to_more_actions", async () => {
+    show();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archive…" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Keep it" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "More actions" }),
+      ).toHaveFocus();
+    });
+    expect(archiveAction).not.toHaveBeenCalled();
+  });
+
+  it("the_versions_tab_runs_an_earlier_version_from_its_row", () => {
+    show({ tab: "versions" });
+
+    const row = screen.getByRole("link", { name: "1.1.0" }).closest("tr");
+    const run = within(row ?? document.body).getByRole("button", {
+      name: "Run this version",
+    });
+    fireEvent.click(run);
+
+    expect(window.location.search).toBe("?start=1&version=1.1.0");
+  });
+
+  it("archiving_asks_with_keep_it_focused_then_archives", async () => {
     archiveAction.mockResolvedValue({ ok: true, value: undefined });
     show();
 

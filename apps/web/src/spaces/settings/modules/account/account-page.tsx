@@ -15,9 +15,9 @@ export function AccountPage({ user }: { readonly user: User }) {
         description="Who you are signed in as, and your password."
       />
       <section aria-labelledby="your-account" className="border-t pt-4">
-        <h2 id="your-account" className="mb-3 text-body font-semibold">
+        <h3 id="your-account" className="mb-3 text-body font-semibold">
           Your account
-        </h2>
+        </h3>
         <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[8rem_minmax(0,1fr)]">
           <dt className="text-muted-foreground">Name</dt>
           <dd>{user.name}</dd>
@@ -30,9 +30,9 @@ export function AccountPage({ user }: { readonly user: User }) {
         </dl>
       </section>
       <section aria-labelledby="password" className="border-t pt-4">
-        <h2 id="password" className="mb-3 text-body font-semibold">
+        <h3 id="password" className="mb-3 text-body font-semibold">
           Password
-        </h2>
+        </h3>
         <PasswordForm />
       </section>
     </div>

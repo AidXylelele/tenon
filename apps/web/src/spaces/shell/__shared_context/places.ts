@@ -101,7 +101,7 @@ export const PLACES: readonly Place[] = [
 export const SETTINGS_PAGES: readonly Page[] = [
   { label: "Account", href: ACCOUNT_HREF, icon: UserIcon, access: null },
   {
-    label: "Invitations",
+    label: "People",
     href: PEOPLE_HREF,
     icon: MailIcon,
     access: "administrator",

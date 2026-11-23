@@ -20,7 +20,7 @@ const meta = {
       </TooltipProvider>
     ),
   ],
-  args: { secrets: SECRETS, creating: false },
+  args: { secrets: SECRETS },
 } satisfies Meta<typeof SecretsPage>;
 
 export default meta;
@@ -34,5 +34,10 @@ export const NoSecrets: Story = {
 };
 
 export const NewSecret: Story = {
-  args: { creating: true },
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: { pathname: "/secrets", query: { new: "1" } },
+    },
+  },
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCwIcon, SendIcon } from "lucide-react";
-import { useId, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { Problem } from "@/libs/data-access/problem";
 import type { CloudEvent } from "@/libs/data-access/types";
@@ -28,27 +28,28 @@ import { Spinner } from "@/libs/ui/components/spinner";
 import { Textarea } from "@/libs/ui/components/textarea";
 import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { ProblemMessage } from "@/libs/ui/composites/problem-message";
+import { useAddressState } from "@/libs/routing/address-state";
+import { FLAG } from "@/libs/routing/flag";
 import { sendEventAction } from "./actions";
+import { EventTypePicker } from "./event-type-picker";
 
 interface TestEventDialogProps {
   readonly eventTypes: readonly string[];
-  readonly defaultOpen?: boolean;
 }
 
 const EXAMPLE_TYPE = "com.example.order.paid";
 const EXAMPLE_DATA = '{\n  "orderId": 1,\n  "total": 42\n}';
+const TEST = "test";
 const NOT_JSON = "This is not JSON; check its quotes, commas and brackets.";
 
 function dataOf(text: string): JsonValue | undefined {
   return text.trim() === "" ? undefined : (JSON.parse(text) as JsonValue);
 }
 
-export function TestEventDialog({
-  eventTypes,
-  defaultOpen = false,
-}: TestEventDialogProps) {
+export function TestEventDialog({ eventTypes }: TestEventDialogProps) {
   const firstType = eventTypes.at(0) ?? EXAMPLE_TYPE;
-  const [open, setOpen] = useState(defaultOpen);
+  const address = useAddressState();
+  const open = address.flagged(TEST);
   const [id, setId] = useState(() => crypto.randomUUID());
   const [type, setType] = useState(firstType);
   const [source, setSource] = useState("/console");
@@ -57,8 +58,7 @@ export function TestEventDialog({
   const [dataError, setDataError] = useState<string | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [pending, start] = useTransition();
-  const typeField = useRef<HTMLInputElement>(null);
-  const known = useId();
+  const typeField = useRef<HTMLButtonElement>(null);
   const dataInvalid = dataError !== null;
 
   function send(event: React.SubmitEvent<HTMLFormElement>) {
@@ -105,6 +105,11 @@ export function TestEventDialog({
     });
   }
 
+  function setOpen(next: boolean) {
+    const flag = next ? FLAG : null;
+    address.change({ [TEST]: flag });
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -132,25 +137,16 @@ export function TestEventDialog({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="event-type">Event type</FieldLabel>
-              <Input
+              <FieldDescription>
+                Pick one of your webhooks&apos; types, or type another.
+              </FieldDescription>
+              <EventTypePicker
                 ref={typeField}
                 id="event-type"
-                list={known}
                 value={type}
-                onChange={(change) => {
-                  setType(change.target.value);
-                }}
-                required
-                className="font-mono"
+                known={eventTypes}
+                onChange={setType}
               />
-              <datalist id={known}>
-                {eventTypes.map((each) => (
-                  <option key={each} value={each} />
-                ))}
-              </datalist>
-              <FieldDescription>
-                Your webhooks&apos; types are offered as you type.
-              </FieldDescription>
             </Field>
             <Field data-invalid={dataInvalid}>
               <FieldLabel htmlFor="event-data">
@@ -159,6 +155,11 @@ export function TestEventDialog({
                   optional
                 </span>
               </FieldLabel>
+              {dataError === null && (
+                <FieldDescription>
+                  JSON; leave it empty for an event without data.
+                </FieldDescription>
+              )}
               <Textarea
                 id="event-data"
                 value={data}
@@ -171,13 +172,7 @@ export function TestEventDialog({
                 aria-invalid={dataInvalid}
                 className="font-mono"
               />
-              {dataError === null ? (
-                <FieldDescription>
-                  JSON; leave it empty for an event without data.
-                </FieldDescription>
-              ) : (
-                <FieldError>{dataError}</FieldError>
-              )}
+              {dataError !== null && <FieldError>{dataError}</FieldError>}
             </Field>
             <Disclosure title="More options" summary="Source, subject and id">
               <FieldGroup>
@@ -210,6 +205,10 @@ export function TestEventDialog({
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="event-id">Id</FieldLabel>
+                  <FieldDescription>
+                    The same source and id are one event: sending it again has
+                    no effect.
+                  </FieldDescription>
                   <div className="flex gap-2">
                     <Input
                       id="event-id"
@@ -229,10 +228,6 @@ export function TestEventDialog({
                       <RefreshCwIcon />
                     </Button>
                   </div>
-                  <FieldDescription>
-                    The same source and id are one event: sending it again has
-                    no effect.
-                  </FieldDescription>
                 </Field>
               </FieldGroup>
             </Disclosure>

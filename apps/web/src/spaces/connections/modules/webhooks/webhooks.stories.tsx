@@ -20,7 +20,7 @@ const meta = {
       </TooltipProvider>
     ),
   ],
-  args: { webhooks: WEBHOOKS, testing: false, creating: false },
+  args: { webhooks: WEBHOOKS },
 } satisfies Meta<typeof WebhooksPage>;
 
 export default meta;
@@ -34,9 +34,19 @@ export const NoWebhooks: Story = {
 };
 
 export const SendATestEvent: Story = {
-  args: { testing: true },
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: { pathname: "/webhooks", query: { test: "1" } },
+    },
+  },
 };
 
 export const NewWebhook: Story = {
-  args: { creating: true },
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: { pathname: "/webhooks", query: { new: "1" } },
+    },
+  },
 };

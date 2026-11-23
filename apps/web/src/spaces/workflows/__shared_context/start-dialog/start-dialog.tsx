@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/libs/ui/components/dialog";
 import {
   Field,
@@ -36,6 +35,8 @@ import {
 import { Spinner } from "@/libs/ui/components/spinner";
 import { Textarea } from "@/libs/ui/components/textarea";
 import { ProblemMessage } from "@/libs/ui/composites/problem-message";
+import { useAddressState } from "@/libs/routing/address-state";
+import { FLAG } from "@/libs/routing/flag";
 import { runHref } from "@/libs/routing/routes";
 import { startAction } from "./actions";
 import {
@@ -54,10 +55,43 @@ interface StartDialogProps {
   readonly inputSchema: InputSchema | null;
   readonly chosen?: string;
   readonly label?: string;
-  readonly defaultOpen?: boolean;
 }
 
 const LATEST = "latest";
+const START = "start";
+const VERSION = "version";
+
+function versionOf(addressed: string | null, current: string): string {
+  return addressed === null || addressed === current ? LATEST : addressed;
+}
+
+interface RunVersionButtonProps {
+  readonly version: string | null;
+  readonly label: string;
+  readonly variant?: "default" | "outline";
+}
+
+export function RunVersionButton({
+  version,
+  label,
+  variant = "outline",
+}: RunVersionButtonProps) {
+  const address = useAddressState();
+  const size = variant === "outline" ? "sm" : "default";
+
+  return (
+    <Button
+      variant={variant}
+      size={size}
+      onClick={() => {
+        address.change({ [START]: FLAG, [VERSION]: version });
+      }}
+    >
+      <PlayIcon data-icon="inline-start" />
+      {label}
+    </Button>
+  );
+}
 const NO_INPUT: JsonObject = {};
 
 export function StartDialog({
@@ -69,12 +103,14 @@ export function StartDialog({
   inputSchema,
   chosen = currentVersion,
   label = "Run",
-  defaultOpen = false,
 }: StartDialogProps) {
   const router = useRouter();
-  const first = chosen === currentVersion ? LATEST : chosen;
-  const [open, setOpen] = useState(defaultOpen);
-  const [version, setVersion] = useState(first);
+  const address = useAddressState();
+  const open = address.flagged(START);
+  const addressed = address.value(VERSION);
+  const [picked, setPicked] = useState<string | null>(null);
+  const version = picked ?? versionOf(addressed, currentVersion);
+  const opener = useRef<Element | null>(null);
   const [json, setJson] = useState("{}");
   const [formed, setFormed] = useState(NO_INPUT);
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -132,26 +168,40 @@ export function StartDialog({
     });
   }
 
+  function close() {
+    keys.current.clear();
+    setPicked(null);
+    address.change({ [START]: null, [VERSION]: null });
+  }
+
+  function giveFocusBack(event: Event) {
+    const element = opener.current;
+
+    if (!(element instanceof HTMLElement) || !element.isConnected) return;
+
+    event.preventDefault();
+    element.focus();
+  }
+
   return (
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        setOpen(next);
-
-        if (!next) keys.current.clear();
+        if (!next) close();
       }}
     >
-      <DialogTrigger asChild>
-        <Button>
-          <PlayIcon data-icon="inline-start" />
-          {label}
-        </Button>
-      </DialogTrigger>
+      <RunVersionButton
+        version={chosen === currentVersion ? null : chosen}
+        label={label}
+        variant="default"
+      />
       <DialogContent
         onOpenAutoFocus={(event) => {
           event.preventDefault();
+          opener.current = document.activeElement;
           versionField.current?.focus();
         }}
+        onCloseAutoFocus={giveFocusBack}
       >
         <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
@@ -165,7 +215,7 @@ export function StartDialog({
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="start-version">Version</FieldLabel>
-              <Select value={version} onValueChange={setVersion}>
+              <Select value={version} onValueChange={setPicked}>
                 <SelectTrigger
                   ref={versionField}
                   id="start-version"
@@ -199,6 +249,12 @@ export function StartDialog({
             ) : (
               <Field data-invalid={jsonError !== null}>
                 <FieldLabel htmlFor="start-input">Input</FieldLabel>
+                {jsonError === null && (
+                  <FieldDescription>
+                    Any JSON value, for example{" "}
+                    {'{ "email": "ada@example.com" }'}.
+                  </FieldDescription>
+                )}
                 <Textarea
                   id="start-input"
                   value={json}
@@ -211,25 +267,12 @@ export function StartDialog({
                   className="font-mono text-xs"
                   aria-invalid={jsonError !== null}
                 />
-                {jsonError === null ? (
-                  <FieldDescription>
-                    Any JSON value, for example{" "}
-                    {'{ "email": "ada@example.com" }'}.
-                  </FieldDescription>
-                ) : (
-                  <FieldError>{jsonError}</FieldError>
-                )}
+                {jsonError !== null && <FieldError>{jsonError}</FieldError>}
               </Field>
             )}
           </FieldGroup>
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setOpen(false);
-              }}
-            >
+            <Button type="button" variant="outline" onClick={close}>
               Cancel
             </Button>
             <Button type="submit" disabled={pending}>

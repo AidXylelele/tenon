@@ -1,13 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { StartDialog } from "./start-dialog";
+import { visit } from "@/libs/routing/navigation.test-support";
+import { RunVersionButton, StartDialog } from "./start-dialog";
 
 const { push, startAction } = vi.hoisted(() => ({
   push: vi.fn(),
   startAction: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/navigation", async () => {
+  const address = await import("@/libs/routing/navigation.test-support");
+  return { ...address, useRouter: () => ({ push }) };
+});
 vi.mock("./actions", () => ({ startAction }));
 
 const unreachable = {
@@ -23,6 +27,7 @@ const unreachable = {
 
 describe("starting a run", () => {
   beforeEach(() => {
+    visit("/workflows/sales/route-lead");
     push.mockClear();
     startAction.mockReset();
   });
@@ -201,6 +206,58 @@ describe("starting a run", () => {
 });
 
 describe("the run dialog's versions", () => {
+  beforeEach(() => {
+    visit("/workflows/sales/route-lead");
+    startAction.mockReset();
+  });
+
+  it("the_start_flag_in_the_address_opens_it_and_closing_takes_the_flag_away", () => {
+    visit("/workflows/sales/route-lead?start=1");
+    render(
+      <StartDialog
+        namespace="sales"
+        name="route-lead"
+        title="Route a lead"
+        versions={["1.0.0"]}
+        currentVersion="1.0.0"
+        inputSchema={null}
+      />,
+    );
+
+    expect(screen.getByRole("dialog")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(window.location.search).toBe("");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("a_row_button_opens_it_on_its_version_and_gets_the_focus_back", async () => {
+    render(
+      <>
+        <StartDialog
+          namespace="sales"
+          name="route-lead"
+          title="Route a lead"
+          versions={["1.1.0", "1.0.0"]}
+          currentVersion="1.1.0"
+          inputSchema={null}
+        />
+        <RunVersionButton version="1.0.0" label="Run 1.0.0" />
+      </>,
+    );
+
+    const row = screen.getByRole("button", { name: "Run 1.0.0" });
+    row.focus();
+    fireEvent.click(row);
+    const version = screen.getByRole("combobox", { name: "Version" });
+    expect(version).toHaveTextContent("1.0.0");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Run 1.0.0" })).toHaveFocus();
+    });
+  });
+
   it("the_current_version_is_named_and_chosen_and_takes_focus", () => {
     render(
       <StartDialog

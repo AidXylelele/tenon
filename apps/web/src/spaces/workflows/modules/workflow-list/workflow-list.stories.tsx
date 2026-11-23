@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { PageBody } from "@/libs/ui/composites/page-body";
 import { WORKFLOWS } from "../../__shared_context/workflows.test-support";
 import { WorkflowListPage } from "./workflow-list-page";
@@ -12,9 +13,11 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <PageBody>
-        <Story />
-      </PageBody>
+      <TooltipProvider delayDuration={300}>
+        <PageBody>
+          <Story />
+        </PageBody>
+      </TooltipProvider>
     ),
   ],
   args: {

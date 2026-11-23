@@ -13,21 +13,20 @@ import {
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { NewSecret } from "./new-secret";
-import { SecretMenu } from "./secret-menu";
+import { SECRET_TABLE, SecretMenu } from "./secret-menu";
 
 export interface SecretsPageProps {
   readonly secrets: readonly Secret[];
-  readonly creating: boolean;
 }
 
 const PURPOSE =
   "Passwords, tokens and keys your steps and notifications use. A value is never shown again after it is saved.";
 
-export function SecretsPage({ secrets, creating }: SecretsPageProps) {
+export function SecretsPage({ secrets }: SecretsPageProps) {
   const none = secrets.length === 0;
-  const create = <NewSecret defaultOpen={creating} />;
+  const create = <NewSecret />;
 
   return (
     <>
@@ -45,7 +44,12 @@ export function SecretsPage({ secrets, creating }: SecretsPageProps) {
         />
       ) : (
         <TableFrame>
-          <div role="region" aria-label="Secrets" tabIndex={0}>
+          <div
+            id={SECRET_TABLE}
+            role="region"
+            aria-label="Secrets"
+            tabIndex={0}
+          >
             <Table className="min-w-[36rem]">
               <TableHeader>
                 <TableRow>
@@ -102,7 +106,7 @@ function SecretRow({ secret }: { readonly secret: Secret }) {
         )}
       </TableCell>
       <TableCell>
-        <Time value={secret.updatedAt} />
+        <AbsoluteTime value={secret.updatedAt} />
       </TableCell>
       <TableCell>
         <SecretMenu name={secret.name} warning={warning} />

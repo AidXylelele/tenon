@@ -7,9 +7,11 @@ describe("the platform page", () => {
   it("says_what_steps_can_do_in_sentences_and_the_limits", () => {
     render(<PlatformPage profile={PROFILE} />);
 
-    expect(screen.getByText("Scripts are written in")).toBeVisible();
-    expect(screen.getByText("python")).toBeVisible();
-    expect(screen.getByText("Nothing here")).toBeVisible();
+    expect(
+      screen.getByText("Scripts are written in these languages."),
+    ).toBeVisible();
+    expect(screen.getByText("js · python")).toHaveClass("font-mono");
+    expect(screen.queryByText("Calls get OAuth2 tokens.")).toBeNull();
     expect(screen.getByText(/at most 5\.0/)).toBeVisible();
   });
 

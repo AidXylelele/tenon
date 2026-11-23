@@ -2,17 +2,16 @@ import { ArchiveIcon, PencilIcon, WorkflowIcon } from "lucide-react";
 import type {
   InstanceSummary,
   Page,
-  Read,
   Version,
   VersionStructure,
   Workflow,
 } from "@/libs/data-access/types";
-import { RefreshControl } from "@/libs/live/refresh-control";
 import { Link } from "@/libs/routing/link";
 import {
   editorHref,
   runsHref,
   versionHref,
+  versionSourceHref,
   workflowHref,
 } from "@/libs/routing/routes";
 import {
@@ -30,20 +29,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/libs/ui/components/table";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { RouteTabs } from "@/libs/ui/composites/route-tabs";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Time } from "@/libs/ui/composites/time";
-import { isUnended } from "@/operations/run-progress";
 import { PhaseStatus } from "@/features/run-status";
 import { RunTable } from "@/features/run-table";
 import { ViewerLine } from "@/features/viewer-notice";
 import { WorkflowFlow } from "@/features/workflow-flow";
-import { StartDialog } from "../../__shared_context/start-dialog";
-import { workflowStartOf } from "../../__shared_context/workflow-start";
+import {
+  RunVersionButton,
+  StartDialog,
+} from "../../__shared_context/start-dialog";
+import {
+  startWordsOf,
+  workflowStartOf,
+} from "../../__shared_context/workflow-start";
 import { AutomaticStarts } from "./automatic-starts";
-import type { YamlFile } from "../../__shared_context/yaml-file";
 import { WorkflowMenu } from "./workflow-menu";
 
 export type WorkflowTab = "overview" | "runs" | "versions";
@@ -52,12 +55,10 @@ export interface WorkflowPageProps {
   readonly workflow: Workflow;
   readonly tab: WorkflowTab;
   readonly versions: readonly Version[];
-  readonly runs: Read<Page<InstanceSummary>>;
+  readonly runs: Page<InstanceSummary>;
   readonly structure: VersionStructure | null;
-  readonly yaml: YamlFile | null;
   readonly author: boolean;
   readonly operator: boolean;
-  readonly starting: boolean;
 }
 
 const READ = { kind: "read" } as const;
@@ -68,10 +69,8 @@ export function WorkflowPage({
   versions,
   runs,
   structure,
-  yaml,
   author,
   operator,
-  starting,
 }: WorkflowPageProps) {
   const namespace = workflow.namespace;
   const name = workflow.name;
@@ -79,29 +78,25 @@ export function WorkflowPage({
   const archived = workflow.status === "archived";
   const edits = author && !archived;
   const runsIt = operator && !archived && current !== null;
-  const start = workflowStartOf(workflow.schedule);
+  const automatic = workflowStartOf(workflow.schedule).automatic;
+  const startWords =
+    structure === null ? "Not published yet" : startWordsOf(structure.triggers);
   const title = structure?.title ?? name;
   const published = versions.find((version) => version.current);
   const versionNames = versions.map((version) => version.version);
   const versionCount = String(versions.length);
   const inputSchema = structure?.input.schema ?? null;
+  const viewer = !author && !operator;
   const overview = workflowHref(namespace, name);
   const runsTab = workflowHref(namespace, name, { tab: "runs" });
   const versionsTab = workflowHref(namespace, name, { tab: "versions" });
   const editor = editorHref(namespace, name);
   const allRuns = runsHref({ namespace, name });
-  const viewer = !author && !operator;
+  const download =
+    current === null ? null : versionSourceHref(namespace, name, current);
   const tabs = [
-    {
-      href: overview,
-      label: "Overview",
-      current: tab === "overview",
-    },
-    {
-      href: runsTab,
-      label: "Runs",
-      current: tab === "runs",
-    },
+    { href: overview, label: "Overview", current: tab === "overview" },
+    { href: runsTab, label: "Runs", current: tab === "runs" },
     {
       href: versionsTab,
       label: (
@@ -125,19 +120,14 @@ export function WorkflowPage({
             <span className="font-mono">
               {namespace}/{name}
             </span>
-            <span>· {start.words}</span>
-            <span>
-              ·{" "}
-              {published === undefined ? (
-                "not published yet"
-              ) : (
-                <>
-                  version {published.version}, published by{" "}
-                  {published.publishedBy.name}{" "}
-                  <Time value={published.publishedAt} />
-                </>
-              )}
-            </span>
+            <span>· {startWords}</span>
+            {published !== undefined && (
+              <span>
+                · version {published.version}, published by{" "}
+                {published.publishedBy.name}{" "}
+                <AbsoluteTime value={published.publishedAt} />
+              </span>
+            )}
           </span>
         }
         actions={
@@ -159,17 +149,14 @@ export function WorkflowPage({
                 versions={versionNames}
                 currentVersion={current}
                 inputSchema={inputSchema}
-                defaultOpen={starting}
               />
             )}
-            {(edits || yaml !== null) && (
+            {(edits || download !== null) && (
               <WorkflowMenu
                 namespace={namespace}
                 name={name}
-                on={workflow.on}
-                automatic={start.automatic}
-                author={edits}
-                yaml={yaml}
+                archives={edits}
+                download={download}
               />
             )}
           </>
@@ -185,7 +172,7 @@ export function WorkflowPage({
           </AlertDescription>
         </Alert>
       ) : (
-        start.automatic && (
+        automatic && (
           <AutomaticStarts
             namespace={namespace}
             name={name}
@@ -211,7 +198,7 @@ export function WorkflowPage({
           moreLabel="Find runs of this workflow"
         />
       )}
-      {tab === "versions" && <Versions versions={versions} />}
+      {tab === "versions" && <Versions versions={versions} runs={runsIt} />}
     </>
   );
 }
@@ -223,7 +210,7 @@ function Overview({
   edits,
 }: {
   readonly workflow: Workflow;
-  readonly runs: Read<Page<InstanceSummary>>;
+  readonly runs: Page<InstanceSummary>;
   readonly structure: VersionStructure | null;
   readonly edits: boolean;
 }) {
@@ -256,7 +243,7 @@ function Overview({
   const opensVersion = `Open version ${current}`;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
       <Runs
         runs={runs}
         title="Recent runs"
@@ -272,7 +259,7 @@ function Overview({
             <Link href={version}>{opensVersion}</Link>
           </Button>
         </div>
-        <div className="h-[28rem] overflow-hidden rounded-lg border bg-canvas">
+        <div className="overflow-hidden rounded-lg border bg-canvas">
           <WorkflowFlow workflow={structure} mode={READ} />
         </div>
       </section>
@@ -286,26 +273,20 @@ function Runs({
   more,
   moreLabel,
 }: {
-  readonly runs: Read<Page<InstanceSummary>>;
+  readonly runs: Page<InstanceSummary>;
   readonly title: string;
   readonly more: string;
   readonly moreLabel: string;
 }) {
-  const live = runs.items.some((instance) => isUnended(instance.phase));
-  const activity = live ? "in-flight" : "open";
-
   return (
     <section aria-labelledby="workflow-runs" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="workflow-runs" className="text-body font-semibold">
           {title}
         </h2>
-        <div className="flex items-center gap-3">
-          <RefreshControl activity={activity} renderedAt={runs.readAt} />
-          <Button variant="link" size="sm" asChild>
-            <Link href={more}>{moreLabel}</Link>
-          </Button>
-        </div>
+        <Button variant="link" size="sm" asChild>
+          <Link href={more}>{moreLabel}</Link>
+        </Button>
       </div>
       <RunTable
         runs={runs.items}
@@ -322,7 +303,13 @@ function Runs({
   );
 }
 
-function Versions({ versions }: { readonly versions: readonly Version[] }) {
+function Versions({
+  versions,
+  runs,
+}: {
+  readonly versions: readonly Version[];
+  readonly runs: boolean;
+}) {
   if (versions.length === 0)
     return (
       <EmptyState
@@ -340,11 +327,16 @@ function Versions({ versions }: { readonly versions: readonly Version[] }) {
               <TableHead>Version</TableHead>
               <TableHead>Published</TableHead>
               <TableHead>By</TableHead>
+              {runs && (
+                <TableHead className="w-0">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {versions.map((version) => (
-              <VersionRow key={version.version} version={version} />
+              <VersionRow key={version.version} version={version} runs={runs} />
             ))}
           </TableBody>
         </Table>
@@ -353,8 +345,15 @@ function Versions({ versions }: { readonly versions: readonly Version[] }) {
   );
 }
 
-function VersionRow({ version }: { readonly version: Version }) {
+function VersionRow({
+  version,
+  runs,
+}: {
+  readonly version: Version;
+  readonly runs: boolean;
+}) {
   const href = versionHref(version.namespace, version.name, version.version);
+  const chosen = version.current ? null : version.version;
 
   return (
     <TableRow className="relative">
@@ -370,9 +369,14 @@ function VersionRow({ version }: { readonly version: Version }) {
         </span>
       </TableCell>
       <TableCell>
-        <Time value={version.publishedAt} />
+        <AbsoluteTime value={version.publishedAt} />
       </TableCell>
       <TableCell>{version.publishedBy.name}</TableCell>
+      {runs && (
+        <TableCell className="relative z-10 text-right">
+          <RunVersionButton version={chosen} label="Run this version" />
+        </TableCell>
+      )}
     </TableRow>
   );
 }

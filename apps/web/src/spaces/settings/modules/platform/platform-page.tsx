@@ -1,11 +1,10 @@
 import type { HostProfile } from "@/libs/data-access/types";
-import { Badge } from "@/libs/ui/components/badge";
 import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 
 interface Capability {
-  readonly label: string;
-  readonly values: readonly string[];
+  readonly sentence: string;
+  readonly terms: readonly string[];
 }
 
 const MEBIBYTE = 1_048_576;
@@ -15,15 +14,30 @@ export function PlatformPage({ profile }: { readonly profile: HostProfile }) {
   const limits = profile.limits;
   const mebibytes = (limits.responseBytes / MEBIBYTE).toFixed(1);
   const capabilities: readonly Capability[] = [
-    { label: "Steps call services over", values: profile.effects },
-    { label: "Messages go over", values: profile.asyncApiProtocols },
-    { label: "MCP servers are reached by", values: profile.mcpTransports },
-    { label: "Calls sign in with", values: profile.authentications },
-    { label: "OAuth2 grants", values: profile.grants },
-    { label: "Steps run", values: profile.processes },
-    { label: "Scripts are written in", values: profile.scriptLanguages },
-    { label: "Workflows start by themselves", values: profile.schedules },
+    { sentence: "Steps call services.", terms: profile.effects },
+    {
+      sentence: "Steps send and read messages.",
+      terms: profile.asyncApiProtocols,
+    },
+    {
+      sentence: "Steps use the tools of MCP servers.",
+      terms: profile.mcpTransports,
+    },
+    {
+      sentence: "Calls sign in to the services they call.",
+      terms: profile.authentications,
+    },
+    { sentence: "Calls get OAuth2 tokens.", terms: profile.grants },
+    { sentence: "Steps run code and commands.", terms: profile.processes },
+    {
+      sentence: "Scripts are written in these languages.",
+      terms: profile.scriptLanguages,
+    },
+    { sentence: "Workflows start by themselves.", terms: profile.schedules },
   ];
+  const offered = capabilities.filter(
+    (capability) => capability.terms.length > 0,
+  );
   const commandCount = `${String(shell.commands.length)} commands`;
 
   return (
@@ -34,32 +48,27 @@ export function PlatformPage({ profile }: { readonly profile: HostProfile }) {
         description="What your steps can do on this Tenon."
       />
       <section aria-labelledby="what-steps-can-do" className="border-t pt-4">
-        <h2 id="what-steps-can-do" className="mb-3 text-body font-semibold">
+        <h3 id="what-steps-can-do" className="mb-3 text-body font-semibold">
           What steps can do
-        </h2>
-        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[14rem_minmax(0,1fr)]">
-          {capabilities.map((capability) => (
-            <div key={capability.label} className="contents">
-              <dt className="text-muted-foreground">{capability.label}</dt>
-              <dd className="flex flex-wrap gap-1">
-                {capability.values.length === 0 ? (
-                  <span className="text-muted-foreground">Nothing here</span>
-                ) : (
-                  capability.values.map((value) => (
-                    <Badge key={value} variant="secondary">
-                      {value}
-                    </Badge>
-                  ))
-                )}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        </h3>
+        <ul className="flex flex-col gap-3">
+          {offered.map((capability) => {
+            const terms = capability.terms.join(" · ");
+            return (
+              <li key={capability.sentence}>
+                {capability.sentence}
+                <span className="block font-mono text-caption text-muted-foreground">
+                  {terms}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </section>
       <section aria-labelledby="limits" className="border-t pt-4">
-        <h2 id="limits" className="mb-3 text-body font-semibold">
+        <h3 id="limits" className="mb-3 text-body font-semibold">
           Limits
-        </h2>
+        </h3>
         <p className="max-w-prose">
           A call has {limits.callSeconds} s to answer and a script or command{" "}
           {limits.processSeconds} s to finish; an answer is at most {mebibytes}{" "}
@@ -67,26 +76,19 @@ export function PlatformPage({ profile }: { readonly profile: HostProfile }) {
         </p>
       </section>
       <section aria-labelledby="shell" className="border-t pt-4">
-        <h2 id="shell" className="mb-3 text-body font-semibold">
+        <h3 id="shell" className="mb-3 text-body font-semibold">
           Shell
-        </h2>
+        </h3>
         <p className="mb-3">
-          Commands run in {shell.shell} on {shell.platform}.
+          Commands run in <span className="font-mono">{shell.shell}</span> on{" "}
+          <span className="font-mono">{shell.platform}</span>.
         </p>
         <Disclosure title="Show the shell's commands" summary={commandCount}>
-          {shell.commands.length === 0 ? (
-            <p className="text-muted-foreground">None</p>
-          ) : (
-            <ul className="flex flex-wrap gap-1">
-              {shell.commands.map((command) => (
-                <li key={command}>
-                  <Badge variant="outline" className="font-mono">
-                    {command}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          )}
+          <ul className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-caption">
+            {shell.commands.map((command) => (
+              <li key={command}>{command}</li>
+            ))}
+          </ul>
         </Disclosure>
       </section>
     </div>

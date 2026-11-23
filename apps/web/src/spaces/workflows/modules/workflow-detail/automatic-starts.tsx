@@ -1,9 +1,10 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useOptimistic, useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { Switch } from "@/libs/ui/components/switch";
-import { useAutomaticStarts } from "./use-automatic-starts";
+import { turnAction } from "./actions";
 
 interface AutomaticStartsProps {
   readonly namespace: string;
@@ -18,14 +19,36 @@ export function AutomaticStarts({
   on,
   disabled,
 }: AutomaticStartsProps) {
-  const { shown, pending, refusal, turn } = useAutomaticStarts(
-    namespace,
-    name,
-    on,
-  );
+  const [shown, setShown] = useOptimistic(on);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [pending, start] = useTransition();
   const label = useId();
   const reason = useId();
   const state = shown ? "On" : "Off";
+
+  function turn(next: boolean) {
+    setRefusal(null);
+    start(async () => {
+      setShown(next);
+      const outcome = await turnAction(namespace, name, next);
+
+      if (!outcome.ok) {
+        setRefusal(outcome.problem.detail);
+        return;
+      }
+
+      const done = next
+        ? `Automatic starts turned on for ${name}`
+        : `Automatic starts turned off for ${name}`;
+      const undo = {
+        label: "Undo",
+        onClick: () => {
+          turn(!next);
+        },
+      };
+      toast.success(done, { duration: Infinity, action: undo });
+    });
+  }
 
   return (
     <div className="flex flex-col gap-1">

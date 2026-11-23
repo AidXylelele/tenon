@@ -243,16 +243,16 @@ describe("the search of the console", () => {
     expect(names).not.toContain("Invite someone");
   });
 
-  it("an_administrator_also_finds_the_invitations_and_inviting_someone", async () => {
+  it("an_administrator_also_finds_the_people_and_inviting_someone", async () => {
     searchable.mockResolvedValue([]);
     renderFor(ADMINISTRATOR);
     pressK("metaKey");
 
-    type("invit");
+    type("peop");
     await readSettled();
 
     const names = optionNames();
-    expect(names).toEqual(["Settings › Invitations", "Invite someone"]);
+    expect(names).toEqual(["Settings › People"]);
   });
 
   it("what_is_typed_narrows_the_pages_and_actions_and_says_how_many", async () => {

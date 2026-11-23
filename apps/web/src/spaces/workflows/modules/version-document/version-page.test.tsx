@@ -10,9 +10,10 @@ import { VersionPage, type VersionPageProps } from "./version-page";
 
 const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace }),
-}));
+vi.mock("next/navigation", async () => {
+  const address = await import("@/libs/routing/navigation.test-support");
+  return { ...address, useRouter: () => ({ push: vi.fn(), replace }) };
+});
 vi.mock("../../__shared_context/start-dialog/actions", () => ({
   startAction: vi.fn(),
 }));
@@ -32,7 +33,8 @@ const VERSION: VersionPageProps = {
   version: "1.2.0",
   versions: ROUTER_VERSIONS,
   structure: ROUTER_STRUCTURE,
-  file: { text: "do: []\n", kind: "YAML", href: "data:,", name: "a.yaml" },
+  file: { text: "do: []\n", kind: "YAML" },
+  download: `${PAGE}/source`,
   view: "flow",
   hrefs: { flow: PAGE, code: `${PAGE}?view=code` },
   author: true,
@@ -84,6 +86,19 @@ describe("a version's page", () => {
     expect(replace).toHaveBeenCalledWith(`${PAGE}?view=code`, {
       scroll: false,
     });
+  });
+
+  it("download_takes_the_source_address", () => {
+    show();
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "More actions" }),
+      { button: 0, ctrlKey: false },
+    );
+
+    expect(
+      screen.getByRole("menuitem", { name: "Download YAML" }),
+    ).toHaveAttribute("href", `${PAGE}/source`);
   });
 
   it("a_viewer_neither_edits_nor_runs", () => {
