@@ -262,6 +262,16 @@ test.each([
     "container",
   ],
   [
+    "a JavaScript script that prints JSON",
+    "count: { run: { script: { language: js, code: x }, }, output: { as: '${ fromjson }' } }",
+    "JavaScript · prints its result as JSON",
+  ],
+  [
+    "a Python script that prints text",
+    "count: { run: { script: { language: python, code: x } } }",
+    "Python · prints its result as text",
+  ],
+  [
     "a loop with no list yet",
     'loop: { for: { each: item, in: "" }, do: [] }',
     "item",
