@@ -270,7 +270,7 @@ async function awaitedOf(
   instanceId: string,
 ): Promise<readonly string[]> {
   const stored = await instances.find(instanceId);
-  const awaited = stored?.agenda.awaited ?? [];
+  const awaited = stored?.awaited ?? [];
   return awaited.map((effect) => effect.id);
 }
 
@@ -548,7 +548,7 @@ describe("a run this build of the interpreter cannot continue", () => {
     await fixture.respond.execute({ instanceId: instance.id, answer, signal });
     const stored = await fixture.instances.find(instance.id);
 
-    expect(stored?.agenda.awaited).toEqual([]);
+    expect(stored?.awaited).toEqual([]);
     expect(stored?.phase).toBe(Phase.Cancelled);
     expect(stored?.cancelReason).toBe(CancelReason.InterpreterChanged);
   });

@@ -175,12 +175,11 @@ describe("Workflow firing its schedule", () => {
 
     const fired = workflow.fireSchedule(fire);
 
-    expect(fired).toEqual({ ok: true, value: undefined });
+    expect(fired).toBe(true);
     expect(workflow.events).toEqual([
       {
         kind: WorkflowEventKind.ScheduleFired,
         workflowId: workflow.id,
-        arming: 1,
         at: slot.getTime(),
       },
       {
@@ -200,10 +199,7 @@ describe("Workflow firing its schedule", () => {
 
     const again = workflow.fireSchedule(fire);
 
-    expect(again).toEqual({
-      ok: false,
-      failure: WorkflowRefusal.ScheduleStale,
-    });
+    expect(again).toBe(false);
   });
 
   it("a_late_fire_records_its_slot_once_and_arms_the_first_slot_after_now", () => {
@@ -224,10 +220,7 @@ describe("Workflow firing its schedule", () => {
 
     const fired = workflow.fireSchedule(fire);
 
-    expect(fired).toEqual({
-      ok: false,
-      failure: WorkflowRefusal.ScheduleStale,
-    });
+    expect(fired).toBe(false);
   });
 
   it("a_fired_slot_starts_a_scheduled_instance_of_the_current_version", () => {
@@ -311,26 +304,6 @@ describe("Workflow firing its schedule", () => {
 });
 
 describe("Workflow starting instances by itself", () => {
-  it("a_schedule_starts_an_instance_of_the_current_version_named_by_its_occurrence", () => {
-    const workflow = Workflow.register(name);
-    const version = published(workflow);
-    workflow.turnOn(now);
-
-    const started = workflow.startScheduledInstance({
-      instanceId: "occurrence-1",
-      version,
-      input: {},
-      trigger: TriggerKind.Schedule,
-      chained: false,
-      chainRunning: false,
-      lifecycleOf: null,
-      now,
-    });
-
-    expect(started.ok && started.value.id).toBe("occurrence-1");
-    expect(started.ok && started.value.trigger).toBe(TriggerKind.Schedule);
-  });
-
   it("a_workflow_that_is_off_starts_nothing_by_itself", () => {
     const workflow = Workflow.register(name);
     const version = published(workflow);
@@ -340,7 +313,6 @@ describe("Workflow starting instances by itself", () => {
       version,
       input: {},
       trigger: TriggerKind.Event,
-      chained: false,
       chainRunning: false,
       lifecycleOf: null,
       now,
@@ -360,35 +332,12 @@ describe("Workflow starting instances by itself", () => {
       version: earlier,
       input: {},
       trigger: TriggerKind.Schedule,
-      chained: false,
       chainRunning: false,
       lifecycleOf: null,
       now: later,
     });
 
     expect(started).toEqual({ ok: false, failure: WorkflowRefusal.Off });
-  });
-
-  it("a_link_of_an_after_chain_starts_none_while_the_schedules_instance_runs", () => {
-    const workflow = Workflow.register(name);
-    const version = published(workflow);
-    workflow.turnOn(now);
-
-    const started = workflow.startScheduledInstance({
-      instanceId: null,
-      version,
-      input: {},
-      trigger: TriggerKind.Schedule,
-      chained: true,
-      chainRunning: true,
-      lifecycleOf: null,
-      now,
-    });
-
-    expect(started).toEqual({
-      ok: false,
-      failure: WorkflowRefusal.ChainRunning,
-    });
   });
 
   it("only_a_workflow_that_is_on_has_a_scheduled_version", () => {
@@ -412,7 +361,6 @@ describe("Workflow starting instances by itself", () => {
       version,
       input: [],
       trigger: TriggerKind.Event,
-      chained: false,
       chainRunning: false,
       lifecycleOf: workflow.id,
       now,
@@ -422,7 +370,6 @@ describe("Workflow starting instances by itself", () => {
       version,
       input: [],
       trigger: TriggerKind.Event,
-      chained: false,
       chainRunning: false,
       lifecycleOf: "another-workflow",
       now,

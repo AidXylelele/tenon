@@ -23,7 +23,7 @@ export class FireSchedule {
       now,
     });
 
-    if (!fired.ok) return;
+    if (!fired) return;
 
     await this.unitOfWork.run(async () => {
       await this.workflows.save(workflow);

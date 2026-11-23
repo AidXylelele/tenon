@@ -12,7 +12,6 @@ import { OfferEvent } from "../../application/automation/instances/offer-event.j
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
-import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
 import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { ConsumerSpan } from "./consumer-span.js";
 import { MessageTopic } from "./enums.js";
@@ -88,7 +87,7 @@ export class AutomationHandler {
     return this.#handled(context, () => this.startOnEvent.execute(command));
   }
 
-  @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "children" })
+  @OnOutboxMessage(MessageTopic.InstanceEnded, { consumer: "children" })
   ended(
     message: InstanceMessage,
     context: OutboxHandlerContext,
@@ -97,9 +96,7 @@ export class AutomationHandler {
     return this.#handled(context, () => this.cancelChildren.execute(command));
   }
 
-  @OnOutboxMessage(InstanceEventKind.ChildrenAbandoned, {
-    consumer: "children",
-  })
+  @OnOutboxMessage(MessageTopic.ChildrenAbandoned, { consumer: "children" })
   abandoned(
     message: InstanceMessage,
     context: OutboxHandlerContext,
@@ -119,7 +116,7 @@ export class AutomationHandler {
     });
   }
 
-  @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "schedules" })
+  @OnOutboxMessage(MessageTopic.InstanceEnded, { consumer: "schedules" })
   continued(
     message: InstanceMessage,
     context: OutboxHandlerContext,

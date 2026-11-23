@@ -2,7 +2,6 @@ import type { TransactionHost } from "@nestjs-cls/transactional";
 import type { NewOutboxMessage, Outbox } from "@nestjs/outbox";
 import {
   EffectKind,
-  InstanceEventKind,
   Phase,
   TaskValueKind,
   TriggerKind,
@@ -153,9 +152,32 @@ describe("the outbox messages of an instance's events", () => {
 
     expect(fixture.outbox.added).toEqual([
       {
-        topic: InstanceEventKind.Ended,
+        topic: MessageTopic.InstanceEnded,
         key: "parent-1",
         payload: { instanceId: "child-1", parentId: "parent-1" },
+      },
+    ]);
+  });
+
+  it("abandoned_children_are_a_command_under_the_instance_key", async () => {
+    const fixture = setUp();
+    const instance = anInstanceIn(Phase.Pending);
+    const begun = aTurn({ requested: [aCall("/do/0/child")] });
+    const abandoning = aTurn({
+      withdrawn: ["/do/0/child"],
+      abandoned: ["/do/0/child"],
+    });
+    instance.begin(begun, noSecrets, T0);
+    instance.clearEvents();
+    instance.advance(abandoning, noSecrets, T0);
+
+    await fixture.gateway.dispatch(instance);
+
+    expect(fixture.outbox.added).toEqual([
+      {
+        topic: MessageTopic.ChildrenAbandoned,
+        key: "instance-1",
+        payload: { instanceId: "instance-1" },
       },
     ]);
   });

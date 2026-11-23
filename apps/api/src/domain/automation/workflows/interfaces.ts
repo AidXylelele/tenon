@@ -106,7 +106,6 @@ export interface ScheduledStart {
   readonly version: WorkflowVersion;
   readonly input: JsonValue;
   readonly trigger: TriggerKind;
-  readonly chained: boolean;
   readonly chainRunning: boolean;
   readonly lifecycleOf: string | null;
   readonly now: Date;
@@ -122,7 +121,6 @@ export interface ScheduleArmed {
 export interface ScheduleFired {
   readonly kind: WorkflowEventKind.ScheduleFired;
   readonly workflowId: string;
-  readonly arming: number;
   readonly at: number;
 }
 

@@ -220,32 +220,27 @@ export class Workflow {
     return true;
   }
 
-  fireSchedule(fire: ScheduleFire): Result<void, WorkflowRefusal> {
-    if (fire.arming !== this.#arming)
-      return { ok: false, failure: WorkflowRefusal.ScheduleStale };
-
+  fireSchedule(fire: ScheduleFire): boolean {
     const schedule = this.#schedule();
 
-    if (schedule === null) return { ok: false, failure: WorkflowRefusal.Off };
+    if (fire.arming !== this.#arming || schedule === null) return false;
 
     this.#events.push({
       kind: WorkflowEventKind.ScheduleFired,
       workflowId: this.#id,
-      arming: fire.arming,
       at: fire.at,
     });
     const following = schedule.followingAt(fire.now);
     this.#armAt(following);
-    return { ok: true, value: undefined };
+    return true;
   }
 
   startFiredInstance(
     start: FiredStart,
   ): Result<WorkflowInstance, WorkflowRefusal> {
     const version = this.scheduledVersion;
-    const schedule = version?.schedule ?? null;
 
-    if (version === null || schedule === null)
+    if (version === null || version.schedule === null)
       return { ok: false, failure: WorkflowRefusal.Off };
 
     return this.startScheduledInstance({
@@ -253,7 +248,6 @@ export class Workflow {
       version,
       input: {},
       trigger: TriggerKind.Schedule,
-      chained: schedule.chained,
       chainRunning: start.chainRunning,
       lifecycleOf: null,
       now: start.now,
@@ -305,7 +299,9 @@ export class Workflow {
     if (scheduled?.id !== start.version.id)
       return { ok: false, failure: WorkflowRefusal.Off };
 
-    if (start.chained && start.chainRunning)
+    const chained = start.version.schedule?.chained ?? false;
+
+    if (chained && start.chainRunning)
       return { ok: false, failure: WorkflowRefusal.ChainRunning };
 
     if (start.lifecycleOf === this.#id)

@@ -322,7 +322,7 @@ export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository
   }
 
   findEndedChildren(parent: WorkflowInstance): Promise<WorkflowInstance[]> {
-    const awaited = parent.agenda.awaited.map((effect) => effect.id);
+    const awaited = parent.awaited.map((effect) => effect.id);
     const rows = [...this.rows.values()].filter(
       (row) =>
         row.originId === parent.id &&

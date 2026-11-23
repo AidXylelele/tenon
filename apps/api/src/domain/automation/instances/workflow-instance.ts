@@ -22,7 +22,6 @@ import type {
   LivePhase,
   PlayedTurn,
   Receiving,
-  RunAgenda,
   RunEnding,
   RunTurn,
   RunWait,
@@ -207,9 +206,10 @@ export class WorkflowInstance {
     );
   }
 
-  get agenda(): RunAgenda {
-    const awaited = this.ended ? [] : (this.#run?.awaited ?? []);
-    return { instanceId: this.#id, ended: this.ended, awaited };
+  get awaited(): readonly AwaitedEffect[] {
+    if (this.ended) return [];
+
+    return this.#run?.awaited ?? [];
   }
 
   get listening(): readonly Listening[] {
@@ -426,12 +426,12 @@ export class WorkflowInstance {
 
       if (!awaited) continue;
 
-      this.#askTheWorld(effect);
+      this.#requestEffect(effect);
       this.#setTimers(effect);
     }
   }
 
-  #askTheWorld(effect: AwaitedEffect): void {
+  #requestEffect(effect: AwaitedEffect): void {
     const outside = WorkflowInstance.#OUTSIDE.includes(effect.kind);
 
     if (!outside) return;
@@ -460,7 +460,6 @@ export class WorkflowInstance {
     this.#events.push({
       kind: InstanceEventKind.ChildrenAbandoned,
       instanceId: this.#id,
-      parentId: this.awaitedBy,
     });
   }
 

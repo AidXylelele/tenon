@@ -97,8 +97,12 @@ export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
       case InstanceEventKind.TimerSet:
         return this.#timerOf(event.instanceId, event.effectId, event.at);
       case InstanceEventKind.Ended:
+        return this.#endedOf(event.instanceId, event.parentId);
       case InstanceEventKind.ChildrenAbandoned:
-        return this.#endedOf(event.kind, event.instanceId, event.parentId);
+        return this.#commandOf(
+          MessageTopic.ChildrenAbandoned,
+          event.instanceId,
+        );
     }
   }
 
@@ -123,13 +127,9 @@ export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
     return { topic: MessageTopic.RunTimer, key, payload, availableAt: at };
   }
 
-  #endedOf(
-    topic: InstanceEventKind,
-    instanceId: string,
-    parentId: string | null,
-  ): NewOutboxMessage {
+  #endedOf(instanceId: string, parentId: string | null): NewOutboxMessage {
     const payload: InstanceEndedMessage = { instanceId, parentId };
     const key = parentId ?? instanceId;
-    return { topic, key, payload };
+    return { topic: MessageTopic.InstanceEnded, key, payload };
   }
 }

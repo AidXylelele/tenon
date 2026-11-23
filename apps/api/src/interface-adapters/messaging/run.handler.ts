@@ -9,7 +9,6 @@ import { AnswerReceives } from "../../application/automation/instances/answer-re
 import { BeginRun } from "../../application/automation/instances/begin-run.js";
 import { FailRun } from "../../application/automation/instances/fail-run.js";
 import { RespondToEffect } from "../../application/automation/instances/respond-to-effect.js";
-import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
 import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { ConsumerSpan } from "./consumer-span.js";
 import { MessageTopic } from "./enums.js";
@@ -74,7 +73,7 @@ export class RunHandler {
     );
   }
 
-  @OnOutboxMessage(InstanceEventKind.Ended, { consumer: "parents" })
+  @OnOutboxMessage(MessageTopic.InstanceEnded, { consumer: "parents" })
   async childEnded(
     message: InstanceEndedMessage,
     context: OutboxHandlerContext,

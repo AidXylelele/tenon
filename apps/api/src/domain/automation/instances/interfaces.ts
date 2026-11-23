@@ -62,7 +62,6 @@ export interface InstanceEnded {
 export interface ChildrenAbandoned {
   readonly kind: InstanceEventKind.ChildrenAbandoned;
   readonly instanceId: string;
-  readonly parentId: string | null;
 }
 
 export type InstanceEvent =
@@ -211,10 +210,4 @@ export interface RoutingMatch {
   readonly stream: string;
   readonly level: number;
   readonly filter: number;
-}
-
-export interface RunAgenda {
-  readonly instanceId: string;
-  readonly ended: boolean;
-  readonly awaited: readonly AwaitedEffect[];
 }

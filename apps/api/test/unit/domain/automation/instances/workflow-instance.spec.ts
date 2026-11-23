@@ -181,7 +181,7 @@ describe("a turn that answers an effect", () => {
     instance.advance(turn, noSecrets, later);
 
     expect(instance.awaits("/do/0/fetch")).toBe(false);
-    expect(instance.agenda.awaited.map((effect) => effect.id)).toEqual([
+    expect(instance.awaited.map((effect) => effect.id)).toEqual([
       "/do/1/pause",
     ]);
   });
@@ -201,11 +201,7 @@ describe("a turn that answers an effect", () => {
     expect(instance.phase).toBe(Phase.Completed);
     expect(instance.output).toEqual({ echoed: "Bearer ***" });
     expect(instance.endedAt).toEqual(later);
-    expect(instance.agenda).toEqual({
-      instanceId: instance.id,
-      ended: true,
-      awaited: [],
-    });
+    expect(instance.awaited).toEqual([]);
   });
 
   it("keeps_the_task_values_it_reports_with_their_secrets_masked", () => {
@@ -386,7 +382,7 @@ describe("a run the platform's interpreter no longer continues", () => {
 
     instance.advance(stranded, noSecrets, later);
 
-    expect(instance.agenda.awaited).toEqual([]);
+    expect(instance.awaited).toEqual([]);
     expect(instance.waits).toEqual([]);
     expect(instance.listening).toEqual([]);
   });

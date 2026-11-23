@@ -2,6 +2,8 @@ export enum MessageTopic {
   EventAccepted = "event.accepted",
   EventOffered = "event.offered",
   TriggerOffered = "trigger.offered",
+  InstanceEnded = "instance.ended",
+  ChildrenAbandoned = "instance.children-abandoned",
   CancelRequested = "instance.cancel-requested",
   RunBegin = "run.begin",
   RunRespond = "run.respond",

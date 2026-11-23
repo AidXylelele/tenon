@@ -80,7 +80,7 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
   async findEndedChildren(
     parent: WorkflowInstance,
   ): Promise<WorkflowInstance[]> {
-    const awaited = parent.agenda.awaited.map((effect) => effect.id);
+    const awaited = parent.awaited.map((effect) => effect.id);
 
     if (awaited.length === 0) return [];
 

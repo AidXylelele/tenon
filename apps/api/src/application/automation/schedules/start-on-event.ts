@@ -54,7 +54,6 @@ export class StartOnEvent {
       version,
       input: consumed,
       trigger: TriggerKind.Event,
-      chained: false,
       chainRunning: false,
       lifecycleOf: event.lifecycleOf,
       now,
