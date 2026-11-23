@@ -44,7 +44,7 @@ do:
   - Has items:
       switch:
         - has items:
-            when: \${ (.slideshow.slides | length) > 0 }
+            when: '\${ .slideshow.slides | . != null and . != "" and . != [] and . != {} }'
             then: continue
         - default:
             then: end

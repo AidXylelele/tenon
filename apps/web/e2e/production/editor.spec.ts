@@ -9,8 +9,9 @@ async function signedIn(page: Page, baseURL: string | undefined) {
 
 async function openStep(page: Page, name: string) {
   await page.goto("/workflows/sales/digest/edit");
-  const flow = page.getByRole("region", { name: "Flow" });
-  await flow.getByRole("button", { name }).first().click();
+  const flow = page.getByRole("region", { name: "The workflow's flow" });
+  const card = flow.getByRole("group", { name: new RegExp(name) });
+  await card.getByRole("button").first().click();
   await expect(page.getByRole("heading", { name, level: 2 })).toBeVisible();
 }
 

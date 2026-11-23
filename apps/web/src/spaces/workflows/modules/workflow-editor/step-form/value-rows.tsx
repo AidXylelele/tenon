@@ -73,7 +73,7 @@ export function ValueRows({ field, words, path }: ValueRowsProps) {
 
   return (
     <FieldSet className="gap-2" onBlur={problems.leave}>
-      <FieldLegend variant="label" className="mb-0">
+      <FieldLegend variant="label" className="mb-0 flex items-baseline gap-2">
         <FieldTitle field={field} words={words} path={path} />
       </FieldLegend>
       {words.help !== null && <FieldDescription>{words.help}</FieldDescription>}

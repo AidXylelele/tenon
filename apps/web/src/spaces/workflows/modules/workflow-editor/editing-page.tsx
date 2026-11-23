@@ -578,10 +578,7 @@ function EditingBody({
 
   const main = (
     <div className="relative flex size-full min-h-0 min-w-0 flex-col">
-      <section
-        aria-label="Flow"
-        className={cn("flex min-h-0 flex-1", shown !== "flow" && "hidden")}
-      >
+      <div className={cn("flex min-h-0 flex-1", shown !== "flow" && "hidden")}>
         {structure !== null && (
           <WorkflowFlow
             ref={flow}
@@ -591,9 +588,8 @@ function EditingBody({
             onSelect={onSelect}
           />
         )}
-      </section>
-      <section
-        aria-label="Code"
+      </div>
+      <div
         className={cn(
           "flex min-h-0 flex-1 flex-col",
           shown !== "code" && "hidden",
@@ -606,7 +602,7 @@ function EditingBody({
           onView={editing.onView}
           onUpdate={onUpdate}
         />
-      </section>
+      </div>
       {structure?.stale === true && (
         <p className="absolute top-2 right-2 rounded-lg border bg-warning-soft px-3 py-1 text-caption">
           The text does not read; the flow shows its last good state.

@@ -64,7 +64,7 @@ function FieldGroup({
 }) {
   return (
     <FieldSet className="gap-4">
-      <FieldLegend variant="label" className="mb-0">
+      <FieldLegend variant="label" className="mb-0 flex items-baseline gap-2">
         <FieldTitle field={field} words={words} path={path} />
       </FieldLegend>
       {words.help !== null && <FieldDescription>{words.help}</FieldDescription>}
