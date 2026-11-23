@@ -49,6 +49,7 @@ const MODAL_STORIES = [
   "spaces-workflows-workflow--run-dialog",
   "spaces-connections-webhooks--send-a-test-event",
   "spaces-connections-webhooks--new-webhook",
+  "spaces-secrets-secrets--new-secret",
 ];
 
 const REVIEWED_INCOMPLETE: readonly Reviewed[] = [

@@ -1,10 +1,8 @@
 "use client";
 
-import { KeyRoundIcon, PencilIcon, PlusIcon } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { Problem } from "@/libs/data-access/problem";
-import { field } from "@/libs/forms/form-state";
 import { Button } from "@/libs/ui/components/button";
 import {
   Dialog,
@@ -13,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/libs/ui/components/dialog";
 import {
   Field,
@@ -22,78 +19,112 @@ import {
   FieldLabel,
 } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
+import { Label } from "@/libs/ui/components/label";
+import { RadioGroup, RadioGroupItem } from "@/libs/ui/components/radio-group";
 import { Spinner } from "@/libs/ui/components/spinner";
-import { Textarea } from "@/libs/ui/components/textarea";
 import { ProblemMessage } from "@/libs/ui/composites/problem-message";
 import { createSecretAction, replaceSecretAction } from "./actions";
 
-const SHAPES = [
-  { label: "Basic", value: '{\n  "username": "",\n  "password": ""\n}' },
-  { label: "Bearer", value: '{\n  "token": ""\n}' },
+type Shape = "text" | "basic" | "bearer";
+
+const SHAPES: readonly { readonly value: Shape; readonly label: string }[] = [
+  { value: "text", label: "Text" },
+  { value: "basic", label: "A username and a password" },
+  { value: "bearer", label: "A bearer token" },
 ];
 
-export function SecretValueDialog({ name }: { readonly name?: string }) {
+interface SecretValueDialogProps {
+  readonly name?: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}
+
+function isShape(value: string): value is Shape {
+  return SHAPES.some((shape) => shape.value === value);
+}
+
+function valueOf(
+  shape: Shape,
+  text: string,
+  username: string,
+  password: string,
+): string {
+  if (shape === "basic") return JSON.stringify({ username, password });
+
+  if (shape === "bearer") return JSON.stringify({ token: text });
+
+  return text;
+}
+
+export function SecretValueDialog({
+  name,
+  open,
+  onOpenChange,
+}: SecretValueDialogProps) {
   const replacing = name !== undefined;
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
+  const [chosen, setChosen] = useState("");
+  const [shape, setShape] = useState<Shape>("text");
+  const [text, setText] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [problem, setProblem] = useState<Problem | null>(null);
   const [pending, start] = useTransition();
+  const first = useRef<HTMLInputElement>(null);
+  const basic = shape === "basic";
+  const empty = basic ? password === "" : text === "";
+  const title = replacing ? `Replace the value of ${name}` : "New secret";
+  const submitLabel = replacing ? "Replace value" : "Save secret";
+  const textLabel = shape === "bearer" ? "Token" : "Value";
 
   function change(next: boolean) {
-    setOpen(next);
-    setValue("");
+    onOpenChange(next);
+
+    if (next) return;
+
+    setChosen("");
+    setText("");
+    setUsername("");
+    setPassword("");
     setProblem(null);
   }
 
-  function submit(form: FormData) {
-    const chosen = replacing ? name : field(form, "name").trim();
+  function submit(event: React.SubmitEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const secretName = name ?? chosen.trim();
+    const value = valueOf(shape, text, username, password);
     setProblem(null);
     start(async () => {
       const outcome = replacing
-        ? await replaceSecretAction(chosen, value)
-        : await createSecretAction(chosen, value);
+        ? await replaceSecretAction(secretName, value)
+        : await createSecretAction(secretName, value);
 
       if (!outcome.ok) {
         setProblem(outcome.problem);
         return;
       }
 
-      toast.success(
-        replacing
-          ? `${chosen} replaced; the next runs use the new value`
-          : `${chosen} kept`,
-      );
+      const done = replacing
+        ? `${secretName} replaced; the next runs use the new value`
+        : `${secretName} saved`;
+      toast.success(done);
       change(false);
     });
   }
 
   return (
     <Dialog open={open} onOpenChange={change}>
-      <DialogTrigger asChild>
-        {replacing ? (
-          <Button variant="ghost" size="sm">
-            <PencilIcon data-icon="inline-start" />
-            Replace
-          </Button>
-        ) : (
-          <Button>
-            <PlusIcon data-icon="inline-start" />
-            New secret
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent>
-        <form action={submit} className="flex flex-col gap-4">
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          first.current?.focus();
+        }}
+      >
+        <form onSubmit={submit} className="flex flex-col gap-4">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <KeyRoundIcon className="size-4" />
-              {replacing ? `Replace ${name}` : "New secret"}
-            </DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              Kept encrypted and resolved only while a run needs it. Shown as
-              *** wherever a run records it as written. A value a workflow
-              computes from it, such as an encoded or changed copy, is recorded
-              as computed.
+              Kept encrypted and read only while a run needs it. Runs record it
+              as ***; it is never shown again after it is saved.
             </DialogDescription>
           </DialogHeader>
           <ProblemMessage problem={problem} />
@@ -101,64 +132,112 @@ export function SecretValueDialog({ name }: { readonly name?: string }) {
             {!replacing && (
               <Field>
                 <FieldLabel htmlFor="secret-name">Name</FieldLabel>
+                <FieldDescription>
+                  Letters, digits, dashes and underscores, such as
+                  CRM_API_TOKEN. Steps pick it by this name.
+                </FieldDescription>
                 <Input
+                  ref={first}
                   id="secret-name"
-                  name="name"
+                  value={chosen}
+                  onChange={(change) => {
+                    setChosen(change.target.value);
+                  }}
                   required
                   pattern="[A-Za-z0-9_\-]{1,120}"
-                  placeholder="crm-login"
-                  className="font-mono text-xs"
-                  autoFocus
+                  autoComplete="off"
+                  className="font-mono"
                 />
-                <FieldDescription>
-                  Letters, digits, dashes and underscores. Workflows refer to it
-                  by this name.
-                </FieldDescription>
               </Field>
             )}
             <Field>
-              <div className="flex items-center justify-between">
-                <FieldLabel htmlFor="secret-value">Value</FieldLabel>
-                <span className="flex gap-1">
-                  {SHAPES.map((shape) => (
-                    <Button
-                      key={shape.label}
-                      type="button"
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => {
-                        setValue(shape.value);
-                      }}
-                    >
-                      {shape.label}
-                    </Button>
-                  ))}
-                </span>
-              </div>
-              <Textarea
-                id="secret-value"
-                value={value}
-                onChange={(event) => {
-                  setValue(event.target.value);
+              <FieldLabel id="secret-shape">What it holds</FieldLabel>
+              <RadioGroup
+                value={shape}
+                onValueChange={(next) => {
+                  if (isShape(next)) setShape(next);
                 }}
-                required
-                maxLength={16384}
-                rows={5}
-                spellCheck={false}
-                autoComplete="off"
-                className="font-mono text-xs"
-                autoFocus={replacing}
-              />
-              <FieldDescription>
-                Text, or JSON: basic authentication takes a username and
-                password, bearer a token.
-              </FieldDescription>
+                aria-labelledby="secret-shape"
+              >
+                {SHAPES.map((each) => {
+                  const id = `secret-shape-${each.value}`;
+                  return (
+                    <div key={each.value} className="flex items-center gap-2">
+                      <RadioGroupItem id={id} value={each.value} />
+                      <Label htmlFor={id}>{each.label}</Label>
+                    </div>
+                  );
+                })}
+              </RadioGroup>
             </Field>
+            {basic ? (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="secret-username">Username</FieldLabel>
+                  <Input
+                    ref={replacing ? first : undefined}
+                    id="secret-username"
+                    value={username}
+                    onChange={(change) => {
+                      setUsername(change.target.value);
+                    }}
+                    required
+                    autoComplete="off"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="secret-password">Password</FieldLabel>
+                  <Input
+                    id="secret-password"
+                    type="password"
+                    value={password}
+                    onChange={(change) => {
+                      setPassword(change.target.value);
+                    }}
+                    required
+                    autoComplete="new-password"
+                  />
+                </Field>
+              </>
+            ) : (
+              <Field>
+                <FieldLabel htmlFor="secret-value">{textLabel}</FieldLabel>
+                <Input
+                  ref={replacing ? first : undefined}
+                  id="secret-value"
+                  type="password"
+                  value={text}
+                  onChange={(change) => {
+                    setText(change.target.value);
+                  }}
+                  required
+                  maxLength={16384}
+                  autoComplete="new-password"
+                  className="font-mono"
+                />
+                <FieldDescription>
+                  Hidden as you type; Tenon never shows it again.
+                </FieldDescription>
+              </Field>
+            )}
           </FieldGroup>
           <DialogFooter>
-            <Button type="submit" disabled={pending || value === ""}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                change(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={pending || empty}
+              aria-busy={pending}
+            >
               {pending && <Spinner data-icon="inline-start" />}
-              {replacing ? "Replace value" : "Keep secret"}
+              {submitLabel}
             </Button>
           </DialogFooter>
         </form>

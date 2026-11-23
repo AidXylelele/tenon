@@ -3,6 +3,8 @@ import { Secrets } from "@/spaces/secrets/modules/secrets";
 
 export const metadata: Metadata = { title: "Secrets" };
 
-export default function SecretsPage() {
-  return <Secrets />;
+export default async function SecretsPage({
+  searchParams,
+}: PageProps<"/secrets">) {
+  return <Secrets query={await searchParams} />;
 }
