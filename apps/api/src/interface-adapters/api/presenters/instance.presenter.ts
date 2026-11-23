@@ -14,6 +14,7 @@ import type {
 } from "../../../application/automation/instances/interfaces.js";
 import type { Person } from "../../../application/identity/users/interfaces.js";
 import { Phase } from "../../../domain/automation/instances/enums.js";
+import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import {
   type EventPageResponse,
   type FailingWorkflowsResponse,
@@ -135,7 +136,8 @@ export class InstancePresenter {
     }));
     const total = this.#byPhase(counted.total);
     const previous = this.#previousOf(counted.previous);
-    const now = this.#liveOf(counted.live);
+    const live = WorkflowInstance.livePhases();
+    const now = this.#countedIn(counted.live, live);
     return { to: counted.to.toISOString(), buckets, total, previous, now };
   }
 
@@ -148,17 +150,15 @@ export class InstancePresenter {
     return { from: previous.from.toISOString(), counts };
   }
 
-  #liveOf(live: readonly PhaseCount[]): InstanceCountsResponse["now"] {
-    return {
-      [Phase.Pending]: this.#countOf(live, Phase.Pending),
-      [Phase.Running]: this.#countOf(live, Phase.Running),
-      [Phase.Waiting]: this.#countOf(live, Phase.Waiting),
-      [Phase.Suspended]: this.#countOf(live, Phase.Suspended),
-    };
-  }
-
   #byPhase(counted: readonly PhaseCount[]): PhaseCounts {
     const phases = Object.values(Phase);
+    return this.#countedIn(counted, phases);
+  }
+
+  #countedIn(
+    counted: readonly PhaseCount[],
+    phases: readonly Phase[],
+  ): PhaseCounts {
     const entries = phases.map((phase) => [
       phase,
       this.#countOf(counted, phase),

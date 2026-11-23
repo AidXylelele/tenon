@@ -10,6 +10,7 @@ import {
   TriggerKind,
   WaitKind,
 } from "../../../domain/automation/instances/enums.js";
+import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 
 export const ResponseJson = z.json();
 
@@ -230,12 +231,9 @@ const PhaseCounts = z.record(z.enum(Phase), z.number().int());
 
 export type PhaseCounts = z.infer<typeof PhaseCounts>;
 
-const LiveCounts = z.object({
-  [Phase.Pending]: z.number().int(),
-  [Phase.Running]: z.number().int(),
-  [Phase.Waiting]: z.number().int(),
-  [Phase.Suspended]: z.number().int(),
-});
+const LivePhases = WorkflowInstance.livePhases();
+
+const LiveCounts = z.record(z.enum(LivePhases), z.number().int());
 
 export const InstanceCountsResponse = z.object({
   to: z.iso.datetime(),
