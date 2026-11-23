@@ -14,8 +14,8 @@ import {
   RETRYING,
   SCRIPT_FORM,
   SCRIPT_STEP,
-  SET_FORM,
   SET_STEP,
+  setFormOf,
   SWITCH_FORM,
   SWITCH_STEP,
   WAIT_FORM,
@@ -29,7 +29,7 @@ import {
 } from "../condition-builder/readings.test-support";
 import { DataField, DataPicker } from "../data-picker";
 import {
-  AT_AN_ADDRESS,
+  ADDRESS_AFTER_A_TEST,
   AFTER_A_TEST,
 } from "../data-picker/data-choices/data.test-support";
 import type { ConditionSlot, DataSlot } from "./interfaces";
@@ -49,6 +49,11 @@ const ROUTED_BY_AN_EXPRESSION = formWith(SWITCH_FORM, "switch", [
   { "Has items": { when: NON_CANONICAL_TEXT, then: "continue" } },
   { default: { then: "end" } },
 ]);
+
+const SET_BY_REFERENCE = setFormOf(
+  { title: "${ .slideshow.title }", slides: "${ .slideshow.slides }" },
+  "inputAndValues",
+);
 
 function picker({ label, describedBy, onPick }: PickerSlot) {
   return (
@@ -77,7 +82,7 @@ function builder(slot: ConditionSlot) {
 }
 
 function dataField(slot: DataSlot) {
-  return <DataField {...slot} data={AT_AN_ADDRESS} />;
+  return <DataField {...slot} data={ADDRESS_AFTER_A_TEST} />;
 }
 
 const meta = {
@@ -99,6 +104,7 @@ const meta = {
     protection: null,
     revealProblems: false,
     languageTerms: false,
+    renderData: dataField,
     onEdit: fn(),
   },
 } satisfies Meta<typeof StepForm>;
@@ -139,7 +145,7 @@ export const SwitchBranches: Story = {
 };
 
 export const SetDataKeepsIncoming: Story = {
-  args: { step: SET_STEP, form: SET_FORM },
+  args: { step: SET_STEP, form: SET_BY_REFERENCE },
 };
 
 export const ScriptResult: Story = {

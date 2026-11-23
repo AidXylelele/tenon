@@ -63,6 +63,18 @@ function runKindOf(fields: readonly FormField[]): RunKind {
   return kind ?? "script";
 }
 
+export function fieldAt(
+  fields: readonly FormField[],
+  pointer: string,
+): FormField | null {
+  const here = fields.find((field) => field.pointer === pointer);
+
+  if (here !== undefined) return here;
+
+  const below = fields.map((field) => fieldAt(field.fields, pointer));
+  return below.find((field) => field !== null) ?? null;
+}
+
 export function pathOf(field: FormField, base: string): string {
   const start = base.length + 1;
   return field.pointer.slice(start);
@@ -183,6 +195,7 @@ function statementOf(
       return [countedOf(field, words.title)];
     case "seconds":
       return field.written ? [limitText(field)] : [];
+    case "body":
     case "value":
     case "data":
     case "condition":

@@ -30,7 +30,7 @@ test.describe("the step form playground", () => {
   }) => {
     await page.goto(TO_FILL);
     const more = page.getByRole("button", { name: "More options" });
-    const headers = page.getByLabel(/Headers/);
+    const headers = page.getByRole("group", { name: /Headers/ });
     await expect(headers).toBeHidden();
 
     await more.focus();

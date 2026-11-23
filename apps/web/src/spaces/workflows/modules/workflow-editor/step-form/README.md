@@ -22,8 +22,8 @@ The form shows the name, the essential fields, the step's result where the langu
 
 Consumer: the workflow editor's panel, which replaces the old `step-inspector` with these in M5.
 
-A field is "optional" only when it is not required, has no fill words and no usual value (a choice, after this step, a method, a language, a time limit). Errors carry a circle-alert icon; placeholders are faint.
+An HTTP call's data says how it is sent ("Send as": Message, the usual, written as `{ "text": … }`; JSON; Form fields, named values with their content type), and its headers are named values. A field is "optional" only when it is not required, has no fill words and no usual value (a choice, after this step, a method, a language, a time limit). Errors carry a circle-alert icon; placeholders are faint.
 
 ## Playground
 
-`step-form.stories.tsx`: an HTTP step's essentials, its more options, an address to fill and the problem after leaving it, language terms, a switch's branches, set data keeping the incoming data, a script's result, a wait, failure handling with retry settings, and composed as the editor composes them: an HTTP step with the data picker, a switch with the condition builder and with an expression. `start-form.stories.tsx`: a schedule, one before daylight saving, a weekly schedule, a webhook, an event to fill, and by hand without webhooks.
+`step-form.stories.tsx`: an HTTP step's essentials, its more options, an address to fill and the problem after leaving it, language terms, a switch's branches, set data keeping the incoming data, a script's result, a wait, set data whose values are references shown as chips, failure handling with retry settings, and composed as the editor composes them: an HTTP step with the data picker, a switch with the condition builder and with an expression. `start-form.stories.tsx`: a schedule, one before daylight saving, a weekly schedule, a webhook, an event to fill, and by hand without webhooks.

@@ -53,6 +53,7 @@ export function FieldControl(props: ControlProps) {
 
   switch (words.control) {
     case "data":
+    case "body":
       return <DataControl {...props} />;
     case "condition":
       return <ConditionControl {...props} />;
@@ -93,7 +94,7 @@ function ValueControl(props: ControlProps) {
   }
 }
 
-function DataControl(props: ControlProps) {
+export function DataControl(props: ControlProps) {
   const { field, words, wiring } = props;
   const { renderData, onEdit } = useFormSettings();
   const holdsObject = typeof field.value === "object" && field.value !== null;

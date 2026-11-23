@@ -26,6 +26,7 @@ export type FieldControl =
   | "values"
   | "cases"
   | "seconds"
+  | "body"
   | "hidden";
 
 export interface FieldWords {
@@ -98,6 +99,8 @@ export interface CaseRow {
   readonly then: string;
   readonly isOtherwise: boolean;
 }
+
+export type SendAs = "message" | "json" | "form";
 
 export type StartWay = "hand" | "schedule" | "webhook" | "event";
 

@@ -68,6 +68,7 @@ export function StepForm({
     base: step.pointer,
     revealProblems,
     languageTerms,
+    fields: form.fields,
     flowChoices,
     scriptLanguage,
     renderData,

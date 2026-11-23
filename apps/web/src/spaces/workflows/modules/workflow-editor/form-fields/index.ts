@@ -44,12 +44,14 @@ export type {
   FormKind,
   FormLayout,
   RetryCount,
+  SendAs,
   StartReading,
   StartWay,
   ValueRow,
   WordsKind,
 } from "./interfaces";
-export { formKindOf, layoutOf, pathOf, summaryOf } from "./layout";
+export { fieldAt, formKindOf, layoutOf, pathOf, summaryOf } from "./layout";
+export { SEND_AS_CHOICES, sendAsEditsOf, sendAsOf } from "./sending";
 export { cronEditsOf, eventEditsOf, startEditsOf, startOf } from "./start";
 export { timeLimitCommitOf, timeLimitOf } from "./time-limit";
 export {
@@ -59,5 +61,5 @@ export {
   renameCommitOf,
   rowsOf,
 } from "./values";
-export type { Json, JsonObject } from "./json";
+export { isObject, type Json, type JsonObject } from "./json";
 export { CONTINUE, flowChoicesOf, resultText, wordsOf } from "./words";

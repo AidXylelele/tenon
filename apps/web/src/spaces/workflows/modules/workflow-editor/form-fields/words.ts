@@ -79,8 +79,7 @@ const WORDS: ReadonlyMap<string, WordsEntry> = new Map([
     "http|with/body",
     {
       title: "Data",
-      help: "Insert data from an earlier step, or type JSON.",
-      control: "data",
+      control: "body",
     },
   ],
   ["http|with/headers", { title: "Headers", control: "values" }],

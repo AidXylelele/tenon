@@ -9,6 +9,7 @@ import {
 import { type FieldWords, pathOf, wordsOf } from "../form-fields";
 import { FieldControl } from "./field-control";
 import { FieldShell, FieldTitle } from "./field-shell";
+import { BodyField } from "./send-as";
 import { useFormSettings } from "./form-settings";
 import { SwitchCases } from "./switch-cases";
 import { ValueRows } from "./value-rows";
@@ -30,6 +31,9 @@ export function FieldView({ field }: { readonly field: FormField }) {
 
   if (words.control === "cases")
     return <SwitchCases field={field} words={words} />;
+
+  if (words.control === "body")
+    return <BodyField field={field} words={words} path={path} />;
 
   if (words.control === "values")
     return <ValueRows field={field} words={words} path={path} />;

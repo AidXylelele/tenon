@@ -108,6 +108,7 @@ export function StartForm({
     base: "",
     revealProblems,
     languageTerms,
+    fields: form.fields,
     flowChoices: NO_FLOW,
     scriptLanguage: "",
     onEdit: send,

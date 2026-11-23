@@ -579,6 +579,39 @@ describe("set data", () => {
   });
 });
 
+describe("how a call sends its data", () => {
+  it("a_message_is_the_usual_and_its_text_is_set_at_its_place", () => {
+    const { onEdit } = shown({ step: POST_STEP, form: POST_FORM });
+    const message = screen.getByRole("radio", { name: "Message" });
+    const text = screen.getByRole("textbox", { name: /^Data/ });
+
+    leave(text, "The digest is ready");
+
+    const pointer = `${POST_STEP.pointer}/with/body/text`;
+    expect(message).toHaveAttribute("aria-checked", "true");
+    expect(onEdit).toHaveBeenCalledWith([
+      { kind: "setField", pointer, value: "The digest is ready" },
+    ]);
+  });
+
+  it("form_fields_write_their_content_type", () => {
+    const { onEdit } = shown({ step: POST_STEP, form: POST_FORM });
+    const form = screen.getByRole("radio", { name: "Form fields" });
+
+    act(() => {
+      fireEvent.click(form);
+    });
+
+    const pointer = `${POST_STEP.pointer}/with/headers`;
+    const value = { "Content-Type": "application/x-www-form-urlencoded" };
+    const body = `${POST_STEP.pointer}/with/body`;
+    expect(onEdit).toHaveBeenCalledWith([
+      { kind: "setField", pointer, value },
+      { kind: "setField", pointer: body, value: {} },
+    ]);
+  });
+});
+
 describe("a script's result", () => {
   it("comes_after_the_code_and_before_the_data_the_script_gets", () => {
     shown({ step: SCRIPT_STEP, form: SCRIPT_FORM });

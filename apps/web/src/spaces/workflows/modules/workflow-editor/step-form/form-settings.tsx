@@ -10,6 +10,7 @@ export interface FormSettings extends FormSlots {
   readonly base: string;
   readonly revealProblems: boolean;
   readonly languageTerms: boolean;
+  readonly fields: readonly FormField[];
   readonly flowChoices: readonly FormField["value"][];
   readonly scriptLanguage: string;
   readonly onEdit: Edit;
