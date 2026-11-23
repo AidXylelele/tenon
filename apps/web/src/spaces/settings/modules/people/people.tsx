@@ -1,13 +1,24 @@
 import {
   CircleCheckIcon,
+  CirclePauseIcon,
   CircleSlashIcon,
   ClockIcon,
   MailIcon,
+  UsersIcon,
   XIcon,
 } from "lucide-react";
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
-import { currentSession, invitations } from "@/libs/data-access/identity";
-import type { Invitation, InvitationStatus } from "@/libs/data-access/types";
+import {
+  currentSession,
+  invitations,
+  members,
+} from "@/libs/data-access/identity";
+import type {
+  Invitation,
+  InvitationStatus,
+  Member,
+  MemberStatus,
+} from "@/libs/data-access/types";
 import {
   Card,
   CardContent,
@@ -40,7 +51,13 @@ const STATUS: Record<InvitationStatus, StatusLook> = {
   expired: { label: "Expired", tone: "neutral", icon: ClockIcon },
 };
 
-export async function Invitations() {
+const MEMBER: Record<MemberStatus, StatusLook> = {
+  active: { label: "Active", tone: "success", icon: CircleCheckIcon },
+  suspended: { label: "Suspended", tone: "warning", icon: CirclePauseIcon },
+  invited: { label: "Invited", tone: "info", icon: MailIcon },
+};
+
+export async function People() {
   const session = await available(currentSession());
 
   if (session === UNAVAILABLE) return <Unavailable />;
@@ -55,17 +72,50 @@ export async function Invitations() {
       />
     );
 
-  const list = await available(invitations());
+  const read = await available(Promise.all([members(), invitations()]));
 
-  if (list === UNAVAILABLE) return <Unavailable />;
+  if (read === UNAVAILABLE) return <Unavailable />;
+
+  const [people, list] = read;
+  const sent = list.filter((invitation) => invitation.status !== "accepted");
 
   return (
     <>
       <PageHeader
         level={2}
-        title="Invitations"
-        description="Invite people by email. A link lets them choose a name and password."
+        title="People"
+        description="Who has access and with which role. Invite people by email; a link lets them choose a name and password."
       />
+      <section aria-labelledby="members" className="flex flex-col gap-3">
+        <h3 id="members" className="heading-3">
+          Members
+        </h3>
+        {people.length === 0 ? (
+          <EmptyState
+            icon={<UsersIcon />}
+            title="No members yet"
+            description="People appear here once they accept an invitation."
+          />
+        ) : (
+          <TableFrame>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="hidden sm:table-cell">Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden md:table-cell">Since</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {people.map((member) => (
+                  <MemberRow key={member.id} member={member} />
+                ))}
+              </TableBody>
+            </Table>
+          </TableFrame>
+        )}
+      </section>
       <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle>Invite someone</CardTitle>
@@ -74,11 +124,14 @@ export async function Invitations() {
           <InviteForm />
         </CardContent>
       </Card>
-      {list.length === 0 ? (
+      <h3 id="invitations" className="heading-3">
+        Invitations
+      </h3>
+      {sent.length === 0 ? (
         <EmptyState
           icon={<MailIcon />}
-          title="No invitations yet"
-          description="Invitations you send appear here with what became of them."
+          title="No open invitations"
+          description="Invitations you send appear here until they are accepted."
         />
       ) : (
         <TableFrame>
@@ -94,7 +147,7 @@ export async function Invitations() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {list.map((invitation) => (
+              {sent.map((invitation) => (
                 <InvitationRow key={invitation.id} invitation={invitation} />
               ))}
             </TableBody>
@@ -102,6 +155,30 @@ export async function Invitations() {
         </TableFrame>
       )}
     </>
+  );
+}
+
+function MemberRow({ member }: { readonly member: Member }) {
+  const look = MEMBER[member.status];
+  const role = roleLabel(member.role);
+  const name = member.name ?? member.email;
+
+  return (
+    <TableRow>
+      <TableCell>
+        <span className="block font-medium">{name}</span>
+        <span className="block text-xs text-muted-foreground">
+          {member.email}
+        </span>
+      </TableCell>
+      <TableCell className="hidden sm:table-cell">{role}</TableCell>
+      <TableCell>
+        <Status look={look} />
+      </TableCell>
+      <TableCell className="hidden md:table-cell">
+        <Time value={member.since} />
+      </TableCell>
+    </TableRow>
   );
 }
 
