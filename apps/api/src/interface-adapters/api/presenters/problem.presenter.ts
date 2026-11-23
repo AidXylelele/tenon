@@ -80,6 +80,14 @@ export class ProblemPresenter {
       },
     ],
     [
+      WorkflowRefusal.Unpublished,
+      {
+        status: HttpStatus.NOT_FOUND,
+        title: "Workflow not found",
+        detail: "The workflow has no published version",
+      },
+    ],
+    [
       WorkflowRefusal.Off,
       {
         status: HttpStatus.CONFLICT,

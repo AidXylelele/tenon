@@ -154,18 +154,26 @@ export class Workflow {
     return found ?? null;
   }
 
-  archive(now: Date): boolean {
+  archive(now: Date): Result<boolean, WorkflowRefusal> {
+    const unpublished = this.#currentVersionId === null;
+
+    if (unpublished) return { ok: false, failure: WorkflowRefusal.Unpublished };
+
     const archived = this.#isArchived();
 
-    if (archived) return false;
+    if (archived) return { ok: true, value: false };
 
     this.#status = WorkflowStatus.Archived;
     this.#archivedAt = now;
     this.turnOff();
-    return true;
+    return { ok: true, value: true };
   }
 
   turnOn(): Result<boolean, WorkflowRefusal> {
+    const unpublished = this.#currentVersionId === null;
+
+    if (unpublished) return { ok: false, failure: WorkflowRefusal.Unpublished };
+
     const archived = this.#isArchived();
 
     if (archived) return { ok: false, failure: WorkflowRefusal.Archived };

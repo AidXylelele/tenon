@@ -91,6 +91,30 @@ describe("a test run of a draft over HTTP", () => {
     expect(versions.status).toBe(404);
   });
 
+  it("a_workflow_only_tested_is_neither_turned_on_nor_archived", async () => {
+    const etag = await drafted(aDocument());
+    await request(t.server)
+      .post(TEST_RUNS)
+      .set(editor)
+      .set("If-Match", etag)
+      .send({})
+      .expect(201);
+
+    const on = await request(t.server)
+      .post(`${WORKFLOW}/turn-on`)
+      .set(editor)
+      .expect(404);
+    const archived = await request(t.server)
+      .post(`${WORKFLOW}/archive`)
+      .set(editor)
+      .expect(404);
+
+    expect(on.body).toMatchObject({ type: "urn:problem:workflow.unpublished" });
+    expect(archived.body).toMatchObject({
+      type: "urn:problem:workflow.unpublished",
+    });
+  });
+
   it("a_test_run_is_left_out_of_the_published_workflows_starts_and_versions", async () => {
     await publish(t, editor, aDocument());
     const etag = await drafted(aDocument({}, [{ other: { set: { x: 1 } } }]));

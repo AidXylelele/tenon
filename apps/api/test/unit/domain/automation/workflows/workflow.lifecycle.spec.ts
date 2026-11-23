@@ -234,36 +234,41 @@ describe("Workflow publishing and archiving", () => {
 
   it("archiving_records_the_moment_once", () => {
     const workflow = Workflow.register(name);
+    publishNew(workflow, "1.0.0");
 
-    workflow.archive(now);
-    workflow.archive(later);
+    const first = workflow.archive(now);
+    const again = workflow.archive(later);
 
+    expect(first).toEqual({ ok: true, value: true });
+    expect(again).toEqual({ ok: true, value: false });
     expect(workflow.status).toBe(WorkflowStatus.Archived);
     expect(workflow.archivedAt).toBe(now);
   });
 
-  it("a_workflow_without_versions_can_be_archived", () => {
+  it("a_workflow_never_published_is_not_archived", () => {
     const workflow = Workflow.register(name);
 
-    workflow.archive(now);
+    const result = workflow.archive(now);
 
-    expect(workflow.status).toBe(WorkflowStatus.Archived);
-    expect(workflow.currentVersionId).toBeNull();
+    expect(result).toEqual({ ok: false, failure: WorkflowRefusal.Unpublished });
+    expect(workflow.status).toBe(WorkflowStatus.Active);
+    expect(workflow.archivedAt).toBeNull();
   });
 
-  it("a_registered_workflow_that_was_archived_refuses_its_first_version", () => {
+  it("an_archived_workflow_refuses_a_new_version", () => {
     const workflow = Workflow.register(name);
+    const current = publishNew(workflow, "1.0.0");
     workflow.archive(now);
 
     const result = workflow.publish({
-      definition: definitionOf("1.0.0"),
+      definition: definitionOf("2.0.0"),
       source: null,
       publisherId: "author-1",
       now,
     });
 
     expect(result).toEqual({ ok: false, failure: WorkflowRefusal.Archived });
-    expect(workflow.currentVersionId).toBeNull();
+    expect(workflow.currentVersionId).toBe(current.id);
   });
 });
 

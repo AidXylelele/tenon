@@ -47,7 +47,7 @@ export interface ArchiveWorkflowCommand {
   readonly name: WorkflowName;
 }
 
-export type ArchiveResult = Result<void, Missing>;
+export type ArchiveResult = Result<void, WorkflowRefusal | Missing>;
 
 export interface TurnWorkflowCommand {
   readonly name: WorkflowName;

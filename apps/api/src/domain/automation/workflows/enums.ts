@@ -5,6 +5,7 @@ export enum WorkflowStatus {
 
 export enum WorkflowRefusal {
   Archived = "workflow.archived",
+  Unpublished = "workflow.unpublished",
   VersionTaken = "workflow.version-taken",
   Off = "workflow.off",
   ChainRunning = "workflow.chain-running",
