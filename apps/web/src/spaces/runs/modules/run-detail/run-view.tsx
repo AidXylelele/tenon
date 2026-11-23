@@ -24,9 +24,13 @@ import {
   recordsOf,
   type TaskProgress,
 } from "@/operations/run-progress";
-import { stepsIn, stepsUnder } from "@/operations/workflow-graph";
-import { kindInfoOf } from "@/operations/step-kinds";
-import { type StepRun, WorkflowFlow } from "@/features/workflow-flow";
+import {
+  kindLookOf,
+  type StepRun,
+  stepsIn,
+  stepsUnder,
+  WorkflowFlow,
+} from "@/features/workflow-flow";
 import { EventList } from "./event-list";
 import { FaultStrip } from "./fault-strip";
 import type { RunPanel } from "./query";
@@ -178,7 +182,7 @@ export function RunView({
                     {step.name}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {kindInfoOf(step.kind).label},{" "}
+                    {kindLookOf(step.kind).word},{" "}
                     {stepRecords.length === 1
                       ? "1 execution"
                       : `${String(stepRecords.length)} executions`}

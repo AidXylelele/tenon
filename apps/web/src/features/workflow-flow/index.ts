@@ -10,5 +10,7 @@ export type {
   StepRun,
   WorkflowFlowProps,
 } from "./interfaces";
+export { stepsIn, stepsUnder } from "./flow";
 export { START } from "./items";
+export { kindLookOf } from "./looks";
 export { WorkflowFlow } from "./workflow-flow";

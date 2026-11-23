@@ -7,6 +7,8 @@ import {
   doneExitOf,
   jumpsOf,
   sourcesOf,
+  stepsIn,
+  stepsUnder,
 } from "./flow";
 import {
   DAILY_DIGEST,
@@ -313,5 +315,28 @@ describe("the line between two steps", () => {
     const drawn = lineOf(shown, "start", to);
 
     expect(drawn).toBe(line);
+  });
+});
+
+describe("every step of a list, nested ones after their block", () => {
+  it("a_block_is_followed_by_the_steps_inside_it", () => {
+    const [prepare, each] = MONTH_END.steps.steps;
+
+    if (prepare === undefined || each === undefined)
+      throw new Error("Month-end has no first two steps");
+
+    const names = stepsIn(MONTH_END.steps).map((step) => step.name);
+    const under = stepsUnder(prepare).map((step) => step.name);
+
+    expect(under).toEqual([
+      prepare.name,
+      "Fetch the invoices",
+      "Add up the totals",
+    ]);
+    expect(names.slice(0, 5)).toEqual([
+      ...under,
+      each.name,
+      "Send the invoice",
+    ]);
   });
 });

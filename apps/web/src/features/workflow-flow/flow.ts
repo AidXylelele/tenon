@@ -221,3 +221,12 @@ function stepsBetweenOf(
 
   return ids.slice(first, last + 1);
 }
+
+export function stepsIn(list: StepList): Step[] {
+  return list.steps.flatMap(stepsUnder);
+}
+
+export function stepsUnder(step: Step): Step[] {
+  const inner = step.lists.flatMap(stepsIn);
+  return [step, ...inner];
+}
