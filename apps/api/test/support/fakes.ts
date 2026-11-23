@@ -36,6 +36,7 @@ import { Workflow } from "../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../src/domain/automation/workflows/workflow-name.js";
 import type { WorkflowVersion } from "../../src/domain/automation/workflows/workflow-version.js";
 import type { Result } from "../../src/domain/interfaces.js";
+import { UnitOfWork } from "../../src/application/unit-of-work.js";
 import {
   AccountRepository,
   PasswordHasher,
@@ -52,6 +53,12 @@ import { StaleWriteError } from "../../src/domain/stale-write.error.js";
 import type { Invitation } from "../../src/domain/identity/invitations/invitation.js";
 import type { InvitationToken } from "../../src/domain/identity/invitations/invitation-token.js";
 import type { User } from "../../src/domain/identity/users/user.js";
+
+export class FakeUnitOfWork extends UnitOfWork {
+  run<T>(work: () => Promise<T>): Promise<T> {
+    return work();
+  }
+}
 
 export class InMemoryUserRepository extends UserRepository {
   readonly users = new Map<string, User>();

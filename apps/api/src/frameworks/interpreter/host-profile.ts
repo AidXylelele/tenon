@@ -1,5 +1,5 @@
 import type { HostProfile } from "interpreter";
-import { BrokerProtocol } from "../asyncapi/enums.js";
+import { BrokerProtocol } from "../../interface-adapters/workflows/effects/enums.js";
 
 export const HOST_PROFILE: Required<HostProfile> = {
   effects: [

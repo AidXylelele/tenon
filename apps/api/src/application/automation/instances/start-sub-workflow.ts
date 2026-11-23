@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import type { StartChildCommand, StartResult } from "./interfaces.js";
@@ -11,9 +11,9 @@ export class StartSubWorkflow {
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
     private readonly runs: InstanceRuns,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: StartChildCommand): Promise<StartResult> {
     const existing = await this.instances.findChild(
       command.parentId,
@@ -50,8 +50,10 @@ export class StartSubWorkflow {
     if (!started.ok) return started;
 
     const child = started.value;
-    await this.instances.save(child);
-    await this.runs.start(child);
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(child);
+      await this.runs.start(child);
+    });
     return { ok: true, value: { instanceId: child.id } };
   }
 }

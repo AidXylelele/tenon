@@ -9,7 +9,7 @@ import type { FoundWorkflow } from "./found-workflow";
 import { useWorkflowSearch, WorkflowResults } from "./workflow-results";
 
 const searchable = vi.fn<() => Promise<FoundWorkflow[]>>();
-const onGo = vi.fn<(href: string) => void>();
+const onChoose = vi.fn<(workflow: FoundWorkflow) => void>();
 const push = vi.fn<(href: string) => void>();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -43,11 +43,16 @@ function Search() {
       <Command>
         <CommandInput placeholder="Type a workflow" />
         <CommandList>
-          <WorkflowResults search={search} onGo={onGo} />
+          <WorkflowResults search={search} onChoose={onChoose} />
         </CommandList>
       </Command>
     </>
   );
+}
+
+function openSearch() {
+  const button = screen.getByRole("button", { name: "Open" });
+  fireEvent.click(button);
 }
 
 function deferred(): {
@@ -64,7 +69,7 @@ function deferred(): {
 describe("the workflows the search offers", () => {
   beforeEach(() => {
     searchable.mockReset();
-    onGo.mockReset();
+    onChoose.mockReset();
     push.mockReset();
     vi.stubGlobal("fetch", answer);
     Element.prototype.scrollIntoView = vi.fn();
@@ -73,9 +78,11 @@ describe("the workflows the search offers", () => {
   it("nothing_is_read_before_the_search_opens", () => {
     render(<Search />);
 
+    const reading = screen.queryByText("Reading workflows…");
+    const options = screen.queryAllByRole("option");
     expect(searchable).not.toHaveBeenCalled();
-    expect(screen.queryByText("Reading workflows…")).not.toBeInTheDocument();
-    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(reading).not.toBeInTheDocument();
+    expect(options).toHaveLength(0);
   });
 
   it("a_line_says_they_are_read_until_the_first_answer_comes", async () => {
@@ -83,23 +90,25 @@ describe("the workflows the search offers", () => {
     searchable.mockReturnValue(answer.promise);
     render(<Search />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    openSearch();
     const readingFirst = screen.queryByText("Reading workflows…") !== null;
     await act(async () => {
       answer.resolve([lead]);
       await answer.promise;
     });
 
+    const reading = screen.queryByText("Reading workflows…");
+    const found = screen.getByRole("option", { name: /route-lead/ });
     expect(readingFirst).toBe(true);
-    expect(screen.queryByText("Reading workflows…")).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /route-lead/ })).toBeVisible();
+    expect(reading).not.toBeInTheDocument();
+    expect(found).toBeVisible();
   });
 
   it("each_workflow_shows_its_name_its_namespace_and_whether_it_is_on_or_archived", async () => {
     searchable.mockResolvedValue([lead, charge]);
     render(<Search />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    openSearch();
     const on = await screen.findByRole("option", { name: /route-lead/ });
     const off = screen.getByRole("option", { name: /charge-card/ });
 
@@ -108,28 +117,29 @@ describe("the workflows the search offers", () => {
     expect(off).not.toHaveTextContent("On");
   });
 
-  it("a_workflow_opens_its_page", async () => {
+  it("a_workflow_chosen_is_handed_over_whole", async () => {
     searchable.mockResolvedValue([lead]);
     render(<Search />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
-    fireEvent.click(await screen.findByRole("option", { name: /route-lead/ }));
+    openSearch();
+    const found = await screen.findByRole("option", { name: /route-lead/ });
+    fireEvent.click(found);
 
-    expect(onGo).toHaveBeenCalledWith("/workflows/sales/route-lead");
+    expect(onChoose).toHaveBeenCalledWith(lead);
   });
 
   it("a_workflow_is_found_by_its_namespace_as_well_as_its_name", async () => {
     searchable.mockResolvedValue([lead, charge]);
     render(<Search />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    openSearch();
     await screen.findByRole("option", { name: /route-lead/ });
-    fireEvent.change(screen.getByPlaceholderText("Type a workflow"), {
-      target: { value: "billing" },
-    });
+    const field = screen.getByPlaceholderText("Type a workflow");
+    fireEvent.change(field, { target: { value: "billing" } });
 
-    expect(screen.getAllByRole("option")).toHaveLength(1);
-    expect(screen.getByRole("option")).toHaveTextContent("charge-card");
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent("charge-card");
   });
 
   it("each_opening_reads_them_again_and_keeps_the_last_list_meanwhile", async () => {
@@ -137,9 +147,9 @@ describe("the workflows the search offers", () => {
     searchable.mockResolvedValueOnce([lead]).mockReturnValueOnce(again.promise);
     render(<Search />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    openSearch();
     await screen.findByRole("option", { name: /route-lead/ });
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    openSearch();
     const meanwhile = screen.getAllByRole("option").length;
     const readingAgain = screen.queryByText("Reading workflows…") !== null;
     await act(async () => {
@@ -148,20 +158,35 @@ describe("the workflows the search offers", () => {
     });
 
     expect(searchable).toHaveBeenCalledTimes(2);
+    const options = screen.getAllByRole("option");
     expect(meanwhile).toBe(1);
     expect(readingAgain).toBe(false);
-    expect(screen.getAllByRole("option")).toHaveLength(2);
+    expect(options).toHaveLength(2);
   });
 
   it("a_read_that_fails_says_so_instead_of_an_empty_list", async () => {
     vi.stubGlobal("fetch", () => Promise.reject(new TypeError("offline")));
     render(<Search />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    openSearch();
     const said = await screen.findByText("Workflows could not be read.");
 
+    const options = screen.queryAllByRole("option");
     expect(said).toBeInTheDocument();
-    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(options).toHaveLength(0);
+  });
+
+  it.each([
+    ["an_answer_that_is_not_ok", () => Response.json([], { status: 503 })],
+    ["an_answer_of_another_shape", () => Response.json([{ name: 1 }])],
+  ])("%s_says_the_workflows_could_not_be_read", async (_, answered) => {
+    vi.stubGlobal("fetch", () => Promise.resolve(answered()));
+    render(<Search />);
+
+    openSearch();
+
+    const said = await screen.findByText("Workflows could not be read.");
+    expect(said).toBeInTheDocument();
   });
 
   it("a_session_that_ended_opens_sign_in_saying_so", async () => {
@@ -170,7 +195,7 @@ describe("the workflows the search offers", () => {
     vi.stubGlobal("fetch", () => Promise.resolve(redirected));
     render(<Search />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    openSearch();
     await act(async () => {
       await Promise.resolve();
     });

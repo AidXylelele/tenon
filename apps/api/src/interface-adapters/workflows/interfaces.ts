@@ -98,6 +98,10 @@ export interface StartedStep {
   readonly fingerprint: string;
 }
 
+export type ProgramStep =
+  | { readonly kind: "played"; readonly step: Step }
+  | { readonly kind: "incompatible" };
+
 export interface NamedFilter {
   readonly name: string;
   readonly filter: JsonValue;
@@ -115,7 +119,10 @@ export interface Program {
   readonly awaited: readonly AwaitedEffect[];
 }
 
-export type ControlStep = (call: ProgramCall, state: State) => Promise<Step>;
+export type ControlStep = (
+  call: ProgramCall,
+  state: State,
+) => Promise<ProgramStep>;
 
 export type ChildEffect = Effect & WorkflowRequest;
 
@@ -197,22 +204,22 @@ export abstract class InterpreterClient {
     state: State,
     response: EffectResponse,
     context: StepContext,
-  ): Promise<Step>;
+  ): Promise<ProgramStep>;
   abstract suspend(
     call: ProgramCall,
     state: State,
     context: StepContext,
-  ): Promise<Step>;
+  ): Promise<ProgramStep>;
   abstract resume(
     call: ProgramCall,
     state: State,
     context: StepContext,
-  ): Promise<Step>;
+  ): Promise<ProgramStep>;
   abstract cancel(
     call: ProgramCall,
     state: State,
     context: StepContext,
-  ): Promise<Step>;
+  ): Promise<ProgramStep>;
   abstract route(
     call: ProgramCall,
     event: CloudEvent,

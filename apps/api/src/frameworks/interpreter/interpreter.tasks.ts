@@ -87,6 +87,10 @@ export class InterpreterTasks {
     return this.#answered(task, (source) => this.#structured(source));
   }
 
+  ready(task: ThreadTask<null>): TaskAnswer<null> {
+    return { kind: "answered", value: task.call };
+  }
+
   filter(task: ThreadTask<JsonValue>): TaskAnswer<FilterCheck> {
     return this.#answered(task, (filter) => this.#checked(filter));
   }

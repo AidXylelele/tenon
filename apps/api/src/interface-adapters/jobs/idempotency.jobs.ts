@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Interval } from "@nestjs/schedule";
 import { PostgresIdempotencyStore } from "../persistence/stores/postgres-idempotency.store.js";
-import { JobTracer } from "./job.tracer.js";
 
 @Injectable()
 export class IdempotencyJobs {
@@ -10,17 +9,10 @@ export class IdempotencyJobs {
 
   private readonly logger = new Logger(IdempotencyJobs.name);
 
-  constructor(
-    private readonly idempotency: PostgresIdempotencyStore,
-    private readonly tracer: JobTracer,
-  ) {}
+  constructor(private readonly idempotency: PostgresIdempotencyStore) {}
 
   @Interval(IdempotencyJobs.PRUNE, IdempotencyJobs.PRUNE_MS)
-  pruneExpiredKeys(): Promise<void> {
-    return this.tracer.run(IdempotencyJobs.PRUNE, () => this.#pruned());
-  }
-
-  async #pruned(): Promise<void> {
+  async pruneExpiredKeys(): Promise<void> {
     const records = await this.idempotency.prune();
     this.logger.debug({ records }, "Pruned the expired idempotency keys");
   }

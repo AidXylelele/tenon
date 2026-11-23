@@ -1,14 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import type { SubscriptionCommand, SubscriptionResult } from "./interfaces.js";
 import { SubscriptionRepository } from "./ports.js";
 
 @Injectable()
 export class DeleteSubscription {
-  constructor(private readonly subscriptions: SubscriptionRepository) {}
+  constructor(
+    private readonly subscriptions: SubscriptionRepository,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  @Transactional()
   async execute(command: SubscriptionCommand): Promise<SubscriptionResult> {
     const subscription = await this.subscriptions.findOwned(
       command.ownerId,
@@ -18,7 +20,7 @@ export class DeleteSubscription {
     if (subscription === null)
       return { ok: false, failure: Missing.Subscription };
 
-    await this.subscriptions.remove(subscription);
+    await this.unitOfWork.run(() => this.subscriptions.remove(subscription));
     return { ok: true, value: undefined };
   }
 }

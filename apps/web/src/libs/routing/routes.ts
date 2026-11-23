@@ -25,6 +25,8 @@ export const ACCOUNT_HREF = "/settings/account";
 export const INVITATIONS_HREF = "/settings/invitations";
 export const PLATFORM_HREF = "/settings/platform";
 
+const EDITOR_PATH = /^\/workflows\/[^/]+\/[^/]+\/edit$/;
+
 type SignInReason = "ended" | "signed-out" | "password-set";
 
 interface SignInQuery {
@@ -80,6 +82,10 @@ export function editorHref(
 ): string {
   const path = `${workflowHref(namespace, name)}/edit`;
   return withQuery(path, { task });
+}
+
+export function isEditorPath(pathname: string): boolean {
+  return pathname === NEW_WORKFLOW_HREF || EDITOR_PATH.test(pathname);
 }
 
 export function versionHref(

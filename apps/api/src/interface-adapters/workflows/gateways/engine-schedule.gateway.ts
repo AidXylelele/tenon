@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import {
   WorkflowClient,
   WorkflowSchedules as EngineSchedules,
@@ -107,7 +103,6 @@ export class EngineScheduleGateway implements WorkflowSchedules {
     await this.schedules.remove(id);
   }
 
-  @Transactional(Propagation.Mandatory)
   async continueAfter(
     instance: WorkflowInstance,
     version: WorkflowVersion,

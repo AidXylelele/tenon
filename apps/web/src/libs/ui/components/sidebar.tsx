@@ -14,6 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/libs/ui/components/sheet";
+import { SIDEBAR_COOKIE_NAME } from "@/libs/ui/components/sidebar-cookie";
 import { Skeleton } from "@/libs/ui/components/skeleton";
 import {
   Tooltip,
@@ -22,7 +23,6 @@ import {
 } from "@/libs/ui/components/tooltip";
 import { PanelLeftIcon } from "lucide-react";
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state";
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 const SIDEBAR_WIDTH = "15rem";
 const SIDEBAR_WIDTH_MOBILE = "18rem";
@@ -599,7 +599,6 @@ function SidebarMenuSkeleton({
 }
 
 export {
-  SIDEBAR_COOKIE_NAME,
   Sidebar,
   SidebarContent,
   SidebarFooter,

@@ -76,11 +76,7 @@ import { PostgresWebhookRepository } from "../../interface-adapters/persistence/
 import { HttpImportGateway } from "../../interface-adapters/workflows/gateways/http-import.gateway.js";
 import { InterpreterCapabilitiesGateway } from "../../interface-adapters/workflows/gateways/interpreter-capabilities.gateway.js";
 import { InterpreterCompilerGateway } from "../../interface-adapters/workflows/gateways/interpreter-compiler.gateway.js";
-import {
-  ResourceClient,
-  StructureClient,
-} from "../../interface-adapters/workflows/interfaces.js";
-import { HttpClient } from "../http-client/http.client.js";
+import { StructureClient } from "../../interface-adapters/workflows/interfaces.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
 import { AutomationModule } from "./automation.module.js";
 import { linksConfig } from "./configs.js";
@@ -131,7 +127,6 @@ import { HttpModule } from "./http.module.js";
     AutomationPolicy,
     HttpImportGateway,
     { provide: ImportFetcher, useExisting: HttpImportGateway },
-    { provide: ResourceClient, useExisting: HttpClient },
     InterpreterCompilerGateway,
     { provide: DefinitionCompiler, useExisting: InterpreterCompilerGateway },
     InterpreterCapabilitiesGateway,

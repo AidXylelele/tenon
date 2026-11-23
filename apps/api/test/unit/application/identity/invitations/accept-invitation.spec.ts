@@ -18,7 +18,10 @@ import {
   InMemoryAccountRepository,
   InMemoryInvitationRepository,
   InMemoryUserRepository,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 const now = new Date();
 const eightDays = 8 * 24 * 60 * 60 * 1000;
@@ -43,7 +46,7 @@ const acceptingWith = (
   invitations: InMemoryInvitationRepository,
   users: InMemoryUserRepository,
   accounts: InMemoryAccountRepository,
-) => new AcceptInvitation(invitations, users, accounts, passwords);
+) => new AcceptInvitation(invitations, users, accounts, passwords, unitOfWork);
 
 describe("VerifyInvitationLink", () => {
   it("the_link_of_a_pending_invitation_shows_whom_it_invites", async () => {

@@ -1,5 +1,5 @@
 import type { INestApplicationContext } from "@nestjs/common";
-import { ResilienceModule } from "@nestjs/resilience";
+import { ResilienceModule, ResilienceTimeoutError } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
 import {
   context,
@@ -14,8 +14,6 @@ import {
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import type { JsonObject, State } from "interpreter";
 import { Piscina } from "piscina";
-import { PermanentFault } from "../../../../src/interface-adapters/workflows/permanent-fault.error.js";
-import { IncompatibleRun } from "../../../../src/interface-adapters/workflows/incompatible-run.error.js";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
 import { PiscinaInterpreterClient } from "../../../../src/frameworks/interpreter/piscina-interpreter.client.js";
 
@@ -199,8 +197,8 @@ describe("the interpreter on its Piscina threads", () => {
     expect(started.step.status).toBe("running");
     expect(timer).toMatchObject({ kind: "timer" });
     expect(answered).toMatchObject({
-      status: "completed",
-      output: { done: true },
+      kind: "played",
+      step: { status: "completed", output: { done: true } },
     });
   });
 
@@ -217,7 +215,7 @@ describe("the interpreter on its Piscina threads", () => {
     expect(sources - before).toBeGreaterThanOrEqual(1);
   });
 
-  it("a_call_with_a_state_another_build_made_is_refused_as_an_incompatible_run", async () => {
+  it("a_call_with_a_state_another_build_made_is_answered_as_incompatible", async () => {
     const started = await client.start(
       callOf("version-incompatible"),
       {},
@@ -225,18 +223,31 @@ describe("the interpreter on its Piscina threads", () => {
     );
     const elsewhere = callOf("version-incompatible", "another-build");
 
-    const answered = client.suspend(elsewhere, started.step.state, moment);
+    const answered = await client.suspend(
+      elsewhere,
+      started.step.state,
+      moment,
+    );
 
-    await expect(answered).rejects.toBeInstanceOf(IncompatibleRun);
+    expect(answered).toEqual({ kind: "incompatible" });
   });
 
-  it("a_state_that_is_no_state_arrives_as_a_permanent_fault", async () => {
+  it("a_state_that_is_no_state_arrives_as_the_interpreters_refusal", async () => {
     const call = callOf("version-faulted");
     const broken = { blob: "no state" } as unknown as State;
 
     const answered = client.suspend(call, broken, moment);
 
-    await expect(answered).rejects.toBeInstanceOf(PermanentFault);
+    await expect(answered).rejects.toThrow("The interpreter refused the call");
+  });
+
+  it("a_compilation_out_of_time_is_answered_as_expired", async () => {
+    const timeout = new ResilienceTimeoutError(7_000, "interpreter-checks");
+    run.mockRejectedValueOnce(timeout);
+
+    const compilation = await client.compile(waiting, [], {});
+
+    expect(compilation).toEqual({ kind: "expired" });
   });
 
   it("a_call_carries_its_callers_trace_context_to_the_thread", async () => {

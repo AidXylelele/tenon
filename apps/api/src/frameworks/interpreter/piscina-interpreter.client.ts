@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -33,7 +34,6 @@ import type { Imports } from "interpreter/front-end";
 import { LRUCache } from "lru-cache";
 import { Piscina } from "piscina";
 import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
-import { IncompatibleRun } from "../../interface-adapters/workflows/incompatible-run.error.js";
 import type {
   CompilationData,
   FilterCheck,
@@ -41,6 +41,7 @@ import type {
   NamedFilter,
   ProgramCall,
   ProgramSource,
+  ProgramStep,
   RouteMatch,
   StartedStep,
   StructureClient,
@@ -71,9 +72,8 @@ export class PiscinaInterpreterClient
     OnModuleInit,
     OnApplicationShutdown
 {
-  static readonly RUN_THREADS = 10;
+  static readonly RUN_THREADS = availableParallelism();
   static readonly CHECK_THREADS = 2;
-  private static readonly IDLE_RUN_THREAD_MS = 60_000;
   private static readonly MOST_KEPT_STRUCTURES = 1_000;
   private static readonly NOT_STARTED =
     "The interpreter has not started its threads";
@@ -91,27 +91,23 @@ export class PiscinaInterpreterClient
     this.descriptor = this.#descriptorOf();
   }
 
-  onModuleInit(): void {
-    this.runs = {
+  async onModuleInit(): Promise<void> {
+    const runs: ThreadPool = {
       name: "runs",
-      threads: this.#threadsOf(
-        0,
-        PiscinaInterpreterClient.RUN_THREADS,
-        PiscinaInterpreterClient.IDLE_RUN_THREAD_MS,
-      ),
+      threads: this.#threadsOf(PiscinaInterpreterClient.RUN_THREADS),
       policy: this.resilience.preset("interpreter"),
       bulkhead: this.resilience.bulkhead("interpreter"),
     };
-    this.checks = {
+    const checks: ThreadPool = {
       name: "checks",
-      threads: this.#threadsOf(
-        PiscinaInterpreterClient.CHECK_THREADS,
-        PiscinaInterpreterClient.CHECK_THREADS,
-        0,
-      ),
+      threads: this.#threadsOf(PiscinaInterpreterClient.CHECK_THREADS),
       policy: this.resilience.preset("interpreter-checks"),
       bulkhead: this.resilience.bulkhead("interpreter-checks"),
     };
+    const booting = [this.#booted(runs), this.#booted(checks)];
+    await Promise.all(booting);
+    this.runs = runs;
+    this.checks = checks;
     const queues = this.#queuesGauge();
     queues.addCallback((result) => this.#queuesObserved(result));
   }
@@ -178,50 +174,82 @@ export class PiscinaInterpreterClient
     }));
   }
 
-  respond(
+  async respond(
     call: ProgramCall,
     state: State,
     response: EffectResponse,
     context: StepContext,
-  ): Promise<Step> {
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "respond", call, (program) => ({
-      program,
-      state,
-      response,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "respond",
+      call,
+      (program) => ({
+        program,
+        state,
+        response,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
-  suspend(
+  async suspend(
     call: ProgramCall,
     state: State,
     context: StepContext,
-  ): Promise<Step> {
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "suspend", call, (program) => ({
-      program,
-      state,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "suspend",
+      call,
+      (program) => ({
+        program,
+        state,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
-  resume(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
+  async resume(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "resume", call, (program) => ({
-      program,
-      state,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "resume",
+      call,
+      (program) => ({
+        program,
+        state,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
-  cancel(call: ProgramCall, state: State, context: StepContext): Promise<Step> {
+  async cancel(
+    call: ProgramCall,
+    state: State,
+    context: StepContext,
+  ): Promise<ProgramStep> {
     const pool = this.#runs();
-    return this.#program(pool, "cancel", call, (program) => ({
-      program,
-      state,
-      context,
-    }));
+    const answer = await this.#programAnswer(
+      pool,
+      "cancel",
+      call,
+      (program) => ({
+        program,
+        state,
+        context,
+      }),
+    );
+    return this.#steppedOf(answer);
   }
 
   route(call: ProgramCall, event: CloudEvent): Promise<readonly RouteMatch[]> {
@@ -393,18 +421,25 @@ export class PiscinaInterpreterClient
     return this.checks;
   }
 
+  #steppedOf(answer: TaskAnswer<Step>): ProgramStep {
+    if (answer.kind === "incompatible") return { kind: "incompatible" };
+
+    const step = this.#unwrapped(answer);
+    return { kind: "played", step };
+  }
+
   #unwrapped<T>(answer: TaskAnswer<T>): T {
     switch (answer.kind) {
       case "answered":
         return answer.value;
       case "fault":
-        throw new PermanentFault(
+        throw new Error(
           `The interpreter refused the call: ${answer.name}: ${answer.message}`,
         );
       case "missing":
-        throw new PermanentFault("The interpreter did not keep the program");
+        throw new Error("The interpreter did not keep the program");
       case "incompatible":
-        throw new IncompatibleRun();
+        throw new Error("The interpreter does not rebuild the run's program");
     }
   }
 
@@ -430,16 +465,24 @@ export class PiscinaInterpreterClient
     }
   }
 
-  #threadsOf(least: number, most: number, idleMs: number): Piscina {
+  async #booted(pool: ThreadPool): Promise<void> {
+    const count = pool.threads.maxThreads;
+    const readiness = Array.from({ length: count }, () => {
+      const task = this.#taskOf(pool.name, null);
+      return pool.threads.run(task, { name: "ready" });
+    });
+    await Promise.all(readiness);
+  }
+
+  #threadsOf(count: number): Piscina {
     const path = fileURLToPath(import.meta.url);
     const extension = extname(path);
     const thread = `./interpreter.thread${extension}`;
     const filename = new URL(thread, import.meta.url).href;
     return new Piscina({
       filename,
-      minThreads: least,
-      maxThreads: most,
-      idleTimeout: idleMs,
+      minThreads: count,
+      maxThreads: count,
       atomics: "async",
       resourceLimits: { maxOldGenerationSizeMb: 256 },
     });

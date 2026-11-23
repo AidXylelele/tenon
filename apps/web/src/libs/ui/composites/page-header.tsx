@@ -1,10 +1,7 @@
-import { type Crumb, Crumbs } from "./crumbs";
-
 interface PageHeaderProps {
   readonly title: React.ReactNode;
   readonly description?: React.ReactNode;
   readonly actions?: React.ReactNode;
-  readonly crumbs?: readonly Crumb[];
   readonly level?: 1 | 2;
 }
 
@@ -12,20 +9,18 @@ export function PageHeader({
   title,
   description,
   actions,
-  crumbs,
   level = 1,
 }: PageHeaderProps) {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex min-w-0 flex-col gap-1">
-        {crumbs !== undefined && <Crumbs trail={crumbs} />}
         {level === 1 ? (
           <h1 className="heading-1 break-words">{title}</h1>
         ) : (
           <h2 className="sr-only">{title}</h2>
         )}
         {description !== undefined && (
-          <p className="max-w-prose text-sm text-muted-foreground">
+          <p className="max-w-prose text-caption text-muted-foreground">
             {description}
           </p>
         )}

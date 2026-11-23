@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
 import { WorkflowRepository } from "../workflows/ports.js";
@@ -20,9 +20,9 @@ export class StartInstance {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runs: InstanceRuns,
     private readonly runtime: WorkflowRuntime,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: StartInstanceCommand): Promise<StartInstanceResult> {
     const workflow = await this.workflows.findByName(command.name);
 
@@ -51,8 +51,10 @@ export class StartInstance {
     if (!started.ok) return started;
 
     const instance = started.value;
-    await this.instances.save(instance);
-    await this.runs.start(instance);
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.runs.start(instance);
+    });
     return { ok: true, value: { instanceId: instance.id } };
   }
 }

@@ -18,7 +18,10 @@ import {
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
   T0,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 const name = new WorkflowName("sales", "route-lead");
 
@@ -32,11 +35,21 @@ function setUp() {
     instances,
     runs,
     schedules,
-    turnOn: new TurnWorkflowOn(workflows),
-    turnOff: new TurnWorkflowOff(workflows),
+    turnOn: new TurnWorkflowOn(workflows, unitOfWork),
+    turnOff: new TurnWorkflowOff(workflows, unitOfWork),
     sync: new SyncSchedule(workflows, schedules),
-    scheduled: new StartScheduledInstance(workflows, instances, runs),
-    continued: new ContinueSchedule(instances, workflows, schedules),
+    scheduled: new StartScheduledInstance(
+      workflows,
+      instances,
+      runs,
+      unitOfWork,
+    ),
+    continued: new ContinueSchedule(
+      instances,
+      workflows,
+      schedules,
+      unitOfWork,
+    ),
   };
 }
 

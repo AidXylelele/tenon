@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq, type SQL } from "drizzle-orm";
 import type { DraftRepository } from "../../../application/automation/drafts/ports.js";
 import type { Draft } from "../../../domain/automation/drafts/draft.js";
@@ -29,7 +25,6 @@ export class PostgresDraftRepository implements DraftRepository {
     return this.draftMapper.toEntity(row);
   }
 
-  @Transactional(Propagation.Mandatory)
   async save(draft: Draft): Promise<void> {
     const row = this.draftMapper.toRow(draft);
 

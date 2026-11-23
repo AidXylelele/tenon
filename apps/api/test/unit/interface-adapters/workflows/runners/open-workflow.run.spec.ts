@@ -1,5 +1,5 @@
 import type { INestApplicationContext } from "@nestjs/common";
-import { SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { Test } from "@nestjs/testing";
 import {
   WorkflowClient,
@@ -16,7 +16,6 @@ import {
 } from "../../../../../src/interface-adapters/workflows/interfaces.js";
 import { RunController } from "../../../../../src/interface-adapters/workflows/run.controller.js";
 import { OpenWorkflowRun } from "../../../../../src/interface-adapters/workflows/runners/open-workflow.run.js";
-import { RunTracer } from "../../../../../src/interface-adapters/workflows/runners/run.tracer.js";
 import { RecordedSpans } from "../../../../support/recorded-spans.js";
 
 const ENDED: RunAgendaView = {
@@ -93,6 +92,18 @@ class ScriptedRuns {
   }
 }
 
+class ExhaustedRuns extends ScriptedRuns {
+  responses = 0;
+
+  override respond(): Promise<RunAgendaView> {
+    this.responses += 1;
+    const fault = new PermanentFault(
+      "The interpreter ran out of time or memory",
+    );
+    return Promise.reject(fault);
+  }
+}
+
 class TimedPerformer {
   constructor(private readonly delays: Readonly<Record<string, number>>) {}
 
@@ -151,7 +162,7 @@ describe("the run of an instance on the engine", () => {
         WorkflowsModule.forRoot({
           worker: { enabled: false },
           allowInMemoryStorage: true,
-          retry: false,
+          retry: { attempts: 2, backoff: { delay: 0 } },
         }),
       ],
       providers: [
@@ -159,10 +170,6 @@ describe("the run of an instance on the engine", () => {
         { provide: RunController, useValue: runs },
         { provide: EffectClient, useValue: performer },
         { provide: EngineRunGateway, useValue: engine },
-        {
-          provide: RunTracer,
-          useValue: new RunTracer(trace.getTracer("test")),
-        },
       ],
     }).compile();
     app = await moduleRef.init();
@@ -324,7 +331,7 @@ describe("the run of an instance on the engine", () => {
     expect(runs.answers).toEqual([]);
   });
 
-  it("fails_its_instance_when_a_call_fails_permanently", async () => {
+  it("fails_its_instance_when_the_interpreter_runs_out_of_time_or_memory", async () => {
     const agenda = {
       ended: false,
       calls: [aCall("/do/0/fetch")],
@@ -334,14 +341,12 @@ describe("the run of an instance on the engine", () => {
       receives: [],
       waits: [],
     };
-    const runs = new ScriptedRuns(agenda);
-    const refusing = new ScriptedPerformer(() =>
-      Promise.reject(new PermanentFault("The host does not perform it")),
-    );
-    const worker = await started(runs, refusing);
+    const runs = new ExhaustedRuns(agenda);
+    const worker = await started(runs);
 
     await worker.drain();
 
+    expect(runs.responses).toBe(1);
     expect(runs.failed).toEqual(["instance-1"]);
   });
 
@@ -421,7 +426,7 @@ describe("the run of an instance on the engine", () => {
     expect(runs.answers).toEqual(["/fork/1/fetch:responded"]);
   });
 
-  it("traces_an_execution_as_a_consumer_span_holding_a_span_per_step_attempt", async () => {
+  it("traces_an_execution_as_one_consumer_span_without_a_span_per_step", async () => {
     const agenda = {
       ended: false,
       calls: [aCall("/do/0/fetch")],
@@ -435,31 +440,18 @@ describe("the run of an instance on the engine", () => {
 
     await worker.drain();
 
-    const executions = spans.named("execute open-workflow");
-    const [execution] = executions;
-    const steps = executions
-      .flatMap((parent) => spans.childrenOf(parent))
-      .map((span) => span.name);
-    const [effect] = spans.named("step effect");
-    expect(execution?.kind).toBe(SpanKind.CONSUMER);
-    expect(execution?.attributes).toEqual({
+    const execution = spans.only("execute open-workflow");
+    const names = spans.all().map((span) => span.name);
+    expect(execution.kind).toBe(SpanKind.CONSUMER);
+    expect(execution.attributes).toEqual({
       "tenon.workflow": "open-workflow",
       "tenon.instance.id": "instance-1",
       "tenon.workflow.generation": 1,
     });
-    expect(steps).toEqual([
-      "step secrets",
-      "step begin",
-      "step effect",
-      "step respond",
-    ]);
-    expect(effect?.attributes).toEqual({
-      "tenon.step.kind": "effect",
-      "tenon.step.attempt": 1,
-    });
+    expect(names).toEqual(["execute open-workflow"]);
   });
 
-  it("opens_no_span_for_the_steps_a_later_execution_replays", async () => {
+  it("ends_an_execution_its_wait_interrupts_without_marking_it_an_error", async () => {
     const agenda = {
       ended: false,
       calls: [],
@@ -478,38 +470,10 @@ describe("the run of an instance on the engine", () => {
     await worker.drain();
 
     const executions = spans.named("execute open-workflow");
-    expect(executions).toHaveLength(2);
-    expect(spans.named("step secrets")).toHaveLength(1);
-    expect(spans.named("step begin")).toHaveLength(1);
-    expect(spans.named("step agenda")).toHaveLength(1);
     expect(executions.map((span) => span.status.code)).toEqual([
       SpanStatusCode.UNSET,
       SpanStatusCode.UNSET,
     ]);
-  });
-
-  it("marks_the_attempt_of_a_call_that_failed_permanently_as_an_error", async () => {
-    const agenda = {
-      ended: false,
-      calls: [aCall("/do/0/fetch")],
-      processes: [],
-      detached: [],
-      children: [],
-      receives: [],
-      waits: [],
-    };
-    const refusing = new ScriptedPerformer(() =>
-      Promise.reject(new PermanentFault("The host does not perform it")),
-    );
-    const worker = await started(new ScriptedRuns(agenda), refusing);
-
-    await worker.drain();
-
-    const [effect] = spans.named("step effect");
-    expect(effect?.status).toEqual({
-      code: SpanStatusCode.ERROR,
-      message: "The host does not perform it",
-    });
-    expect(effect?.events.map((event) => event.name)).toEqual(["exception"]);
+    expect(executions.flatMap((span) => span.events)).toEqual([]);
   });
 });

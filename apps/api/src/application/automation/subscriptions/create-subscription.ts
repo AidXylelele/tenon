@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Subscription } from "../../../domain/automation/subscriptions/subscription.js";
 import { SecretRepository } from "../secrets/ports.js";
 import { EndpointRefusal } from "./enums.js";
@@ -20,9 +20,9 @@ export class CreateSubscription {
     private readonly filters: SubscriptionFilters,
     private readonly secrets: SecretRepository,
     private readonly sender: EventSender,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(
     command: CreateSubscriptionCommand,
   ): Promise<CreateSubscriptionResult> {
@@ -49,7 +49,7 @@ export class CreateSubscription {
     if (!created.ok) return created;
 
     const subscription = created.value;
-    await this.subscriptions.add(subscription);
+    await this.unitOfWork.run(() => this.subscriptions.add(subscription));
     const view = {
       id: subscription.id,
       name: subscription.name,

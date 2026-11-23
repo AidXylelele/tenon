@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { Control } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
@@ -18,9 +18,9 @@ export class CancelInstance {
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
     private readonly runs: InstanceRuns,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: CancelInstanceCommand): Promise<InstanceResult> {
     const instance = await this.instances.find(command.instanceId);
 
@@ -34,7 +34,7 @@ export class CancelInstance {
 
     if (instance.pending) {
       instance.cancel(now);
-      await this.instances.save(instance);
+      await this.unitOfWork.run(() => this.instances.save(instance));
       return { ok: true, value: undefined };
     }
 
@@ -47,8 +47,10 @@ export class CancelInstance {
       command.signal,
     );
     instance.advance(turn, secrets, now);
-    await this.instances.save(instance);
-    await this.runs.wakeOnControl(instance, Control.Cancel);
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.runs.wakeOnControl(instance, Control.Cancel);
+    });
     return { ok: true, value: undefined };
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { EventStore } from "../events/ports.js";
 import type { MatchSubscriptionsCommand } from "./interfaces.js";
 import {
@@ -17,9 +17,9 @@ export class MatchSubscriptions {
     private readonly filters: SubscriptionFilters,
     private readonly deliveries: Deliveries,
     private readonly log: DeliveryLog,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: MatchSubscriptionsCommand): Promise<void> {
     const now = new Date();
     const event = await this.events.find(command.sequence);
@@ -33,9 +33,11 @@ export class MatchSubscriptions {
       command.signal,
     );
 
-    for (const subscription of accepting) {
-      await this.log.pending(subscription, event, now);
-      await this.deliveries.schedule(subscription, event);
-    }
+    await this.unitOfWork.run(async () => {
+      for (const subscription of accepting) {
+        await this.log.pending(subscription, event, now);
+        await this.deliveries.schedule(subscription, event);
+      }
+    });
   }
 }

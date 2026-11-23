@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   editorHref,
+  isEditorPath,
   runHref,
   runsHref,
   notificationHref,
@@ -78,5 +79,17 @@ describe("the addresses of the console", () => {
     expect(signInHref({ reason: "ended", next: "/runs?phase=running" })).toBe(
       "/sign-in?reason=ended&next=%2Fruns%3Fphase%3Drunning",
     );
+  });
+
+  it.each([
+    ["/workflows/new", true],
+    ["/workflows/sales/route-lead/edit", true],
+    ["/workflows/sales/route-lead", false],
+    ["/workflows/sales/route-lead/edit/more", false],
+    ["/runs/7c41e2d0", false],
+  ])("the_address_%s_is_the_editor_%s", (pathname, editing) => {
+    const editor = isEditorPath(pathname);
+
+    expect(editor).toBe(editing);
   });
 });

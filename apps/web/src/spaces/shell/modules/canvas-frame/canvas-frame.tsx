@@ -4,7 +4,10 @@ export function CanvasFrame({
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-[calc(100svh-3.5rem)] min-h-[28rem] min-w-0 flex-col">
+    <div
+      data-frame="canvas"
+      className="flex min-h-[28rem] min-w-0 flex-1 flex-col"
+    >
       {children}
     </div>
   );

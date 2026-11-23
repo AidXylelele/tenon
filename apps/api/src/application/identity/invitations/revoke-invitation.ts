@@ -1,14 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import type { RevocationResult } from "./interfaces.js";
 import { InvitationRepository } from "./ports.js";
 
 @Injectable()
 export class RevokeInvitation {
-  constructor(private readonly invitations: InvitationRepository) {}
+  constructor(
+    private readonly invitations: InvitationRepository,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  @Transactional()
   async execute(id: string): Promise<RevocationResult> {
     const invitation = await this.invitations.find(id);
 
@@ -19,7 +21,7 @@ export class RevokeInvitation {
 
     if (!revoked.ok) return revoked;
 
-    await this.invitations.save(invitation);
+    await this.unitOfWork.run(() => this.invitations.save(invitation));
     return { ok: true, value: undefined };
   }
 }

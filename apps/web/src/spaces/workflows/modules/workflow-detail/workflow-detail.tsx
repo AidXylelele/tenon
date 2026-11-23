@@ -22,7 +22,6 @@ import {
   runsHref,
   versionHref,
   workflowHref,
-  WORKFLOWS_HREF,
 } from "@/libs/routing/routes";
 import { type Query, segment } from "@/libs/routing/segment";
 import {
@@ -139,11 +138,6 @@ export async function WorkflowDetail({
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "Workflows", href: WORKFLOWS_HREF },
-          { label: namespace },
-          { label: name },
-        ]}
         title={title}
         description={summary}
         actions={

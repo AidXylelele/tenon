@@ -82,6 +82,18 @@ const libFloors: [string, Floor][] = [
 
 const modulePartFloors: [string, Floor][] = [
   [
+    "src/spaces/workflows/modules/workflow-editor/condition-builder/**",
+    FEATURE_FLOOR,
+  ],
+  [
+    "src/spaces/workflows/modules/workflow-editor/data-picker/**",
+    FEATURE_FLOOR,
+  ],
+  [
+    "src/spaces/workflows/modules/workflow-editor/form-fields/**",
+    FEATURE_FLOOR,
+  ],
+  [
     "src/spaces/workflows/modules/workflow-editor/script-field/**",
     FEATURE_FLOOR,
   ],
@@ -89,6 +101,7 @@ const modulePartFloors: [string, Floor][] = [
     "src/spaces/workflows/modules/workflow-editor/step-catalog/**",
     FEATURE_FLOOR,
   ],
+  ["src/spaces/workflows/modules/workflow-editor/step-form/**", FEATURE_FLOOR],
 ];
 
 const floors = operationFloors.concat(

@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { Outbox } from "@nestjs/outbox";
 import { and, asc, eq, isNull, lte, or, type SQL, sql } from "drizzle-orm";
 import type { AcceptedEvent } from "../../../application/automation/events/interfaces.js";
@@ -18,7 +14,6 @@ import type {
   EventOfferedMessage,
   TriggerOfferedMessage,
 } from "../../messaging/interfaces.js";
-import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type { Transaction } from "../interfaces.js";
 import {
   listener as listeners,
@@ -34,7 +29,6 @@ export class PostgresEventOfferStore implements EventOffers {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
     private readonly outbox: Outbox,
-    private readonly tracer: OutboxTracer,
   ) {}
 
   async programsFor(event: AcceptedEvent): Promise<ProgramReference[]> {
@@ -55,7 +49,6 @@ export class PostgresEventOfferStore implements EventOffers {
     return rows.map((row) => ({ versionId: row.versionId }));
   }
 
-  @Transactional(Propagation.Mandatory)
   async offer(
     matches: readonly RoutingMatch[],
     event: AcceptedEvent,
@@ -90,13 +83,11 @@ export class PostgresEventOfferStore implements EventOffers {
       topic: MessageTopic.EventOffered,
       key: instanceId,
       payload: this.#offered(instanceId, event, listens),
-      headers: this.tracer.headers(),
     }));
 
     if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
   }
 
-  @Transactional(Propagation.Mandatory)
   async trigger(
     matches: readonly RoutingMatch[],
     event: AcceptedEvent,
@@ -119,7 +110,6 @@ export class PostgresEventOfferStore implements EventOffers {
       topic: MessageTopic.TriggerOffered,
       key: row.workflowId,
       payload: this.#triggered(row.workflowId, event),
-      headers: this.tracer.headers(),
     }));
 
     if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);

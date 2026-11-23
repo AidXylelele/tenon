@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { InstanceRefusal } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
 import type { InstanceResult, ReceiveInboundCommand } from "./interfaces.js";
@@ -15,9 +15,9 @@ export class ReceiveInbound {
     private readonly instances: WorkflowInstanceRepository,
     private readonly messages: ReceivedMessages,
     private readonly runs: InstanceRuns,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: ReceiveInboundCommand): Promise<InstanceResult> {
     const instance = await this.instances.find(command.instanceId);
 
@@ -27,17 +27,19 @@ export class ReceiveInbound {
 
     if (!receiving) return { ok: false, failure: InstanceRefusal.NotReceiving };
 
-    const position = await this.messages.append(
-      instance,
-      command.execution,
-      command.inbound,
-      command.fence,
-    );
+    return this.unitOfWork.run(async () => {
+      const position = await this.messages.append(
+        instance,
+        command.execution,
+        command.inbound,
+        command.fence,
+      );
 
-    if (position === null)
-      return { ok: false, failure: InstanceRefusal.NotReceiving };
+      if (position === null)
+        return { ok: false, failure: InstanceRefusal.NotReceiving };
 
-    await this.runs.wakeOnInbound(instance, command.execution, position);
-    return { ok: true, value: undefined };
+      await this.runs.wakeOnInbound(instance, command.execution, position);
+      return { ok: true, value: undefined };
+    });
   }
 }

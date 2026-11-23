@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Account } from "../../../domain/identity/accounts/account.js";
 import { InvitationToken } from "../../../domain/identity/invitations/invitation-token.js";
 import { User } from "../../../domain/identity/users/user.js";
@@ -19,9 +19,9 @@ export class AcceptInvitation {
     private readonly users: UserRepository,
     private readonly accounts: AccountRepository,
     private readonly passwords: PasswordHasher,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: AcceptInvitationCommand): Promise<AcceptanceResult> {
     const token = new InvitationToken(command.token);
     const invitation = await this.invitations.findByToken(token);
@@ -41,10 +41,12 @@ export class AcceptInvitation {
     if (!accepted.ok) return accepted;
 
     const passwordHash = await this.passwords.hash(command.password);
-    await this.users.add(user);
     const account = Account.password(user, passwordHash, now);
-    await this.accounts.save(account);
-    await this.invitations.save(invitation);
+    await this.unitOfWork.run(async () => {
+      await this.users.add(user);
+      await this.accounts.save(account);
+      await this.invitations.save(invitation);
+    });
     const signedIn = {
       id: user.id,
       email: user.email,
