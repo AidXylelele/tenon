@@ -1,7 +1,6 @@
-import { diff } from "@codemirror/merge";
-import { Transaction } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { forgetHistory } from "@/libs/codemirror/base-setup";
+import { takeOwnersText } from "@/libs/codemirror/owned-text";
 import type { DraftRevision, DraftWrite } from "@/libs/data-access/types";
 import type { JsonObject } from "@/libs/json/json";
 import { reasonOf } from "@/libs/language-client/failures";
@@ -17,11 +16,11 @@ const PAUSE_MS = 1500;
 const RETRY_MS = 5000;
 const SECOND_MS = 1000;
 const TRANSIENT: ReadonlySet<number> = new Set([408, 429]);
+const NO_LAYOUT: JsonObject = {};
 
-export class DraftKeeper {
+export class DraftStore {
   private etag: string | null;
   private base: string | null;
-  private layout: JsonObject;
   private pending = false;
   private closed = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -36,8 +35,7 @@ export class DraftKeeper {
   ) {
     this.etag = opened?.etag ?? null;
     this.base = opened?.draft.source ?? null;
-    this.layout = opened?.draft.layout ?? {};
-    const saved = opened === null ? null : DraftKeeper.savedOf(opened);
+    const saved = opened === null ? null : DraftStore.savedOf(opened);
     this.state = {
       status: "clean",
       saved,
@@ -91,7 +89,7 @@ export class DraftKeeper {
 
     this.adopt(open.theirs);
     this.show({ conflict: null });
-    DraftKeeper.replaceText(editor, text);
+    DraftStore.replaceText(editor, text);
     void this.enqueue(null);
   }
 
@@ -118,7 +116,7 @@ export class DraftKeeper {
     }
 
     this.adopt(answer.revision);
-    DraftKeeper.replaceText(editor, answer.revision.draft.source);
+    DraftStore.replaceText(editor, answer.revision.draft.source);
   }
 
   dispose(): void {
@@ -165,7 +163,7 @@ export class DraftKeeper {
     this.show({ status: "saving" });
 
     try {
-      const content = { source: text, layout: this.layout };
+      const content = { source: text, layout: NO_LAYOUT };
       const request = { ...this.workflow, ...content, etag: this.etag };
       const answer = await saveDraftAction(request);
       return await this.settle(answer, text);
@@ -227,8 +225,7 @@ export class DraftKeeper {
   private adopt(revision: DraftRevision): void {
     this.etag = revision.etag;
     this.base = revision.draft.source;
-    this.layout = revision.draft.layout;
-    this.show({ saved: DraftKeeper.savedOf(revision) });
+    this.show({ saved: DraftStore.savedOf(revision) });
   }
 
   private show(change: Partial<DraftState>): void {
@@ -252,17 +249,7 @@ export class DraftKeeper {
   }
 
   private static replaceText(editor: EditorView, text: string): void {
-    const current = editor.state.doc.toString();
-    const changes = diff(current, text).map((change) => ({
-      from: change.fromA,
-      to: change.toA,
-      insert: text.slice(change.fromB, change.toB),
-    }));
-    const annotations = [
-      Transaction.addToHistory.of(false),
-      Transaction.remote.of(true),
-    ];
-    editor.dispatch({ changes, annotations });
+    takeOwnersText(editor, text);
     forgetHistory(editor);
   }
 }

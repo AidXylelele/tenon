@@ -48,6 +48,7 @@ const RAISE_FORM: StepFormResult = {
   step: RAISE.id,
   failure: "stop",
   retry: null,
+  timeout: null,
   result: null,
   fields: [
     fieldOf({
@@ -633,5 +634,43 @@ describe("retry settings", () => {
     const note = screen.getByText(/written in another form/);
 
     expect(note).toBeInTheDocument();
+  });
+
+  it("a_call_signs_in_with_a_bearer_token_from_a_secret", () => {
+    const pointer = `${FETCH_STEP.pointer}/with/endpoint/authentication`;
+    const authentication = fieldOf({
+      key: "authentication",
+      pointer,
+      input: "oneOf",
+    });
+    const fields = FETCH_FORM.fields.map((field) =>
+      field.key === "with"
+        ? { ...field, fields: [...field.fields, authentication] }
+        : field,
+    );
+    const form = { ...FETCH_FORM, fields };
+    const { onEdit } = shown({ step: FETCH_STEP, form });
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /More options/ }));
+    });
+
+    const scheme = screen.getByRole("combobox", { name: /Authentication/ });
+    act(() => {
+      fireEvent.keyDown(scheme, { key: "ArrowDown" });
+    });
+    act(() => {
+      fireEvent.click(
+        screen.getByRole("option", { name: "A bearer token from a secret" }),
+      );
+    });
+    const secret = screen.getByRole("textbox", { name: "The secret's name" });
+    act(() => {
+      fireEvent.change(secret, { target: { value: "API_TOKEN" } });
+      fireEvent.blur(secret);
+    });
+
+    expect(onEdit).toHaveBeenCalledWith([
+      { kind: "setField", pointer, value: { bearer: { use: "API_TOKEN" } } },
+    ]);
   });
 });

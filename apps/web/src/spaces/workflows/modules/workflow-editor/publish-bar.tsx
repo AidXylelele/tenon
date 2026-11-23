@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  CircleCheckIcon,
-  CircleXIcon,
-  SendIcon,
-  ShieldCheckIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { CircleXIcon, SendIcon, TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -21,17 +15,10 @@ import { Button } from "@/libs/ui/components/button";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { Status, type StatusLook } from "@/libs/ui/composites/status";
 import type { WorkflowSession } from "@/operations/workflow-language";
-import { checkAction } from "./actions";
 import type { Publication } from "./interfaces";
 import { freeVersion } from "./version";
 
 const TAKEN = "workflow.version-taken";
-
-const READY: StatusLook = {
-  tone: "success",
-  icon: CircleCheckIcon,
-  label: "Ready to publish",
-};
 
 interface PublishBarProps {
   readonly session: WorkflowSession;
@@ -41,6 +28,7 @@ interface PublishBarProps {
   readonly onPublished: (version: Version) => Promise<void>;
   readonly currentVersion: string | null;
   readonly onUseVersion: (version: string) => void;
+  readonly onShowProblems: () => void;
 }
 
 export function PublishBar({
@@ -51,13 +39,13 @@ export function PublishBar({
   onPublished,
   currentVersion,
   onUseVersion,
+  onShowProblems,
 }: PublishBarProps) {
   const router = useRouter();
   const [outcome, setOutcome] = useState<StatusLook | null>(null);
   const [offered, setOffered] = useState<string | null>(null);
-  const [checking, startChecking] = useTransition();
   const [publishing, startPublishing] = useTransition();
-  const busy = checking || publishing;
+  const busy = publishing;
 
   async function documentOrRefusal(): Promise<unknown> {
     const read = await session.document();
@@ -86,26 +74,12 @@ export function PublishBar({
     setOutcome({ tone: "danger", icon: CircleXIcon, label: problem.detail });
   }
 
-  function check() {
-    setOutcome(null);
-    startChecking(async () => {
-      const document = await documentOrRefusal();
-
-      if (document === null) return;
-
-      const checked = await checkAction(document);
-
-      if (checked.ok) {
-        onPlatformProblems([]);
-        setOutcome(READY);
-        return;
-      }
-
-      await refuse(checked.problem);
-    });
-  }
-
   function publishDraft() {
+    if (problems > 0) {
+      onShowProblems();
+      return;
+    }
+
     setOutcome(null);
     setOffered(null);
     startPublishing(async () => {
@@ -149,20 +123,10 @@ export function PublishBar({
         {busy && (
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <Spinner />
-            {publishing ? "Publishing…" : "Checking…"}
+            Publishing…
           </span>
         )}
         {!busy && outcome !== null && <Status look={outcome} />}
-        {!busy && outcome === null && problems > 0 && (
-          <Status
-            look={{
-              tone: "danger",
-              icon: CircleXIcon,
-              label:
-                problems === 1 ? "1 problem" : `${String(problems)} problems`,
-            }}
-          />
-        )}
       </span>
       {!busy && offered !== null && (
         <Button
@@ -177,10 +141,6 @@ export function PublishBar({
           Use version {offered}
         </Button>
       )}
-      <Button variant="outline" disabled={busy} onClick={check}>
-        <ShieldCheckIcon data-icon="inline-start" />
-        Check
-      </Button>
       <Button disabled={busy} onClick={publishDraft}>
         <SendIcon data-icon="inline-start" />
         Publish

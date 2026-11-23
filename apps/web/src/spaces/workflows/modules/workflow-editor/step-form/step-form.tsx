@@ -61,7 +61,13 @@ export function StepForm({
   const resultAt = codeAt === -1 ? pathed.length : codeAt + 1;
   const beforeResult = layout.essentials.slice(0, resultAt);
   const afterResult = layout.essentials.slice(resultAt);
-  const moreSummary = summaryOf(layout.more, kind, step.pointer, USUAL);
+  const moreSummary = summaryOf(
+    layout.more,
+    kind,
+    step.pointer,
+    USUAL,
+    form.timeout,
+  );
   const dataSummary = summaryOf(layout.data, kind, step.pointer, EXPRESSIONS);
   const settings: FormSettings = {
     kind,
@@ -71,6 +77,7 @@ export function StepForm({
     fields: form.fields,
     flowChoices,
     scriptLanguage,
+    timeLimit: form.timeout,
     renderData,
     renderCondition,
     renderCode,

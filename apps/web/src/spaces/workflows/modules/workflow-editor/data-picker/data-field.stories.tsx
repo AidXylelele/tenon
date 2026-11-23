@@ -36,6 +36,7 @@ const meta = {
     data: AT_AN_ADDRESS,
     onText: fn(),
     onUse: fn(),
+    onTemplate: fn(),
     onClear: fn(),
   },
 } satisfies Meta<typeof DataField>;
@@ -61,4 +62,17 @@ export const SecretReference: Story = {
 
 export const AnExpression: Story = {
   args: { value: '${ "https://example.com/" + (now | todate) }' },
+};
+
+export const TextWithData: Story = {
+  args: {
+    value: "New digest: ${ .title }",
+    template: {
+      kind: "template",
+      parts: [
+        { kind: "text", text: "New digest: " },
+        { kind: "data", expression: ".title", label: "title" },
+      ],
+    },
+  },
 };

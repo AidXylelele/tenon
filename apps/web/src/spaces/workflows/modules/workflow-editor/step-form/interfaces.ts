@@ -3,6 +3,7 @@ import type {
   FormField,
   Step,
   StepFormResult,
+  TemplatePart,
   WorkflowFormResult,
 } from "language-server/protocol";
 import type { ReactNode } from "react";
@@ -25,6 +26,10 @@ export interface DataSlot {
   readonly placeholder: string;
   readonly onText: (text: string) => void;
   readonly onUse: (use: DataUse) => void;
+  readonly onTemplate: (
+    parts: readonly TemplatePart[],
+    use: DataUse | null,
+  ) => void;
   readonly onClear: () => void;
 }
 
@@ -35,6 +40,7 @@ export interface ConditionSlot {
   readonly labelledBy: string;
   readonly describedBy: string | undefined;
   readonly invalid: boolean;
+  readonly header?: HTMLElement | null;
 }
 
 export interface CodeSlot {

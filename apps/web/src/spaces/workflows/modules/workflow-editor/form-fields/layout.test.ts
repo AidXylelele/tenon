@@ -155,7 +155,13 @@ describe("the summary of options behind a disclosure", () => {
     const value = { after: { seconds: 45 } };
     const limit = { ...written("timeout", "Timeout"), value };
 
-    const summary = summaryOf([limit], "http", FETCH_STEP.pointer, "Usual");
+    const summary = summaryOf(
+      [limit],
+      "http",
+      FETCH_STEP.pointer,
+      "Usual",
+      45_000,
+    );
 
     expect(summary).toBe("Time limit 45 s");
   });

@@ -22,7 +22,7 @@ import {
   numberCommitOf,
   textEditsOf,
   timeLimitCommitOf,
-  timeLimitOf,
+  limitSecondsOf,
   valueEditsOf,
 } from "../form-fields";
 import { blurOnEnter, type ControlWiring } from "./field-shell";
@@ -238,8 +238,9 @@ export function JsonControl({ field, wiring }: ControlProps) {
 
 export function TimeLimitControl(props: ControlProps) {
   const { field, words, wiring } = props;
+  const { timeLimit } = useFormSettings();
   const apply = useCommit(wiring);
-  const seconds = timeLimitOf(field.value);
+  const seconds = limitSecondsOf(timeLimit);
   const shown = seconds === null ? "" : String(seconds);
   const isOtherwise = field.written && seconds === null;
 

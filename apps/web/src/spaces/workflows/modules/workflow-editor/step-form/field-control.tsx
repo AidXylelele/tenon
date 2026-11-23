@@ -14,10 +14,12 @@ import {
   clearEditsOf,
   CONTINUE,
   dataUseOf,
+  templateEditsOf,
   flowChoicesOf,
   textEditsOf,
   valueEditsOf,
 } from "../form-fields";
+import { AuthenticationControl } from "./authentication-control";
 import { useFormSettings } from "./form-settings";
 import type { CodeSlot, ConditionSlot, DataSlot, DataUse } from "./interfaces";
 import { Segmented } from "./segmented";
@@ -63,6 +65,10 @@ export function FieldControl(props: ControlProps) {
       return <CodeControl {...props} />;
     case "seconds":
       return <TimeLimitControl {...props} />;
+    case "authentication": {
+      const written = JSON.stringify(field.value);
+      return <AuthenticationControl key={written} {...props} />;
+    }
     case "httpMethod":
       return <Segmented field={field} options={HTTP_METHODS} wiring={wiring} />;
     case "language":
@@ -117,6 +123,12 @@ export function DataControl(props: ControlProps) {
     },
     onUse: (use: DataUse) => {
       const edits = dataUseOf(field.pointer, use.value, use.export);
+      onEdit(edits);
+    },
+    onTemplate: (parts, use) => {
+      const exported = use?.export ?? null;
+      const value = use?.value ?? "";
+      const edits = templateEditsOf(field.pointer, parts, exported, value);
       onEdit(edits);
     },
     onClear: () => {

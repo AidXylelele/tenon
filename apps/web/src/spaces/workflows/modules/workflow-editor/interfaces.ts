@@ -5,7 +5,6 @@ import type {
   StepFormResult,
   StepVariant,
   StructureResult,
-  Trigger,
   WorkflowFormResult,
 } from "language-server/protocol";
 import type { Diagnostic, Position } from "vscode-languageserver-protocol";
@@ -13,11 +12,15 @@ import type { Problem } from "@/libs/data-access/problem";
 import type {
   DraftRevision,
   HostProfile,
+  InstanceSummary,
   Person,
+  TaskRecord,
   Version,
 } from "@/libs/data-access/types";
 import type { JsonObject } from "@/libs/json/json";
 import type { WorkflowSession } from "@/operations/workflow-language";
+import type { InsertPlace } from "@/features/workflow-flow";
+import type { Webhook } from "./step-form";
 
 export interface EditingSession {
   readonly session: WorkflowSession;
@@ -26,6 +29,7 @@ export interface EditingSession {
   readonly selected: Step | null;
   readonly selectedId: string | null;
   readonly form: StepFormResult | null;
+  readonly protection: StepFormResult | null;
   readonly formless: boolean;
   readonly startForm: WorkflowFormResult | null;
   readonly startFormless: boolean;
@@ -36,16 +40,10 @@ export interface EditingSession {
   readonly onUpdate: (update: ViewUpdate) => void;
   readonly select: (step: string | null) => void;
   readonly reveal: (start: Position) => void;
-  readonly edit: (action: EditAction, remembered?: boolean) => Promise<void>;
-}
-
-export interface StartPanelProps {
-  readonly triggers: readonly Trigger[];
-  readonly form: WorkflowFormResult | null;
-  readonly formless: boolean;
-  readonly onShow: (trigger: Trigger) => void;
-  readonly onEdit: (action: EditAction) => void;
-  readonly onClose: () => void;
+  readonly edit: (
+    actions: readonly EditAction[],
+    remembered?: boolean,
+  ) => Promise<void>;
 }
 
 export type FormReading =
@@ -53,8 +51,27 @@ export type FormReading =
       readonly kind: "step";
       readonly id: string;
       readonly form: StepFormResult | null;
+      readonly protection: StepFormResult | null;
     }
   | { readonly kind: "start"; readonly form: WorkflowFormResult | null };
+
+export type Aside =
+  | { readonly kind: "form" }
+  | { readonly kind: "catalog"; readonly place: InsertPlace }
+  | { readonly kind: "test" }
+  | { readonly kind: "problems" };
+
+export type CodeShown = "flow" | "code";
+
+export interface TestRun {
+  readonly run: InstanceSummary;
+  readonly records: readonly TaskRecord[];
+}
+
+export type TestRunAnswer =
+  | { readonly kind: "started"; readonly run: InstanceSummary }
+  | { readonly kind: "conflict" }
+  | { readonly kind: "refused"; readonly problem: Problem };
 
 export interface LeaveGuard {
   readonly leaving: string | null;
@@ -88,10 +105,16 @@ export type Opening =
       readonly document: JsonObject | null;
     };
 
+export interface Starts {
+  readonly on: boolean;
+}
+
 export interface EditorProps {
   readonly opening: Opening;
   readonly profile: HostProfile;
   readonly secretNames: readonly string[];
+  readonly webhooks: readonly Webhook[];
+  readonly starts: Starts | null;
   readonly task: string | null;
   readonly userId: string;
 }

@@ -5,7 +5,6 @@ import type { WorkflowSession } from "@/operations/workflow-language";
 import { PublishBar } from "./publish-bar";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("./actions", () => ({ checkAction: vi.fn() }));
 
 const POINTED = {
   start: { line: 15, character: 8 },
@@ -47,6 +46,7 @@ describe("the publish bar", () => {
         onPublished={() => Promise.resolve()}
         currentVersion={null}
         onUseVersion={vi.fn()}
+        onShowProblems={vi.fn()}
       />,
     );
 
@@ -60,5 +60,28 @@ describe("the publish bar", () => {
       { line: 3, character: 6 },
       POINTED.start,
     ]);
+  });
+
+  it("publishing_with_problems_shows_them_instead", () => {
+    const session = {} as unknown as WorkflowSession;
+    const publish = vi.fn(() => Promise.resolve({ kind: "held" as const }));
+    const onShowProblems = vi.fn();
+    render(
+      <PublishBar
+        session={session}
+        problems={2}
+        onPlatformProblems={vi.fn()}
+        publish={publish}
+        onPublished={() => Promise.resolve()}
+        currentVersion={null}
+        onUseVersion={vi.fn()}
+        onShowProblems={onShowProblems}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(onShowProblems).toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
   });
 });

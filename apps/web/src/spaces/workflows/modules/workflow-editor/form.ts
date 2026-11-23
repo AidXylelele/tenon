@@ -8,8 +8,6 @@ export const NamingFields = z.object({
 
 export type NamingFields = z.infer<typeof NamingFields>;
 
-export const PublishedDocument = z.record(z.string(), z.json());
-
 export const ImportAddress = z.url({ protocol: /^https?$/ }).max(2048);
 
 export const DraftTarget = z.object({
@@ -34,3 +32,11 @@ export const DraftEtag = DraftTarget.extend({ etag: EntityTag });
 export const PublishedVersion = z.object({
   document: z.object({ version: z.string() }),
 });
+
+export const DraftTest = DraftEtag.extend({ input: z.json() });
+
+export const RunId = z.uuid();
+
+export const StartsTurn = DraftTarget.extend({ on: z.boolean() });
+
+export const TestEventType = z.string().trim().min(1).max(256);

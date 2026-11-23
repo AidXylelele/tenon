@@ -3,7 +3,7 @@ import { EditorView } from "@codemirror/view";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { baseSetup } from "@/libs/codemirror/base-setup";
 import type { DraftRevision } from "@/libs/data-access/types";
-import { DraftKeeper } from "./draft-keeper";
+import { DraftStore } from "./draft-store";
 
 const {
   saveDraftAction,
@@ -36,7 +36,7 @@ function revisionOf(source: string, etag: string, by = ADA): DraftRevision {
 
 function keeperOn(text: string, opened: DraftRevision | null) {
   const view = new EditorView({ doc: text });
-  const keeper = new DraftKeeper(WORKFLOW, opened, () => view);
+  const keeper = new DraftStore(WORKFLOW, opened, () => view);
   return { view, keeper };
 }
 
@@ -171,7 +171,7 @@ describe("the draft kept beside the editor", () => {
 
   it("undo_never_takes_back_a_draft_saved_elsewhere", async () => {
     const view = new EditorView({ doc: BASE, extensions: baseSetup() });
-    const keeper = new DraftKeeper(
+    const keeper = new DraftStore(
       WORKFLOW,
       revisionOf(BASE, '"1"'),
       () => view,
@@ -210,7 +210,7 @@ describe("the draft kept beside the editor", () => {
 
   it("undo_never_takes_back_a_resolution", async () => {
     const view = new EditorView({ doc: BASE, extensions: baseSetup() });
-    const keeper = new DraftKeeper(
+    const keeper = new DraftStore(
       WORKFLOW,
       revisionOf(BASE, '"1"'),
       () => view,

@@ -1,4 +1,4 @@
-import type { EditAction } from "language-server/protocol";
+import type { EditAction, TemplatePart } from "language-server/protocol";
 import type { Commit, FieldState } from "./interfaces";
 import type { Json } from "./json";
 
@@ -100,4 +100,15 @@ export function dataUseOf(
   exported: string | null,
 ): EditAction[] {
   return [{ kind: "useData", pointer, value, export: exported }];
+}
+
+export function templateEditsOf(
+  pointer: string,
+  parts: readonly TemplatePart[],
+  exported: string | null,
+  value: string,
+): EditAction[] {
+  const exports = exported === null ? [] : dataUseOf(pointer, value, exported);
+  const template: EditAction = { kind: "setTemplate", pointer, parts };
+  return [...exports, template];
 }

@@ -22,6 +22,7 @@ const fetchLead: Step = {
 
 const form: StepFormResult = {
   retry: null,
+  timeout: null,
   version: 3,
   step: fetchLead.id,
   failure: "stop",

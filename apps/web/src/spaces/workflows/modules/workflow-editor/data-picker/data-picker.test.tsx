@@ -54,6 +54,7 @@ function type(text: string) {
 function field(props: Partial<DataFieldProps> = {}) {
   const onText = vi.fn();
   const onUse = vi.fn();
+  const onTemplate = vi.fn();
   const onClear = vi.fn();
   render(
     <Announcer>
@@ -72,13 +73,14 @@ function field(props: Partial<DataFieldProps> = {}) {
           data={AT_AN_ADDRESS}
           onText={onText}
           onUse={onUse}
+          onTemplate={onTemplate}
           onClear={onClear}
           {...props}
         />
       </TooltipProvider>
     </Announcer>,
   );
-  return { onText, onUse, onClear };
+  return { onText, onUse, onTemplate, onClear };
 }
 
 describe("the data picker", () => {

@@ -1,6 +1,12 @@
 "use server";
 
-import { checkDocument, fetchImport } from "@/libs/data-access/automation";
+import {
+  fetchImport,
+  instance,
+  publishEvent,
+  taskRecords,
+  turnWorkflow,
+} from "@/libs/data-access/automation";
 import {
   checkDraft,
   draft,
@@ -19,9 +25,14 @@ import {
   DraftSave,
   DraftStart,
   DraftTarget,
+  DraftTest,
   ImportAddress,
-  PublishedDocument,
+  RunId,
+  StartsTurn,
+  TestEventType,
 } from "./form";
+import type { TestRun, TestRunAnswer } from "./interfaces";
+import { testDraft } from "./test-runs";
 
 const UNREADABLE: Problem = {
   type: "about:blank",
@@ -44,14 +55,6 @@ const UNFETCHABLE: Problem = {
   errors: [],
   retryAfter: null,
 };
-
-export async function checkAction(document: unknown): Promise<Outcome<void>> {
-  const parsed = PublishedDocument.safeParse(document);
-
-  if (!parsed.success) return { ok: false, problem: UNREADABLE };
-
-  return checkDocument(parsed.data);
-}
 
 export async function fetchImportAction(
   address: unknown,
@@ -113,4 +116,58 @@ export async function publishDraftAction(
 
   const { namespace, name, etag } = parsed.data;
   return publishDraft(namespace, name, etag);
+}
+
+export async function testRunAction(request: unknown): Promise<TestRunAnswer> {
+  const parsed = DraftTest.safeParse(request);
+
+  if (!parsed.success) return REFUSED;
+
+  const { namespace, name, etag, input } = parsed.data;
+  const key = crypto.randomUUID();
+  return testDraft(namespace, name, etag, input, key);
+}
+
+export async function testRunReadAction(id: unknown): Promise<TestRun | null> {
+  const parsed = RunId.safeParse(id);
+
+  if (!parsed.success) return null;
+
+  const [run, records] = await Promise.all([
+    instance(parsed.data),
+    taskRecords(parsed.data),
+  ]);
+
+  if (run === null) return null;
+
+  return { run, records: records.items };
+}
+
+export async function turnStartsAction(
+  request: unknown,
+): Promise<Outcome<void>> {
+  const parsed = StartsTurn.safeParse(request);
+
+  if (!parsed.success) return { ok: false, problem: UNREADABLE };
+
+  const { namespace, name, on } = parsed.data;
+  return turnWorkflow(namespace, name, on);
+}
+
+export async function testEventAction(type: unknown): Promise<Outcome<void>> {
+  const parsed = TestEventType.safeParse(type);
+
+  if (!parsed.success) return { ok: false, problem: UNREADABLE };
+
+  const id = crypto.randomUUID();
+  const time = new Date().toISOString();
+  const event = {
+    specversion: "1.0",
+    id,
+    source: "tenon/console",
+    type: parsed.data,
+    time,
+    data: {},
+  };
+  return publishEvent(event);
 }

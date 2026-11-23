@@ -108,6 +108,7 @@ export function StartForm({
     fields: form.fields,
     flowChoices: NO_FLOW,
     scriptLanguage: "",
+    timeLimit: null,
     onEdit: send,
   };
 

@@ -17,21 +17,17 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import {
-  type Diagnostic,
-  DiagnosticSeverity,
-  type Position,
-} from "vscode-languageserver-protocol";
-import { isObject } from "@/libs/json/json";
+import type { Diagnostic, Position } from "vscode-languageserver-protocol";
 import type { DiagnosticsBoard } from "@/libs/language-client/diagnostics-board";
 import { isOutdated, reasonOf } from "@/libs/language-client/failures";
 import { applyTextEdits } from "@/libs/language-client/text-edits";
-import { START, stepAt, stepWithId } from "@/operations/workflow-graph";
 import {
   stepVariantsOf,
   WorkflowSession,
 } from "@/operations/workflow-language";
+import { START } from "@/features/workflow-flow";
 import type { EditingSession, FormReading } from "./interfaces";
+import { protectingTryOf, stepAt, stepWithId } from "./steps";
 
 const NONE: readonly Diagnostic[] = [];
 
@@ -116,12 +112,10 @@ export function useEditingSession(
     const start = selectedId === START;
     const failed: FormReading = start
       ? { kind: "start", form: null }
-      : { kind: "step", id: selectedId, form: null };
+      : { kind: "step", id: selectedId, form: null, protection: null };
     const asked: Promise<FormReading> = start
       ? session.workflowForm().then((form) => ({ kind: "start", form }))
-      : session
-          .stepForm(selectedId)
-          .then((form) => ({ kind: "step", id: selectedId, form }));
+      : stepReadingOf(session, structure, selectedId);
 
     asked.then(
       (read) => {
@@ -201,17 +195,19 @@ export function useEditingSession(
   );
 
   const edit = useCallback(
-    async (action: EditAction, remembered = true) => {
+    async (actions: readonly EditAction[], remembered = true) => {
       setRefusal(null);
       const editor = view.current;
 
       if (editor === null) return;
 
       try {
-        const result = await session.edit(action);
-        applyTextEdits(editor, result.edits, remembered);
-        client.sync();
-        setSelectedId((before) => selectionAfter(action, result.ids, before));
+        for (const action of actions) {
+          const result = await session.edit(action);
+          applyTextEdits(editor, result.edits, remembered);
+          client.sync();
+          setSelectedId((before) => selectionAfter(action, result.ids, before));
+        }
       } catch (failure) {
         if (!isOutdated(failure)) setRefusal(reasonOf(failure));
       }
@@ -226,6 +222,7 @@ export function useEditingSession(
     selected,
     selectedId,
     form: stepReading?.form ?? null,
+    protection: stepReading?.protection ?? null,
     formless: stepReading !== null && stepReading.form === null,
     startForm: startReading?.form ?? null,
     startFormless: startReading !== null && startReading.form === null,
@@ -253,44 +250,15 @@ function selectionAfter(
   return moved?.to ?? before;
 }
 
-export function flaggedSteps(
+async function stepReadingOf(
+  session: WorkflowSession,
   structure: StructureResult | null,
-  diagnostics: readonly Diagnostic[],
-): ReadonlySet<string> {
-  if (structure === null) return new Set();
-
-  const errors = diagnostics.filter(
-    (diagnostic) => diagnostic.severity === DiagnosticSeverity.Error,
-  );
-  const steps = errors.map((error) =>
-    stepAt(structure.workflow.steps, error.range.start),
-  );
-  const ids = steps.flatMap((step) => (step === null ? [] : [step.id]));
-  const triggers = structure.workflow.triggers.map((each) => each.pointer);
-  const atStart = errors.some((error) => startsIt(pointerOf(error), triggers));
-  const flagged = atStart ? [...ids, START] : ids;
-  return new Set(flagged);
-}
-
-function pointerOf(diagnostic: Diagnostic): string | null {
-  const data: unknown = diagnostic.data;
-
-  if (!isObject(data) || typeof data.pointer !== "string") return null;
-
-  return data.pointer;
-}
-
-function startsIt(
-  pointer: string | null,
-  triggers: readonly string[],
-): boolean {
-  if (pointer === null || pointer === "") return false;
-
-  return triggers.some(
-    (trigger) => within(trigger, pointer) || within(pointer, trigger),
-  );
-}
-
-function within(inner: string, outer: string): boolean {
-  return inner === outer || inner.startsWith(`${outer}/`);
+  id: string,
+): Promise<FormReading> {
+  const steps = structure?.workflow.steps ?? null;
+  const guard = steps === null ? null : protectingTryOf(steps, id);
+  const asked = session.stepForm(id);
+  const protecting = guard === null ? null : session.stepForm(guard.id);
+  const [form, protection] = await Promise.all([asked, protecting]);
+  return { kind: "step", id, form, protection };
 }

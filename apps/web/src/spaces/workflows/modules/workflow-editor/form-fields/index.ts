@@ -28,6 +28,7 @@ export {
   jsonCommitOf,
   jsonTextOf,
   numberCommitOf,
+  templateEditsOf,
   textEditsOf,
   valueEditsOf,
 } from "./edits";
@@ -37,6 +38,8 @@ export type {
   FailureChoice,
   FailureReading,
   FailureTarget,
+  Authentication,
+  AuthScheme,
   FieldControl,
   FieldState,
   FieldWords,
@@ -53,7 +56,8 @@ export type {
 export { fieldAt, formKindOf, layoutOf, pathOf, summaryOf } from "./layout";
 export { SEND_AS_CHOICES, sendAsEditsOf, sendAsOf } from "./sending";
 export { cronEditsOf, eventEditsOf, startEditsOf, startOf } from "./start";
-export { timeLimitCommitOf, timeLimitOf } from "./time-limit";
+export { limitSecondsOf, timeLimitCommitOf } from "./time-limit";
+export { authenticationEditsOf, authenticationOf } from "./authentication";
 export {
   additionOf,
   memberPointerOf,
