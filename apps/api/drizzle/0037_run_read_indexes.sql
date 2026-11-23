@@ -1,5 +1,0 @@
-DROP INDEX "workflow_instance_created_idx";--> statement-breakpoint
-CREATE INDEX "workflow_instance_started_idx" ON "workflow_instance" USING btree ("started_at","created_at","id","phase","workflow_id","test","ended_at");--> statement-breakpoint
-CREATE INDEX "workflow_instance_workflow_started_idx" ON "workflow_instance" USING btree ("workflow_id","started_at","created_at","id","phase","test","ended_at");--> statement-breakpoint
-CREATE INDEX "workflow_instance_live_idx" ON "workflow_instance" USING btree ("phase","workflow_id","test") WHERE "workflow_instance"."phase" in ('pending', 'running', 'waiting', 'suspended');--> statement-breakpoint
-CREATE INDEX "workflow_instance_scheduled_idx" ON "workflow_instance" USING btree ("workflow_id","created_at") WHERE "workflow_instance"."trigger" = 'schedule';

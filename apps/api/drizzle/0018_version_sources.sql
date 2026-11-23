@@ -1,1 +1,0 @@
-ALTER TABLE "workflow_version" ADD COLUMN "source" text;

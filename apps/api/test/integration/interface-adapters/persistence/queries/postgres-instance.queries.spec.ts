@@ -488,6 +488,7 @@ describe("PostgresInstanceQueries finding failing workflows", () => {
       {
         namespace: "sales",
         name: "route-lead",
+        title: null,
         failed: 2,
         runs: 4,
         firstFailedAt: at("2026-03-01T01:00:00.000Z"),
@@ -504,6 +505,7 @@ describe("PostgresInstanceQueries finding failing workflows", () => {
       {
         namespace: "sales",
         name: "digest",
+        title: null,
         failed: 1,
         runs: 2,
         firstFailedAt: at("2026-03-01T03:00:00.000Z"),
