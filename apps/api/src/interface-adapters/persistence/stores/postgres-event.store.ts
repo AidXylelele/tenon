@@ -94,7 +94,7 @@ export class PostgresEventStore implements EventStore {
     await this.outbox.add(this.txHost.tx, [
       {
         topic: MessageTopic.EventAccepted,
-        key: row.instanceId ?? row.source,
+        key: row.source,
         payload,
       },
     ]);
