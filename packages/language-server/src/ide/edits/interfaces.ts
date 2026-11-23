@@ -8,6 +8,7 @@ import type {
 import type { TextChange } from "../text/index.js";
 import type { Condition } from "../conditions/index.js";
 import type { Snapshot } from "../snapshot/index.js";
+import type { TemplatePart } from "../templates/index.js";
 import type { ChosenResult, StepVariant } from "../variants/index.js";
 import type {
   ListEnd,
@@ -66,6 +67,12 @@ export interface SetCondition {
   readonly kind: "setCondition";
   readonly pointer: string;
   readonly condition: Condition;
+}
+
+export interface SetTemplate {
+  readonly kind: "setTemplate";
+  readonly pointer: string;
+  readonly parts: readonly TemplatePart[];
 }
 
 export interface ClearField {
@@ -153,7 +160,7 @@ export type StepAction =
   | UseData
   | WrapSteps;
 
-export type FieldAction = SetField | ClearField | SetCondition;
+export type FieldAction = SetField | ClearField | SetCondition | SetTemplate;
 
 export type EditAction = StepAction | FieldAction;
 

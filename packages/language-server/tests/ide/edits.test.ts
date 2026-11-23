@@ -1999,6 +1999,48 @@ test("a condition that cannot be written is refused with its reason", () => {
   });
 });
 
+const templateFlow = `${inlineHeader}do:
+  - greet:
+      set:
+        message: 'New digest: \${ .title }'
+        total: \${ .a + .b }
+`;
+
+test("a template is written into its field in its one form", () => {
+  const action: EditAction = {
+    kind: "setTemplate",
+    pointer: "/do/0/greet/set/message",
+    parts: [
+      { kind: "text", text: "Digest: " },
+      { kind: "data", expression: ".title", label: "title" },
+    ],
+  };
+
+  const outcome = outcomeOf(templateFlow, action);
+
+  const expected = templateFlow.replace(
+    "message: 'New digest: ${ .title }'",
+    `message: '\${ "Digest: \\(.title)" }'`,
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a template over an expression it cannot show is refused", () => {
+  const action: EditAction = {
+    kind: "setTemplate",
+    pointer: "/do/0/greet/set/total",
+    parts: [{ kind: "text", text: "none" }],
+  };
+
+  const editing = check(templateFlow, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason:
+      "/do/0/greet/set/total holds an expression a template does not show; edit it as jq.",
+  });
+});
+
 const wrapFlow = `${inlineHeader}do:
   - start:
       set:

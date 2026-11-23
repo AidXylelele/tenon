@@ -28,6 +28,7 @@ test("initialize answers the server's capabilities", async () => {
         "workflow/newDocument": true,
         "workflow/rangesOf": true,
         "workflow/readCondition": true,
+        "workflow/readTemplate": true,
         "workflow/structure": true,
         "workflow/stepForm": true,
         "workflow/stepVariants": true,

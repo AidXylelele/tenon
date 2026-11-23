@@ -983,6 +983,56 @@ type Literal = string | number | boolean | null;
 }
 ```
 
+## Read a template
+
+**Method:** `workflow/readTemplate`
+
+The client sends this request to open a text field that mixes text with data, such as a message or a subject, in the template builder, so that it never parses jq itself.
+
+```typescript
+interface ReadTemplateParams {
+  textDocument: VersionedTextDocumentIdentifier;
+  pointer: string; // the field's pointer
+}
+
+type ReadTemplateResult =
+  | { kind: "template"; parts: TemplatePart[] }
+  | { kind: "expression"; text: string }; // open the field as jq; the text as written
+
+type TemplatePart =
+  | { kind: "text"; text: string }
+  | {
+      kind: "data";
+      expression: string; // a workflow/dataAt expression that is a path
+      label: string; // the member it names, e.g. "title" for .title
+    };
+```
+
+- **What reads as a template.** A text alone (`Hello`); a reference alone (`${ .title }`); a jq string whose interpolations are paths (`${ "New digest: \(.title)" }`); and a text with references written into it (`New digest: ${ .title }`), which the interpreter passes on as written: in the default `strict` mode an expression is marked with `${}` (dsl.md, "Runtime Expressions"), and the interpreter takes a text for one only where `${` starts it and `}` ends it. Paths are those of `workflow/readCondition`: `.`, `.name`, `.["a name"]`, `$name` and their members. An empty text, or a field not written, is a template with no part.
+- **Labels.** A reference's `label` is the last member it names: `title` for `.title`, `items` for `$context.fetch.items`, `first name` for `.["first name"]`, `order` for `$order`, and `.` for `.`.
+- **Anything else** is `expression`, so the client opens it as jq: a computation (`${ .count + 1 }`), an interpolation that is no path (`${ "Total: \(.a + .b)" }`), a join of strings, or a text with a written-in reference that is no path (`Price: ${ 5 }`). A template that cannot be shown is never rewritten: `setTemplate` refuses it.
+- **Writing** is `workflow/edit`'s `setTemplate`, in one form, the one the interpreter evaluates: no part writes `""`; text alone writes the text, or a jq string where it holds `${`; a reference alone writes `${ <path> }`; anything else writes one jq string, its text escaped as JSON escapes it and each reference interpolated, `${ "New digest: \(.title)" }`. jq interpolates data that is not text as its JSON (`Count: \(.count)` gives `Count: 3`). A reference that is no path is refused with its reason.
+- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for a text that does not read and a field that holds no text; `InvalidParams` (-32602).
+
+**Example**, on a step that sets `message: 'New digest: ${ .title }'`:
+
+```json
+{
+  "textDocument": { "uri": "file:///flow.yaml", "version": 1 },
+  "pointer": "/do/0/greet/set/message"
+}
+```
+
+```json
+{
+  "kind": "template",
+  "parts": [
+    { "kind": "text", "text": "New digest: " },
+    { "kind": "data", "expression": ".title", "label": "title" }
+  ]
+}
+```
+
 ## Edit
 
 **Method:** `workflow/edit`
@@ -1017,6 +1067,7 @@ type EditAction =
   | { kind: "setField"; pointer: string; value: JsonValue }
   | { kind: "clearField"; pointer: string }
   | { kind: "setCondition"; pointer: string; condition: Condition }
+  | { kind: "setTemplate"; pointer: string; parts: TemplatePart[] }
   | { kind: "setFailure"; step: string; failure: Failure }
   | {
       kind: "wrapSteps";
@@ -1096,10 +1147,11 @@ interface EditResult {
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
 - **The step's result** (`setResult`) writes the members of the chosen result and removes the others: `output.as`, and the `output` that holds nothing else; a script's `run.return`, set to the mode the result needs (`stdout` or `code`) where the step returns another. A result the step does not offer is refused.
 - **Conditions** (`setCondition`) write the condition at the field in its one form (`workflow/readCondition`), as `setField` would its text.
+- **Templates** (`setTemplate`) write the parts at the field in their one form (`workflow/readTemplate`), as `setField` would its text, where the field is not written or holds a text that reads as a template.
 - **Data** (`useData`) sets the field to the value and, with `export`, writes that step's `export.as: ${ $context + { "<name>": . } }`, the export a `$context.<name>` entry of `workflow/dataAt` reads; a step that already writes it is left as it is, and a step that writes another export is refused.
 - **Errors:**
   - `ContentModified` (-32801), when the version is not the store's;
-  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a condition with no row or with a path that is not one, a retry on no status, a wrap of no step, of steps not next to each other in one list, of several fork branches or whose directives cannot keep their meaning, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
+  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a condition with no row or with a path that is not one, a template with a reference that is no path or over a field that holds no text or an expression it does not show, a retry on no status, a wrap of no step, of steps not next to each other in one list, of several fork branches or whose directives cannot keep their meaning, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
   - `InvalidParams` (-32602), when the params are of another shape.
 
 **Example:**

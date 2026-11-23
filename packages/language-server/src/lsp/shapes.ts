@@ -18,6 +18,7 @@ import type {
   NewDocumentParams,
   RangesOfParams,
   ReadConditionParams,
+  ReadTemplateParams,
   StepFormParams,
 } from "../protocol/index.js";
 import type { ActionKind } from "./interfaces.js";
@@ -55,6 +56,7 @@ const actionShapes: Record<ActionKind, (action: unknown) => boolean> = {
   duplicateStep: (action) => holdsStrings(action, ["step"]),
   setField: holdsSetting,
   setCondition: holdsConditionSetting,
+  setTemplate: holdsTemplateSetting,
   clearField: (action) => holdsStrings(action, ["pointer"]),
   setFailure: holdsFailureSetting,
   setResult: holdsResultSetting,
@@ -159,6 +161,12 @@ export function holdsReadConditionParams(
   return holdsStrings(params, ["text"]);
 }
 
+export function holdsReadTemplateParams(
+  params: unknown,
+): params is ReadTemplateParams {
+  return holdsVersionedDocument(params) && holdsStrings(params, ["pointer"]);
+}
+
 export function holdsEditParams(params: unknown): params is EditParams {
   const action = memberOf(params, "action");
   const kind = memberOf(action, "kind");
@@ -224,6 +232,27 @@ function holdsConditionSetting(action: unknown): boolean {
   const isConditional = isJoin && isList && rows.every(holdsRow);
 
   return holdsStrings(action, ["pointer"]) && isConditional;
+}
+
+function holdsTemplateSetting(action: unknown): boolean {
+  const parts = memberOf(action, "parts");
+  const isList = Array.isArray(parts);
+  const areParts = isList && parts.every(holdsTemplatePart);
+
+  return holdsStrings(action, ["pointer"]) && areParts;
+}
+
+function holdsTemplatePart(part: unknown): boolean {
+  const kind = memberOf(part, "kind");
+
+  switch (kind) {
+    case "text":
+      return holdsStrings(part, ["text"]);
+    case "data":
+      return holdsStrings(part, ["expression", "label"]);
+    default:
+      return false;
+  }
 }
 
 function holdsRow(row: unknown): boolean {

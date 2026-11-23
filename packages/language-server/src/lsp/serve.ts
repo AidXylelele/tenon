@@ -37,6 +37,8 @@ import {
   rangesOfRequest,
   readConditionAnswerOf,
   readConditionRequest,
+  readTemplateHandlerOf,
+  readTemplateRequest,
   stepFormHandlerOf,
   stepFormRequest,
   stepVariantsHandlerOf,
@@ -246,6 +248,7 @@ function serveFeatures(
   const formStep = stepFormHandlerOf(documents, host, schemasAt);
   const formWorkflow = workflowFormHandlerOf(documents, host, reads);
   const readData = dataAtHandlerOf(documents, host);
+  const readTemplate = readTemplateHandlerOf(documents, host);
   const edit = editHandlerOf(documents, host);
   const writeNew = newDocumentHandlerOf(host);
   const listVariants = stepVariantsHandlerOf(host);
@@ -259,6 +262,7 @@ function serveFeatures(
   const answerStepForm = lifecycle.guarded(formStep);
   const answerWorkflowForm = lifecycle.guarded(formWorkflow);
   const answerData = lifecycle.guarded(readData);
+  const answerTemplate = lifecycle.guarded(readTemplate);
   const answerEdit = lifecycle.guarded(edit);
   const answerNewDocument = lifecycle.guarded(writeNew);
   const answerVariants = lifecycle.guarded(listVariants);
@@ -273,6 +277,7 @@ function serveFeatures(
   connection.onRequest(stepFormRequest, answerStepForm);
   connection.onRequest(workflowFormRequest, answerWorkflowForm);
   connection.onRequest(dataAtRequest, answerData);
+  connection.onRequest(readTemplateRequest, answerTemplate);
   connection.onRequest(editRequest, answerEdit);
   connection.onRequest(newDocumentRequest, answerNewDocument);
   connection.onRequest(stepVariantsRequest, answerVariants);

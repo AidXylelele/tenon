@@ -5,6 +5,7 @@ export const methods = {
   newDocument: "workflow/newDocument",
   rangesOf: "workflow/rangesOf",
   readCondition: "workflow/readCondition",
+  readTemplate: "workflow/readTemplate",
   structure: "workflow/structure",
   stepForm: "workflow/stepForm",
   stepVariants: "workflow/stepVariants",
