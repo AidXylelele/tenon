@@ -14,4 +14,4 @@ import type { Database } from "../../interface-adapters/persistence/interfaces.j
     },
   ],
 })
-export class DurableStoresModule {}
+export class OutboxStoreModule {}
