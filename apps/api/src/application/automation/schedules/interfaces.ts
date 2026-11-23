@@ -7,6 +7,10 @@ export interface FireScheduleCommand {
   readonly at: number;
 }
 
+export interface ListExpectedStartsCommand {
+  readonly from: Date;
+}
+
 export interface StartScheduledCommand {
   readonly workflowId: string;
   readonly instanceId: string;

@@ -3,9 +3,9 @@ import type {
   ScheduledWorkflow,
   StartSlot,
 } from "../../../../../src/application/automation/schedules/interfaces.js";
+import { ListExpectedStarts } from "../../../../../src/application/automation/schedules/list-expected-starts.js";
 import type { WorkflowQueries } from "../../../../../src/application/automation/workflows/queries.js";
 import { ScheduleKind } from "../../../../../src/domain/automation/workflows/enums.js";
-import { ExpectedStartsQueries } from "../../../../../src/interface-adapters/workflows/queries/expected-starts.queries.js";
 
 class Starts {
   readonly slots: StartSlot[] = [];
@@ -37,8 +37,8 @@ class Starts {
   }
 }
 
-function queriesOf(starts: Starts): ExpectedStartsQueries {
-  return new ExpectedStartsQueries(starts as unknown as WorkflowQueries);
+function listOf(starts: Starts): ListExpectedStarts {
+  return new ListExpectedStarts(starts as unknown as WorkflowQueries);
 }
 
 describe("the starts a schedule was expected to make", () => {
@@ -55,7 +55,7 @@ describe("the starts a schedule was expected to make", () => {
     const starts = new Starts(0);
     const from = new Date(Date.UTC(2026, 0, 2));
 
-    const [expected] = await queriesOf(starts).expected(from);
+    const [expected] = await listOf(starts).execute({ from });
 
     expect(expected?.missed).toBe(0);
     expect(expected?.next[0]).toEqual(new Date(Date.UTC(2026, 0, 2, 9)));
@@ -67,7 +67,7 @@ describe("the starts a schedule was expected to make", () => {
     const starts = new Starts(1);
     const from = new Date(Date.UTC(2026, 0, 1));
 
-    const [expected] = await queriesOf(starts).expected(from);
+    const [expected] = await listOf(starts).execute({ from });
 
     expect(starts.slots).toEqual([
       {

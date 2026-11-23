@@ -22,6 +22,12 @@ export type ScheduleSpec =
       readonly types: readonly string[];
     };
 
+export interface PassedSlots {
+  readonly from: number;
+  readonly to: number;
+  readonly count: number;
+}
+
 export interface WorkflowProps {
   readonly id: string;
   readonly name: WorkflowName;

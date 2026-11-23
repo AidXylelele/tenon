@@ -15,7 +15,6 @@ import {
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../../application/automation/instances/ports.js";
-import { ScheduleQueries } from "../../application/automation/schedules/queries.js";
 import { SecretRepository } from "../../application/automation/secrets/ports.js";
 import { SecretQueries } from "../../application/automation/secrets/queries.js";
 import {
@@ -56,7 +55,6 @@ import { PostgresWorkflowRepository } from "../../interface-adapters/persistence
 import { PostgresEventStore } from "../../interface-adapters/persistence/stores/postgres-event.store.js";
 import { PostgresLifecycleEventStore } from "../../interface-adapters/persistence/stores/postgres-lifecycle-event.store.js";
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
-import { ExpectedStartsQueries } from "../../interface-adapters/workflows/queries/expected-starts.queries.js";
 import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
 import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
 import { AccessTokens } from "../../interface-adapters/workflows/effects/access-tokens.js";
@@ -124,7 +122,6 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: EventOffers, useExisting: EventMessagesGateway },
     WorkflowMessagesGateway,
     { provide: WorkflowEvents, useExisting: WorkflowMessagesGateway },
-    { provide: ScheduleQueries, useClass: ExpectedStartsQueries },
     WorkflowMapper,
     WorkflowVersionMapper,
     WorkflowInstanceMapper,
@@ -210,7 +207,6 @@ import { OutboundModule } from "./outbound.module.js";
     ChildCancellations,
     EventOffers,
     WorkflowEvents,
-    ScheduleQueries,
     WorkflowRepository,
     WorkflowQueries,
     WorkflowInstanceRepository,

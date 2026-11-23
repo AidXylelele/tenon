@@ -23,6 +23,7 @@ import { RestartInstance } from "../../application/automation/instances/restart-
 import { ResumeInstance } from "../../application/automation/instances/resume-instance.js";
 import { StartInstance } from "../../application/automation/instances/start-instance.js";
 import { SuspendInstance } from "../../application/automation/instances/suspend-instance.js";
+import { ListExpectedStarts } from "../../application/automation/schedules/list-expected-starts.js";
 import { CreateSecret } from "../../application/automation/secrets/create-secret.js";
 import { DeleteSecret } from "../../application/automation/secrets/delete-secret.js";
 import { ReplaceSecret } from "../../application/automation/secrets/replace-secret.js";
@@ -105,6 +106,7 @@ import { HttpModule } from "./http.module.js";
     ArchiveWorkflow,
     TurnWorkflowOn,
     TurnWorkflowOff,
+    ListExpectedStarts,
     CreateDraft,
     SaveDraft,
     DiscardDraft,
