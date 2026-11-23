@@ -339,4 +339,25 @@ describe("a field that takes data", () => {
 
     expect(text).toHaveValue("${ now | todate }");
   });
+
+  it("a_text_the_server_reads_as_an_expression_opens_as_one", () => {
+    const value = "${ .count + 1 }";
+    const template = { kind: "expression", text: value } as const;
+    field({ value, data: null, template });
+
+    const text = screen.getByRole("textbox", { name: "Address" });
+
+    expect(text.tagName).toBe("TEXTAREA");
+  });
+
+  it("a_text_the_server_reads_as_text_stays_text_whatever_it_starts_with", () => {
+    const value = "${ .title } is sent as written";
+    const parts = [{ kind: "text", text: value }] as const;
+    const template = { kind: "template", parts } as const;
+    field({ value, data: null, template });
+
+    const text = screen.getByRole("textbox", { name: "Address" });
+
+    expect(text.tagName).toBe("INPUT");
+  });
 });

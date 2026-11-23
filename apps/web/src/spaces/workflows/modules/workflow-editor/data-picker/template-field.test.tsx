@@ -43,6 +43,33 @@ function field(parts: readonly TemplatePart[] = MIXED) {
 }
 
 describe("a field of text with data inside it", () => {
+  it("says_it_is_invalid_once_its_problem_shows", () => {
+    function shown(invalid: boolean) {
+      return (
+        <Announcer>
+          <TooltipProvider>
+            <span id="message-label">Message</span>
+            <TemplateField
+              parts={MIXED}
+              data={AFTER_A_TEST}
+              inputId="message"
+              labelId="message-label"
+              describedBy={undefined}
+              invalid={invalid}
+              onTemplate={vi.fn()}
+            />
+          </TooltipProvider>
+        </Announcer>
+      );
+    }
+    const { rerender } = render(shown(false));
+
+    rerender(shown(true));
+
+    const content = document.querySelector(".cm-content");
+    expect(content).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("shows_the_text_and_names_the_data_in_a_chip", () => {
     const { content } = field();
 

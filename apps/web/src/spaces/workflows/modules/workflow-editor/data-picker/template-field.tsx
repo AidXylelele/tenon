@@ -1,6 +1,7 @@
 "use client";
 
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { Compartment } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import type { TemplatePart } from "language-server/protocol";
 import { useEffect, useEffectEvent, useRef } from "react";
@@ -27,6 +28,13 @@ const LOOK = EditorView.theme({
 });
 
 type DataPart = Extract<TemplatePart, { readonly kind: "data" }>;
+
+const validity = new Compartment();
+
+function validityOf(invalid: boolean) {
+  const attributes = { "aria-invalid": String(invalid) };
+  return EditorView.contentAttributes.of(attributes);
+}
 
 export function TemplateField({
   parts,
@@ -78,9 +86,9 @@ export function TemplateField({
           id: inputId,
           "aria-labelledby": labelId,
           "aria-multiline": "false",
-          "aria-invalid": String(invalid),
           ...described,
         }),
+        validity.of(validityOf(invalid)),
         EditorView.domEventHandlers({
           blur: () => {
             commit();
@@ -99,6 +107,12 @@ export function TemplateField({
       view.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const facet = validityOf(invalid);
+    const reconfiguration = validity.reconfigure(facet);
+    view.current?.dispatch({ effects: reconfiguration });
+  }, [invalid]);
 
   function insert(pick: DataPick) {
     const editor = view.current;

@@ -12,6 +12,7 @@ import { choiceOfValue } from "./data-choices";
 import { DataPicker } from "./data-picker";
 import type { DataFieldProps, DataPick } from "./interfaces";
 import { TemplateField } from "./template-field";
+import { textPartOf } from "./template-text";
 
 const TYPED = "w-auto min-w-0 grow basis-40 placeholder:text-faint";
 
@@ -38,7 +39,7 @@ export function DataField({
   const reference =
     writing || data === null ? null : choiceOfValue(value, data);
   const text = typeof value === "string" ? value : "";
-  const isExpression = writing || text.startsWith("${");
+  const isExpression = writing || template?.kind === "expression";
   const parts = template?.kind === "template" ? template.parts : [];
   const isMixed = parts.length > 1;
 
@@ -164,8 +165,4 @@ export function DataField({
       />
     </div>
   );
-}
-
-function textPartOf(text: string): TemplatePart[] {
-  return text === "" ? [] : [{ kind: "text", text }];
 }

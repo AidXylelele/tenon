@@ -97,7 +97,7 @@ function placedPartsOf(state: EditorState): PlacedPart[] {
   return found;
 }
 
-function textPartOf(text: string): TemplatePart[] {
+export function textPartOf(text: string): TemplatePart[] {
   return text === "" ? [] : [{ kind: "text", text }];
 }
 
