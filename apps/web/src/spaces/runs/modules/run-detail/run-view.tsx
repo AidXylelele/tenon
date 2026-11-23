@@ -26,8 +26,7 @@ import {
 } from "@/operations/run-progress";
 import { stepsIn, stepsUnder } from "@/operations/workflow-graph";
 import { kindInfoOf } from "@/operations/step-kinds";
-import { TaskStatusOf } from "@/features/run-status";
-import { TaskTile, WorkflowCanvas } from "@/features/workflow-canvas";
+import { type StepRun, WorkflowFlow } from "@/features/workflow-flow";
 import { EventList } from "./event-list";
 import { FaultStrip } from "./fault-strip";
 import type { RunPanel } from "./query";
@@ -55,11 +54,6 @@ export function RunView({
   const router = useRouter();
   const pathname = usePathname();
   const [selected, setSelected] = useState<string | null>(null);
-  const [reveal, setReveal] = useState<{ readonly step: string } | null>(null);
-  const showStep = (step: string) => {
-    setSelected(step);
-    setReveal({ step });
-  };
   const [shown, setShown] = useState<RunPanel>(panel);
   const [, startShowing] = useTransition();
   const show = (value: string) => {
@@ -75,9 +69,25 @@ export function RunView({
     [workflow],
   );
   const progress = useMemo(() => progressOf(records, steps), [records, steps]);
-  const status = useCallback(
-    (step: Step) => <StepProgress progress={progress.get(step.id)} />,
-    [progress],
+  const runs = useMemo(() => stepRunsOf(progress), [progress]);
+  const ended = !isUnended(instance.phase);
+  const start = useMemo(
+    () => ({
+      trigger: instance.trigger,
+      detail: instance.startedBy?.name ?? "",
+    }),
+    [instance.trigger, instance.startedBy],
+  );
+  const keepIteration = useCallback(() => undefined, []);
+  const mode = useMemo(
+    () => ({
+      kind: "run" as const,
+      start,
+      steps: runs,
+      ended,
+      onIteration: keepIteration,
+    }),
+    [start, runs, ended, keepIteration],
   );
   const faulted = faultedStep(instance, records, steps);
   const step = steps.find((each) => each.id === selected) ?? null;
@@ -91,7 +101,7 @@ export function RunView({
           instance={instance}
           step={faulted}
           canEdit={canEdit}
-          onShow={showStep}
+          onShow={setSelected}
         />
       )}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -101,13 +111,11 @@ export function RunView({
               The version is no longer readable.
             </p>
           ) : (
-            <WorkflowCanvas
+            <WorkflowFlow
               workflow={workflow}
-              scope={`${instance.namespace}/${instance.name}`}
+              mode={mode}
               selected={selected}
               onSelect={setSelected}
-              status={status}
-              reveal={reveal}
             />
           )}
         </div>
@@ -165,7 +173,6 @@ export function RunView({
                 >
                   <ChevronLeftIcon />
                 </Button>
-                <TaskTile kind={step.kind} size="sm" />
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold">
                     {step.name}
@@ -195,23 +202,14 @@ export function RunView({
   );
 }
 
-function StepProgress({
-  progress,
-}: {
-  readonly progress: TaskProgress | undefined;
-}) {
-  if (progress === undefined) return null;
-
-  return (
-    <span className="flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-xs shadow-xs">
-      <TaskStatusOf status={progress.status} />
-      {progress.runs > 1 && (
-        <span className="text-muted-foreground tabular-nums">
-          ×{progress.runs}
-        </span>
-      )}
-    </span>
-  );
+function stepRunsOf(
+  progress: ReadonlyMap<string, TaskProgress>,
+): ReadonlyMap<string, StepRun> {
+  const entries = [...progress].map(([step, each]): [string, StepRun] => {
+    const detail = each.runs > 1 ? `${String(each.runs)} runs` : null;
+    return [step, { status: each.status, detail }];
+  });
+  return new Map(entries);
 }
 
 function faultedStep(

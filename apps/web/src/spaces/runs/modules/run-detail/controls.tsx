@@ -73,7 +73,7 @@ export function Controls({
             }}
           >
             <PauseIcon data-icon="inline-start" />
-            Suspend
+            Pause
           </Button>
         )}
         {allowed.has("resume") && (

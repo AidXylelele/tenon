@@ -17,7 +17,7 @@ describe("the controls of a run", () => {
       .getAllByRole("button")
       .map((each) => each.textContent);
 
-    expect(buttons).toEqual(["Suspend", "Cancel run"]);
+    expect(buttons).toEqual(["Pause", "Cancel run"]);
   });
 
   it("an_ended_run_is_run_again_or_deleted", () => {
