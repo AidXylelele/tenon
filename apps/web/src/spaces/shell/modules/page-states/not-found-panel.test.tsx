@@ -20,8 +20,32 @@ describe("the page for an address with nothing at it", () => {
     expect(way).toHaveAttribute("href", href);
   });
 
-  it("says_what_happened_in_the_heading", () => {
-    address.pathname = "/runs/not-a-uuid";
+  it.each([
+    ["/runs/not-a-uuid", "No run with this address", "not-a-uuid"],
+    ["/workflows/sales/gone", "No workflow with this address", "sales/gone"],
+    [
+      "/workflows/sales/route-lead/versions/9.9.9",
+      "No version with this address",
+      "9.9.9",
+    ],
+    [
+      "/connections/notifications/4f2a",
+      "No notification with this address",
+      "4f2a",
+    ],
+  ])("%s_names_what_is_missing_and_its_id", (pathname, said, id) => {
+    address.pathname = pathname;
+
+    render(<NotFoundPanel />);
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    const shown = screen.getByText(id);
+    expect(heading).toHaveTextContent(said);
+    expect(shown).toHaveClass("font-mono");
+  });
+
+  it("an_address_of_no_known_thing_says_nothing_is_there", () => {
+    address.pathname = "/nowhere";
 
     render(<NotFoundPanel />);
 
