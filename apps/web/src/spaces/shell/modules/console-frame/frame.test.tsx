@@ -216,6 +216,42 @@ describe("the navigation drawer below 1024 px", () => {
     expect(home).toBeVisible();
   });
 
+  it("opening_it_focuses_the_current_place", async () => {
+    address.pathname = "/runs/7c41e2d0";
+    renderFrame(800, EDITOR);
+
+    openDrawer();
+
+    const drawer = screen.getByRole("dialog", { name: "Navigation" });
+    const runs = within(drawer).getByRole("link", { name: /^Runs/ });
+    await waitFor(() => {
+      expect(runs).toHaveFocus();
+    });
+  });
+
+  it("opening_it_away_from_any_place_focuses_home", async () => {
+    address.pathname = "/connections";
+    renderFrame(800, EDITOR);
+
+    openDrawer();
+
+    const drawer = screen.getByRole("dialog", { name: "Navigation" });
+    const home = within(drawer).getByRole("link", { name: "Home" });
+    await waitFor(() => {
+      expect(home).toHaveFocus();
+    });
+  });
+
+  it("its_brand_is_not_a_tab_stop", () => {
+    renderFrame(800, EDITOR);
+
+    openDrawer();
+
+    const drawer = screen.getByRole("dialog", { name: "Navigation" });
+    const brand = within(drawer).getByRole("link", { name: "Tenon" });
+    expect(brand).toHaveAttribute("tabindex", "-1");
+  });
+
   it("choosing_a_place_closes_it_and_moves_focus_to_the_content", async () => {
     renderFrame(800, EDITOR);
     openDrawer();

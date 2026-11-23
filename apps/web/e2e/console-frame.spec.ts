@@ -251,14 +251,15 @@ test.describe("the navigation drawer below 1024 px", () => {
     await expect(root).toHaveAttribute("inert");
   });
 
-  test("opening_it_focuses_its_first_link", async ({ page }) => {
+  test("opening_it_focuses_the_current_place", async ({ page }) => {
     await page.setViewportSize(NARROW);
     await open(page, "narrow");
 
     await page.getByRole("button", { name: "Navigation" }).click();
 
-    const brand = page.getByRole("link", { name: "Tenon" });
-    await expect(brand).toBeFocused({ timeout: 1_000 });
+    const drawer = page.getByRole("dialog", { name: "Navigation" });
+    const current = drawer.getByRole("link", { name: "Workflows" });
+    await expect(current).toBeFocused({ timeout: 1_000 });
   });
 
   test("escape_closes_it_and_returns_focus_to_its_button", async ({ page }) => {

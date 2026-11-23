@@ -2,7 +2,7 @@
 
 import { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useEffectEvent, useId } from "react";
+import { useEffect, useEffectEvent, useId, useRef } from "react";
 import type { Capabilities } from "@/libs/data-access/types";
 import { Link } from "@/libs/routing/link";
 import { PRODUCT_NAME } from "@/libs/routing/page-title";
@@ -46,6 +46,10 @@ export function ConsoleSidebar({
   const work = placesOf(capabilities, "work");
   const connect = placesOf(capabilities, "connect");
   const settings = placesOf(capabilities, "settings");
+  const pathname = usePathname();
+  const shown = work.concat(connect, settings);
+  const current = shown.find((place) => isCurrent(place, pathname));
+  const landing = current?.href ?? HOME_HREF;
 
   useDrawerClosedOnArrival();
 
@@ -54,13 +58,15 @@ export function ConsoleSidebar({
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <Places places={work} inProgress={inProgress} />
+            <Places places={work} landing={landing} inProgress={inProgress} />
           </SidebarGroupContent>
         </SidebarGroup>
-        {connect.length > 0 && <ConnectGroup places={connect} />}
+        {connect.length > 0 && (
+          <ConnectGroup places={connect} landing={landing} />
+        )}
       </SidebarContent>
       <SidebarFooter>
-        <Places places={settings} />
+        <Places places={settings} landing={landing} />
         {account !== null && (
           <>
             <SidebarSeparator className="mx-0" />
@@ -106,6 +112,8 @@ function SidebarFrame({ children }: { readonly children: React.ReactNode }) {
 
 function Brand() {
   const leave = useLeaveDrawer();
+  const { isMobile } = useSidebar();
+  const reachable = isMobile ? -1 : undefined;
 
   return (
     <SidebarMenu>
@@ -115,7 +123,7 @@ function Brand() {
           tooltip={PRODUCT_NAME}
           className="font-semibold group-data-[collapsible=icon]:p-1! in-data-[mobile=true]:w-[calc(100%-2.5rem)] [&_svg]:size-6!"
         >
-          <Link href={HOME_HREF} onClick={leave}>
+          <Link href={HOME_HREF} onClick={leave} tabIndex={reachable}>
             <BrandMark />
             <span>{PRODUCT_NAME}</span>
           </Link>
@@ -125,7 +133,13 @@ function Brand() {
   );
 }
 
-function ConnectGroup({ places }: { readonly places: readonly Place[] }) {
+function ConnectGroup({
+  places,
+  landing,
+}: {
+  readonly places: readonly Place[];
+  readonly landing: string;
+}) {
   const label = useId();
 
   return (
@@ -133,7 +147,7 @@ function ConnectGroup({ places }: { readonly places: readonly Place[] }) {
       <SidebarGroupLabel id={label}>Connect</SidebarGroupLabel>
       <SidebarSeparator className="mx-0 mb-2 hidden group-data-[collapsible=icon]:block" />
       <SidebarGroupContent>
-        <Places places={places} />
+        <Places places={places} landing={landing} />
       </SidebarGroupContent>
     </SidebarGroup>
   );
@@ -141,16 +155,26 @@ function ConnectGroup({ places }: { readonly places: readonly Place[] }) {
 
 function Places({
   places,
+  landing,
   inProgress = 0,
 }: {
   readonly places: readonly Place[];
+  readonly landing: string;
   readonly inProgress?: number;
 }) {
   return (
     <SidebarMenu>
       {places.map((place) => {
         const count = place.href === RUNS_HREF ? inProgress : 0;
-        return <PlaceItem key={place.href} place={place} count={count} />;
+        const lands = place.href === landing;
+        return (
+          <PlaceItem
+            key={place.href}
+            place={place}
+            lands={lands}
+            count={count}
+          />
+        );
       })}
     </SidebarMenu>
   );
@@ -158,21 +182,26 @@ function Places({
 
 function PlaceItem({
   place,
+  lands,
   count,
 }: {
   readonly place: Place;
+  readonly lands: boolean;
   readonly count: number;
 }) {
   const pathname = usePathname();
   const leave = useLeaveDrawer();
+  const link = useRef<HTMLAnchorElement>(null);
   const current = isCurrent(place, pathname);
   const counting = count > 0;
+
+  useLandingOnOpen(link, lands);
   const Icon = place.icon;
 
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild isActive={current} tooltip={place.label}>
-        <Link href={place.href} onClick={leave}>
+        <Link ref={link} href={place.href} onClick={leave}>
           <Icon />
           <span>{place.label}</span>
           <InProgressSaid count={count} />
@@ -224,6 +253,24 @@ function useDrawerClosedOnArrival() {
   useEffect(() => {
     arrive();
   }, [pathname]);
+}
+
+function useLandingOnOpen(
+  link: React.RefObject<HTMLAnchorElement | null>,
+  lands: boolean,
+) {
+  const { isMobile, openMobile, sidebarId } = useSidebar();
+  const opened = isMobile && openMobile;
+
+  useEffect(() => {
+    if (!lands || !opened) return;
+
+    const drawer = document.getElementById(sidebarId);
+    const place = link.current;
+    const inDrawer = place !== null && drawer?.contains(place) === true;
+
+    if (inDrawer) place.focus();
+  }, [lands, link, opened, sidebarId]);
 }
 
 function focusContent() {
