@@ -5,19 +5,15 @@ const PLAYGROUND_URL = `http://localhost:${String(PLAYGROUND_PORT)}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "production/**",
   fullyParallel: true,
   forbidOnly: true,
   reporter: "list",
-  projects: [
-    {
-      name: "playground",
-      use: {
-        ...devices["Desktop Chrome"],
-        baseURL: PLAYGROUND_URL,
-        reducedMotion: "reduce",
-      },
-    },
-  ],
+  use: {
+    ...devices["Desktop Chrome"],
+    baseURL: PLAYGROUND_URL,
+    reducedMotion: "reduce",
+  },
   webServer: {
     command:
       "vite preview --config e2e/playground-server.config.ts --outDir storybook-static",

@@ -12,6 +12,7 @@ describe("the line of a jump", () => {
     between: [],
     lane: 1,
     case: "A parcel",
+    branch: "A parcel",
   };
 
   it("leaves_the_source_to_the_right_runs_beside_the_widest_step_between_and_enters_the_target_from_the_right", () => {

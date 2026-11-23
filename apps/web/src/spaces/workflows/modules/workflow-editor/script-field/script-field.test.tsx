@@ -1,7 +1,8 @@
+import type { ReactNode } from "react";
 import { undo } from "@codemirror/commands";
 import { diagnosticCount, forceLinting } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import {
   afterEach,
   beforeEach,
@@ -17,8 +18,22 @@ import type {
   WorkerRequest,
 } from "@/libs/code-formatting/interfaces";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import type { ScriptFieldProps } from "./interfaces";
 import { ScriptField } from "./script-field";
+
+function field() {
+  const group = screen.getByRole("group", { name: "Code" });
+  return within(group);
+}
+
+function Providers({ children }: { readonly children: ReactNode }) {
+  return (
+    <Announcer>
+      <TooltipProvider>{children}</TooltipProvider>
+    </Announcer>
+  );
+}
 
 type Shown = Omit<ScriptFieldProps, "onChange" | "onExpandedChange">;
 
@@ -113,7 +128,7 @@ function showField(shown: Shown): Owner {
   }
 
   const first = fieldOf(shown);
-  const { rerender } = render(first, { wrapper: TooltipProvider });
+  const { rerender } = render(first, { wrapper: Providers });
 
   function show(next: Shown): void {
     const field = fieldOf(next);
@@ -293,7 +308,7 @@ describe("the script field", () => {
 
     format();
 
-    await screen.findByText("Formatted with Prettier");
+    await field().findByText("Formatted with Prettier");
     const cursor = editor().state.selection.main.head;
     expect(cursor).toBe(5);
   });
@@ -304,7 +319,7 @@ describe("the script field", () => {
 
     format();
 
-    const told = await screen.findByText("Formatted with Prettier");
+    const told = await field().findByText("Formatted with Prettier");
     expect(told).toBeVisible();
     expect(formatRequests).toEqual([
       { kind: "format", language: "javascript", text: JS_RAW, cursor: 0 },
@@ -324,7 +339,7 @@ describe("the script field", () => {
 
     format();
 
-    const told = await screen.findByText("Formatted with Ruff");
+    const told = await field().findByText("Formatted with Ruff");
     expect(told).toBeVisible();
     expect(formatRequests).toEqual([
       { kind: "format", language: "python", text: "x=1", cursor: 0 },
@@ -338,7 +353,7 @@ describe("the script field", () => {
 
     format();
 
-    const told = await screen.findByText("Formatted with Prettier");
+    const told = await field().findByText("Formatted with Prettier");
     expect(told).toBeVisible();
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -353,12 +368,12 @@ describe("the script field", () => {
 
     format();
 
-    const told = await screen.findByText(
+    const told = await field().findByText(
       "Fix line 3 first: unexpected EOF while parsing. Ruff formats only code that parses.",
     );
     const said = screen.getByRole("status");
     expect(told).toBeVisible();
-    expect(said).toContainElement(told);
+    expect(said).toHaveTextContent(told.textContent);
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -368,7 +383,7 @@ describe("the script field", () => {
 
     format();
 
-    const told = await screen.findByText(
+    const told = await field().findByText(
       "Ruff could not run: CompileError: refused",
     );
     expect(told).toBeVisible();
@@ -404,7 +419,7 @@ describe("the script field", () => {
 
     release({ kind: "formatted", text: JS_FORMATTED, cursor: 0 });
 
-    const told = await screen.findByText(
+    const told = await field().findByText(
       "The code changed while Prettier formatted it; press Format again.",
     );
     const typed = `// names\n${JS_RAW}`;
@@ -420,7 +435,7 @@ describe("the script field", () => {
     });
     answers.push({ kind: "formatted", text: JS_FORMATTED, cursor: 0 });
     format();
-    await screen.findByText("Formatted with Prettier");
+    await field().findByText("Formatted with Prettier");
 
     act(() => {
       undo(view);
@@ -443,7 +458,7 @@ describe("the script field", () => {
       altKey: true,
     });
 
-    const told = await screen.findByText("Formatted with Prettier");
+    const told = await field().findByText("Formatted with Prettier");
     expect(told).toBeVisible();
   });
 

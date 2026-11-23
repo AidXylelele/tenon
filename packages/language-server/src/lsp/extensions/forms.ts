@@ -55,8 +55,8 @@ export function stepFormHandlerOf(
         const fields = reading.fields.map(lspFieldOf);
         const { version } = snapshot;
         const { step } = params;
-        const { failure, retry, result } = reading;
-        return { version, step, failure, retry, result, fields };
+        const { failure, retry, result, timeout } = reading;
+        return { version, step, failure, retry, result, timeout, fields };
       }
       case "refused":
         return new ResponseError(LSPErrorCodes.RequestFailed, reading.reason);

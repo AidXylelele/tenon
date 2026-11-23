@@ -36,6 +36,14 @@ describe("a time said as a date", () => {
     expect(time).toHaveAttribute("datetime", at);
   });
 
+  it("says_the_seconds_where_asked", () => {
+    const at = new Date(2026, 10, 23, 15, 24, 31);
+
+    const words = absoluteText(at.getTime(), NOW, true);
+
+    expect(words).toBe("Today 15:24:31");
+  });
+
   it("a_missing_time_is_a_dash", () => {
     render(<AbsoluteTime value={null} />);
 

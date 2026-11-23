@@ -114,7 +114,7 @@ test("a switch's cases flow before its own then", () => {
 
   const route = stepNamed(reading.workflow, "route");
   expect(route).toMatchObject({
-    summary: "2 cases",
+    summary: "2 branches",
     flow: [
       {
         on: "case",
@@ -260,6 +260,16 @@ test.each([
     "a container with no image yet",
     'box: { run: { container: { image: "" } } }',
     "container",
+  ],
+  [
+    "a JavaScript script that prints JSON",
+    "count: { run: { script: { language: js, code: x }, }, output: { as: '${ fromjson }' } }",
+    "JavaScript · prints its result as JSON",
+  ],
+  [
+    "a Python script that prints text",
+    "count: { run: { script: { language: python, code: x } } }",
+    "Python · prints its result as text",
   ],
   [
     "a loop with no list yet",

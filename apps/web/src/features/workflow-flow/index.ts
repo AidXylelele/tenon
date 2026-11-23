@@ -11,7 +11,15 @@ export type {
   StepRun,
   WorkflowFlowProps,
 } from "./interfaces";
-export { placeOf, stepsIn, stepsUnder, stepWithId } from "./flow";
+export { branchNameOf } from "./flow";
 export { START } from "./items";
-export { kindLookOf } from "./looks";
+export { kindLookOf, startCardOf } from "./looks";
+export {
+  listsOf,
+  placeOf,
+  stepAt,
+  stepsIn,
+  stepsUnder,
+  stepWithId,
+} from "./steps";
 export { WorkflowFlow } from "./workflow-flow";

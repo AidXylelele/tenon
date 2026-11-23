@@ -19,6 +19,7 @@ import {
 import {
   additionOf,
   dataUseOf,
+  templateEditsOf,
   type FieldWords,
   jsonCommitOf,
   jsonTextOf,
@@ -171,6 +172,12 @@ function ValueRowView({ holder, row, position }: RowProps) {
     placeholder: "",
     onText: write,
     onUse: use,
+    onTemplate: (parts, used) => {
+      const exported = used?.export ?? null;
+      const value = used?.value ?? "";
+      const edits = templateEditsOf(pointer, parts, exported, value);
+      onEdit(edits);
+    },
     onClear: () => {
       write("");
     },

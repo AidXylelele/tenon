@@ -17,9 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/libs/ui/components/select";
-import { CopyButton } from "@/libs/ui/composites/copy-button";
+import { Link } from "@/libs/routing/link";
+import { WEBHOOKS_HREF } from "@/libs/routing/routes";
 import { Disclosure } from "@/libs/ui/composites/disclosure";
-import { cronOf, REPEAT_CHOICES } from "@/operations/schedule-words";
+import { FIRST_CRON } from "@/operations/schedule-words";
 import {
   type FieldWords,
   eventEditsOf,
@@ -97,9 +98,6 @@ export function StartForm({
   const input = form.fields.find((field) => field.pointer === "/input");
   const webhookTypes = webhooks.map((webhook) => webhook.eventType);
   const start = startOf(schedule, webhookTypes);
-  const [firstRepeat] = REPEAT_CHOICES;
-  const firstCron =
-    firstRepeat === undefined ? "0 9 * * *" : cronOf(firstRepeat);
   const firstWebhook = webhookTypes[0] ?? null;
   const inputFields = input?.fields ?? [];
   const inputSummary = summaryOf(inputFields, "start", "", "Any JSON");
@@ -111,6 +109,7 @@ export function StartForm({
     fields: form.fields,
     flowChoices: NO_FLOW,
     scriptLanguage: "",
+    timeLimit: null,
     onEdit: send,
   };
 
@@ -119,7 +118,7 @@ export function StartForm({
 
     if (schedule === undefined || way === undefined) return;
 
-    const begin = { cron: firstCron, eventType: firstWebhook };
+    const begin = { cron: FIRST_CRON, eventType: firstWebhook };
     const edits = startEditsOf(schedule, start, way, begin);
 
     send(edits);
@@ -178,7 +177,11 @@ export function StartForm({
           />
         )}
         {input !== undefined && (
-          <Disclosure title="Workflow input" summary={inputSummary}>
+          <Disclosure
+            title="Workflow input"
+            summary={inputSummary}
+            summaryBelow
+          >
             {inputFields.map((field) => (
               <FieldView key={field.pointer} field={field} />
             ))}
@@ -242,7 +245,6 @@ function WebhookChoice({
   const settings = useFormSettings();
   const id = useId();
   const helpId = `${id}-help`;
-  const addressId = `${id}-address`;
   const chosen = webhooks.find((webhook) => webhook.eventType === eventType);
   const value = chosen?.eventType ?? "";
 
@@ -273,18 +275,14 @@ function WebhookChoice({
         </Select>
       </Field>
       {chosen !== undefined && (
-        <Field>
-          <FieldLabel htmlFor={addressId}>Its address</FieldLabel>
-          <div className="flex items-center gap-2">
-            <Input
-              id={addressId}
-              readOnly
-              className="font-mono"
-              value={chosen.address}
-            />
-            <CopyButton value={chosen.address} label="Copy" size="sm" />
-          </div>
-        </Field>
+        <p className="text-caption text-muted-foreground">
+          {chosen.name} gives its address once, when it is made; find it, or
+          make another, under{" "}
+          <Link href={WEBHOOKS_HREF} className="underline">
+            Webhooks
+          </Link>
+          .
+        </p>
       )}
       <p className="text-caption text-muted-foreground">
         Steps read the call&apos;s data from the data picker, under Workflow

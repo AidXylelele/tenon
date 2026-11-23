@@ -3,12 +3,14 @@
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  CircleAlertIcon,
   EllipsisIcon,
   PlusIcon,
   Trash2Icon,
 } from "lucide-react";
 import type { FormField } from "language-server/protocol";
-import { useId } from "react";
+import { useId, useState } from "react";
+import { diagnosticText } from "@/libs/language-client/diagnostic-text";
 import { Button } from "@/libs/ui/components/button";
 import {
   DropdownMenu,
@@ -133,16 +135,23 @@ function CaseCard({ holder, row, isFirst, isLast }: CaseCardProps) {
   const { renderCondition, onEdit } = useFormSettings();
   const id = useId();
   const nameId = `${id}-name`;
+  const problemsId = `${id}-problems`;
+  const [header, setHeader] = useState<HTMLElement | null>(null);
   const pointer = whenPointerOf(holder.pointer, row);
   const text = row.when ?? "";
   const conditionLabel = `Condition of ${row.name}`;
+  const caseField = holder.fields.find((each) => each.key === row.name);
+  const problems = caseField?.diagnostics.map(diagnosticText) ?? [];
+  const hasProblems = problems.length > 0;
+  const describedBy = hasProblems ? problemsId : undefined;
   const slot: ConditionSlot = {
     pointer,
     text,
     required: true,
     labelledBy: nameId,
-    describedBy: undefined,
-    invalid: false,
+    describedBy,
+    invalid: hasProblems,
+    header,
   };
   const condition =
     renderCondition === undefined ? (
@@ -161,21 +170,41 @@ function CaseCard({ holder, row, isFirst, isLast }: CaseCardProps) {
     <div
       role="group"
       aria-labelledby={nameId}
+      aria-describedby={describedBy}
       className="flex flex-col gap-3 rounded-lg border bg-surface p-3"
     >
       <div className="flex items-center justify-between gap-2">
         <h4 id={nameId} className="font-semibold">
           {row.name}
         </h4>
-        <BranchActions
-          holder={holder}
-          row={row}
-          isFirst={isFirst}
-          isLast={isLast}
-        />
+        <span className="flex items-center gap-1">
+          <span ref={setHeader} className="contents" />
+          <BranchActions
+            holder={holder}
+            row={row}
+            isFirst={isFirst}
+            isLast={isLast}
+          />
+        </span>
       </div>
       {condition}
       <ThenSelect value={row.then} onChoose={choose} />
+      {hasProblems && (
+        <ul id={problemsId} className="flex flex-col gap-1">
+          {problems.map((problem) => (
+            <li
+              key={problem}
+              className="flex items-start gap-1 text-caption text-destructive"
+            >
+              <CircleAlertIcon
+                className="mt-0.5 size-3.5 shrink-0"
+                aria-hidden
+              />
+              {problem}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

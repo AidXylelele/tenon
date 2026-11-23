@@ -1,5 +1,7 @@
 import type { LSPClient } from "@codemirror/lsp-client";
 import {
+  type DataAtParams,
+  type DataAtResult,
   type DocumentParams,
   type DocumentResult,
   type EditAction,
@@ -8,6 +10,10 @@ import {
   methods,
   type RangesOfParams,
   type RangesOfResult,
+  type ReadConditionParams,
+  type ReadConditionResult,
+  type ReadTemplateParams,
+  type ReadTemplateResult,
   type StepFormParams,
   type StepFormResult,
   type StructureParams,
@@ -16,6 +22,7 @@ import {
   type WorkflowFormResult,
 } from "language-server/protocol";
 import type { VersionedTextDocumentIdentifier } from "vscode-languageserver-protocol";
+import type { JsonValue } from "@/libs/json/json";
 
 export class WorkflowSession {
   constructor(
@@ -68,6 +75,34 @@ export class WorkflowSession {
     return await this.client.request<RangesOfParams, RangesOfResult>(
       methods.rangesOf,
       { textDocument, pointers },
+    );
+  }
+
+  async dataAt(
+    step: string,
+    field: string,
+    samples: Readonly<Record<string, JsonValue>>,
+    typed: string,
+  ): Promise<DataAtResult> {
+    const textDocument = this.synced();
+    return await this.client.request<DataAtParams, DataAtResult>(
+      methods.dataAt,
+      { textDocument, step, field, samples, typed },
+    );
+  }
+
+  async readTemplate(pointer: string): Promise<ReadTemplateResult> {
+    const textDocument = this.synced();
+    return await this.client.request<ReadTemplateParams, ReadTemplateResult>(
+      methods.readTemplate,
+      { textDocument, pointer },
+    );
+  }
+
+  async readCondition(text: string): Promise<ReadConditionResult> {
+    return await this.client.request<ReadConditionParams, ReadConditionResult>(
+      methods.readCondition,
+      { text },
     );
   }
 

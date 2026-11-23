@@ -1,4 +1,4 @@
-export { problemsOf } from "./problems.js";
+export { isWarning, problemsOf } from "./problems.js";
 export { modelOf, sourceOf } from "./reads.js";
 export type {
   AddressDiagnostic,

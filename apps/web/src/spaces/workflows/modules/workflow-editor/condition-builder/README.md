@@ -13,6 +13,8 @@ Owner: web — editor. Sources: research D9 of the console redesign (005); desig
 - `renderPicker(slot)`: the module renders the data picker with `onlyPaths` (`PickerSlot`: `label`, always "Insert data", `describedBy`, the id of "Value" or "Compared with", and `onPick({ value, expression, export })`).
 - `onEdit(actions)`: once every row is complete, `useData` for each step to export, then `setCondition`; an expression (a mono text area, kept as typed) is `setField` when it changed, or `clearField` when an optional condition is emptied.
 
+Where the slot gives a `header` (a branch card's header), "Write an expression" and "Use the builder" sit there (DQ-9); otherwise above the rows.
+
 A row: its value (the data chosen), its comparison ("is not empty", "is empty", "is", "is not", "contains", "does not contain", "is greater than", "is less than") and, where the comparison takes one, what it is compared with (a value typed, data from the workflow, Now, Today or Yesterday). Rows are added and removed; with two or more, "All must hold" or "Any may hold". A reading that comes back as the builder's own condition keeps the rows being edited; one from elsewhere (the Code view) replaces them.
 
 Consumer: the editor's step form, through its `renderCondition` slot, wired by the editor in M5.

@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/libs/ui/components/select";
-import { Switch } from "@/libs/ui/components/switch";
+import { Checkbox } from "@/libs/ui/components/checkbox";
 import { Textarea } from "@/libs/ui/components/textarea";
 import { cn } from "@/libs/ui/tokens/cn";
 import {
@@ -22,7 +22,7 @@ import {
   numberCommitOf,
   textEditsOf,
   timeLimitCommitOf,
-  timeLimitOf,
+  limitSecondsOf,
   valueEditsOf,
 } from "../form-fields";
 import { blurOnEnter, type ControlWiring } from "./field-shell";
@@ -159,13 +159,14 @@ export function BooleanControl({ field, wiring }: ControlProps) {
   const checked = field.value === true;
 
   return (
-    <Switch
+    <Checkbox
       id={wiring.id}
       checked={checked}
       aria-describedby={wiring.describedBy}
       aria-invalid={wiring.invalid}
       onCheckedChange={(next) => {
-        const edits = valueEditsOf(field, next);
+        const isChecked = next === true;
+        const edits = valueEditsOf(field, isChecked);
         onEdit(edits);
       }}
     />
@@ -237,8 +238,9 @@ export function JsonControl({ field, wiring }: ControlProps) {
 
 export function TimeLimitControl(props: ControlProps) {
   const { field, words, wiring } = props;
+  const { timeLimit } = useFormSettings();
   const apply = useCommit(wiring);
-  const seconds = timeLimitOf(field.value);
+  const seconds = limitSecondsOf(timeLimit);
   const shown = seconds === null ? "" : String(seconds);
   const isOtherwise = field.written && seconds === null;
 

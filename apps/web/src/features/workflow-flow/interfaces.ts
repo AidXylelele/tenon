@@ -70,6 +70,7 @@ export type FlowMode = { readonly kind: "read" } | EditMode | RunMode;
 
 export interface FlowHandle {
   readonly focusAfterRemoving: (step: string) => void;
+  readonly focusStep: (step: string) => void;
 }
 
 export interface WorkflowFlowProps {
@@ -118,6 +119,7 @@ export type Exit =
 
 export interface Branch {
   readonly case: string;
+  readonly name: string;
   readonly when: string | null;
   readonly exit: Exit;
 }
@@ -131,6 +133,7 @@ export interface Jump {
   readonly between: readonly string[];
   readonly lane: number;
   readonly case: string | null;
+  readonly branch: string | null;
 }
 
 export interface JumpTransition {

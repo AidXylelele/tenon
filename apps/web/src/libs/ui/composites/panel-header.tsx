@@ -1,6 +1,5 @@
 import { ChevronLeftIcon, XIcon } from "lucide-react";
-import { Button } from "../components/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip";
+import { IconButton } from "./icon-button";
 
 interface PanelHeaderProps {
   readonly title: string;
@@ -10,31 +9,6 @@ interface PanelHeaderProps {
   readonly backLabel?: string;
   readonly actions?: React.ReactNode;
   readonly onClose?: () => void;
-}
-
-interface HeaderButtonProps {
-  readonly label: string;
-  readonly onClick: () => void;
-  readonly children: React.ReactNode;
-}
-
-function HeaderButton({ label, onClick, children }: HeaderButtonProps) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={label}
-          onClick={onClick}
-        >
-          {children}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  );
 }
 
 export function PanelHeader({
@@ -49,9 +23,12 @@ export function PanelHeader({
   return (
     <header className="flex items-start gap-2.5 border-b border-border px-4 py-3">
       {onBack !== undefined && (
-        <HeaderButton label={backLabel} onClick={onBack}>
-          <ChevronLeftIcon />
-        </HeaderButton>
+        <IconButton
+          type="button"
+          label={backLabel}
+          icon={ChevronLeftIcon}
+          onClick={onBack}
+        />
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <h2 id={titleId} className="truncate text-body font-semibold">
@@ -63,9 +40,12 @@ export function PanelHeader({
       </div>
       {actions}
       {onClose !== undefined && (
-        <HeaderButton label="Close" onClick={onClose}>
-          <XIcon />
-        </HeaderButton>
+        <IconButton
+          type="button"
+          label="Close"
+          icon={XIcon}
+          onClick={onClose}
+        />
       )}
     </header>
   );

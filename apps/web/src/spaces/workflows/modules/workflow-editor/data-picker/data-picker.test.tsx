@@ -54,6 +54,7 @@ function type(text: string) {
 function field(props: Partial<DataFieldProps> = {}) {
   const onText = vi.fn();
   const onUse = vi.fn();
+  const onTemplate = vi.fn();
   const onClear = vi.fn();
   render(
     <Announcer>
@@ -72,13 +73,14 @@ function field(props: Partial<DataFieldProps> = {}) {
           data={AT_AN_ADDRESS}
           onText={onText}
           onUse={onUse}
+          onTemplate={onTemplate}
           onClear={onClear}
           {...props}
         />
       </TooltipProvider>
     </Announcer>,
   );
-  return { onText, onUse, onClear };
+  return { onText, onUse, onTemplate, onClear };
 }
 
 describe("the data picker", () => {
@@ -181,6 +183,27 @@ describe("the data picker", () => {
 
     const note = /No step runs before this one/;
     expect(search).toHaveAccessibleDescription(note);
+  });
+
+  it("a_group's_note_sits_under_its_own_group", () => {
+    picker({ data: AFTER_FETCH });
+    openPicker();
+
+    const note = screen.getByText(/Run a test to see the fields/);
+    const group = note.closest("[cmdk-group]");
+
+    expect(group).toHaveTextContent("From Fetch the digest");
+  });
+
+  it("the_picker_is_never_taller_than_the_room_it_has", () => {
+    picker();
+    openPicker();
+
+    const dialog = screen.getByRole("dialog");
+
+    expect(dialog.className).toContain(
+      "max-h-(--radix-popover-content-available-height)",
+    );
   });
 
   it("nothing_that_matches_is_said", () => {
@@ -336,5 +359,26 @@ describe("a field that takes data", () => {
     const text = screen.getByRole("textbox", { name: "Address" });
 
     expect(text).toHaveValue("${ now | todate }");
+  });
+
+  it("a_text_the_server_reads_as_an_expression_opens_as_one", () => {
+    const value = "${ .count + 1 }";
+    const template = { kind: "expression", text: value } as const;
+    field({ value, data: null, template });
+
+    const text = screen.getByRole("textbox", { name: "Address" });
+
+    expect(text.tagName).toBe("TEXTAREA");
+  });
+
+  it("a_text_the_server_reads_as_text_stays_text_whatever_it_starts_with", () => {
+    const value = "${ .title } is sent as written";
+    const parts = [{ kind: "text", text: value }] as const;
+    const template = { kind: "template", parts } as const;
+    field({ value, data: null, template });
+
+    const text = screen.getByRole("textbox", { name: "Address" });
+
+    expect(text.tagName).toBe("INPUT");
   });
 });

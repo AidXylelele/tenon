@@ -16,6 +16,8 @@ export type {
   RangesOfResult,
   ReadConditionParams,
   ReadConditionResult,
+  ReadTemplateParams,
+  ReadTemplateResult,
   Step,
   StepFormParams,
   StepFormResult,
@@ -52,6 +54,12 @@ export type { EditAction, Failure, IdChange } from "../ide/edits/index.js";
 export { type StepFamily, stepFamilies } from "../ide/families/index.js";
 export type { FormSection } from "../ide/forms/index.js";
 export type { DraftAddress } from "../ide/snapshot/index.js";
+export type {
+  DataPart,
+  TemplatePart,
+  TemplateReading,
+  TextPart,
+} from "../ide/templates/index.js";
 export type {
   Afterward,
   FailureKind,

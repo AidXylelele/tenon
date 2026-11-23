@@ -105,7 +105,7 @@ function RunRow({
       )}
       <TableCell>
         <Link href={href} className="after:absolute after:inset-0">
-          <AbsoluteTime value={started} />
+          <AbsoluteTime value={started} seconds />
           <span className="sr-only">{name}</span>
         </Link>
       </TableCell>

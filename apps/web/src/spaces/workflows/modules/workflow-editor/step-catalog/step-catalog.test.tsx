@@ -1,3 +1,4 @@
+import { Announcer } from "@/libs/ui/composites/announcer";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, type Mock, vi } from "vitest";
 import { TENON_VARIANTS, WITHOUT_SHELL } from "./hosts.test-support";
@@ -30,7 +31,9 @@ const HOST_WITHOUT_SHELL: Shown = {
 
 function openCatalog(shown: Shown): Owner {
   const onChoose = vi.fn<(action: EntryAction) => void>();
-  render(<StepCatalog {...shown} onChoose={onChoose} />);
+  render(<StepCatalog {...shown} onChoose={onChoose} />, {
+    wrapper: Announcer,
+  });
   return { onChoose };
 }
 
@@ -163,7 +166,7 @@ describe("the step catalog at a plus", () => {
 
     const said = screen.getByRole("status");
 
-    expect(said).toBeEmptyDOMElement();
+    expect(said.textContent).toBe("");
   });
 
   it("the_count_of_matches_is_said_politely_while_searching", () => {

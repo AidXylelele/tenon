@@ -76,6 +76,23 @@ const WORDS: ReadonlyMap<string, WordsEntry> = new Map([
     },
   ],
   [
+    "http|with/endpoint/uri",
+    {
+      title: "Address",
+      placeholder: "https://",
+      fill: ADDRESS_FILL,
+      control: "data",
+    },
+  ],
+  [
+    "http|with/endpoint/authentication",
+    {
+      title: "Authentication",
+      help: "Signs the call in with a secret; its value never shows in run records.",
+      control: "authentication",
+    },
+  ],
+  [
     "http|with/body",
     {
       title: "Data",
@@ -189,12 +206,13 @@ export function wordsOf(
   const own = WORDS.get(`${kind}|${path}`);
   const shared = WORDS.get(`${ANY_KIND}|${path}`);
   const entry = own ?? shared ?? {};
+  const usual = field.suggested ? "values" : "value";
   return {
     title: entry.title ?? field.title,
     help: entry.help ?? null,
     placeholder: entry.placeholder ?? "",
     fill: entry.fill ?? null,
-    control: entry.control ?? "value",
+    control: entry.control ?? usual,
     mono: entry.mono ?? false,
     choices: entry.choices ?? NO_CHOICES,
   };

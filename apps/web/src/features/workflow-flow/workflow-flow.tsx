@@ -96,6 +96,7 @@ export function WorkflowFlow({
   const still = select === null && kind !== "edit";
   const description = still ? undefined : KEYBOARD;
   const room = { paddingInline: sideRoomOf(jumps.length) };
+  const zoomAt = kind === "read" ? "top-right" : "bottom-left";
 
   useLayoutEffect(() => {
     store.show(shown);
@@ -117,8 +118,12 @@ export function WorkflowFlow({
         const targets = removalFocusOf(steps, step);
         removal.current = { step, focus: targets };
       },
+      focusStep: (step: string) => {
+        const item = stepItemOf(step);
+        focus([item]);
+      },
     }),
-    [steps],
+    [steps, focus],
   );
 
   function press(event: KeyboardEvent<HTMLElement>) {
@@ -135,7 +140,12 @@ export function WorkflowFlow({
 
   return (
     <FlowContext value={state}>
-      <FlowCanvas label={label} description={description} focusable={still}>
+      <FlowCanvas
+        label={label}
+        description={description}
+        focusable={still}
+        zoomAt={zoomAt}
+      >
         <div
           ref={container}
           onFocus={onFocus}

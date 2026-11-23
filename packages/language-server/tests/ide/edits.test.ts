@@ -1999,6 +1999,48 @@ test("a condition that cannot be written is refused with its reason", () => {
   });
 });
 
+const templateFlow = `${inlineHeader}do:
+  - greet:
+      set:
+        message: 'New digest: \${ .title }'
+        total: \${ .a + .b }
+`;
+
+test("a template is written into its field in its one form", () => {
+  const action: EditAction = {
+    kind: "setTemplate",
+    pointer: "/do/0/greet/set/message",
+    parts: [
+      { kind: "text", text: "Digest: " },
+      { kind: "data", expression: ".title", label: "title" },
+    ],
+  };
+
+  const outcome = outcomeOf(templateFlow, action);
+
+  const expected = templateFlow.replace(
+    "message: 'New digest: ${ .title }'",
+    `message: '\${ "Digest: \\(.title)" }'`,
+  );
+  expect(outcome).toEqual({ text: expected, ids: [], diagnostics: [] });
+});
+
+test("a template over an expression it cannot show is refused", () => {
+  const action: EditAction = {
+    kind: "setTemplate",
+    pointer: "/do/0/greet/set/total",
+    parts: [{ kind: "text", text: "none" }],
+  };
+
+  const editing = check(templateFlow, action);
+
+  expect(editing).toEqual({
+    kind: "refused",
+    reason:
+      "/do/0/greet/set/total holds an expression a template does not show; edit it as jq.",
+  });
+});
+
 const wrapFlow = `${inlineHeader}do:
   - start:
       set:
@@ -2437,4 +2479,43 @@ test.each([
   const editing = check(text, action);
 
   expect(editing).toEqual({ kind: "refused", reason });
+});
+
+const fetchingText = `${inlineHeader}do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: https://example.com
+`;
+
+test("an authentication set on an address written as its text writes the address as an object", () => {
+  const action: EditAction = {
+    kind: "setField",
+    pointer: "/do/0/fetch/with/endpoint/authentication",
+    value: { bearer: { use: "TOKEN" } },
+  };
+
+  const outcome = outcomeOf(fetchingText, action);
+
+  const expected = fetchingText.replace(
+    "endpoint: https://example.com\n",
+    "endpoint: { uri: https://example.com, authentication: { bearer: { use: TOKEN } } }\n",
+  );
+  expect(outcome).toMatchObject({ text: expected, ids: [] });
+});
+
+test("code of several lines is written as a block scalar", () => {
+  const text = `${inlineHeader}do:\n  - count:\n      run:\n        script:\n          language: js\n          code: "x"\n`;
+  const action: EditAction = {
+    kind: "setField",
+    pointer: "/do/0/count/run/script/code",
+    value: "const a = 1;\nconsole.log(a);\n",
+  };
+
+  const edited = editedOf(text, action);
+
+  expect(edited).toContain(
+    "          code: |\n            const a = 1;\n            console.log(a);\n",
+  );
 });

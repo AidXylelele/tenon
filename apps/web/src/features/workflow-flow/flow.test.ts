@@ -7,11 +7,8 @@ import {
   doneExitOf,
   jumpsOf,
   sourcesOf,
-  placeOf,
-  stepsIn,
-  stepsUnder,
-  stepWithId,
 } from "./flow";
+import { placeOf, stepsIn, stepsUnder, stepWithId } from "./steps";
 import {
   DAILY_DIGEST,
   goTo,
@@ -124,6 +121,7 @@ describe("a choice", () => {
     expect(branches).toEqual([
       {
         case: "A licence",
+        name: "A licence",
         when: '${ .kind == "licence" }',
         exit: {
           kind: "jump",
@@ -133,6 +131,7 @@ describe("a choice", () => {
       },
       {
         case: "A parcel",
+        name: "A parcel",
         when: '${ .kind == "parcel" }',
         exit: {
           kind: "jump",
@@ -140,7 +139,12 @@ describe("a choice", () => {
           name: "Book the courier",
         },
       },
-      { case: "Otherwise", when: null, exit: { kind: "end" } },
+      {
+        case: "default",
+        name: "Otherwise",
+        when: null,
+        exit: { kind: "end" },
+      },
     ]);
   });
 
@@ -154,7 +158,12 @@ describe("a choice", () => {
     const branches = branchesOf(choice, list);
 
     expect(branches).toEqual([
-      { case: "Fine", when: "${ .ok }", exit: { kind: "next" } },
+      {
+        case: "Fine",
+        name: "Fine",
+        when: "${ .ok }",
+        exit: { kind: "next" },
+      },
     ]);
   });
 });
@@ -173,6 +182,7 @@ describe("the jumps of a workflow", () => {
         between: ["/do/Which kind?", "/do/Send the licence"],
         lane: 0,
         case: "A licence",
+        branch: "A licence",
       },
       {
         key: "case:/do/Which kind?:A parcel",
@@ -187,6 +197,7 @@ describe("the jumps of a workflow", () => {
         ],
         lane: 1,
         case: "A parcel",
+        branch: "A parcel",
       },
       {
         key: "case:/do/Booked?:Not yet",
@@ -197,6 +208,7 @@ describe("the jumps of a workflow", () => {
         between: ["/do/Booked?", "/do/Tell the customer", "/do/Wait a minute"],
         lane: 2,
         case: "Not yet",
+        branch: "Not yet",
       },
       {
         key: "done:/do/Wait a minute",
@@ -212,6 +224,7 @@ describe("the jumps of a workflow", () => {
         ],
         lane: 3,
         case: null,
+        branch: null,
       },
     ]);
   });
@@ -236,6 +249,7 @@ describe("the jumps of a workflow", () => {
         between: ["/do/Group/do/First", "/do/Group/do/Last"],
         lane: 0,
         case: null,
+        branch: null,
       },
     ]);
   });

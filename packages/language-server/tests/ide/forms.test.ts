@@ -109,6 +109,7 @@ test("a then suggests the flow directives and the names of its list", () => {
     choices: ["continue", "exit", "end", "pause", "route"],
     required: false,
     written: true,
+    suggested: false,
     value: "route",
     essentialRank: null,
     fields: [],
@@ -132,11 +133,105 @@ test("a member not written is a field with no value", () => {
     choices: [],
     required: false,
     written: false,
+    suggested: false,
     value: null,
     essentialRank: null,
     fields: [],
     diagnostics: [],
   });
+});
+
+const scriptAndCall = `${inlineHeader}do:
+  - run:
+      run:
+        script:
+          language: js
+          code: "1"
+          environment:
+            MODE: test
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint: https://example.com
+`;
+
+function suggestedOf(fields: readonly FormField[]): readonly string[] {
+  return fields.flatMap((field) => {
+    const below = suggestedOf(field.fields);
+    const own = field.suggested ? [field.pointer] : [];
+    return [...own, ...below];
+  });
+}
+
+test.each([
+  [
+    "a script",
+    "/do/run",
+    ["/do/0/run/metadata", "/do/0/run/run/script/arguments"],
+  ],
+  [
+    "an HTTP call",
+    "/do/fetch",
+    [
+      "/do/1/fetch/metadata",
+      "/do/1/fetch/with/headers",
+      "/do/1/fetch/with/query",
+    ],
+  ],
+])(
+  "%s suggests the unwritten objects whose members a person adds",
+  (_, step, pointers) => {
+    const fields = fieldsOf(scriptAndCall, step);
+
+    const suggested = suggestedOf(fields);
+
+    expect(suggested).toEqual(pointers);
+  },
+);
+
+const brokenRoute = `${inlineHeader}do:
+  - route:
+      switch:
+        - known:
+            when: '\${ .a | }'
+            then: end
+        - other:
+            then: nowhere
+`;
+
+test("a problem inside a case is reported at the case, not at the switch", () => {
+  const fields = fieldsOf(brokenRoute, "/do/route");
+  const cases = fieldOf(fields, "switch");
+
+  const placed = cases?.fields.map((field) => {
+    const pointers = field.diagnostics.map((problem) => problem.pointer);
+    return [field.pointer, pointers];
+  });
+
+  expect(cases?.diagnostics).toEqual([]);
+  expect(placed).toEqual([
+    ["/do/0/route/switch/0/known", ["/do/0/route/switch/0/known/when"]],
+    ["/do/0/route/switch/1/other", ["/do/0/route/switch/1/other/then"]],
+  ]);
+});
+
+test("a case is a group of its condition and its next step", () => {
+  const fields = fieldsOf(brokenRoute, "/do/route");
+  const cases = fieldOf(fields, "switch");
+
+  const known = cases?.fields[0];
+  const keys = known?.fields.map((field) => field.key);
+
+  expect(known).toMatchObject({
+    key: "known",
+    title: "Known",
+    input: "group",
+    section: "settings",
+    written: true,
+    required: true,
+  });
+  expect(keys).toEqual(["when", "then"]);
 });
 
 test("an object of named members is a group of fields in its section", () => {
@@ -701,4 +796,99 @@ test.each<readonly [string, JsonObject, unknown]>([
   const reading = check(text, "/do/step");
 
   expect(reading).toMatchObject({ kind: "form", result });
+});
+
+const timedFetch = `${inlineHeader}use:
+  timeouts:
+    short:
+      after: PT10S
+do:
+  - fetch:
+      call: http
+      timeout:
+        after: PT30S
+      with:
+        method: get
+        endpoint: https://example.com
+`;
+
+test.each([
+  ["a step with no time limit has none", paused, "/do/pause", null],
+  [
+    "an ISO time limit is read as its milliseconds",
+    timedFetch,
+    "/do/fetch",
+    30000,
+  ],
+  [
+    "a time limit of units is read as its milliseconds",
+    timedFetch.replace("after: PT30S", "after: { seconds: 5 }"),
+    "/do/fetch",
+    5000,
+  ],
+  [
+    "a time limit named in use.timeouts is read where it is defined",
+    timedFetch.replace("timeout:\n        after: PT30S", "timeout: short"),
+    "/do/fetch",
+    10000,
+  ],
+])("%s", (_, text, step, timeout) => {
+  const reading = check(text, step);
+
+  expect(reading).toMatchObject({ kind: "form", timeout });
+});
+
+const authenticated = `${inlineHeader}do:
+  - fetch:
+      call: http
+      with:
+        method: get
+        endpoint:
+          uri: https://example.com
+          authentication:
+            bearer:
+              use: TOKEN
+`;
+
+test("an address written as its text is offered with its authentication", () => {
+  const fields = fieldsOf(fetching, "/do/fetch");
+
+  const all = flattenedOf(fields);
+  const authentication = all.find((field) => field.key === "authentication");
+  const policies = authentication?.fields.map((field) => field.key);
+  const bearer = authentication?.fields.find((field) => field.key === "bearer");
+  const bearerKeys = bearer?.fields.map((field) => field.key);
+
+  expect(authentication).toMatchObject({
+    pointer: "/do/0/fetch/with/endpoint/authentication",
+    input: "oneOf",
+    written: false,
+    value: null,
+    essentialRank: null,
+  });
+  expect(policies).toEqual(expect.arrayContaining(["basic", "bearer"]));
+  expect(bearer?.input).toBe("group");
+  expect(bearerKeys).toEqual(expect.arrayContaining(["token", "use"]));
+});
+
+test("an address written as an object is its uri, beside its authentication", () => {
+  const fields = fieldsOf(authenticated, "/do/fetch");
+
+  const all = flattenedOf(fields);
+  const essentials = essentialsOf(fields);
+  const endpoint = all.find((field) => field.key === "endpoint");
+  const uri = all.find((field) => field.key === "uri");
+  const authentication = all.find((field) => field.key === "authentication");
+
+  expect(essentials).toEqual([
+    "/do/0/fetch/with/method",
+    "/do/0/fetch/with/endpoint/uri",
+  ]);
+  expect(endpoint?.input).toBe("group");
+  expect(uri).toMatchObject({ input: "text", value: "https://example.com" });
+  expect(authentication).toMatchObject({
+    input: "oneOf",
+    written: true,
+    value: { bearer: { use: "TOKEN" } },
+  });
 });

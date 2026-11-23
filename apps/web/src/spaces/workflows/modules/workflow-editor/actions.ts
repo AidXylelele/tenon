@@ -1,17 +1,25 @@
 "use server";
 
-import { checkDocument, fetchImport } from "@/libs/data-access/automation";
+import {
+  fetchImport,
+  publishEvent,
+  turnWorkflow,
+} from "@/libs/data-access/automation";
 import {
   checkDraft,
+  discardDraft,
   draft,
   publishDraft,
+  testDraft,
   writeDraft,
 } from "@/libs/data-access/drafts";
 import type { Outcome, Problem } from "@/libs/data-access/problem";
 import type {
   DraftCheck,
+  DraftDiscard,
   DraftPublication,
   DraftRevision,
+  DraftTestRun,
   DraftWrite,
 } from "@/libs/data-access/types";
 import {
@@ -19,8 +27,10 @@ import {
   DraftSave,
   DraftStart,
   DraftTarget,
+  DraftTest,
   ImportAddress,
-  PublishedDocument,
+  StartsTurn,
+  TestEventType,
 } from "./form";
 
 const UNREADABLE: Problem = {
@@ -44,14 +54,6 @@ const UNFETCHABLE: Problem = {
   errors: [],
   retryAfter: null,
 };
-
-export async function checkAction(document: unknown): Promise<Outcome<void>> {
-  const parsed = PublishedDocument.safeParse(document);
-
-  if (!parsed.success) return { ok: false, problem: UNREADABLE };
-
-  return checkDocument(parsed.data);
-}
 
 export async function fetchImportAction(
   address: unknown,
@@ -113,4 +115,53 @@ export async function publishDraftAction(
 
   const { namespace, name, etag } = parsed.data;
   return publishDraft(namespace, name, etag);
+}
+
+export async function discardDraftAction(
+  request: unknown,
+): Promise<DraftDiscard> {
+  const parsed = DraftEtag.safeParse(request);
+
+  if (!parsed.success) return REFUSED;
+
+  const { namespace, name, etag } = parsed.data;
+  return discardDraft(namespace, name, etag);
+}
+
+export async function testRunAction(request: unknown): Promise<DraftTestRun> {
+  const parsed = DraftTest.safeParse(request);
+
+  if (!parsed.success) return REFUSED;
+
+  const { namespace, name, etag, input, key } = parsed.data;
+  return testDraft(namespace, name, etag, input, key);
+}
+
+export async function turnStartsAction(
+  request: unknown,
+): Promise<Outcome<void>> {
+  const parsed = StartsTurn.safeParse(request);
+
+  if (!parsed.success) return { ok: false, problem: UNREADABLE };
+
+  const { namespace, name, on } = parsed.data;
+  return turnWorkflow(namespace, name, on);
+}
+
+export async function testEventAction(type: unknown): Promise<Outcome<void>> {
+  const parsed = TestEventType.safeParse(type);
+
+  if (!parsed.success) return { ok: false, problem: UNREADABLE };
+
+  const id = crypto.randomUUID();
+  const time = new Date().toISOString();
+  const event = {
+    specversion: "1.0",
+    id,
+    source: "tenon/console",
+    type: parsed.data,
+    time,
+    data: {},
+  };
+  return publishEvent(event);
 }

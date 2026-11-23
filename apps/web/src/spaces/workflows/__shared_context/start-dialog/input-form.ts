@@ -155,6 +155,7 @@ function fieldOf(
     choices,
     required,
     written: written !== undefined,
+    suggested: false,
     value: written ?? null,
     essentialRank: null,
     fields,

@@ -258,7 +258,7 @@ describe("adding steps", () => {
     expect(mode.onInsert).toHaveBeenCalledWith({
       kind: "branch",
       switch: "/do/Has items?",
-      case: "Otherwise",
+      case: "default",
     });
   });
 
@@ -574,6 +574,27 @@ describe("removing a step", () => {
     shown.rerender(<TooltipProvider>{flow}</TooltipProvider>);
 
     expect(post).toHaveFocus();
+  });
+
+  it("focuses_a_step_it_is_asked_to", () => {
+    const mode = editing();
+    const handle = createRef<FlowHandle>();
+    render(
+      <TooltipProvider>
+        <WorkflowFlow
+          ref={handle}
+          workflow={DAILY_DIGEST}
+          mode={mode}
+          onSelect={vi.fn()}
+        />
+      </TooltipProvider>,
+    );
+
+    act(() => {
+      handle.current?.focusStep(POST);
+    });
+
+    expect(stepButton("Post the items")).toHaveFocus();
   });
 
   it("offers_no_step_menu_on_the_card", () => {

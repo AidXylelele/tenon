@@ -27,7 +27,15 @@ export type FieldControl =
   | "cases"
   | "seconds"
   | "body"
+  | "authentication"
   | "hidden";
+
+export type AuthScheme = "bearer" | "basic";
+
+export interface Authentication {
+  readonly scheme: AuthScheme | "none" | "other";
+  readonly secret: string;
+}
 
 export interface FieldWords {
   readonly title: string;

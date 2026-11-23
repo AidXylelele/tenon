@@ -128,7 +128,7 @@ function stepOf(node: StepNode, sources: Sources): Step {
   const document = sources.model.source.document;
   const family = stepFamilies[task.kind];
   const variant = variantOf(task);
-  const summary = summaryOf(task, document);
+  const summary = summaryOf(node, document);
   const milliseconds = stepMillisecondsOf(task);
   const written = task.metadata.note;
   const note = typeof written === "string" ? written : null;

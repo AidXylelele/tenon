@@ -41,6 +41,18 @@ describe("the words a field is shown with", () => {
     });
   });
 
+  it("an_object_whose_members_a_person_names_is_offered_as_rows_to_add", () => {
+    const query = fieldOf({
+      key: "headers",
+      pointer: "/do/0/call/with/headers",
+      suggested: true,
+    });
+
+    const words = wordsOf("grpc", "with/headers", query);
+
+    expect(words.control).toBe("values");
+  });
+
   it("a_kind's_own_words_are_known_and_another_kind's_are_not", () => {
     const own = hasWords("script", "run/script/environment");
     const other = hasWords("shell", "run/script/environment");

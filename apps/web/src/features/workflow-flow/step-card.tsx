@@ -121,7 +121,7 @@ function BranchRow({ step, branch, taken }: BranchRowProps) {
   const jump = jumpKeyOf(step.id, branch.case);
   const item = branchItemOf(step.id, branch.case);
   const place = { kind: "branch", switch: step.id, case: branch.case } as const;
-  const label = `Add a step on the branch ${branch.case}`;
+  const label = `Add a step on the branch ${branch.name}`;
   const plus = branchPlusItemOf(step.id, branch.case);
   const row = cn(
     "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left text-caption hover:bg-hover",
@@ -154,7 +154,7 @@ function BranchRow({ step, branch, taken }: BranchRowProps) {
         className={row}
       >
         <span className="flex min-w-0 flex-col">
-          <span className={name}>{branch.case}</span>
+          <span className={name}>{branch.name}</span>
           <span className={condition}>{when}</span>
         </span>
         <span className={exit}>
