@@ -16,13 +16,13 @@ import type {
   SubscriptionClient,
 } from "../../messaging/interfaces.js";
 import { ResourceClient, type StepCall } from "../interfaces.js";
-import { AmqpChannel } from "./amqp.channel.js";
+import { AmqpGateway } from "./amqp.gateway.js";
 import { AsyncApiDocuments } from "./asyncapi-documents.js";
 import { Authenticator } from "./authenticator.js";
 import { BrokerProtocol } from "./enums.js";
 import type {
   BasicCredentials,
-  BrokerChannel,
+  BrokerGateway,
   BrokerInbox,
   BrokerMessage,
   BrokerTarget,
@@ -32,10 +32,10 @@ import type {
   Targeted,
   UnusableSecret,
 } from "./interfaces.js";
-import { KafkaChannel } from "./kafka.channel.js";
-import { MqttChannel } from "./mqtt.channel.js";
-import { NatsChannel } from "./nats.channel.js";
-import { RedisChannel } from "./redis.channel.js";
+import { KafkaGateway } from "./kafka.gateway.js";
+import { MqttGateway } from "./mqtt.gateway.js";
+import { NatsGateway } from "./nats.gateway.js";
+import { RedisGateway } from "./redis.gateway.js";
 import { TransportFailures } from "./transport-failures.js";
 
 @Injectable()
@@ -44,7 +44,7 @@ export class AsyncApiGateway implements SubscriptionClient {
   private static readonly EXPIRED: Expired = { kind: "expired" };
 
   private readonly policy: ResiliencePolicy;
-  private readonly channels: ReadonlyMap<string, BrokerChannel>;
+  private readonly brokers: ReadonlyMap<string, BrokerGateway>;
 
   constructor(
     private readonly resources: ResourceClient,
@@ -52,15 +52,15 @@ export class AsyncApiGateway implements SubscriptionClient {
     private readonly documents: AsyncApiDocuments,
     private readonly limit: ResponseSizeLimit,
     private readonly failures: TransportFailures,
-    amqp: AmqpChannel,
-    kafka: KafkaChannel,
-    mqtt: MqttChannel,
-    nats: NatsChannel,
-    redis: RedisChannel,
+    amqp: AmqpGateway,
+    kafka: KafkaGateway,
+    mqtt: MqttGateway,
+    nats: NatsGateway,
+    redis: RedisGateway,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("asyncapi-calls");
-    const channels: Readonly<Record<BrokerProtocol, BrokerChannel>> = {
+    const brokers: Readonly<Record<BrokerProtocol, BrokerGateway>> = {
       [BrokerProtocol.Amqp]: amqp,
       [BrokerProtocol.Amqps]: amqp,
       [BrokerProtocol.Kafka]: kafka,
@@ -71,8 +71,8 @@ export class AsyncApiGateway implements SubscriptionClient {
       [BrokerProtocol.Nats]: nats,
       [BrokerProtocol.Redis]: redis,
     };
-    const entries = Object.entries(channels);
-    this.channels = new Map(entries);
+    const entries = Object.entries(brokers);
+    this.brokers = new Map(entries);
   }
 
   async perform(
@@ -91,9 +91,9 @@ export class AsyncApiGateway implements SubscriptionClient {
     if (target.kind !== "target") return target;
 
     const protocol = target.server.protocol;
-    const channel = this.channels.get(protocol);
+    const broker = this.brokers.get(protocol);
 
-    if (channel === undefined)
+    if (broker === undefined)
       return {
         kind: "misconfigured",
         detail: `The host does not publish over the protocol '${protocol}'`,
@@ -120,7 +120,7 @@ export class AsyncApiGateway implements SubscriptionClient {
       idempotencyKey: context.idempotencyKey,
       login,
     };
-    return this.#published(channel, target, message, context.signal);
+    return this.#published(broker, target, message, context.signal);
   }
 
   async subscribe(
@@ -139,9 +139,9 @@ export class AsyncApiGateway implements SubscriptionClient {
     if (target.kind !== "target") return target;
 
     const protocol = target.server.protocol;
-    const channel = this.channels.get(protocol);
+    const broker = this.brokers.get(protocol);
 
-    if (channel === undefined)
+    if (broker === undefined)
       return {
         kind: "misconfigured",
         detail: `The host does not receive over the protocol '${protocol}'`,
@@ -152,7 +152,7 @@ export class AsyncApiGateway implements SubscriptionClient {
     if (login !== null && login.kind !== "basic") return login;
 
     const brokerInbox = this.#brokerInboxOf(target, step, inbox);
-    const subscribing = channel.subscribe(target, login, brokerInbox);
+    const subscribing = broker.subscribe(target, login, brokerInbox);
     const subscribed = await this.#within(subscribing, inbox.ended);
 
     if (subscribed === AsyncApiGateway.EXPIRED)
@@ -173,13 +173,13 @@ export class AsyncApiGateway implements SubscriptionClient {
   }
 
   async #published(
-    channel: BrokerChannel,
+    broker: BrokerGateway,
     target: BrokerTarget,
     message: BrokerMessage,
     signal: AbortSignal,
   ): Promise<AsyncApiOutcome> {
     const publishing = this.policy.execute(
-      (attempt) => channel.publish(target, message, attempt.signal),
+      (attempt) => broker.publish(target, message, attempt.signal),
       { signal },
     );
 

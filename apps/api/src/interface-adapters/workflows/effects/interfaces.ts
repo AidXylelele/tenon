@@ -99,7 +99,7 @@ export interface BrokerInbox {
   lost(): void;
 }
 
-export interface BrokerChannel {
+export interface BrokerGateway {
   publish(
     target: BrokerTarget,
     message: BrokerMessage,
@@ -113,10 +113,5 @@ export interface BrokerChannel {
 }
 
 export type AmqpBinding = z.infer<typeof AMQP_CHANNEL>;
-
-export interface AmqpQueue {
-  readonly name: string;
-  readonly shared: boolean;
-}
 
 export type MqttBinding = z.infer<typeof MQTT_OPERATION>;

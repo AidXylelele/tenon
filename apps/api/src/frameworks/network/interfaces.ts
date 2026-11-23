@@ -14,6 +14,11 @@ export interface BrokerServer {
   readonly secure: boolean;
 }
 
+export interface Login {
+  readonly username: string;
+  readonly password: string;
+}
+
 export type Lost = () => void;
 
 export interface Opening<C> {

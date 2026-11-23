@@ -7,14 +7,14 @@ import type { Subscribed } from "../../messaging/interfaces.js";
 import { KAFKA_CHANNEL } from "./asyncapi-bindings.schema.js";
 import type {
   BasicCredentials,
-  BrokerChannel,
+  BrokerGateway,
   BrokerInbox,
   BrokerMessage,
   BrokerTarget,
 } from "./interfaces.js";
 
 @Injectable()
-export class KafkaChannel implements BrokerChannel {
+export class KafkaGateway implements BrokerGateway {
   private static readonly CONTENT_TYPE = "content-type";
   private static readonly TOMBSTONE = Buffer.alloc(0);
   private static readonly UNREAD_BINDING: Failure = {
@@ -30,7 +30,7 @@ export class KafkaChannel implements BrokerChannel {
   ): Promise<AsyncApiOutcome> {
     const topic = this.#topicOf(target);
 
-    if (topic === null) return KafkaChannel.UNREAD_BINDING;
+    if (topic === null) return KafkaGateway.UNREAD_BINDING;
 
     const headers = this.#headersOf(message);
     const record = { topic, value: message.body, headers };
@@ -50,7 +50,7 @@ export class KafkaChannel implements BrokerChannel {
   ): Promise<Subscribed> {
     const topic = this.#topicOf(target);
 
-    if (topic === null) return KafkaChannel.UNREAD_BINDING;
+    if (topic === null) return KafkaGateway.UNREAD_BINDING;
 
     const lost = () => {
       inbox.lost();
@@ -75,8 +75,8 @@ export class KafkaChannel implements BrokerChannel {
   async #consumed(stream: KafkaStream, inbox: BrokerInbox): Promise<void> {
     for await (const message of stream) {
       const headers = Object.fromEntries(message.headers);
-      const contentType = headers[KafkaChannel.CONTENT_TYPE] ?? null;
-      const body = message.value ?? KafkaChannel.TOMBSTONE;
+      const contentType = headers[KafkaGateway.CONTENT_TYPE] ?? null;
+      const body = message.value ?? KafkaGateway.TOMBSTONE;
       const received = { body, contentType, headers, correlationId: null };
       await inbox.deliver(received);
       await message.commit();
@@ -94,7 +94,7 @@ export class KafkaChannel implements BrokerChannel {
 
   #headersOf(message: BrokerMessage): Record<string, string> {
     const headers: Record<string, string> = {
-      [KafkaChannel.CONTENT_TYPE]: message.contentType,
+      [KafkaGateway.CONTENT_TYPE]: message.contentType,
     };
 
     for (const [name, value] of Object.entries(message.headers))

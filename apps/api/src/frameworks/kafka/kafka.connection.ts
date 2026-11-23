@@ -12,10 +12,9 @@ import {
   stringDeserializer,
   stringSerializer,
 } from "@platformatic/kafka";
-import type { PasswordCredentials } from "../../interface-adapters/workflows/effects/interfaces.js";
 import { AddressPolicy } from "../network/address-policy.js";
 import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Lost } from "../network/interfaces.js";
+import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
 import type {
   KafkaConsumer,
   KafkaProducer,
@@ -39,11 +38,14 @@ export class KafkaConnection implements OnApplicationShutdown {
 
   async send(
     server: BrokerServer,
-    login: PasswordCredentials | null,
+    login: Login | null,
     record: KafkaRecord,
   ): Promise<void> {
-    const producer = await this.connections.of(server, login, (address, lost) =>
-      this.#producer(server, address, login, lost),
+    const producer = await this.connections.of(
+      server,
+      "",
+      login,
+      (address, lost) => this.#producer(server, address, login, lost),
     );
     await this.#checked(producer, record.topic);
     await producer.send({ messages: [record] });
@@ -51,7 +53,7 @@ export class KafkaConnection implements OnApplicationShutdown {
 
   async consume(
     server: BrokerServer,
-    login: PasswordCredentials | null,
+    login: Login | null,
     groupId: string,
     topic: string,
     lost: Lost,
@@ -76,7 +78,7 @@ export class KafkaConnection implements OnApplicationShutdown {
   #producer(
     server: BrokerServer,
     address: string,
-    login: PasswordCredentials | null,
+    login: Login | null,
     lost: Lost,
   ): Promise<KafkaProducer> {
     const bootstrap = this.#bootstrapOf(server, address);
@@ -108,7 +110,7 @@ export class KafkaConnection implements OnApplicationShutdown {
   #consumer(
     server: BrokerServer,
     address: string,
-    login: PasswordCredentials | null,
+    login: Login | null,
     groupId: string,
     lost: Lost,
   ): Promise<KafkaConsumer> {
@@ -184,7 +186,7 @@ export class KafkaConnection implements OnApplicationShutdown {
     return server.secure && named ? server.hostname : undefined;
   }
 
-  #saslOf(login: PasswordCredentials | null): SASLOptions | undefined {
+  #saslOf(login: Login | null): SASLOptions | undefined {
     if (login === null) return undefined;
 
     return {

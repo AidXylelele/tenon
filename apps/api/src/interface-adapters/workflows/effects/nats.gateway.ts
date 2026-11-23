@@ -11,14 +11,14 @@ import { NatsConnection } from "../../../frameworks/nats/nats.connection.js";
 import type { Subscribed } from "../../messaging/interfaces.js";
 import type {
   BasicCredentials,
-  BrokerChannel,
+  BrokerGateway,
   BrokerInbox,
   BrokerMessage,
   BrokerTarget,
 } from "./interfaces.js";
 
 @Injectable()
-export class NatsChannel implements BrokerChannel {
+export class NatsGateway implements BrokerGateway {
   private static readonly MESSAGE_ID = "Nats-Msg-Id";
 
   constructor(private readonly nats: NatsConnection) {}
@@ -107,7 +107,7 @@ export class NatsChannel implements BrokerChannel {
       sent.set(name, text);
     }
 
-    sent.set(NatsChannel.MESSAGE_ID, message.idempotencyKey);
+    sent.set(NatsGateway.MESSAGE_ID, message.idempotencyKey);
     return sent;
   }
 

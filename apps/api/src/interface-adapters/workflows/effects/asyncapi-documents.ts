@@ -13,8 +13,6 @@ import type { AsyncApiServer, Targeted } from "./interfaces.js";
 
 @Injectable()
 export class AsyncApiDocuments {
-  private static readonly REFUSED_REFERENCE =
-    '{"$external-references-are-not-read": true}';
   private static readonly CONTENT_TYPE = "application/json";
   private static readonly SECURE_PROTOCOLS: readonly string[] = [
     BrokerProtocol.Amqps,
@@ -28,17 +26,7 @@ export class AsyncApiDocuments {
     "tls:",
   ];
   private static readonly VARIABLE = /\{([^{}]+)\}/g;
-  private static readonly RESOLVERS = ["file", "http", "https"].map(
-    (schema) => ({
-      schema,
-      order: 1,
-      read: () => AsyncApiDocuments.REFUSED_REFERENCE,
-    }),
-  );
-
-  private readonly parser = new Parser({
-    __unstable: { resolver: { resolvers: AsyncApiDocuments.RESOLVERS } },
-  });
+  constructor(private readonly parser: Parser) {}
 
   async targetOf(text: string, request: AsyncApiRequest): Promise<Targeted> {
     const parsed = await this.parser.parse(text);

@@ -1,23 +1,25 @@
 import { isIP } from "node:net";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import {
+  type ChannelModel,
   type ConfirmChannel,
   connect,
   type Options,
   type RecoveringChannelModel,
   type RecoveryOptions,
 } from "amqplib";
-import type { PasswordCredentials } from "../../interface-adapters/workflows/effects/interfaces.js";
 import { AddressPolicy } from "../network/address-policy.js";
 import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Lost } from "../network/interfaces.js";
+import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
 import { AmqpPublisher } from "./amqp-publisher.js";
+import type { MessageHandler, QueueDeclaration } from "./interfaces.js";
 
 @Injectable()
 export class AmqpConnection implements OnApplicationShutdown {
   private static readonly PORT = 5672;
   private static readonly SECURE_PORT = 5671;
   private static readonly DEFAULT_VHOST = "/";
+  private static readonly IN_FLIGHT = 1;
 
   private readonly connections: BrokerConnections<AmqpPublisher>;
 
@@ -29,10 +31,11 @@ export class AmqpConnection implements OnApplicationShutdown {
 
   async channelOf(
     server: BrokerServer,
-    login: PasswordCredentials | null,
+    login: Login | null,
   ): Promise<ConfirmChannel> {
     const publisher = await this.connections.of(
       server,
+      "",
       login,
       (address, lost) => this.#publisher(server, address, login, lost),
     );
@@ -41,10 +44,13 @@ export class AmqpConnection implements OnApplicationShutdown {
 
   async consume(
     server: BrokerServer,
-    login: PasswordCredentials | null,
-    setup: RecoveryOptions["setup"],
+    login: Login | null,
+    declare: QueueDeclaration,
+    handle: MessageHandler,
     lost: Lost,
   ): Promise<RecoveringChannelModel> {
+    const setup = (connected: ChannelModel) =>
+      this.#consumed(connected, declare, handle, lost);
     const model = await this.connections.dedicated(server, (address) =>
       this.#recovering(server, address, login, lost, setup),
     );
@@ -56,10 +62,34 @@ export class AmqpConnection implements OnApplicationShutdown {
     return this.connections.close();
   }
 
+  async #consumed(
+    connected: ChannelModel,
+    declare: QueueDeclaration,
+    handle: MessageHandler,
+    lost: Lost,
+  ): Promise<void> {
+    const channel = await connected.createChannel();
+    channel.on("error", lost);
+    const queue = await declare(channel);
+    await channel.prefetch(AmqpConnection.IN_FLIGHT);
+    await channel.consume(
+      queue,
+      (message) => {
+        if (message === null) {
+          lost();
+          return;
+        }
+
+        handle(channel, message);
+      },
+      { noAck: false },
+    );
+  }
+
   async #publisher(
     server: BrokerServer,
     address: string,
-    login: PasswordCredentials | null,
+    login: Login | null,
     lost: Lost,
   ): Promise<AmqpPublisher> {
     const model = await this.#recovering(server, address, login, lost);
@@ -71,7 +101,7 @@ export class AmqpConnection implements OnApplicationShutdown {
   async #recovering(
     server: BrokerServer,
     address: string,
-    login: PasswordCredentials | null,
+    login: Login | null,
     lost: Lost,
     setup?: RecoveryOptions["setup"],
   ): Promise<RecoveringChannelModel> {

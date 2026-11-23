@@ -5,14 +5,14 @@ import { RedisConnection } from "../../../frameworks/redis/redis.connection.js";
 import type { Subscribed } from "../../messaging/interfaces.js";
 import type {
   BasicCredentials,
-  BrokerChannel,
+  BrokerGateway,
   BrokerInbox,
   BrokerMessage,
   BrokerTarget,
 } from "./interfaces.js";
 
 @Injectable()
-export class RedisChannel implements BrokerChannel {
+export class RedisGateway implements BrokerGateway {
   private static readonly REFUSED_LOGINS = /^(WRONGPASS|NOAUTH|NOPERM)/;
 
   constructor(private readonly redis: RedisConnection) {}
@@ -83,7 +83,7 @@ export class RedisChannel implements BrokerChannel {
   #failureOf(error: unknown): Failure {
     const detail = error instanceof Error ? error.message : String(error);
     const refused =
-      error instanceof ErrorReply && RedisChannel.REFUSED_LOGINS.test(detail);
+      error instanceof ErrorReply && RedisGateway.REFUSED_LOGINS.test(detail);
 
     if (refused) return { kind: "unauthenticated", detail };
 

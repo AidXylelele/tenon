@@ -2,9 +2,9 @@ import { AddressPolicy } from "../../../../src/frameworks/network/address-policy
 import { BrokerConnections } from "../../../../src/frameworks/network/broker-connections.js";
 import type {
   BrokerServer,
+  Login,
   Lost,
 } from "../../../../src/frameworks/network/interfaces.js";
-import type { PasswordCredentials } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 
 interface Connection {
   readonly address: string;
@@ -13,7 +13,7 @@ interface Connection {
 
 const KEPT = 64;
 const ANONYMOUS = null;
-const LOGIN: PasswordCredentials = {
+const LOGIN: Login = {
   username: "ada",
   password: "lovelace",
 };
@@ -50,8 +50,8 @@ describe("the broker connections a host keeps", () => {
   it("calls_to_one_server_with_one_login_share_a_connection", async () => {
     const open = vi.fn(opened);
 
-    const first = await connections.of(server, LOGIN, open);
-    const second = await connections.of(server, LOGIN, open);
+    const first = await connections.of(server, "", LOGIN, open);
+    const second = await connections.of(server, "", LOGIN, open);
 
     expect(second).toBe(first);
     expect(open).toHaveBeenCalledOnce();
@@ -62,8 +62,8 @@ describe("the broker connections a host keeps", () => {
     const open = vi.fn(opened);
 
     const [first, second] = await Promise.all([
-      connections.of(server, LOGIN, open),
-      connections.of(server, LOGIN, open),
+      connections.of(server, "", LOGIN, open),
+      connections.of(server, "", LOGIN, open),
     ]);
 
     expect(second).toBe(first);
@@ -73,8 +73,8 @@ describe("the broker connections a host keeps", () => {
   it("another_login_opens_its_own_connection", async () => {
     const open = vi.fn(opened);
 
-    const anonymous = await connections.of(server, ANONYMOUS, open);
-    const login = await connections.of(server, LOGIN, open);
+    const anonymous = await connections.of(server, "", ANONYMOUS, open);
+    const login = await connections.of(server, "", LOGIN, open);
 
     expect(login).not.toBe(anonymous);
     expect(open).toHaveBeenCalledTimes(2);
@@ -84,11 +84,24 @@ describe("the broker connections a host keeps", () => {
     const open = vi.fn(opened);
     const other = serverAt("8.8.8.8");
 
-    const first = await connections.of(server, LOGIN, open);
-    const second = await connections.of(other, LOGIN, open);
+    const first = await connections.of(server, "", LOGIN, open);
+    const second = await connections.of(other, "", LOGIN, open);
 
     expect(second).not.toBe(first);
     expect(open).toHaveBeenCalledTimes(2);
+  });
+
+  it("another_variant_or_transport_security_on_one_url_opens_its_own_connection", async () => {
+    const open = vi.fn(opened);
+    const secure = { ...server, secure: true };
+
+    const plain = await connections.of(server, "4", LOGIN, open);
+    const five = await connections.of(server, "5", LOGIN, open);
+    const tls = await connections.of(secure, "4", LOGIN, open);
+
+    expect(five).not.toBe(plain);
+    expect(tls).not.toBe(plain);
+    expect(open).toHaveBeenCalledTimes(3);
   });
 
   it("an_opening_that_fails_is_not_kept_and_the_next_call_opens_again", async () => {
@@ -96,10 +109,12 @@ describe("the broker connections a host keeps", () => {
       .fn(opened)
       .mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
 
-    const failed = connections.of(server, LOGIN, open);
+    const failed = connections.of(server, "", LOGIN, open);
 
     await expect(failed).rejects.toThrow("connect ECONNREFUSED");
-    await expect(connections.of(server, LOGIN, open)).resolves.toMatchObject({
+    await expect(
+      connections.of(server, "", LOGIN, open),
+    ).resolves.toMatchObject({
       address: "127.0.0.1",
     });
     expect(open).toHaveBeenCalledTimes(2);
@@ -107,10 +122,10 @@ describe("the broker connections a host keeps", () => {
 
   it("a_lost_connection_is_closed_and_the_next_call_opens_a_new_one", async () => {
     const open = vi.fn(opened);
-    const first = await connections.of(server, LOGIN, open);
+    const first = await connections.of(server, "", LOGIN, open);
 
     first.lost();
-    const second = await connections.of(server, LOGIN, open);
+    const second = await connections.of(server, "", LOGIN, open);
 
     expect(second).not.toBe(first);
     expect(closed).toEqual([first]);
@@ -122,7 +137,7 @@ describe("the broker connections a host keeps", () => {
       return opened(address, lost);
     };
 
-    const opening = connections.of(server, LOGIN, open);
+    const opening = connections.of(server, "", LOGIN, open);
 
     await expect(opening).rejects.toThrow(
       "The broker connection ended as it opened",
@@ -135,13 +150,13 @@ describe("the broker connections a host keeps", () => {
       username: `user-${String(index)}`,
       password: "p",
     }));
-    const first = await connections.of(server, ANONYMOUS, opened);
+    const first = await connections.of(server, "", ANONYMOUS, opened);
 
-    for (const login of others) await connections.of(server, login, opened);
+    for (const login of others) await connections.of(server, "", login, opened);
 
-    const successor = await connections.of(server, ANONYMOUS, opened);
+    const successor = await connections.of(server, "", ANONYMOUS, opened);
     first.lost();
-    const kept = await connections.of(server, ANONYMOUS, opened);
+    const kept = await connections.of(server, "", ANONYMOUS, opened);
 
     expect(closed[0]).toBe(first);
     expect(successor).not.toBe(first);
@@ -152,7 +167,7 @@ describe("the broker connections a host keeps", () => {
     const open = vi.fn(opened);
     const refused = serverAt("10.0.0.1");
 
-    const opening = connections.of(refused, LOGIN, open);
+    const opening = connections.of(refused, "", LOGIN, open);
 
     await expect(opening).rejects.toThrow(
       "The address is private, loopback or link-local and not allow-listed",
@@ -172,7 +187,7 @@ describe("the broker connections a host keeps", () => {
         return finishing;
       },
     );
-    const kept = await slow.of(server, LOGIN, opened);
+    const kept = await slow.of(server, "", LOGIN, opened);
     let done = false;
 
     const closing = slow.close().then(() => {
@@ -194,7 +209,7 @@ describe("the broker connections a host keeps", () => {
         pending.arrive = resolve;
       });
 
-    const opening = connections.of(server, LOGIN, open);
+    const opening = connections.of(server, "", LOGIN, open);
     await vi.waitFor(() => {
       expect(pending.arrive).toBeDefined();
     });

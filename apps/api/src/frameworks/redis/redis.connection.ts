@@ -1,10 +1,9 @@
 import { isIP } from "node:net";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { createClient, type RedisClientType } from "redis";
-import type { PasswordCredentials } from "../../interface-adapters/workflows/effects/interfaces.js";
 import { AddressPolicy } from "../network/address-policy.js";
 import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Lost } from "../network/interfaces.js";
+import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
 
 @Injectable()
 export class RedisConnection implements OnApplicationShutdown {
@@ -21,16 +20,16 @@ export class RedisConnection implements OnApplicationShutdown {
 
   clientOf(
     server: BrokerServer,
-    login: PasswordCredentials | null,
+    login: Login | null,
   ): Promise<RedisClientType> {
-    return this.connections.of(server, login, (address, lost) =>
+    return this.connections.of(server, "", login, (address, lost) =>
       this.#connected(server, address, login, lost),
     );
   }
 
   subscriberOf(
     server: BrokerServer,
-    login: PasswordCredentials | null,
+    login: Login | null,
     lost: Lost,
   ): Promise<RedisClientType> {
     return this.connections.dedicated(server, (address) =>
@@ -45,13 +44,14 @@ export class RedisConnection implements OnApplicationShutdown {
   async #connected(
     server: BrokerServer,
     address: string,
-    login: PasswordCredentials | null,
+    login: Login | null,
     lost: Lost,
   ): Promise<RedisClientType> {
     const path = server.pathname.slice(1);
     const database = Number(path) || 0;
     const port = server.port ?? RedisConnection.PORT;
     const named = isIP(server.hostname) === 0;
+    const servername = named ? server.hostname : undefined;
     const connectTimeout = BrokerConnections.CONNECT_MS;
     const reconnectStrategy = (): number | false =>
       this.#reconnectionOf(client);
@@ -60,7 +60,7 @@ export class RedisConnection implements OnApplicationShutdown {
           tls: true as const,
           host: address,
           port,
-          servername: named ? server.hostname : undefined,
+          servername,
           connectTimeout,
           reconnectStrategy,
         }

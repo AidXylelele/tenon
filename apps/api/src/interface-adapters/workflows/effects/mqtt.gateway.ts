@@ -7,7 +7,7 @@ import type { Subscribed } from "../../messaging/interfaces.js";
 import { MQTT_OPERATION } from "./asyncapi-bindings.schema.js";
 import type {
   BasicCredentials,
-  BrokerChannel,
+  BrokerGateway,
   BrokerInbox,
   BrokerMessage,
   BrokerTarget,
@@ -16,7 +16,7 @@ import type {
 } from "./interfaces.js";
 
 @Injectable()
-export class MqttChannel implements BrokerChannel {
+export class MqttGateway implements BrokerGateway {
   private static readonly VERSION_5: MqttVersion = 5;
   private static readonly VERSION_3_1_1: MqttVersion = 4;
   private static readonly REFUSED_LOGINS = [4, 5, 134, 135];
@@ -37,13 +37,13 @@ export class MqttChannel implements BrokerChannel {
     const headed = Object.keys(message.headers).length > 0;
     const binding = this.#bindingOf(target);
 
-    if (headed && version !== MqttChannel.VERSION_5)
+    if (headed && version !== MqttGateway.VERSION_5)
       return {
         kind: "misconfigured",
         detail: "MQTT 3.1.1 carries no headers; name protocolVersion 5",
       };
 
-    if (binding === null) return MqttChannel.UNREAD_BINDING;
+    if (binding === null) return MqttGateway.UNREAD_BINDING;
 
     try {
       const client = await this.mqtt.clientOf(
@@ -66,7 +66,7 @@ export class MqttChannel implements BrokerChannel {
   ): Promise<Subscribed> {
     const binding = this.#bindingOf(target);
 
-    if (binding === null) return MqttChannel.UNREAD_BINDING;
+    if (binding === null) return MqttGateway.UNREAD_BINDING;
 
     const version = this.#versionOf(target);
     const lost = () => {
@@ -91,7 +91,7 @@ export class MqttChannel implements BrokerChannel {
       );
       const subscription = { close: () => client.endAsync() };
       client.on("message", (_topic, payload, packet) => {
-        if (packet.qos !== MqttChannel.AT_MOST_ONCE) return;
+        if (packet.qos !== MqttGateway.AT_MOST_ONCE) return;
 
         this.#delivered(payload, packet, inbox);
       });
@@ -117,7 +117,7 @@ export class MqttChannel implements BrokerChannel {
     const received = this.#receivedOf(payload, packet);
     inbox.deliver(received).then(
       () => {
-        done(MqttChannel.SUCCESS);
+        done(MqttGateway.SUCCESS);
       },
       () => {
         inbox.lost();
@@ -165,7 +165,7 @@ export class MqttChannel implements BrokerChannel {
     const qos = binding.qos;
     const retain = binding.retain;
 
-    if (version !== MqttChannel.VERSION_5) return { qos, retain };
+    if (version !== MqttGateway.VERSION_5) return { qos, retain };
 
     const userProperties: Record<string, string> = {};
 
@@ -196,7 +196,7 @@ export class MqttChannel implements BrokerChannel {
     const five =
       server.protocol === "mqtt5" ||
       (server.protocolVersion?.startsWith("5") ?? false);
-    return five ? MqttChannel.VERSION_5 : MqttChannel.VERSION_3_1_1;
+    return five ? MqttGateway.VERSION_5 : MqttGateway.VERSION_3_1_1;
   }
 
   #failureOf(error: unknown): Failure {
@@ -204,7 +204,7 @@ export class MqttChannel implements BrokerChannel {
       error instanceof Error ? Reflect.get(error, "code") : undefined;
     const detail = error instanceof Error ? error.message : String(error);
     const refused =
-      typeof code === "number" && MqttChannel.REFUSED_LOGINS.includes(code);
+      typeof code === "number" && MqttGateway.REFUSED_LOGINS.includes(code);
 
     if (refused) return { kind: "unauthenticated", detail };
 

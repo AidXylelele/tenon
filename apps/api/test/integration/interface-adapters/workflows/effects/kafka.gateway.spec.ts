@@ -1,3 +1,4 @@
+import { Parser } from "@asyncapi/parser";
 import type { LookupAddress, LookupOptions } from "node:dns";
 import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceModule, ResilienceService } from "@nestjs/resilience";
@@ -20,6 +21,7 @@ import type {
   JsonObject,
 } from "interpreter";
 import { AmqpConnection } from "../../../../../src/frameworks/amqp/amqp.connection.js";
+import { parserOptions } from "../../../../../src/frameworks/asyncapi/parser.options.js";
 import {
   resiliencePresets,
   responseSizeLimit,
@@ -30,13 +32,13 @@ import { NatsConnection } from "../../../../../src/frameworks/nats/nats.connecti
 import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
 import { RedisConnection } from "../../../../../src/frameworks/redis/redis.connection.js";
 import type { BrokerSubscription } from "../../../../../src/interface-adapters/messaging/interfaces.js";
-import { AmqpChannel } from "../../../../../src/interface-adapters/workflows/effects/amqp.channel.js";
+import { AmqpGateway } from "../../../../../src/interface-adapters/workflows/effects/amqp.gateway.js";
 import { AsyncApiDocuments } from "../../../../../src/interface-adapters/workflows/effects/asyncapi-documents.js";
 import { AsyncApiGateway } from "../../../../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
-import { KafkaChannel } from "../../../../../src/interface-adapters/workflows/effects/kafka.channel.js";
-import { MqttChannel } from "../../../../../src/interface-adapters/workflows/effects/mqtt.channel.js";
-import { NatsChannel } from "../../../../../src/interface-adapters/workflows/effects/nats.channel.js";
-import { RedisChannel } from "../../../../../src/interface-adapters/workflows/effects/redis.channel.js";
+import { KafkaGateway } from "../../../../../src/interface-adapters/workflows/effects/kafka.gateway.js";
+import { MqttGateway } from "../../../../../src/interface-adapters/workflows/effects/mqtt.gateway.js";
+import { NatsGateway } from "../../../../../src/interface-adapters/workflows/effects/nats.gateway.js";
+import { RedisGateway } from "../../../../../src/interface-adapters/workflows/effects/redis.gateway.js";
 import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
 import {
   startStubServer,
@@ -104,14 +106,14 @@ describe("the AsyncAPI gateway on a Kafka cluster a document names", () => {
     new AsyncApiGateway(
       resourcesOf(new AddressPolicy([HOST]), resilience),
       authenticationOf(fetchClientOf(policy.dispatcher)),
-      new AsyncApiDocuments(),
+      new AsyncApiDocuments(new Parser(parserOptions)),
       responseSizeLimit,
       new TransportFailures(),
-      new AmqpChannel(new AmqpConnection(policy)),
-      new KafkaChannel(kafkaOn),
-      new MqttChannel(new MqttConnection(policy)),
-      new NatsChannel(new NatsConnection(policy)),
-      new RedisChannel(new RedisConnection(policy)),
+      new AmqpGateway(new AmqpConnection(policy)),
+      new KafkaGateway(kafkaOn),
+      new MqttGateway(new MqttConnection(policy)),
+      new NatsGateway(new NatsConnection(policy)),
+      new RedisGateway(new RedisConnection(policy)),
       resilience,
     );
 
