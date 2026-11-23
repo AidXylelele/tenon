@@ -10,7 +10,13 @@ import {
 } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
 import { Disclosure } from "@/libs/ui/composites/disclosure";
-import { formKindOf, layoutOf, pathOf, summaryOf } from "../form-fields";
+import {
+  formKindOf,
+  layoutOf,
+  METHOD_PATH,
+  pathOf,
+  summaryOf,
+} from "../form-fields";
 import { FailureBox } from "./failure-box";
 import { OTHER_METHODS } from "./field-control";
 import { blurOnEnter } from "./field-shell";
@@ -24,7 +30,6 @@ import type { Edit, StepFormProps } from "./interfaces";
 import { ResultChoice } from "./result-choice";
 import { Segmented } from "./segmented";
 
-const METHOD_PATH = "with/method";
 const LANGUAGE_PATH = "run/script/language";
 const CODE_PATH = "run/script/code";
 const USUAL = "Usual settings";

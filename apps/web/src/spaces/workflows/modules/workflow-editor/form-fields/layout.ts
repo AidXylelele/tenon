@@ -18,6 +18,12 @@ const TIME_LIMIT_WORDS = "Time limit";
 
 const COMMON_KEYS: ReadonlySet<string> = new Set(["if", "then"]);
 
+export const METHOD_PATH = "with/method";
+
+const BODY_PATH = "with/body";
+
+const BODYLESS_METHODS: ReadonlySet<string> = new Set(["get", "head"]);
+
 const CALL_KINDS: readonly CallKind[] = [
   "http",
   "openapi",
@@ -82,7 +88,8 @@ export function pathOf(field: FormField, base: string): string {
 
 export function layoutOf(fields: readonly FormField[], step: Step): FormLayout {
   const kind = formKindOf(step.kind, fields);
-  const place = { kind, step };
+  const method = methodOf(fields, step);
+  const place = { kind, step, method };
   const essentials = essentialsOf(fields);
   const settings = fields.filter((field) => field.section === "settings");
   const own = settings.filter((field) => !COMMON_KEYS.has(field.key));
@@ -106,6 +113,14 @@ export function layoutOf(fields: readonly FormField[], step: Step): FormLayout {
 interface Place {
   readonly kind: FormKind;
   readonly step: Step;
+  readonly method: string;
+}
+
+function methodOf(fields: readonly FormField[], step: Step): string {
+  const pointer = `${step.pointer}/${METHOD_PATH}`;
+  const method = fieldAt(fields, pointer)?.value;
+
+  return typeof method === "string" ? method.toLowerCase() : "";
 }
 
 function essentialsOf(fields: readonly FormField[]): FormField[] {
@@ -143,6 +158,8 @@ function restOf(field: FormField, place: Place): FormField[] {
 
   if (words.control === "hidden") return [];
 
+  if (isUnsentBody(field, path, place)) return [];
+
   if (isFixedChoice(field)) return [];
 
   if (!holdsEssentials(field)) return [field];
@@ -157,6 +174,13 @@ function isOffered(field: FormField, place: Place): boolean {
   const isUnwrittenObject = field.input === "structured" && !field.written;
 
   return !isUnwrittenObject || hasWords(place.kind, path);
+}
+
+function isUnsentBody(field: FormField, path: string, place: Place): boolean {
+  const isBody = place.kind === "http" && path === BODY_PATH;
+  const isBodyless = BODYLESS_METHODS.has(place.method);
+
+  return isBody && isBodyless && !field.written;
 }
 
 function isFixedChoice(field: FormField): boolean {

@@ -3,6 +3,7 @@ import {
   FETCH_FORM,
   FETCH_STEP,
   fieldOf,
+  formChanged,
   POST_FORM,
   POST_STEP,
   REPORT_STEP,
@@ -31,14 +32,28 @@ describe("the layout of a step's form", () => {
 
     const more = keysOf(layout.more);
 
-    expect(more).toEqual([
-      "headers",
-      "body",
-      "output",
-      "timeout",
-      "if",
-      "then",
-    ]);
+    expect(more).toEqual(["headers", "output", "timeout", "if", "then"]);
+  });
+
+  it("a_head_call_offers_no_data_to_send", () => {
+    const method = `${FETCH_STEP.pointer}/with/method`;
+    const form = formChanged(FETCH_FORM, method, { value: "HEAD" });
+    const layout = layoutOf(form.fields, FETCH_STEP);
+
+    const more = keysOf(layout.more);
+
+    expect(more).not.toContain("body");
+  });
+
+  it("a_get_call_keeps_the_data_it_already_sends", () => {
+    const body = `${FETCH_STEP.pointer}/with/body`;
+    const value = { text: "hello" };
+    const form = formChanged(FETCH_FORM, body, { written: true, value });
+    const layout = layoutOf(form.fields, FETCH_STEP);
+
+    const more = keysOf(layout.more);
+
+    expect(more).toContain("body");
   });
 
   it("a_choice_with_its_only_value_written_is_left_out_as_nothing_to_choose", () => {

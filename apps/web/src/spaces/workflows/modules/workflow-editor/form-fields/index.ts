@@ -53,7 +53,14 @@ export type {
   ValueRow,
   WordsKind,
 } from "./interfaces";
-export { fieldAt, formKindOf, layoutOf, pathOf, summaryOf } from "./layout";
+export {
+  fieldAt,
+  formKindOf,
+  layoutOf,
+  METHOD_PATH,
+  pathOf,
+  summaryOf,
+} from "./layout";
 export { SEND_AS_CHOICES, sendAsEditsOf, sendAsOf } from "./sending";
 export { cronEditsOf, eventEditsOf, startEditsOf, startOf } from "./start";
 export { limitSecondsOf, timeLimitCommitOf } from "./time-limit";
