@@ -7,6 +7,7 @@ import {
 } from "@/libs/data-access/automation";
 import {
   checkDraft,
+  discardDraft,
   draft,
   publishDraft,
   testDraft,
@@ -15,6 +16,7 @@ import {
 import type { Outcome, Problem } from "@/libs/data-access/problem";
 import type {
   DraftCheck,
+  DraftDiscard,
   DraftPublication,
   DraftRevision,
   DraftTestRun,
@@ -113,6 +115,17 @@ export async function publishDraftAction(
 
   const { namespace, name, etag } = parsed.data;
   return publishDraft(namespace, name, etag);
+}
+
+export async function discardDraftAction(
+  request: unknown,
+): Promise<DraftDiscard> {
+  const parsed = DraftEtag.safeParse(request);
+
+  if (!parsed.success) return REFUSED;
+
+  const { namespace, name, etag } = parsed.data;
+  return discardDraft(namespace, name, etag);
 }
 
 export async function testRunAction(request: unknown): Promise<DraftTestRun> {

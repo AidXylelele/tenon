@@ -1,9 +1,7 @@
 "use client";
 
 import type { LSPClient } from "@codemirror/lsp-client";
-import type { EditorView } from "@codemirror/view";
 import type { EditAction, StepList } from "language-server/protocol";
-import { replaceTextAsOneStep } from "@/libs/codemirror/owned-text";
 import type { Outcome, Problem } from "@/libs/data-access/problem";
 import type { Version } from "@/libs/data-access/types";
 import { turnStartsAction } from "./actions";
@@ -25,7 +23,6 @@ interface PublishingProps {
     actions: readonly EditAction[],
     remembered?: boolean,
   ) => Promise<boolean>;
-  readonly view: () => EditorView | null;
 }
 
 const NOT_DISCARDED: Problem = {
@@ -33,6 +30,15 @@ const NOT_DISCARDED: Problem = {
   title: "The published version could not be read",
   status: 503,
   detail: "The published version's text could not be read, so the draft stays.",
+  errors: [],
+  retryAfter: null,
+};
+
+const HELD: Problem = {
+  type: "about:blank",
+  title: "Someone else saved this draft meanwhile",
+  status: 412,
+  detail: "Resolve the draft first, then discard it.",
   errors: [],
   retryAfter: null,
 };
@@ -48,7 +54,6 @@ export function usePublishing({
   steps,
   store,
   edit,
-  view,
 }: PublishingProps) {
   const draft = useDraftState(store);
   const hasDraft = currentVersion !== null && draft.saved !== null;
@@ -83,18 +88,28 @@ export function usePublishing({
   }
 
   async function discard(): Promise<Outcome<void>> {
-    const editor = view();
+    const text = await publishedText();
 
-    if (currentVersion === null || editor === null)
-      return { ok: false, problem: NOT_DISCARDED };
+    if (text === null) return { ok: false, problem: NOT_DISCARDED };
+
+    const answer = await store.discard(text);
+
+    if (answer.kind === "held") return { ok: false, problem: HELD };
+
+    if (answer.kind === "refused")
+      return { ok: false, problem: answer.problem };
+
+    return { ok: true, value: undefined };
+  }
+
+  async function publishedText(): Promise<string | null> {
+    if (currentVersion === null) return null;
 
     try {
       const published = await publishedTextOf(name, currentVersion);
-      const text = await yamlOf(client, published);
-      replaceTextAsOneStep(editor, text, 0);
-      return { ok: true, value: undefined };
+      return await yamlOf(client, published);
     } catch {
-      return { ok: false, problem: NOT_DISCARDED };
+      return null;
     }
   }
 

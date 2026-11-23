@@ -10,12 +10,14 @@ import type { JsonObject, JsonValue } from "@/libs/json/json";
 import { reasonOf } from "@/libs/language-client/failures";
 import {
   checkDraftAction,
+  discardDraftAction,
   publishDraftAction,
   readDraftAction,
   saveDraftAction,
   testRunAction,
 } from "./actions";
 import type {
+  Discarding,
   DraftState,
   Held,
   Publication,
@@ -31,6 +33,7 @@ const SECOND_MS = 1000;
 const TRANSIENT: ReadonlySet<number> = new Set([408, 429]);
 const NO_LAYOUT: JsonObject = {};
 const HELD: Held = { kind: "held" };
+const DISCARDED: Discarding = { kind: "discarded" };
 
 export class DraftStore {
   private etag: string | null;
@@ -93,6 +96,25 @@ export class DraftStore {
       const request = { ...this.workflow, etag, input, key };
       return testRunAction(request);
     });
+  }
+
+  async discard(published: string): Promise<Discarding> {
+    this.stopTimer();
+    this.pending = false;
+    await this.queue.then(DraftStore.settled, DraftStore.settled);
+    const etag = this.etag;
+
+    if (etag === null) return this.forget(published);
+
+    const request = { ...this.workflow, etag };
+    const answer = await discardDraftAction(request);
+
+    if (answer.kind === "refused") return answer;
+
+    if (answer.kind === "discarded") return this.forget(published);
+
+    await this.holdAgainst(answer.current);
+    return HELD;
   }
 
   resolve(text: string): void {
@@ -251,6 +273,17 @@ export class DraftStore {
     this.show({ status: "unsaved", conflict });
   }
 
+  private forget(published: string): Discarding {
+    this.etag = null;
+    this.base = null;
+    this.show({ status: "clean", saved: null, failure: null, retrying: false });
+    const editor = this.view();
+
+    if (editor !== null) DraftStore.replaceText(editor, published);
+
+    return DISCARDED;
+  }
+
   private adopt(revision: DraftRevision): void {
     this.etag = revision.etag;
     this.base = revision.draft.source;
@@ -271,6 +304,10 @@ export class DraftStore {
     if (this.timer !== null) clearTimeout(this.timer);
 
     this.timer = null;
+  }
+
+  private static settled(): void {
+    return;
   }
 
   private static isConflict(answer: {

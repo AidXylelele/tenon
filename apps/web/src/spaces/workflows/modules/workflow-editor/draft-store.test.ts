@@ -11,12 +11,14 @@ const {
   checkDraftAction,
   publishDraftAction,
   testRunAction,
+  discardDraftAction,
 } = vi.hoisted(() => ({
   saveDraftAction: vi.fn(),
   readDraftAction: vi.fn(),
   checkDraftAction: vi.fn(),
   publishDraftAction: vi.fn(),
   testRunAction: vi.fn(),
+  discardDraftAction: vi.fn(),
 }));
 
 vi.mock("./actions", () => ({
@@ -25,6 +27,7 @@ vi.mock("./actions", () => ({
   checkDraftAction,
   publishDraftAction,
   testRunAction,
+  discardDraftAction,
 }));
 
 const WORKFLOW = { namespace: "sales", name: "leads" };
@@ -57,6 +60,7 @@ describe("the draft kept beside the editor", () => {
     checkDraftAction.mockReset();
     publishDraftAction.mockReset();
     testRunAction.mockReset();
+    discardDraftAction.mockReset();
   });
 
   afterEach(() => {
@@ -179,6 +183,39 @@ describe("the draft kept beside the editor", () => {
     expect(started).toEqual({ kind: "held" });
     expect(readDraftAction).not.toHaveBeenCalled();
     expect(keeper.read().conflict).toEqual({ theirs, base: BASE });
+  });
+
+  it("discarding_deletes_the_saved_revision_and_shows_the_published_text", async () => {
+    const opened = revisionOf(BASE, '"1"');
+    const { view, keeper } = keeperOn(BASE, opened);
+    discardDraftAction.mockResolvedValue({ kind: "discarded" });
+    typeInto(view, "leads", "mine");
+    keeper.changed();
+
+    const answer = await keeper.discard("published: true\n");
+    await vi.runAllTimersAsync();
+
+    expect(answer).toEqual({ kind: "discarded" });
+    expect(discardDraftAction).toHaveBeenCalledWith({
+      ...WORKFLOW,
+      etag: '"1"',
+    });
+    expect(saveDraftAction).not.toHaveBeenCalled();
+    expect(view.state.doc.toString()).toBe("published: true\n");
+    expect(keeper.read()).toMatchObject({ status: "clean", saved: null });
+  });
+
+  it("a_discard_refused_by_a_newer_draft_holds_with_that_revision", async () => {
+    const opened = revisionOf(BASE, '"1"');
+    const { view, keeper } = keeperOn(BASE, opened);
+    const theirs = revisionOf(BASE.replace("leads", "theirs"), '"2"', GRACE);
+    discardDraftAction.mockResolvedValue({ kind: "conflict", current: theirs });
+
+    const answer = await keeper.discard("published: true\n");
+
+    expect(answer).toEqual({ kind: "held" });
+    expect(keeper.read().conflict).toEqual({ theirs, base: BASE });
+    expect(view.state.doc.toString()).toBe(BASE);
   });
 
   it("an_untouched_editor_takes_a_newer_draft_saved_elsewhere", async () => {

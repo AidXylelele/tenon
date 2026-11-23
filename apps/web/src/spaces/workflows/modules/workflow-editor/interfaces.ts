@@ -146,6 +146,11 @@ export type Publication =
   | { readonly kind: "refused"; readonly problem: Problem }
   | Held;
 
+export type Discarding =
+  | { readonly kind: "discarded" }
+  | { readonly kind: "refused"; readonly problem: Problem }
+  | Held;
+
 export type TestStart =
   | { readonly kind: "started"; readonly run: InstanceSummary }
   | { readonly kind: "refused"; readonly problem: Problem }

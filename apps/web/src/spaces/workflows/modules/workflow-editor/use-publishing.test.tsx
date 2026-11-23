@@ -17,6 +17,10 @@ const WORKFLOW = { namespace: "sales", name: "digest" };
 const SAVED = { by: { id: "u1", name: "Ada" }, at: "2026-11-23T08:00:00Z" };
 const CLIENT = {} as LSPClient;
 
+const discarding = vi.fn<(published: string) => Promise<unknown>>(() =>
+  Promise.resolve({ kind: "discarded" }),
+);
+
 function storeWith(saved: DraftState["saved"]): DraftStore {
   const state = {
     status: "clean",
@@ -30,6 +34,7 @@ function storeWith(saved: DraftState["saved"]): DraftStore {
     read: () => state,
     publish: vi.fn(),
     flush: vi.fn(),
+    discard: discarding,
   };
   return store as unknown as DraftStore;
 }
@@ -47,7 +52,6 @@ function publishingOn(
     steps: null,
     store: storeWith(saved),
     edit,
-    view: () => view,
   };
   const { result } = renderHook(() => usePublishing(props));
   return { result, edit };
@@ -59,6 +63,7 @@ describe("publishing and discarding the draft", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", fetching);
     fetching.mockReset();
+    discarding.mockClear();
   });
 
   afterEach(() => {
@@ -81,7 +86,7 @@ describe("publishing and discarding the draft", () => {
     expect(result.current.discard).toBeNull();
   });
 
-  it("discarding_takes_the_published_text", async () => {
+  it("discarding_deletes_the_draft_for_the_published_text", async () => {
     const view = new EditorView({ doc: "mine: true\n" });
     fetching.mockResolvedValue(new Response("published: true\n"));
     const { result } = publishingOn(view, SAVED, "1.0.0");
@@ -89,7 +94,7 @@ describe("publishing and discarding the draft", () => {
     const outcome = await act(() => result.current.discard?.());
 
     expect(outcome).toEqual({ ok: true, value: undefined });
-    expect(view.state.doc.toString()).toBe("published: true\n");
+    expect(discarding).toHaveBeenCalledWith("published: true\n");
     expect(fetching.mock.calls[0]?.[0]).toBe(
       "/workflows/sales/digest/versions/1.0.0/source",
     );
@@ -102,7 +107,7 @@ describe("publishing and discarding the draft", () => {
 
     await act(() => result.current.discard?.());
 
-    expect(view.state.doc.toString()).toBe("from: json\n");
+    expect(discarding).toHaveBeenCalledWith("from: json\n");
   });
 
   it("a_published_version_that_cannot_be_read_keeps_the_draft", async () => {
@@ -113,7 +118,21 @@ describe("publishing and discarding the draft", () => {
     const outcome = await act(() => result.current.discard?.());
 
     expect(outcome).toMatchObject({ ok: false });
-    expect(view.state.doc.toString()).toBe("mine: true\n");
+    expect(discarding).not.toHaveBeenCalled();
+  });
+
+  it("a_draft_saved_elsewhere_meanwhile_is_not_discarded", async () => {
+    const view = new EditorView({ doc: "mine: true\n" });
+    fetching.mockResolvedValue(new Response("published: true\n"));
+    discarding.mockResolvedValueOnce({ kind: "held" });
+    const { result } = publishingOn(view, SAVED, "1.0.0");
+
+    const outcome = await act(() => result.current.discard?.());
+
+    expect(outcome).toMatchObject({
+      ok: false,
+      problem: { title: "Someone else saved this draft meanwhile" },
+    });
   });
 
   it("a_version_is_one_edit_of_the_document_version", async () => {

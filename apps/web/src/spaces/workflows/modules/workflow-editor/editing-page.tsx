@@ -165,7 +165,6 @@ function EditingBody({
     steps: root,
     store,
     edit,
-    view,
   });
   const readMine = useCallback(
     () => view()?.state.doc.toString() ?? "",
