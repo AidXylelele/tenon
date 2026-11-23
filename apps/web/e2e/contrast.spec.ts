@@ -57,6 +57,24 @@ const PAIRS: readonly Pair[] = [
     minimum: TEXT,
   },
   {
+    use: "highlighted option text in a command list",
+    foreground: "--text",
+    background: "--selected",
+    minimum: TEXT,
+  },
+  {
+    use: "highlighted option ring in a command list",
+    foreground: "--focus-ring",
+    background: "--surface-raised",
+    minimum: GRAPHIC,
+  },
+  {
+    use: "highlighted option ring on its fill",
+    foreground: "--focus-ring",
+    background: "--selected",
+    minimum: GRAPHIC,
+  },
+  {
     use: "links, current tab",
     foreground: "--accent-text",
     background: "--bg",

@@ -289,3 +289,47 @@ test.describe("the navigation drawer below 1024 px", () => {
     await expect(content).toBeFocused();
   });
 });
+
+interface HighlightLook {
+  readonly fill: string;
+  readonly surface: string;
+  readonly ring: string;
+  readonly focusRing: string;
+}
+
+function highlightLookOf(item: Element): HighlightLook {
+  const dialog = item.closest("[role=dialog]") ?? document.body;
+  const probe = document.createElement("div");
+  probe.style.setProperty("color", "var(--focus-ring)");
+  dialog.append(probe);
+  const focusRing = getComputedStyle(probe).color;
+  probe.remove();
+  const style = getComputedStyle(item);
+  const surface = getComputedStyle(dialog).backgroundColor;
+  return {
+    fill: style.backgroundColor,
+    surface,
+    ring: style.boxShadow,
+    focusRing,
+  };
+}
+
+test.describe("the highlighted result of the search", () => {
+  for (const theme of ["light", "dark"]) {
+    test(`stands_out_from_the_dialog_with_a_fill_and_a_ring_in_the_${theme}_theme`, async ({
+      page,
+    }) => {
+      const story = storyOf("search-open");
+      await page.goto(`${story}&globals=theme:${theme}`);
+      const root = page.locator("html");
+      await expect(root).toHaveAttribute("data-theme", theme);
+      const highlighted = page.locator("[cmdk-item][data-selected=true]");
+      await highlighted.first().waitFor();
+
+      const look = await highlighted.first().evaluate(highlightLookOf);
+
+      expect(look.fill).not.toBe(look.surface);
+      expect(look.ring).toContain(look.focusRing);
+    });
+  }
+});
