@@ -5,18 +5,18 @@ export class RequestPath {
   private static readonly HOOKS = `/${ApiRoute.Prefix}/hooks/`;
   private static readonly HOOK = `${RequestPath.HOOKS}:token`;
 
-  readonly #url: string;
+  private readonly url: string;
 
   constructor(url: string | undefined) {
-    this.#url = url ?? "";
+    this.url = url ?? "";
   }
 
   isHealth(): boolean {
-    return this.#url.startsWith(RequestPath.HEALTH);
+    return this.url.startsWith(RequestPath.HEALTH);
   }
 
   isHook(): boolean {
-    return this.#url.startsWith(RequestPath.HOOKS);
+    return this.url.startsWith(RequestPath.HOOKS);
   }
 
   redacted(): string {
@@ -24,10 +24,10 @@ export class RequestPath {
 
     if (hook) return RequestPath.HOOK;
 
-    const query = this.#url.indexOf("?");
+    const query = this.url.indexOf("?");
 
-    if (query === -1) return this.#url;
+    if (query === -1) return this.url;
 
-    return this.#url.slice(0, query);
+    return this.url.slice(0, query);
   }
 }

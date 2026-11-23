@@ -9,14 +9,14 @@ export class BrokerConnections<C extends object> {
   private static readonly KEPT = 64;
   private static readonly IDLE_MS = 5 * 60 * 1000;
 
-  readonly #opened: LRUCache<string, C, Opening<C>>;
+  private readonly opened: LRUCache<string, C, Opening<C>>;
   readonly #closing = new Set<Promise<unknown>>();
 
   constructor(
     private readonly addresses: AddressPolicy,
     private readonly closing: (connection: C) => Promise<void> | void,
   ) {
-    this.#opened = new LRUCache<string, C, Opening<C>>({
+    this.opened = new LRUCache<string, C, Opening<C>>({
       max: BrokerConnections.KEPT,
       ttl: BrokerConnections.IDLE_MS,
       ttlAutopurge: true,
@@ -38,7 +38,7 @@ export class BrokerConnections<C extends object> {
     const key = this.#keyOf(server, variant, login);
     const context = { server, open };
     const signal = AbortSignal.timeout(BrokerConnections.OPEN_MS);
-    return this.#opened.forceFetch(key, { context, signal });
+    return this.opened.forceFetch(key, { context, signal });
   }
 
   dedicated<Dedicated>(
@@ -49,7 +49,7 @@ export class BrokerConnections<C extends object> {
   }
 
   async close(): Promise<void> {
-    this.#opened.clear();
+    this.opened.clear();
     const closing = Array.from(this.#closing);
     await Promise.all(closing);
   }
@@ -93,9 +93,9 @@ export class BrokerConnections<C extends object> {
   }
 
   #forgotten(key: string, connection: C): void {
-    const kept = this.#opened.peek(key);
+    const kept = this.opened.peek(key);
 
-    if (kept === connection) this.#opened.delete(key);
+    if (kept === connection) this.opened.delete(key);
   }
 
   #closed(connection: C): void {

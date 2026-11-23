@@ -11,12 +11,12 @@ import { Instrumentation } from "./enums.js";
 
 @Injectable()
 export class LockMetrics implements OnModuleInit, OnApplicationShutdown {
-  readonly #subscription = new Subscription();
-  readonly #losses: Counter;
+  private readonly subscription = new Subscription();
+  private readonly losses: Counter;
 
   constructor(@Optional() private readonly events?: LocksEvents) {
     const meter = metrics.getMeter(Instrumentation.Scope);
-    this.#losses = meter.createCounter("tenon.lock.losses", {
+    this.losses = meter.createCounter("tenon.lock.losses", {
       unit: "{loss}",
       description: "The locks a holder lost while using them.",
     });
@@ -26,12 +26,12 @@ export class LockMetrics implements OnModuleInit, OnApplicationShutdown {
     if (this.events === undefined) return;
 
     const recording = this.events.events$.subscribe((event) => {
-      if (event.type === "lock-lost") this.#losses.add(1);
+      if (event.type === "lock-lost") this.losses.add(1);
     });
-    this.#subscription.add(recording);
+    this.subscription.add(recording);
   }
 
   onApplicationShutdown(): void {
-    this.#subscription.unsubscribe();
+    this.subscription.unsubscribe();
   }
 }

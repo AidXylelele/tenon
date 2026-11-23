@@ -16,18 +16,18 @@ import { durationBoundaries } from "./histogram.presets.js";
 
 @Injectable()
 export class OutboxMetrics implements OnModuleInit, OnApplicationShutdown {
-  readonly #subscription = new Subscription();
-  readonly #lag: Histogram;
-  readonly #failures: Counter;
+  private readonly subscription = new Subscription();
+  private readonly lag: Histogram;
+  private readonly failures: Counter;
 
   constructor(private readonly events: OutboxEvents) {
     const meter = metrics.getMeter(Instrumentation.Scope);
-    this.#lag = meter.createHistogram("tenon.outbox.lag", {
+    this.lag = meter.createHistogram("tenon.outbox.lag", {
       unit: "s",
       description: "The time from adding a message to its publish.",
       advice: { explicitBucketBoundaries: durationBoundaries },
     });
-    this.#failures = meter.createCounter("tenon.outbox.failures", {
+    this.failures = meter.createCounter("tenon.outbox.failures", {
       unit: "{failure}",
       description: "The publishes that failed.",
     });
@@ -37,11 +37,11 @@ export class OutboxMetrics implements OnModuleInit, OnApplicationShutdown {
     const recording = this.events.events$.subscribe((event) => {
       this.#recorded(event);
     });
-    this.#subscription.add(recording);
+    this.subscription.add(recording);
   }
 
   onApplicationShutdown(): void {
-    this.#subscription.unsubscribe();
+    this.subscription.unsubscribe();
   }
 
   #recorded(event: OutboxEvent): void {
@@ -60,7 +60,7 @@ export class OutboxMetrics implements OnModuleInit, OnApplicationShutdown {
   #published(event: OutboxPublishedEvent): void {
     const attributes = { "tenon.outbox.topic": event.message.topic };
     const lag = (Date.now() - event.message.createdAt) / 1000;
-    this.#lag.record(lag, attributes);
+    this.lag.record(lag, attributes);
   }
 
   #failed(message: OutboxMessage, failure: string): void {
@@ -68,6 +68,6 @@ export class OutboxMetrics implements OnModuleInit, OnApplicationShutdown {
       "tenon.outbox.topic": message.topic,
       "tenon.outbox.failure": failure,
     };
-    this.#failures.add(1, attributes);
+    this.failures.add(1, attributes);
   }
 }

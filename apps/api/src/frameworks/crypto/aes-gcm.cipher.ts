@@ -2,19 +2,19 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 
 export class AesGcmCipher implements Cipher {
-  static readonly #ALGORITHM = "aes-256-gcm";
-  static readonly #IV_BYTES = 12;
-  static readonly #TAG_BYTES = 16;
+  private static readonly ALGORITHM = "aes-256-gcm";
+  private static readonly IV_BYTES = 12;
+  private static readonly TAG_BYTES = 16;
 
-  readonly #key: Buffer;
+  private readonly key: Buffer;
 
   constructor(base64Key: string) {
-    this.#key = Buffer.from(base64Key, "base64");
+    this.key = Buffer.from(base64Key, "base64");
   }
 
   seal(value: string): string {
-    const iv = randomBytes(AesGcmCipher.#IV_BYTES);
-    const cipher = createCipheriv(AesGcmCipher.#ALGORITHM, this.#key, iv);
+    const iv = randomBytes(AesGcmCipher.IV_BYTES);
+    const cipher = createCipheriv(AesGcmCipher.ALGORITHM, this.key, iv);
     const head = cipher.update(value, "utf8");
     const tail = cipher.final();
     const tag = cipher.getAuthTag();
@@ -24,11 +24,11 @@ export class AesGcmCipher implements Cipher {
 
   open(sealed: string): string {
     const bytes = Buffer.from(sealed, "base64");
-    const tagEnd = AesGcmCipher.#IV_BYTES + AesGcmCipher.#TAG_BYTES;
-    const iv = bytes.subarray(0, AesGcmCipher.#IV_BYTES);
-    const tag = bytes.subarray(AesGcmCipher.#IV_BYTES, tagEnd);
+    const tagEnd = AesGcmCipher.IV_BYTES + AesGcmCipher.TAG_BYTES;
+    const iv = bytes.subarray(0, AesGcmCipher.IV_BYTES);
+    const tag = bytes.subarray(AesGcmCipher.IV_BYTES, tagEnd);
     const body = bytes.subarray(tagEnd);
-    const decipher = createDecipheriv(AesGcmCipher.#ALGORITHM, this.#key, iv);
+    const decipher = createDecipheriv(AesGcmCipher.ALGORITHM, this.key, iv);
     decipher.setAuthTag(tag);
     const head = decipher.update(body, undefined, "utf8");
     const tail = decipher.final("utf8");

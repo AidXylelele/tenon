@@ -5,16 +5,16 @@ import type {
 } from "amqplib";
 
 export class AmqpPublisher {
-  #channel: Promise<ConfirmChannel>;
+  private confirmChannel: Promise<ConfirmChannel>;
 
   constructor(private readonly model: RecoveringChannelModel) {
     model.on("connect", (connected: ChannelModel) => {
-      this.#channel = this.#channelOn(connected);
+      this.confirmChannel = this.#channelOn(connected);
     });
   }
 
   channel(): Promise<ConfirmChannel> {
-    return this.#channel;
+    return this.confirmChannel;
   }
 
   close(): Promise<void> {
@@ -24,7 +24,7 @@ export class AmqpPublisher {
   #channelOn(connected: ChannelModel): Promise<ConfirmChannel> {
     const opening = connected.createConfirmChannel();
     const reopen = () => {
-      this.#channel = this.#channelOn(connected);
+      this.confirmChannel = this.#channelOn(connected);
     };
     const opened = (channel: ConfirmChannel) => {
       channel.on("error", reopen);

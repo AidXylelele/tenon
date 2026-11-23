@@ -53,24 +53,24 @@ export class InterpreterTasks {
   private static readonly KEPT = 1_000;
   private static readonly MILLISECONDS_PER_SECOND = 1_000;
 
-  readonly #programs = new LRUCache<string, KeptProgram, CompileSource>({
+  private readonly programs = new LRUCache<string, KeptProgram, CompileSource>({
     max: InterpreterTasks.KEPT,
     memoMethod: (_versionId, _kept, { context: source }) =>
       this.#keptProgramOf(source),
   });
-  readonly #filters = new LRUCache<string, KeptFilter, JsonValue>({
+  private readonly filters = new LRUCache<string, KeptFilter, JsonValue>({
     max: InterpreterTasks.KEPT,
     memoMethod: (_key, _kept, { context: filter }) =>
       this.#keptFilterOf(filter),
   });
-  readonly #wait: Histogram;
+  private readonly wait: Histogram;
 
   constructor(
     @Inject(InterpreterTasks.INTERPRETER)
     private readonly interpreter: Interpreter,
   ) {
     const meter = metrics.getMeter(Instrumentation.Scope);
-    this.#wait = meter.createHistogram("tenon.interpreter.pool.wait.duration", {
+    this.wait = meter.createHistogram("tenon.interpreter.pool.wait.duration", {
       unit: "s",
       description: "The time a task waits for an interpreter thread.",
       advice: { explicitBucketBoundaries: durationBoundaries },
@@ -175,7 +175,7 @@ export class InterpreterTasks {
     const waited = Date.now() - task.enqueuedAt;
     const seconds = waited / InterpreterTasks.MILLISECONDS_PER_SECOND;
     const attributes = { "tenon.interpreter.pool": task.pool };
-    this.#wait.record(seconds, attributes);
+    this.wait.record(seconds, attributes);
   }
 
   #guarded<C, T>(call: C, answer: (call: C) => TaskAnswer<T>): TaskAnswer<T> {
@@ -198,9 +198,9 @@ export class InterpreterTasks {
   }
 
   #programOf(thread: ThreadProgram): KeptProgram | undefined {
-    if (thread.source === null) return this.#programs.get(thread.versionId);
+    if (thread.source === null) return this.programs.get(thread.versionId);
 
-    return this.#programs.memo(thread.versionId, { context: thread.source });
+    return this.programs.memo(thread.versionId, { context: thread.source });
   }
 
   #playedBy<C extends ProgramTaskCall, T>(
@@ -326,7 +326,7 @@ export class InterpreterTasks {
 
   #filterOf(filter: JsonValue): EventFilter | null {
     const key = JSON.stringify(filter);
-    const kept = this.#filters.memo(key, { context: filter });
+    const kept = this.filters.memo(key, { context: filter });
     return kept.filter;
   }
 
