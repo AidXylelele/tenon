@@ -114,9 +114,10 @@ src/
     │                           *-background in the worker), the interpreter thread's module, configuration, host presets
     ├── http-client/            outbound HTTP: the effect client, OpenAPI operations, authentication and OAuth tokens,
     │                           address policy, size limit, transport failures, response content, event delivery
-    ├── grpc/, mcp/, a2a/       one client per effect protocol
+    ├── grpc/                   the gRPC connection: the channel pool, its TLS rule and address check
+    ├── mcp/, a2a/              one client per effect protocol
     ├── asyncapi/               AsyncAPI documents, the client, one broker per protocol, broker connections and tracer
-    ├── go-judge/               the sandbox client for script and shell processes, its limits, the image's shell platform
+    ├── go-judge/               the sandbox's result schemas and the image's shell platform
     ├── interpreter/            the interpreter on Piscina threads (client, tasks, thread entry), the host profile, the
     │                           effect performer
     ├── crypto/                 AES-GCM sealing of secret values
