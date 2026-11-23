@@ -3,11 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { EventStore } from "../events/ports.js";
 import { SecretRepository } from "../secrets/ports.js";
-import {
-  InstanceEvents,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 import type { OfferCommand } from "./interfaces.js";
 
 @Injectable()

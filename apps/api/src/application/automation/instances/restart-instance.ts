@@ -3,7 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import type { RestartInstanceCommand, StartResult } from "./interfaces.js";
-import { InstanceEvents, WorkflowInstanceRepository } from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository } from "./ports.js";
 
 @Injectable()
 export class RestartInstance {

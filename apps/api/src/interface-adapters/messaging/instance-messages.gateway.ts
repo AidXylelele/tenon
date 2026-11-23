@@ -3,7 +3,7 @@ import { TransactionHost } from "@nestjs-cls/transactional";
 import { type NewOutboxMessage, Outbox } from "@nestjs/outbox";
 import type {
   ChildCancellations,
-  InstanceEvents,
+  InstanceMessages,
   InstanceRuns,
 } from "../../application/automation/instances/ports.js";
 import {
@@ -30,7 +30,7 @@ import { RunDataMapper } from "./mappers/run-data.mapper.js";
 
 @Injectable()
 export class InstanceMessagesGateway
-  implements InstanceEvents, InstanceRuns, ChildCancellations
+  implements InstanceMessages, InstanceRuns, ChildCancellations
 {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,

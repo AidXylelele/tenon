@@ -1,4 +1,5 @@
 import { Missing } from "../../../../../src/application/automation/enums.js";
+import { InstanceEvents } from "../../../../../src/application/automation/instances/instance-events.js";
 import type { InputProblem } from "../../../../../src/application/automation/instances/interfaces.js";
 import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
 import { RestartInstance } from "../../../../../src/application/automation/instances/restart-instance.js";
@@ -13,7 +14,9 @@ import { WorkflowName } from "../../../../../src/domain/automation/workflows/wor
 import { aDefinition } from "../../../../support/builders.js";
 import {
   anInstanceIn,
-  RecordingInstanceEvents,
+  AppendingLifecycleEvents,
+  RecordingAnnouncements,
+  RecordingInstanceMessages,
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
   T0,
@@ -36,7 +39,12 @@ async function setUp(
 ) {
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository(parent);
-  const events = new RecordingInstanceEvents(instances);
+  const messages = new RecordingInstanceMessages(instances);
+  const events = new InstanceEvents(
+    new AppendingLifecycleEvents(),
+    new RecordingAnnouncements(),
+    messages,
+  );
   const workflow = Workflow.register(name);
   const definition = aDefinition({}, "content-1");
   workflow.publish({ definition, source: null, publisherId: "a-1", now: T0 });
@@ -47,7 +55,7 @@ async function setUp(
   return {
     workflows,
     instances,
-    events,
+    messages,
     restart: new RestartInstance(workflows, instances, events, unitOfWork),
     start: new StartInstance(
       workflows,
@@ -70,10 +78,10 @@ describe("starting an instance", () => {
       starterId: "author-1",
     });
 
-    const ran = fixture.events.started.map((run) => run.instance.id);
+    const ran = fixture.messages.started.map((run) => run.instance.id);
     expect(ran).toHaveLength(1);
     expect(started).toEqual({ ok: true, value: { instanceId: ran[0] } });
-    expect(fixture.events.started[0]?.stored).toBe(true);
+    expect(fixture.messages.started[0]?.stored).toBe(true);
   });
 
   it("dispatches_the_start_of_its_run_with_the_stored_instance", async () => {
@@ -87,7 +95,7 @@ describe("starting an instance", () => {
     });
 
     const instanceId = started.ok ? started.value.instanceId : "";
-    expect(fixture.events.kindsOf(instanceId)).toEqual([
+    expect(fixture.messages.kindsOf(instanceId)).toEqual([
       InstanceEventKind.Started,
     ]);
   });
@@ -120,7 +128,7 @@ describe("starting an instance", () => {
 
     expect(started).toEqual({ ok: false, failure: problems });
     expect(fixture.instances.rows.size).toBe(1);
-    expect(fixture.events.started).toHaveLength(0);
+    expect(fixture.messages.started).toHaveLength(0);
   });
 });
 
@@ -142,9 +150,9 @@ describe("restarting an instance", () => {
     });
 
     const instanceId = restarted.ok ? restarted.value.instanceId : "";
-    expect(fixture.events.kindsOf(instanceId)).toEqual([
+    expect(fixture.messages.kindsOf(instanceId)).toEqual([
       InstanceEventKind.Started,
     ]);
-    expect(fixture.events.started[0]?.stored).toBe(true);
+    expect(fixture.messages.started[0]?.stored).toBe(true);
   });
 });

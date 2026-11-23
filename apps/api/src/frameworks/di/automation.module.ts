@@ -8,10 +8,12 @@ import {
   EventStore,
 } from "../../application/automation/events/ports.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
+import { InstanceEvents } from "../../application/automation/instances/instance-events.js";
 import {
   ChildCancellations,
-  InstanceEvents,
+  InstanceMessages,
   InstanceRuns,
+  LifecycleEvents,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../../application/automation/instances/ports.js";
@@ -113,8 +115,9 @@ import { OutboundModule } from "./outbound.module.js";
     InterpreterFilterGateway,
     { provide: SubscriptionFilters, useExisting: InterpreterFilterGateway },
     RunDataMapper,
+    InstanceEvents,
     InstanceMessagesGateway,
-    { provide: InstanceEvents, useExisting: InstanceMessagesGateway },
+    { provide: InstanceMessages, useExisting: InstanceMessagesGateway },
     { provide: InstanceRuns, useExisting: InstanceMessagesGateway },
     { provide: ChildCancellations, useExisting: InstanceMessagesGateway },
     EventMessagesGateway,
@@ -142,6 +145,7 @@ import { OutboundModule } from "./outbound.module.js";
       useClass: PostgresWorkflowInstanceRepository,
     },
     PostgresLifecycleEventStore,
+    { provide: LifecycleEvents, useExisting: PostgresLifecycleEventStore },
     PostgresTaskValueStore,
     PostgresEventStore,
     { provide: EventStore, useExisting: PostgresEventStore },

@@ -1,9 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
-import {
-  InstanceEvents,
-  WorkflowInstanceRepository,
-} from "../instances/ports.js";
+import { InstanceEvents } from "../instances/instance-events.js";
+import { WorkflowInstanceRepository } from "../instances/ports.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import type { StartScheduledCommand } from "./interfaces.js";
 

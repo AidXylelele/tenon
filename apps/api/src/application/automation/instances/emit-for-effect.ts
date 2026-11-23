@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { EventOrigin } from "../events/enums.js";
-import { EventStore } from "../events/ports.js";
+import { EventAnnouncements, EventStore } from "../events/ports.js";
 import { SecretRepository } from "../secrets/ports.js";
 import { EffectResult } from "./enums.js";
 import type { EffectCommand } from "./interfaces.js";
@@ -19,6 +19,7 @@ export class EmitForEffect {
     private readonly secrets: SecretRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly events: EventStore,
+    private readonly announcements: EventAnnouncements,
     private readonly runs: InstanceRuns,
     private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -37,7 +38,16 @@ export class EmitForEffect {
     const answer = { effectId: command.effectId, outcome };
     const now = new Date();
     await this.unitOfWork.run(async () => {
-      await this.events.accept(masked, EventOrigin.Emit, instance.id, now);
+      const accepted = await this.events.accept(
+        masked,
+        EventOrigin.Emit,
+        instance.id,
+        now,
+      );
+
+      if (accepted !== null)
+        await this.announcements.announce(accepted, EventOrigin.Emit);
+
       await this.runs.respond(instance, answer);
     });
   }

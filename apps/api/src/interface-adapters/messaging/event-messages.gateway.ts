@@ -26,13 +26,9 @@ export class EventMessagesGateway implements EventAnnouncements, EventOffers {
     private readonly outbox: Outbox,
   ) {}
 
-  async announce(
-    sequence: number,
-    origin: EventOrigin,
-    cloudEvent: CloudEvent,
-  ): Promise<void> {
-    const payload: AcceptedEventMessage = { sequence };
-    const key = this.#laneOf(origin, cloudEvent);
+  async announce(event: AcceptedEvent, origin: EventOrigin): Promise<void> {
+    const payload: AcceptedEventMessage = { sequence: event.sequence };
+    const key = this.#laneOf(origin, event.cloudEvent);
     const message = { topic: MessageTopic.EventAccepted, key, payload };
     await this.outbox.add(this.txHost.tx, message);
   }

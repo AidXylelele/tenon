@@ -56,7 +56,11 @@ export abstract class ReceivedMessages {
   ): Promise<void>;
 }
 
-export abstract class InstanceEvents {
+export abstract class LifecycleEvents {
+  abstract append(instance: WorkflowInstance): Promise<AcceptedEvent[]>;
+}
+
+export abstract class InstanceMessages {
   abstract dispatch(instance: WorkflowInstance): Promise<void>;
 }
 

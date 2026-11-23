@@ -23,13 +23,13 @@ import {
   receiver as receivers,
   workflowInstance as instances,
 } from "../schema/index.js";
-import { PostgresLifecycleEventStore } from "../stores/postgres-lifecycle-event.store.js";
+import { PostgresTaskValueStore } from "../stores/postgres-task-value.store.js";
 
 @Injectable()
 export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepository {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly lifecycle: PostgresLifecycleEventStore,
+    private readonly taskValues: PostgresTaskValueStore,
     private readonly workflowInstanceMapper: WorkflowInstanceMapper,
   ) {}
 
@@ -142,7 +142,8 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
 
     await this.#listen(instance);
     await this.#receive(instance);
-    await this.#record(instance);
+    const now = new Date();
+    await this.taskValues.keep(instance, now);
   }
 
   async remove(instance: WorkflowInstance): Promise<void> {
@@ -218,11 +219,5 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
             open: sql`excluded.open`,
           },
         });
-  }
-
-  async #record(instance: WorkflowInstance): Promise<void> {
-    const now = new Date();
-    await this.lifecycle.record(instance, now);
-    instance.clearLifecycle();
   }
 }

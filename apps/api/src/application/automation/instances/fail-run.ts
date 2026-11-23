@@ -1,11 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import type { InstanceCommand } from "./interfaces.js";
-import {
-  InstanceEvents,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 
 @Injectable()
 export class FailRun {

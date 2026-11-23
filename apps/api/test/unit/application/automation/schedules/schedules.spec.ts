@@ -1,5 +1,6 @@
 import type { AcceptedEvent } from "../../../../../src/application/automation/events/interfaces.js";
 import type { EventStore } from "../../../../../src/application/automation/events/ports.js";
+import { InstanceEvents } from "../../../../../src/application/automation/instances/instance-events.js";
 import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
 import { ContinueSchedule } from "../../../../../src/application/automation/schedules/continue-schedule.js";
 import { FireSchedule } from "../../../../../src/application/automation/schedules/fire-schedule.js";
@@ -25,7 +26,9 @@ import { aDefinition } from "../../../../support/builders.js";
 import {
   anInstanceIn,
   FakeUnitOfWork,
-  RecordingInstanceEvents,
+  AppendingLifecycleEvents,
+  RecordingAnnouncements,
+  RecordingInstanceMessages,
   RecordingWorkflowEvents,
   StoredSecrets,
   StoredWorkflowInstanceRepository,
@@ -72,12 +75,17 @@ function runtimeAccepting(accepts: boolean): WorkflowRuntime {
 function setUp(accepts = true) {
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository();
-  const instanceEvents = new RecordingInstanceEvents(instances);
+  const instanceMessages = new RecordingInstanceMessages(instances);
+  const instanceEvents = new InstanceEvents(
+    new AppendingLifecycleEvents(),
+    new RecordingAnnouncements(),
+    instanceMessages,
+  );
   const workflowEvents = new RecordingWorkflowEvents();
   return {
     workflows,
     instances,
-    instanceEvents,
+    instanceMessages,
     workflowEvents,
     turnOn: new TurnWorkflowOn(workflows, workflowEvents, unitOfWork),
     turnOff: new TurnWorkflowOff(workflows, workflowEvents, unitOfWork),
@@ -214,8 +222,8 @@ describe("the instance of a fired slot", () => {
     await fixture.start.execute(command);
 
     expect(fixture.instances.rows.size).toBe(1);
-    expect(fixture.instanceEvents.started[0]?.stored).toBe(true);
-    expect(fixture.instanceEvents.kindsOf(SLOT)).toEqual([
+    expect(fixture.instanceMessages.started[0]?.stored).toBe(true);
+    expect(fixture.instanceMessages.kindsOf(SLOT)).toEqual([
       InstanceEventKind.Started,
     ]);
     expect(fixture.workflowEvents.calls).toEqual([]);
@@ -248,7 +256,7 @@ describe("the instance of a fired slot", () => {
     await fixture.start.execute({ workflowId: workflow.id, instanceId: SLOT });
 
     expect(fixture.instances.rows.size).toBe(1);
-    expect(fixture.instanceEvents.started).toEqual([]);
+    expect(fixture.instanceMessages.started).toEqual([]);
   });
 });
 
@@ -273,8 +281,8 @@ describe("the instance an event starts", () => {
     expect(fixture.instances.rows.size).toBe(1);
     expect(started?.trigger).toBe(TriggerKind.Event);
     expect(started?.input).toEqual([PAID.cloudEvent]);
-    expect(fixture.instanceEvents.started[0]?.stored).toBe(true);
-    expect(fixture.instanceEvents.kindsOf(STARTED)).toEqual([
+    expect(fixture.instanceMessages.started[0]?.stored).toBe(true);
+    expect(fixture.instanceMessages.kindsOf(STARTED)).toEqual([
       InstanceEventKind.Started,
     ]);
   });
@@ -291,7 +299,7 @@ describe("the instance an event starts", () => {
     });
 
     expect(fixture.instances.rows.size).toBe(0);
-    expect(fixture.instanceEvents.calls).toEqual([]);
+    expect(fixture.instanceMessages.calls).toEqual([]);
   });
 });
 

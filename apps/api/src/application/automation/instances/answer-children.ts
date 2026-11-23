@@ -3,11 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { SecretRepository } from "../secrets/ports.js";
 import type { RunCommand } from "./interfaces.js";
-import {
-  InstanceEvents,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 
 @Injectable()
 export class AnswerChildren {

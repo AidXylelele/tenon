@@ -3,8 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import { EffectResult } from "./enums.js";
 import type { EffectCommand } from "./interfaces.js";
+import { InstanceEvents } from "./instance-events.js";
 import {
-  InstanceEvents,
   InstanceRuns,
   WorkflowInstanceRepository,
   WorkflowRuntime,

@@ -1,9 +1,11 @@
-import type { EventOrigin } from "../../../../../src/application/automation/events/enums.js";
+import { EventOrigin } from "../../../../../src/application/automation/events/enums.js";
+import type { AcceptedEvent } from "../../../../../src/application/automation/events/interfaces.js";
 import type { EventStore } from "../../../../../src/application/automation/events/ports.js";
 import { AnswerTimer } from "../../../../../src/application/automation/instances/answer-timer.js";
 import { EmitForEffect } from "../../../../../src/application/automation/instances/emit-for-effect.js";
 import type { EffectResult } from "../../../../../src/application/automation/instances/enums.js";
 import { GiveUpEffect } from "../../../../../src/application/automation/instances/give-up-effect.js";
+import { InstanceEvents } from "../../../../../src/application/automation/instances/instance-events.js";
 import type {
   ChildRequest,
   EffectCall,
@@ -41,7 +43,9 @@ import { aDefinition, aTimer, aTurn } from "../../../../support/builders.js";
 import {
   anInstanceIn,
   FakeUnitOfWork,
-  RecordingInstanceEvents,
+  AppendingLifecycleEvents,
+  RecordingAnnouncements,
+  RecordingInstanceMessages,
   RecordingInstanceRuns,
   StoredSecrets,
   StoredWorkflowInstanceRepository,
@@ -127,9 +131,18 @@ interface Accepted {
 class AcceptingEvents {
   readonly accepted: Accepted[] = [];
 
-  accept(event: JsonObject, origin: EventOrigin): Promise<number | null> {
+  accept(event: JsonObject, origin: EventOrigin): Promise<AcceptedEvent> {
     this.accepted.push({ event, origin });
-    return Promise.resolve(1);
+    const sequence = this.accepted.length;
+    const accepted = {
+      sequence,
+      eventId: event.id as string,
+      type: event.type as string,
+      cloudEvent: event,
+      acceptedAt: T0,
+      lifecycleOf: null,
+    };
+    return Promise.resolve(accepted);
   }
 }
 
@@ -162,19 +175,26 @@ async function setUp(
   workflow.publish({ definition, source: null, publisherId: "a-1", now: T0 });
   await workflows.save(workflow);
   const secrets = new StoredSecrets();
-  const events = new RecordingInstanceEvents(instances);
+  const messages = new RecordingInstanceMessages(instances);
+  const events = new InstanceEvents(
+    new AppendingLifecycleEvents(),
+    new RecordingAnnouncements(),
+    messages,
+  );
   const runs = new RecordingInstanceRuns();
   const performer = new RecordingPerformer();
   const runtime = runtimeOf(child);
   const accepted = new AcceptingEvents();
   const store = accepted as unknown as EventStore;
+  const announcements = new RecordingAnnouncements();
   const receipts = new StoredReceipts(stored);
   return {
     instances,
-    events,
+    messages,
     runs,
     performer,
     accepted,
+    announcements,
     perform: new PerformEffect(instances, secrets, performer, runs, unitOfWork),
     detach: new StartDetachedProcess(instances, runtime, runs, unitOfWork),
     performDetached: new PerformDetachedProcess(secrets, performer),
@@ -191,6 +211,7 @@ async function setUp(
       secrets,
       runtime,
       store,
+      announcements,
       runs,
       unitOfWork,
     ),
@@ -313,12 +334,12 @@ describe("a child a run asks for", () => {
 
     await fixture.startChild.execute(command);
 
-    const child = fixture.events.started[0]?.instance;
+    const child = fixture.messages.started[0]?.instance;
     expect(child?.originId).toBe("parent-1");
     expect(child?.originEffectId).toBe(CHILD);
     expect(child?.trigger).toBe(TriggerKind.Parent);
-    expect(fixture.events.started[0]?.stored).toBe(true);
-    const kinds = fixture.events.kindsOf(child?.id ?? "");
+    expect(fixture.messages.started[0]?.stored).toBe(true);
+    const kinds = fixture.messages.kindsOf(child?.id ?? "");
     expect(kinds).toEqual([InstanceEventKind.Started]);
     expect(fixture.runs.responded).toEqual([]);
   });
@@ -330,7 +351,7 @@ describe("a child a run asks for", () => {
 
     await fixture.startChild.execute(command);
 
-    expect(fixture.events.started).toHaveLength(1);
+    expect(fixture.messages.started).toHaveLength(1);
     expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
       kind: "started",
     });
@@ -343,7 +364,7 @@ describe("a child a run asks for", () => {
     await fixture.startChild.execute(command);
     await fixture.startChild.execute(command);
 
-    expect(fixture.events.started).toHaveLength(1);
+    expect(fixture.messages.started).toHaveLength(1);
   });
 
   it("an_unknown_workflow_is_answered_missing", async () => {
@@ -354,7 +375,7 @@ describe("a child a run asks for", () => {
 
     await fixture.startChild.execute(command);
 
-    expect(fixture.events.started).toEqual([]);
+    expect(fixture.messages.started).toEqual([]);
     expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
       kind: "missing",
     });
@@ -362,7 +383,7 @@ describe("a child a run asks for", () => {
 });
 
 describe("an event a run emits", () => {
-  it("is_accepted_as_emitted_and_answered_emitted", async () => {
+  it("is_accepted_and_announced_as_emitted_and_answered_emitted", async () => {
     const event = { id: "e-1", source: "/runs", type: "com.example.done" };
     const effect = anEffect("/do/0/tell", EffectKind.Emit, { event });
     const fixture = await setUp([effect]);
@@ -372,6 +393,9 @@ describe("an event a run emits", () => {
 
     expect(fixture.accepted.accepted.map((each) => each.event)).toEqual([
       event,
+    ]);
+    expect(fixture.announcements.announced).toEqual([
+      { sequence: 1, origin: EventOrigin.Emit },
     ]);
     expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
       kind: "emitted",

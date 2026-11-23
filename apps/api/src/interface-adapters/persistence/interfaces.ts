@@ -110,6 +110,7 @@ export type LifecycleEventName = keyof typeof lifecycleEventCatalogue;
 export interface LifecycleCloudEvent {
   readonly cloudEvent: CloudEvent;
   readonly lifecycle: LifecycleEventName | null;
+  readonly execution: string | null;
 }
 
 export interface LifecycleEventRow {

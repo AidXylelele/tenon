@@ -6,10 +6,8 @@ import type {
   AcceptedEvent,
   CloudEvent,
 } from "../../../application/automation/events/interfaces.js";
-import {
-  EventAnnouncements,
-  type EventStore,
-} from "../../../application/automation/events/ports.js";
+import type { EventStore } from "../../../application/automation/events/ports.js";
+import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import type { WebhookEvent } from "../../../domain/automation/webhooks/interfaces.js";
 import type {
   EventRow,
@@ -26,7 +24,6 @@ import {
 export class PostgresEventStore implements EventStore {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly announcements: EventAnnouncements,
     private readonly webhookEventMapper: WebhookEventMapper,
   ) {}
 
@@ -35,11 +32,11 @@ export class PostgresEventStore implements EventStore {
     origin: EventOrigin,
     instanceId: string | null,
     acceptedAt: Date,
-  ): Promise<number | null> {
+  ): Promise<AcceptedEvent | null> {
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
     const type = cloudEvent.type as string;
-    return this.#inserted({
+    const row = {
       source,
       eventId,
       type,
@@ -49,38 +46,42 @@ export class PostgresEventStore implements EventStore {
       lifecycle: null,
       cloudEvent,
       acceptedAt,
-    });
+    };
+    return this.#inserted(row, null);
   }
 
   acceptLifecycle(
     told: LifecycleCloudEvent,
-    instanceId: string,
-    execution: string | null,
+    instance: WorkflowInstance,
     acceptedAt: Date,
-  ): Promise<number | null> {
+  ): Promise<AcceptedEvent | null> {
     const cloudEvent = told.cloudEvent;
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
     const type = cloudEvent.type as string;
-    return this.#inserted({
+    const row = {
       source,
       eventId,
       type,
       origin: EventOrigin.Lifecycle,
-      instanceId,
-      execution,
+      instanceId: instance.id,
+      execution: told.execution,
       lifecycle: told.lifecycle,
       cloudEvent,
       acceptedAt,
-    });
+    };
+    return this.#inserted(row, instance.workflowId);
   }
 
-  acceptWebhookEvent(event: WebhookEvent): Promise<number | null> {
+  acceptWebhookEvent(event: WebhookEvent): Promise<AcceptedEvent | null> {
     const cloudEvent = this.webhookEventMapper.toCloudEvent(event);
     return this.accept(cloudEvent, EventOrigin.Webhook, null, event.at);
   }
 
-  async #inserted(row: EventRow): Promise<number | null> {
+  async #inserted(
+    row: EventRow,
+    lifecycleOf: string | null,
+  ): Promise<AcceptedEvent | null> {
     const [accepted] = await this.txHost.tx
       .insert(events)
       .values(row)
@@ -89,9 +90,14 @@ export class PostgresEventStore implements EventStore {
 
     if (accepted === undefined) return null;
 
-    const sequence = accepted.sequence;
-    await this.announcements.announce(sequence, row.origin, row.cloudEvent);
-    return sequence;
+    return {
+      sequence: accepted.sequence,
+      eventId: row.eventId,
+      type: row.type,
+      cloudEvent: row.cloudEvent,
+      acceptedAt: row.acceptedAt,
+      lifecycleOf,
+    };
   }
 
   async find(sequence: number): Promise<AcceptedEvent | null> {

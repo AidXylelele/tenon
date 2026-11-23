@@ -2,8 +2,8 @@ import { Injectable } from "@nestjs/common";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
 import { UnitOfWork } from "../../unit-of-work.js";
+import { InstanceEvents } from "../instances/instance-events.js";
 import {
-  InstanceEvents,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../instances/ports.js";

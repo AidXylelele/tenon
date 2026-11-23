@@ -31,16 +31,16 @@ describe("the outbox messages of accepted events", () => {
   it("an_emitted_or_lifecycle_event_keeps_its_sources_lane_and_any_other_its_own", async () => {
     const fixture = setUp();
 
-    await fixture.gateway.announce(1, EventOrigin.Emit, cloudEvent);
-    await fixture.gateway.announce(2, EventOrigin.Lifecycle, cloudEvent);
-    await fixture.gateway.announce(3, EventOrigin.Webhook, cloudEvent);
-    await fixture.gateway.announce(4, EventOrigin.Intake, cloudEvent);
+    await fixture.gateway.announce(PAID, EventOrigin.Emit);
+    await fixture.gateway.announce(PAID, EventOrigin.Lifecycle);
+    await fixture.gateway.announce(PAID, EventOrigin.Webhook);
+    await fixture.gateway.announce(PAID, EventOrigin.Intake);
 
     const keys = fixture.outbox.added.map((message) => message.key);
     expect(fixture.outbox.added[0]).toEqual({
       topic: MessageTopic.EventAccepted,
       key: "/shop",
-      payload: { sequence: 1 },
+      payload: { sequence: 7 },
     });
     expect(keys).toEqual(["/shop", "/shop", "order-1", "order-1"]);
     expect(fixture.outbox.transactions).toEqual([TX, TX, TX, TX]);

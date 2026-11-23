@@ -3,6 +3,7 @@ import { AnswerReceives } from "../../../../../src/application/automation/instan
 import { BeginRun } from "../../../../../src/application/automation/instances/begin-run.js";
 import { CancelInstance } from "../../../../../src/application/automation/instances/cancel-instance.js";
 import { FailRun } from "../../../../../src/application/automation/instances/fail-run.js";
+import { InstanceEvents } from "../../../../../src/application/automation/instances/instance-events.js";
 import type {
   InputProblem,
   Receipt,
@@ -45,7 +46,9 @@ import {
 } from "../../../../support/builders.js";
 import {
   anInstanceIn,
-  RecordingInstanceEvents,
+  AppendingLifecycleEvents,
+  RecordingAnnouncements,
+  RecordingInstanceMessages,
   StoredSecrets,
   StoredWorkflowInstanceRepository,
   FakeUnitOfWork,
@@ -224,11 +227,17 @@ function setUp(instance: WorkflowInstance, turn: PlayedTurn) {
   const instances = new StoredWorkflowInstanceRepository(instance);
   const runtime = new ScriptedRuntime(turn);
   const secrets = new StoredSecrets();
-  const events = new RecordingInstanceEvents(instances);
+  const messages = new RecordingInstanceMessages(instances);
+  const events = new InstanceEvents(
+    new AppendingLifecycleEvents(),
+    new RecordingAnnouncements(),
+    messages,
+  );
   return {
     instances,
     runtime,
     events,
+    messages,
     begin: new BeginRun(instances, runtime, secrets, events, unitOfWork),
     respond: new RespondToEffect(
       instances,
@@ -304,7 +313,7 @@ describe("a run begun from its start", () => {
 
     await fixture.begin.execute({ instanceId: pending.id, signal });
 
-    expect(fixture.events.dispatched).toEqual([
+    expect(fixture.messages.dispatched).toEqual([
       {
         kind: InstanceEventKind.EffectRequested,
         instanceId: pending.id,
@@ -348,8 +357,8 @@ describe("a run begun from its start", () => {
 
     await fixture.begin.execute({ instanceId: pending.id, signal });
 
-    expect(fixture.events.kindsOf(pending.id)).toEqual([]);
-    expect(fixture.events.calls).toEqual([pending.id]);
+    expect(fixture.messages.kindsOf(pending.id)).toEqual([]);
+    expect(fixture.messages.calls).toEqual([pending.id]);
   });
 
   it("a_turn_that_ends_the_run_requests_nothing_and_dispatches_its_end", async () => {
@@ -362,7 +371,7 @@ describe("a run begun from its start", () => {
 
     await fixture.begin.execute({ instanceId: pending.id, signal });
 
-    expect(fixture.events.kindsOf(pending.id)).toEqual([
+    expect(fixture.messages.kindsOf(pending.id)).toEqual([
       InstanceEventKind.Ended,
     ]);
   });
@@ -374,7 +383,7 @@ describe("a run begun from its start", () => {
     await fixture.begin.execute({ instanceId: instance.id, signal });
 
     expect(fixture.runtime.calls).toEqual([]);
-    expect(fixture.events.calls).toEqual([]);
+    expect(fixture.messages.calls).toEqual([]);
   });
 
   it("a_run_of_an_instance_that_is_gone_plays_nothing", async () => {
@@ -399,7 +408,7 @@ describe("a run answered by effect id", () => {
     expect(fixture.runtime.calls).toEqual(["respond /do/0/fetch"]);
     expect(awaited).toEqual(["/do/1/pause"]);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Waiting);
-    expect(fixture.events.calls).toEqual([instance.id]);
+    expect(fixture.messages.calls).toEqual([instance.id]);
   });
 
   it("an_answer_repeated_after_a_crash_never_reaches_the_interpreter", async () => {
@@ -412,7 +421,7 @@ describe("a run answered by effect id", () => {
     await fixture.respond.execute({ instanceId: instance.id, answer, signal });
 
     expect(fixture.runtime.calls).toEqual(["respond /do/0/fetch"]);
-    expect(fixture.events.calls).toEqual([instance.id]);
+    expect(fixture.messages.calls).toEqual([instance.id]);
   });
 
   it("an_answer_that_requests_the_next_effect_dispatches_its_request", async () => {
@@ -426,7 +435,7 @@ describe("a run answered by effect id", () => {
 
     await fixture.respond.execute({ instanceId: instance.id, answer, signal });
 
-    expect(fixture.events.dispatched).toEqual([
+    expect(fixture.messages.dispatched).toEqual([
       {
         kind: InstanceEventKind.EffectRequested,
         instanceId: instance.id,
@@ -448,7 +457,7 @@ describe("suspension, resumption, cancellation and failure", () => {
     expect(result.ok).toBe(true);
     expect(fixture.runtime.calls).toEqual(["suspend"]);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Suspended);
-    expect(fixture.events.calls).toEqual([instance.id]);
+    expect(fixture.messages.calls).toEqual([instance.id]);
   });
 
   it("a_resumption_runs_the_instance_again_and_dispatches_its_turn", async () => {
@@ -464,7 +473,7 @@ describe("suspension, resumption, cancellation and failure", () => {
 
     expect(fixture.runtime.calls).toEqual(["resume"]);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Running);
-    expect(fixture.events.kindsOf(instance.id)).toEqual([
+    expect(fixture.messages.kindsOf(instance.id)).toEqual([
       InstanceEventKind.EffectRequested,
     ]);
   });
@@ -478,7 +487,7 @@ describe("suspension, resumption, cancellation and failure", () => {
 
     expect(fixture.runtime.calls).toEqual(["cancel"]);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Cancelled);
-    expect(fixture.events.kindsOf(instance.id)).toEqual([
+    expect(fixture.messages.kindsOf(instance.id)).toEqual([
       InstanceEventKind.Ended,
     ]);
   });
@@ -491,7 +500,7 @@ describe("suspension, resumption, cancellation and failure", () => {
 
     expect(fixture.runtime.calls).toEqual([]);
     expect(fixture.instances.phaseOf(pending.id)).toBe(Phase.Cancelled);
-    expect(fixture.events.kindsOf(pending.id)).toEqual([
+    expect(fixture.messages.kindsOf(pending.id)).toEqual([
       InstanceEventKind.Ended,
     ]);
   });
@@ -503,7 +512,7 @@ describe("suspension, resumption, cancellation and failure", () => {
     await fixture.fail.execute({ instanceId: instance.id });
 
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Faulted);
-    expect(fixture.events.kindsOf(instance.id)).toEqual([
+    expect(fixture.messages.kindsOf(instance.id)).toEqual([
       InstanceEventKind.Ended,
     ]);
   });
@@ -530,7 +539,7 @@ describe("an event offered to a listening run", () => {
     });
 
     expect(fixture.runtime.calls).toEqual(["offer"]);
-    expect(fixture.events.calls).toEqual([pending.id]);
+    expect(fixture.messages.calls).toEqual([pending.id]);
   });
 });
 
@@ -561,7 +570,7 @@ describe("a run this build of the interpreter cannot continue", () => {
 
     expect(result.ok).toBe(true);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Cancelled);
-    expect(fixture.events.kindsOf(instance.id)).toEqual([
+    expect(fixture.messages.kindsOf(instance.id)).toEqual([
       InstanceEventKind.Ended,
     ]);
   });
@@ -598,7 +607,7 @@ describe("children answered by their parent's own run", () => {
       "respond /do/0/fetch",
       "answerChild",
     ]);
-    expect(fixture.events.calls).toEqual([parent.id, parent.id]);
+    expect(fixture.messages.calls).toEqual([parent.id, parent.id]);
   });
 
   it("a_parent_whose_awaited_children_have_not_ended_is_read_without_a_write", async () => {
@@ -661,7 +670,7 @@ describe("receives answered from the stored messages", () => {
     expect(fixture.runtime.calls).toEqual(["receive"]);
     expect(messages.forgotten).toEqual(["/fork/0/a@message[0]"]);
     expect(fixture.instances.phaseOf(pending.id)).toBe(Phase.Completed);
-    expect(fixture.events.kindsOf(pending.id)).toEqual([
+    expect(fixture.messages.kindsOf(pending.id)).toEqual([
       InstanceEventKind.Ended,
     ]);
   });

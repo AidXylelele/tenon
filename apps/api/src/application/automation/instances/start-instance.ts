@@ -3,11 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
 import { WorkflowRepository } from "../workflows/ports.js";
-import {
-  InstanceEvents,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 import type {
   StartInstanceCommand,
   StartInstanceResult,

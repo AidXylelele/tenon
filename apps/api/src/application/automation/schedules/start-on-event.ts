@@ -3,8 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { EventStore } from "../events/ports.js";
+import { InstanceEvents } from "../instances/instance-events.js";
 import {
-  InstanceEvents,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../instances/ports.js";

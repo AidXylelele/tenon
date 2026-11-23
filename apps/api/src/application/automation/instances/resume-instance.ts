@@ -5,11 +5,8 @@ import { Control } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
 import type { InstanceCommand, InstanceResult } from "./interfaces.js";
-import {
-  InstanceEvents,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 
 @Injectable()
 export class ResumeInstance {

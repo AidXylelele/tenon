@@ -1,8 +1,12 @@
 import { DraftRepository } from "../../src/application/automation/drafts/ports.js";
 import type { Draft } from "../../src/domain/automation/drafts/draft.js";
+import type { EventOrigin } from "../../src/application/automation/events/enums.js";
+import type { AcceptedEvent } from "../../src/application/automation/events/interfaces.js";
+import { EventAnnouncements } from "../../src/application/automation/events/ports.js";
 import {
-  InstanceEvents,
+  InstanceMessages,
   InstanceRuns,
+  LifecycleEvents,
   WorkflowInstanceRepository,
 } from "../../src/application/automation/instances/ports.js";
 import { SecretRepository } from "../../src/application/automation/secrets/ports.js";
@@ -355,7 +359,6 @@ export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository
     const row = instanceRow(instance, instance.version + 1);
     this.rows.set(instance.id, row);
     this.saves += 1;
-    instance.clearLifecycle();
     return Promise.resolve();
   }
 
@@ -447,7 +450,7 @@ export interface StartedRun {
   readonly stored: boolean;
 }
 
-export class RecordingInstanceEvents extends InstanceEvents {
+export class RecordingInstanceMessages extends InstanceMessages {
   readonly started: StartedRun[] = [];
   readonly dispatched: InstanceEvent[] = [];
   readonly calls: string[] = [];
@@ -488,6 +491,46 @@ export interface RecordedProcess {
   readonly instanceId: string;
   readonly effectId: string;
   readonly request: JsonObject;
+}
+
+export class AppendingLifecycleEvents extends LifecycleEvents {
+  readonly appended: AcceptedEvent[] = [];
+
+  append(instance: WorkflowInstance): Promise<AcceptedEvent[]> {
+    const accepted: AcceptedEvent[] = [];
+
+    for (const event of instance.lifecycle) {
+      const sequence = this.appended.length + 1;
+      const eventId = `${instance.id}/${String(sequence)}`;
+      const cloudEvent = { id: eventId, source: instance.id, type: event.name };
+      const appended = {
+        sequence,
+        eventId,
+        type: event.name,
+        cloudEvent,
+        acceptedAt: T0,
+        lifecycleOf: instance.workflowId,
+      };
+      this.appended.push(appended);
+      accepted.push(appended);
+    }
+
+    return Promise.resolve(accepted);
+  }
+}
+
+export interface RecordedAnnouncement {
+  readonly sequence: number;
+  readonly origin: EventOrigin;
+}
+
+export class RecordingAnnouncements extends EventAnnouncements {
+  readonly announced: RecordedAnnouncement[] = [];
+
+  announce(event: AcceptedEvent, origin: EventOrigin): Promise<void> {
+    this.announced.push({ sequence: event.sequence, origin });
+    return Promise.resolve();
+  }
 }
 
 export class RecordingInstanceRuns extends InstanceRuns {
