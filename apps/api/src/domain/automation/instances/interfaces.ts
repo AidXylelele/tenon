@@ -53,10 +53,16 @@ export interface TimerSet {
   readonly at: number;
 }
 
-export interface InstanceEnded {
-  readonly kind: InstanceEventKind.Ended;
+export interface ChildEnded {
+  readonly kind: InstanceEventKind.ChildEnded;
   readonly instanceId: string;
-  readonly parentId: string | null;
+  readonly parentId: string;
+}
+
+export interface ScheduledCompleted {
+  readonly kind: InstanceEventKind.ScheduledCompleted;
+  readonly instanceId: string;
+  readonly workflowId: string;
 }
 
 export interface ChildrenAbandoned {
@@ -68,7 +74,8 @@ export type InstanceEvent =
   | InstanceStarted
   | EffectRequested
   | TimerSet
-  | InstanceEnded
+  | ChildEnded
+  | ScheduledCompleted
   | ChildrenAbandoned;
 
 export interface WaitDeadline {

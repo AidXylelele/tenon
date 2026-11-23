@@ -19,8 +19,8 @@ import type { WorkflowInstance } from "../../domain/automation/instances/workflo
 import type { Transaction } from "../persistence/interfaces.js";
 import { MessageTopic } from "./enums.js";
 import type {
+  ChildEndedMessage,
   EffectMessage,
-  InstanceEndedMessage,
   InstanceMessage,
   ProcessMessage,
   RespondMessage,
@@ -107,8 +107,10 @@ export class InstanceMessagesGateway
         return this.#effectOf(event.instanceId, event.effectId, event.effect);
       case InstanceEventKind.TimerSet:
         return this.#timerOf(event.instanceId, event.effectId, event.at);
-      case InstanceEventKind.Ended:
-        return this.#endedOf(event.instanceId, event.parentId);
+      case InstanceEventKind.ChildEnded:
+        return this.#childEndedOf(event.instanceId, event.parentId);
+      case InstanceEventKind.ScheduledCompleted:
+        return this.#scheduledOf(event.instanceId, event.workflowId);
       case InstanceEventKind.ChildrenAbandoned:
         return this.#commandOf(
           MessageTopic.ChildrenAbandoned,
@@ -141,9 +143,14 @@ export class InstanceMessagesGateway
     return { topic: MessageTopic.RunTimer, key, payload, availableAt: at };
   }
 
-  #endedOf(instanceId: string, parentId: string | null): NewOutboxMessage {
-    const payload: InstanceEndedMessage = { instanceId, parentId };
-    const key = parentId ?? instanceId;
-    return { topic: MessageTopic.InstanceEnded, key, payload };
+  #childEndedOf(instanceId: string, parentId: string): NewOutboxMessage {
+    const payload: ChildEndedMessage = { instanceId, parentId };
+    return { topic: MessageTopic.ChildEnded, key: parentId, payload };
+  }
+
+  #scheduledOf(instanceId: string, workflowId: string): NewOutboxMessage {
+    const payload: InstanceMessage = { instanceId };
+    const topic = MessageTopic.ScheduledCompleted;
+    return { topic, key: workflowId, payload };
   }
 }

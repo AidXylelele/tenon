@@ -283,8 +283,10 @@ async function awaitedOf(
   return awaited.map((effect) => effect.id);
 }
 
+const AWAITED = { trigger: TriggerKind.Parent, originId: "parent-1" };
+
 async function aBegunInstance(): Promise<WorkflowInstance> {
-  const pending = anInstanceIn(Phase.Pending);
+  const pending = anInstanceIn(Phase.Pending, AWAITED);
   const firstTurn = aTurn({
     requested: [aCall("/do/0/fetch"), aTimer("/do/1/pause")],
   });
@@ -362,7 +364,7 @@ describe("a run begun from its start", () => {
   });
 
   it("a_turn_that_ends_the_run_requests_nothing_and_dispatches_its_end", async () => {
-    const pending = anInstanceIn(Phase.Pending);
+    const pending = anInstanceIn(Phase.Pending, AWAITED);
     const turn = aTurn({
       status: TurnStatus.Faulted,
       requested: [aCall("/do/0/fetch")],
@@ -372,7 +374,7 @@ describe("a run begun from its start", () => {
     await fixture.begin.execute({ instanceId: pending.id, signal });
 
     expect(fixture.messages.kindsOf(pending.id)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 
@@ -488,12 +490,12 @@ describe("suspension, resumption, cancellation and failure", () => {
     expect(fixture.runtime.calls).toEqual(["cancel"]);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Cancelled);
     expect(fixture.messages.kindsOf(instance.id)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 
   it("a_pending_instance_is_cancelled_without_the_interpreter_and_its_end_dispatched", async () => {
-    const pending = anInstanceIn(Phase.Pending);
+    const pending = anInstanceIn(Phase.Pending, AWAITED);
     const fixture = setUp(pending, aTurn());
 
     await fixture.cancel.execute({ instanceId: pending.id, signal: null });
@@ -501,7 +503,7 @@ describe("suspension, resumption, cancellation and failure", () => {
     expect(fixture.runtime.calls).toEqual([]);
     expect(fixture.instances.phaseOf(pending.id)).toBe(Phase.Cancelled);
     expect(fixture.messages.kindsOf(pending.id)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 
@@ -513,7 +515,7 @@ describe("suspension, resumption, cancellation and failure", () => {
 
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Faulted);
     expect(fixture.messages.kindsOf(instance.id)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 });
@@ -571,7 +573,7 @@ describe("a run this build of the interpreter cannot continue", () => {
     expect(result.ok).toBe(true);
     expect(fixture.instances.phaseOf(instance.id)).toBe(Phase.Cancelled);
     expect(fixture.messages.kindsOf(instance.id)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 });
@@ -635,7 +637,7 @@ describe("children answered by their parent's own run", () => {
 
 describe("receives answered from the stored messages", () => {
   it("a_receipt_whose_receive_an_earlier_answer_ended_never_reaches_the_interpreter", async () => {
-    const pending = anInstanceIn(Phase.Pending);
+    const pending = anInstanceIn(Phase.Pending, AWAITED);
     const both = aTurn({
       requested: [
         aReceive("/fork/0/a@message[0]", "/fork/0/a"),
@@ -671,7 +673,7 @@ describe("receives answered from the stored messages", () => {
     expect(messages.forgotten).toEqual(["/fork/0/a@message[0]"]);
     expect(fixture.instances.phaseOf(pending.id)).toBe(Phase.Completed);
     expect(fixture.messages.kindsOf(pending.id)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 });

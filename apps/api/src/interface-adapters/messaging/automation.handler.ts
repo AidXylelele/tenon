@@ -87,15 +87,6 @@ export class AutomationHandler {
     return this.#handled(context, () => this.startOnEvent.execute(command));
   }
 
-  @OnOutboxMessage(MessageTopic.InstanceEnded, { consumer: "children" })
-  ended(
-    message: InstanceMessage,
-    context: OutboxHandlerContext,
-  ): Promise<void> {
-    const command = { instanceId: message.instanceId };
-    return this.#handled(context, () => this.cancelChildren.execute(command));
-  }
-
   @OnOutboxMessage(MessageTopic.ChildrenAbandoned, { consumer: "children" })
   abandoned(
     message: InstanceMessage,
@@ -116,7 +107,7 @@ export class AutomationHandler {
     });
   }
 
-  @OnOutboxMessage(MessageTopic.InstanceEnded, { consumer: "schedules" })
+  @OnOutboxMessage(MessageTopic.ScheduledCompleted, { consumer: "schedules" })
   continued(
     message: InstanceMessage,
     context: OutboxHandlerContext,

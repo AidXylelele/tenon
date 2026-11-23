@@ -13,7 +13,7 @@ import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { ConsumerSpan } from "./consumer-span.js";
 import { MessageTopic } from "./enums.js";
 import type {
-  InstanceEndedMessage,
+  ChildEndedMessage,
   InstanceMessage,
   RespondMessage,
 } from "./interfaces.js";
@@ -73,17 +73,13 @@ export class RunHandler {
     );
   }
 
-  @OnOutboxMessage(MessageTopic.InstanceEnded, { consumer: "parents" })
-  async childEnded(
-    message: InstanceEndedMessage,
+  @OnOutboxMessage(MessageTopic.ChildEnded, { consumer: "parents" })
+  childEnded(
+    message: ChildEndedMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    const parentId = message.parentId;
-
-    if (parentId === null) return;
-
-    const command = { instanceId: parentId, signal: context.signal };
-    await this.#played(context, parentId, () =>
+    const command = { instanceId: message.parentId, signal: context.signal };
+    return this.#played(context, message.parentId, () =>
       this.answerChildren.execute(command),
     );
   }

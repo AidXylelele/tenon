@@ -112,7 +112,7 @@ describe("the run commands an instance's key orders", () => {
     );
   });
 
-  it("a_child_end_answers_its_parent_and_an_unawaited_one_nothing", async () => {
+  it("a_child_end_answers_its_parent", async () => {
     const recorder = new Recorder();
     const handler = runHandlerOf(recorder);
     const context = contextAt(1);
@@ -121,12 +121,8 @@ describe("the run commands an instance's key orders", () => {
       { instanceId: "child-1", parentId: "parent-1" },
       context,
     );
-    await handler.childEnded(
-      { instanceId: "child-2", parentId: null },
-      context,
-    );
 
-    expect(recorder.calls).toHaveLength(1);
+    expect(names(recorder)).toEqual(["children"]);
     expect(recorder.calls[0]).toContain('"instanceId":"parent-1"');
   });
 

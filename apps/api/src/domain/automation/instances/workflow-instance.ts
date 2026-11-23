@@ -457,9 +457,42 @@ export class WorkflowInstance {
   }
 
   #abandonChildren(): void {
+    const told = this.#events.some(
+      (event) => event.kind === InstanceEventKind.ChildrenAbandoned,
+    );
+
+    if (told) return;
+
     this.#events.push({
       kind: InstanceEventKind.ChildrenAbandoned,
       instanceId: this.#id,
+    });
+  }
+
+  #awaitsChildren(): boolean {
+    const awaited = this.#run?.awaited ?? [];
+    return awaited.some((effect) => effect.kind === EffectKind.Child);
+  }
+
+  #tellParent(): void {
+    const parentId = this.awaitedBy;
+
+    if (parentId === null) return;
+
+    this.#events.push({
+      kind: InstanceEventKind.ChildEnded,
+      instanceId: this.#id,
+      parentId,
+    });
+  }
+
+  #tellSchedule(): void {
+    if (!this.continuesSchedule) return;
+
+    this.#events.push({
+      kind: InstanceEventKind.ScheduledCompleted,
+      instanceId: this.#id,
+      workflowId: this.#workflowId,
     });
   }
 
@@ -470,11 +503,11 @@ export class WorkflowInstance {
   #end(phase: Phase, now: Date): void {
     this.#phase = phase;
     this.#endedAt = now;
-    this.#events.push({
-      kind: InstanceEventKind.Ended,
-      instanceId: this.#id,
-      parentId: this.awaitedBy,
-    });
+
+    if (this.#awaitsChildren()) this.#abandonChildren();
+
+    this.#tellParent();
+    this.#tellSchedule();
   }
 
   static #refusalIn(phase: Phase, control: Control): InstanceRefusal | null {

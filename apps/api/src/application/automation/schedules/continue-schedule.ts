@@ -16,7 +16,7 @@ export class ContinueSchedule {
   async execute(command: InstanceCommand): Promise<void> {
     const instance = await this.instances.find(command.instanceId);
 
-    if (!instance?.continuesSchedule) return;
+    if (instance === null) return;
 
     const workflow = await this.workflows.findById(instance.workflowId);
 

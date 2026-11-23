@@ -26,9 +26,9 @@ export interface InstanceMessage {
   readonly instanceId: string;
 }
 
-export interface InstanceEndedMessage {
+export interface ChildEndedMessage {
   readonly instanceId: string;
-  readonly parentId: string | null;
+  readonly parentId: string;
 }
 
 export interface EffectMessage {

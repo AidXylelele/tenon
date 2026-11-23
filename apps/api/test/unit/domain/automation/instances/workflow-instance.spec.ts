@@ -27,8 +27,10 @@ import { anInstanceIn, T0 } from "../../../../support/fakes.js";
 const noSecrets = RunSecrets.of([]);
 const later = new Date("2026-11-03T11:00:00.000Z");
 
-function begun(requested = [aTimer("/do/0/pause")]) {
-  const instance = anInstanceIn(Phase.Pending);
+const AWAITED = { trigger: TriggerKind.Parent, originId: "parent-1" };
+
+function begun(requested = [aTimer("/do/0/pause")], overrides = {}) {
+  const instance = anInstanceIn(Phase.Pending, overrides);
   const turn = aTurn({ requested });
   instance.begin(turn, noSecrets, T0);
   instance.clearEvents();
@@ -164,9 +166,7 @@ describe("what a run asks of the world", () => {
 
     instance.begin(turn, noSecrets, T0);
 
-    expect(instance.events.map((event) => event.kind)).toEqual([
-      InstanceEventKind.Ended,
-    ]);
+    expect(instance.events).toEqual([]);
   });
 });
 
@@ -318,7 +318,7 @@ describe("the controls of an instance", () => {
   });
 
   it("a_platform_failure_faults_it_with_the_ending_s_error_and_ends_it_once", () => {
-    const instance = begun();
+    const instance = begun(undefined, AWAITED);
     const ending = aFaultedEnding();
 
     instance.fail(ending, later);
@@ -328,7 +328,72 @@ describe("the controls of an instance", () => {
     expect(instance.error).toEqual(ending.error);
     expect(instance.lifecycle).toEqual(ending.events);
     expect(instance.events.map((event) => event.kind)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
+    ]);
+  });
+});
+
+describe("the end of an instance", () => {
+  const completed = aTurn({ status: TurnStatus.Completed });
+
+  it("a_top_level_run_tells_nobody", () => {
+    const instance = begun();
+
+    instance.advance(completed, noSecrets, later);
+
+    expect(instance.events).toEqual([]);
+  });
+
+  it("an_awaited_child_tells_its_parent", () => {
+    const instance = begun(undefined, AWAITED);
+
+    instance.cancel(later);
+
+    expect(instance.events).toEqual([
+      {
+        kind: InstanceEventKind.ChildEnded,
+        instanceId: "instance-1",
+        parentId: "parent-1",
+      },
+    ]);
+  });
+
+  it("a_completed_scheduled_run_tells_its_schedule_and_a_faulted_one_does_not", () => {
+    const scheduled = { trigger: TriggerKind.Schedule };
+    const instance = begun(undefined, scheduled);
+    const faulted = begun(undefined, scheduled);
+
+    instance.advance(completed, noSecrets, later);
+    faulted.fail(aFaultedEnding(), later);
+
+    expect(instance.events).toEqual([
+      {
+        kind: InstanceEventKind.ScheduledCompleted,
+        instanceId: "instance-1",
+        workflowId: "workflow-1",
+      },
+    ]);
+    expect(faulted.events).toEqual([]);
+  });
+
+  it("a_run_ending_while_it_awaits_children_tells_them_once_they_are_abandoned", () => {
+    const child = {
+      id: "/do/0/child",
+      kind: EffectKind.Child,
+      request: { id: "/do/0/child" },
+      wait: null,
+    };
+    const instance = begun([child, aCall("/do/1/other")]);
+    const ended = aTurn({
+      status: TurnStatus.Cancelled,
+      withdrawn: ["/do/1/other"],
+      abandoned: ["/do/1/other"],
+    });
+
+    instance.advance(ended, noSecrets, later);
+
+    expect(instance.events.map((event) => event.kind)).toEqual([
+      InstanceEventKind.ChildrenAbandoned,
     ]);
   });
 });
@@ -359,7 +424,7 @@ describe("a run the platform's interpreter no longer continues", () => {
   }
 
   it("is_cancelled_with_the_reason_that_the_interpreter_changed_and_ends_once", () => {
-    const instance = begun();
+    const instance = begun(undefined, AWAITED);
     const ending = aCancelledEnding();
     const stranded = strandedBy(ending);
 
@@ -372,7 +437,7 @@ describe("a run the platform's interpreter no longer continues", () => {
     expect(instance.error).toBeNull();
     expect(instance.lifecycle).toEqual(ending.events);
     expect(instance.events.map((event) => event.kind)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 

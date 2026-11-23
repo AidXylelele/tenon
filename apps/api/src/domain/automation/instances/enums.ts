@@ -50,7 +50,8 @@ export enum InstanceEventKind {
   Started = "instance.started",
   EffectRequested = "instance.effect-requested",
   TimerSet = "instance.timer-set",
-  Ended = "instance.ended",
+  ChildEnded = "instance.child-ended",
+  ScheduledCompleted = "instance.scheduled-completed",
   ChildrenAbandoned = "instance.children-abandoned",
 }
 

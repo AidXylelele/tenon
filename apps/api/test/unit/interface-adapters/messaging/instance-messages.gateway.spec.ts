@@ -5,6 +5,7 @@ import {
   Phase,
   TaskValueKind,
   TriggerKind,
+  TurnStatus,
 } from "../../../../src/domain/automation/instances/enums.js";
 import { RunSecrets } from "../../../../src/domain/automation/secrets/run-secrets.js";
 import { Workflow } from "../../../../src/domain/automation/workflows/workflow.js";
@@ -142,7 +143,7 @@ describe("the outbox messages of an instance's events", () => {
     ]);
   });
 
-  it("an_end_keeps_its_topic_and_is_keyed_by_the_parent_that_awaits_it", async () => {
+  it("an_awaited_childs_end_is_keyed_by_its_parent", async () => {
     const fixture = setUp();
     const child = anInstanceIn(Phase.Running, {
       id: "child-1",
@@ -156,9 +157,28 @@ describe("the outbox messages of an instance's events", () => {
 
     expect(fixture.outbox.added).toEqual([
       {
-        topic: MessageTopic.InstanceEnded,
+        topic: MessageTopic.ChildEnded,
         key: "parent-1",
         payload: { instanceId: "child-1", parentId: "parent-1" },
+      },
+    ]);
+  });
+
+  it("a_completed_scheduled_run_is_keyed_by_its_workflow", async () => {
+    const fixture = setUp();
+    const scheduled = anInstanceIn(Phase.Pending, {
+      trigger: TriggerKind.Schedule,
+    });
+    const completed = aTurn({ status: TurnStatus.Completed });
+    scheduled.begin(completed, noSecrets, T0);
+
+    await fixture.gateway.dispatch(scheduled);
+
+    expect(fixture.outbox.added).toEqual([
+      {
+        topic: MessageTopic.ScheduledCompleted,
+        key: "workflow-1",
+        payload: { instanceId: "instance-1" },
       },
     ]);
   });
