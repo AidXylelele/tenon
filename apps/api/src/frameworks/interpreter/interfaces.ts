@@ -72,6 +72,8 @@ type ThreadTasks = typeof thread;
 
 export type TaskName = keyof ThreadTasks;
 
+export type StepTaskName = "respond" | "suspend" | "resume" | "cancel";
+
 export type TaskCall<N extends TaskName> = Parameters<
   ThreadTasks[N]
 >[0]["call"];
