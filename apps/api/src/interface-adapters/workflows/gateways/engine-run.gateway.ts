@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { WorkflowClient, WorkflowNotFoundError } from "@nestjs/workflows";
 import type { InstanceRuns } from "../../../application/automation/instances/ports.js";
 import type { Control } from "../../../domain/automation/instances/enums.js";
@@ -21,7 +17,6 @@ export class EngineRunGateway implements InstanceRuns {
     private readonly txHost: TransactionHost<Transaction>,
   ) {}
 
-  @Transactional(Propagation.Mandatory)
   async start(instance: WorkflowInstance): Promise<void> {
     const input = { instanceId: instance.id, generation: 1 };
     const id = this.#runIdOf(instance.id, 1);
@@ -32,7 +27,6 @@ export class EngineRunGateway implements InstanceRuns {
     });
   }
 
-  @Transactional(Propagation.Mandatory)
   async wakeOnChild(
     parent: WorkflowInstance,
     child: WorkflowInstance,
@@ -41,7 +35,6 @@ export class EngineRunGateway implements InstanceRuns {
     await this.#woken(parent, cause);
   }
 
-  @Transactional(Propagation.Mandatory)
   async wakeOnEvent(
     instance: WorkflowInstance,
     sequence: number,
@@ -50,7 +43,6 @@ export class EngineRunGateway implements InstanceRuns {
     await this.#woken(instance, cause);
   }
 
-  @Transactional(Propagation.Mandatory)
   async wakeOnControl(
     instance: WorkflowInstance,
     control: Control,
@@ -60,7 +52,6 @@ export class EngineRunGateway implements InstanceRuns {
     await this.#woken(instance, cause);
   }
 
-  @Transactional(Propagation.Mandatory)
   async wakeOnInbound(
     instance: WorkflowInstance,
     execution: string,

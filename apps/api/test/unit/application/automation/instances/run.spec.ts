@@ -44,7 +44,10 @@ import {
   RecordingInstanceRuns,
   StoredSecrets,
   StoredWorkflowInstanceRepository,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 class ScriptedRuntime extends WorkflowRuntime {
   readonly calls: string[] = [];
@@ -182,13 +185,13 @@ function setUp(instance: WorkflowInstance, turn: PlayedTurn) {
     instances,
     runtime,
     runs,
-    begin: new BeginRun(instances, runtime, secrets),
-    respond: new RespondToEffect(instances, runtime, secrets),
-    suspend: new SuspendInstance(instances, runtime, secrets, runs),
-    resume: new ResumeInstance(instances, runtime, secrets, runs),
-    cancel: new CancelInstance(instances, runtime, secrets, runs),
-    wakeParent: new WakeParent(instances, runs),
-    answerChildren: new AnswerChildren(instances, runtime, secrets),
+    begin: new BeginRun(instances, runtime, secrets, unitOfWork),
+    respond: new RespondToEffect(instances, runtime, secrets, unitOfWork),
+    suspend: new SuspendInstance(instances, runtime, secrets, runs, unitOfWork),
+    resume: new ResumeInstance(instances, runtime, secrets, runs, unitOfWork),
+    cancel: new CancelInstance(instances, runtime, secrets, runs, unitOfWork),
+    wakeParent: new WakeParent(instances, runs, unitOfWork),
+    answerChildren: new AnswerChildren(instances, runtime, secrets, unitOfWork),
   };
 }
 
@@ -439,6 +442,7 @@ describe("receives answered from the stored messages", () => {
       messages,
       fixture.runtime,
       new StoredSecrets(),
+      unitOfWork,
     );
 
     await answer.execute({ instanceId: pending.id, signal });

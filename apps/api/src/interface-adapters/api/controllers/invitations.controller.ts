@@ -21,7 +21,6 @@ import {
   ApiTags,
   ApiTooManyRequestsResponse,
 } from "@nestjs/swagger";
-import { Transactional } from "@nestjs-cls/transactional";
 import { minutes, Throttle } from "@nestjs/throttler";
 import { InvitationPolicy } from "../auth/invitation.policy.js";
 import { AcceptInvitation } from "../../../application/identity/invitations/accept-invitation.js";
@@ -120,7 +119,6 @@ export class InvitationsController {
   @Post("accept")
   @Public()
   @Throttle({ default: { limit: 10, ttl: minutes(15) } })
-  @Transactional()
   @HttpCode(200)
   @ApiOkResponse({ standardSchema: AcceptedInvitationResponse })
   @ApiNotFoundResponse()

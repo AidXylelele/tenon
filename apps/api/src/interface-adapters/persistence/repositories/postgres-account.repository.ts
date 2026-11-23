@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq, type SQL } from "drizzle-orm";
 import type { Account } from "../../../domain/identity/accounts/account.js";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
@@ -19,7 +15,6 @@ export class PostgresAccountRepository implements AccountRepository {
     private readonly accountMapper: AccountMapper,
   ) {}
 
-  @Transactional(Propagation.Mandatory)
   async save(account: Account): Promise<void> {
     const row = this.accountMapper.toRow(account);
     const version = account.version + 1;

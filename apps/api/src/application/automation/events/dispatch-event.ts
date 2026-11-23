@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import type { DispatchEventCommand } from "./interfaces.js";
 import { EventOffers, EventRouting, EventStore } from "./ports.js";
 
@@ -9,9 +9,9 @@ export class DispatchEvent {
     private readonly events: EventStore,
     private readonly routing: EventRouting,
     private readonly offers: EventOffers,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: DispatchEventCommand): Promise<void> {
     const event = await this.events.find(command.sequence);
 
@@ -23,7 +23,9 @@ export class DispatchEvent {
       event,
       command.signal,
     );
-    await this.offers.offer(matches, event);
-    await this.offers.trigger(matches, event);
+    await this.unitOfWork.run(async () => {
+      await this.offers.offer(matches, event);
+      await this.offers.trigger(matches, event);
+    });
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import {
   InstanceRuns,
@@ -14,9 +14,9 @@ export class StartScheduledInstance {
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
     private readonly runs: InstanceRuns,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: StartScheduledCommand): Promise<void> {
     const existing = await this.instances.find(command.instanceId);
 
@@ -42,7 +42,10 @@ export class StartScheduledInstance {
 
     if (!started.ok) return;
 
-    await this.instances.save(started.value);
-    await this.runs.start(started.value);
+    const instance = started.value;
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.runs.start(instance);
+    });
   }
 }

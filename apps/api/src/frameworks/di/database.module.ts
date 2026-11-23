@@ -1,14 +1,17 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { DrizzleModule, getDrizzleToken } from "@nestjs/drizzle";
 import { ClsPluginTransactional } from "@nestjs-cls/transactional";
 import { TransactionalAdapterDrizzleOrm } from "@nestjs-cls/transactional-adapter-drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { ClsModule } from "nestjs-cls";
+import { UnitOfWork } from "../../application/unit-of-work.js";
 import type { Database } from "../../interface-adapters/persistence/interfaces.js";
+import { PostgresUnitOfWork } from "../../interface-adapters/persistence/postgres-unit-of-work.js";
 import * as schema from "../../interface-adapters/persistence/schema/index.js";
 import { databaseConfig } from "./configs.js";
 
+@Global()
 @Module({
   imports: [
     DrizzleModule.forRootAsync({
@@ -38,5 +41,7 @@ import { databaseConfig } from "./configs.js";
       ],
     }),
   ],
+  providers: [{ provide: UnitOfWork, useClass: PostgresUnitOfWork }],
+  exports: [UnitOfWork],
 })
 export class DatabaseModule {}

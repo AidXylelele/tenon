@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq } from "drizzle-orm";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import { InvitationStatus } from "../../../domain/identity/invitations/enums.js";
@@ -21,7 +17,6 @@ export class PostgresInvitationRepository implements InvitationRepository {
     private readonly invitationMapper: InvitationMapper,
   ) {}
 
-  @Transactional(Propagation.Mandatory)
   async save(invitation: Invitation): Promise<void> {
     const row = this.invitationMapper.toRow(invitation);
     const version = invitation.version + 1;

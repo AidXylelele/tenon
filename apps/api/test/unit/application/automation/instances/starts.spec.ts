@@ -13,7 +13,10 @@ import {
   StoredWorkflowInstanceRepository,
   StoredWorkflowRepository,
   T0,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 const name = new WorkflowName("sales", "route-lead");
 const unknown = new WorkflowName("sales", "nobody");
@@ -42,8 +45,9 @@ async function setUp(archived = false, problems: readonly InputProblem[] = []) {
       instances,
       runs,
       inputsChecked(problems),
+      unitOfWork,
     ),
-    child: new StartSubWorkflow(workflows, instances, runs),
+    child: new StartSubWorkflow(workflows, instances, runs, unitOfWork),
   };
 }
 
