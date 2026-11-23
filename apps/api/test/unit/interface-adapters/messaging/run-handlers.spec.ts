@@ -8,7 +8,6 @@ import type { FailRun } from "../../../../src/application/automation/instances/f
 import type { GiveUpEffect } from "../../../../src/application/automation/instances/give-up-effect.js";
 import type { PerformDetachedProcess } from "../../../../src/application/automation/instances/perform-detached-process.js";
 import type { PerformEffect } from "../../../../src/application/automation/instances/perform-effect.js";
-import type { ReceiveForEffect } from "../../../../src/application/automation/instances/receive-for-effect.js";
 import type { RespondToEffect } from "../../../../src/application/automation/instances/respond-to-effect.js";
 import type { StartChildForEffect } from "../../../../src/application/automation/instances/start-child-for-effect.js";
 import type { StartDetachedProcess } from "../../../../src/application/automation/instances/start-detached-process.js";
@@ -74,7 +73,6 @@ function effectHandlerOf(recorder: Recorder) {
     recorder.use<PerformDetachedProcess>("process"),
     recorder.use<StartChildForEffect>("child"),
     recorder.use<EmitForEffect>("emit"),
-    recorder.use<ReceiveForEffect>("receive"),
     recorder.use<AnswerTimer>("timer"),
     recorder.use<GiveUpEffect>("giveUp"),
   );
@@ -174,7 +172,6 @@ describe("the effects a run asks for", () => {
     [EffectKind.Detached, "detach"],
     [EffectKind.Child, "child"],
     [EffectKind.Emit, "emit"],
-    [EffectKind.Receive, "receive"],
   ];
 
   it.each(routes)(

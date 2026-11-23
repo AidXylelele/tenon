@@ -25,7 +25,6 @@ import {
 } from "../../application/automation/instances/ports.js";
 import { ReceiverQueries } from "../../application/automation/instances/queries.js";
 import { ProcessPlatform } from "../../application/automation/host/queries.js";
-import { ReceiveForEffect } from "../../application/automation/instances/receive-for-effect.js";
 import { ReceiveInbound } from "../../application/automation/instances/receive-inbound.js";
 import { RespondToEffect } from "../../application/automation/instances/respond-to-effect.js";
 import { StartChildForEffect } from "../../application/automation/instances/start-child-for-effect.js";
@@ -117,7 +116,6 @@ import { OutboundModule } from "./outbound.module.js";
     PerformDetachedProcess,
     StartChildForEffect,
     EmitForEffect,
-    ReceiveForEffect,
     AnswerTimer,
     GiveUpEffect,
     ReceiveInbound,

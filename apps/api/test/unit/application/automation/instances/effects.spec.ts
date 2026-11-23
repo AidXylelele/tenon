@@ -9,21 +9,17 @@ import { InstanceEvents } from "../../../../../src/application/automation/instan
 import type {
   ChildRequest,
   EffectCall,
-  Receipt,
 } from "../../../../../src/application/automation/instances/interfaces.js";
 import { PerformDetachedProcess } from "../../../../../src/application/automation/instances/perform-detached-process.js";
 import { PerformEffect } from "../../../../../src/application/automation/instances/perform-effect.js";
 import {
   EffectClient,
-  ReceivedMessages,
   type WorkflowRuntime,
 } from "../../../../../src/application/automation/instances/ports.js";
-import { ReceiveForEffect } from "../../../../../src/application/automation/instances/receive-for-effect.js";
 import { StartChildForEffect } from "../../../../../src/application/automation/instances/start-child-for-effect.js";
 import { StartDetachedProcess } from "../../../../../src/application/automation/instances/start-detached-process.js";
 import {
   EffectKind,
-  InboundKind,
   InstanceEventKind,
   Phase,
   TriggerKind,
@@ -31,7 +27,6 @@ import {
   WaitKind,
 } from "../../../../../src/domain/automation/instances/enums.js";
 import type { AwaitedEffect } from "../../../../../src/domain/automation/instances/interfaces.js";
-import type { WorkflowInstance } from "../../../../../src/domain/automation/instances/workflow-instance.js";
 import type {
   JsonObject,
   JsonValue,
@@ -100,29 +95,6 @@ class RecordingPerformer extends EffectClient {
   }
 }
 
-class StoredReceipts extends ReceivedMessages {
-  constructor(private readonly stored: boolean) {
-    super();
-  }
-
-  append(): Promise<number | null> {
-    return Promise.resolve(0);
-  }
-
-  awaitedBy(instance: WorkflowInstance): Promise<readonly Receipt[]> {
-    if (!this.stored) return Promise.resolve([]);
-
-    const message = { payload: null, headers: {}, correlationId: null };
-    const inbound = { kind: InboundKind.Message as const, message };
-    const receipts = instance.waits.map((wait) => ({ wait, inbound }));
-    return Promise.resolve(receipts);
-  }
-
-  forget(): Promise<void> {
-    return Promise.resolve();
-  }
-}
-
 interface Accepted {
   readonly event: JsonObject;
   readonly origin: EventOrigin;
@@ -163,7 +135,6 @@ function aChildRequest(trigger: TriggerKind, workflow = name): ChildRequest {
 async function setUp(
   awaited: readonly AwaitedEffect[],
   child: ChildRequest = aChildRequest(TriggerKind.Parent),
-  stored = true,
 ) {
   const parent = anInstanceIn(Phase.Pending, { id: "parent-1" });
   parent.begin(aTurn({ requested: awaited }), RunSecrets.of([]), T0);
@@ -187,7 +158,6 @@ async function setUp(
   const accepted = new AcceptingEvents();
   const store = accepted as unknown as EventStore;
   const announcements = new RecordingAnnouncements();
-  const receipts = new StoredReceipts(stored);
   return {
     instances,
     messages,
@@ -216,7 +186,6 @@ async function setUp(
       unitOfWork,
     ),
     timer: new AnswerTimer(instances, runtime, runs, unitOfWork),
-    receive: new ReceiveForEffect(instances, receipts, runs, unitOfWork),
     giveUp: new GiveUpEffect(instances, runs, unitOfWork),
   };
 }
@@ -429,27 +398,5 @@ describe("a timer a run set", () => {
     });
 
     expect(fixture.runs.responded).toEqual([]);
-  });
-});
-
-describe("a receive a run waits on", () => {
-  it("asks_the_run_to_take_a_message_stored_before_it_waited", async () => {
-    const effect = aClosingReceive("/do/0/orders@message[0]");
-    const fixture = await setUp([effect]);
-    const command = commandOf("/do/0/orders@message[0]");
-
-    await fixture.receive.execute(command);
-
-    expect(fixture.runs.received).toEqual(["parent-1"]);
-  });
-
-  it("asks_nothing_while_no_message_is_stored", async () => {
-    const effect = aClosingReceive("/do/0/orders@message[0]");
-    const fixture = await setUp([effect], undefined, false);
-    const command = commandOf("/do/0/orders@message[0]");
-
-    await fixture.receive.execute(command);
-
-    expect(fixture.runs.received).toEqual([]);
   });
 });

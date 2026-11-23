@@ -13,7 +13,6 @@ import type {
 } from "../../application/automation/instances/interfaces.js";
 import { PerformDetachedProcess } from "../../application/automation/instances/perform-detached-process.js";
 import { PerformEffect } from "../../application/automation/instances/perform-effect.js";
-import { ReceiveForEffect } from "../../application/automation/instances/receive-for-effect.js";
 import { StartChildForEffect } from "../../application/automation/instances/start-child-for-effect.js";
 import { StartDetachedProcess } from "../../application/automation/instances/start-detached-process.js";
 import { EffectKind } from "../../domain/automation/instances/enums.js";
@@ -41,7 +40,6 @@ export class EffectHandler {
     private readonly performDetachedProcess: PerformDetachedProcess,
     private readonly startChildForEffect: StartChildForEffect,
     private readonly emitForEffect: EmitForEffect,
-    private readonly receiveForEffect: ReceiveForEffect,
     private readonly answerTimer: AnswerTimer,
     private readonly giveUpEffect: GiveUpEffect,
   ) {}
@@ -114,10 +112,9 @@ export class EffectHandler {
         return this.startChildForEffect.execute(command);
       case EffectKind.Emit:
         return this.emitForEffect.execute(command);
-      case EffectKind.Receive:
-        return this.receiveForEffect.execute(command);
       case EffectKind.Timer:
       case EffectKind.Listen:
+      case EffectKind.Receive:
         return Promise.resolve();
     }
   }

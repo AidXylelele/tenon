@@ -42,6 +42,29 @@ function setUp() {
 const noSecrets = RunSecrets.of([]);
 
 describe("the outbox messages of an instance's events", () => {
+  it("a_requested_receive_asks_the_run_to_take_its_stored_messages", async () => {
+    const fixture = setUp();
+    const instance = anInstanceIn(Phase.Pending);
+    const receive = {
+      id: "/do/0/orders@message[0]",
+      kind: EffectKind.Receive,
+      request: {},
+      wait: null,
+    };
+    const turn = aTurn({ requested: [receive] });
+    instance.begin(turn, noSecrets, T0);
+
+    await fixture.gateway.dispatch(instance);
+
+    expect(fixture.outbox.added).toEqual([
+      {
+        topic: MessageTopic.RunReceives,
+        key: "instance-1",
+        payload: { instanceId: "instance-1" },
+      },
+    ]);
+  });
+
   it("a_requested_effect_flows_under_its_own_key_and_a_timer_waits_for_its_instant", async () => {
     const fixture = setUp();
     const instance = anInstanceIn(Phase.Pending);

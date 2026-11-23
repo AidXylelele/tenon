@@ -7,7 +7,7 @@ import type {
   InstanceRuns,
 } from "../../application/automation/instances/ports.js";
 import {
-  type EffectKind,
+  EffectKind,
   InstanceEventKind,
 } from "../../domain/automation/instances/enums.js";
 import type {
@@ -127,6 +127,9 @@ export class InstanceMessagesGateway
     effectId: string,
     effect: EffectKind,
   ): NewOutboxMessage {
+    if (effect === EffectKind.Receive)
+      return this.#commandOf(MessageTopic.RunReceives, instanceId);
+
     const payload: EffectMessage = { instanceId, effectId, effect };
     const key = `${instanceId}/${effectId}`;
     return { topic: MessageTopic.RunEffect, key, payload };
