@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Fragment } from "react";
 import { Link } from "@/libs/routing/link";
+import { useTrailName } from "@/libs/routing/trail-name";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -19,7 +20,8 @@ const HIDDEN_WHEN_NARROW = "max-md:hidden";
 
 export function BreadcrumbTrail() {
   const pathname = usePathname();
-  const trail = trailOf(pathname);
+  const named = useTrailName();
+  const trail = trailOf(pathname, named);
 
   if (trail.length === 0) return <div className="flex-1" />;
 

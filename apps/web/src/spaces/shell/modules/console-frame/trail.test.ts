@@ -91,6 +91,31 @@ describe("the breadcrumb an address shows", () => {
     });
   });
 
+  it.each([
+    ["/workflows/sales/route-lead", { label: "Route a lead" }],
+    [
+      "/workflows/sales/route-lead/edit",
+      { label: "Route a lead", href: "/workflows/sales/route-lead" },
+    ],
+  ])("%s_shows_the_workflow's_title_its_page_names", (pathname, crumb) => {
+    const named = {
+      href: "/workflows/sales/route-lead",
+      label: "Route a lead",
+    };
+
+    const shown = trailOf(pathname, named);
+
+    expect(shown[1]).toEqual(crumb);
+  });
+
+  it("a_title_named_for_another_workflow_is_not_shown", () => {
+    const named = { href: "/workflows/sales/other", label: "Another" };
+
+    const shown = trailOf("/workflows/sales/route-lead", named);
+
+    expect(shown[1]).toEqual({ label: "route-lead" });
+  });
+
   it("a_name_that_does_not_decode_is_shown_as_written", () => {
     const shown = trailOf("/workflows/sales/route%E0");
 

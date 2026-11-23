@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import { fn } from "storybook/test";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import {
+  type ConditionWords,
   type EditMode,
   type FlowMode,
   type RunMode,
@@ -86,12 +87,27 @@ function RepeatStory() {
   );
 }
 
-function editing(marks: ReadonlyMap<string, StepMark> = new Map()): EditMode {
+const ORDER_WORDS: ConditionWords = new Map([
+  [
+    "/do/Which kind?",
+    new Map([
+      ["A licence", "Read the order › kind is “licence”"],
+      ["A parcel", "Read the order › kind is “parcel”"],
+    ]),
+  ],
+]);
+
+function editing(
+  marks: ReadonlyMap<string, StepMark> = new Map(),
+  conditions: ConditionWords = new Map(),
+): EditMode {
   return {
     kind: "edit",
     marks,
     inserting: null,
     onInsert: fn(),
+    conditions,
+    languageTerms: false,
   };
 }
 
@@ -221,7 +237,7 @@ export const EmptyBlock: Story = {
 export const BranchesAndJumps: Story = {
   args: {
     workflow: ORDER_ROUTER,
-    mode: editing(),
+    mode: editing(new Map(), ORDER_WORDS),
     selected: "/do/Which kind?",
     selectable: true,
   },

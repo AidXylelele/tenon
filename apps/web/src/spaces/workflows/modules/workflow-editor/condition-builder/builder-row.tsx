@@ -23,7 +23,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
-import { choiceOfExpression, DataChip } from "../data-picker";
+import { DataChip } from "../data-picker";
 import { blurOnEnter } from "../step-form";
 import {
   COMPARISONS,
@@ -40,6 +40,7 @@ import {
   withRight,
   withRowRemoved,
 } from "./condition-rows";
+import { dataChoiceOf } from "./condition-words";
 import type {
   ConditionBuilderProps,
   PickedData,
@@ -56,6 +57,12 @@ interface RowProps extends Offered {
 }
 
 const INSERT = "Insert data";
+
+const NOT_CHOSEN = "No data chosen yet";
+
+const READING_DATA = "Reading the data…";
+
+const UNREACHED = "Data this step cannot reach";
 
 const TYPED = "value";
 const DATA = "data";
@@ -181,19 +188,25 @@ function DataName({
   readonly path: string | null;
   readonly data: ConditionBuilderProps["data"];
 }) {
-  if (path === null)
-    return (
-      <span className="text-caption text-muted-foreground">
-        No data chosen yet
-      </span>
-    );
-
-  const choice = data === null ? null : choiceOfExpression(path, data);
+  const choice =
+    path === null || data === null ? null : dataChoiceOf(path, data);
+  const note = noteOf(path, data);
 
   if (choice === null)
-    return <code className="font-mono text-code">{path}</code>;
+    return <span className="text-caption text-muted-foreground">{note}</span>;
 
   return <DataChip choice={choice} />;
+}
+
+function noteOf(
+  path: string | null,
+  data: ConditionBuilderProps["data"],
+): string {
+  if (path === null) return NOT_CHOSEN;
+
+  if (data === null) return READING_DATA;
+
+  return UNREACHED;
 }
 
 function ComparedWith({

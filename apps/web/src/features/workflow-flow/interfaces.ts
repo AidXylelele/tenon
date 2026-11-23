@@ -51,11 +51,15 @@ export interface RunStart {
   readonly detail: string;
 }
 
+export type ConditionWords = ReadonlyMap<string, ReadonlyMap<string, string>>;
+
 export interface EditMode {
   readonly kind: "edit";
   readonly marks: ReadonlyMap<string, StepMark>;
   readonly inserting: InsertPlace | null;
   readonly onInsert: (place: InsertPlace) => void;
+  readonly conditions: ConditionWords;
+  readonly languageTerms: boolean;
 }
 
 export interface RunMode {
@@ -194,6 +198,8 @@ export interface FlowView {
   readonly marks: ReadonlyMap<string, StepMark>;
   readonly inserting: InsertPlace | null;
   readonly run: RunView | null;
+  readonly conditions: ConditionWords;
+  readonly languageTerms: boolean;
 }
 
 export interface FlowState {

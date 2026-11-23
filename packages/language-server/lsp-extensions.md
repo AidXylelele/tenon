@@ -762,6 +762,7 @@ interface DataAtParams {
 interface DataAtResult {
   version: number;
   entries: DataEntry[];
+  written: WrittenMember[]; // the data paths the field already holds, named in words
   warnings: (
     | { kind: "inputNotKnownObject"; step: string }
     | { kind: "mayHoldNothing"; step: string }
@@ -785,6 +786,10 @@ interface DataMember {
   size: number | null; // a list's length in the sample; null otherwise
   members: DataMember[]; // where the shape is known before the run, or from a sample
 }
+
+interface WrittenMember extends DataMember {
+  label: string[]; // the path in words, e.g. ["Fetch the digest", "slideshow", "slides"]
+}
 ```
 
 - **Order.** The steps before the field's step, nearest first, then the workflow's input, the variables, the secrets and the times.
@@ -796,6 +801,7 @@ interface DataMember {
 - **References.** Every reference the client inserts comes from here: `expression` to put into an expression, `value` for a field that holds only it, and `isPath` where a field takes only a path (`.items`, `$context.fetch["a name"]`, `$secrets.token`); the times are computed, so they are no paths. A client builds no reference of its own.
 - **Samples.** `samples` gives what each step put out in the last test run, as plain JSON keyed by step id. A step whose shape gives no members before the run takes its `shape` and `members` from its sample: each field of the sample's objects, at any depth, with its own expression and, for a list, its length as `size` (lists are not looked into). A step whose members are known before the run keeps them, whatever its sample holds.
 - **Typed fields.** `typed`, where it is a field name once the spaces around it are dropped (names of letters, digits, `_` and `-`, not starting with a digit or `-`, joined by `.`), gives each entry that is a path and whose shape is `object` or `unknown` (a step's output, the workflow's input, a variable) the field it names in that data as `typed`: its `name` the trimmed text, its `expression` the path (`items.title` on `$context.fetch` is `$context.fetch.items.title`, `first-name` is `$context.fetch["first-name"]`, `id` on the variable `order` is `$order.id`), its `shape` `unknown`. It is `null` on the other entries (the times, the secrets), where no field name is typed, and where the entry already offers that member. The test run shows whether the output has it.
+- **Written data.** `written` names each data path the field's text already holds, in the order written and once each: the paths of its rows where it reads as a condition (`workflow/readCondition`, a row's value and data it is compared with), and its references where it reads as a template (`workflow/readTemplate`). Each is a member of the entry whose expression it starts with, the data that came in (`.`), an earlier step's output through the context, the workflow's input or a variable, its `label` the entry's name (the step's name, "The workflow's input", the variable's) followed by the name of each field below it: `.slideshow.slides` after the step `Fetch the digest` is `["Fetch the digest", "slideshow", "slides"]`, `$workflow.input.due` is `["The workflow's input", "due"]`, `.["first date"]` names `first date`. Its `shape` and `size` are the entry's member's where it offers that path, else `unknown` and `null`. A path no entry starts with is left out, and a field that holds no text, or whose text holds no path, has none, so a client names every path it shows in words and shows jq only where a person asks for it.
 - **Secrets** are offered only in fields where credentials go: under `authentication` or `headers`, or an address (`endpoint`, `uri`, `server`) (research D16). Each reads `$secrets.<name>`.
 - **Times** are UTC times jq computes from the run's clock: `now` (`now | todate`), `today` and `yesterday` (the start of the day, `now | strftime("%Y-%m-%dT00:00:00Z")`, a day earlier for `yesterday`).
 - **Warnings.** `inputNotKnownObject` on a set that keeps its input (`output.as: ${ $input + . }`) where that input is not known to be an object: jq adds an object only to an object or `null`. `mayHoldNothing` for a step offered through the context that has an `if`, or sits in a block that has one apart from the field's step: when it is skipped it exports nothing, and inside a loop the previous item's value stays. A step a jump passes over reads `null` too; no warning names it. `contextNotKnownObject` where data is read through the context and the workflow's transformed input is not known to be an object.
@@ -905,6 +911,18 @@ interface DataMember {
       "needsExport": false,
       "members": [],
       "typed": null
+    }
+  ],
+  "written": [
+    {
+      "name": "retry",
+      "expression": ".retry",
+      "value": "${ .retry }",
+      "isPath": true,
+      "shape": "unknown",
+      "size": null,
+      "members": [],
+      "label": ["guard", "retry"]
     }
   ],
   "warnings": [{ "kind": "contextNotKnownObject" }]

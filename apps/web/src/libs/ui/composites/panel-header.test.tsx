@@ -24,6 +24,21 @@ describe("the header of a side panel", () => {
     expect(where).toBeInTheDocument();
   });
 
+  it("an_icon_sits_before_the_title_and_is_not_read_out", () => {
+    render(
+      <PanelHeader
+        title="Fetch the digest"
+        icon={<span data-testid="kind" aria-hidden />}
+      />,
+    );
+
+    const icon = screen.getByTestId("kind");
+    const heading = screen.getByRole("heading", { level: 2 });
+    const before = icon.compareDocumentPosition(heading);
+    expect(before & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading).toHaveAccessibleName("Fetch the digest");
+  });
+
   it("without_a_way_back_or_out_it_offers_no_buttons", () => {
     render(<PanelHeader title="Daily digest" />);
 

@@ -126,6 +126,7 @@ function workflowOf(namespace, name) {
   return {
     namespace,
     name,
+    title: name === "digest" ? "Daily digest" : null,
     status: "active",
     on: true,
     currentVersion: name === "digest" ? "1.0.0" : null,

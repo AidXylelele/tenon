@@ -178,9 +178,22 @@ export function summaryOf(
   const shown = said.slice(0, SUMMARY_LIMIT);
   const hidden = said.length - shown.length;
   const more = hidden > 0 ? [`${String(hidden)} more`] : [];
-  const parts = shown.concat(more);
+  const parts = shown.concat(more).map(sentenceCaseOf);
 
   return parts.length > 0 ? parts.join(" · ") : unwritten;
+}
+
+function sentenceCaseOf(part: string, index: number): string {
+  const first = part.charAt(0);
+  const second = part.charAt(1);
+  const isAcronym = second !== second.toLowerCase();
+  const rest = part.slice(1);
+
+  if (index === 0) return `${first.toUpperCase()}${rest}`;
+
+  if (isAcronym) return part;
+
+  return `${first.toLowerCase()}${rest}`;
 }
 
 function statementOf(
@@ -212,7 +225,7 @@ function statementOf(
     case "authentication":
       return field.written
         ? [words.title]
-        : [`no ${words.title.toLowerCase()}`];
+        : [`No ${words.title.toLowerCase()}`];
   }
 }
 

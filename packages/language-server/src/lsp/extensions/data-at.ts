@@ -54,8 +54,8 @@ export function dataAtHandlerOf(
 
     switch (reading.kind) {
       case "data": {
-        const { entries, warnings } = reading;
-        return { version: snapshot.version, entries, warnings };
+        const { entries, written, warnings } = reading;
+        return { version: snapshot.version, entries, written, warnings };
       }
       case "refused":
         return new ResponseError(LSPErrorCodes.RequestFailed, reading.reason);

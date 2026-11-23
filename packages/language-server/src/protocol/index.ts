@@ -49,6 +49,7 @@ export type {
   DataShape,
   DataSource,
   DataWarning,
+  WrittenMember,
 } from "../ide/data/index.js";
 export type { EditAction, Failure, IdChange } from "../ide/edits/index.js";
 export { type StepFamily, stepFamilies } from "../ide/families/index.js";

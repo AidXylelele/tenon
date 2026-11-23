@@ -57,6 +57,7 @@ import { PublishBar } from "./publish-bar";
 import type { EntryAction } from "./step-catalog";
 import type { Webhook } from "./step-form";
 import { samplesOf, stepRunsOf } from "./test-run";
+import { useConditionWords } from "./use-condition-words";
 import { useEditingSession } from "./use-editing-session";
 import { usePublishing } from "./use-publishing";
 import { useStepChanges } from "./use-step-changes";
@@ -197,6 +198,7 @@ function EditingBody({
     [records, steps],
   );
   const runEnded = testRun !== null && !isUnended(testRun.run.phase);
+  const conditions = useConditionWords(session, steps, samples);
   const inserting = aside.kind === "catalog" ? aside.place : null;
   const showsRun = aside.kind === "test" && stepRuns !== null;
   const title = structure?.workflow.title ?? name.name;
@@ -249,8 +251,24 @@ function EditingBody({
         onIteration: ignoreIteration,
       };
 
-    return { kind: "edit", marks, inserting, onInsert };
-  }, [showsRun, stepRuns, runEnded, marks, inserting, onInsert]);
+    return {
+      kind: "edit",
+      marks,
+      inserting,
+      onInsert,
+      conditions,
+      languageTerms,
+    };
+  }, [
+    showsRun,
+    stepRuns,
+    runEnded,
+    marks,
+    inserting,
+    onInsert,
+    conditions,
+    languageTerms,
+  ]);
 
   const sources = useMemo<SlotSources>(
     () => ({

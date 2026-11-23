@@ -17,4 +17,10 @@ export type {
   DraftRow,
   TimeName,
 } from "./interfaces";
-export { COMPARISONS, secondOf, TIMES } from "./words";
+export {
+  COMPARISONS,
+  comparisonWordsOf,
+  secondOf,
+  TIMES,
+  timeWordsOf,
+} from "./words";

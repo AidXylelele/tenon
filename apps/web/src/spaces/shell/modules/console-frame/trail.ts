@@ -6,6 +6,7 @@ import {
   workflowHref,
   WORKFLOWS_HREF,
 } from "@/libs/routing/routes";
+import type { Named } from "@/libs/routing/trail-name";
 import {
   type Place,
   placeOf,
@@ -23,12 +24,15 @@ const NEW_NOTIFICATION: Crumb = { label: "New notification" };
 const NOTIFICATION: Crumb = { label: "Notification" };
 const EDITOR: Crumb = { label: "Editor" };
 
-export function trailOf(pathname: string): readonly Crumb[] {
+export function trailOf(
+  pathname: string,
+  named: Named | null = null,
+): readonly Crumb[] {
   const place = placeOf(pathname);
 
   if (place === null) return [];
 
-  const below = belowOf(place, pathname);
+  const below = belowOf(place, pathname, named);
 
   if (below.length === 0) return [{ label: place.label }];
 
@@ -36,14 +40,18 @@ export function trailOf(pathname: string): readonly Crumb[] {
   return [top].concat(below);
 }
 
-function belowOf(place: Place, pathname: string): readonly Crumb[] {
+function belowOf(
+  place: Place,
+  pathname: string,
+  named: Named | null,
+): readonly Crumb[] {
   const after = pathname.slice(place.href.length);
   const rest = segmentsOf(after);
   const editing = isEditorPath(pathname);
 
   switch (place.href) {
     case WORKFLOWS_HREF:
-      return workflowCrumbs(rest, editing);
+      return workflowCrumbs(rest, editing, named);
     case RUNS_HREF:
       return runCrumbs(rest);
     case NOTIFICATIONS_HREF:
@@ -58,6 +66,7 @@ function belowOf(place: Place, pathname: string): readonly Crumb[] {
 function workflowCrumbs(
   rest: readonly string[],
   editing: boolean,
+  named: Named | null,
 ): readonly Crumb[] {
   const [namespace, name, part, version] = rest;
 
@@ -65,17 +74,19 @@ function workflowCrumbs(
 
   if (namespace === undefined || name === undefined) return [];
 
-  if (part === undefined) return [{ label: name }];
-
   const href = workflowHref(namespace, name);
-  const workflow: Crumb = { label: name, href };
+  const label = named?.href === href ? named.label : name;
+
+  if (part === undefined) return [{ label }];
+
+  const workflow: Crumb = { label, href };
 
   if (editing) return [workflow, EDITOR];
 
   if (part !== "versions" || version === undefined) return [workflow];
 
-  const label = `Version ${version}`;
-  return [workflow, { label }];
+  const versionLabel = `Version ${version}`;
+  return [workflow, { label: versionLabel }];
 }
 
 function runCrumbs(rest: readonly string[]): readonly Crumb[] {

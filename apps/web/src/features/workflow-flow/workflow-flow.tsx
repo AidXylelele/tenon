@@ -28,6 +28,7 @@ import {
 import { FlowViewStore } from "./flow-view-store";
 import { sideRoomOf } from "./geometry";
 import type {
+  ConditionWords,
   FlowMode,
   FlowState,
   FlowView,
@@ -48,6 +49,8 @@ const KEYBOARD =
   "The arrow keys move between the steps and the + buttons; Escape clears the selection.";
 
 const NO_MARKS: ReadonlyMap<string, StepMark> = new Map();
+
+const NO_CONDITIONS: ConditionWords = new Map();
 
 export function WorkflowFlow({
   workflow,
@@ -173,8 +176,18 @@ function viewOf(
 ): FlowView {
   const marks = mode.kind === "edit" ? mode.marks : NO_MARKS;
   const inserting = mode.kind === "edit" ? mode.inserting : null;
+  const conditions = mode.kind === "edit" ? mode.conditions : NO_CONDITIONS;
+  const languageTerms = mode.kind === "edit" && mode.languageTerms;
 
-  return { selected, itemProps, marks, inserting, run };
+  return {
+    selected,
+    itemProps,
+    marks,
+    inserting,
+    run,
+    conditions,
+    languageTerms,
+  };
 }
 
 const StartCard = memo(function StartCard({
