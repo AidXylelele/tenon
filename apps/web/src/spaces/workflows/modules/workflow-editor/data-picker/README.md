@@ -20,7 +20,7 @@ Owner: web — editor. Sources: research D9 and D16 of the console redesign (005
 
 Consumers: the editor's step form (its `renderData` slot) and condition builder (its picker slot), wired by the editor in M5.
 
-`choiceOfExpression(expression, data)` (the choice a condition's path names) is shared with the condition builder.
+`DataChip` (`choice`, and for a field's chip `id`, `labelId`, `describedBy`, `onChange`, `onRemove`) is the one chip of the editor, the data field's and the condition builder's: its words truncate in the middle, keeping the field's name; picker rows truncate the same way and the selected row takes the accent. `choiceOfExpression(expression, data)` (the choice a condition's path names) is shared with the condition builder.
 
 ## Playground
 

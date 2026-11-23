@@ -23,7 +23,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
-import { choiceOfExpression } from "../data-picker";
+import { choiceOfExpression, DataChip } from "../data-picker";
 import { blurOnEnter } from "../step-form";
 import {
   COMPARISONS,
@@ -54,6 +54,8 @@ interface RowProps extends Offered {
   readonly position: number;
   readonly onDraft: (next: Draft) => void;
 }
+
+const INSERT = "Insert data";
 
 const TYPED = "value";
 const DATA = "data";
@@ -99,12 +101,16 @@ export function BuilderRow({
     onDraft(next);
   }
 
-  const leftSlot: PickerSlot = { label: "Choose data", onPick: pickLeft };
+  const leftSlot: PickerSlot = {
+    label: INSERT,
+    describedBy: valueId,
+    onPick: pickLeft,
+  };
   const leftPicker = renderPicker(leftSlot);
 
   return (
     <li>
-      <FieldSet className="gap-3 rounded-md border p-3">
+      <FieldSet className="gap-3">
         <FieldLegend className="sr-only">{legend}</FieldLegend>
         <Field>
           <FieldLabel id={valueId}>Value</FieldLabel>
@@ -187,11 +193,7 @@ function DataName({
   if (choice === null)
     return <code className="font-mono text-code">{path}</code>;
 
-  return (
-    <span className="rounded-full border border-accent-border bg-accent-soft px-2.5 py-0.5 text-accent-text">
-      {choice.label}
-    </span>
-  );
+  return <DataChip choice={choice} />;
 }
 
 function ComparedWith({
@@ -207,6 +209,7 @@ function ComparedWith({
 }) {
   const id = useId();
   const kindId = `${id}-kind`;
+  const kindLabelId = `${id}-kind-label`;
   const shownKind = kindOf(row.right);
   const problem = rowProblemOf(row);
 
@@ -232,7 +235,8 @@ function ComparedWith({
   }
 
   const rightSlot: PickerSlot = {
-    label: "Choose data to compare with",
+    label: INSERT,
+    describedBy: kindLabelId,
     onPick: pickRight,
   };
   const rightPicker = renderPicker(rightSlot);
@@ -241,7 +245,9 @@ function ComparedWith({
     <>
       {offersOperand && (
         <Field>
-          <FieldLabel htmlFor={kindId}>Compared with</FieldLabel>
+          <FieldLabel id={kindLabelId} htmlFor={kindId}>
+            Compared with
+          </FieldLabel>
           <Select value={shownKind} onValueChange={chooseKind}>
             <SelectTrigger id={kindId} className="w-full">
               <SelectValue />

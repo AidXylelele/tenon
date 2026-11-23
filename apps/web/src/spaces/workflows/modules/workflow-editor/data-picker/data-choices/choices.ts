@@ -15,9 +15,19 @@ import type {
 
 const SEPARATOR = " › ";
 
+const OWNER_END = SEPARATOR.trimEnd().length;
+
 const WHOLE_ANSWER = "the whole answer";
 
 const WORKFLOW_INPUT = "The workflow's input";
+
+const TIME_SHAPES: ReadonlyMap<string, string> = new Map([
+  ["now", "date and time"],
+  ["today", "date"],
+  ["yesterday", "date"],
+]);
+
+const SECRET_SHAPE = "secret";
 
 const TIME_WORDS: ReadonlyMap<string, string> = new Map([
   ["now", "Now"],
@@ -99,16 +109,19 @@ function groupsOf(data: DataAtResult): ChoiceGroup[] {
   );
   const times = entriesOf(data, "time").map((entry) => {
     const label = TIME_WORDS.get(entry.name) ?? entry.name;
-    return choiceOf(entry, label, "time", null);
+    const choice = choiceOf(entry, label, "time", null);
+    const shape = TIME_SHAPES.get(entry.name) ?? choice.shape;
+    return { ...choice, shape };
   });
-  const secrets = entriesOf(data, "secret").map((entry) =>
-    choiceOf(entry, entry.name, "secret", null),
-  );
+  const secrets = entriesOf(data, "secret").map((entry) => {
+    const choice = choiceOf(entry, entry.name, "secret", null);
+    return { ...choice, shape: SECRET_SHAPE };
+  });
   const others = [
     groupOf("input", "Workflow input", inputs),
     groupOf("variables", "Variables", variables),
-    groupOf("times", "Dates and times", times),
     groupOf("secrets", "Secrets · kept out of run records", secrets),
+    groupOf("times", "Dates and times", times),
   ];
 
   return before.concat(others.filter((group) => group.choices.length > 0));
@@ -196,9 +209,14 @@ function choiceOf(
   const size = member.size;
   const shapeWord = SHAPE_WORDS[member.shape];
   const shape = size === null ? shapeWord : `list of ${String(size)}`;
+  const cut = label.lastIndexOf(SEPARATOR);
+  const owner = cut === -1 ? "" : label.slice(0, cut + OWNER_END);
+  const name = cut === -1 ? label : label.slice(cut + SEPARATOR.length);
   return {
     id: member.expression,
     label,
+    owner,
+    name,
     value: member.value,
     expression: member.expression,
     export: exported,

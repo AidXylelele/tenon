@@ -19,6 +19,7 @@ import {
 import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { choicesOf, type DataChoice } from "./data-choices";
 import { ChoiceIcon } from "./choice-icon";
+import { ChipWords } from "./data-chip";
 import type { DataPick, DataPickerProps } from "./interfaces";
 
 const SEARCH = "Find data, or type a field name";
@@ -208,12 +209,16 @@ function ChoiceItem({
   return (
     <CommandItem
       value={choice.id}
+      className="data-selected:bg-accent-soft data-selected:text-accent-text"
       onSelect={() => {
         onPick(choice);
       }}
     >
       <ChoiceIcon kind={choice.kind} className="text-muted-foreground" />
-      <span className="min-w-0 flex-1 truncate">{choice.label}</span>
+      <span aria-hidden className="flex min-w-0 flex-1">
+        <ChipWords choice={choice} />
+      </span>
+      <span className="sr-only">{choice.label}</span>
       <span className="shrink-0 text-caption text-muted-foreground">
         {choice.shape}
       </span>

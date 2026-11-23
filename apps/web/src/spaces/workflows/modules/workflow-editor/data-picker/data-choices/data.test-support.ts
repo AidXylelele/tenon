@@ -83,6 +83,13 @@ export const TIME_ENTRIES = [
     isPath: false,
     shape: "text",
   }),
+  entryOf({
+    source: "time",
+    name: "yesterday",
+    expression: 'now - 86400 | strftime("%Y-%m-%dT00:00:00Z")',
+    isPath: false,
+    shape: "text",
+  }),
 ];
 
 export const SECRET_ENTRY = entryOf({

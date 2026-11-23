@@ -58,9 +58,10 @@ function propsOf(
     invalid: false,
     reading: TWO_ROWS_ALL,
     data: AFTER_A_TEST,
-    renderPicker: ({ label, onPick }: PickerSlot) => (
+    renderPicker: ({ label, describedBy, onPick }: PickerSlot) => (
       <button
         type="button"
+        aria-describedby={describedBy}
         onClick={() => {
           onPick(picked);
         }}
@@ -104,9 +105,13 @@ function choose(trigger: HTMLElement, option: string) {
   });
 }
 
-function press(name: string, within_: HTMLElement | null = null) {
+function press(
+  name: string,
+  within_: HTMLElement | null = null,
+  description: string | undefined = undefined,
+) {
   const scope = within_ === null ? screen : within(within_);
-  const button = scope.getByRole("button", { name });
+  const button = scope.getByRole("button", { name, description });
 
   act(() => {
     fireEvent.click(button);
@@ -195,7 +200,7 @@ describe("a condition in the builder", () => {
 
     press("Add a condition");
     const before = onEdit.mock.calls.length;
-    press("Choose data", row(3));
+    press("Insert data", row(3), "Value");
 
     expect(before).toBe(0);
     expect(onEdit).toHaveBeenCalledWith([
@@ -213,7 +218,7 @@ describe("a condition in the builder", () => {
   it("data_read_through_the_context_exports_its_step_first", () => {
     const { onEdit } = shown({ text: "", reading: NO_ROWS }, GREET);
 
-    press("Choose data", row(1));
+    press("Insert data", row(1), "Value");
 
     expect(onEdit).toHaveBeenCalledWith([
       {
@@ -290,7 +295,7 @@ describe("a condition in the builder", () => {
 
     choose(kind, "Yesterday");
     choose(kind, "Data from the workflow");
-    press("Choose data to compare with", row(2));
+    press("Insert data", row(2), "Compared with");
 
     expect(onEdit.mock.calls).toEqual([
       [
@@ -346,7 +351,7 @@ describe("a condition in the builder", () => {
 
     expect(first).toHaveTextContent("Today");
     expect(second).toHaveTextContent("Data from the workflow");
-    const inputName = within(row(2)).getByText("The workflow's input");
+    const [inputName] = within(row(2)).getAllByText("The workflow's input");
     expect(inputName).toBeInTheDocument();
   });
 

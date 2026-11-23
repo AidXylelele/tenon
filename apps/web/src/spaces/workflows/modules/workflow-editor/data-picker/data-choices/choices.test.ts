@@ -56,6 +56,8 @@ describe("the data offered at a field", () => {
       {
         id: "$context.Greet.message",
         label: "Greet › message",
+        owner: "Greet ›",
+        name: "message",
         value: "${ $context.Greet.message }",
         expression: "$context.Greet.message",
         export: "/do/Greet",
@@ -103,7 +105,7 @@ describe("the data offered at a field", () => {
 
   it("secrets_are_offered_where_the_language_server_offers_them", () => {
     const choices = choicesOf(AT_AN_ADDRESS, "", false);
-    const secrets = choices.groups.at(-1);
+    const secrets = choices.groups.find((group) => group.id === "secrets");
 
     expect(secrets?.title).toBe("Secrets · kept out of run records");
     expect(secrets?.choices[0]).toMatchObject({
@@ -209,7 +211,7 @@ describe("finding data by typing", () => {
   it("counts_what_it_shows", () => {
     const choices = choicesOf(AFTER_FETCH, "", false);
 
-    expect(choices.count).toBe(6);
+    expect(choices.count).toBe(7);
   });
 });
 

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
+import { DataPicker } from "../data-picker";
 import { AFTER_A_TEST } from "../data-picker/data-choices/data.test-support";
 import { ConditionBuilder } from "./condition-builder";
 import type { PickerSlot } from "./interfaces";
@@ -14,21 +16,15 @@ import {
   TWO_ROWS_TEXT,
 } from "./readings.test-support";
 
-function StandInPicker({ label, onPick }: PickerSlot) {
+function Picker({ label, describedBy, onPick }: PickerSlot) {
   return (
-    <button
-      type="button"
-      className="rounded-md border px-3 py-1 text-body font-semibold"
-      onClick={() => {
-        onPick({
-          value: "${ .slideshow.slides }",
-          expression: ".slideshow.slides",
-          export: null,
-        });
-      }}
-    >
-      {label}
-    </button>
+    <DataPicker
+      data={AFTER_A_TEST}
+      onlyPaths
+      label={label}
+      describedBy={describedBy}
+      onPick={onPick}
+    />
   );
 }
 
@@ -36,20 +32,22 @@ const meta = {
   component: ConditionBuilder,
   decorators: [
     (Story) => (
-      <TooltipProvider>
-        <div className="w-[400px] p-4">
-          <div
-            role="group"
-            aria-labelledby="branch"
-            className="flex flex-col gap-3 rounded-lg border bg-surface p-3"
-          >
-            <h4 id="branch" className="font-semibold">
-              Has items
-            </h4>
-            <Story />
+      <Announcer>
+        <TooltipProvider>
+          <div className="w-[400px] p-4">
+            <div
+              role="group"
+              aria-labelledby="branch"
+              className="flex flex-col gap-3 rounded-lg border bg-surface p-3"
+            >
+              <h4 id="branch" className="font-semibold">
+                Has items
+              </h4>
+              <Story />
+            </div>
           </div>
-        </div>
-      </TooltipProvider>
+        </TooltipProvider>
+      </Announcer>
     ),
   ],
   args: {
@@ -61,7 +59,7 @@ const meta = {
     invalid: false,
     reading: TWO_ROWS_ALL,
     data: AFTER_A_TEST,
-    renderPicker: (slot: PickerSlot) => <StandInPicker {...slot} />,
+    renderPicker: (slot: PickerSlot) => <Picker {...slot} />,
     onEdit: fn(),
   },
 } satisfies Meta<typeof ConditionBuilder>;

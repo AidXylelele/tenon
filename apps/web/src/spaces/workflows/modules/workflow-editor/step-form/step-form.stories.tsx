@@ -50,9 +50,15 @@ const ROUTED_BY_AN_EXPRESSION = formWith(SWITCH_FORM, "switch", [
   { default: { then: "end" } },
 ]);
 
-function picker({ label, onPick }: PickerSlot) {
+function picker({ label, describedBy, onPick }: PickerSlot) {
   return (
-    <DataPicker data={AFTER_A_TEST} onlyPaths label={label} onPick={onPick} />
+    <DataPicker
+      data={AFTER_A_TEST}
+      onlyPaths
+      label={label}
+      describedBy={describedBy}
+      onPick={onPick}
+    />
   );
 }
 

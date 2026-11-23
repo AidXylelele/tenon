@@ -152,11 +152,13 @@ describe("the data picker", () => {
     type("title");
 
     const options = screen.getAllByRole("option");
-    const texts = options.map((option) => option.textContent);
-    expect(texts).toEqual([
-      "Fetch the digest › slideshow › titletext",
-      "Fetch the digest › titlea field of the answer",
-    ]);
+    const known = screen.getByRole("option", {
+      name: /^Fetch the digest › slideshow › title/,
+    });
+    const typed = screen.getByRole("option", {
+      name: /^Fetch the digest › title/,
+    });
+    expect(options).toEqual([known, typed]);
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent("2 pieces of data");
   });

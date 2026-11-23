@@ -14,6 +14,7 @@ export interface PickedData {
 
 export interface PickerSlot {
   readonly label: string;
+  readonly describedBy: string;
   readonly onPick: (pick: PickedData) => void;
 }
 

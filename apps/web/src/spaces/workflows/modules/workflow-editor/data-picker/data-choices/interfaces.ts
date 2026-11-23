@@ -5,6 +5,8 @@ export type ChoiceKind = "data" | "time" | "secret";
 export interface DataChoice {
   readonly id: string;
   readonly label: string;
+  readonly owner: string;
+  readonly name: string;
   readonly value: string;
   readonly expression: string;
   readonly export: string | null;
