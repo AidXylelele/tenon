@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Outcome } from "@/libs/data-access/problem";
 import { AutomaticStarts } from "./automatic-starts";
@@ -56,6 +62,27 @@ describe("a workflow's automatic starts", () => {
       );
     });
     expect(turn).toHaveBeenCalledWith(false);
+  });
+
+  it("undo_turns_it_back", async () => {
+    const turn = vi.fn(() => Promise.resolve(DONE));
+    render(<AutomaticStarts workflow="Daily digest" on turn={turn} />);
+
+    fireEvent.click(screen.getByRole("switch"));
+    await waitFor(() => {
+      expect(toastSuccess).toHaveBeenCalled();
+    });
+    const [, options] = toastSuccess.mock.lastCall as [
+      string,
+      { readonly action: { readonly onClick: () => void } },
+    ];
+    act(() => {
+      options.action.onClick();
+    });
+
+    await waitFor(() => {
+      expect(turn).toHaveBeenLastCalledWith(true);
+    });
   });
 
   it("a_refusal_is_said_beside_the_switch", async () => {

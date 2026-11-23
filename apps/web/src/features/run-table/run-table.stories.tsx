@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { ListedInstance, Phase } from "@/libs/data-access/types";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
 import { RunPager } from "./run-pager";
 import { RunTable } from "./run-table";
 
@@ -79,6 +80,13 @@ function RunsPage({ total, exact }: RunsPageProps) {
 
 const meta = {
   component: RunsPage,
+  decorators: [
+    (Story) => (
+      <TooltipProvider>
+        <Story />
+      </TooltipProvider>
+    ),
+  ],
 } satisfies Meta<typeof RunsPage>;
 
 export default meta;

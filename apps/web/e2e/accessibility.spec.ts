@@ -53,6 +53,10 @@ const CHART_STORIES = [
   "features-runs-chart--day-in-utc",
   "spaces-home-home--week",
   "spaces-home-home--calm",
+  "spaces-workflows-workflow--overview",
+  "spaces-workflows-workflow--starts-on-a-schedule",
+  "spaces-workflows-workflow--archived",
+  "spaces-workflows-workflow--for-a-viewer",
 ];
 
 const PAGE_MODAL_STORIES = [
