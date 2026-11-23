@@ -64,7 +64,7 @@ export function BodyField({ field, words, path }: BodyFieldProps) {
 
   return (
     <div className="flex flex-col gap-3">
-      <FieldShell field={field} words={words} path={path} labelsControl={false}>
+      <FieldShell field={field} words={words} path={path} labelsControl>
         {(wiring) => (
           <>
             <div>

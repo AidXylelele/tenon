@@ -46,25 +46,25 @@ export function DataChip({
       <ChoiceIcon kind={choice.kind} className="size-3.5 shrink-0" />
       {onChange === undefined ? (
         <span className="flex min-w-0 text-body">
+          <span className="sr-only">{told}</span>
           <span aria-hidden className="flex min-w-0">
             {words}
           </span>
-          <span className="sr-only">{told}</span>
         </span>
       ) : (
         <button
           id={id}
           type="button"
-          className="flex min-w-0 rounded-sm text-left text-body"
+          className="flex min-h-6 min-w-12 items-center rounded-sm text-left text-body"
           aria-labelledby={labelledBy}
           aria-describedby={describedBy}
           onClick={onChange}
         >
-          <span aria-hidden className="flex min-w-0">
-            {words}
-          </span>
           <span id={textId} className="sr-only">
             {changing}
+          </span>
+          <span aria-hidden className="flex min-w-0">
+            {words}
           </span>
         </button>
       )}
@@ -94,8 +94,8 @@ export function ChipWords({ choice }: { readonly choice: DataChoice }) {
 
   return (
     <>
-      <span className="min-w-0 truncate">{choice.owner}</span>
-      <span className={cn("shrink-0 whitespace-nowrap", gap)}>{name}</span>
+      <span className="min-w-0 shrink-[100] truncate">{choice.owner}</span>
+      <span className={cn("min-w-0 truncate", gap)}>{name}</span>
     </>
   );
 }

@@ -17,6 +17,7 @@ test.describe("the step form playground", () => {
 
     await address.focus();
     await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
 
     const error = page.getByRole("alert");
     await expect(error).toHaveText(

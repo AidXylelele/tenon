@@ -4,11 +4,14 @@ import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Input } from "@/libs/ui/components/input";
 import { Textarea } from "@/libs/ui/components/textarea";
+import { cn } from "@/libs/ui/tokens/cn";
 import { blurOnEnter } from "../step-form";
 import { DataChip } from "./data-chip";
 import { choiceOfValue } from "./data-choices";
 import { DataPicker } from "./data-picker";
 import type { DataFieldProps, DataPick } from "./interfaces";
+
+const TYPED = "w-auto min-w-0 grow basis-40 placeholder:text-faint";
 
 export function DataField({
   value,
@@ -71,14 +74,14 @@ export function DataField({
   };
 
   return (
-    <div className="flex items-start gap-2">
+    <div className="flex flex-wrap items-start gap-2">
       {reference === null && isExpression && (
         <Textarea
           key={text}
           {...shared}
           rows={1}
           spellCheck={false}
-          className="font-mono"
+          className={cn(TYPED, "font-mono")}
           onBlur={(event) => {
             commit(event.currentTarget.value);
           }}
@@ -88,6 +91,7 @@ export function DataField({
         <Input
           key={text}
           {...shared}
+          className={TYPED}
           onBlur={(event) => {
             commit(event.currentTarget.value);
           }}
@@ -95,7 +99,7 @@ export function DataField({
         />
       )}
       {reference !== null && (
-        <div className="flex min-w-0 flex-1">
+        <div className="flex min-w-0 grow basis-40">
           <DataChip
             key={reference.id}
             id={inputId}

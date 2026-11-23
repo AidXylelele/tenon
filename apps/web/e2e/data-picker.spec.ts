@@ -40,7 +40,8 @@ test.describe("the data picker playground", () => {
     const chip = page.getByRole("button", {
       name: "Address SLACK_WEBHOOK_URL, a secret kept out of run records, change",
     });
-    await expect(chip).toHaveText("•••• SLACK_WEBHOOK_URL");
+    const masked = chip.getByText("•••• SLACK_WEBHOOK_URL");
+    await expect(masked).toBeVisible();
 
     await chip.click();
 

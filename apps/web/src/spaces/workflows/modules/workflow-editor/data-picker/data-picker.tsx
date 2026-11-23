@@ -215,10 +215,10 @@ function ChoiceItem({
       }}
     >
       <ChoiceIcon kind={choice.kind} className="text-muted-foreground" />
+      <span className="sr-only">{choice.label}</span>
       <span aria-hidden className="flex min-w-0 flex-1">
         <ChipWords choice={choice} />
       </span>
-      <span className="sr-only">{choice.label}</span>
       <span className="shrink-0 text-caption text-muted-foreground">
         {choice.shape}
       </span>

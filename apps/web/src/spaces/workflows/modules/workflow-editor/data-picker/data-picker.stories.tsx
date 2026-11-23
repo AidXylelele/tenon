@@ -1,13 +1,18 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { fn } from "storybook/test";
+import { Announcer } from "@/libs/ui/composites/announcer";
 import {
   AFTER_FETCH,
   AT_AN_ADDRESS,
   FIRST_STEP,
   AFTER_A_TEST,
+  typedAs,
 } from "./data-choices/data.test-support";
-import { Announcer } from "@/libs/ui/composites/announcer";
 import { DataPicker } from "./data-picker";
+
+const ITEMS_TYPED = typedAs(AFTER_FETCH, "items", {
+  "Fetch the digest": ".items",
+});
 
 const meta = {
   component: DataPicker,
@@ -59,6 +64,7 @@ export const FilteredByTyping: Story = {
 };
 
 export const ATypedFieldName: Story = {
+  args: { data: ITEMS_TYPED },
   play: async ({ canvas, userEvent }) => {
     const insert = await canvas.findByRole("button", { name: "Insert data" });
     await userEvent.click(insert);
