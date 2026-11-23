@@ -60,7 +60,7 @@ export function ConsoleSidebar({
         {connect.length > 0 && <ConnectGroup places={connect} />}
       </SidebarContent>
       <SidebarFooter>
-        <Places places={settings} inProgress={0} />
+        <Places places={settings} />
         {account !== null && (
           <>
             <SidebarSeparator className="mx-0" />
@@ -133,7 +133,7 @@ function ConnectGroup({ places }: { readonly places: readonly Place[] }) {
       <SidebarGroupLabel id={label}>Connect</SidebarGroupLabel>
       <SidebarSeparator className="mx-0 mb-2 hidden group-data-[collapsible=icon]:block" />
       <SidebarGroupContent>
-        <Places places={places} inProgress={0} />
+        <Places places={places} />
       </SidebarGroupContent>
     </SidebarGroup>
   );
@@ -141,10 +141,10 @@ function ConnectGroup({ places }: { readonly places: readonly Place[] }) {
 
 function Places({
   places,
-  inProgress,
+  inProgress = 0,
 }: {
   readonly places: readonly Place[];
-  readonly inProgress: number;
+  readonly inProgress?: number;
 }) {
   return (
     <SidebarMenu>

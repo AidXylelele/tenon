@@ -18,17 +18,21 @@ export function useThemeChoice(keep: KeepTheme): ThemeChoice {
   const theme = useSyncExternalStore(subscribe, themeNow, systemOnServer);
 
   function choose(chosen: string) {
-    const next = themeOf(chosen);
-    const attribute = themeAttributeOf(next);
-    const root = document.documentElement;
-
-    if (attribute === undefined) delete root.dataset.theme;
-    else root.dataset.theme = attribute;
-
-    void keep(next);
+    chooseTheme(chosen, keep);
   }
 
   return { theme, choose };
+}
+
+export function chooseTheme(chosen: string, keep: KeepTheme): void {
+  const next = themeOf(chosen);
+  const attribute = themeAttributeOf(next);
+  const root = document.documentElement;
+
+  if (attribute === undefined) delete root.dataset.theme;
+  else root.dataset.theme = attribute;
+
+  void keep(next);
 }
 
 function subscribe(listener: () => void): () => void {

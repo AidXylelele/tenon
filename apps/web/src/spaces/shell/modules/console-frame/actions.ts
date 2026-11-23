@@ -6,8 +6,7 @@ import { isSessionCookieSecure } from "@/libs/data-access/environment";
 import { signOut } from "@/libs/data-access/identity";
 import { signInHref } from "@/libs/routing/routes";
 import { THEME_COOKIE, themeOf } from "../../__shared_context/theme";
-
-const YEAR_S = 365 * 24 * 60 * 60;
+import { YEAR_S } from "./cookie-age";
 
 export async function signOutAction(): Promise<void> {
   await signOut();

@@ -29,7 +29,7 @@ import { runLabelOf } from "../../__shared_context/run-label";
 import type { FoundWorkflow } from "./found-workflow";
 import { ACTIONS, type PaletteAction } from "./palette-actions";
 import { remember, useRecent, type Visit } from "./recent";
-import { type KeepTheme, useThemeChoice } from "./theme-choice";
+import { chooseTheme, type KeepTheme } from "./theme-choice";
 import {
   isFirstRead,
   type WorkflowSearch,
@@ -62,7 +62,6 @@ export function PaletteContent({
   onFollow,
 }: PaletteContentProps) {
   const scheme = useColorScheme();
-  const { choose } = useThemeChoice(keepTheme);
   const recent = useRecent(userId);
   const [view, setView] = useState<View>("everything");
   const [query, setQuery] = useState("");
@@ -103,7 +102,7 @@ export function PaletteContent({
         return;
       case "theme": {
         const next = oppositeOf(scheme);
-        choose(next);
+        chooseTheme(next, keepTheme);
         return;
       }
     }

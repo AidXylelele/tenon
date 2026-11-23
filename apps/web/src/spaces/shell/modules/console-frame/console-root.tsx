@@ -4,11 +4,11 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { isEditorPath } from "@/libs/routing/routes";
 import { SidebarProvider } from "@/libs/ui/components/sidebar";
+import { YEAR_S } from "./cookie-age";
 import { useModalOpen } from "./modal-open";
 import { type Viewport, VIEWPORT_COOKIE } from "./viewport";
 
 const COMPACT = "(max-width: 1199px)";
-const YEAR_S = 365 * 24 * 60 * 60;
 
 interface ConsoleRootProps {
   readonly defaultOpen: boolean | null;
