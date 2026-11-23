@@ -26,7 +26,7 @@ Owner: web — editor. Decisions: research D2 and D10 of the console redesign (0
 
 - The search takes focus on open. It is cmdk's combobox (`libs/ui` Command) over one listbox named "Kinds of step"; the open groups are named groups inside it, the first entry is active, and the active entry carries the accent bar and the focus ring.
 - The closed groups are `libs/ui` buttons outside the listbox, each named by its title and count ("Decide and repeat, 3 kinds of step"); opening one lists its entries and returns focus to the search.
-- While the person searches, the count of matches is said politely; a search that matches nothing shows the note in `libs/ui`'s Empty, with the Slack and email hint. The count stays in the part's own polite region until the app-wide announcer of `libs/ui` lands.
+- While the person searches, the count of matches is said politely; a search that matches nothing shows the note in `libs/ui`'s Empty, with the Slack and email hint. The count is said through libs/ui's `useAnnounce`, so an `Announcer` must be above the catalog.
 
 ## Playground
 

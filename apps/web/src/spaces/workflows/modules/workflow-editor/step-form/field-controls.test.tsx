@@ -242,7 +242,7 @@ describe("a field's value by its kind", () => {
 
   it("a_yes_or_no_is_a_switch", () => {
     const { onEdit } = shown();
-    const flag = screen.getByRole("switch", { name: /public/ });
+    const flag = screen.getByRole("checkbox", { name: /public/ });
 
     act(() => {
       fireEvent.click(flag);

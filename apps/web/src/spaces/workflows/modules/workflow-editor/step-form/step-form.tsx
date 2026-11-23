@@ -91,7 +91,7 @@ export function StepForm({
           <FieldView key={field.pointer} field={field} />
         ))}
         {hasMore && (
-          <Disclosure title="More options" summary={moreSummary}>
+          <Disclosure title="More options" summary={moreSummary} summaryBelow>
             {otherMethods !== undefined && (
               <OtherMethods field={otherMethods} />
             )}
@@ -107,7 +107,11 @@ export function StepForm({
           fields={layout.failure}
         />
         {showsData && (
-          <Disclosure title="Data in and out" summary={dataSummary}>
+          <Disclosure
+            title="Data in and out"
+            summary={dataSummary}
+            summaryBelow
+          >
             {layout.data.map((field) => (
               <FieldView key={field.pointer} field={field} />
             ))}

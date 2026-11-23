@@ -508,7 +508,7 @@ describe("a switch's branches", () => {
 describe("set data", () => {
   it("keeps_the_incoming_data_until_turned_off", () => {
     const { onEdit } = shown({ step: SET_STEP, form: SET_FORM });
-    const keep = screen.getByRole("switch", {
+    const keep = screen.getByRole("checkbox", {
       name: "Keep the data that came in",
     });
 
@@ -525,7 +525,7 @@ describe("set data", () => {
   it("a_result_written_another_way_says_so_and_can_be_turned_on", () => {
     const written = setFormOf({ total: "1" }, "written");
     const { onEdit } = shown({ step: SET_STEP, form: written });
-    const keep = screen.getByRole("switch", {
+    const keep = screen.getByRole("checkbox", {
       name: "Keep the data that came in",
     });
 

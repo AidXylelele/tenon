@@ -22,13 +22,15 @@ const MINUTES_IN_HOUR = 60;
 
 const NINE: TimeOfDay = { hour: 9, minute: 0 };
 
+export const FIRST_CRON = "0 9 * * *";
+
 export const REPEAT_CHOICES: readonly Repeat[] = [
   { kind: "daily", at: NINE },
   { kind: "weekdays", at: NINE },
   { kind: "hourly", minute: 0 },
   { kind: "minutes", every: 10 },
   { kind: "weekly", days: [1], at: NINE },
-  { kind: "custom", cron: "0 9 * * *" },
+  { kind: "custom", cron: FIRST_CRON },
 ];
 
 const conjunction = new Intl.ListFormat("en-GB", { type: "conjunction" });

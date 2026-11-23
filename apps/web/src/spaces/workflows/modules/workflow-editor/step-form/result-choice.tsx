@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/libs/ui/components/select";
-import { Switch } from "@/libs/ui/components/switch";
+import { Checkbox } from "@/libs/ui/components/checkbox";
 import { resultText } from "../form-fields";
 import { useFormSettings } from "./form-settings";
 
@@ -56,17 +56,17 @@ function KeepIncoming({ step, result }: ResultChoiceProps) {
   const checked = result.value === KEEPING;
   const isWritten = result.value === "written";
   const help = isWritten
-    ? "The step's result is written as an expression under Data in and out; turn this on to keep the incoming data beside these values."
-    : "Later steps get the incoming data plus these values. Turn off to pass on only these values.";
+    ? "The step's result is written as an expression under Data in and out; check this to keep the incoming data beside these values."
+    : "Later steps get the incoming data plus these values. Clear it to pass on only these values.";
 
   return (
     <Field orientation="horizontal" className="items-start">
-      <Switch
+      <Checkbox
         id={id}
         checked={checked}
         aria-describedby={helpId}
         onCheckedChange={(next) => {
-          const chosen = next ? KEEPING : REPLACING;
+          const chosen = next === true ? KEEPING : REPLACING;
           set(chosen, result.value);
         }}
       />

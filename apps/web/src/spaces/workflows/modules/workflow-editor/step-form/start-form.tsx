@@ -19,7 +19,7 @@ import {
 } from "@/libs/ui/components/select";
 import { CopyButton } from "@/libs/ui/composites/copy-button";
 import { Disclosure } from "@/libs/ui/composites/disclosure";
-import { cronOf, REPEAT_CHOICES } from "@/operations/schedule-words";
+import { FIRST_CRON } from "@/operations/schedule-words";
 import {
   type FieldWords,
   eventEditsOf,
@@ -97,9 +97,6 @@ export function StartForm({
   const input = form.fields.find((field) => field.pointer === "/input");
   const webhookTypes = webhooks.map((webhook) => webhook.eventType);
   const start = startOf(schedule, webhookTypes);
-  const [firstRepeat] = REPEAT_CHOICES;
-  const firstCron =
-    firstRepeat === undefined ? "0 9 * * *" : cronOf(firstRepeat);
   const firstWebhook = webhookTypes[0] ?? null;
   const inputFields = input?.fields ?? [];
   const inputSummary = summaryOf(inputFields, "start", "", "Any JSON");
@@ -119,7 +116,7 @@ export function StartForm({
 
     if (schedule === undefined || way === undefined) return;
 
-    const begin = { cron: firstCron, eventType: firstWebhook };
+    const begin = { cron: FIRST_CRON, eventType: firstWebhook };
     const edits = startEditsOf(schedule, start, way, begin);
 
     send(edits);
@@ -178,7 +175,11 @@ export function StartForm({
           />
         )}
         {input !== undefined && (
-          <Disclosure title="Workflow input" summary={inputSummary}>
+          <Disclosure
+            title="Workflow input"
+            summary={inputSummary}
+            summaryBelow
+          >
             {inputFields.map((field) => (
               <FieldView key={field.pointer} field={field} />
             ))}

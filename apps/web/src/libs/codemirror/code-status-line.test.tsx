@@ -43,7 +43,7 @@ describe("the status line under a code editor", () => {
     expect(note).toBeVisible();
   });
 
-  it("the_message_is_said_politely", () => {
+  it("the_message_is_shown_on_its_own_line", () => {
     render(
       <CodeStatusLine
         problems={[]}
@@ -52,8 +52,8 @@ describe("the status line under a code editor", () => {
       />,
     );
 
-    const said = screen.getByRole("status");
+    const message = screen.getByText("Formatted with Prettier");
 
-    expect(said).toHaveTextContent("Formatted with Prettier");
+    expect(message).toBeVisible();
   });
 });

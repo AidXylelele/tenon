@@ -13,6 +13,7 @@ Owner: web — editor. Decisions: research D15 of the console redesign (005); in
 - `nextStartsOf(cron, now, count)`: the next starts after now, as ISO instants; none for a cron that does not parse or never comes. Days match as in Vixie cron: when both the day of the month and the weekday are restricted, a day that matches either runs.
 - `startText(start, zone)`: "Mon 23 Nov 09:00 UTC · 11:00 your time", with the local date when it differs: "Mon 23 Nov 23:30 UTC · Tue 24 Nov 01:30 your time".
 - `Repeat`, the form's choices: `daily`, `weekdays` and `weekly` at a `TimeOfDay` in UTC (`weekly` on its `Weekday`s, 0 for Sunday), `hourly` at a minute, `minutes` every n minutes (a divisor of 60), `custom` with its cron.
+  - `FIRST_CRON`: the cron a new schedule starts from, every day at 09:00 UTC (`0 9 * * *`).
   - `REPEAT_CHOICES`: the six choices in the form's order, each at its starting values (09:00, Monday, every 10 minutes); `repeatLabel(repeat)`: "Every day", "Every weekday", "Every hour", "Every 10 minutes", "Every week on…", "A custom schedule (cron)".
   - `repeatOf(cron)`: the choice a cron reads as, `custom` when none fits. `cronOf(repeat)`: the cron it writes, such as `0 9 * * 1-5`.
 

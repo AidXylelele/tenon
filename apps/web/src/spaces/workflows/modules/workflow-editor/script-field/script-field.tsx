@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { CodeStatusLine } from "@/libs/codemirror/code-status-line";
+import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { CodeMirrorView } from "@/libs/codemirror/codemirror-view";
 import type { CodeProblem } from "@/libs/codemirror/interfaces";
 import {
@@ -72,6 +73,7 @@ export function ScriptField({
 }: ScriptFieldProps): JSX.Element {
   const view = useRef<EditorView>(null);
   const [formatting, setFormatting] = useState(IDLE);
+  const announce = useAnnounce();
   const [problems, setProblems] = useState(NO_PROBLEMS);
   const settings = SCRIPT_LANGUAGES[language];
   const formatter = FORMATTER_NAMES[settings.library];
@@ -133,6 +135,7 @@ export function ScriptField({
     applyFormatting(editor, outcome, text);
     const words = formatWordsOf(outcome, formatter);
     setFormatting({ kind: "told", words });
+    announce(words);
   }
 
   function startFormatting(): void {

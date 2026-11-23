@@ -85,7 +85,7 @@ export function FailureBox({
   }
 
   return (
-    <Disclosure title="If this step fails" summary={summary}>
+    <Disclosure title="If this step fails" summary={summary} summaryBelow>
       <RadioGroup
         value={reading.choice}
         onValueChange={choose}

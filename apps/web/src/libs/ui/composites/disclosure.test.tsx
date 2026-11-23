@@ -76,4 +76,22 @@ describe("a disclosure of rarely needed fields", () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
+
+  it("with_its_summary_below_the_title_it_still_describes_its_header", () => {
+    render(
+      <Disclosure
+        title="More options"
+        summary="No headers · no authentication"
+        summaryBelow
+      >
+        <p>Headers</p>
+      </Disclosure>,
+    );
+
+    const header = screen.getByRole("button", {
+      name: "More options",
+      description: "No headers · no authentication",
+    });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+  });
 });

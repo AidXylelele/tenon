@@ -24,6 +24,7 @@ import {
 import { Disclosure } from "@/libs/ui/composites/disclosure";
 import {
   cronOf,
+  FIRST_CRON,
   cronText,
   daylightNote,
   localTimeText,
@@ -75,7 +76,7 @@ const DAYS: readonly { readonly day: Weekday; readonly text: string }[] = [
 const CRON_WORDS: FieldWords = {
   title: "Custom schedule (cron)",
   help: "minute, hour, day of month, month, day of week — in UTC. Written for you by the choices above.",
-  placeholder: "0 9 * * *",
+  placeholder: FIRST_CRON,
   fill: "Write the schedule as five parts: minute, hour, day of month, month and day of week.",
   control: "value",
   mono: true,
@@ -179,7 +180,7 @@ export function ScheduleBuilder({
         )}
       </div>
       {!custom && (
-        <Disclosure title="More options" summary={summary}>
+        <Disclosure title="More options" summary={summary} summaryBelow>
           <CronField schedule={schedule} cron={cron} />
         </Disclosure>
       )}
