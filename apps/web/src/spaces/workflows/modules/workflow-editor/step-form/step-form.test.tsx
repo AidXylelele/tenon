@@ -6,6 +6,7 @@ import { Announcer } from "@/libs/ui/composites/announcer";
 import {
   FETCH_FORM,
   FETCH_STEP,
+  formChanged,
   HANDLING,
   POST_FORM,
   POST_STEP,
@@ -204,6 +205,22 @@ describe("a step's essential fields", () => {
     const data = screen.queryByRole("button", { name: "Data in and out" });
 
     expect(data).toBeNull();
+  });
+
+  it.each([
+    ["text", "PT1M"],
+    ["json", { after: { minutes: 1 } }],
+  ])("a_time_limit_written_otherwise_as_%s_is_shown_as_written", (_, value) => {
+    const pointer = `${FETCH_STEP.pointer}/timeout`;
+    const form = formChanged(FETCH_FORM, pointer, { written: true, value });
+    shown({ form });
+    open("More options");
+
+    const limit = screen.getByRole("textbox", {
+      name: /Time limit, seconds/,
+    });
+
+    expect(limit).not.toHaveValue("");
   });
 
   it("a_time_limit_is_written_in_seconds", () => {
@@ -594,6 +611,41 @@ describe("how a call sends its data", () => {
     ]);
   });
 
+  it("other_json_is_json_and_a_message_writes_an_empty_text", () => {
+    const pointer = `${POST_STEP.pointer}/with/body`;
+    const value = { items: [] };
+    const form = formChanged(POST_FORM, pointer, { written: true, value });
+    const { onEdit } = shown({ step: POST_STEP, form });
+    const json = screen.getByRole("radio", { name: "JSON" });
+    const message = screen.getByRole("radio", { name: "Message" });
+
+    act(() => {
+      fireEvent.click(message);
+    });
+
+    const emptied = { kind: "setField", pointer, value: { text: "" } };
+    expect(json).toHaveAttribute("aria-checked", "true");
+    expect(onEdit).toHaveBeenCalledWith([emptied]);
+  });
+
+  it("form_fields_are_named_values", () => {
+    const body = `${POST_STEP.pointer}/with/body`;
+    const headers = `${POST_STEP.pointer}/with/headers`;
+    const type = { "Content-Type": "application/x-www-form-urlencoded" };
+    const named = formChanged(POST_FORM, body, {
+      written: true,
+      value: { name: "Ada" },
+    });
+    const form = formChanged(named, headers, { written: true, value: type });
+    shown({ step: POST_STEP, form });
+
+    const fields = screen.getByRole("group", { name: /Form fields/ });
+    const name = screen.getByRole("textbox", { name: "Name of value 1" });
+
+    expect(fields).toBeInTheDocument();
+    expect(name).toHaveValue("name");
+  });
+
   it("form_fields_write_their_content_type", () => {
     const { onEdit } = shown({ step: POST_STEP, form: POST_FORM });
     const form = screen.getByRole("radio", { name: "Form fields" });
@@ -730,6 +782,32 @@ describe("if this step fails", () => {
     expect(retryThenHandle).toHaveAttribute("aria-checked", "false");
     const pressTheLane = screen.getByText(/press the lane's \+/);
     expect(pressTheLane).toBeInTheDocument();
+  });
+
+  it("a_retry_on_time_outs_is_chosen_and_wrong_statuses_are_refused", () => {
+    const { onEdit } = shown({
+      step: REPORT_INNER_STEP,
+      form: REPORT_FORM,
+      protection: RETRYING,
+    });
+    open("If this step fails");
+    const when = screen.getByRole("combobox", { name: "Retry when" });
+
+    choose(when, "It runs out of time");
+    choose(when, "The answer has one of these statuses");
+    const statuses = screen.getByRole("textbox", { name: "Statuses" });
+    leave(statuses, "soon");
+
+    const error = screen.getByRole("alert");
+    const on = { kind: "timeouts" };
+    expect(error).toHaveTextContent(/from 100 to 599/);
+    expect(onEdit).toHaveBeenCalledWith([
+      {
+        kind: "setFailure",
+        step: REPORT_STEP.id,
+        failure: { kind: "retry", retry: { ...FIRST_RETRY, on } },
+      },
+    ]);
   });
 
   it("a_retry_on_statuses_is_written_from_the_typed_list", () => {
