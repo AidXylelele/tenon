@@ -13,6 +13,7 @@ function workflowOf(status: WorkflowStatus, name: string): Workflow {
   return {
     namespace: "sales",
     name,
+    title: null,
     status,
     on,
     currentVersion: "1.2.0",

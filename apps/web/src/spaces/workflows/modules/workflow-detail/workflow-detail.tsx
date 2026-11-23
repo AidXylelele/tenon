@@ -9,12 +9,7 @@ import {
 } from "@/libs/data-access/automation";
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
-import type {
-  InstanceSummary,
-  Page,
-  Read,
-  Version,
-} from "@/libs/data-access/types";
+import type { InstancePage, Read, Version } from "@/libs/data-access/types";
 import { RefreshControl } from "@/libs/live/refresh-control";
 import { Link } from "@/libs/routing/link";
 import {
@@ -245,7 +240,7 @@ function Runs({
   title,
   more,
 }: {
-  readonly runs: Read<Page<InstanceSummary>>;
+  readonly runs: Read<InstancePage>;
   readonly live: boolean;
   readonly title: string;
   readonly more: string;
