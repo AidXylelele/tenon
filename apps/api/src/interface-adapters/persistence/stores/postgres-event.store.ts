@@ -24,8 +24,6 @@ import {
 
 @Injectable()
 export class PostgresEventStore implements EventStore {
-  private static readonly KEY = "events";
-
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
     private readonly outbox: Outbox,
@@ -96,7 +94,7 @@ export class PostgresEventStore implements EventStore {
     await this.outbox.add(this.txHost.tx, [
       {
         topic: MessageTopic.EventAccepted,
-        key: PostgresEventStore.KEY,
+        key: row.source,
         payload,
       },
     ]);
