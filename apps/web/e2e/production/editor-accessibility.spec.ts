@@ -75,6 +75,18 @@ for (const scheme of SCHEMES) {
       expect(testRun).toEqual([]);
     });
 
+    test("the_publish_dialog_passes_axe", async ({ page }) => {
+      await page.getByRole("button", { name: "Publish", exact: true }).click();
+      await expect(
+        page.getByRole("dialog", { name: /Publish “Daily digest”/ }),
+      ).toBeVisible();
+      await expect(page.getByText("What changed")).toBeVisible();
+
+      const violations = await violationsOf(page);
+
+      expect(violations).toEqual([]);
+    });
+
     test("the_code_view_passes_axe", async ({ page }) => {
       await page.getByRole("radio", { name: "Code" }).click();
       await expect(
