@@ -21,6 +21,8 @@ import {
   jsonTextOf,
   numberCommitOf,
   textEditsOf,
+  timeLimitCommitOf,
+  timeLimitOf,
   valueEditsOf,
 } from "../form-fields";
 import { blurOnEnter, type ControlWiring } from "./field-shell";
@@ -35,6 +37,8 @@ export interface ControlProps {
 const UNSET = "\u0000unset";
 
 const FIRST_UNIT = "minutes";
+
+const FAINT_HINT = "w-24 placeholder:text-faint";
 
 const UNITS_MS: ReadonlyMap<string, number> = new Map([
   ["days", 86_400_000],
@@ -54,7 +58,7 @@ export function TextControl({
   const written = typeof field.value === "string" ? field.value : "";
   const isExpression = written.startsWith("${");
   const mono = words.mono || isExpression || multiline;
-  const className = cn(mono && "font-mono");
+  const className = cn("placeholder:text-faint", mono && "font-mono");
   const suggestions = field.choices.filter(
     (choice) => typeof choice === "string",
   );
@@ -227,6 +231,43 @@ export function JsonControl({ field, wiring }: ControlProps) {
         const commit = jsonCommitOf(field, event.currentTarget.value);
         apply(commit);
       }}
+    />
+  );
+}
+
+export function TimeLimitControl(props: ControlProps) {
+  const { field, words, wiring } = props;
+  const apply = useCommit(wiring);
+  const seconds = timeLimitOf(field.value);
+  const shown = seconds === null ? "" : String(seconds);
+  const isOtherwise = field.written && seconds === null;
+
+  if (isOtherwise && typeof field.value === "string")
+    return <TextControl {...props} />;
+
+  if (isOtherwise) return <JsonControl {...props} />;
+
+  function commit(text: string) {
+    if (text.trim() === shown) return;
+
+    const limit = timeLimitCommitOf(field, text);
+    apply(limit);
+  }
+
+  return (
+    <Input
+      key={shown}
+      id={wiring.id}
+      inputMode="numeric"
+      className={FAINT_HINT}
+      placeholder={words.placeholder}
+      defaultValue={shown}
+      aria-describedby={wiring.describedBy}
+      aria-invalid={wiring.invalid}
+      onBlur={(event) => {
+        commit(event.currentTarget.value);
+      }}
+      onKeyDown={blurOnEnter}
     />
   );
 }

@@ -104,7 +104,7 @@ function retrySettingsOf(policy: Json): RetrySettings | null {
   return { retries, seconds, growing };
 }
 
-function secondsOf(delay: Json | undefined): number | null {
+export function secondsOf(delay: Json | undefined): number | null {
   if (!isObject(delay)) return null;
 
   const amounts = Object.entries(delay).map(([unit, amount]) => {

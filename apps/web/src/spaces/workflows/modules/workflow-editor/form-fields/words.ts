@@ -45,8 +45,16 @@ const WORDS: ReadonlyMap<string, WordsEntry> = new Map([
     },
   ],
   ["*|then", { title: "After this step", control: "flow" }],
-  ["*|timeout", { title: "Time limit" }],
-  ["*|metadata", { title: "Notes" }],
+  [
+    "*|timeout",
+    {
+      title: "Time limit, seconds",
+      help: "30 seconds when empty.",
+      placeholder: "30",
+      control: "seconds",
+    },
+  ],
+  ["*|metadata", { control: "hidden" }],
   [
     "*|input/from",
     {
@@ -75,10 +83,10 @@ const WORDS: ReadonlyMap<string, WordsEntry> = new Map([
       control: "data",
     },
   ],
-  ["http|with/headers", { title: "Headers", control: "data" }],
+  ["http|with/headers", { title: "Headers", control: "values" }],
   ["http|with/query", { title: "Query", control: "data" }],
   ["http|with/output", { title: "The step's result", choices: HTTP_RESULTS }],
-  ["http|with/redirect", { title: "Follow redirects" }],
+  ["http|with/redirect", { control: "hidden" }],
   [
     "openapi|with/document/endpoint",
     {

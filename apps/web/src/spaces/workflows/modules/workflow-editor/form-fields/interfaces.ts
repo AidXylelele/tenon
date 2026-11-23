@@ -20,6 +20,7 @@ export type FieldControl =
   | "httpMethod"
   | "values"
   | "cases"
+  | "seconds"
   | "hidden";
 
 export interface FieldWords {

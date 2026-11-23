@@ -16,11 +16,13 @@ Owner: web — editor. Sources: research D2, D9, D13, D14, D15, D16 of the conso
 - `onEdit(actions)`: the `workflow/edit` actions to apply in order, each on the text the previous one leaves; never empty.
 - Slots, each optional, filled by the module: `renderData(slot)` for a field that takes data (`DataSlot`: the field's `pointer` and `value`, the input's `inputId`, `describedBy`, `invalid`, `placeholder`, and `onText(text)`, `onUse({ value, export })`, `onClear()`), `renderCondition(slot)` for a condition (`ConditionSlot`: `pointer`, `text`, `required`, `labelledBy`, `describedBy`, `invalid`; a switch's branch, required, and "Run only if", optional), `renderCode(slot)` for a script's code (`CodeSlot`: the `field`, its `language`, `labelledBy`, `describedBy`). Without a slot the field is plain text. `blurOnEnter`: the one Enter-leaves-the-field handler the editor's parts share.
 
-The form shows the name, the essential fields, the step's result where the language server offers a choice (a set's "Keep the data that came in", a script's "The step's result"), then "More options", "Data in and out" and "If this step fails" (stop · retry, then stop · retry, then run other steps · continue with the next step · run other steps instead, with the retry's settings). A switch shows its branches as cards, each with its condition, its destination, and move or remove; "Otherwise" ends the run or goes on.
+The form shows the name, the essential fields, the step's result where the language server offers a choice (a set's "Keep the data that came in", a script's "The step's result", right after the code), then "More options" (shown only when it holds something), "If this step fails" and, while language terms are shown, "Data in and out" (stop · retry, then stop · retry, then run other steps · continue with the next step · run other steps instead, with the retry's settings). A switch shows its branches as cards, each with its condition, its destination, and move or remove; "Otherwise" ends the run or goes on.
 
 `StartForm` (`StartFormProps`): `form` (`workflow/workflowForm`), `webhooks` (`name`, `eventType`, `address`), `now` (an ISO instant) and `zone` (an IANA name) for the local time beside the UTC schedule, `revealProblems`, `languageTerms`, `onEdit`. By hand, on a schedule (repeat, time in UTC, days, minutes, or a cron; the viewer's time, the daylight-saving note and the next three starts), by a webhook (its address to copy) or by an event type; the workflow's input under "Workflow input".
 
 Consumer: the workflow editor's panel, which replaces the old `step-inspector` with these in M5.
+
+A field is "optional" only when it is not required, has no fill words and no usual value (a choice, after this step, a method, a language, a time limit). Errors carry a circle-alert icon; placeholders are faint.
 
 ## Playground
 

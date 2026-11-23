@@ -26,6 +26,7 @@ import { Segmented } from "./segmented";
 
 const METHOD_PATH = "with/method";
 const LANGUAGE_PATH = "run/script/language";
+const CODE_PATH = "run/script/code";
 const USUAL = "Usual settings";
 const EXPRESSIONS = "Expressions";
 
@@ -55,6 +56,11 @@ export function StepForm({
     typeof language?.value === "string" ? language.value : "";
   const otherMethods = kind === "http" ? method : undefined;
   const hasMore = otherMethods !== undefined || layout.more.length > 0;
+  const showsData = languageTerms && layout.data.length > 0;
+  const codeAt = pathed.findIndex((each) => each.path === CODE_PATH);
+  const resultAt = codeAt === -1 ? pathed.length : codeAt + 1;
+  const beforeResult = layout.essentials.slice(0, resultAt);
+  const afterResult = layout.essentials.slice(resultAt);
   const moreSummary = summaryOf(layout.more, kind, step.pointer, USUAL);
   const dataSummary = summaryOf(layout.data, kind, step.pointer, EXPRESSIONS);
   const settings: FormSettings = {
@@ -74,12 +80,15 @@ export function StepForm({
     <FormSettingsContext value={settings}>
       <div className="flex flex-col gap-4">
         <NameField step={step} onEdit={onEdit} />
-        {layout.essentials.map((field) => (
+        {beforeResult.map((field) => (
           <FieldView key={field.pointer} field={field} />
         ))}
         {form.result !== null && (
           <ResultChoice step={form.step} result={form.result} />
         )}
+        {afterResult.map((field) => (
+          <FieldView key={field.pointer} field={field} />
+        ))}
         {hasMore && (
           <Disclosure title="More options" summary={moreSummary}>
             {otherMethods !== undefined && (
@@ -90,19 +99,19 @@ export function StepForm({
             ))}
           </Disclosure>
         )}
-        {layout.data.length > 0 && (
-          <Disclosure title="Data in and out" summary={dataSummary}>
-            {layout.data.map((field) => (
-              <FieldView key={field.pointer} field={field} />
-            ))}
-          </Disclosure>
-        )}
         <FailureBox
           step={step}
           form={form}
           protection={protection}
           fields={layout.failure}
         />
+        {showsData && (
+          <Disclosure title="Data in and out" summary={dataSummary}>
+            {layout.data.map((field) => (
+              <FieldView key={field.pointer} field={field} />
+            ))}
+          </Disclosure>
+        )}
       </div>
     </FormSettingsContext>
   );

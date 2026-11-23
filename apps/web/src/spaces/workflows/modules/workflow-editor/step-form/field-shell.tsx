@@ -1,6 +1,6 @@
 "use client";
 
-import { PencilIcon } from "lucide-react";
+import { CircleAlertIcon, PencilIcon } from "lucide-react";
 import type { FormField } from "language-server/protocol";
 import {
   type FocusEvent,
@@ -20,6 +20,13 @@ import type { FieldWords } from "../form-fields";
 import { useFormSettings } from "./form-settings";
 
 const NEEDS_VALUE = "This field needs a value.";
+
+const DEFAULTED: ReadonlySet<FieldWords["control"]> = new Set([
+  "flow",
+  "httpMethod",
+  "language",
+  "seconds",
+]);
 
 export interface ControlWiring {
   readonly id: string;
@@ -174,7 +181,10 @@ export function ProblemLines({
         </p>
       )}
       {problems.invalid && (
-        <FieldError id={problems.ids.error}>{problems.message}</FieldError>
+        <FieldError id={problems.ids.error} className="flex items-start gap-1">
+          <CircleAlertIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {problems.message}
+        </FieldError>
       )}
     </>
   );
@@ -191,7 +201,8 @@ export function FieldTitle({
 }) {
   const settings = useFormSettings();
   const term = path.replaceAll("/", ".");
-  const isOptional = !field.required && words.fill === null;
+  const hasDefault = DEFAULTED.has(words.control) || field.input === "choice";
+  const isOptional = !field.required && words.fill === null && !hasDefault;
 
   return (
     <>

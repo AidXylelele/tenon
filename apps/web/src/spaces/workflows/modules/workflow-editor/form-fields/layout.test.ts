@@ -35,10 +35,9 @@ describe("the layout of a step's form", () => {
       "headers",
       "body",
       "output",
-      "redirect",
+      "timeout",
       "if",
       "then",
-      "metadata",
     ]);
   });
 
@@ -55,14 +54,7 @@ describe("the layout of a step's form", () => {
 
     const more = keysOf(layout.more);
 
-    expect(more).toEqual([
-      "await",
-      "return",
-      "environment",
-      "if",
-      "then",
-      "metadata",
-    ]);
+    expect(more).toEqual(["await", "environment", "timeout", "if", "then"]);
   });
 
   it("data_in_and_out_and_failure_fields_keep_their_own_sections", () => {
@@ -72,7 +64,7 @@ describe("the layout of a step's form", () => {
     const failure = keysOf(layout.failure);
 
     expect(data).toEqual(["input", "output"]);
-    expect(failure).toEqual(["timeout"]);
+    expect(failure).toEqual([]);
   });
 });
 
@@ -143,6 +135,29 @@ describe("the summary of options behind a disclosure", () => {
     const summary = summaryOf(fields, "http", FETCH_STEP.pointer, "Usual");
 
     expect(summary).toBe("Run only if · Time limit");
+  });
+
+  it("named_values_are_said_by_how_many_are_set", () => {
+    const none = fieldOf({
+      key: "headers",
+      pointer: `${FETCH_STEP.pointer}/with/headers`,
+    });
+    const two = { ...none, written: true, value: { a: "1", b: "2" } };
+
+    const empty = summaryOf([none], "http", FETCH_STEP.pointer, "Usual");
+    const set = summaryOf([two], "http", FETCH_STEP.pointer, "Usual");
+
+    expect(empty).toBe("No headers");
+    expect(set).toBe("Headers: 2");
+  });
+
+  it("a_time_limit_is_said_in_seconds", () => {
+    const value = { after: { seconds: 45 } };
+    const limit = { ...written("timeout", "Timeout"), value };
+
+    const summary = summaryOf([limit], "http", FETCH_STEP.pointer, "Usual");
+
+    expect(summary).toBe("Time limit 45 s");
   });
 
   it("beyond_three_the_rest_are_counted", () => {

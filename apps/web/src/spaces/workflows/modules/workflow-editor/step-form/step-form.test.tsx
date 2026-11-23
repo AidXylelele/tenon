@@ -184,6 +184,70 @@ describe("a step's essential fields", () => {
     ]);
   });
 
+  it("the_sections_come_in_order_and_data_in_and_out_only_with_language_terms", () => {
+    shown({ languageTerms: true });
+
+    const headers = screen.getAllByRole("button", { expanded: false });
+    const titles = headers.map((header) => header.textContent);
+
+    expect(titles).toEqual([
+      expect.stringContaining("More options"),
+      expect.stringContaining("If this step fails"),
+      expect.stringContaining("Data in and out"),
+    ]);
+  });
+
+  it("without_language_terms_data_in_and_out_is_not_offered", () => {
+    shown();
+
+    const data = screen.queryByRole("button", { name: "Data in and out" });
+
+    expect(data).toBeNull();
+  });
+
+  it("a_time_limit_is_written_in_seconds", () => {
+    const { onEdit } = shown();
+    open("More options");
+    const limit = screen.getByRole("textbox", { name: /Time limit, seconds/ });
+
+    leave(limit, "1.5");
+    const refusal = screen.getByRole("alert").textContent;
+    leave(limit, "45");
+
+    expect(refusal).toBe("Write the seconds as a whole number above 0.");
+    expect(onEdit).toHaveBeenCalledWith([
+      {
+        kind: "setField",
+        pointer: `${FETCH_STEP.pointer}/timeout`,
+        value: { after: { seconds: 45 } },
+      },
+    ]);
+  });
+
+  it("headers_are_named_values_and_notes_and_redirects_are_not_offered", () => {
+    shown();
+    open("More options");
+
+    const add = screen.getByRole("button", { name: "Add a value" });
+    const notes = screen.queryByText("Notes");
+    const redirects = screen.queryByText("Follow redirects");
+
+    expect(add).toBeInTheDocument();
+    expect(notes).toBeNull();
+    expect(redirects).toBeNull();
+  });
+
+  it("a_choice_with_a_usual_value_is_not_called_optional", () => {
+    shown();
+    open("More options");
+
+    const result = screen.getByRole("combobox", { name: "The step's result" });
+    const limit = screen.getByRole("textbox", { name: "Time limit, seconds" });
+
+    expect(result).toHaveAccessibleName("The step's result");
+    expect(limit).toBeInTheDocument();
+  });
+
   it("language_terms_show_each_field's_place_in_the_text", () => {
     shown({ languageTerms: true });
 
@@ -515,6 +579,20 @@ describe("set data", () => {
 });
 
 describe("a script's result", () => {
+  it("comes_after_the_code_and_before_the_data_the_script_gets", () => {
+    shown({ step: SCRIPT_STEP, form: SCRIPT_FORM });
+
+    const code = screen.getByRole("textbox", { name: "Code" });
+    const result = screen.getByRole("combobox", { name: "The step's result" });
+    const data = screen.getByText("Data the script gets");
+
+    const afterCode = code.compareDocumentPosition(result);
+    const beforeData = result.compareDocumentPosition(data);
+    const following = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(afterCode & following).toBe(following);
+    expect(beforeData & following).toBe(following);
+  });
+
   it("is_chosen_in_words", () => {
     const { onEdit } = shown({ step: SCRIPT_STEP, form: SCRIPT_FORM });
     const result = screen.getByRole("combobox", { name: "The step's result" });

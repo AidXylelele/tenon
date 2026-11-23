@@ -47,6 +47,7 @@ export type {
 } from "./interfaces";
 export { formKindOf, layoutOf, pathOf, summaryOf } from "./layout";
 export { cronEditsOf, eventEditsOf, startEditsOf, startOf } from "./start";
+export { timeLimitCommitOf, timeLimitOf } from "./time-limit";
 export {
   additionOf,
   memberPointerOf,

@@ -6,9 +6,15 @@ import type {
   RunKind,
   WordsKind,
 } from "./interfaces";
+import { isObject } from "./json";
+import { timeLimitOf } from "./time-limit";
 import { hasWords, wordsOf } from "./words";
 
 const SUMMARY_LIMIT = 3;
+
+const TIME_LIMIT = "timeout";
+
+const TIME_LIMIT_WORDS = "Time limit";
 
 const COMMON_KEYS: ReadonlySet<string> = new Set(["if", "then"]);
 
@@ -72,12 +78,15 @@ export function layoutOf(fields: readonly FormField[], step: Step): FormLayout {
   const notes = fields.filter((field) => field.section === "note");
   const inData = fields.filter((field) => field.section === "data");
   const inFailure = fields.filter((field) => field.section === "failure");
+  const limits = inFailure.filter((field) => field.key === TIME_LIMIT);
+  const failing = inFailure.filter((field) => field.key !== TIME_LIMIT);
   const ownRest = restsOf(own, place);
+  const limitRest = restsOf(limits, place);
   const commonRest = restsOf(common, place);
   const notesRest = restsOf(notes, place);
-  const more = ownRest.concat(commonRest, notesRest);
+  const more = ownRest.concat(limitRest, commonRest, notesRest);
   const data = restsOf(inData, place);
-  const failure = restsOf(inFailure, place);
+  const failure = restsOf(failing, place);
 
   return { essentials, more, data, failure };
 }
@@ -115,7 +124,12 @@ function restsOf(fields: readonly FormField[], place: Place): FormField[] {
 }
 
 function restOf(field: FormField, place: Place): FormField[] {
+  const path = pathOf(field, place.step.pointer);
+  const words = wordsOf(place.kind, path, field);
+
   if (field.essentialRank !== null) return [];
+
+  if (words.control === "hidden") return [];
 
   if (isFixedChoice(field)) return [];
 
@@ -145,16 +159,54 @@ export function summaryOf(
   base: string,
   unwritten: string,
 ): string {
-  const written = fields.filter((field) => field.written);
-  const titles = written.map((field) => {
-    const path = pathOf(field, base);
-    const words = wordsOf(kind, path, field);
-    return words.title;
-  });
-  const shown = titles.slice(0, SUMMARY_LIMIT);
-  const hidden = titles.length - shown.length;
+  const said = fields.flatMap((field) => statementOf(field, kind, base));
+  const shown = said.slice(0, SUMMARY_LIMIT);
+  const hidden = said.length - shown.length;
   const more = hidden > 0 ? [`${String(hidden)} more`] : [];
   const parts = shown.concat(more);
 
   return parts.length > 0 ? parts.join(" · ") : unwritten;
+}
+
+function statementOf(
+  field: FormField,
+  kind: WordsKind,
+  base: string,
+): string[] {
+  const path = pathOf(field, base);
+  const words = wordsOf(kind, path, field);
+
+  switch (words.control) {
+    case "hidden":
+      return [];
+    case "values":
+      return [countedOf(field, words.title)];
+    case "seconds":
+      return field.written ? [limitText(field)] : [];
+    case "value":
+    case "data":
+    case "condition":
+    case "flow":
+    case "code":
+    case "language":
+    case "httpMethod":
+    case "cases":
+      return field.written ? [words.title] : [];
+  }
+}
+
+function countedOf(field: FormField, title: string): string {
+  const count = isObject(field.value) ? Object.keys(field.value).length : 0;
+
+  if (count === 0) return `No ${title.toLowerCase()}`;
+
+  return `${title}: ${String(count)}`;
+}
+
+function limitText(field: FormField): string {
+  const seconds = timeLimitOf(field.value);
+
+  if (seconds === null) return TIME_LIMIT_WORDS;
+
+  return `${TIME_LIMIT_WORDS} ${String(seconds)} s`;
 }

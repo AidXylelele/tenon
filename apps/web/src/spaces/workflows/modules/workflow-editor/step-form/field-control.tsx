@@ -29,6 +29,7 @@ import {
   JsonControl,
   NumberControl,
   TextControl,
+  TimeLimitControl,
 } from "./value-controls";
 
 const HTTP_METHODS = [
@@ -59,6 +60,8 @@ export function FieldControl(props: ControlProps) {
       return <FlowControl {...props} />;
     case "code":
       return <CodeControl {...props} />;
+    case "seconds":
+      return <TimeLimitControl {...props} />;
     case "httpMethod":
       return <Segmented field={field} options={HTTP_METHODS} wiring={wiring} />;
     case "language":
