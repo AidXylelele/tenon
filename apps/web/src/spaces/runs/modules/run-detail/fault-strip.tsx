@@ -1,11 +1,11 @@
 "use client";
 
-import { CircleXIcon, CrosshairIcon, PencilIcon } from "lucide-react";
+import { CircleXIcon, CrosshairIcon, RotateCwIcon } from "lucide-react";
 import type { Step } from "language-server/protocol";
 import type { Instance } from "@/libs/data-access/types";
-import { Button } from "@/libs/ui/components/button";
 import { Link } from "@/libs/routing/link";
 import { editorHref } from "@/libs/routing/routes";
+import { Button } from "@/libs/ui/components/button";
 
 interface FaultStripProps {
   readonly instance: Instance;
@@ -13,6 +13,8 @@ interface FaultStripProps {
   readonly canEdit: boolean;
   readonly onShow: (step: string) => void;
 }
+
+const ADVICE = "Run again later, or add a retry to this step.";
 
 export function FaultStrip({
   instance,
@@ -25,54 +27,52 @@ export function FaultStrip({
   if (error === null) return null;
 
   const node = step?.id ?? null;
-  const kind = error.type.split("/").at(-1);
-  const editor = editorHref(instance.namespace, instance.name, node);
+  const subject = step?.name ?? "The run";
+  const why =
+    error.detail ??
+    error.title ??
+    "the step raised an error the workflow did not handle";
+  const retry = editorHref(instance.namespace, instance.name, node);
 
   return (
-    <section
-      aria-label="Why the run faulted"
-      className="flex flex-col gap-2 border-b bg-destructive-soft px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4 md:px-6"
-    >
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <CircleXIcon
-          className="mt-0.5 size-4 shrink-0 text-destructive"
-          aria-hidden
-        />
-        <div className="min-w-0">
-          <span className="font-medium text-destructive">
-            {error.title ?? "The run faulted"}
-            {step !== null && ` at ${step.name}`}
-          </span>
-          <span className="text-foreground">
-            {" "}
-            {error.detail ??
-              "The task raised an error the workflow did not handle."}{" "}
-            ({kind}, status {error.status})
-          </span>
+    <div className="px-4 pt-3 md:px-6">
+      <div
+        role="alert"
+        className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive-soft px-4 py-2.5 text-sm sm:flex-row sm:items-center sm:gap-4"
+      >
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <CircleXIcon
+            className="mt-0.5 size-4 shrink-0 text-destructive"
+            aria-hidden
+          />
+          <p className="min-w-0">
+            <strong className="font-semibold">{subject}</strong> failed: {why}.{" "}
+            {ADVICE}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pl-7 sm:pl-0">
+          {canEdit && node !== null && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={retry}>
+                <RotateCwIcon data-icon="inline-start" />
+                Add a retry to this step
+              </Link>
+            </Button>
+          )}
+          {node !== null && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                onShow(node);
+              }}
+            >
+              <CrosshairIcon data-icon="inline-start" />
+              Show the step
+            </Button>
+          )}
         </div>
       </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2 pl-7 sm:pl-0">
-        {node !== null && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              onShow(node);
-            }}
-          >
-            <CrosshairIcon data-icon="inline-start" />
-            Show the task
-          </Button>
-        )}
-        {canEdit && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={editor}>
-              <PencilIcon data-icon="inline-start" />
-              Open in editor
-            </Link>
-          </Button>
-        )}
-      </div>
-    </section>
+    </div>
   );
 }

@@ -35,6 +35,7 @@ import {
 import { EventList } from "./event-list";
 import { FaultStrip } from "./fault-strip";
 import { panelOf, type RunPanel } from "./query";
+import { StepTabs } from "./step-tabs";
 import { Timeline } from "./timeline";
 
 interface RunViewProps {
@@ -100,6 +101,7 @@ export function RunView({
   const step = steps.find((each) => each.id === selected) ?? null;
   const stepRecords = step === null ? [] : recordsOf(records, stepsUnder(step));
   const live = isUnended(instance.phase);
+  const latest = stepRecords.at(-1);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -192,14 +194,17 @@ export function RunView({
                   </div>
                 </div>
               </div>
-              {stepRecords.length === 0 ? (
+              {latest === undefined ? (
                 <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
                   {live
                     ? "This task has not run yet."
                     : "This task did not run."}
                 </p>
               ) : (
-                <Timeline records={stepRecords} more={false} open />
+                <StepTabs record={latest} />
+              )}
+              {stepRecords.length > 1 && (
+                <Timeline records={stepRecords} more={false} />
               )}
             </div>
           )}
