@@ -15,6 +15,7 @@ import { type Outcome, unreachable } from "./problem";
 import type {
   Invitation,
   InvitationPreview,
+  Member,
   Role,
   Session,
   User,
@@ -82,6 +83,10 @@ export function completeRecovery(
     json: { token, newPassword },
     anonymous: true,
   });
+}
+
+export async function members(): Promise<Member[]> {
+  return (await read<Member[]>("/members")) ?? [];
 }
 
 export async function invitations(): Promise<Invitation[]> {

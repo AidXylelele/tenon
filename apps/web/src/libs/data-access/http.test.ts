@@ -84,6 +84,17 @@ describe("a request to the API", () => {
     expect(init.method).toBe("POST");
   });
 
+  it("a_parameter_of_several_values_is_repeated_in_their_order", async () => {
+    fetchApi.mockResolvedValue(answer(200, []));
+
+    await send("/instances", {
+      query: { phase: ["faulted", "cancelled"], none: [] },
+    });
+
+    const { url } = lastRequest();
+    expect(url.search).toBe("?phase=faulted&phase=cancelled");
+  });
+
   it("the_persons_address_goes_to_the_api_even_when_anonymous", async () => {
     fetchApi.mockResolvedValue(answer(204));
     requestHeaders.set("x-forwarded-for", "203.0.113.7");

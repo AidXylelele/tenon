@@ -32,17 +32,16 @@ interface SignInQuery {
   readonly next?: string;
 }
 
-export const STARTED_WITHIN = ["1h", "24h", "7d"] as const;
-
-export type StartedWithin = (typeof STARTED_WITHIN)[number];
-
-interface RunsQuery {
+export interface RunsQuery {
   readonly namespace?: string;
   readonly name?: string;
   readonly version?: string;
+  readonly status?: string;
+  readonly started?: string;
+  readonly page?: number;
+  readonly size?: number;
+  readonly sort?: string;
   readonly phase?: Phase;
-  readonly started?: StartedWithin;
-  readonly cursor?: string;
 }
 
 interface WorkflowsQuery {
