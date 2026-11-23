@@ -76,6 +76,7 @@ export function PaletteContent({
   const pages = pagesOf(capabilities);
   const actions = allowedOf(ACTIONS, capabilities);
   const prompt = view === "run" ? RUN_PROMPT : PROMPT;
+  const nothing = view === "run" ? noWorkflowFor(query) : nothingFor(query);
 
   function visit(visited: Visit) {
     remember(userId, visited);
@@ -148,12 +149,7 @@ export function PaletteContent({
           onValueChange={setQuery}
         />
         <CommandList label="Results" className="max-h-96 p-1">
-          {settled && (
-            <CommandEmpty>
-              Nothing matches “{query}”. Try a workflow&apos;s name, a page, an
-              action or a run ID.
-            </CommandEmpty>
-          )}
+          {settled && <CommandEmpty>{nothing}</CommandEmpty>}
           {view === "run" ? (
             <WorkflowResults search={workflows} onChoose={chooseWorkflow} />
           ) : (
@@ -290,6 +286,14 @@ function ResultCountSaid({ speaking }: { readonly speaking: boolean }) {
   }, [announce, said, speaking]);
 
   return null;
+}
+
+function nothingFor(query: string): string {
+  return `Nothing matches “${query}”. Try a workflow's name, a page, an action or a run ID.`;
+}
+
+function noWorkflowFor(query: string): string {
+  return `No workflow matches “${query}”.`;
 }
 
 function labelOf(action: PaletteAction, scheme: Scheme): string {

@@ -424,6 +424,19 @@ describe("the search of the console", () => {
     expect(push).toHaveBeenCalledWith("/workflows/sales/route-lead?start=1");
   });
 
+  it("the_workflow_to_run_that_matches_nothing_says_only_that", async () => {
+    searchable.mockResolvedValue([lead]);
+    renderFor(EDITOR);
+    pressK("metaKey");
+    choose("Run a workflow…");
+
+    type("zzzz");
+    await readSettled();
+
+    const said = screen.getByText(/matches “zzzz”/);
+    expect(said).toHaveTextContent("No workflow matches “zzzz”.");
+  });
+
   it("backspace_in_an_empty_field_goes_back_from_running_to_everything", () => {
     renderFor(EDITOR);
     pressK("metaKey");
