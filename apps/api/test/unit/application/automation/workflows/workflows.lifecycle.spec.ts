@@ -15,7 +15,7 @@ import {
   FakeDefinitionCompiler,
   StoredDrafts,
   StoredSecrets,
-  RecordingSchedules,
+  RecordingWorkflowEvents,
   StoredWorkflowRepository,
   T0,
   FakeUnitOfWork,
@@ -33,14 +33,14 @@ function setUp() {
   const compiler = new FakeDefinitionCompiler();
   const workflows = new StoredWorkflowRepository();
   const secrets = new StoredSecrets();
-  const schedules = new RecordingSchedules();
+  const events = new RecordingWorkflowEvents();
   const drafts = new StoredDrafts();
-  const check = new CheckDefinition(compiler, workflows, secrets, schedules);
+  const check = new CheckDefinition(compiler, workflows, secrets);
   const compilation = new DraftCompilation(drafts, secrets, compiler);
   const publishDraft = new PublishDraft(
     compilation,
     workflows,
-    schedules,
+    events,
     unitOfWork,
   );
   const publish = {
@@ -61,7 +61,7 @@ function setUp() {
       });
     },
   };
-  const archive = new ArchiveWorkflow(workflows, unitOfWork);
+  const archive = new ArchiveWorkflow(workflows, events, unitOfWork);
   return { compiler, workflows, check, publish, archive };
 }
 

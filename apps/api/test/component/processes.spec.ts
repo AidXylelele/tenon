@@ -14,10 +14,10 @@ import { AsyncApiHandler } from "../../src/interface-adapters/messaging/asyncapi
 import { DeliveryHandler } from "../../src/interface-adapters/messaging/delivery.handler.js";
 import { EffectHandler } from "../../src/interface-adapters/messaging/effect.handler.js";
 import { RunHandler } from "../../src/interface-adapters/messaging/run.handler.js";
+import { ScheduleHandler } from "../../src/interface-adapters/messaging/schedule.handler.js";
 import { AsyncApiGateway } from "../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { SandboxGateway } from "../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
-import { ScheduleRun } from "../../src/interface-adapters/workflows/runners/schedule.run.js";
 import { truncateAll } from "../support/db.js";
 
 const UNKNOWN = "this provider does not exist in the current context";
@@ -38,7 +38,7 @@ const RETENTION_SCHEDULES = ["0 4 * * *", "30 3 * * *"];
 const RUNNERS = new Set<unknown>([
   RunHandler,
   EffectHandler,
-  ScheduleRun,
+  ScheduleHandler,
   DeliveryHandler,
 ]);
 

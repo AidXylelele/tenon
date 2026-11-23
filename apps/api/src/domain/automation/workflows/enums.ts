@@ -10,10 +10,12 @@ export enum WorkflowRefusal {
   Off = "workflow.off",
   ChainRunning = "workflow.chain-running",
   OwnLifecycle = "workflow.own-lifecycle",
+  ScheduleStale = "workflow.schedule-stale",
 }
 
 export enum WorkflowEventKind {
-  ScheduleChanged = "workflow.schedule-changed",
+  ScheduleArmed = "workflow.schedule-armed",
+  ScheduleFired = "workflow.schedule-fired",
 }
 
 export enum ScheduleKind {

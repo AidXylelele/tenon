@@ -15,6 +15,8 @@ export class WorkflowMapper {
       on: workflow.on,
       currentVersionId: workflow.currentVersionId,
       archivedAt: workflow.archivedAt,
+      arming: workflow.arming,
+      scheduledSince: workflow.scheduledSince,
       version: workflow.version,
     };
   }
@@ -28,6 +30,8 @@ export class WorkflowMapper {
       on: row.on,
       currentVersionId: row.currentVersionId,
       archivedAt: row.archivedAt,
+      arming: row.arming,
+      scheduledSince: row.scheduledSince,
       version: row.version,
       versions,
     });

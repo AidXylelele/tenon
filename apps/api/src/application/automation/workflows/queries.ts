@@ -1,6 +1,10 @@
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
-import type { ScheduledStarts, StartSlot } from "../schedules/interfaces.js";
+import type {
+  ScheduledStarts,
+  ScheduledWorkflow,
+  StartSlot,
+} from "../schedules/interfaces.js";
 import type {
   VersionIdentity,
   VersionProgram,
@@ -38,4 +42,6 @@ export abstract class WorkflowQueries {
   abstract scheduledStarts(
     slots: readonly StartSlot[],
   ): Promise<ScheduledStarts[]>;
+  abstract scheduled(): Promise<ScheduledWorkflow[]>;
+  abstract unarmedSchedules(): Promise<string[]>;
 }

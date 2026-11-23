@@ -29,6 +29,13 @@
       "when": 1795403327712,
       "tag": "0003_first_administrator",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795470909936,
+      "tag": "0004_workflow_schedule_arming",
+      "breakpoints": true
     }
   ]
 }

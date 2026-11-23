@@ -2,15 +2,14 @@ import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import type { InstanceCommand } from "../instances/interfaces.js";
 import { WorkflowInstanceRepository } from "../instances/ports.js";
-import { WorkflowRepository } from "../workflows/ports.js";
-import { WorkflowSchedules } from "./ports.js";
+import { WorkflowEvents, WorkflowRepository } from "../workflows/ports.js";
 
 @Injectable()
 export class ContinueSchedule {
   constructor(
     private readonly instances: WorkflowInstanceRepository,
     private readonly workflows: WorkflowRepository,
-    private readonly schedules: WorkflowSchedules,
+    private readonly events: WorkflowEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -20,12 +19,17 @@ export class ContinueSchedule {
     if (!instance?.continuesSchedule) return;
 
     const workflow = await this.workflows.findById(instance.workflowId);
-    const version = workflow?.versionById(instance.versionId) ?? null;
 
-    if (version === null) return;
+    if (workflow === null) return;
 
-    await this.unitOfWork.run(() =>
-      this.schedules.continueAfter(instance, version),
-    );
+    const now = new Date();
+    const continued = workflow.continueSchedule(instance, now);
+
+    if (!continued) return;
+
+    await this.unitOfWork.run(async () => {
+      await this.workflows.save(workflow);
+      await this.events.dispatch(workflow);
+    });
   }
 }

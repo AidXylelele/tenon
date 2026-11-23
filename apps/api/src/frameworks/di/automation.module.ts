@@ -10,7 +10,6 @@ import {
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../../application/automation/instances/ports.js";
-import { WorkflowSchedules } from "../../application/automation/schedules/ports.js";
 import { ScheduleQueries } from "../../application/automation/schedules/queries.js";
 import { SecretRepository } from "../../application/automation/secrets/ports.js";
 import { SecretQueries } from "../../application/automation/secrets/queries.js";
@@ -19,11 +18,15 @@ import {
   SubscriptionFilters,
   SubscriptionRepository,
 } from "../../application/automation/subscriptions/ports.js";
-import { WorkflowRepository } from "../../application/automation/workflows/ports.js";
+import {
+  WorkflowEvents,
+  WorkflowRepository,
+} from "../../application/automation/workflows/ports.js";
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
 import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
 import { HttpDeliveryGateway } from "../../interface-adapters/messaging/http-delivery.gateway.js";
 import { InstanceMessagesGateway } from "../../interface-adapters/messaging/instance-messages.gateway.js";
+import { WorkflowMessagesGateway } from "../../interface-adapters/messaging/workflow-messages.gateway.js";
 import {
   DeliveryAdmission,
   EventDeliveries,
@@ -46,8 +49,7 @@ import { PostgresWorkflowRepository } from "../../interface-adapters/persistence
 import { PostgresEventStore } from "../../interface-adapters/persistence/stores/postgres-event.store.js";
 import { PostgresLifecycleEventStore } from "../../interface-adapters/persistence/stores/postgres-lifecycle-event.store.js";
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
-import { EngineScheduleGateway } from "../../interface-adapters/workflows/gateways/engine-schedule.gateway.js";
-import { EngineExpectedStartsQueries } from "../../interface-adapters/workflows/queries/engine-expected-starts.queries.js";
+import { ExpectedStartsQueries } from "../../interface-adapters/workflows/queries/expected-starts.queries.js";
 import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
 import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
 import { AccessTokens } from "../../interface-adapters/workflows/effects/access-tokens.js";
@@ -108,9 +110,9 @@ import { OutboundModule } from "./outbound.module.js";
     InstanceMessagesGateway,
     { provide: InstanceEvents, useExisting: InstanceMessagesGateway },
     { provide: InstanceRuns, useExisting: InstanceMessagesGateway },
-    EngineScheduleGateway,
-    { provide: WorkflowSchedules, useExisting: EngineScheduleGateway },
-    { provide: ScheduleQueries, useClass: EngineExpectedStartsQueries },
+    WorkflowMessagesGateway,
+    { provide: WorkflowEvents, useExisting: WorkflowMessagesGateway },
+    { provide: ScheduleQueries, useClass: ExpectedStartsQueries },
     WorkflowMapper,
     WorkflowVersionMapper,
     WorkflowInstanceMapper,
@@ -187,7 +189,7 @@ import { OutboundModule } from "./outbound.module.js";
     SubscriptionFilters,
     InstanceEvents,
     InstanceRuns,
-    WorkflowSchedules,
+    WorkflowEvents,
     ScheduleQueries,
     WorkflowRepository,
     WorkflowQueries,

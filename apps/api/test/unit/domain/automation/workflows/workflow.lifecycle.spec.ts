@@ -312,6 +312,8 @@ describe("Workflow finding its versions", () => {
       on: false,
       currentVersionId: version.id,
       archivedAt: null,
+      arming: 0,
+      scheduledSince: null,
       version: 1,
       versions: [version],
     });
@@ -331,6 +333,8 @@ describe("Workflow finding its versions", () => {
       on: false,
       currentVersionId: version.id,
       archivedAt: null,
+      arming: 0,
+      scheduledSince: null,
       version: 1,
       versions: [version],
     });

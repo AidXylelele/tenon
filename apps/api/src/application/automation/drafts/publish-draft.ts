@@ -1,8 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
-import { WorkflowSchedules } from "../schedules/ports.js";
-import { WorkflowRepository } from "../workflows/ports.js";
+import { WorkflowEvents, WorkflowRepository } from "../workflows/ports.js";
 import { DraftCompilation } from "./draft-compilation.js";
 import type { PublishDraftCommand, PublishDraftResult } from "./interfaces.js";
 
@@ -11,7 +10,7 @@ export class PublishDraft {
   constructor(
     private readonly compilation: DraftCompilation,
     private readonly workflows: WorkflowRepository,
-    private readonly schedules: WorkflowSchedules,
+    private readonly events: WorkflowEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -26,11 +25,6 @@ export class PublishDraft {
 
     const draft = compiled.value.draft;
     const definition = compiled.value.definition;
-    const refusedSchedule = await this.schedules.check(definition);
-
-    if (refusedSchedule !== null)
-      return { ok: false, failure: [refusedSchedule] };
-
     const now = new Date();
     const found = await this.workflows.findByName(definition.name);
     const workflow = found ?? Workflow.register(definition.name);
@@ -46,7 +40,10 @@ export class PublishDraft {
     const publication = published.value;
 
     if (publication.created)
-      await this.unitOfWork.run(() => this.workflows.save(workflow));
+      await this.unitOfWork.run(async () => {
+        await this.workflows.save(workflow);
+        await this.events.dispatch(workflow);
+      });
 
     const version = {
       namespace: workflow.name.namespace,

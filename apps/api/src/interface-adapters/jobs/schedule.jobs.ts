@@ -1,0 +1,20 @@
+import { Injectable, Logger } from "@nestjs/common";
+import { OnOneInstance } from "@nestjs/locks";
+import { Timeout } from "@nestjs/schedule";
+import { ArmSchedules } from "../../application/automation/schedules/arm-schedules.js";
+
+@Injectable()
+export class ScheduleJobs {
+  private static readonly ARM = "schedules:arm";
+
+  private readonly logger = new Logger(ScheduleJobs.name);
+
+  constructor(private readonly armSchedules: ArmSchedules) {}
+
+  @Timeout(0)
+  @OnOneInstance({ key: ScheduleJobs.ARM })
+  async armUnarmed(): Promise<void> {
+    await this.armSchedules.execute();
+    this.logger.log("Armed the schedules nothing armed");
+  }
+}

@@ -11,6 +11,7 @@ import {
   FakeDefinitionCompiler,
   FakeUnitOfWork,
   RecordingInstanceEvents,
+  RecordingWorkflowEvents,
   StoredDrafts,
   StoredSecrets,
   StoredWorkflowInstanceRepository,
@@ -50,6 +51,7 @@ async function setUp(problems: readonly InputProblem[] = []) {
   const testDraft = new TestDraft(
     compilation,
     workflows,
+    new RecordingWorkflowEvents(),
     instances,
     events,
     runtime,

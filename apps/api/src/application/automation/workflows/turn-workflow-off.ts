@@ -1,13 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
-import { WorkflowRepository } from "./ports.js";
+import { WorkflowEvents, WorkflowRepository } from "./ports.js";
 import type { TurnResult, TurnWorkflowCommand } from "./interfaces.js";
 
 @Injectable()
 export class TurnWorkflowOff {
   constructor(
     private readonly workflows: WorkflowRepository,
+    private readonly events: WorkflowEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -18,7 +19,11 @@ export class TurnWorkflowOff {
 
     const turned = workflow.turnOff();
 
-    if (turned) await this.unitOfWork.run(() => this.workflows.save(workflow));
+    if (turned)
+      await this.unitOfWork.run(async () => {
+        await this.workflows.save(workflow);
+        await this.events.dispatch(workflow);
+      });
 
     return { ok: true, value: undefined };
   }

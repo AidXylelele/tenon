@@ -5,15 +5,16 @@ import {
   InstanceRuns,
   WorkflowInstanceRepository,
 } from "../../src/application/automation/instances/ports.js";
-import { WorkflowSchedules } from "../../src/application/automation/schedules/ports.js";
 import { SecretRepository } from "../../src/application/automation/secrets/ports.js";
 import type { Secret } from "../../src/domain/automation/secrets/secret.js";
 import type {
   VersionPublication,
+  WorkflowEvent,
   WorkflowProps,
 } from "../../src/domain/automation/workflows/interfaces.js";
 import {
   DefinitionCompiler,
+  WorkflowEvents,
   WorkflowRepository,
 } from "../../src/application/automation/workflows/ports.js";
 import type {
@@ -36,7 +37,6 @@ import type { JsonObject } from "../../src/domain/automation/interfaces.js";
 import { CheckedDefinition } from "../../src/domain/automation/workflows/checked-definition.js";
 import { Workflow } from "../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../src/domain/automation/workflows/workflow-name.js";
-import type { WorkflowVersion } from "../../src/domain/automation/workflows/workflow-version.js";
 import type { Result } from "../../src/domain/interfaces.js";
 import { UnitOfWork } from "../../src/application/unit-of-work.js";
 import {
@@ -384,6 +384,8 @@ function workflowRow(workflow: Workflow, version: number): WorkflowRoot {
     on: workflow.on,
     currentVersionId: workflow.currentVersionId,
     archivedAt: workflow.archivedAt,
+    arming: workflow.arming,
+    scheduledSince: workflow.scheduledSince,
     version,
   };
 }
@@ -553,35 +555,15 @@ export function anInstanceIn(
   });
 }
 
-export interface ContinuedChain {
-  readonly instanceId: string;
-  readonly versionId: string;
-}
+export class RecordingWorkflowEvents extends WorkflowEvents {
+  readonly dispatched: WorkflowEvent[] = [];
+  readonly calls: string[] = [];
 
-export class RecordingSchedules extends WorkflowSchedules {
-  readonly applied: string[] = [];
-  readonly cleared: string[] = [];
-  readonly continued: ContinuedChain[] = [];
+  dispatch(workflow: Workflow): Promise<void> {
+    for (const event of workflow.events) this.dispatched.push(event);
 
-  check(): Promise<DefinitionProblem | null> {
-    return Promise.resolve(null);
-  }
-
-  apply(workflow: Workflow, version: WorkflowVersion): Promise<void> {
-    this.applied.push(`${workflow.id}@${version.id}`);
-    return Promise.resolve();
-  }
-
-  clear(workflow: Workflow): Promise<void> {
-    this.cleared.push(workflow.id);
-    return Promise.resolve();
-  }
-
-  continueAfter(
-    instance: WorkflowInstance,
-    version: WorkflowVersion,
-  ): Promise<void> {
-    this.continued.push({ instanceId: instance.id, versionId: version.id });
+    this.calls.push(workflow.id);
+    workflow.clearEvents();
     return Promise.resolve();
   }
 }

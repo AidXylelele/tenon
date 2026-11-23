@@ -33,8 +33,9 @@ import { StartChildForEffect } from "../../application/automation/instances/star
 import { StartDetachedProcess } from "../../application/automation/instances/start-detached-process.js";
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
+import { ArmSchedules } from "../../application/automation/schedules/arm-schedules.js";
+import { FireSchedule } from "../../application/automation/schedules/fire-schedule.js";
 import { StartScheduledInstance } from "../../application/automation/schedules/start-scheduled-instance.js";
-import { SyncSchedule } from "../../application/automation/schedules/sync-schedule.js";
 import { DeliverEvent } from "../../application/automation/subscriptions/deliver-event.js";
 import { FailDelivery } from "../../application/automation/subscriptions/fail-delivery.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
@@ -43,6 +44,7 @@ import {
   DeliveryLog,
 } from "../../application/automation/subscriptions/ports.js";
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
+import { ScheduleJobs } from "../../interface-adapters/jobs/schedule.jobs.js";
 import { AsyncApiHandler } from "../../interface-adapters/messaging/asyncapi.handler.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
 import { ConsumerSpan } from "../../interface-adapters/messaging/consumer-span.js";
@@ -50,6 +52,7 @@ import { DeliveryMessagesGateway } from "../../interface-adapters/messaging/deli
 import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.handler.js";
 import { EffectHandler } from "../../interface-adapters/messaging/effect.handler.js";
 import { RunHandler } from "../../interface-adapters/messaging/run.handler.js";
+import { ScheduleHandler } from "../../interface-adapters/messaging/schedule.handler.js";
 import { SubscriptionClient } from "../../interface-adapters/messaging/interfaces.js";
 import { InboundMapper } from "../../interface-adapters/persistence/mappers/inbound.mapper.js";
 import { PostgresReceiverQueries } from "../../interface-adapters/persistence/queries/postgres-receiver.queries.js";
@@ -76,7 +79,6 @@ import { RedisGateway } from "../../interface-adapters/workflows/effects/redis.g
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
 import { RunController } from "../../interface-adapters/workflows/run.controller.js";
-import { ScheduleRun } from "../../interface-adapters/workflows/runners/schedule.run.js";
 import { AmqpConnection } from "../amqp/amqp.connection.js";
 import { parserOptions } from "../asyncapi/parser.options.js";
 import { GrpcConnection } from "../grpc/grpc.connection.js";
@@ -127,14 +129,14 @@ import { OutboundModule } from "./outbound.module.js";
     OfferEvent,
     DispatchEvent,
     StartOnEvent,
+    FireSchedule,
     StartScheduledInstance,
     ContinueSchedule,
-    SyncSchedule,
+    ArmSchedules,
     MatchSubscriptions,
     DeliverEvent,
     FailDelivery,
     RunController,
-    ScheduleRun,
     DeliveryMessagesGateway,
     { provide: Deliveries, useExisting: DeliveryMessagesGateway },
     InterpreterRoutingGateway,
@@ -144,8 +146,10 @@ import { OutboundModule } from "./outbound.module.js";
     RunHandler,
     EffectHandler,
     DeliveryHandler,
+    ScheduleHandler,
     AsyncApiHandler,
     RetentionJobs,
+    ScheduleJobs,
     InboundMapper,
     { provide: EventOffers, useClass: PostgresEventOfferStore },
     { provide: DeliveryLog, useClass: PostgresDeliveryLogStore },

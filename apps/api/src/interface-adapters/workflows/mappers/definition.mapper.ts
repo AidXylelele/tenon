@@ -8,8 +8,9 @@ import { CheckedDefinition } from "../../../domain/automation/workflows/checked-
 import { ScheduleKind } from "../../../domain/automation/workflows/enums.js";
 import type {
   ImportTexts,
-  Schedule,
+  ScheduleSpec,
 } from "../../../domain/automation/workflows/interfaces.js";
+import { Schedule } from "../../../domain/automation/workflows/schedule.js";
 import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { Result } from "../../../domain/interfaces.js";
 import type { CompiledData } from "../interfaces.js";
@@ -19,6 +20,8 @@ export class DefinitionMapper {
   private static readonly SYNTAX = "syntax";
   private static readonly ROOT = "";
   private static readonly NOT_JSON = "The value is not a JSON value.";
+  private static readonly CRON = "cron";
+  private static readonly CRON_POINTER = "/schedule/cron";
 
   toDefinition(
     compiled: CompiledData,
@@ -34,7 +37,10 @@ export class DefinitionMapper {
     const identity = manifest.identity;
     const name = new WorkflowName(identity.namespace, identity.name);
     const [declared] = manifest.schedules;
-    const schedule = this.#scheduleOf(declared);
+    const scheduled = this.#scheduleOf(declared);
+
+    if (!scheduled.ok) return scheduled;
+
     const definition = new CheckedDefinition({
       name,
       version: identity.version,
@@ -43,7 +49,7 @@ export class DefinitionMapper {
       document,
       imports,
       programFingerprint: compiled.fingerprint,
-      schedule,
+      schedule: scheduled.value,
       secrets: manifest.secrets,
     });
     return { ok: true, value: definition };
@@ -93,9 +99,27 @@ export class DefinitionMapper {
     return { ok: false, failure: [problem] };
   }
 
-  #scheduleOf(schedule: ProtocolSchedule | undefined): Schedule | null {
-    if (schedule === undefined) return null;
+  #scheduleOf(
+    declared: ProtocolSchedule | undefined,
+  ): Result<Schedule | null, readonly DefinitionProblem[]> {
+    if (declared === undefined) return { ok: true, value: null };
 
+    const spec = this.#specOf(declared);
+    const schedule = Schedule.of(spec);
+
+    if (schedule.ok) return schedule;
+
+    const problem = {
+      code: DefinitionMapper.CRON,
+      pointer: DefinitionMapper.CRON_POINTER,
+      detail: schedule.failure,
+      line: null,
+      column: null,
+    };
+    return { ok: false, failure: [problem] };
+  }
+
+  #specOf(schedule: ProtocolSchedule): ScheduleSpec {
     switch (schedule.kind) {
       case "every":
         return { kind: ScheduleKind.Every, interval: schedule.interval };

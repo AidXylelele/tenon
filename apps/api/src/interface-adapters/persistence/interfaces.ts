@@ -16,7 +16,7 @@ import type {
   JsonValue,
 } from "../../domain/automation/interfaces.js";
 import type { WorkflowStatus } from "../../domain/automation/workflows/enums.js";
-import type { Schedule } from "../../domain/automation/workflows/interfaces.js";
+import type { ScheduleSpec } from "../../domain/automation/workflows/interfaces.js";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { lifecycleEventCatalogue } from "interpreter";
 import type { CloudEvent } from "../../application/automation/events/interfaces.js";
@@ -162,7 +162,7 @@ export interface WorkflowSummaryRow extends LastRunColumns {
   readonly status: WorkflowStatus;
   readonly on: boolean;
   readonly currentVersion: string | null;
-  readonly schedule: Schedule | null;
+  readonly schedule: ScheduleSpec | null;
   readonly weekRuns: number;
   readonly weekFailed: number;
 }
@@ -172,7 +172,7 @@ export interface ScheduledStartsRow extends LastRunColumns {
   readonly namespace: string;
   readonly name: string;
   readonly title: string | null;
-  readonly schedule: Schedule | null;
+  readonly schedule: ScheduleSpec | null;
   readonly starts: number;
 }
 

@@ -5,9 +5,9 @@ import { WorkflowRefusal } from "./enums.js";
 import type {
   NewPublication,
   Publication,
-  Schedule,
   WorkflowVersionProps,
 } from "./interfaces.js";
+import type { Schedule } from "./schedule.js";
 
 export class WorkflowVersion {
   readonly #id: string;

@@ -6,6 +6,7 @@ import {
   desc,
   eq,
   gte,
+  inArray,
   isNotNull,
   lt,
   type SQL,
@@ -13,6 +14,7 @@ import {
 } from "drizzle-orm";
 import type {
   ScheduledStarts,
+  ScheduledWorkflow,
   StartSlot,
 } from "../../../application/automation/schedules/interfaces.js";
 import {
@@ -32,8 +34,12 @@ import type {
 } from "../../../application/automation/workflows/interfaces.js";
 import type { WorkflowQueries } from "../../../application/automation/workflows/queries.js";
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
-import type { WorkflowStatus } from "../../../domain/automation/workflows/enums.js";
+import {
+  ScheduleKind,
+  WorkflowStatus,
+} from "../../../domain/automation/workflows/enums.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
+import { MessageTopic } from "../../messaging/enums.js";
 import type {
   LastRunColumns,
   ScheduledStartsRow,
@@ -211,6 +217,60 @@ export class PostgresWorkflowQueries implements WorkflowQueries {
       .leftJoinLateral(lastRun, sql`true`)
       .orderBy(asc(workflows.namespace), asc(workflows.name));
     return scheduled.map((row) => this.#scheduledOf(row));
+  }
+
+  async scheduled(): Promise<ScheduledWorkflow[]> {
+    const repeating = [ScheduleKind.Every, ScheduleKind.Cron];
+    const rows = await this.txHost.tx
+      .select({
+        workflowId: workflows.id,
+        schedule: versions.schedule,
+        since: workflows.scheduledSince,
+      })
+      .from(workflows)
+      .innerJoin(versions, eq(versions.id, workflows.currentVersionId))
+      .where(
+        and(
+          eq(workflows.on, true),
+          eq(workflows.status, WorkflowStatus.Active),
+          isNotNull(workflows.scheduledSince),
+          inArray(sql`${versions.schedule} ->> 'kind'`, repeating),
+        ),
+      );
+    return rows.flatMap((row) => {
+      if (row.schedule === null || row.since === null) return [];
+
+      return [
+        {
+          workflowId: row.workflowId,
+          schedule: row.schedule,
+          since: row.since,
+        },
+      ];
+    });
+  }
+
+  async unarmedSchedules(): Promise<string[]> {
+    const timed = [ScheduleKind.Every, ScheduleKind.Cron, ScheduleKind.After];
+    const armed = sql`exists (
+      select 1 from nest_outbox.messages armed
+      where armed.topic = ${MessageTopic.ScheduleArmed}
+        and armed.payload ->> 'workflowId' = ${workflows.id}::text
+        and (armed.payload ->> 'arming')::int = ${workflows.arming}
+    )`;
+    const rows = await this.txHost.tx
+      .select({ workflowId: workflows.id })
+      .from(workflows)
+      .innerJoin(versions, eq(versions.id, workflows.currentVersionId))
+      .where(
+        and(
+          eq(workflows.on, true),
+          eq(workflows.status, WorkflowStatus.Active),
+          inArray(sql`${versions.schedule} ->> 'kind'`, timed),
+          sql`not ${armed}`,
+        ),
+      );
+    return rows.map((row) => row.workflowId);
   }
 
   #scheduledOf(row: ScheduledStartsRow): ScheduledStarts {

@@ -12,11 +12,9 @@ import { CancelInstance } from "../../application/automation/instances/cancel-in
 import { OfferEvent } from "../../application/automation/instances/offer-event.js";
 import { ContinueSchedule } from "../../application/automation/schedules/continue-schedule.js";
 import { StartOnEvent } from "../../application/automation/schedules/start-on-event.js";
-import { SyncSchedule } from "../../application/automation/schedules/sync-schedule.js";
 import { MatchSubscriptions } from "../../application/automation/subscriptions/match-subscriptions.js";
 import { UnitOfWork } from "../../application/unit-of-work.js";
 import { InstanceEventKind } from "../../domain/automation/instances/enums.js";
-import { WorkflowEventKind } from "../../domain/automation/workflows/enums.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { PermanentFault } from "../workflows/permanent-fault.error.js";
 import { ConsumerSpan } from "./consumer-span.js";
@@ -26,7 +24,6 @@ import type {
   EventOfferedMessage,
   InstanceMessage,
   TriggerOfferedMessage,
-  WorkflowMessage,
 } from "./interfaces.js";
 
 @Injectable()
@@ -43,7 +40,6 @@ export class AutomationHandler {
     private readonly cancelChildren: CancelChildren,
     private readonly cancelInstance: CancelInstance,
     private readonly continueSchedule: ContinueSchedule,
-    private readonly syncSchedule: SyncSchedule,
   ) {}
 
   @OnOutboxMessage(MessageTopic.EventAccepted, { consumer: "dispatch" })
@@ -143,16 +139,6 @@ export class AutomationHandler {
   ): Promise<void> {
     return this.#once(context, () =>
       this.continueSchedule.execute({ instanceId: message.instanceId }),
-    );
-  }
-
-  @OnOutboxMessage(WorkflowEventKind.ScheduleChanged, { consumer: "schedules" })
-  changed(
-    message: WorkflowMessage,
-    context: OutboxHandlerContext,
-  ): Promise<void> {
-    return this.#once(context, () =>
-      this.syncSchedule.execute({ workflowId: message.workflowId }),
     );
   }
 

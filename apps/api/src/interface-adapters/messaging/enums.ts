@@ -10,4 +10,6 @@ export enum MessageTopic {
   RunEffect = "run.effect",
   RunTimer = "run.timer",
   DeliveryRequested = "delivery.requested",
+  ScheduleArmed = "schedule.armed",
+  ScheduleFired = "schedule.fired",
 }

@@ -53,8 +53,15 @@ export interface RespondMessage {
   readonly outcome: DomainObject;
 }
 
-export interface WorkflowMessage {
+export interface ScheduleMessage {
   readonly workflowId: string;
+  readonly arming: number;
+  readonly at: number;
+}
+
+export interface ScheduleFiredMessage {
+  readonly workflowId: string;
+  readonly at: number;
 }
 
 export interface AsyncApiInbox {

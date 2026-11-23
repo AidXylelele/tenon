@@ -295,6 +295,9 @@ importers:
       canonicalize:
         specifier: 5.1.0
         version: 5.1.0
+      cron:
+        specifier: 4.4.0
+        version: 4.4.0
       drizzle-orm:
         specifier: 0.45.4
         version: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.6)(pg@8.23.1)

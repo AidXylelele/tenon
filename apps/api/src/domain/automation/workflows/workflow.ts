@@ -7,13 +7,16 @@ import type {
   InstanceRestart,
   NewInstance,
   NewPublication,
+  FiredStart,
   Publication,
   ScheduledStart,
+  ScheduleFire,
   StartRefusal,
   VersionPublication,
   WorkflowEvent,
   WorkflowProps,
 } from "./interfaces.js";
+import type { Schedule } from "./schedule.js";
 import type { WorkflowName } from "./workflow-name.js";
 import { WorkflowVersion } from "./workflow-version.js";
 
@@ -25,6 +28,8 @@ export class Workflow {
   #on: boolean;
   #currentVersionId: string | null;
   #archivedAt: Date | null;
+  #arming: number;
+  #scheduledSince: Date | null;
   #versions: readonly WorkflowVersion[];
   #publications: VersionPublication[] = [];
   #events: WorkflowEvent[] = [];
@@ -36,6 +41,8 @@ export class Workflow {
     this.#on = props.on;
     this.#currentVersionId = props.currentVersionId;
     this.#archivedAt = props.archivedAt;
+    this.#arming = props.arming;
+    this.#scheduledSince = props.scheduledSince;
     this.#version = props.version;
     this.#versions = props.versions;
   }
@@ -49,6 +56,8 @@ export class Workflow {
       on: false,
       currentVersionId: null,
       archivedAt: null,
+      arming: 0,
+      scheduledSince: null,
       version: 0,
       versions: [],
     });
@@ -76,6 +85,14 @@ export class Workflow {
 
   get archivedAt(): Date | null {
     return this.#archivedAt;
+  }
+
+  get arming(): number {
+    return this.#arming;
+  }
+
+  get scheduledSince(): Date | null {
+    return this.#scheduledSince;
   }
 
   get version(): number {
@@ -116,7 +133,7 @@ export class Workflow {
     this.#add(version, input);
     this.#currentVersionId = version.id;
 
-    if (this.#on) this.#raise(WorkflowEventKind.ScheduleChanged);
+    if (this.#on) this.#apply(input.now);
 
     return { ok: true, value: { version, created: true } };
   }
@@ -169,7 +186,7 @@ export class Workflow {
     return { ok: true, value: true };
   }
 
-  turnOn(): Result<boolean, WorkflowRefusal> {
+  turnOn(now: Date): Result<boolean, WorkflowRefusal> {
     const unpublished = this.#currentVersionId === null;
 
     if (unpublished) return { ok: false, failure: WorkflowRefusal.Unpublished };
@@ -181,7 +198,7 @@ export class Workflow {
     if (this.#on) return { ok: true, value: false };
 
     this.#on = true;
-    this.#raise(WorkflowEventKind.ScheduleChanged);
+    this.#apply(now);
     return { ok: true, value: true };
   }
 
@@ -189,7 +206,70 @@ export class Workflow {
     if (!this.#on) return false;
 
     this.#on = false;
-    this.#raise(WorkflowEventKind.ScheduleChanged);
+    this.#scheduledSince = null;
+    this.#armAt(null);
+    return true;
+  }
+
+  armSchedule(now: Date): boolean {
+    const at = this.#schedule()?.armedAt(now) ?? null;
+
+    if (at === null) return false;
+
+    this.#armAt(at);
+    return true;
+  }
+
+  fireSchedule(fire: ScheduleFire): Result<void, WorkflowRefusal> {
+    if (fire.arming !== this.#arming)
+      return { ok: false, failure: WorkflowRefusal.ScheduleStale };
+
+    const schedule = this.#schedule();
+
+    if (schedule === null) return { ok: false, failure: WorkflowRefusal.Off };
+
+    this.#events.push({
+      kind: WorkflowEventKind.ScheduleFired,
+      workflowId: this.#id,
+      arming: fire.arming,
+      at: fire.at,
+    });
+    const following = schedule.followingAt(fire.now);
+    this.#armAt(following);
+    return { ok: true, value: undefined };
+  }
+
+  startFiredInstance(
+    start: FiredStart,
+  ): Result<WorkflowInstance, WorkflowRefusal> {
+    const version = this.scheduledVersion;
+    const schedule = version?.schedule ?? null;
+
+    if (version === null || schedule === null)
+      return { ok: false, failure: WorkflowRefusal.Off };
+
+    return this.startScheduledInstance({
+      instanceId: start.instanceId,
+      version,
+      input: {},
+      trigger: TriggerKind.Schedule,
+      chained: schedule.chained,
+      chainRunning: start.chainRunning,
+      lifecycleOf: null,
+      now: start.now,
+    });
+  }
+
+  continueSchedule(instance: WorkflowInstance, now: Date): boolean {
+    const own = instance.workflowId === this.#id;
+
+    if (!own || !instance.continuesSchedule) return false;
+
+    const at = this.#schedule()?.continuedAt(now) ?? null;
+
+    if (at === null) return false;
+
+    this.#armAt(at);
     return true;
   }
 
@@ -305,7 +385,26 @@ export class Workflow {
     return this.versionById(id);
   }
 
-  #raise(kind: WorkflowEventKind): void {
-    this.#events.push({ kind, workflowId: this.#id });
+  #schedule(): Schedule | null {
+    return this.scheduledVersion?.schedule ?? null;
+  }
+
+  #apply(now: Date): void {
+    const at = this.#schedule()?.armedAt(now) ?? null;
+    this.#scheduledSince = now;
+    this.#armAt(at);
+  }
+
+  #armAt(at: number | null): void {
+    this.#arming += 1;
+
+    if (at === null) return;
+
+    this.#events.push({
+      kind: WorkflowEventKind.ScheduleArmed,
+      workflowId: this.#id,
+      arming: this.#arming,
+      at,
+    });
   }
 }
