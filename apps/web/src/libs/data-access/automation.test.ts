@@ -107,7 +107,7 @@ describe("the automation routes", () => {
       to: "2026-11-03T12:00:00Z",
     });
 
-    await expect(counting).rejects.toThrow("did not count the runs");
+    await expect(counting).rejects.toThrow("Tenon did not count the runs");
   });
 
   it("reads_the_failing_workflows_of_a_window_and_the_expected_starts_since_a_moment", async () => {

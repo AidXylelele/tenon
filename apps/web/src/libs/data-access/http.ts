@@ -63,11 +63,9 @@ export async function send(
       signal,
     });
   } catch (error) {
-    throw new ApiError(
-      503,
-      "The platform is not answering; try again in a moment",
-      { cause: error },
-    );
+    throw new ApiError(503, "Tenon is not answering; try again in a moment", {
+      cause: error,
+    });
   }
 
   const sessionEnded = response.status === 401 && options.anonymous !== true;

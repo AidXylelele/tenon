@@ -200,18 +200,18 @@ describe("a request to the API", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it("a_platform_that_does_not_answer_fails_with_what_to_do", async () => {
+  it("tenon_not_answering_fails_with_what_to_do", async () => {
     const networkError = new TypeError("fetch failed: ECONNREFUSED");
     fetchApi.mockRejectedValue(networkError);
 
     const sending = send("/workflows");
 
     await expect(sending).rejects.toEqual(
-      new ApiError(503, "The platform is not answering; try again in a moment"),
+      new ApiError(503, "Tenon is not answering; try again in a moment"),
     );
   });
 
-  it("a_platform_that_does_not_answer_keeps_its_cause_for_the_server_log", async () => {
+  it("tenon_not_answering_keeps_its_cause_for_the_server_log", async () => {
     const networkError = new TypeError("fetch failed");
     fetchApi.mockRejectedValue(networkError);
 
@@ -372,7 +372,7 @@ describe("a command", () => {
     });
   });
 
-  it("a_platform_that_does_not_answer_is_a_problem_the_form_can_show", async () => {
+  it("tenon_not_answering_is_a_problem_the_form_can_show", async () => {
     const networkError = new TypeError("fetch failed");
     fetchApi.mockRejectedValue(networkError);
 
@@ -380,7 +380,7 @@ describe("a command", () => {
 
     expect(outcome).toMatchObject({
       ok: false,
-      problem: { status: 503, title: "The platform is not answering" },
+      problem: { status: 503, title: "Tenon is not answering" },
     });
   });
 

@@ -174,8 +174,7 @@ export async function instanceCounts(
     },
   });
 
-  if (counts === null)
-    throw new ApiError(404, "The platform did not count the runs");
+  if (counts === null) throw new ApiError(404, "Tenon did not count the runs");
 
   return stamped(counts);
 }
@@ -268,7 +267,7 @@ export async function hostProfile(): Promise<HostProfile> {
   const profile = await read<HostProfile>("/host-profile");
 
   if (profile === null)
-    throw new ApiError(404, "The platform did not say what it can run");
+    throw new ApiError(404, "Tenon did not say what it can run");
 
   return profile;
 }
