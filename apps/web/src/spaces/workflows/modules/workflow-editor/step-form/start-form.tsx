@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from "@/libs/ui/components/select";
 import { CopyButton } from "@/libs/ui/composites/copy-button";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
+import { cronOf, REPEAT_CHOICES } from "@/operations/schedule-words";
 import {
   type FieldWords,
   eventEditsOf,
@@ -26,10 +28,7 @@ import {
   type StartWay,
   startOf,
   summaryOf,
-  textEditsOf,
 } from "../form-fields";
-import { cronOf, REPEAT_CHOICES } from "@/operations/schedule-words";
-import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { ProblemLines, useFieldProblems } from "./field-shell";
 import { FieldView } from "./field-view";
 import {
@@ -303,19 +302,11 @@ function EventTypeField({
 }) {
   const settings = useFormSettings();
   const written = eventType ?? "";
-  const typed = { ...schedule, value: written };
-  const problems = useFieldProblems(typed, EVENT_WORDS);
-  const field = {
-    pointer: schedule.pointer,
-    required: true,
-    written: true,
-    value: written,
-  };
+  const shown = { ...schedule, value: written };
+  const problems = useFieldProblems(shown, EVENT_WORDS);
 
   function commit(typed: string) {
-    const changes = textEditsOf(field, typed);
-
-    if (changes.length === 0) return;
+    if (typed === written) return;
 
     const edits = eventEditsOf(schedule, typed);
     settings.onEdit(edits);

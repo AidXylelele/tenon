@@ -37,6 +37,7 @@ import {
   caseRemovalOf,
   type CaseRow,
   casesOf,
+  CONTINUE,
   type FieldWords,
   flowChoicesOf,
   otherwiseEditsOf,
@@ -60,8 +61,6 @@ interface CaseCardProps {
   readonly isFirst: boolean;
   readonly isLast: boolean;
 }
-
-const CONTINUE = "continue";
 
 export function SwitchCases({ field, words }: SwitchCasesProps) {
   const { onEdit, languageTerms } = useFormSettings();
@@ -142,6 +141,8 @@ function CaseCard({ holder, row, isFirst, isLast }: CaseCardProps) {
     text,
     required: true,
     labelledBy: nameId,
+    describedBy: undefined,
+    invalid: false,
   };
   const condition =
     renderCondition === undefined ? (

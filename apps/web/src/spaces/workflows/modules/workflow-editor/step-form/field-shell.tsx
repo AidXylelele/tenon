@@ -2,7 +2,13 @@
 
 import { PencilIcon } from "lucide-react";
 import type { FormField } from "language-server/protocol";
-import { type FocusEvent, type ReactNode, useId, useState } from "react";
+import {
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  useId,
+  useState,
+} from "react";
 import { diagnosticText } from "@/libs/language-client/diagnostic-text";
 import {
   Field,
@@ -98,6 +104,10 @@ export function useFieldProblems(
     leave,
     refuse: setRefusal,
   };
+}
+
+export function blurOnEnter(event: KeyboardEvent<HTMLElement>) {
+  if (event.key === "Enter") event.currentTarget.blur();
 }
 
 function toldOf(

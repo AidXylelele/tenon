@@ -1,9 +1,6 @@
 import type { EditAction, FormField } from "language-server/protocol";
 import type { StartReading, StartWay } from "./interfaces";
-
-type Json = FormField["value"];
-
-type JsonObject = { readonly [key: string]: Json };
+import { isObject, type Json } from "./json";
 
 const TIMED_KEYS: readonly string[] = ["every", "after"];
 
@@ -82,8 +79,4 @@ export function eventEditsOf(
 ): EditAction[] {
   const value = { on: { one: { with: { type: eventType } } } };
   return [{ kind: "setField", pointer: schedule.pointer, value }];
-}
-
-function isObject(value: Json | undefined): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

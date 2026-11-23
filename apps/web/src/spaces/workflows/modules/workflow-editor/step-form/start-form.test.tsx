@@ -81,11 +81,14 @@ describe("how the workflow starts", () => {
     const way = screen.getByRole("radio", { name: "On a schedule" });
 
     expect(way).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText("Every day at 09:00 UTC")).toBeInTheDocument();
-    expect(screen.getByText("11:00 your time")).toBeInTheDocument();
-    expect(
-      screen.getByText("Mon 23 Nov 09:00 UTC · 11:00 your time"),
-    ).toBeInTheDocument();
+    const everyDayAt = screen.getByText("Every day at 09:00 UTC");
+    expect(everyDayAt).toBeInTheDocument();
+    const yourTime = screen.getByText("11:00 your time");
+    expect(yourTime).toBeInTheDocument();
+    const monNovUtc = screen.getByText(
+      "Mon 23 Nov 09:00 UTC · 11:00 your time",
+    );
+    expect(monNovUtc).toBeInTheDocument();
   });
 
   it("by_hand_clears_the_schedule", () => {
@@ -222,9 +225,10 @@ describe("a start by webhook or event", () => {
     const address = screen.getByLabelText("Its address");
 
     expect(address).toHaveValue(SIGN_UPS.address);
-    expect(
-      screen.getByRole("button", { name: "Copy the address" }),
-    ).toBeInTheDocument();
+    const copyTheAddress = screen.getByRole("button", {
+      name: "Copy the address",
+    });
+    expect(copyTheAddress).toBeInTheDocument();
   });
 
   it("another_webhook_writes_its_event_type", () => {

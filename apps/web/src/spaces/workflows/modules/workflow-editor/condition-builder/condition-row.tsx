@@ -1,7 +1,7 @@
 "use client";
 
 import { XIcon } from "lucide-react";
-import { type KeyboardEvent, useId } from "react";
+import { useId } from "react";
 import { Button } from "@/libs/ui/components/button";
 import { Field, FieldError, FieldLabel } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
@@ -17,6 +17,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
+import { choiceOfValue, valueOf } from "../data-picker/data-choices";
+import { blurOnEnter } from "../step-form";
 import {
   COMPARISONS,
   type Draft,
@@ -30,7 +32,6 @@ import {
   withRight,
   withRowRemoved,
 } from "./condition-rows";
-import { choiceOfValue, valueOf } from "../data-picker/data-choices";
 import type { ConditionBuilderProps, PickedData } from "./interfaces";
 
 interface RowProps extends Pick<
@@ -293,10 +294,6 @@ function TypedValue({
   const errorId = `${id}-error`;
   const invalid = problem !== null;
   const describedBy = invalid ? errorId : undefined;
-
-  function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") event.currentTarget.blur();
-  }
 
   return (
     <Field data-invalid={invalid}>

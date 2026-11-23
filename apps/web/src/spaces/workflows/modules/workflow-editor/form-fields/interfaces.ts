@@ -58,6 +58,8 @@ export interface RetrySettings {
   readonly growing: boolean;
 }
 
+export type RetryCount = "retries" | "seconds";
+
 export interface FailureTarget {
   readonly step: string;
   readonly pointer: string;

@@ -157,6 +157,18 @@ describe("a field the client marks to fill", () => {
     expect(fill).toBeNull();
   });
 
+  it("a_form_with_nothing_more_has_no_more_options", () => {
+    const titled: StepFormResult = {
+      ...RAISE_FORM,
+      fields: [essential(0, { key: "title", written: true, value: "Late" })],
+    };
+    shown({ form: titled });
+
+    const more = screen.queryByRole("button", { name: "More options" });
+
+    expect(more).toBeNull();
+  });
+
   it("empty_script_code_says_fill_in_and_is_not_optional", () => {
     const pointer = `${SCRIPT_STEP.pointer}/run/script/code`;
     const blank = formChanged(SCRIPT_FORM, pointer, { value: "" });
@@ -198,7 +210,8 @@ describe("a field's value by its kind", () => {
 
     leave(status, "four");
 
-    expect(screen.getByRole("alert")).toHaveTextContent("Write a number.");
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Write a number.");
     expect(onEdit).not.toHaveBeenCalled();
   });
 
@@ -416,9 +429,8 @@ describe("named values", () => {
     expect(onEdit).toHaveBeenCalledWith([
       { kind: "setField", pointer: `${SET_STEP.pointer}/set/count`, value: 3 },
     ]);
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Write the value as JSON",
-    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Write the value as JSON");
   });
 
   it("a_value_in_the_data_slot_reports_uses_and_clearing", () => {
@@ -585,9 +597,28 @@ describe("retry settings", () => {
     });
 
     leave(seconds, "later");
+    const later = screen.getByRole("alert").textContent;
+    leave(seconds, "2.5");
+    const fraction = screen.getByRole("alert").textContent;
     leave(seconds, "2");
+    const error = screen.queryByRole("alert");
 
+    expect(later).toBe("Write the seconds as a whole number.");
+    expect(fraction).toBe("Write the seconds as a whole number.");
+    expect(error).toBeNull();
     expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it("a_refused_count_is_told_beside_its_input", () => {
+    shown({ step: REPORT_INNER_STEP, form: REPORT_FORM, protection: RETRYING });
+    open("If this step fails");
+    const times = screen.getByRole("textbox", { name: "Try again" });
+
+    leave(times, "-");
+
+    const reason = "Write how many times as a whole number.";
+    expect(times).toHaveAttribute("aria-invalid", "true");
+    expect(times).toHaveAccessibleDescription(reason);
   });
 
   it("a_retry_written_in_another_form_says_so", () => {

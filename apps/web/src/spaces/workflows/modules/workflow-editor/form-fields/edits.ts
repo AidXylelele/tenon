@@ -1,7 +1,6 @@
-import type { EditAction, FormField } from "language-server/protocol";
+import type { EditAction } from "language-server/protocol";
 import type { Commit, FieldState } from "./interfaces";
-
-type Json = FormField["value"];
+import type { Json } from "./json";
 
 const EXPRESSION_START = "${";
 
@@ -50,7 +49,8 @@ export function numberCommitOf(field: FieldState, text: string): Commit {
 
   const value = Number(trimmed);
 
-  if (Number.isNaN(value)) return { kind: "refused", reason: REFUSED_NUMBER };
+  if (!Number.isFinite(value))
+    return { kind: "refused", reason: REFUSED_NUMBER };
 
   const edits = valueEditsOf(field, value);
   return { kind: "edits", edits };

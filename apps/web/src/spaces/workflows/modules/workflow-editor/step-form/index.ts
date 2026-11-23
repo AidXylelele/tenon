@@ -8,5 +8,6 @@ export type {
   StepFormProps,
   Webhook,
 } from "./interfaces";
+export { blurOnEnter } from "./field-shell";
 export { StartForm } from "./start-form";
 export { StepForm } from "./step-form";

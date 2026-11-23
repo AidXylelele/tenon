@@ -134,21 +134,22 @@ describe("a condition in the builder", () => {
     const first = row(1);
     const second = row(2);
 
-    expect(
-      screen.getByRole("group", { name: "Has items" }),
-    ).toBeInTheDocument();
-    expect(
-      within(first).getByText("Fetch the digest › slideshow › slides"),
-    ).toBeInTheDocument();
-    expect(
-      within(first).getByRole("combobox", { name: "Comparison" }),
-    ).toHaveTextContent("is not empty");
-    expect(
-      within(second).getByRole("textbox", { name: "Value to compare with" }),
-    ).toHaveValue("Sample Slide Show");
-    expect(
-      screen.getByRole("radio", { name: "All must hold" }),
-    ).toHaveAttribute("aria-checked", "true");
+    const hasItems = screen.getByRole("group", { name: "Has items" });
+    expect(hasItems).toBeInTheDocument();
+    const fetchTheDigest = within(first).getByText(
+      "Fetch the digest › slideshow › slides",
+    );
+    expect(fetchTheDigest).toBeInTheDocument();
+    const firstComparison = within(first).getByRole("combobox", {
+      name: "Comparison",
+    });
+    expect(firstComparison).toHaveTextContent("is not empty");
+    const valueToCompare = within(second).getByRole("textbox", {
+      name: "Value to compare with",
+    });
+    expect(valueToCompare).toHaveValue("Sample Slide Show");
+    const allMustHold = screen.getByRole("radio", { name: "All must hold" });
+    expect(allMustHold).toHaveAttribute("aria-checked", "true");
   });
 
   it("another_comparison_writes_the_condition", () => {
@@ -347,9 +348,8 @@ describe("a condition in the builder", () => {
 
     expect(first).toHaveTextContent("Today");
     expect(second).toHaveTextContent("Data from the workflow");
-    expect(
-      within(row(2)).getByText("The workflow's input"),
-    ).toBeInTheDocument();
+    const inputName = within(row(2)).getByText("The workflow's input");
+    expect(inputName).toBeInTheDocument();
   });
 
   it("data_the_picker_does_not_offer_is_shown_as_its_path", () => {
@@ -365,13 +365,15 @@ describe("a condition in the builder", () => {
 
     rerender({ text: "", reading: BEFORE_TODAY });
 
-    expect(within(row(1)).getByText(".due")).toBeInTheDocument();
+    const due = within(row(1)).getByText(".due");
+    expect(due).toBeInTheDocument();
   });
 
   it("while_the_condition_is_read_it_says_so", () => {
     shown({ reading: null });
 
-    expect(screen.getByText("Reading the condition…")).toBeInTheDocument();
+    const readingTheCondition = screen.getByText("Reading the condition…");
+    expect(readingTheCondition).toBeInTheDocument();
   });
 });
 
@@ -384,10 +386,12 @@ describe("a condition as an expression", () => {
     });
 
     expect(expression).toHaveValue(NON_CANONICAL_TEXT);
-    expect(
-      screen.queryByRole("button", { name: "Use the builder" }),
-    ).toBeNull();
-    expect(screen.getByText(/cannot show this expression/)).toBeInTheDocument();
+    const useTheBuilder = screen.queryByRole("button", {
+      name: "Use the builder",
+    });
+    expect(useTheBuilder).toBeNull();
+    const cannotShowThis = screen.getByText(/cannot show this expression/);
+    expect(cannotShowThis).toBeInTheDocument();
   });
 
   it("writing_an_expression_keeps_focus_on_the_switch_and_back", () => {
@@ -449,7 +453,8 @@ describe("a condition as an expression", () => {
     rerender({ text: TWO_ROWS_TEXT, reading: TWO_ROWS_ALL });
     press("Use the builder");
 
-    expect(row(2)).toBeInTheDocument();
+    const secondRow = row(2);
+    expect(secondRow).toBeInTheDocument();
   });
 });
 

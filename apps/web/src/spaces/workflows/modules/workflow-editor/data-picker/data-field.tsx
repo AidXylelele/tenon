@@ -1,7 +1,7 @@
 "use client";
 
 import { XIcon } from "lucide-react";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { Input } from "@/libs/ui/components/input";
 import {
@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/libs/ui/components/tooltip";
 import { cn } from "@/libs/ui/tokens/cn";
+import { blurOnEnter } from "../step-form";
 import { choiceOfValue, type DataChoice } from "./data-choices";
 import { ChoiceIcon } from "./choice-icon";
 import { DataPicker } from "./data-picker";
@@ -59,10 +60,6 @@ export function DataField({
   function clear() {
     onClear();
     trigger.current?.focus();
-  }
-
-  function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") event.currentTarget.blur();
   }
 
   return (

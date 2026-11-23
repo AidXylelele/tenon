@@ -2,7 +2,7 @@
 
 import { CalendarClockIcon } from "lucide-react";
 import type { FormField } from "language-server/protocol";
-import { type KeyboardEvent, useId, useState } from "react";
+import { useId, useState } from "react";
 import {
   Field,
   FieldDescription,
@@ -20,7 +20,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/libs/ui/components/toggle-group";
-import { cronEditsOf, type FieldWords } from "../form-fields";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
 import {
   cronOf,
   cronText,
@@ -35,8 +35,8 @@ import {
   type TimeOfDay,
   type Weekday,
 } from "@/operations/schedule-words";
-import { Disclosure } from "@/libs/ui/composites/disclosure";
-import { ProblemLines, useFieldProblems } from "./field-shell";
+import { cronEditsOf, type FieldWords } from "../form-fields";
+import { blurOnEnter, ProblemLines, useFieldProblems } from "./field-shell";
 import { useFormSettings } from "./form-settings";
 
 interface ScheduleBuilderProps {
@@ -76,10 +76,6 @@ const CRON_WORDS: FieldWords = {
   mono: true,
   choices: new Map(),
 };
-
-function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-  if (event.key === "Enter") event.currentTarget.blur();
-}
 
 function twoDigits(amount: number): string {
   return String(amount).padStart(2, "0");

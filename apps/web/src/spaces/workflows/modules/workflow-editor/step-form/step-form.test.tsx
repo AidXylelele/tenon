@@ -105,7 +105,8 @@ describe("a step's essential fields", () => {
 
     expect(fill).toBeInTheDocument();
     expect(address).toHaveAccessibleDescription("Fill in");
-    expect(screen.queryByRole("alert")).toBeNull();
+    const alert = screen.queryByRole("alert");
+    expect(alert).toBeNull();
   });
 
   it("an_address_left_empty_says_how_to_fill_it", () => {
@@ -114,11 +115,13 @@ describe("a step's essential fields", () => {
 
     leave(address, "");
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(
       "Enter the address to call, for example https://api.example.com/orders",
     );
     expect(address).toHaveAttribute("aria-invalid", "true");
-    expect(screen.queryByText("Fill in")).toBeNull();
+    const fillIn = screen.queryByText("Fill in");
+    expect(fillIn).toBeNull();
   });
 
   it("test_or_publish_shows_every_problem_at_once", () => {
@@ -127,7 +130,8 @@ describe("a step's essential fields", () => {
     const error = screen.getByRole("alert");
 
     expect(error).toHaveTextContent("Enter the address to call");
-    expect(screen.queryByText("Fill in")).toBeNull();
+    const fillIn = screen.queryByText("Fill in");
+    expect(fillIn).toBeNull();
   });
 
   it("a_typed_address_is_set_when_the_field_is_left", () => {
@@ -207,9 +211,8 @@ describe("the step's name", () => {
 
     leave(name, "  ");
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Give the step a name.",
-    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Give the step a name.");
     expect(onEdit).not.toHaveBeenCalled();
   });
 
@@ -310,25 +313,30 @@ describe("the slots other features fill", () => {
     shown({ renderCondition });
     open("More options");
     const add = screen.getByRole("button", { name: "Add a condition" });
+    const help = "Skip the step unless the condition holds.";
+    expect(add).toHaveAccessibleDescription(help);
 
     act(() => {
       fireEvent.click(add);
     });
 
-    expect(screen.getByText("The builder")).toBeInTheDocument();
-    expect(renderCondition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pointer: `${FETCH_STEP.pointer}/if`,
-        text: "",
-      }),
-    );
+    const builder = screen.getByText("The builder");
+    const slot = expect.objectContaining({
+      pointer: `${FETCH_STEP.pointer}/if`,
+      text: "",
+      describedBy: expect.any(String),
+      invalid: false,
+    });
+    expect(builder).toBeInTheDocument();
+    expect(renderCondition).toHaveBeenCalledWith(slot);
   });
 
   it("the_code_of_a_script_goes_to_the_code_slot_with_its_language", () => {
     const renderCode = vi.fn(() => <p>The code editor</p>);
     shown({ step: SCRIPT_STEP, form: SCRIPT_FORM, renderCode });
 
-    expect(screen.getByText("The code editor")).toBeInTheDocument();
+    const theCodeEditor = screen.getByText("The code editor");
+    expect(theCodeEditor).toBeInTheDocument();
     expect(renderCode).toHaveBeenCalledWith(
       expect.objectContaining({ language: "js" }),
     );
@@ -350,12 +358,14 @@ describe("a switch's branches", () => {
     const branch = screen.getByRole("group", { name: "Has items" });
     const otherwise = screen.getByRole("group", { name: "Otherwise" });
 
-    expect(
-      within(branch).getByRole("textbox", { name: "Condition of Has items" }),
-    ).toBeInTheDocument();
-    expect(
-      within(otherwise).getByRole("combobox", { name: "Then" }),
-    ).toHaveTextContent("End the run");
+    const conditionOfHas = within(branch).getByRole("textbox", {
+      name: "Condition of Has items",
+    });
+    expect(conditionOfHas).toBeInTheDocument();
+    const otherwiseThen = within(otherwise).getByRole("combobox", {
+      name: "Then",
+    });
+    expect(otherwiseThen).toHaveTextContent("End the run");
   });
 
   it("a_branch_is_added_before_otherwise", () => {
@@ -441,7 +451,8 @@ describe("set data", () => {
       fireEvent.click(keep);
     });
 
-    expect(screen.getByText(/written as an expression/)).toBeInTheDocument();
+    const writtenAsAn = screen.getByText(/written as an expression/);
+    expect(writtenAsAn).toBeInTheDocument();
     expect(onEdit).toHaveBeenCalledWith([
       { kind: "setResult", step: SET_STEP.id, result: "inputAndValues" },
     ]);
@@ -473,9 +484,8 @@ describe("set data", () => {
 
     leave(name, "count");
 
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Another value is already named “count”.",
-    );
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("Another value is already named “count”.");
     expect(onEdit).not.toHaveBeenCalled();
   });
 
@@ -600,7 +610,8 @@ describe("if this step fails", () => {
     });
 
     expect(retryThenHandle).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText(/press the lane's \+/)).toBeInTheDocument();
+    const pressTheLane = screen.getByText(/press the lane's \+/);
+    expect(pressTheLane).toBeInTheDocument();
   });
 
   it("a_step_without_a_try_wraps_itself_to_retry", () => {

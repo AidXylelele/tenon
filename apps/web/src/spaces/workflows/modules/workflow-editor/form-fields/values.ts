@@ -1,9 +1,6 @@
-import type { EditAction, FormField } from "language-server/protocol";
+import type { EditAction } from "language-server/protocol";
 import type { Commit, FieldState, ValueRow } from "./interfaces";
-
-type Json = FormField["value"];
-
-type JsonObject = { readonly [key: string]: Json };
+import { isObject, type Json, type JsonObject } from "./json";
 
 const FIRST_NAME = "value";
 
@@ -77,8 +74,4 @@ function membersOf(value: Json): JsonObject {
 
 function setOf(holder: FieldState, value: JsonObject): EditAction[] {
   return [{ kind: "setField", pointer: holder.pointer, value }];
-}
-
-function isObject(value: Json): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -6,12 +6,14 @@ import type {
   WordsKind,
 } from "./interfaces";
 
+export const CONTINUE = "continue";
+
 const ANY_KIND = "*";
 
 const NO_CHOICES: ReadonlyMap<string, string> = new Map();
 
 const FLOW_WORDS: ReadonlyMap<string, string> = new Map([
-  ["continue", "Continue with the next step"],
+  [CONTINUE, "Continue with the next step"],
   ["exit", "Leave the block"],
   ["end", "End the run"],
 ]);
@@ -205,7 +207,7 @@ export function flowChoicesOf(
   });
 }
 
-export function flowText(value: string): string {
+function flowText(value: string): string {
   return FLOW_WORDS.get(value) ?? `Go to “${value}”`;
 }
 

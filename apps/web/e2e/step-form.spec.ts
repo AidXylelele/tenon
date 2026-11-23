@@ -29,7 +29,7 @@ test.describe("the step form playground", () => {
     page,
   }) => {
     await page.goto(TO_FILL);
-    const more = page.locator("summary", { hasText: "More options" });
+    const more = page.getByRole("button", { name: "More options" });
     const headers = page.getByLabel(/Headers/);
     await expect(headers).toBeHidden();
 
@@ -43,8 +43,13 @@ test.describe("the step form playground", () => {
   test("a_schedule_is_said_in_utc_with_the_viewer's_time", async ({ page }) => {
     await page.goto(SCHEDULE);
 
-    await expect(page.getByText("Every day at 09:00 UTC")).toBeVisible();
-    await expect(page.getByText("Next starts")).toBeVisible();
+    const utc = page.getByText("Every day at 09:00 UTC");
+    const local = page.getByText("11:00 your time", { exact: true });
+    const nextStarts = page.getByText("Next starts");
+
+    await expect(utc).toBeVisible();
+    await expect(local).toBeVisible();
+    await expect(nextStarts).toBeVisible();
   });
 
   test("the_start_form_renders_in_the_dark_theme_when_chosen", async ({
@@ -53,9 +58,9 @@ test.describe("the step form playground", () => {
     await page.goto(DARK_SCHEDULE);
 
     const root = page.locator("html");
+    const way = page.getByRole("radio", { name: "On a schedule" });
+
     await expect(root).toHaveAttribute("data-theme", "dark");
-    await expect(
-      page.getByRole("radio", { name: "On a schedule" }),
-    ).toBeChecked();
+    await expect(way).toBeChecked();
   });
 });

@@ -6,8 +6,7 @@ import type {
   WorkflowFormResult,
 } from "language-server/protocol";
 import type { ReactNode } from "react";
-
-export type Json = FormField["value"];
+import type { Json } from "../form-fields";
 
 export type Edit = (actions: readonly EditAction[]) => void;
 
@@ -33,6 +32,8 @@ export interface ConditionSlot {
   readonly text: string;
   readonly required: boolean;
   readonly labelledBy: string;
+  readonly describedBy: string | undefined;
+  readonly invalid: boolean;
 }
 
 export interface CodeSlot {

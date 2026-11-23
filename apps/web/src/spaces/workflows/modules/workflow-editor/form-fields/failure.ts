@@ -6,13 +6,14 @@ import type {
   StepFormResult,
 } from "language-server/protocol";
 import type {
+  Commit,
   FailureChoice,
   FailureReading,
   FailureTarget,
+  RetryCount,
   RetrySettings,
 } from "./interfaces";
-
-type Json = FormField["value"];
+import { isObject, type Json } from "./json";
 
 export const FIRST_RETRY: RetrySettings = {
   retries: 3,
@@ -40,6 +41,11 @@ const SECONDS_IN: ReadonlyMap<string, number> = new Map([
 ]);
 
 const LANE = "“If it fails” lane";
+
+const REFUSED_COUNTS: Readonly<Record<RetryCount, string>> = {
+  retries: "Write how many times as a whole number.",
+  seconds: "Write the seconds as a whole number.",
+};
 
 export function failureOf(
   step: Step,
@@ -83,7 +89,7 @@ function targetOf(
   return { step: protection.step, pointer };
 }
 
-export function retrySettingsOf(policy: Json): RetrySettings | null {
+function retrySettingsOf(policy: Json): RetrySettings | null {
   if (!isObject(policy)) return null;
 
   const seconds = secondsOf(policy.delay);
@@ -123,11 +129,7 @@ function growingOf(backoff: Json | undefined): boolean | null {
   return null;
 }
 
-function isObject(value: Json | undefined): value is { [key: string]: Json } {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function policyOf(retry: RetrySettings): Json {
+function policyOf(retry: RetrySettings): Json {
   const backoff = retry.growing ? "exponential" : "constant";
   return {
     delay: { seconds: retry.seconds },
@@ -210,6 +212,25 @@ export function retryChangeOf(
     case "handle":
       return [];
   }
+}
+
+export function retryCommitOf(
+  reading: FailureReading,
+  count: RetryCount,
+  text: string,
+): Commit {
+  const shown = reading.retry ?? FIRST_RETRY;
+  const trimmed = text.trim();
+  const amount = Number(trimmed);
+  const isCount = trimmed !== "" && Number.isInteger(amount) && amount >= 0;
+
+  if (!isCount) return { kind: "refused", reason: REFUSED_COUNTS[count] };
+
+  if (amount === shown[count]) return { kind: "edits", edits: [] };
+
+  const next = { ...shown, [count]: amount };
+  const edits = retryChangeOf(reading, next);
+  return { kind: "edits", edits };
 }
 
 export function failureSummaryOf(reading: FailureReading): string {

@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormField } from "language-server/protocol";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Input } from "@/libs/ui/components/input";
 import {
   Select,
@@ -23,7 +23,7 @@ import {
   textEditsOf,
   valueEditsOf,
 } from "../form-fields";
-import type { ControlWiring } from "./field-shell";
+import { blurOnEnter, type ControlWiring } from "./field-shell";
 import { useFormSettings } from "./form-settings";
 
 export interface ControlProps {
@@ -43,10 +43,6 @@ const UNITS_MS: ReadonlyMap<string, number> = new Map([
   ["seconds", 1000],
   ["milliseconds", 1],
 ]);
-
-function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-  if (event.key === "Enter") event.currentTarget.blur();
-}
 
 export function TextControl({
   field,

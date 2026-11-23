@@ -1,7 +1,8 @@
 "use client";
 
 import type { FormField, Step, StepFormResult } from "language-server/protocol";
-import { type KeyboardEvent, useId } from "react";
+import { useId, useState } from "react";
+import { FieldError } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
 import { Label } from "@/libs/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@/libs/ui/components/radio-group";
@@ -12,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/libs/ui/components/select";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
 import {
   FAILURE_CHOICES,
   type FailureChoice,
@@ -22,9 +24,11 @@ import {
   failureSummaryOf,
   FIRST_RETRY,
   retryChangeOf,
+  retryCommitOf,
+  type RetryCount,
   type RetrySettings,
 } from "../form-fields";
-import { Disclosure } from "@/libs/ui/composites/disclosure";
+import { blurOnEnter } from "./field-shell";
 import { FieldView } from "./field-view";
 import { useFormSettings } from "./form-settings";
 
@@ -33,6 +37,11 @@ interface FailureBoxProps {
   readonly form: StepFormResult;
   readonly protection: StepFormResult | null;
   readonly fields: readonly FormField[];
+}
+
+interface Refusal {
+  readonly count: RetryCount;
+  readonly reason: string;
 }
 
 const GROWING = "growing";
@@ -103,10 +112,16 @@ function RetrySettingsView({ reading }: { readonly reading: FailureReading }) {
   const retriesId = `${id}-retries`;
   const secondsId = `${id}-seconds`;
   const waitId = `${id}-wait`;
+  const errorId = `${id}-error`;
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
   const shown = reading.retry ?? FIRST_RETRY;
   const retries = String(shown.retries);
   const seconds = String(shown.seconds);
   const wait = shown.growing ? GROWING : STEADY;
+  const retriesRefused = refusal?.count === "retries";
+  const secondsRefused = refusal?.count === "seconds";
+  const retriesDescribedBy = retriesRefused ? errorId : undefined;
+  const secondsDescribedBy = secondsRefused ? errorId : undefined;
 
   function change(next: RetrySettings) {
     const edits = retryChangeOf(reading, next);
@@ -114,19 +129,17 @@ function RetrySettingsView({ reading }: { readonly reading: FailureReading }) {
     onEdit(edits);
   }
 
-  function changeCount(text: string, key: "retries" | "seconds") {
-    const amount = Number(text);
-    const isAmount =
-      Number.isFinite(amount) && amount >= 0 && text.trim() !== "";
+  function changeCount(text: string, count: RetryCount) {
+    const commit = retryCommitOf(reading, count, text);
 
-    if (!isAmount || amount === shown[key]) return;
+    if (commit.kind === "refused") {
+      setRefusal({ count, reason: commit.reason });
+      return;
+    }
 
-    const next = { ...shown, [key]: amount };
-    change(next);
-  }
+    setRefusal(null);
 
-  function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") event.currentTarget.blur();
+    onEdit(commit.edits);
   }
 
   return (
@@ -141,33 +154,44 @@ function RetrySettingsView({ reading }: { readonly reading: FailureReading }) {
           writes it again.
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2">
-        <Label htmlFor={retriesId}>Try again</Label>
-        <Input
-          key={retries}
-          id={retriesId}
-          inputMode="numeric"
-          className="w-16"
-          defaultValue={retries}
-          onBlur={(event) => {
-            changeCount(event.currentTarget.value, "retries");
-          }}
-          onKeyDown={blurOnEnter}
-        />
-        <span>times,</span>
-        <Input
-          key={seconds}
-          id={secondsId}
-          inputMode="decimal"
-          className="w-16"
-          aria-label="Seconds between tries"
-          defaultValue={seconds}
-          onBlur={(event) => {
-            changeCount(event.currentTarget.value, "seconds");
-          }}
-          onKeyDown={blurOnEnter}
-        />
-        <span>seconds apart</span>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Label htmlFor={retriesId}>Try again</Label>
+          <Input
+            key={retries}
+            id={retriesId}
+            inputMode="numeric"
+            className="w-16"
+            defaultValue={retries}
+            aria-describedby={retriesDescribedBy}
+            aria-invalid={retriesRefused}
+            onBlur={(event) => {
+              changeCount(event.currentTarget.value, "retries");
+            }}
+            onKeyDown={blurOnEnter}
+          />
+          <span>times,</span>
+          <span className="flex items-center gap-2 whitespace-nowrap">
+            <Input
+              key={seconds}
+              id={secondsId}
+              inputMode="numeric"
+              className="w-16"
+              aria-label="Seconds between tries"
+              defaultValue={seconds}
+              aria-describedby={secondsDescribedBy}
+              aria-invalid={secondsRefused}
+              onBlur={(event) => {
+                changeCount(event.currentTarget.value, "seconds");
+              }}
+              onKeyDown={blurOnEnter}
+            />
+            seconds apart
+          </span>
+        </div>
+        {refusal !== null && (
+          <FieldError id={errorId}>{refusal.reason}</FieldError>
+        )}
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor={waitId}>The wait between tries</Label>

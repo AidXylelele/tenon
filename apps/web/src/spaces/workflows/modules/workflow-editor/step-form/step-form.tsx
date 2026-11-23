@@ -1,7 +1,7 @@
 "use client";
 
 import type { EditAction, FormField, Step } from "language-server/protocol";
-import { type KeyboardEvent, useId, useState } from "react";
+import { useId, useState } from "react";
 import {
   Field,
   FieldDescription,
@@ -9,10 +9,11 @@ import {
   FieldLabel,
 } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
-import { formKindOf, layoutOf, pathOf, summaryOf } from "../form-fields";
 import { Disclosure } from "@/libs/ui/composites/disclosure";
+import { formKindOf, layoutOf, pathOf, summaryOf } from "../form-fields";
 import { FailureBox } from "./failure-box";
 import { OTHER_METHODS } from "./field-control";
+import { blurOnEnter } from "./field-shell";
 import { FieldView } from "./field-view";
 import {
   type FormSettings,
@@ -53,6 +54,7 @@ export function StepForm({
   const scriptLanguage =
     typeof language?.value === "string" ? language.value : "";
   const otherMethods = kind === "http" ? method : undefined;
+  const hasMore = otherMethods !== undefined || layout.more.length > 0;
   const moreSummary = summaryOf(layout.more, kind, step.pointer, USUAL);
   const dataSummary = summaryOf(layout.data, kind, step.pointer, EXPRESSIONS);
   const settings: FormSettings = {
@@ -78,12 +80,16 @@ export function StepForm({
         {form.result !== null && (
           <ResultChoice step={form.step} result={form.result} />
         )}
-        <Disclosure title="More options" summary={moreSummary}>
-          {otherMethods !== undefined && <OtherMethods field={otherMethods} />}
-          {layout.more.map((field) => (
-            <FieldView key={field.pointer} field={field} />
-          ))}
-        </Disclosure>
+        {hasMore && (
+          <Disclosure title="More options" summary={moreSummary}>
+            {otherMethods !== undefined && (
+              <OtherMethods field={otherMethods} />
+            )}
+            {layout.more.map((field) => (
+              <FieldView key={field.pointer} field={field} />
+            ))}
+          </Disclosure>
+        )}
         {layout.data.length > 0 && (
           <Disclosure title="Data in and out" summary={dataSummary}>
             {layout.data.map((field) => (
@@ -155,10 +161,6 @@ function NameField({
 
     const action: EditAction = { kind: "renameStep", step: step.id, name };
     onEdit([action]);
-  }
-
-  function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") event.currentTarget.blur();
   }
 
   return (

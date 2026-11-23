@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fieldOf } from "./forms.test-support";
-import {
-  flowChoicesOf,
-  flowText,
-  hasWords,
-  resultText,
-  wordsOf,
-} from "./words";
+import { flowChoicesOf, hasWords, resultText, wordsOf } from "./words";
 
 const ENDPOINT = fieldOf({
   key: "endpoint",
@@ -68,9 +62,9 @@ describe("the words of where a step goes next", () => {
   });
 
   it("a_step_name_reads_as_going_to_it", () => {
-    const text = flowText("Post the items");
+    const [choice] = flowChoicesOf(["Post the items"]);
 
-    expect(text).toBe("Go to “Post the items”");
+    expect(choice?.text).toBe("Go to “Post the items”");
   });
 });
 

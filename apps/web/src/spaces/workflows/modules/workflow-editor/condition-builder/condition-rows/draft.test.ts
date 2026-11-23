@@ -94,7 +94,8 @@ describe("changing the rows", () => {
     const written = conditionOf(draft);
 
     expect(written).toBeNull();
-    expect(writtenPartOf(draft)).toEqual(PAID);
+    const writtenPart = writtenPartOf(draft);
+    expect(writtenPart).toEqual(PAID);
   });
 
   it("choosing_the_value_of_a_new_row_completes_it", () => {
@@ -128,7 +129,8 @@ describe("changing the rows", () => {
     const problems = greater.rows.map(rowProblemOf);
 
     expect(problems).toEqual(["Enter a number.", null]);
-    expect(conditionOf(greater)).toBeNull();
+    const condition = conditionOf(greater);
+    expect(condition).toBeNull();
   });
 
   it("an_empty_second_value_waits_without_a_problem", () => {
@@ -148,7 +150,8 @@ describe("changing the rows", () => {
       null,
     );
 
-    expect(conditionOf(pending)).toBeNull();
+    const condition = conditionOf(pending);
+    expect(condition).toBeNull();
   });
 
   it("emptiness_needs_no_second_value", () => {
@@ -196,13 +199,15 @@ describe("changing the rows", () => {
   it("removing_a_row_keeps_the_others", () => {
     const draft = withRowRemoved(draftOf(PAID), 0);
 
-    expect(conditionOf(draft)?.rows).toEqual([PAID.rows[1]]);
+    const condition = conditionOf(draft)?.rows;
+    expect(condition).toEqual([PAID.rows[1]]);
   });
 
   it("any_joins_the_rows_by_or", () => {
     const draft = withJoin(draftOf(PAID), "any");
 
-    expect(conditionOf(draft)?.join).toBe("any");
+    const condition = conditionOf(draft)?.join;
+    expect(condition).toBe("any");
   });
 });
 

@@ -6,7 +6,7 @@ export {
   failureSummaryOf,
   FIRST_RETRY,
   retryChangeOf,
-  retrySettingsOf,
+  retryCommitOf,
 } from "./failure";
 export {
   caseAdditionOf,
@@ -38,6 +38,7 @@ export type {
   FlowChoice,
   FormKind,
   FormLayout,
+  RetryCount,
   RetrySettings,
   StartReading,
   StartWay,
@@ -53,4 +54,5 @@ export {
   renameCommitOf,
   rowsOf,
 } from "./values";
-export { flowChoicesOf, flowText, resultText, wordsOf } from "./words";
+export type { Json, JsonObject } from "./json";
+export { CONTINUE, flowChoicesOf, resultText, wordsOf } from "./words";

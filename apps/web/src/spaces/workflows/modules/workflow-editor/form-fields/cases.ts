@@ -1,12 +1,8 @@
-import type { EditAction, FormField } from "language-server/protocol";
+import type { EditAction } from "language-server/protocol";
 import type { CaseRow, FieldState } from "./interfaces";
+import { isObject, type Json } from "./json";
+import { CONTINUE } from "./words";
 import { memberPointerOf } from "./values";
-
-type Json = FormField["value"];
-
-type JsonObject = { readonly [key: string]: Json };
-
-const CONTINUE = "continue";
 
 const BRANCH = "branch";
 
@@ -129,8 +125,4 @@ export function caseRemovalOf(holder: FieldState, row: CaseRow): EditAction[] {
 
 function itemsOf(value: Json): readonly Json[] {
   return Array.isArray(value) ? value : [];
-}
-
-function isObject(value: Json | undefined): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

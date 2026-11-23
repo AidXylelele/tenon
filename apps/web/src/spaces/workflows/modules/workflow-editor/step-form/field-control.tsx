@@ -12,6 +12,7 @@ import {
 } from "@/libs/ui/components/select";
 import {
   clearEditsOf,
+  CONTINUE,
   dataUseOf,
   flowChoicesOf,
   textEditsOf,
@@ -29,8 +30,6 @@ import {
   NumberControl,
   TextControl,
 } from "./value-controls";
-
-const CONTINUE = "continue";
 
 const HTTP_METHODS = [
   { value: "get", text: "Get data" },
@@ -140,7 +139,7 @@ function ConditionControl(props: ControlProps) {
         variant="link"
         size="sm"
         className="self-start px-0"
-        aria-describedby={wiring.labelId}
+        aria-describedby={wiring.describedBy}
         onClick={() => {
           setAdding(true);
         }}
@@ -155,6 +154,8 @@ function ConditionControl(props: ControlProps) {
     text,
     required: field.required,
     labelledBy: wiring.labelId,
+    describedBy: wiring.describedBy,
+    invalid: wiring.invalid,
   };
 
   return renderCondition(slot);

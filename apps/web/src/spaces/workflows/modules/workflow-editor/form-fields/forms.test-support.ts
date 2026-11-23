@@ -4,14 +4,11 @@ import type {
   StepFormResult,
   WorkflowFormResult,
 } from "language-server/protocol";
+import type { Json, JsonObject } from "./json";
 import {
   type Diagnostic,
   DiagnosticSeverity,
 } from "vscode-languageserver-protocol";
-
-type Json = FormField["value"];
-
-type JsonObject = { readonly [key: string]: Json };
 
 type FieldShape = Partial<FormField> & Pick<FormField, "key" | "pointer">;
 

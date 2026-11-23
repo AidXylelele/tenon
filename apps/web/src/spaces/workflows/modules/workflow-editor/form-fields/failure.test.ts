@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONTINUING,
   HANDLING,
+  protectionOf,
   REPORT_FORM,
   REPORT_INNER_STEP,
   REPORT_STEP,
@@ -18,7 +19,7 @@ import {
   failureSummaryOf,
   FIRST_RETRY,
   retryChangeOf,
-  retrySettingsOf,
+  retryCommitOf,
 } from "./failure";
 
 const INNER = REPORT_INNER_STEP;
@@ -65,10 +66,11 @@ describe("reading a retry policy", () => {
       backoff: { constant: {} },
       limit: { attempt: { count: 4 } },
     };
+    const protection = protectionOf({ retry: policy }, "retry");
 
-    const settings = retrySettingsOf(policy);
+    const reading = failureOf(INNER, REPORT_FORM, protection);
 
-    expect(settings).toEqual({ retries: 4, seconds: 90, growing: false });
+    expect(reading.retry).toEqual({ retries: 4, seconds: 90, growing: false });
   });
 
   it.each([
@@ -77,9 +79,33 @@ describe("reading a retry policy", () => {
     ["no_attempt_count", { ...RETRY_POLICY, limit: {} }],
     ["a_reference_by_name", "standard"],
   ])("%s_is_not_shown_as_settings", (_, policy) => {
-    const settings = retrySettingsOf(policy);
+    const protection = protectionOf({ retry: policy }, "retry");
 
-    expect(settings).toBeNull();
+    const reading = failureOf(INNER, REPORT_FORM, protection);
+
+    expect(reading.retry).toBeNull();
+  });
+});
+
+describe("a retry's count typed in the form", () => {
+  it.each([["later"], ["-"], ["2.5"], [""]])("%s_is_refused", (text) => {
+    const reading = failureOf(INNER, REPORT_FORM, RETRYING);
+
+    const commit = retryCommitOf(reading, "seconds", text);
+
+    expect(commit.kind).toBe("refused");
+  });
+
+  it("the_count_in_force_sends_nothing_and_another_one_sends_the_change", () => {
+    const reading = failureOf(INNER, REPORT_FORM, RETRYING);
+
+    const same = retryCommitOf(reading, "retries", "3");
+    const more = retryCommitOf(reading, "retries", " 5 ");
+
+    const changed = { ...FIRST_RETRY, retries: 5 };
+    const edits = retryChangeOf(reading, changed);
+    expect(same).toEqual({ kind: "edits", edits: [] });
+    expect(more).toEqual({ kind: "edits", edits });
   });
 });
 

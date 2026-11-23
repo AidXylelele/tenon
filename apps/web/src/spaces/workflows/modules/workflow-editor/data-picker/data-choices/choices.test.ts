@@ -42,7 +42,8 @@ describe("the data offered at a field", () => {
     const choices = choicesOf(AFTER_FETCH, NONE, "", false);
     const [fetch] = choices.groups;
 
-    expect(labelsOf(fetch)).toEqual(["Fetch the digest › the whole answer"]);
+    const labels = labelsOf(fetch);
+    expect(labels).toEqual(["Fetch the digest › the whole answer"]);
     expect(fetch?.note).toBe(
       "Run a test to see the fields of the answer, or type a field name.",
     );
@@ -75,7 +76,8 @@ describe("the data offered at a field", () => {
     const [fetch] = choices.groups;
 
     expect(fetch?.title).toBe("From Fetch the digest · the last test run");
-    expect(labelsOf(fetch)).toEqual([
+    const labels = labelsOf(fetch);
+    expect(labels).toEqual([
       "Fetch the digest › slideshow",
       "Fetch the digest › slideshow › title",
       "Fetch the digest › slideshow › slides",
@@ -148,10 +150,8 @@ describe("finding data by typing", () => {
   it("keeps_what_matches_and_drops_the_notes", () => {
     const choices = choicesOf(AFTER_FETCH, NONE, "MESSAGE", false);
 
-    expect(titlesOf(choices.groups)).toEqual([
-      "From Greet",
-      "Use as a field of the answer",
-    ]);
+    const titles = titlesOf(choices.groups);
+    expect(titles).toEqual(["From Greet", "Use as a field of the answer"]);
     expect(choices.groups[0]?.note).toBeNull();
   });
 
@@ -182,7 +182,8 @@ describe("finding data by typing", () => {
     const choices = choicesOf(AFTER_FETCH, NONE, "message", false);
     const typed = choices.groups.at(-1);
 
-    expect(labelsOf(typed)).toEqual(["Fetch the digest › message"]);
+    const labels = labelsOf(typed);
+    expect(labels).toEqual(["Fetch the digest › message"]);
   });
 
   it("text_that_is_no_field_name_offers_nothing_typed", () => {

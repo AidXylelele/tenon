@@ -84,8 +84,10 @@ describe("the data picker", () => {
       name: "Find data, or type a field name",
     });
     expect(search).toHaveFocus();
-    expect(screen.getByText("From Greet")).toBeInTheDocument();
-    expect(screen.getByText("Dates and times")).toBeInTheDocument();
+    const fromGreet = screen.getByText("From Greet");
+    expect(fromGreet).toBeInTheDocument();
+    const datesAndTimes = screen.getByText("Dates and times");
+    expect(datesAndTimes).toBeInTheDocument();
     expect(onOpenChange).toHaveBeenCalledWith(true);
   });
 
@@ -105,7 +107,8 @@ describe("the data picker", () => {
       export: "/do/Greet",
       secret: false,
     });
-    expect(screen.queryByRole("option")).toBeNull();
+    const option = screen.queryByRole("option");
+    expect(option).toBeNull();
   });
 
   it("a_secret_is_picked_as_a_secret", () => {
@@ -135,7 +138,8 @@ describe("the data picker", () => {
       "Fetch the digest › titlea field of the answer",
       "Greet › titlea field of the answer",
     ]);
-    expect(screen.getByRole("status")).toHaveTextContent("3 pieces of data");
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("3 pieces of data");
   });
 
   it("one_match_is_said_as_one_piece", () => {
@@ -154,9 +158,8 @@ describe("the data picker", () => {
 
     type("a b");
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Nothing matches “a b”.",
-    );
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Nothing matches “a b”.");
   });
 
   it("writing_an_expression_closes_the_picker_and_hands_over", () => {
@@ -169,7 +172,8 @@ describe("the data picker", () => {
     });
 
     expect(onWriteExpression).toHaveBeenCalledOnce();
-    expect(screen.queryByRole("option")).toBeNull();
+    const option = screen.queryByRole("option");
+    expect(option).toBeNull();
   });
 
   it("while_the_data_is_read_it_says_so", () => {
@@ -181,9 +185,10 @@ describe("the data picker", () => {
     );
 
     expect(reading).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Write an expression" }),
-    ).toBeNull();
+    const writeAnExpression = screen.queryByRole("button", {
+      name: "Write an expression",
+    });
+    expect(writeAnExpression).toBeNull();
   });
 
   it("only_paths_leave_out_the_times", () => {
@@ -236,7 +241,8 @@ describe("a field that takes data", () => {
     });
 
     expect(chip).toHaveTextContent("Fetch the digest › slideshow › slides");
-    expect(screen.queryByRole("textbox")).toBeNull();
+    const textbox = screen.queryByRole("textbox");
+    expect(textbox).toBeNull();
   });
 
   it("a_secret_chip_is_masked_and_says_it_stays_out_of_run_records", () => {
@@ -259,7 +265,8 @@ describe("a field that takes data", () => {
       fireEvent.click(chip);
     });
 
-    expect(screen.getByRole("combobox", { name: /Find data/ })).toHaveFocus();
+    const findData = screen.getByRole("combobox", { name: /Find data/ });
+    expect(findData).toHaveFocus();
   });
 
   it("removing_the_chip_clears_the_field_and_keeps_focus_on_insert_data", () => {
@@ -273,7 +280,8 @@ describe("a field that takes data", () => {
     });
 
     expect(onClear).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Insert data" })).toHaveFocus();
+    const insertData = screen.getByRole("button", { name: "Insert data" });
+    expect(insertData).toHaveFocus();
   });
 
   it("write_an_expression_shows_the_value_as_text_to_edit", () => {

@@ -19,19 +19,20 @@ test.describe("the data picker playground", () => {
       name: /Fetch the digest › slideshow › slides/,
     });
     await expect(option).toBeVisible();
-    await expect(page.getByRole("status")).toHaveText(/pieces of data/);
+    const status = page.getByRole("status");
+    await expect(status).toHaveText(/pieces of data/);
   });
 
   test("escape_closes_only_the_picker_and_returns_focus", async ({ page }) => {
     await page.goto(AFTER_A_TEST);
-    await expect(page.getByRole("listbox")).toBeVisible();
+    const listbox = page.getByRole("listbox");
+    await expect(listbox).toBeVisible();
 
     await page.keyboard.press("Escape");
 
-    await expect(page.getByRole("listbox")).toBeHidden();
-    await expect(
-      page.getByRole("button", { name: "Insert data" }),
-    ).toBeFocused();
+    const insert = page.getByRole("button", { name: "Insert data" });
+    await expect(listbox).toBeHidden();
+    await expect(insert).toBeFocused();
   });
 
   test("a_secret_chip_is_masked_and_reopens_the_picker", async ({ page }) => {
@@ -43,13 +44,17 @@ test.describe("the data picker playground", () => {
 
     await chip.click();
 
-    await expect(page.getByRole("listbox")).toBeVisible();
+    const listbox = page.getByRole("listbox");
+    await expect(listbox).toBeVisible();
   });
 
   test("the_picker_renders_in_the_dark_theme_when_chosen", async ({ page }) => {
-    await page.goto(`${AFTER_A_TEST}&globals=theme:dark`);
+    const dark = `${AFTER_A_TEST}&globals=theme:dark`;
+    await page.goto(dark);
 
-    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-    await expect(page.getByRole("listbox")).toBeVisible();
+    const html = page.locator("html");
+    await expect(html).toHaveAttribute("data-theme", "dark");
+    const listbox = page.getByRole("listbox");
+    await expect(listbox).toBeVisible();
   });
 });

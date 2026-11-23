@@ -7,7 +7,7 @@ import type {
   EditAction,
   Join,
 } from "language-server/protocol";
-import { type KeyboardEvent, useId, useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/libs/ui/components/button";
 import {
   Field,
@@ -19,6 +19,8 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/libs/ui/components/toggle-group";
+import { textEditsOf } from "../form-fields";
+import { blurOnEnter } from "../step-form";
 import {
   type Draft,
   draftOf,
@@ -28,7 +30,6 @@ import {
   withJoin,
   withRowAdded,
 } from "./condition-rows";
-import { textEditsOf } from "../form-fields";
 import { ConditionRowView } from "./condition-row";
 import type { ConditionBuilderProps } from "./interfaces";
 
@@ -237,10 +238,6 @@ function ExpressionField({
     const edits = textEditsOf(field, typed.trim());
 
     if (edits.length > 0) onEdit(edits);
-  }
-
-  function blurOnEnter(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter") event.currentTarget.blur();
   }
 
   return (
