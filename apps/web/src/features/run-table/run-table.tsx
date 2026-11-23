@@ -11,7 +11,8 @@ import {
 } from "@/libs/ui/components/table";
 import { utcText } from "@/libs/ui/composites/format";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Duration, Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
+import { Duration } from "@/libs/ui/composites/time";
 import { phaseLabel, triggerLabel } from "@/operations/run-progress";
 
 interface RunTableProps {
@@ -34,7 +35,7 @@ export function RunTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Phase</TableHead>
+            <TableHead>Status</TableHead>
             {showWorkflow && <TableHead>Workflow</TableHead>}
             <TableHead className="hidden md:table-cell">Version</TableHead>
             <TableHead className="hidden md:table-cell">Started by</TableHead>
@@ -78,7 +79,7 @@ export function RunTable({
                   {triggerLabel(run.trigger)}
                 </TableCell>
                 <TableCell>
-                  <Time value={started} />
+                  <AbsoluteTime value={started} />
                 </TableCell>
                 <TableCell className="hidden text-right sm:table-cell">
                   <Duration from={run.startedAt} to={run.endedAt} />

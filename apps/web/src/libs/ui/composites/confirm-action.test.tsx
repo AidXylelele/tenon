@@ -131,3 +131,29 @@ describe("an action that asks first", () => {
     );
   });
 });
+
+describe("an action that asks first, opened from elsewhere", () => {
+  it("shows_no_button_of_its_own_and_reports_closing", () => {
+    const changed = vi.fn();
+    render(
+      <TooltipProvider>
+        <ConfirmAction
+          icon={<TrashIcon />}
+          label="Delete run"
+          title="Delete this run?"
+          description="It cannot be undone."
+          actionLabel="Delete run"
+          action={vi.fn()}
+          success="Run deleted"
+          open
+          onOpenChange={changed}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("alertdialog")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Keep it" }));
+
+    expect(changed).toHaveBeenCalledWith(false);
+  });
+});

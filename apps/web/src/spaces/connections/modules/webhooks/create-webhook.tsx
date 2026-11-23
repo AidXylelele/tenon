@@ -30,10 +30,15 @@ import { Input } from "@/libs/ui/components/input";
 import { Spinner } from "@/libs/ui/components/spinner";
 import { CopyButton } from "@/libs/ui/composites/copy-button";
 import { ProblemMessage } from "@/libs/ui/composites/problem-message";
+import { useAddressState } from "@/libs/routing/address-state";
+import { FLAG } from "@/libs/routing/flag";
 import { createWebhookAction } from "./actions";
 
+const NEW = "new";
+
 export function CreateWebhook() {
-  const [open, setOpen] = useState(false);
+  const address = useAddressState();
+  const open = address.flagged(NEW);
   const [created, setCreated] = useState<CreatedWebhook | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -53,7 +58,8 @@ export function CreateWebhook() {
   }
 
   function change(next: boolean) {
-    setOpen(next);
+    const flag = next ? FLAG : null;
+    address.change({ [NEW]: flag });
 
     if (next) return;
 
@@ -106,17 +112,17 @@ export function CreateWebhook() {
               </Field>
               <Field>
                 <FieldLabel htmlFor="webhook-type">Event type</FieldLabel>
+                <FieldDescription>
+                  Workflows that start or wait on this type receive the calls.
+                </FieldDescription>
                 <Input
                   id="webhook-type"
                   name="eventType"
                   required
                   maxLength={255}
                   placeholder="com.example.form.submitted"
-                  className="font-mono text-xs"
+                  className="font-mono"
                 />
-                <FieldDescription>
-                  Workflows that start or wait on this type receive the calls.
-                </FieldDescription>
               </Field>
             </FieldGroup>
             <DialogFooter>
@@ -168,8 +174,8 @@ function Created({
         <CircleCheckIcon />
         <AlertTitle>Copy the URL now</AlertTitle>
         <AlertDescription>
-          It is shown only here; the platform keeps only its fingerprint. A lost
-          URL means a new webhook.
+          It is shown only here; Tenon keeps only its fingerprint. A lost URL
+          means a new webhook.
         </AlertDescription>
       </Alert>
       <div className="flex min-w-0 items-start gap-2 rounded-lg border bg-muted p-2">

@@ -42,26 +42,19 @@ describe("the breadcrumb an address shows", () => {
       "/runs/7c41e2d0-5b0e-4a13-9f2b-cf9b8fad0001",
       [{ label: "Runs", href: "/runs" }, { label: "Run 7c41e2d0" }],
     ],
-    ["/connections/webhooks", [{ label: "Webhooks" }]],
+    ["/webhooks", [{ label: "Webhooks" }]],
+    ["/notifications", [{ label: "Notifications" }]],
     [
-      "/connections/test-event",
+      "/notifications/new",
       [
-        { label: "Webhooks", href: "/connections/webhooks" },
-        { label: "Send a test event" },
-      ],
-    ],
-    ["/connections/notifications", [{ label: "Notifications" }]],
-    [
-      "/connections/notifications/new",
-      [
-        { label: "Notifications", href: "/connections/notifications" },
+        { label: "Notifications", href: "/notifications" },
         { label: "New notification" },
       ],
     ],
     [
-      "/connections/notifications/ae769898",
+      "/notifications/ae769898",
       [
-        { label: "Notifications", href: "/connections/notifications" },
+        { label: "Notifications", href: "/notifications" },
         { label: "Notification" },
       ],
     ],
@@ -72,8 +65,8 @@ describe("the breadcrumb an address shows", () => {
       [{ label: "Settings", href: "/settings" }, { label: "Account" }],
     ],
     [
-      "/settings/invitations",
-      [{ label: "Settings", href: "/settings" }, { label: "Invitations" }],
+      "/settings/people",
+      [{ label: "Settings", href: "/settings" }, { label: "People" }],
     ],
     [
       "/settings/platform",
@@ -81,6 +74,7 @@ describe("the breadcrumb an address shows", () => {
     ],
     ["/settings/unknown", [{ label: "Settings" }]],
     ["/connections", []],
+    ["/settings/invitations", [{ label: "Settings" }]],
     ["/nowhere", []],
   ])("%s_shows_its_trail", (pathname, trail) => {
     const shown = trailOf(pathname);

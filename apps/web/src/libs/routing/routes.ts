@@ -1,4 +1,5 @@
 import type { Phase, WorkflowStatus } from "@/libs/data-access/types";
+import { FLAG } from "./flag";
 
 export const HOME_HREF = "/";
 
@@ -11,18 +12,19 @@ export const WORKFLOWS_HREF = "/workflows";
 export const NEW_WORKFLOW_HREF = "/workflows/new";
 export const RUNS_HREF = "/runs";
 
-export const CONNECTIONS_HREF = "/connections";
-export const WEBHOOKS_HREF = "/connections/webhooks";
-export const NOTIFICATIONS_HREF = "/connections/notifications";
-export const NEW_NOTIFICATION_HREF = "/connections/notifications/new";
-export const TEST_EVENT_HREF = "/connections/test-event";
+export const WEBHOOKS_HREF = "/webhooks";
+export const NEW_WEBHOOK_HREF = `/webhooks?new=${FLAG}`;
+export const TEST_EVENT_HREF = `/webhooks?test=${FLAG}`;
+export const NOTIFICATIONS_HREF = "/notifications";
+export const NEW_NOTIFICATION_HREF = "/notifications/new";
 export const SECRETS_HREF = "/secrets";
+export const NEW_SECRET_HREF = `/secrets?new=${FLAG}`;
 
 export const WORKFLOW_SEARCH_HREF = "/search/workflows";
 
 export const SETTINGS_HREF = "/settings";
 export const ACCOUNT_HREF = "/settings/account";
-export const INVITATIONS_HREF = "/settings/invitations";
+export const PEOPLE_HREF = "/settings/people";
 export const PLATFORM_HREF = "/settings/platform";
 
 const EDITOR_PATH = /^\/workflows\/[^/]+\/[^/]+\/edit$/;
@@ -72,7 +74,7 @@ export function workflowHref(
   query: WorkflowQuery = {},
 ): string {
   const path = `${WORKFLOWS_HREF}/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`;
-  const start = query.start === true ? "1" : undefined;
+  const start = query.start === true ? FLAG : undefined;
   return withQuery(path, { tab: query.tab, start });
 }
 
@@ -89,12 +91,27 @@ export function isEditorPath(pathname: string): boolean {
   return pathname === NEW_WORKFLOW_HREF || EDITOR_PATH.test(pathname);
 }
 
+interface VersionQuery {
+  readonly view?: "code";
+}
+
 export function versionHref(
   namespace: string,
   name: string,
   version: string,
+  query: VersionQuery = {},
 ): string {
-  return `${workflowHref(namespace, name)}/versions/${encodeURIComponent(version)}`;
+  const path = `${workflowHref(namespace, name)}/versions/${encodeURIComponent(version)}`;
+  return withQuery(path, query);
+}
+
+export function versionSourceHref(
+  namespace: string,
+  name: string,
+  version: string,
+): string {
+  const path = versionHref(namespace, name, version);
+  return `${path}/source`;
 }
 
 export function runsHref(query: RunsQuery): string {

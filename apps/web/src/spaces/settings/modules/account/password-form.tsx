@@ -22,7 +22,7 @@ export function PasswordForm() {
   }, [state]);
 
   return (
-    <form ref={form} action={action} className="flex max-w-md flex-col gap-4">
+    <form ref={form} action={action} className="flex flex-col gap-4">
       <ProblemMessage problem={state.problem} />
       <FieldGroup>
         <Field>
@@ -41,7 +41,7 @@ export function PasswordForm() {
           note="This browser stays signed in; every other session ends."
         />
       </FieldGroup>
-      <div>
+      <div className="flex justify-end">
         <SubmitButton pendingLabel="Changing…">Change password</SubmitButton>
       </div>
     </form>
