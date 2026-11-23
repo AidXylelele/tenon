@@ -1,23 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { toast } from "sonner";
-import type { Outcome, Problem } from "@/libs/data-access/problem";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "../components/alert-dialog";
+import { useRef, useState } from "react";
+import type { Outcome } from "@/libs/data-access/problem";
 import { Button } from "../components/button";
-import { Spinner } from "../components/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../components/tooltip";
-import { ProblemMessage } from "./problem-message";
+import { ConfirmDialog } from "./confirm-dialog";
 
 interface ConfirmActionProps {
   readonly icon: React.ReactNode;
@@ -47,45 +34,32 @@ export function ConfirmAction({
   onOpenChange,
 }: ConfirmActionProps) {
   const [ownOpen, setOwnOpen] = useState(false);
+  const opener = useRef<HTMLButtonElement>(null);
   const controlled = open !== undefined;
   const shown = open ?? ownOpen;
-  const [refusal, setRefusal] = useState<Problem | null>(null);
-  const [pending, start] = useTransition();
   const iconOnly = size === "icon-sm";
 
   function change(next: boolean) {
     setOwnOpen(next);
     onOpenChange?.(next);
-
-    if (!next) setRefusal(null);
-  }
-
-  function act(event: React.MouseEvent) {
-    event.preventDefault();
-    start(async () => {
-      const outcome = await action();
-
-      if (!outcome.ok) {
-        setRefusal(outcome.problem);
-        return;
-      }
-
-      change(false);
-      toast.success(success);
-      onDone?.();
-    });
   }
 
   const trigger = (
-    <AlertDialogTrigger asChild>
-      <Button variant="ghost" size={size} aria-label={label}>
-        {icon}
-        {!iconOnly && label}
-      </Button>
-    </AlertDialogTrigger>
+    <Button
+      ref={opener}
+      variant="ghost"
+      size={size}
+      aria-label={label}
+      onClick={() => {
+        change(true);
+      }}
+    >
+      {icon}
+      {!iconOnly && label}
+    </Button>
   );
 
-  const opener = iconOnly ? (
+  const button = iconOnly ? (
     <Tooltip>
       <TooltipTrigger asChild>{trigger}</TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
@@ -95,27 +69,19 @@ export function ConfirmAction({
   );
 
   return (
-    <AlertDialog open={shown} onOpenChange={change}>
-      {!controlled && opener}
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <ProblemMessage problem={refusal} />
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={pending}>Keep it</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={act}
-            disabled={pending}
-            aria-busy={pending}
-          >
-            {pending && <Spinner data-icon="inline-start" />}
-            {actionLabel}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <>
+      {!controlled && button}
+      <ConfirmDialog
+        open={shown}
+        onOpenChange={change}
+        title={title}
+        description={description}
+        actionLabel={actionLabel}
+        action={action}
+        success={success}
+        returnFocus={() => opener.current}
+        onDone={onDone}
+      />
+    </>
   );
 }

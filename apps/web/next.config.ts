@@ -2,8 +2,10 @@ import path from "node:path";
 import type { NextConfig } from "next";
 import {
   ACCOUNT_HREF,
-  CONNECTIONS_HREF,
+  NOTIFICATIONS_HREF,
+  PEOPLE_HREF,
   SETTINGS_HREF,
+  TEST_EVENT_HREF,
   WEBHOOKS_HREF,
 } from "./src/libs/routing/routes";
 
@@ -38,6 +40,7 @@ const nextConfig: NextConfig = {
     root: monorepoRoot,
     rules: {
       "*.wasm": { type: "asset" },
+      "*.yaml": { type: "raw" },
     },
   },
   poweredByHeader: false,
@@ -53,12 +56,28 @@ const nextConfig: NextConfig = {
   },
   redirects() {
     return [
-      {
-        source: CONNECTIONS_HREF,
-        destination: WEBHOOKS_HREF,
-        permanent: false,
-      },
       { source: SETTINGS_HREF, destination: ACCOUNT_HREF, permanent: false },
+      { source: "/connections", destination: WEBHOOKS_HREF, permanent: true },
+      {
+        source: "/connections/webhooks",
+        destination: WEBHOOKS_HREF,
+        permanent: true,
+      },
+      {
+        source: "/connections/test-event",
+        destination: TEST_EVENT_HREF,
+        permanent: true,
+      },
+      {
+        source: "/connections/notifications/:path*",
+        destination: `${NOTIFICATIONS_HREF}/:path*`,
+        permanent: true,
+      },
+      {
+        source: "/settings/invitations",
+        destination: PEOPLE_HREF,
+        permanent: true,
+      },
     ];
   },
 };

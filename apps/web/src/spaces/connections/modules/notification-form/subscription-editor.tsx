@@ -1,29 +1,30 @@
 "use client";
 
-import { PlusIcon, XIcon } from "lucide-react";
-import { Link } from "@/libs/routing/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { codeOf, type Problem } from "@/libs/data-access/problem";
 import type { DeliveryScheme, Endpoint } from "@/libs/data-access/types";
 import type { JsonObject, JsonValue } from "@/libs/json/json";
-import { Button } from "@/libs/ui/components/button";
+import { Link } from "@/libs/routing/link";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/libs/ui/components/card";
+  NEW_SECRET_HREF,
+  notificationHref,
+  NOTIFICATIONS_HREF,
+} from "@/libs/routing/routes";
+import { Button } from "@/libs/ui/components/button";
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
+  FieldLegend,
+  FieldSet,
 } from "@/libs/ui/components/field";
 import { Input } from "@/libs/ui/components/input";
+import { Label } from "@/libs/ui/components/label";
+import { RadioGroup, RadioGroupItem } from "@/libs/ui/components/radio-group";
 import {
   Select,
   SelectContent,
@@ -32,69 +33,83 @@ import {
   SelectValue,
 } from "@/libs/ui/components/select";
 import { Spinner } from "@/libs/ui/components/spinner";
+import { Disclosure } from "@/libs/ui/composites/disclosure";
 import { ProblemMessage } from "@/libs/ui/composites/problem-message";
-import {
-  SECRETS_HREF,
-  notificationHref,
-  NOTIFICATIONS_HREF,
-} from "@/libs/routing/routes";
 import { createSubscriptionAction } from "./actions";
-import type { SubscriptionEditorProps } from "./interfaces";
-
-const ATTRIBUTES = [
-  "type",
-  "source",
-  "subject",
-  "id",
-  "datacontenttype",
-  "dataschema",
-  "data",
-] as const;
-
-interface Row {
-  readonly id: string;
-  readonly attribute: (typeof ATTRIBUTES)[number];
-  readonly value: string;
-}
+import { AttributeRows } from "./attribute-rows";
+import type { AttributeRow, SubscriptionEditorProps } from "./interfaces";
 
 const NONE = "none";
+const CUSTOM = "custom";
+const TYPE_POINTER = "/filter/with/type";
+const DATA_IS_AN_OBJECT = "Data is matched by a JSON object it must contain.";
+
+type Scheme = DeliveryScheme | typeof NONE;
+
+function isScheme(value: string): value is Scheme {
+  return value === NONE || value === "basic" || value === "bearer";
+}
+
+function valueOf(row: AttributeRow): JsonValue | undefined {
+  const text = row.value.trim();
+
+  if (row.attribute !== "data") return text;
+
+  if (text.startsWith("${")) return text;
+
+  try {
+    const parsed = JSON.parse(text) as JsonValue;
+    const object =
+      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed);
+    return object ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function pointsAt(problem: Problem | null, pointer: string): string | null {
+  const located = problem?.errors.find(
+    (error) =>
+      error.pointer === pointer || error.pointer.startsWith(`${pointer}/`),
+  );
+  return located?.detail ?? null;
+}
 
 export function SubscriptionEditor({
   secretNames,
   presets,
 }: SubscriptionEditorProps) {
   const router = useRouter();
+  const firstPreset = presets.at(0)?.value ?? CUSTOM;
   const [name, setName] = useState("");
   const [uri, setUri] = useState("https://");
-  const [scheme, setScheme] = useState<DeliveryScheme | typeof NONE>(NONE);
-  const [secret, setSecret] = useState(secretNames[0] ?? "");
-  const [rows, setRows] = useState<readonly Row[]>(() => [
-    {
-      id: crypto.randomUUID(),
-      attribute: "type",
-      value: "com.example.order.paid",
-    },
-  ]);
+  const [scheme, setScheme] = useState<Scheme>(NONE);
+  const [secret, setSecret] = useState(secretNames.at(0) ?? "");
+  const [when, setWhen] = useState(firstPreset);
+  const [customType, setCustomType] = useState("");
+  const [rows, setRows] = useState<readonly AttributeRow[]>([]);
+  const [rowErrors, setRowErrors] = useState<Readonly<Record<string, string>>>(
+    {},
+  );
   const [problem, setProblem] = useState<Problem | null>(null);
-  const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
-  const located = problem?.errors[0];
   const code = problem === null ? null : codeOf(problem);
   const foreign = code === "subscription.foreign-secret";
   const refusedEndpoint = code === "subscription.private-endpoint";
+  const custom = when === CUSTOM;
+  const typeRefusal = pointsAt(problem, TYPE_POINTER);
+  const typeInvalid = custom && typeRefusal !== null;
+  const placed = refusedEndpoint || foreign || typeInvalid;
 
-  function rowProblem(row: Row): string | null {
-    if (located === undefined) return null;
-
-    return located.pointer === `/filter/with/${row.attribute}` ||
-      located.pointer.startsWith(`/filter/with/${row.attribute}/`)
-      ? located.detail
-      : null;
+  function rowError(row: AttributeRow): string | null {
+    const pointer = `/filter/with/${row.attribute}`;
+    return rowErrors[row.id] ?? pointsAt(problem, pointer);
   }
 
   function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-    const filter: JsonObject = {};
+    const type = custom ? customType.trim() : when;
+    const filter: JsonObject = { type };
     const errors: Record<string, string> = {};
 
     rows.forEach((row) => {
@@ -102,8 +117,7 @@ export function SubscriptionEditor({
 
       const value = valueOf(row);
 
-      if (value === undefined)
-        errors[row.id] = "Data is matched by a JSON object it must contain";
+      if (value === undefined) errors[row.id] = DATA_IS_AN_OBJECT;
       else filter[row.attribute] = value;
     });
     setRowErrors(errors);
@@ -112,272 +126,193 @@ export function SubscriptionEditor({
 
     const endpoint: Endpoint =
       scheme === NONE ? { uri } : { uri, authentication: { scheme, secret } };
+    const trimmed = name.trim();
+    const matching = { with: filter };
     setProblem(null);
     start(async () => {
-      const outcome = await createSubscriptionAction(name.trim(), endpoint, {
-        with: filter,
-      });
+      const outcome = await createSubscriptionAction(
+        trimmed,
+        endpoint,
+        matching,
+      );
 
       if (!outcome.ok) {
         setProblem(outcome.problem);
         return;
       }
 
-      toast.success(`${outcome.value.name} subscribed`, {
+      const created = notificationHref(outcome.value.id);
+      toast.success(`${outcome.value.name} created`, {
         description: "Matching events are delivered from now on.",
       });
-      router.push(notificationHref(outcome.value.id));
+      router.push(created);
     });
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-6">
-      {!refusedEndpoint && <ProblemMessage problem={problem} />}
-      <Card>
-        <CardHeader>
-          <CardTitle>Endpoint</CardTitle>
-          <CardDescription>
-            Events are POSTed there as CloudEvents in JSON, retried for about a
-            day when refused.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="subscription-name">Name</FieldLabel>
-              <Input
-                id="subscription-name"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                }}
-                required
-                maxLength={120}
-                placeholder="CRM"
-                autoFocus
-              />
-            </Field>
-            <Field data-invalid={refusedEndpoint}>
-              <FieldLabel htmlFor="subscription-uri">URL</FieldLabel>
-              <Input
-                id="subscription-uri"
-                value={uri}
-                onChange={(e) => {
-                  setUri(e.target.value);
-                }}
-                required
-                type="url"
-                className="font-mono text-xs"
-                aria-invalid={refusedEndpoint}
-              />
-              <FieldDescription>
-                An http or https address the platform may reach; private
-                networks are refused.
-              </FieldDescription>
-              {refusedEndpoint && <FieldError>{problem?.detail}</FieldError>}
-            </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field>
-                <FieldLabel htmlFor="subscription-auth">
-                  Authentication
-                </FieldLabel>
-                <Select
-                  value={scheme}
-                  onValueChange={(next) => {
-                    setScheme(next as DeliveryScheme | typeof NONE);
-                  }}
-                >
-                  <SelectTrigger id="subscription-auth" className="w-full">
+    <form
+      onSubmit={submit}
+      className="flex max-w-(--form-width-max) flex-col gap-6"
+    >
+      {!placed && <ProblemMessage problem={problem} />}
+      <FieldSet className="border-t pt-4">
+        <FieldLegend>Send to</FieldLegend>
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor="subscription-name">Name</FieldLabel>
+            <FieldDescription>
+              Shown in the list, for example “On-call channel”.
+            </FieldDescription>
+            <Input
+              id="subscription-name"
+              value={name}
+              onChange={(change) => {
+                setName(change.target.value);
+              }}
+              required
+              maxLength={120}
+              autoFocus
+            />
+          </Field>
+          <Field data-invalid={refusedEndpoint}>
+            <FieldLabel htmlFor="subscription-uri">Address</FieldLabel>
+            <FieldDescription>
+              Tenon sends a POST request with the event as JSON and tries again
+              for about a day when it is refused. Private networks are refused.
+            </FieldDescription>
+            <Input
+              id="subscription-uri"
+              value={uri}
+              onChange={(change) => {
+                setUri(change.target.value);
+              }}
+              required
+              type="url"
+              className="font-mono"
+              aria-invalid={refusedEndpoint}
+            />
+            {refusedEndpoint && <FieldError>{problem?.detail}</FieldError>}
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="subscription-auth">
+              Authentication{" "}
+              <span className="font-normal text-muted-foreground">
+                optional
+              </span>
+            </FieldLabel>
+            <FieldDescription>
+              Use a secret for a token or a password.
+            </FieldDescription>
+            <Select
+              value={scheme}
+              onValueChange={(next) => {
+                if (isScheme(next)) setScheme(next);
+              }}
+            >
+              <SelectTrigger id="subscription-auth" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>None</SelectItem>
+                <SelectItem value="basic">Basic, from a secret</SelectItem>
+                <SelectItem value="bearer">
+                  Bearer token, from a secret
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          {scheme !== NONE && (
+            <Field data-invalid={foreign}>
+              <FieldLabel htmlFor="subscription-secret">Secret</FieldLabel>
+              {secretNames.length === 0 ? (
+                <FieldDescription>
+                  You have no secrets yet.{" "}
+                  <Link
+                    href={NEW_SECRET_HREF}
+                    className="text-accent-text underline underline-offset-4"
+                  >
+                    Add one
+                  </Link>{" "}
+                  first.
+                </FieldDescription>
+              ) : (
+                <Select value={secret} onValueChange={setSecret}>
+                  <SelectTrigger id="subscription-secret" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NONE}>None</SelectItem>
-                    <SelectItem value="basic">Basic, from a secret</SelectItem>
-                    <SelectItem value="bearer">
-                      Bearer token, from a secret
-                    </SelectItem>
+                    {secretNames.map((each) => (
+                      <SelectItem key={each} value={each}>
+                        {each}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </Field>
-              {scheme !== NONE && (
-                <Field data-invalid={foreign}>
-                  <FieldLabel htmlFor="subscription-secret">Secret</FieldLabel>
-                  {secretNames.length === 0 ? (
-                    <FieldDescription>
-                      You have no secrets yet.{" "}
-                      <Link
-                        href={SECRETS_HREF}
-                        className="underline underline-offset-4"
-                      >
-                        Add one
-                      </Link>{" "}
-                      first.
-                    </FieldDescription>
-                  ) : (
-                    <Select value={secret} onValueChange={setSecret}>
-                      <SelectTrigger
-                        id="subscription-secret"
-                        className="w-full"
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {secretNames.map((each) => (
-                          <SelectItem key={each} value={each}>
-                            {each}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {foreign && <FieldError>{problem?.detail}</FieldError>}
-                </Field>
               )}
-            </div>
-          </FieldGroup>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Events to take</CardTitle>
-          <CardDescription>
-            Each attribute matches whole, as a regular expression or an
-            expression such as{" "}
-            <code className="font-mono">{"${ . > 100 }"}</code>; data matches a
-            JSON object it contains. All rows must match.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <div className="flex flex-wrap gap-1.5">
-            {presets.map((preset) => (
-              <button
-                key={preset.value}
-                type="button"
-                onClick={() => {
-                  setRows([
-                    {
-                      id: crypto.randomUUID(),
-                      attribute: "type",
-                      value: preset.value,
-                    },
-                  ]);
-                }}
-                className="rounded-full border px-2.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-          {rows.map((row, index) => {
-            const error = rowErrors[row.id] ?? rowProblem(row);
-            const invalid = error !== null;
-
+              {foreign && <FieldError>{problem?.detail}</FieldError>}
+            </Field>
+          )}
+        </FieldGroup>
+      </FieldSet>
+      <FieldSet className="border-t pt-4">
+        <FieldLegend>When</FieldLegend>
+        <RadioGroup value={when} onValueChange={setWhen} aria-label="When">
+          {presets.map((preset) => {
+            const id = `when-${preset.value}`;
             return (
-              <Field key={row.id} data-invalid={invalid}>
-                <div className="flex gap-2">
-                  <Select
-                    value={row.attribute}
-                    onValueChange={(attribute) => {
-                      setRows(
-                        rows.map((each, at) =>
-                          at === index
-                            ? {
-                                ...each,
-                                attribute: attribute as Row["attribute"],
-                              }
-                            : each,
-                        ),
-                      );
-                    }}
-                  >
-                    <SelectTrigger className="w-40" aria-label="Attribute">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ATTRIBUTES.map((attribute) => (
-                        <SelectItem key={attribute} value={attribute}>
-                          {attribute}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    aria-label="Matches"
-                    value={row.value}
-                    onChange={(e) => {
-                      setRows(
-                        rows.map((each, at) =>
-                          at === index
-                            ? { ...each, value: e.target.value }
-                            : each,
-                        ),
-                      );
-                    }}
-                    className="flex-1 font-mono text-xs"
-                    placeholder={
-                      row.attribute === "data"
-                        ? '{ "status": "paid" }'
-                        : "com\\.example\\..*"
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove"
-                    disabled={rows.length === 1}
-                    onClick={() => {
-                      setRows(rows.filter((_, at) => at !== index));
-                    }}
-                  >
-                    <XIcon />
-                  </Button>
-                </div>
-                {invalid && <FieldError>{error}</FieldError>}
-              </Field>
+              <div key={preset.value} className="flex items-center gap-2">
+                <RadioGroupItem id={id} value={preset.value} />
+                <Label htmlFor={id}>{preset.label}</Label>
+              </div>
             );
           })}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="self-start"
-            onClick={() => {
-              setRows([
-                ...rows,
-                { id: crypto.randomUUID(), attribute: "source", value: "" },
-              ]);
-            }}
-          >
-            <PlusIcon data-icon="inline-start" />
-            Add a condition
-          </Button>
-        </CardContent>
-      </Card>
-      <div className="flex gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending && <Spinner data-icon="inline-start" />}
-          {pending ? "Subscribing…" : "Subscribe"}
-        </Button>
-        <Button type="button" variant="ghost" asChild>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem id="when-custom" value={CUSTOM} />
+            <Label htmlFor="when-custom">An event of a type I choose</Label>
+          </div>
+        </RadioGroup>
+        {custom && (
+          <Field data-invalid={typeInvalid}>
+            <FieldLabel htmlFor="subscription-type">Event type</FieldLabel>
+            <FieldDescription>
+              Matched whole, as a regular expression, such as com\.example\..*
+            </FieldDescription>
+            <Input
+              id="subscription-type"
+              value={customType}
+              onChange={(change) => {
+                setCustomType(change.target.value);
+              }}
+              required
+              className="font-mono"
+              aria-invalid={typeInvalid}
+            />
+            {typeInvalid && <FieldError>{typeRefusal}</FieldError>}
+          </Field>
+        )}
+      </FieldSet>
+      <Disclosure
+        title="More options"
+        summary="Match other event attributes exactly"
+      >
+        <Field>
+          <FieldDescription>
+            For example source = /sales. Values are regular expressions or
+            expressions such as {"${ . > 100 }"}; data matches a JSON object it
+            contains. Every attribute must match.
+          </FieldDescription>
+          <AttributeRows rows={rows} errorOf={rowError} onChange={setRows} />
+        </Field>
+      </Disclosure>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button type="button" variant="outline" asChild>
           <Link href={NOTIFICATIONS_HREF}>Cancel</Link>
+        </Button>
+        <Button type="submit" disabled={pending} aria-busy={pending}>
+          {pending && <Spinner data-icon="inline-start" />}
+          Create notification
         </Button>
       </div>
     </form>
   );
-}
-
-function valueOf(row: Row): JsonValue | undefined {
-  if (row.attribute !== "data") return row.value.trim();
-
-  try {
-    const parsed = JSON.parse(row.value) as JsonValue;
-    return typeof parsed === "object" &&
-      parsed !== null &&
-      !Array.isArray(parsed)
-      ? parsed
-      : undefined;
-  } catch {
-    return row.value.trim().startsWith("${") ? row.value.trim() : undefined;
-  }
 }

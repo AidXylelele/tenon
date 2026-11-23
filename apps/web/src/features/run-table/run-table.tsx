@@ -13,7 +13,8 @@ import {
 } from "@/libs/ui/components/table";
 import { utcText } from "@/libs/ui/composites/format";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
-import { Duration, Time } from "@/libs/ui/composites/time";
+import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
+import { Duration } from "@/libs/ui/composites/time";
 import { phaseLabel, triggerLabel } from "@/operations/run-progress";
 import type { RunOrder, RunTableProps } from "./interfaces";
 
@@ -32,8 +33,8 @@ export function RunTable({
         <TableHeader>
           <TableRow>
             <TableHead>Status</TableHead>
-            <SortableHead sort="started" label="Started" order={order} />
             {showWorkflow && <TableHead>Workflow</TableHead>}
+            <SortableHead sort="started" label="Started" order={order} />
             <SortableHead
               sort="duration"
               label="Duration"
@@ -92,12 +93,6 @@ function RunRow({
           )}
         </span>
       </TableCell>
-      <TableCell>
-        <Link href={href} className="after:absolute after:inset-0">
-          <Time value={started} />
-          <span className="sr-only">{name}</span>
-        </Link>
-      </TableCell>
       {showWorkflow && (
         <TableCell>
           <span className="block font-medium">{run.name}</span>
@@ -106,6 +101,12 @@ function RunRow({
           </span>
         </TableCell>
       )}
+      <TableCell>
+        <Link href={href} className="after:absolute after:inset-0">
+          <AbsoluteTime value={started} />
+          <span className="sr-only">{name}</span>
+        </Link>
+      </TableCell>
       <TableCell className="hidden text-right sm:table-cell">
         <Duration from={run.startedAt} to={run.endedAt} />
       </TableCell>

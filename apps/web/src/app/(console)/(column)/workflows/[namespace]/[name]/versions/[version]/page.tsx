@@ -12,6 +12,7 @@ export async function generateMetadata({
 
 export default async function VersionPage({
   params,
+  searchParams,
 }: PageProps<"/workflows/[namespace]/[name]/versions/[version]">) {
-  return <VersionDocument params={await params} />;
+  return <VersionDocument params={await params} query={await searchParams} />;
 }

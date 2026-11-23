@@ -1,0 +1,23 @@
+document:
+  dsl: "1.1.0"
+  namespace: default
+  name: repeat-for-each
+  version: "1.0.0"
+  title: Repeat for each item
+do:
+  - fetchTheList:
+      call: http
+      with:
+        method: get
+        endpoint: https://example.com/items
+  - forEachItem:
+      for:
+        each: item
+        in: ${ .items }
+      do:
+        - sendTheItem:
+            call: http
+            with:
+              method: post
+              endpoint: https://example.com/item
+              body: ${ $item }

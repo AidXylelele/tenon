@@ -1,0 +1,27 @@
+document:
+  dsl: "1.1.0"
+  namespace: default
+  name: daily-digest
+  version: "1.0.0"
+  title: Daily digest
+schedule:
+  cron: "0 9 * * *"
+do:
+  - fetchTheDigest:
+      call: http
+      with:
+        method: get
+        endpoint: https://example.com/digest
+  - ifItHasItems:
+      switch:
+        - hasItems:
+            when: ${ (.items // []) | length > 0 }
+            then: postTheItems
+        - otherwise:
+            then: end
+  - postTheItems:
+      call: http
+      with:
+        method: post
+        endpoint: https://example.com/post
+        body: ${ . }
