@@ -24,7 +24,7 @@ export const NotFound: Story = {
 
 export const CouldNotLoad: Story = {
   render: () => {
-    const failed = Object.assign(new Error("The platform did not answer"), {
+    const failed = Object.assign(new Error("Tenon did not answer"), {
       digest: "4211",
     });
     return <PageError error={failed} retry={fn()} />;
