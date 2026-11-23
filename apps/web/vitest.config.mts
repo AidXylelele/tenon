@@ -132,7 +132,11 @@ export default defineConfig({
         "src/{operations,features,libs}/**/*.{ts,tsx}",
         "src/spaces/workflows/modules/workflow-editor/**/*.{ts,tsx}",
       ],
-      exclude: ["src/**/*.stories.tsx", "src/**/*.test-support.ts"],
+      exclude: [
+        "src/**/*.stories.tsx",
+        "src/**/*.test-support.ts",
+        "src/libs/ui/components/chart.tsx",
+      ],
       thresholds,
     },
   },

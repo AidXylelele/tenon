@@ -104,4 +104,19 @@ describe("the runs of a period", () => {
     ).toBeInTheDocument();
     expect(row).toHaveTextContent("Mon 1685102");
   });
+
+  it("an_hourly_chart_in_utc_says_so_and_names_its_table_by_the_hour", () => {
+    render(<RunsChart bars={BARS} unit="hour" zone="UTC" />);
+    const show = screen.getByRole("button", { name: "Show as table" });
+
+    fireEvent.click(show);
+    const table = screen.getByRole("region", {
+      name: "Runs per hour as a table",
+    });
+
+    expect(screen.getByText("Each bar is an hour in UTC.")).toBeInTheDocument();
+    expect(
+      within(table).getByRole("columnheader", { name: "Hour" }),
+    ).toBeInTheDocument();
+  });
 });
