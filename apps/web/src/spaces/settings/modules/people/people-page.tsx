@@ -103,9 +103,7 @@ export function PeoplePage({ people, list }: PeoplePageProps) {
           <InviteForm />
         </CardContent>
       </Card>
-      <h3 id="invitations" className="heading-3">
-        Invitations
-      </h3>
+      <h3 className="heading-3">Invitations</h3>
       {sent.length === 0 ? (
         <EmptyState
           icon={<MailIcon />}

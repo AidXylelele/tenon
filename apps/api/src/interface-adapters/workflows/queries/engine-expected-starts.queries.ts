@@ -53,13 +53,25 @@ export class EngineExpectedStartsQueries implements ScheduleQueries {
     const windowStart = from.getTime();
     const since = Math.max(windowStart, schedule.createdAt);
     const passed = await this.#passedOf(spec, since, due);
-    const last = passed.at(-1) ?? due;
-    const [following] = await this.#preview(spec, last, 1);
     const start = passed[0] ?? since;
-    const end = passed.length === 0 ? start : (following ?? now);
+    const end = await this.#endOf(spec, passed, start, now);
     const slot = { workflowId, from: new Date(start), to: new Date(end) };
     const next = await this.#nextOf(spec, now);
     return { slot, expected: passed.length, next };
+  }
+
+  async #endOf(
+    spec: WorkflowSchedulePreviewSpec,
+    passed: readonly number[],
+    start: number,
+    now: number,
+  ): Promise<number> {
+    const last = passed.at(-1);
+
+    if (last === undefined) return start;
+
+    const [following] = await this.#preview(spec, last, 1);
+    return following ?? now;
   }
 
   async #passedOf(
