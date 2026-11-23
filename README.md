@@ -1,9 +1,8 @@
 # Tenon
 
-Tenon is a workflow platform for the Open Workflow standard (DSL 1.1.0): a workflow is a YAML document, checked
-like a program before it is published, and started by hand, through the API, on a schedule (`every`, `cron`, `after`),
-by an event or by a webhook. Its interpreter runs a workflow one step at a time, and the API keeps every run durable
-across restarts.
+Tenon is a workflow platform for the Open Workflow standard (DSL 1.1.0): a YAML workflow is checked like a program
+before it is published, started by hand, through the API, on a schedule, by an event or by a webhook, and run one step
+at a time, durably across restarts.
 
 ## Layout
 
@@ -16,11 +15,7 @@ across restarts.
 
 ## Install
 
-pnpm `12.8.1` (it downloads Node.js `26.13.1`), then:
-
-```sh
-pnpm install
-```
+pnpm `12.8.1` (it downloads Node.js `26.13.1`), then `pnpm install`.
 
 ## Run the stand
 
@@ -38,45 +33,28 @@ docker compose up --build --wait
 ```
 
 The console answers at `http://localhost:3001`, the API at `http://localhost:53000/api/v1`, Mailpit at
-`http://localhost:58025`, and Grafana at `http://localhost:58888`. The `migrate` service creates the first administrator
-at `ADMIN_EMAIL` with no password, and fails while no administrator exists and `ADMIN_EMAIL` is not an email address:
-set the password through password recovery, whose mail arrives in Mailpit.
-`docker compose down` stops the stand; `--volumes` also deletes its data.
-
-The migrations run as the database owner `tenon`; the api connects as `tenon_app`, which may only read and write data.
-A database created before that role existed gets it only when created again (`docker compose down --volumes`).
-
-In production the console goes behind a proxy that appends `X-Forwarded-For`; the API trusts only the console's address.
+`http://localhost:58025` and Grafana at `http://localhost:58888`. The `migrate` service runs as the owner `tenon` and
+creates the first administrator at `ADMIN_EMAIL` with no password (set it through password recovery, in Mailpit); the
+api connects as `tenon_app`, which only reads and writes data. `docker compose down` stops the stand, `--volumes` also
+deletes its data. In production the console goes behind a proxy that appends `X-Forwarded-For`.
 
 ## Observability
 
-`compose.yaml` runs the platform and includes `compose.observability.yaml`, the observability stack;
-`docker compose up --wait otel-collector grafana` starts that stack alone. The api, the worker and the console send
-their traces and metrics, and the api and the worker their logs, over OTLP to the OpenTelemetry Collector
-(`docker/otel-collector`), the only entry: it derives span metrics and the service graph from the traces and forwards
-traces to Tempo, metrics to Mimir and logs to Loki. Grafana (`docker/grafana`) opens on the Tenon dashboards (overview,
-HTTP, Node.js runtime, interpreter, workflow engine, database) with the links between the three stores; it needs no
-sign-in on `127.0.0.1`. Traces and logs are kept for 72 hours, metrics for 7 days.
+`compose.yaml` includes `compose.observability.yaml` (`docker compose up --wait otel-collector grafana` starts it alone).
+The api, the worker and the console send their telemetry over OTLP to the OpenTelemetry Collector, which derives span
+metrics and forwards to Tempo, Mimir and Loki (traces and logs kept 72 hours, metrics 7 days). Grafana opens on the
+Tenon dashboards without sign-in on `127.0.0.1`.
 
 ## Develop
 
 ```sh
-set -a; . ./.env; set +a
-pnpm build
-pnpm dev
+set -a; . ./.env; set +a && pnpm build && pnpm dev
 ```
-
-`pnpm dev` rebuilds the packages on change and runs the API, the worker and the console, all with the root `.env`.
 
 ## Test
 
 ```sh
-pnpm build
-pnpm lint
-pnpm check-types
-pnpm test
-pnpm format:check
+pnpm build && pnpm lint && pnpm check-types && pnpm test && pnpm format:check
 ```
 
-The pre-commit hook formats and lints the staged files and runs the tests they touch. The api's integration tests
-need Docker: `pnpm --filter api exec vitest run --project integration`.
+The pre-commit hook formats, lints and tests the staged files; the api's own tests are in [`apps/api`](apps/api).
