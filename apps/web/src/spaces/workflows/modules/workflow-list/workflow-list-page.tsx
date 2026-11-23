@@ -172,7 +172,7 @@ function NoWorkflow({
       <EmptyState
         icon={<SearchIcon />}
         title="No workflow matches"
-        description={`No ${status} workflow is named like “${q}”.`}
+        description={`No ${status} workflow has a title or name like “${q}”.`}
         action={
           <Button variant="outline" asChild>
             <Link href={cleared}>Clear the search</Link>
@@ -203,7 +203,7 @@ function WorkflowTable({
             <TableRow>
               <TableHead className="w-[30%]">Workflow</TableHead>
               <TableHead className="w-[30%]">Starts</TableHead>
-              <TableHead className="w-[12%] text-right">Runs</TableHead>
+              <TableHead className="w-[12%] text-right">Runs, 7 days</TableHead>
               <TableHead className="w-[18%]">Last run</TableHead>
               <TableHead className="w-[10%] text-right">Version</TableHead>
             </TableRow>
@@ -229,6 +229,9 @@ function WorkflowRow({ workflow }: { readonly workflow: Workflow }) {
   const lastRun = workflow.lastRun;
   const version = workflow.currentVersion;
   const archived = workflow.status === "archived";
+  const title = workflow.title ?? workflow.name;
+  const week = workflow.week;
+  const failed = `· ${String(week.failed)} failed`;
 
   return (
     <TableRow className="relative">
@@ -237,7 +240,7 @@ function WorkflowRow({ workflow }: { readonly workflow: Workflow }) {
           href={href}
           className="font-semibold after:absolute after:inset-0 hover:underline"
         >
-          {workflow.name}
+          {title}
         </Link>
         <span className="block truncate font-mono text-caption text-muted-foreground">
           {workflow.namespace}/{workflow.name}
@@ -258,7 +261,10 @@ function WorkflowRow({ workflow }: { readonly workflow: Workflow }) {
         </span>
       </TableCell>
       <TableCell className="text-right tabular-nums">
-        {workflow.starts}
+        {week.runs}
+        {week.failed > 0 && (
+          <span className="block text-caption text-destructive">{failed}</span>
+        )}
       </TableCell>
       <TableCell>
         {lastRun === null ? (

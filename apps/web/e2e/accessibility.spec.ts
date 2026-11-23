@@ -48,6 +48,17 @@ const MODAL_STORIES = [
   "spaces-shell-console-frame--narrow-drawer-open",
 ];
 
+const CHART_STORIES = [
+  "features-runs-chart--week-in-kyiv",
+  "features-runs-chart--day-in-utc",
+  "spaces-home-home--week",
+  "spaces-home-home--calm",
+  "spaces-workflows-workflow--overview",
+  "spaces-workflows-workflow--starts-on-a-schedule",
+  "spaces-workflows-workflow--archived",
+  "spaces-workflows-workflow--for-a-viewer",
+];
+
 const PAGE_MODAL_STORIES = [
   "spaces-workflows-workflow--run-dialog",
   "spaces-connections-webhooks--send-a-test-event",
@@ -69,6 +80,20 @@ const REVIEWED_INCOMPLETE: readonly Reviewed[] = [
     target: 'span[title="Fold line"]',
     reason:
       "CodeMirror's fold markers are glyphs, not text; the gutter's colours meet 3:1 in the token table.",
+  },
+  {
+    rule: "color-contrast",
+    stories: CHART_STORIES,
+    target: "tspan",
+    reason:
+      "Recharts draws the axis ticks as SVG text, whose background axe cannot read; they are --muted-foreground on --surface, which meets 4.5:1 in the token table.",
+  },
+  {
+    rule: "color-contrast",
+    stories: CHART_STORIES,
+    target: "\\:text-muted-foreground",
+    reason:
+      "The legend's items hold a coloured swatch beside their words, so axe cannot pick one background; the words are --muted-foreground on --surface, which meets 4.5:1.",
   },
   {
     rule: "aria-hidden-focus",

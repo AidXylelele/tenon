@@ -4,6 +4,7 @@ import {
   acceptInvitation,
   changePassword,
   currentSession,
+  members,
   signIn,
   signOut,
 } from "./identity";
@@ -171,5 +172,24 @@ describe("the identity routes", () => {
       ok: false,
       problem: { status: 410, detail: "This invitation has expired" },
     });
+  });
+
+  it("lists_the_workspaces_members_and_none_when_the_api_has_none", async () => {
+    const member = {
+      id: "u-1",
+      email: "ada@example.com",
+      name: "Ada",
+      role: "admin",
+      status: "active",
+      since: "2026-11-01T09:00:00Z",
+    };
+    read.mockResolvedValueOnce([member]).mockResolvedValueOnce(null);
+
+    const listed = await members();
+    const none = await members();
+
+    expect(read).toHaveBeenCalledWith("/members");
+    expect(listed).toEqual([member]);
+    expect(none).toEqual([]);
   });
 });

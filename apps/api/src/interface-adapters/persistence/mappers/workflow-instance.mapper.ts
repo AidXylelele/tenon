@@ -33,6 +33,7 @@ export class WorkflowInstanceMapper {
       programFingerprint: run?.fingerprint ?? null,
       runWaits: instance.waits,
       cancelReason: instance.cancelReason,
+      test: instance.test,
       version: instance.version,
     };
   }
@@ -57,6 +58,7 @@ export class WorkflowInstanceMapper {
       endedAt: row.endedAt,
       cancelReason: row.cancelReason,
       run,
+      test: row.test,
       version: row.version,
     });
   }

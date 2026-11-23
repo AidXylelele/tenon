@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  expectedStarts,
+  failingWorkflows,
+  instanceCounts,
   instances,
   publishEvent,
   startInstance,
@@ -16,7 +19,12 @@ const { read, command } = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("./http", () => ({ read, command }));
+vi.mock("./http", async () => {
+  const actual = await vi.importActual<typeof import("./http")>("./http");
+  return { ApiError: actual.ApiError, read, command };
+});
+vi.mock("next/headers", () => ({}));
+vi.mock("next/navigation", () => ({}));
 
 const NOW = Date.parse("2026-11-03T12:00:00Z");
 
@@ -31,31 +39,101 @@ describe("the automation routes", () => {
     vi.useRealTimers();
   });
 
-  it("lists_instances_by_the_filter_the_api_offers_stamped_with_when_they_arrived", async () => {
-    read.mockResolvedValue({ items: [], next: "c2" });
+  it("lists_a_numbered_page_of_runs_by_the_filter_the_api_offers_stamped_with_when_it_arrived", async () => {
+    read.mockResolvedValue({ items: [], total: 120, exact: true });
 
     const page = await instances({
-      phase: "faulted",
-      startedFrom: "2026-11-02T12:00:00Z",
-      limit: 200,
+      phases: ["faulted", "cancelled"],
+      from: "2026-11-02T12:00:00Z",
+      to: "2026-11-03T12:00:00Z",
+      sort: "duration",
+      page: 3,
+      limit: 25,
     });
 
     expect(read).toHaveBeenCalledWith("/instances", {
       query: {
-        phase: "faulted",
-        startedFrom: "2026-11-02T12:00:00Z",
-        limit: 200,
+        namespace: undefined,
+        name: undefined,
+        version: undefined,
+        phase: ["faulted", "cancelled"],
+        from: "2026-11-02T12:00:00Z",
+        to: "2026-11-03T12:00:00Z",
+        sort: "duration",
+        page: 3,
+        limit: 25,
       },
     });
-    expect(page).toEqual({ items: [], next: "c2", readAt: NOW });
+    expect(page).toEqual({ items: [], total: 120, exact: true, readAt: NOW });
   });
 
-  it("no_instances_is_an_empty_page", async () => {
+  it("no_runs_is_an_empty_exact_page", async () => {
     read.mockResolvedValue(null);
 
     const page = await instances({});
 
-    expect(page).toEqual({ items: [], next: null, readAt: NOW });
+    expect(page).toEqual({ items: [], total: 0, exact: true, readAt: NOW });
+  });
+
+  it("counts_runs_by_the_bucket_starts_given_with_the_previous_period", async () => {
+    const counted = { to: "2026-11-03T12:00:00Z", buckets: [] };
+    read.mockResolvedValue(counted);
+
+    const counts = await instanceCounts({
+      buckets: ["2026-11-03T10:00:00Z", "2026-11-03T11:00:00Z"],
+      to: "2026-11-03T12:00:00Z",
+      previousFrom: "2026-11-03T08:00:00Z",
+      namespace: "sales",
+      name: "route-lead",
+    });
+
+    expect(read).toHaveBeenCalledWith("/instance-counts", {
+      query: {
+        bucket: ["2026-11-03T10:00:00Z", "2026-11-03T11:00:00Z"],
+        to: "2026-11-03T12:00:00Z",
+        previousFrom: "2026-11-03T08:00:00Z",
+        namespace: "sales",
+        name: "route-lead",
+      },
+    });
+    expect(counts).toEqual({ ...counted, readAt: NOW });
+  });
+
+  it("counts_the_platform_does_not_give_are_an_error", async () => {
+    read.mockResolvedValue(null);
+
+    const counting = instanceCounts({
+      buckets: [],
+      to: "2026-11-03T12:00:00Z",
+    });
+
+    await expect(counting).rejects.toThrow("Tenon did not count the runs");
+  });
+
+  it("reads_the_failing_workflows_of_a_window_and_the_expected_starts_since_a_moment", async () => {
+    read
+      .mockResolvedValueOnce({ items: [], workflows: 0, failed: 0 })
+      .mockResolvedValueOnce(null);
+
+    const failing = await failingWorkflows({
+      from: "2026-11-02T12:00:00Z",
+      to: "2026-11-03T12:00:00Z",
+      limit: 5,
+    });
+    const expected = await expectedStarts("2026-11-02T12:00:00Z");
+
+    expect(read).toHaveBeenNthCalledWith(1, "/failing-workflows", {
+      query: {
+        from: "2026-11-02T12:00:00Z",
+        to: "2026-11-03T12:00:00Z",
+        limit: 5,
+      },
+    });
+    expect(read).toHaveBeenNthCalledWith(2, "/expected-starts", {
+      query: { from: "2026-11-02T12:00:00Z" },
+    });
+    expect(failing).toEqual({ items: [], workflows: 0, failed: 0 });
+    expect(expected).toEqual([]);
   });
 
   it("lists_workflows_by_status_fifty_at_a_time", async () => {

@@ -202,3 +202,9 @@ export interface FlowState {
   readonly sources: ReadonlyMap<string, string>;
   readonly store: FlowViewStore;
 }
+
+export interface ListPlace {
+  readonly list: string;
+  readonly index: number;
+  readonly size: number;
+}

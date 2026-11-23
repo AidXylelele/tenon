@@ -207,6 +207,12 @@ export class StoredDrafts extends DraftRepository {
     this.#drafts.set(key, draft);
     return Promise.resolve();
   }
+
+  remove(draft: Draft): Promise<void> {
+    const key = `${draft.name.namespace}/${draft.name.name}`;
+    this.#drafts.delete(key);
+    return Promise.resolve();
+  }
 }
 
 export class FakeDefinitionCompiler extends DefinitionCompiler {
@@ -263,6 +269,7 @@ function instanceRow(
     endedAt: instance.endedAt,
     cancelReason: instance.cancelReason,
     run: instance.run,
+    test: instance.test,
     version,
   };
 }
@@ -502,6 +509,7 @@ export interface InstanceOverrides {
   readonly input?: WorkflowInstanceProps["input"];
   readonly startedAt?: Date | null;
   readonly endedAt?: Date | null;
+  readonly test?: boolean;
   readonly version?: number;
 }
 
@@ -533,6 +541,7 @@ export function anInstanceIn(
     endedAt: overrides.endedAt === undefined ? endedAt : overrides.endedAt,
     cancelReason: null,
     run: overrides.run ?? null,
+    test: overrides.test ?? false,
     version: overrides.version ?? 1,
   });
 }

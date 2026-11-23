@@ -1,17 +1,15 @@
 import "server-only";
 import { instanceCounts } from "@/libs/data-access/automation";
 import { ApiError } from "@/libs/data-access/http";
-import { phasesOf } from "@/operations/run-periods";
-
-const EPOCH = new Date(0).toISOString();
-const IN_PROGRESS = phasesOf("in-progress");
+import { inProgressOf, liveWindowOf } from "@/operations/run-periods";
 
 export async function inProgressNow(): Promise<number> {
   const now = new Date().toISOString();
+  const window = liveWindowOf(now);
 
   try {
-    const read = await instanceCounts(EPOCH, now);
-    return IN_PROGRESS.reduce((sum, phase) => sum + read.counts[phase], 0);
+    const read = await instanceCounts(window);
+    return inProgressOf(read.now);
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
 

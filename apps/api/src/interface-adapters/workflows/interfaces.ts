@@ -26,6 +26,7 @@ import type {
   WorkflowRequest,
 } from "interpreter";
 import type { Imports } from "interpreter/front-end";
+import type { StartSlot } from "../../application/automation/schedules/interfaces.js";
 import type { WorkflowStructure } from "language-server/structure";
 import type {
   AwaitedEffect,
@@ -260,4 +261,10 @@ export type FetchedText =
 
 export abstract class ResourceClient {
   abstract text(resource: Resource, step: StepCall): Promise<FetchedText>;
+}
+
+export interface SchedulePlan {
+  readonly slot: StartSlot;
+  readonly expected: number;
+  readonly next: readonly Date[];
 }

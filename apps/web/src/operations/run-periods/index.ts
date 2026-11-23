@@ -1,26 +1,30 @@
 export type {
+  Bar,
   Bucket,
   BucketUnit,
+  CountRequest,
+  Figure,
+  FigureKind,
   Period,
   PeriodWindows,
-  RunStatus,
   Started,
   TimeWindow,
 } from "./interfaces";
 export {
   changeText,
+  chartNoteOf,
   periodLabel,
   periodPhrase,
   PERIODS,
   STARTED,
   startedOf,
+  windowPhrase,
 } from "./periods";
 export {
-  phasesOf,
-  statusesOf,
-  statusLabel,
-  statusParamOf,
-  STATUSES,
-  summaryOf,
-} from "./statuses";
+  countWindowOf,
+  figuresOf,
+  inProgressOf,
+  liveWindowOf,
+  seriesOf,
+} from "./figures";
 export { windowsOf } from "./windows";

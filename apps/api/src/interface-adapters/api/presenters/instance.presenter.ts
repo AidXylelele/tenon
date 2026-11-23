@@ -1,21 +1,28 @@
 import { Injectable } from "@nestjs/common";
 import type { EventPage } from "../../../application/automation/events/interfaces.js";
 import type {
+  FailingWorkflows,
+  InstanceCounts,
   InstanceDetail,
   InstancePage,
   InstanceSummary,
+  ListedInstance,
   PhaseCount,
   TaskOutput,
   TaskPage,
+  WindowCount,
 } from "../../../application/automation/instances/interfaces.js";
+import type { Person } from "../../../application/identity/users/interfaces.js";
 import { Phase } from "../../../domain/automation/instances/enums.js";
+import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import {
   type EventPageResponse,
-  InstanceCursor,
+  type FailingWorkflowsResponse,
   type InstanceCountsResponse,
   type InstancePageResponse,
   type InstanceResponse,
   type InstanceSummaryResponse,
+  type PhaseCounts,
   type ResponseJson,
   type TaskPageResponse,
 } from "../schemas/instance.schema.js";
@@ -30,6 +37,7 @@ export class InstancePresenter {
       version: instance.version,
       phase: instance.phase,
       trigger: instance.trigger,
+      test: instance.test,
       createdAt: instance.createdAt.toISOString(),
       startedAt: instance.startedAt?.toISOString() ?? null,
       endedAt: instance.endedAt?.toISOString() ?? null,
@@ -38,7 +46,7 @@ export class InstancePresenter {
 
   detail(instance: InstanceDetail): InstanceResponse {
     const summary = this.summary(instance);
-    const startedBy = this.#startedByOf(instance);
+    const startedBy = this.#personOf(instance.startedBy);
     const waits = instance.waits.map((wait) => ({
       kind: wait.kind,
       until: wait.until?.toISOString() ?? null,
@@ -59,9 +67,25 @@ export class InstancePresenter {
   }
 
   page(page: InstancePage): InstancePageResponse {
-    const items = page.items.map((item) => this.summary(item));
-    const next = page.next === null ? null : InstanceCursor.encode(page.next);
-    return { items, next };
+    const items = page.items.map((item) => this.#listedOf(item));
+    return { items, total: page.total, exact: page.exact };
+  }
+
+  #listedOf(item: ListedInstance): InstancePageResponse["items"][number] {
+    const summary = this.summary(item);
+    const startedBy = this.#personOf(item.startedBy);
+    const waits = item.waits.map((wait) => ({
+      kind: wait.kind,
+      until: wait.until?.toISOString() ?? null,
+      stream: wait.stream,
+    }));
+    return {
+      ...summary,
+      title: item.title,
+      startedBy,
+      durationMs: item.durationMs,
+      waits,
+    };
   }
 
   output(output: TaskOutput): string {
@@ -92,21 +116,61 @@ export class InstancePresenter {
     return { items, next };
   }
 
-  counts(
-    from: Date,
-    to: Date,
-    counted: readonly PhaseCount[],
-  ): InstanceCountsResponse {
+  failing(failing: FailingWorkflows): FailingWorkflowsResponse {
+    const items = failing.items.map((workflow) => ({
+      namespace: workflow.namespace,
+      name: workflow.name,
+      title: workflow.title,
+      failed: workflow.failed,
+      runs: workflow.runs,
+      firstFailedAt: workflow.firstFailedAt.toISOString(),
+      lastFailedAt: workflow.lastFailedAt.toISOString(),
+      lastError: {
+        status: workflow.lastError.status,
+        type: workflow.lastError.type,
+        title: workflow.lastError.title,
+        detail: workflow.lastError.detail,
+      },
+      stillFailing: workflow.stillFailing,
+    }));
+    return { items, workflows: failing.workflows, failed: failing.failed };
+  }
+
+  counts(counted: InstanceCounts): InstanceCountsResponse {
+    const buckets = counted.buckets.map((bucket) => ({
+      start: bucket.start.toISOString(),
+      counts: this.#byPhase(bucket.counts),
+    }));
+    const total = this.#byPhase(counted.total);
+    const previous = this.#previousOf(counted.previous);
+    const live = WorkflowInstance.livePhases();
+    const now = this.#countedIn(counted.live, live);
+    return { to: counted.to.toISOString(), buckets, total, previous, now };
+  }
+
+  #previousOf(
+    previous: WindowCount | null,
+  ): InstanceCountsResponse["previous"] {
+    if (previous === null) return null;
+
+    const counts = this.#byPhase(previous.counts);
+    return { from: previous.from.toISOString(), counts };
+  }
+
+  #byPhase(counted: readonly PhaseCount[]): PhaseCounts {
     const phases = Object.values(Phase);
+    return this.#countedIn(counted, phases);
+  }
+
+  #countedIn<Counted extends Phase>(
+    counted: readonly PhaseCount[],
+    phases: readonly Counted[],
+  ): Record<Counted, number> {
     const entries = phases.map((phase) => [
       phase,
       this.#countOf(counted, phase),
     ]);
-    return {
-      from: from.toISOString(),
-      to: to.toISOString(),
-      counts: Object.fromEntries(entries) as InstanceCountsResponse["counts"],
-    };
+    return Object.fromEntries(entries) as Record<Counted, number>;
   }
 
   #countOf(counted: readonly PhaseCount[], phase: Phase): number {
@@ -114,9 +178,7 @@ export class InstancePresenter {
     return found?.count ?? 0;
   }
 
-  #startedByOf(instance: InstanceDetail): InstanceResponse["startedBy"] {
-    const starter = instance.startedBy;
-
+  #personOf(starter: Person | null): InstanceResponse["startedBy"] {
     if (starter === null) return null;
 
     return { id: starter.id, name: starter.name };

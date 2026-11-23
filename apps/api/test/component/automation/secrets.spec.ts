@@ -20,6 +20,8 @@ import { startStubServer, type StubServer } from "../../support/stub-server.js";
 import type { Created, Page, Problem } from "../../support/bodies.js";
 
 const PROBLEM = "application/problem+json";
+const ECHO = "/echo";
+const TOKEN = "tok-live-87654321";
 const CREDENTIAL = JSON.stringify({
   username: "ada-lovelace",
   password: "s3cret-pass",
@@ -61,9 +63,13 @@ describe("keeping credentials for workflows", () => {
   let crm: StubServer;
 
   beforeAll(async () => {
-    crm = await startStubServer((_request, response) => {
+    crm = await startStubServer((received, response) => {
+      const echoed = received.url.startsWith(ECHO);
+      const body = echoed
+        ? { url: received.url, apiKey: received.headers["x-api-key"] }
+        : { id: 1 };
       response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ id: 1 }));
+      response.end(JSON.stringify(body));
     });
     run = await createRunApp();
     t = run.t;
@@ -178,6 +184,40 @@ describe("keeping credentials for workflows", () => {
 
     expect((await instanceOf(t, editor, id)).phase).toBe("completed");
     expect(authorizations).toEqual([BASIC]);
+  });
+
+  it("two_testers_of_one_draft_each_run_it_with_their_own_secret_of_the_same_name", async () => {
+    const theirs = JSON.stringify({
+      username: "grace",
+      password: "h0pper-pass",
+    });
+    const theirBasic = `Basic ${Buffer.from("grace:h0pper-pass").toString("base64")}`;
+    const draft = "/api/v1/workflows/sales/route-lead/draft";
+    const source = JSON.stringify(aCallingDocument(crm.origin));
+    await createSecret(editor, "crm", CREDENTIAL);
+    await createSecret(other, "crm", theirs);
+    const saved = await request(t.server)
+      .put(draft)
+      .set(editor)
+      .set("If-None-Match", "*")
+      .send({ source, layout: {} })
+      .expect(201);
+    const etag = String(saved.headers.etag);
+
+    for (const tester of [editor, other])
+      await request(t.server)
+        .post(`${draft}/test-runs`)
+        .set(tester)
+        .set("If-Match", etag)
+        .send({})
+        .expect(201);
+    await drain(t);
+    const authorizations = crm.received.map(
+      (request) => request.headers.authorization,
+    );
+
+    expect(authorizations).toHaveLength(2);
+    expect(authorizations).toEqual(expect.arrayContaining([BASIC, theirBasic]));
   });
 
   it("a_replaced_value_is_the_one_the_next_run_uses", async () => {
@@ -297,6 +337,54 @@ describe("keeping credentials for workflows", () => {
     expect(failed?.error).toMatchObject({ detail: "leaked ***" });
     expect(emitted.map((event) => event.data)).toEqual([{ token: "***" }]);
     expect(JSON.stringify(events)).not.toContain("tok-12345678");
+  });
+
+  it("a_secret_a_task_sent_in_a_header_and_a_url_is_masked_in_every_run_record", async () => {
+    await createSecret(editor, "token", TOKEN);
+    await publish(t, editor, {
+      ...aDocument({}, [
+        {
+          fetch: {
+            call: "http",
+            with: {
+              method: "get",
+              endpoint: `\${ "${crm.origin}${ECHO}?key=" + $secrets.token }`,
+              headers: { "x-api-key": "${ $secrets.token }" },
+            },
+          },
+        },
+      ]),
+      use: { secrets: ["token"] },
+    });
+
+    const { id } = await start(t, editor);
+    await drain(t);
+    const instance = await instanceOf(t, editor, id);
+    const tasks = await tasksOf(t, editor, id);
+    const events = await eventsOf(id);
+    const output = await request(t.server)
+      .get(
+        `/api/v1/instances/${id}/tasks/${encodeURIComponent("/do/0/fetch")}/output`,
+      )
+      .set(editor)
+      .expect(200);
+    const list = await request(t.server)
+      .get("/api/v1/instances?tests=true")
+      .set(editor)
+      .expect(200);
+    const sent = crm.received.map((received) => received.headers["x-api-key"]);
+    const records = JSON.stringify([
+      instance,
+      tasks,
+      events,
+      output.body,
+      list.body,
+    ]);
+
+    expect(sent).toEqual([TOKEN]);
+    expect(instance.output).toEqual({ url: `${ECHO}?key=***`, apiKey: "***" });
+    expect(output.body).toEqual({ url: `${ECHO}?key=***`, apiKey: "***" });
+    expect(records).not.toContain(TOKEN);
   });
 
   it("a_secret_holding_another_is_masked_whole", async () => {

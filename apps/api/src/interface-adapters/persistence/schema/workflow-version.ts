@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  boolean,
   jsonb,
   pgTable,
   text,
@@ -34,11 +36,11 @@ export const workflowVersion = pgTable(
       .notNull()
       .references(() => user.id),
     publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
+    test: boolean("test").notNull().default(false),
   },
   (table) => [
-    uniqueIndex("workflow_version_workflow_semver_idx").on(
-      table.workflowId,
-      table.semver,
-    ),
+    uniqueIndex("workflow_version_workflow_semver_idx")
+      .on(table.workflowId, table.semver)
+      .where(sql`not ${table.test}`),
   ],
 );

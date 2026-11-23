@@ -3,11 +3,13 @@ import type {
   AwaitedEffect,
   Listening,
   Receiving,
+  RunWait,
   TakenEvent,
 } from "../../domain/automation/instances/interfaces.js";
 import type {
   Phase,
   TaskValueKind,
+  TriggerKind,
 } from "../../domain/automation/instances/enums.js";
 import type {
   JsonObject,
@@ -56,6 +58,47 @@ export type VersionCatalogueRow = Omit<
   WorkflowVersionRow,
   "workflowId" | "document" | "imports" | "source"
 >;
+
+export interface ListedInstanceRow {
+  readonly id: string;
+  readonly namespace: string;
+  readonly name: string;
+  readonly title: string | null;
+  readonly version: string;
+  readonly phase: Phase;
+  readonly trigger: TriggerKind;
+  readonly test: boolean;
+  readonly createdAt: Date;
+  readonly startedAt: Date | null;
+  readonly endedAt: Date | null;
+  readonly starterId: string | null;
+  readonly starterName: string | null;
+  readonly durationMs: number | null;
+  readonly runWaits: readonly RunWait[];
+}
+
+export interface FailingRow {
+  readonly namespace: string;
+  readonly name: string;
+  readonly workflowTitle: string | null;
+  readonly failed: number;
+  readonly runs: number;
+  readonly firstFailedAt: Date;
+  readonly lastFailedAt: Date;
+  readonly status: number | null;
+  readonly type: string | null;
+  readonly title: string | null;
+  readonly detail: string | null;
+  readonly stillFailing: boolean;
+  readonly workflows: number;
+  readonly failedRuns: number;
+}
+
+export interface CountRow {
+  readonly bucket: number;
+  readonly phase: Phase;
+  readonly count: number;
+}
 
 export interface TaskPosition {
   readonly execution: string;
@@ -106,17 +149,31 @@ export interface SealedRun {
   readonly error: JsonObject | null;
 }
 
-export interface WorkflowSummaryRow {
+export interface LastRunColumns {
+  readonly lastRunId: string | null;
+  readonly lastRunPhase: Phase | null;
+  readonly lastRunAt: Date | null;
+}
+
+export interface WorkflowSummaryRow extends LastRunColumns {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
   readonly status: WorkflowStatus;
   readonly on: boolean;
   readonly currentVersion: string | null;
   readonly schedule: Schedule | null;
+  readonly weekRuns: number;
+  readonly weekFailed: number;
+}
+
+export interface ScheduledStartsRow extends LastRunColumns {
+  readonly workflowId: string;
+  readonly namespace: string;
+  readonly name: string;
+  readonly title: string | null;
+  readonly schedule: Schedule | null;
   readonly starts: number;
-  readonly lastRunId: string | null;
-  readonly lastRunPhase: Phase | null;
-  readonly lastRunAt: Date | null;
 }
 
 export interface VersionSummaryRow {
@@ -128,6 +185,7 @@ export interface VersionSummaryRow {
   readonly publisherId: string;
   readonly publisherName: string;
   readonly publishedAt: Date;
+  readonly runs: number;
 }
 
 export abstract class Cipher {

@@ -19,7 +19,9 @@ export class ArchiveWorkflow {
 
     const archived = workflow.archive(now);
 
-    if (archived)
+    if (!archived.ok) return archived;
+
+    if (archived.value)
       await this.unitOfWork.run(() => this.workflows.save(workflow));
 
     return { ok: true, value: undefined };

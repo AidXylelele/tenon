@@ -308,4 +308,38 @@ describe("a workflow's shared draft over HTTP", () => {
       .send({ source: "x", layout: {} })
       .expect(403);
   });
+
+  it("a_draft_is_discarded_on_its_etag_and_then_is_gone", async () => {
+    const etag = await created();
+
+    await request(t.server).delete(DRAFT).set(ada).expect(428);
+    const stale = await request(t.server)
+      .delete(DRAFT)
+      .set(ada)
+      .set("If-Match", '"old"')
+      .expect(412);
+    await request(t.server)
+      .delete(DRAFT)
+      .set(ada)
+      .set("If-Match", etag)
+      .expect(204);
+    await request(t.server).get(DRAFT).set(ada).expect(404);
+    await request(t.server)
+      .delete(DRAFT)
+      .set(ada)
+      .set("If-Match", etag)
+      .expect(404);
+
+    expect(stale.headers.etag).toBe(etag);
+  });
+
+  it("a_viewer_cannot_discard_a_draft", async () => {
+    const etag = await created();
+
+    await request(t.server)
+      .delete(DRAFT)
+      .set(viewer)
+      .set("If-Match", etag)
+      .expect(403);
+  });
 });

@@ -23,6 +23,10 @@ export class StartSubWorkflow {
     if (existing !== null)
       return { ok: true, value: { instanceId: existing.id } };
 
+    const parent = await this.instances.find(command.parentId);
+
+    if (parent === null) return { ok: false, failure: Missing.Instance };
+
     const workflow = await this.workflows.findByName(command.name);
 
     if (workflow === null) return { ok: false, failure: Missing.Workflow };
@@ -38,7 +42,7 @@ export class StartSubWorkflow {
       input: command.input,
       trigger: command.trigger,
       starterId: null,
-      originId: command.parentId,
+      origin: parent,
       originEffectId: command.effectId,
       now,
     });

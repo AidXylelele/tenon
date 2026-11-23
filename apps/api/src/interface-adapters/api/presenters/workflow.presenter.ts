@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
+import type { ExpectedStarts } from "../../../application/automation/schedules/interfaces.js";
 import type {
   LastRun,
   PublishedVersion,
@@ -9,6 +10,7 @@ import type {
 import { ScheduleKind } from "../../../domain/automation/workflows/enums.js";
 import type { Schedule } from "../../../domain/automation/workflows/interfaces.js";
 import {
+  type ExpectedStartsResponse,
   type VersionListResponse,
   type VersionResponse,
   WorkflowCursor,
@@ -44,6 +46,7 @@ export class WorkflowPresenter {
       current: version.current,
       publishedBy,
       publishedAt: version.publishedAt.toISOString(),
+      runs: version.runs,
     };
   }
 
@@ -57,11 +60,12 @@ export class WorkflowPresenter {
     return {
       namespace: workflow.namespace,
       name: workflow.name,
+      title: workflow.title,
       status: workflow.status,
       on: workflow.on,
       currentVersion: workflow.currentVersion,
       schedule,
-      starts: workflow.starts,
+      week: { runs: workflow.week.runs, failed: workflow.week.failed },
       lastRun,
     };
   }
@@ -70,6 +74,19 @@ export class WorkflowPresenter {
     const items = page.items.map((summary) => this.workflow(summary));
     const next = page.next === null ? null : WorkflowCursor.encode(page.next);
     return { items, next };
+  }
+
+  expectedStarts(expected: readonly ExpectedStarts[]): ExpectedStartsResponse {
+    return expected.map((workflow) => ({
+      namespace: workflow.namespace,
+      name: workflow.name,
+      title: workflow.title,
+      lastRun: this.#lastRunOf(workflow.lastRun),
+      schedule: this.#scheduleOf(workflow.schedule),
+      next: workflow.next.map((at) => at.toISOString()),
+      missed: workflow.missed,
+      missedSince: workflow.missedSince.toISOString(),
+    }));
   }
 
   #scheduleOf(schedule: Schedule | null): WorkflowResponse["schedule"] {

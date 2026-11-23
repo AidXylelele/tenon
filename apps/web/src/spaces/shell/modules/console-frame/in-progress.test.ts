@@ -8,15 +8,7 @@ vi.mock("next/headers", () => ({
 }));
 
 const COUNTS = {
-  counts: {
-    pending: 1,
-    running: 4,
-    waiting: 2,
-    suspended: 3,
-    completed: 90,
-    faulted: 7,
-    cancelled: 1,
-  },
+  now: { pending: 1, running: 4, waiting: 2, suspended: 3 },
 };
 
 describe("the runs in progress now", () => {

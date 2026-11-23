@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   editorHref,
+  homeHref,
   isEditorPath,
   runHref,
   runsHref,
@@ -43,6 +44,15 @@ describe("the addresses of the console", () => {
     );
   });
 
+  it("home_and_a_workflow_keep_their_period_and_a_run_its_view", () => {
+    expect(homeHref({})).toBe("/");
+    expect(homeHref({ period: "7d" })).toBe("/?period=7d");
+    expect(workflowHref("sales", "route-lead", { period: "30d" })).toBe(
+      "/workflows/sales/route-lead?period=30d",
+    );
+    expect(runHref("r 1", { view: "events" })).toBe("/runs/r%201?view=events");
+  });
+
   it("a_run_and_a_notification_escape_their_ids", () => {
     expect(runHref("a/b")).toBe("/runs/a%2Fb");
     expect(notificationHref("n 1")).toBe("/notifications/n%201");
@@ -64,11 +74,15 @@ describe("the addresses of the console", () => {
       runsHref({
         namespace: "sales",
         name: "",
-        phase: "faulted",
+        status: "in-progress,failed",
         started: "24h",
-        cursor: undefined,
+        page: 2,
+        size: undefined,
+        sort: "duration",
       }),
-    ).toBe("/runs?namespace=sales&phase=faulted&started=24h");
+    ).toBe(
+      "/runs?namespace=sales&status=in-progress%2Cfailed&started=24h&page=2&sort=duration",
+    );
   });
 
   it("sign_in_says_why_and_where_to_return", () => {

@@ -2,9 +2,12 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { CreateDraft } from "../../application/automation/drafts/create-draft.js";
 import { DraftRepository } from "../../application/automation/drafts/ports.js";
+import { DraftCompilation } from "../../application/automation/drafts/draft-compilation.js";
 import { PublishDraft } from "../../application/automation/drafts/publish-draft.js";
 import { DraftQueries } from "../../application/automation/drafts/queries.js";
+import { DiscardDraft } from "../../application/automation/drafts/discard-draft.js";
 import { SaveDraft } from "../../application/automation/drafts/save-draft.js";
+import { TestDraft } from "../../application/automation/drafts/test-draft.js";
 import { AcceptEvent } from "../../application/automation/events/accept-event.js";
 import { EventQueries } from "../../application/automation/events/queries.js";
 import {
@@ -39,12 +42,14 @@ import { TurnWorkflowOn } from "../../application/automation/workflows/turn-work
 import { AutomationPolicy } from "../../interface-adapters/api/auth/automation.policy.js";
 import { DraftsController } from "../../interface-adapters/api/controllers/drafts.controller.js";
 import { EventsController } from "../../interface-adapters/api/controllers/events.controller.js";
+import { ExpectedStartsController } from "../../interface-adapters/api/controllers/expected-starts.controller.js";
 import { HooksController } from "../../interface-adapters/api/controllers/hooks.controller.js";
 import { HostController } from "../../interface-adapters/api/controllers/host.controller.js";
 import { ImportsController } from "../../interface-adapters/api/controllers/imports.controller.js";
 import { InstancesController } from "../../interface-adapters/api/controllers/instances.controller.js";
 import { SecretsController } from "../../interface-adapters/api/controllers/secrets.controller.js";
 import { SubscriptionsController } from "../../interface-adapters/api/controllers/subscriptions.controller.js";
+import { TestRunsController } from "../../interface-adapters/api/controllers/test-runs.controller.js";
 import { WebhooksController } from "../../interface-adapters/api/controllers/webhooks.controller.js";
 import { WorkflowsController } from "../../interface-adapters/api/controllers/workflows.controller.js";
 import { EntityTagMapper } from "../../interface-adapters/api/mappers/entity-tag.mapper.js";
@@ -54,6 +59,7 @@ import { DraftPresenter } from "../../interface-adapters/api/presenters/draft.pr
 import { HostPresenter } from "../../interface-adapters/api/presenters/host.presenter.js";
 import { ImportPresenter } from "../../interface-adapters/api/presenters/import.presenter.js";
 import { InstancePresenter } from "../../interface-adapters/api/presenters/instance.presenter.js";
+import { InstanceReadBack } from "../../interface-adapters/api/read-backs/instance.read-back.js";
 import { SecretPresenter } from "../../interface-adapters/api/presenters/secret.presenter.js";
 import { SubscriptionPresenter } from "../../interface-adapters/api/presenters/subscription.presenter.js";
 import { WebhookPresenter } from "../../interface-adapters/api/presenters/webhook.presenter.js";
@@ -82,7 +88,9 @@ import { HttpModule } from "./http.module.js";
   imports: [AutomationModule, HttpModule, ConfigModule.forFeature(linksConfig)],
   controllers: [
     WorkflowsController,
+    ExpectedStartsController,
     DraftsController,
+    TestRunsController,
     InstancesController,
     EventsController,
     WebhooksController,
@@ -99,7 +107,10 @@ import { HttpModule } from "./http.module.js";
     TurnWorkflowOff,
     CreateDraft,
     SaveDraft,
+    DiscardDraft,
+    DraftCompilation,
     PublishDraft,
+    TestDraft,
     FetchImport,
     StartInstance,
     RestartInstance,
@@ -136,6 +147,7 @@ import { HttpModule } from "./http.module.js";
     DraftPresenter,
     WorkflowPresenter,
     InstancePresenter,
+    InstanceReadBack,
     HostPresenter,
     ImportPresenter,
     SecretPresenter,

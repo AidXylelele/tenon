@@ -56,7 +56,7 @@ export function codeOf(problem: Problem): string | null {
 export function unreachable(detail: string): Problem {
   return {
     type: ABOUT_BLANK,
-    title: "The platform is not answering",
+    title: "Tenon is not answering",
     status: 503,
     detail,
     errors: [],

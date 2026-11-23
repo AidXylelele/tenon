@@ -2,6 +2,7 @@ import { type HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import type {
   DraftConflict,
   DraftView,
+  RefusedInput,
 } from "../../../application/automation/drafts/interfaces.js";
 import { DraftRefusal } from "../../../domain/automation/drafts/enums.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
@@ -58,6 +59,17 @@ export class DraftPresenter {
     return this.problemPresenter.of(failure);
   }
 
+  testRefusalOf(
+    failure: DraftConflict | RefusedInput | Failure,
+  ): HttpException {
+    const refusedInput = this.#isRefusedInput(failure);
+
+    if (refusedInput)
+      return this.problemPresenter.ofStart(failure.inputProblems);
+
+    return this.refusalOf(failure);
+  }
+
   conflict(failure: DraftConflict): HttpException {
     if (failure.current === null)
       return this.problemPresenter.of(failure.refusal);
@@ -86,7 +98,7 @@ export class DraftPresenter {
       title: "The draft's revision is required",
       status: HttpStatus.PRECONDITION_REQUIRED,
       detail:
-        "Send If-Match with the draft's ETag to save or publish it, or If-None-Match: * to create it",
+        "Send If-Match with the draft's ETag to save, publish or discard it, or If-None-Match: * to create it",
     };
     const headers = { "Cache-Control": DraftPresenter.UNSTORED };
     return new ConditionalRequestException(problem, headers);
@@ -94,5 +106,11 @@ export class DraftPresenter {
 
   #isConflict(failure: DraftConflict | Failure): failure is DraftConflict {
     return typeof failure === "object" && "refusal" in failure;
+  }
+
+  #isRefusedInput(
+    failure: DraftConflict | RefusedInput | Failure,
+  ): failure is RefusedInput {
+    return typeof failure === "object" && "inputProblems" in failure;
   }
 }

@@ -9,6 +9,7 @@ import {
   WorkflowRuntime,
 } from "../../application/automation/instances/ports.js";
 import { WorkflowSchedules } from "../../application/automation/schedules/ports.js";
+import { ScheduleQueries } from "../../application/automation/schedules/queries.js";
 import { SecretRepository } from "../../application/automation/secrets/ports.js";
 import { SecretQueries } from "../../application/automation/secrets/queries.js";
 import {
@@ -44,6 +45,7 @@ import { PostgresLifecycleEventStore } from "../../interface-adapters/persistenc
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
 import { EngineRunGateway } from "../../interface-adapters/workflows/gateways/engine-run.gateway.js";
 import { EngineScheduleGateway } from "../../interface-adapters/workflows/gateways/engine-schedule.gateway.js";
+import { EngineExpectedStartsQueries } from "../../interface-adapters/workflows/queries/engine-expected-starts.queries.js";
 import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
 import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
 import { AccessTokens } from "../../interface-adapters/workflows/effects/access-tokens.js";
@@ -104,6 +106,7 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: InstanceRuns, useExisting: EngineRunGateway },
     EngineScheduleGateway,
     { provide: WorkflowSchedules, useExisting: EngineScheduleGateway },
+    { provide: ScheduleQueries, useClass: EngineExpectedStartsQueries },
     WorkflowMapper,
     WorkflowVersionMapper,
     WorkflowInstanceMapper,
@@ -171,6 +174,7 @@ import { OutboundModule } from "./outbound.module.js";
     EngineRunGateway,
     InstanceRuns,
     WorkflowSchedules,
+    ScheduleQueries,
     WorkflowRepository,
     WorkflowQueries,
     WorkflowInstanceRepository,

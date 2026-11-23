@@ -9,9 +9,14 @@ import type {
   EventFilter,
   HostProfile,
   ImportText,
+  CountWindow,
+  ExpectedStarts,
+  FailingWorkflows,
+  FailureWindow,
   Instance,
   InstanceCounts,
   InstanceFilter,
+  InstancePage,
   InstanceSummary,
   Page,
   Read,
@@ -139,25 +144,55 @@ export function startInstance(
 
 export async function instances(
   filter: InstanceFilter,
-): Promise<Read<Page<InstanceSummary>>> {
-  const page = await read<Page<InstanceSummary>>("/instances", {
-    query: { ...filter },
+): Promise<Read<InstancePage>> {
+  const page = await read<InstancePage>("/instances", {
+    query: {
+      namespace: filter.namespace,
+      name: filter.name,
+      version: filter.version,
+      phase: filter.phases,
+      from: filter.from,
+      to: filter.to,
+      sort: filter.sort,
+      page: filter.page,
+      limit: filter.limit,
+    },
   });
-  return stamped(page ?? { items: [], next: null });
+  return stamped(page ?? { items: [], total: 0, exact: true });
 }
 
 export async function instanceCounts(
-  from: string,
-  to: string,
+  window: CountWindow,
 ): Promise<Read<InstanceCounts>> {
   const counts = await read<InstanceCounts>("/instance-counts", {
-    query: { from, to },
+    query: {
+      bucket: window.buckets,
+      to: window.to,
+      previousFrom: window.previousFrom,
+      namespace: window.namespace,
+      name: window.name,
+    },
   });
 
-  if (counts === null)
-    throw new ApiError(404, "The platform did not count the runs");
+  if (counts === null) throw new ApiError(404, "Tenon did not count the runs");
 
   return stamped(counts);
+}
+
+export async function failingWorkflows(
+  window: FailureWindow,
+): Promise<FailingWorkflows> {
+  const failing = await read<FailingWorkflows>("/failing-workflows", {
+    query: { from: window.from, to: window.to, limit: window.limit },
+  });
+  return failing ?? { items: [], workflows: 0, failed: 0 };
+}
+
+export async function expectedStarts(from: string): Promise<ExpectedStarts[]> {
+  const expected = await read<ExpectedStarts[]>("/expected-starts", {
+    query: { from },
+  });
+  return expected ?? [];
 }
 
 export function instance(id: string): Promise<Instance | null> {
@@ -232,7 +267,7 @@ export async function hostProfile(): Promise<HostProfile> {
   const profile = await read<HostProfile>("/host-profile");
 
   if (profile === null)
-    throw new ApiError(404, "The platform did not say what it can run");
+    throw new ApiError(404, "Tenon did not say what it can run");
 
   return profile;
 }

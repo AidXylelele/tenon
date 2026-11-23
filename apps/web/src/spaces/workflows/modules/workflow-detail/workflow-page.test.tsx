@@ -12,6 +12,7 @@ import {
   MONTH_END,
   NO_RUNS,
   ORDER_ROUTER,
+  ROUTER_COUNTS,
   ROUTER_RUNS,
   ROUTER_STRUCTURE,
   ROUTER_VERSIONS,
@@ -37,6 +38,10 @@ vi.mock("../../__shared_context/start-dialog/actions", () => ({
 vi.mock("@/features/workflow-flow", () => ({
   WorkflowFlow: () => <section aria-label="The flow" />,
 }));
+vi.mock("@/features/runs-chart", async (original) => ({
+  ...(await original<typeof import("@/features/runs-chart")>()),
+  RunsChart: () => <section aria-label="Runs chart" />,
+}));
 
 const PAGE: WorkflowPageProps = {
   workflow: ORDER_ROUTER,
@@ -46,6 +51,7 @@ const PAGE: WorkflowPageProps = {
   structure: ROUTER_STRUCTURE,
   author: true,
   operator: true,
+  ...ROUTER_COUNTS,
 };
 
 function show(props: Partial<WorkflowPageProps> = {}) {
@@ -69,6 +75,33 @@ describe("a workflow's page", () => {
     success.mockReset();
   });
 
+  it("the_overview_counts_the_period_with_its_chart_and_the_period_sits_left_of_edit", () => {
+    show();
+
+    const week = screen.getByRole("radio", { name: "7 days" });
+    const edit = screen.getByRole("link", { name: "Edit" });
+    const failed = screen.getByRole("link", { name: /^Failed/ });
+    const order = week.compareDocumentPosition(edit);
+
+    expect(week).toHaveAttribute("aria-checked", "true");
+    expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(failed).toHaveAttribute(
+      "href",
+      "/runs?namespace=sales&name=order-router&status=failed&started=7d",
+    );
+    expect(screen.getByRole("region", { name: "Runs chart" })).toBeVisible();
+  });
+
+  it("the_versions_tab_and_the_header_count_the_runs_of_each_version", () => {
+    show({ tab: "versions" });
+
+    const runs = screen.getByRole("columnheader", { name: "Runs" });
+
+    expect(runs).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "24" })).toBeInTheDocument();
+    expect(screen.getByText(/version 1\.2\.0, 24 runs/)).toBeInTheDocument();
+  });
+
   it("an_editor_edits_runs_and_finds_the_rest_under_more", () => {
     show();
 
@@ -84,8 +117,8 @@ describe("a workflow's page", () => {
   it("the_meta_line_names_the_version_and_who_published_it", () => {
     show();
 
-    const meta = screen.getByText(/version 1\.2\.0, published by/);
-    expect(meta).toHaveTextContent("Administrator");
+    const meta = screen.getByText(/published by Administrator/);
+    expect(meta).toHaveTextContent("version 1.2.0, 24 runs");
   });
 
   it("the_overview_shows_the_flow_and_the_recent_runs", () => {
@@ -156,7 +189,7 @@ describe("a workflow's page", () => {
 
     await waitFor(() => {
       expect(success).toHaveBeenCalledWith(
-        "Automatic starts turned off for daily-digest",
+        "Automatic starts turned off for Daily digest",
         expect.objectContaining({ duration: Infinity }),
       );
     });

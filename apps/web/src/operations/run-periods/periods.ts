@@ -1,4 +1,4 @@
-import type { Period, Started } from "./interfaces";
+import type { BucketUnit, Period, Started, TimeWindow } from "./interfaces";
 
 interface PeriodWords {
   readonly label: string;
@@ -45,4 +45,24 @@ function directionOf(current: number, previous: number): string {
   if (current > previous) return "↑ from";
   if (current < previous) return "↓ from";
   return "same as";
+}
+
+export function chartNoteOf(unit: BucketUnit, zone: string): string {
+  const bars = unit === "hour" ? "Each bar is an hour" : "Each bar is a day";
+  const clock = zone === "UTC" ? "UTC" : `your time zone, ${zone}`;
+  return `${bars} in ${clock}.`;
+}
+
+export function windowPhrase(window: TimeWindow, zone: string): string {
+  const format = new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: zone,
+  });
+  const from = format.format(Date.parse(window.from));
+  const to = format.format(Date.parse(window.to));
+  return `between ${from} and ${to}`;
 }

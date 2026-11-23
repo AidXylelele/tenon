@@ -130,6 +130,34 @@ describe("an action that asks first", () => {
       "Archive",
     );
   });
+
+  it("an_action_opened_from_elsewhere_has_no_button_and_says_when_it_closes", async () => {
+    const action = vi.fn().mockResolvedValue({ ok: true, value: undefined });
+    const onOpenChange = vi.fn();
+    render(
+      <ConfirmAction
+        icon={<TrashIcon />}
+        label="Delete run"
+        title="Delete this run?"
+        description="Its record is removed."
+        actionLabel="Delete run"
+        action={action}
+        success="Run deleted"
+        open
+        onOpenChange={onOpenChange}
+      />,
+    );
+    const confirm = screen.getByRole("button", { name: "Delete run" });
+
+    fireEvent.click(confirm);
+
+    await waitFor(() => {
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+    expect(screen.getAllByRole("button", { name: "Delete run" })).toHaveLength(
+      1,
+    );
+  });
 });
 
 describe("an action that asks first, opened from elsewhere", () => {

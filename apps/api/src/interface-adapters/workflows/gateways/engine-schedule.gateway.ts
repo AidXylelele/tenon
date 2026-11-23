@@ -17,6 +17,7 @@ import { ScheduleRun } from "../runners/schedule.run.js";
 
 @Injectable()
 export class EngineScheduleGateway implements WorkflowSchedules {
+  static readonly PREFIX = "schedule-";
   private static readonly UTC = "UTC";
   private static readonly CRON_POINTER = "/schedule/cron";
 
@@ -122,6 +123,6 @@ export class EngineScheduleGateway implements WorkflowSchedules {
   }
 
   #idOf(workflowId: string): string {
-    return `schedule-${workflowId}`;
+    return `${EngineScheduleGateway.PREFIX}${workflowId}`;
   }
 }

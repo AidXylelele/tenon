@@ -1,28 +1,43 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type { Phase } from "@/libs/data-access/types";
-import { PhaseCounts } from "./phase-counts";
+import type { Phase, TaskStatus } from "@/libs/data-access/types";
+import { PHASES } from "@/operations/run-progress";
+import { PhaseStatus, TaskStatusOf } from "./run-status";
+
+const TASKS: readonly TaskStatus[] = [
+  "running",
+  "completed",
+  "faulted",
+  "cancelled",
+  "skipped",
+];
+
+function Statuses() {
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <ul aria-label="Runs" className="flex flex-wrap gap-4">
+        {PHASES.map((phase: Phase) => (
+          <li key={phase}>
+            <PhaseStatus phase={phase} />
+          </li>
+        ))}
+      </ul>
+      <ul aria-label="Steps" className="flex flex-wrap gap-4">
+        {TASKS.map((status) => (
+          <li key={status}>
+            <TaskStatusOf status={status} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 const meta = {
-  component: PhaseCounts,
-} satisfies Meta<typeof PhaseCounts>;
+  component: Statuses,
+} satisfies Meta<typeof Statuses>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const LastDay: Story = {
-  args: {
-    id: "last-day",
-    title: "Last 24 hours",
-    counts: {
-      pending: 0,
-      running: 2,
-      waiting: 0,
-      suspended: 0,
-      completed: 12,
-      faulted: 1,
-      cancelled: 0,
-    },
-    hrefOf: (phase: Phase) => `/runs?phase=${phase}`,
-  },
-};
+export const EveryStatus: Story = {};

@@ -43,7 +43,7 @@ export class StartInstance {
       input: command.input,
       trigger: TriggerKind.Manual,
       starterId: command.starterId,
-      originId: null,
+      origin: null,
       originEffectId: null,
       now,
     });

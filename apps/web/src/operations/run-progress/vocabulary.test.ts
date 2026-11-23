@@ -2,28 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { Phase, Trigger } from "@/libs/data-access/types";
 import type { StepState } from "./interfaces";
 import {
-  isUnended,
   phaseLabel,
   startedBy,
   stepStateLabel,
   triggerLabel,
 } from "./vocabulary";
-
-describe("a run that has not ended", () => {
-  it.each([
-    ["pending", true],
-    ["running", true],
-    ["waiting", true],
-    ["suspended", true],
-    ["completed", false],
-    ["faulted", false],
-    ["cancelled", false],
-  ] as const)("a_%s_run_is_unended_%s", (phase: Phase, unended) => {
-    const answer = isUnended(phase);
-
-    expect(answer).toBe(unended);
-  });
-});
 
 describe("a run's phase in the console's words", () => {
   it.each<[Phase, string]>([

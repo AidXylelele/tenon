@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
+  instanceCounts,
   instances,
   versionStructure,
   versions as versionsOf,
   workflow as workflowOf,
 } from "@/libs/data-access/automation";
-import { available, UNAVAILABLE } from "@/libs/data-access/http";
+import { available, UNAVAILABLE, viewerZone } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
 import { type Query, segment } from "@/libs/routing/segment";
+import { ViewerZone } from "@/libs/live/viewer-zone";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
+import { countWindowOf, windowsOf } from "@/operations/run-periods";
 import type { WorkflowParams } from "../../__shared_context/workflow-params";
 import { WorkflowQuery } from "./query";
 import { WorkflowPage } from "./workflow-page";
@@ -34,18 +37,24 @@ export async function WorkflowDetail({
   const address = WorkflowQuery.parse(query);
   const tab = address.tab;
   const limit = tab === "runs" ? LISTED : RECENT;
+  const period = address.period;
+  const zone = await viewerZone();
+  const now = new Date().toISOString();
+  const windows = windowsOf(period, now, zone);
+  const window = { ...countWindowOf(windows), namespace, name };
   const read = await available(
     Promise.all([
       currentSession(),
       workflowOf(namespace, name),
       versionsOf(namespace, name),
       instances({ namespace, name, limit }),
+      instanceCounts(window),
     ]),
   );
 
   if (read === UNAVAILABLE) return <Unavailable />;
 
-  const [session, workflow, versions, runs] = read;
+  const [session, workflow, versions, runs, counts] = read;
 
   if (workflow === null) notFound();
 
@@ -61,14 +70,21 @@ export async function WorkflowDetail({
   const operator = session?.capabilities.operator === true;
 
   return (
-    <WorkflowPage
-      workflow={workflow}
-      tab={tab}
-      versions={newestFirst}
-      runs={runs}
-      structure={structure}
-      author={author}
-      operator={operator}
-    />
+    <>
+      <ViewerZone zone={zone} />
+      <WorkflowPage
+        workflow={workflow}
+        tab={tab}
+        versions={newestFirst}
+        runs={runs}
+        structure={structure}
+        author={author}
+        operator={operator}
+        period={period}
+        zone={zone}
+        windows={windows}
+        counts={counts}
+      />
+    </>
   );
 }

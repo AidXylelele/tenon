@@ -36,17 +36,18 @@ interface SignInQuery {
   readonly next?: string;
 }
 
-export const STARTED_WITHIN = ["1h", "24h", "7d"] as const;
-
-export type StartedWithin = (typeof STARTED_WITHIN)[number];
-
-interface RunsQuery {
+export interface RunsQuery {
   readonly namespace?: string;
   readonly name?: string;
   readonly version?: string;
+  readonly status?: string;
+  readonly started?: string;
+  readonly from?: string;
+  readonly to?: string;
+  readonly page?: number;
+  readonly size?: number;
+  readonly sort?: string;
   readonly phase?: Phase;
-  readonly started?: StartedWithin;
-  readonly cursor?: string;
 }
 
 interface WorkflowsQuery {
@@ -58,6 +59,19 @@ interface WorkflowsQuery {
 interface WorkflowQuery {
   readonly tab?: "runs" | "versions";
   readonly start?: boolean;
+  readonly period?: string;
+}
+
+interface HomeQuery {
+  readonly period?: string;
+}
+
+interface RunQuery {
+  readonly view?: string;
+}
+
+export function homeHref(query: HomeQuery): string {
+  return withQuery(HOME_HREF, query);
 }
 
 export function signInHref(query: SignInQuery): string {
@@ -75,7 +89,7 @@ export function workflowHref(
 ): string {
   const path = `${WORKFLOWS_HREF}/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`;
   const start = query.start === true ? FLAG : undefined;
-  return withQuery(path, { tab: query.tab, start });
+  return withQuery(path, { tab: query.tab, start, period: query.period });
 }
 
 export function editorHref(
@@ -118,8 +132,9 @@ export function runsHref(query: RunsQuery): string {
   return withQuery(RUNS_HREF, query);
 }
 
-export function runHref(id: string): string {
-  return `${RUNS_HREF}/${encodeURIComponent(id)}`;
+export function runHref(id: string, query: RunQuery = {}): string {
+  const path = `${RUNS_HREF}/${encodeURIComponent(id)}`;
+  return withQuery(path, query);
 }
 
 export function notificationHref(id: string): string {

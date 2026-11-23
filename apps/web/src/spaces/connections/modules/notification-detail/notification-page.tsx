@@ -5,6 +5,8 @@ import type {
   Read,
   SubscriptionDetail,
 } from "@/libs/data-access/types";
+import { LiveUpdates } from "@/libs/live/live-updates";
+import { Badge } from "@/libs/ui/components/badge";
 import {
   Table,
   TableBody,
@@ -39,6 +41,8 @@ export function NotificationPage({
   runEvents,
 }: NotificationPageProps) {
   const deliveries = subscription.deliveries;
+  const pending = deliveries.some((delivery) => delivery.status === "pending");
+  const activity = pending ? "in-flight" : "open";
   const when = whenOf(subscription.filter, runEvents);
   const type = subscription.filter.with["type"];
   const typeText = typeof type === "string" ? type : null;
@@ -51,7 +55,12 @@ export function NotificationPage({
   return (
     <>
       <PageHeader
-        title={subscription.name}
+        title={
+          <span className="flex flex-wrap items-center gap-2">
+            {subscription.name}
+            <Badge variant="success">On</Badge>
+          </span>
+        }
         description={
           <>
             Created <AbsoluteTime value={subscription.createdAt} />
@@ -61,6 +70,7 @@ export function NotificationPage({
           <NotificationMenu id={subscription.id} name={subscription.name} />
         }
       />
+      <LiveUpdates activity={activity} />
       <section
         aria-labelledby="what-it-sends"
         className="rounded-lg border bg-card p-4"

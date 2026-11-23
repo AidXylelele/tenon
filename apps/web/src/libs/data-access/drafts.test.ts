@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { checkDraft, publishDraft, writeDraft } from "./drafts";
+import {
+  checkDraft,
+  discardDraft,
+  publishDraft,
+  testDraft,
+  writeDraft,
+} from "./drafts";
 
 const fetchApi = vi.fn();
 
@@ -97,5 +103,59 @@ describe("a workflow's draft at the API", () => {
     expect(unchanged).toEqual({ kind: "unchanged" });
     expect(asked).toBe('"1"');
     expect(missing).toEqual({ kind: "missing" });
+  });
+
+  it("a_test_run_starts_the_draft_at_its_revision_with_the_input_given", async () => {
+    const started = { id: "run-1", test: true, phase: "pending" };
+    fetchApi.mockResolvedValue(answer(201, started));
+
+    const tested = await testDraft("sales", "leads", '"3"', { a: 1 }, "key-1");
+
+    const [url, init] = fetchApi.mock.lastCall as [URL, RequestInit];
+    expect(url.href).toBe(
+      "http://api.test/api/v1/workflows/sales/leads/draft/test-runs",
+    );
+    expect(init.method).toBe("POST");
+    expect(init.body).toBe('{"input":{"a":1}}');
+    expect(lastHeaders().get("if-match")).toBe('"3"');
+    expect(lastHeaders().get("idempotency-key")).toBe("key-1");
+    expect(tested).toEqual({ kind: "started", run: started });
+  });
+
+  it("a_test_run_of_an_input_the_draft_refuses_answers_its_problems", async () => {
+    const problem = {
+      type: "urn:problem:instance.input-invalid",
+      title: "Input refused",
+      status: 422,
+      detail: "The input does not match the workflow's input schema",
+      errors: [{ pointer: "/input/customer", detail: "Customer is required." }],
+    };
+    fetchApi.mockResolvedValue(answer(422, problem));
+
+    const tested = await testDraft("sales", "leads", '"3"', {}, "key-2");
+
+    expect(tested).toMatchObject({
+      kind: "refused",
+      problem: { status: 422, detail: problem.detail },
+    });
+  });
+
+  it("is_discarded_at_the_revision_it_was_read_at_and_a_newer_one_conflicts", async () => {
+    const stale = { type: "urn:problem:draft.stale", current: SAVED };
+    fetchApi.mockResolvedValueOnce(answer(204));
+    fetchApi.mockResolvedValueOnce(answer(412, stale, '"7"'));
+
+    const discarded = await discardDraft("sales", "leads", '"1"');
+    const sent = lastHeaders().get("if-match");
+    const [, init] = fetchApi.mock.lastCall as [URL, RequestInit];
+    const conflicted = await discardDraft("sales", "leads", '"1"');
+
+    expect(discarded).toEqual({ kind: "discarded" });
+    expect(sent).toBe('"1"');
+    expect(init.method).toBe("DELETE");
+    expect(conflicted).toEqual({
+      kind: "conflict",
+      current: { draft: SAVED, etag: '"7"' },
+    });
   });
 });

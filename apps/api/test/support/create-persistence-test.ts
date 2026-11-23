@@ -17,9 +17,20 @@ import { AccountMapper } from "../../src/interface-adapters/persistence/mappers/
 import { InvitationMapper } from "../../src/interface-adapters/persistence/mappers/invitation.mapper.js";
 import { UserMapper } from "../../src/interface-adapters/persistence/mappers/user.mapper.js";
 import { PostgresInvitationQueries } from "../../src/interface-adapters/persistence/queries/postgres-invitation.queries.js";
+import { InstanceQueries } from "../../src/application/automation/instances/queries.js";
+import { AesGcmCipher } from "../../src/frameworks/crypto/aes-gcm.cipher.js";
+import { Cipher } from "../../src/interface-adapters/persistence/interfaces.js";
+import { TaskRecordMapper } from "../../src/interface-adapters/persistence/mappers/task-record.mapper.js";
+import { TaskValueMapper } from "../../src/interface-adapters/persistence/mappers/task-value.mapper.js";
+import { WorkflowInstanceMapper } from "../../src/interface-adapters/persistence/mappers/workflow-instance.mapper.js";
+import { PostgresInstanceQueries } from "../../src/interface-adapters/persistence/queries/postgres-instance.queries.js";
+import { MemberQueries } from "../../src/application/identity/users/queries.js";
+import { PostgresMemberQueries } from "../../src/interface-adapters/persistence/queries/postgres-member.queries.js";
 import { PostgresAccountRepository } from "../../src/interface-adapters/persistence/repositories/postgres-account.repository.js";
 import { PostgresInvitationRepository } from "../../src/interface-adapters/persistence/repositories/postgres-invitation.repository.js";
 import { PostgresUserRepository } from "../../src/interface-adapters/persistence/repositories/postgres-user.repository.js";
+
+const SECRETS_KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
 
 export interface PersistenceTest {
   readonly module: TestingModule;
@@ -49,6 +60,20 @@ export const invitationRepository: readonly Provider[] = [
 export const invitationQueries: readonly Provider[] = [
   PostgresInvitationQueries,
   { provide: InvitationQueries, useExisting: PostgresInvitationQueries },
+];
+
+export const memberQueries: readonly Provider[] = [
+  PostgresMemberQueries,
+  { provide: MemberQueries, useExisting: PostgresMemberQueries },
+];
+
+export const instanceQueries: readonly Provider[] = [
+  { provide: Cipher, useValue: new AesGcmCipher(SECRETS_KEY) },
+  WorkflowInstanceMapper,
+  TaskRecordMapper,
+  TaskValueMapper,
+  PostgresInstanceQueries,
+  { provide: InstanceQueries, useExisting: PostgresInstanceQueries },
 ];
 
 export async function createPersistenceTest(

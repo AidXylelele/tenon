@@ -6,7 +6,8 @@ Owner: web — editor. Decisions: research D1, D9, D10 and D12 of the console re
 
 ## API
 
-`<WorkflowFlow workflow mode selected onSelect ref />`, filling its container; the canvas scrolls inside it, never the page. Pass stable callbacks (`useCallback`) and keep `marks`, `steps` and `start` by identity between renders: the view then redraws only the cards whose state changed.
+- `stepsIn(list)`, `stepsUnder(step)`: every step of a list, a block followed by the steps inside it. `stepWithId(list, id)`: the step with that id, or `null`. `placeOf(list, id)`: a step's `ListPlace` — the id of its list, its index and the list's size — or `null`. `kindLookOf(kind)`: a step kind's word and icon.
+  `<WorkflowFlow workflow mode selected onSelect ref />`, filling its container; the canvas scrolls inside it, never the page. Pass stable callbacks (`useCallback`) and keep `marks`, `steps` and `start` by identity between renders: the view then redraws only the cards whose state changed.
 
 - `workflow`: the language server's `WorkflowStructure` (`workflow/structure`).
 - `selected`: the step id on show, or `START` for the start; `onSelect(target)` with a step id, `START`, or `null` (Escape). Without `onSelect` the cards are not controls (a version read on its own).

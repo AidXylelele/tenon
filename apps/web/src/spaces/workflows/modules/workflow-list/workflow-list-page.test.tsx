@@ -1,9 +1,11 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import type { Workflow } from "@/libs/data-access/types";
 import {
   DAILY_DIGEST,
   MONTH_END,
+  ORDER_ROUTER,
   WORKFLOWS,
 } from "../../__shared_context/workflows.test-support";
 import {
@@ -27,7 +29,8 @@ const LIST: WorkflowListPageProps = {
   nextPage: null,
 };
 
-function rowOf(name: string): HTMLElement {
+function rowOf(workflow: Workflow): HTMLElement {
+  const name = workflow.title ?? workflow.name;
   const link = screen.getByRole("link", { name });
   const row = link.closest("tr");
   if (row === null) throw new Error(`No row for ${name}`);
@@ -64,9 +67,25 @@ describe("the workflow list", () => {
       </TooltipProvider>,
     );
 
-    const row = within(rowOf(DAILY_DIGEST.name));
+    const row = within(rowOf(DAILY_DIGEST));
     expect(row.getByText("On")).toBeInTheDocument();
     expect(row.getByText("Succeeded")).toBeInTheDocument();
+  });
+
+  it("a_row_is_its_title_over_its_name_with_its_runs_of_the_week_and_the_failed", () => {
+    render(
+      <TooltipProvider>
+        <WorkflowListPage {...LIST} />
+      </TooltipProvider>,
+    );
+
+    const row = within(rowOf(ORDER_ROUTER));
+    const runs = screen.getByRole("columnheader", { name: "Runs, 7 days" });
+
+    expect(runs).toBeInTheDocument();
+    expect(row.getByText("sales/order-router")).toBeInTheDocument();
+    expect(row.getByText("30")).toBeInTheDocument();
+    expect(row.getByText("· 4 failed")).toBeInTheDocument();
   });
 
   it("a_workflow_never_published_reads_as_a_draft_never_run", () => {
@@ -76,7 +95,7 @@ describe("the workflow list", () => {
       </TooltipProvider>,
     );
 
-    const row = within(rowOf(MONTH_END.name));
+    const row = within(rowOf(MONTH_END));
     expect(row.getByText("Draft")).toBeInTheDocument();
     expect(row.getByText("Never run")).toBeInTheDocument();
     expect(row.getByText("By hand")).toBeInTheDocument();

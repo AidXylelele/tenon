@@ -28,6 +28,7 @@ export interface WorkflowInstanceProps {
   readonly endedAt: Date | null;
   readonly cancelReason: CancelReason | null;
   readonly run: Run | null;
+  readonly test: boolean;
   readonly version: number;
 }
 
@@ -75,6 +76,11 @@ export interface InboundMessage {
   readonly headers: JsonObject;
   readonly correlationId: string | null;
 }
+
+export type LivePhase = Exclude<
+  Phase,
+  Phase.Completed | Phase.Faulted | Phase.Cancelled
+>;
 
 export type Inbound =
   | { readonly kind: InboundKind.Message; readonly message: InboundMessage }

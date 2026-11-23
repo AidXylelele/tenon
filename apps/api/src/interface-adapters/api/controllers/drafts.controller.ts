@@ -4,8 +4,10 @@ import { Can } from "@nestjs/authorization";
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
+  HttpCode,
   HttpStatus,
   Param,
   Post,
@@ -18,6 +20,7 @@ import {
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiHeader,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiResponse,
@@ -26,6 +29,7 @@ import {
 } from "@nestjs/swagger";
 import type { Response } from "express";
 import { CreateDraft } from "../../../application/automation/drafts/create-draft.js";
+import { DiscardDraft } from "../../../application/automation/drafts/discard-draft.js";
 import { PublishDraft } from "../../../application/automation/drafts/publish-draft.js";
 import { DraftQueries } from "../../../application/automation/drafts/queries.js";
 import { SaveDraft } from "../../../application/automation/drafts/save-draft.js";
@@ -61,6 +65,7 @@ export class DraftsController {
     private readonly createDraft: CreateDraft,
     private readonly saveDraft: SaveDraft,
     private readonly publishDraft: PublishDraft,
+    private readonly discardDraft: DiscardDraft,
     private readonly drafts: DraftQueries,
     private readonly workflows: WorkflowQueries,
     private readonly draftPresenter: DraftPresenter,
@@ -204,6 +209,38 @@ export class DraftsController {
     const version = await this.#publishedOf(published.value);
     response.status(status).location(location);
     return this.workflowPresenter.version(version);
+  }
+
+  @Delete()
+  @Can(AutomationPolicy, "change")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiHeader({ name: "If-Match", required: true })
+  @ApiNoContentResponse()
+  @ApiNotFoundResponse()
+  @ApiResponse({
+    status: HttpStatus.PRECONDITION_FAILED,
+    standardSchema: DraftConflictResponse,
+  })
+  @ApiResponse({ status: HttpStatus.PRECONDITION_REQUIRED })
+  async discard(
+    @Param({ schema: WorkflowParams }) params: WorkflowParams,
+    @Headers("if-match") ifMatch: string | undefined,
+  ): Promise<void> {
+    const name = new WorkflowName(params.namespace, params.name);
+    const precondition = this.entityTagMapper.toWritePrecondition(
+      ifMatch,
+      undefined,
+    );
+
+    if (precondition.kind !== "match")
+      throw this.draftPresenter.preconditionRequired();
+
+    const discarded = await this.discardDraft.execute({
+      name,
+      expected: precondition.revision,
+    });
+
+    if (!discarded.ok) throw this.draftPresenter.refusalOf(discarded.failure);
   }
 
   async #publishedOf(published: PublishedVersion): Promise<VersionSummary> {

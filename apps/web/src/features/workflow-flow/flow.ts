@@ -6,6 +6,7 @@ import type {
   Jump,
   JumpTransition,
   Line,
+  ListPlace,
   RunView,
 } from "./interfaces";
 import { END, plusItemOf, START, stepItemOf } from "./items";
@@ -220,4 +221,29 @@ function stepsBetweenOf(
   const last = Math.max(start, end);
 
   return ids.slice(first, last + 1);
+}
+
+export function stepsIn(list: StepList): Step[] {
+  return list.steps.flatMap(stepsUnder);
+}
+
+export function stepsUnder(step: Step): Step[] {
+  const inner = step.lists.flatMap(stepsIn);
+  return [step, ...inner];
+}
+
+export function stepWithId(list: StepList, id: string): Step | null {
+  return stepsIn(list).find((step) => step.id === id) ?? null;
+}
+
+export function placeOf(list: StepList, id: string): ListPlace | null {
+  const nested = stepsIn(list).flatMap((step) => step.lists);
+
+  for (const each of [list, ...nested]) {
+    const index = each.steps.findIndex((step) => step.id === id);
+
+    if (index >= 0) return { list: each.id, index, size: each.steps.length };
+  }
+
+  return null;
 }

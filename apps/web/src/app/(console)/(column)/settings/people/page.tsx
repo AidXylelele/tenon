@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { Invitations } from "@/spaces/settings/modules/invitations";
+import { People } from "@/spaces/settings/modules/people";
 
 export const metadata: Metadata = { title: "People" };
 
 export default function PeoplePage() {
-  return <Invitations />;
+  return <People />;
 }

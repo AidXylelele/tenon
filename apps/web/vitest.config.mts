@@ -30,7 +30,7 @@ const FEATURES_DELETED_IN_M5 = [
   "workflow-canvas",
 ];
 
-const FEATURES_WAITING_FOR_TESTS = ["draft-conflict", "problems", "run-status"];
+const FEATURES_WAITING_FOR_TESTS = ["draft-conflict", "problems"];
 
 const FEATURES_BELOW_THE_FLOOR = FEATURES_DELETED_IN_M5.concat(
   FEATURES_WAITING_FOR_TESTS,
@@ -128,7 +128,11 @@ export default defineConfig({
         "src/{operations,features,libs}/**/*.{ts,tsx}",
         "src/spaces/workflows/modules/workflow-editor/**/*.{ts,tsx}",
       ],
-      exclude: ["src/**/*.stories.tsx", "src/**/*.test-support.ts"],
+      exclude: [
+        "src/**/*.stories.tsx",
+        "src/**/*.test-support.ts",
+        "src/libs/ui/components/chart.tsx",
+      ],
       thresholds,
     },
   },
