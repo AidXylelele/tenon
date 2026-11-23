@@ -197,7 +197,7 @@ describe("the search of the console", () => {
     expect(searchable).toHaveBeenCalledTimes(2);
   });
 
-  it("a_viewer_finds_the_pages_for_everyone_and_the_theme_with_nothing_typed", () => {
+  it("a_viewer_finds_the_top_level_places_and_the_theme_with_nothing_typed", () => {
     renderFor(VIEWER);
 
     pressK("metaKey");
@@ -208,10 +208,20 @@ describe("the search of the console", () => {
       "Workflows",
       "Runs",
       "Settings",
-      "Account",
-      "Platform",
       "Switch to the dark theme",
     ]);
+  });
+
+  it("typing_finds_a_settings_page_under_settings", async () => {
+    searchable.mockResolvedValue([]);
+    renderFor(VIEWER);
+    pressK("metaKey");
+
+    type("platform");
+    await readSettled();
+
+    const options = optionNames();
+    expect(options).toEqual(["Settings › Platform"]);
   });
 
   it("an_editor_finds_the_actions_in_the_order_of_the_design", () => {
@@ -233,14 +243,16 @@ describe("the search of the console", () => {
     expect(names).not.toContain("Invite someone");
   });
 
-  it("an_administrator_also_finds_the_invitations_and_inviting_someone", () => {
+  it("an_administrator_also_finds_the_invitations_and_inviting_someone", async () => {
+    searchable.mockResolvedValue([]);
     renderFor(ADMINISTRATOR);
-
     pressK("metaKey");
 
+    type("invit");
+    await readSettled();
+
     const names = optionNames();
-    expect(names).toContain("Invitations");
-    expect(names).toContain("Invite someone");
+    expect(names).toEqual(["Settings › Invitations", "Invite someone"]);
   });
 
   it("what_is_typed_narrows_the_pages_and_actions_and_says_how_many", async () => {

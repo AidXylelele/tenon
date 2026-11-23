@@ -79,7 +79,14 @@ describe("the places of the console", () => {
     [
       "viewer",
       VIEWER,
-      ["Home", "Workflows", "Runs", "Settings", "Account", "Platform"],
+      [
+        "Home",
+        "Workflows",
+        "Runs",
+        "Settings",
+        "Settings › Account",
+        "Settings › Platform",
+      ],
     ],
     [
       "administrator",
@@ -92,9 +99,9 @@ describe("the places of the console", () => {
         "Notifications",
         "Secrets",
         "Settings",
-        "Account",
-        "Invitations",
-        "Platform",
+        "Settings › Account",
+        "Settings › Invitations",
+        "Settings › Platform",
       ],
     ],
   ])("an_%s_can_go_to_its_pages", (_, capabilities, labels) => {

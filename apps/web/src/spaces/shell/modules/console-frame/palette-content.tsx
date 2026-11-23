@@ -24,7 +24,12 @@ import {
 import { Kbd } from "@/libs/ui/components/kbd";
 import { useAnnounce } from "@/libs/ui/composites/announcer";
 import { useColorScheme } from "@/libs/ui/hooks/use-color-scheme";
-import { allowedOf, pagesOf, placeOf } from "../../__shared_context/places";
+import {
+  allowedOf,
+  pagesOf,
+  PLACES,
+  placeOf,
+} from "../../__shared_context/places";
 import { runLabelOf } from "../../__shared_context/run-label";
 import type { FoundWorkflow } from "./found-workflow";
 import { ACTIONS, type PaletteAction } from "./palette-actions";
@@ -73,7 +78,9 @@ export function PaletteContent({
   const settled = searching && !firstRead;
   const looksLikeRun = RUN_ID.test(query);
   const runId = looksLikeRun ? query : null;
-  const pages = pagesOf(capabilities);
+  const everyPage = pagesOf(capabilities);
+  const topPlaces = allowedOf(PLACES, capabilities);
+  const pages = searching ? everyPage : topPlaces;
   const actions = allowedOf(ACTIONS, capabilities);
   const prompt = view === "run" ? RUN_PROMPT : PROMPT;
   const nothing = view === "run" ? noWorkflowFor(query) : nothingFor(query);

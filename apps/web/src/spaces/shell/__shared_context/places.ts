@@ -120,7 +120,8 @@ export function placesOf(
 
 export function pagesOf(capabilities: Capabilities | null): readonly Page[] {
   const places: readonly Page[] = PLACES;
-  const pages = places.concat(SETTINGS_PAGES);
+  const settingsPages = SETTINGS_PAGES.map(underSettings);
+  const pages = places.concat(settingsPages);
   return allowedOf(pages, capabilities);
 }
 
@@ -144,6 +145,11 @@ function isUnder(pathname: string, href: string): boolean {
   if (href === HOME_HREF) return pathname === HOME_HREF;
 
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function underSettings(page: Page): Page {
+  const label = `Settings › ${page.label}`;
+  return { label, href: page.href, icon: page.icon, access: page.access };
 }
 
 function allows(
