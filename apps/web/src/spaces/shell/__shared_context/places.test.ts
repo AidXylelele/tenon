@@ -27,9 +27,8 @@ describe("the places of the console", () => {
     ["/", "Home"],
     ["/workflows/sales/route-lead/edit", "Workflows"],
     ["/runs/7c41e2d0", "Runs"],
-    ["/connections/webhooks", "Webhooks"],
-    ["/connections/test-event", "Webhooks"],
-    ["/connections/notifications/new", "Notifications"],
+    ["/webhooks", "Webhooks"],
+    ["/notifications/new", "Notifications"],
     ["/secrets", "Secrets"],
     ["/settings/platform", "Settings"],
   ])("%s_is_under_%s", (pathname, label) => {
@@ -38,7 +37,7 @@ describe("the places of the console", () => {
     expect(place?.label).toBe(label);
   });
 
-  it.each(["/nowhere", "/runsheet", "/connections"])(
+  it.each(["/nowhere", "/runsheet", "/webhooks-old"])(
     "%s_is_under_no_place",
     (pathname) => {
       const place = placeOf(pathname);
@@ -100,7 +99,7 @@ describe("the places of the console", () => {
         "Secrets",
         "Settings",
         "Settings › Account",
-        "Settings › Invitations",
+        "Settings › People",
         "Settings › Platform",
       ],
     ],

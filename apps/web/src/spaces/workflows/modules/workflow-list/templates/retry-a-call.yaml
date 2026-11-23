@@ -1,0 +1,26 @@
+document:
+  dsl: "1.1.0"
+  namespace: default
+  name: retry-a-call
+  version: "1.0.0"
+  title: Retry a call that fails
+do:
+  - tryTheCall:
+      try:
+        - callTheService:
+            call: http
+            with:
+              method: get
+              endpoint: https://example.com/status
+      catch:
+        retry:
+          delay:
+            seconds: 2
+          backoff:
+            exponential: {}
+          limit:
+            attempt:
+              count: 3
+  - keepTheAnswer:
+      set:
+        answer: ${ . }

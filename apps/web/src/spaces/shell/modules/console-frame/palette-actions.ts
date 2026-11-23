@@ -9,11 +9,11 @@ import {
 } from "lucide-react";
 import type { Capabilities } from "@/libs/data-access/types";
 import {
-  INVITATIONS_HREF,
+  NEW_SECRET_HREF,
+  NEW_WEBHOOK_HREF,
   NEW_WORKFLOW_HREF,
-  SECRETS_HREF,
+  PEOPLE_HREF,
   TEST_EVENT_HREF,
-  WEBHOOKS_HREF,
 } from "@/libs/routing/routes";
 
 type Access = keyof Capabilities | null;
@@ -58,21 +58,21 @@ export const ACTIONS: readonly PaletteAction[] = [
   {
     kind: "link",
     label: "New secret",
-    href: SECRETS_HREF,
+    href: NEW_SECRET_HREF,
     icon: KeyRoundIcon,
     access: "author",
   },
   {
     kind: "link",
     label: "New webhook",
-    href: WEBHOOKS_HREF,
+    href: NEW_WEBHOOK_HREF,
     icon: WebhookIcon,
     access: "author",
   },
   {
     kind: "link",
     label: "Invite someone",
-    href: INVITATIONS_HREF,
+    href: PEOPLE_HREF,
     icon: MailIcon,
     access: "administrator",
   },

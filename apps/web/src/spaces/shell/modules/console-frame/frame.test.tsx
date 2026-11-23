@@ -156,8 +156,8 @@ describe("the console frame", () => {
     expect(names).toEqual(["Tenon", "Home", "Workflows", "Runs", "Settings"]);
   });
 
-  it("the_test_event_page_belongs_to_webhooks", () => {
-    address.pathname = "/connections/test-event";
+  it("the_webhooks_page_marks_webhooks_current", () => {
+    address.pathname = "/webhooks";
 
     renderFrame(1440, EDITOR);
 

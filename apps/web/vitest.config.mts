@@ -1,6 +1,7 @@
 import { readdirSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
+import { yamlText } from "./vite-yaml-text.mjs";
 
 const OPERATION_FLOOR = {
   lines: 75,
@@ -25,7 +26,7 @@ const FEATURE_FLOOR = {
 
 const FEATURES_DELETED_IN_M5 = ["code-editor", "workflow-canvas"];
 
-const FEATURES_WAITING_FOR_TESTS = ["new-password-field", "viewer-notice"];
+const FEATURES_WAITING_FOR_TESTS: string[] = [];
 
 const FEATURES_BELOW_THE_FLOOR = FEATURES_DELETED_IN_M5.concat(
   FEATURES_WAITING_FOR_TESTS,
@@ -104,7 +105,7 @@ const floors = operationFloors.concat(
 const thresholds = Object.fromEntries(floors);
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), yamlText()],
   resolve: {
     tsconfigPaths: true,
   },

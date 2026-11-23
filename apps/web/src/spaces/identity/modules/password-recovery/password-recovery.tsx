@@ -55,6 +55,7 @@ export function PasswordRecovery() {
         <ProblemMessage problem={state.problem} />
         <Field>
           <FieldLabel htmlFor="email">Email</FieldLabel>
+          <FieldDescription>The address you sign in with.</FieldDescription>
           <Input
             id="email"
             name="email"
@@ -64,7 +65,6 @@ export function PasswordRecovery() {
             autoFocus
             defaultValue={state.values.email}
           />
-          <FieldDescription>The address you sign in with.</FieldDescription>
         </Field>
         <SubmitButton size="lg" pendingLabel="Sending…">
           Email me a link
