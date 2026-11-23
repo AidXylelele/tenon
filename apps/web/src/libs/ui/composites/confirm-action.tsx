@@ -29,6 +29,8 @@ interface ConfirmActionProps {
   readonly action: () => Promise<Outcome<void>>;
   readonly success: string;
   readonly onDone?: () => void;
+  readonly open?: boolean;
+  readonly onOpenChange?: (open: boolean) => void;
 }
 
 export function ConfirmAction({
@@ -41,14 +43,19 @@ export function ConfirmAction({
   action,
   success,
   onDone,
+  open,
+  onOpenChange,
 }: ConfirmActionProps) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const controlled = open !== undefined;
+  const shown = open ?? ownOpen;
   const [refusal, setRefusal] = useState<Problem | null>(null);
   const [pending, start] = useTransition();
   const iconOnly = size === "icon-sm";
 
   function change(next: boolean) {
-    setOpen(next);
+    setOwnOpen(next);
+    onOpenChange?.(next);
 
     if (!next) setRefusal(null);
   }
@@ -63,7 +70,7 @@ export function ConfirmAction({
         return;
       }
 
-      setOpen(false);
+      change(false);
       toast.success(success);
       onDone?.();
     });
@@ -78,16 +85,18 @@ export function ConfirmAction({
     </AlertDialogTrigger>
   );
 
+  const opener = iconOnly ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  ) : (
+    trigger
+  );
+
   return (
-    <AlertDialog open={open} onOpenChange={change}>
-      {iconOnly ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
-          <TooltipContent>{label}</TooltipContent>
-        </Tooltip>
-      ) : (
-        trigger
-      )}
+    <AlertDialog open={shown} onOpenChange={change}>
+      {!controlled && opener}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
