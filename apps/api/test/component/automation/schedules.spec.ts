@@ -271,7 +271,9 @@ describe("starting workflows on a schedule and on events", () => {
 
   it("a_workflow_on_its_own_lifecycle_type_is_started_by_others_never_by_itself", async () => {
     const on = {
-      one: { with: { type: "io.serverlessworkflow.workflow.completed.v1" } },
+      one: {
+        with: { type: "org.open-workflow-specification.workflow.completed.v1" },
+      },
     };
     await publish(t, editor, aScheduledDocument({ on }));
     await turn("on");
