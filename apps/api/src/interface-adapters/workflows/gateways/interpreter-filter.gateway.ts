@@ -39,6 +39,8 @@ export class InterpreterFilterGateway implements SubscriptionFilters {
     event: AcceptedEvent,
     signal: AbortSignal,
   ): Promise<Subscription[]> {
+    if (subscriptions.length === 0) return [];
+
     const filters = subscriptions.map((subscription) => ({
       name: subscription.id,
       filter: this.protocol.toObject(subscription.filter),
