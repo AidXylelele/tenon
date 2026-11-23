@@ -14,16 +14,18 @@ import type {
   ResourceRequest,
   RevealedAuthorization,
 } from "interpreter";
-import type {
-  FetchedText,
-  ResourceClient,
-  StepCall,
-} from "../../interface-adapters/workflows/interfaces.js";
-import type { CallContext } from "../interpreter/interfaces.js";
-import { HttpClientName } from "./enums.js";
-import { HttpAuthentication } from "./http-authentication.js";
+import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
 import type {
   Authorization,
+  CallContext,
+} from "../../interface-adapters/workflows/effects/interfaces.js";
+import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
+import type {
+  FetchedText,
+  StepCall,
+} from "../../interface-adapters/workflows/interfaces.js";
+import { HttpClientName } from "../network/enums.js";
+import type {
   EndpointFetch,
   OutboundRequest,
   ResponseOptions,
@@ -31,16 +33,15 @@ import type {
 } from "./interfaces.js";
 import { OpenApiOperations } from "./openapi-operations.js";
 import { ResponseContent } from "./response-content.js";
-import { TransportFailures } from "./transport-failures.js";
 
 @Injectable()
-export class HttpClient implements ResourceClient {
+export class HttpClient {
   private readonly policy: ResiliencePolicy;
 
   constructor(
     @InjectHttpClient(HttpClientName.Outbound)
     private readonly outbound: NestHttpClient,
-    private readonly authentication: HttpAuthentication,
+    private readonly authentication: Authenticator,
     private readonly operations: OpenApiOperations,
     private readonly failures: TransportFailures,
     private readonly content: ResponseContent,

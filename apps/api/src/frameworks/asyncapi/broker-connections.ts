@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { LRUCache } from "lru-cache";
-import type { AddressPolicy } from "../http-client/address-policy.js";
+import type { AddressPolicy } from "../network/address-policy.js";
 import type {
   BrokerCredentials,
   BrokerServer,

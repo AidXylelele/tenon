@@ -9,7 +9,7 @@ import type { IClientOptions } from "mqtt";
 import type { RedisClientType } from "redis";
 import type { z } from "zod";
 import type { Subscribed } from "../../interface-adapters/messaging/interfaces.js";
-import type { PasswordCredentials } from "../http-client/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/workflows/effects/interfaces.js";
 import type { AMQP_CHANNEL, MQTT_OPERATION } from "./bindings.schema.js";
 
 export interface BrokerServer {

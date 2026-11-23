@@ -19,6 +19,7 @@ import {
   ReceivedMessages,
 } from "../../application/automation/instances/ports.js";
 import { ReceiverQueries } from "../../application/automation/instances/queries.js";
+import { ProcessPlatform } from "../../application/automation/host/queries.js";
 import { ReceiveInbound } from "../../application/automation/instances/receive-inbound.js";
 import { RespondToEffect } from "../../application/automation/instances/respond-to-effect.js";
 import { StartSubWorkflow } from "../../application/automation/instances/start-sub-workflow.js";
@@ -47,6 +48,16 @@ import { PostgresLockStore } from "../../interface-adapters/persistence/stores/p
 import { PostgresReceivedMessageStore } from "../../interface-adapters/persistence/stores/postgres-received-message.store.js";
 import { EngineDeliveryGateway } from "../../interface-adapters/workflows/gateways/engine-delivery.gateway.js";
 import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
+import { A2aGateway } from "../../interface-adapters/workflows/effects/a2a.gateway.js";
+import { AsyncApiGateway } from "../../interface-adapters/workflows/effects/asyncapi.gateway.js";
+import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
+import { GrpcGateway } from "../../interface-adapters/workflows/effects/grpc.gateway.js";
+import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
+import { McpGateway } from "../../interface-adapters/workflows/effects/mcp.gateway.js";
+import { OpenApiGateway } from "../../interface-adapters/workflows/effects/openapi.gateway.js";
+import { ProtoSchema } from "../../interface-adapters/workflows/effects/proto-schema.js";
+import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
+import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
 import { EffectClient } from "../../interface-adapters/workflows/interfaces.js";
 import { RunController } from "../../interface-adapters/workflows/run.controller.js";
 import { DeliveryRun } from "../../interface-adapters/workflows/runners/delivery.run.js";
@@ -62,17 +73,13 @@ import { KafkaBroker } from "../asyncapi/kafka.broker.js";
 import { MqttBroker } from "../asyncapi/mqtt.broker.js";
 import { NatsBroker } from "../asyncapi/nats.broker.js";
 import { RedisBroker } from "../asyncapi/redis.broker.js";
-import { SandboxClient } from "../go-judge/sandbox.client.js";
-import { SandboxLimits } from "../go-judge/sandbox-limits.js";
-import { GrpcClient } from "../grpc/grpc.client.js";
-import { ProtoSchema } from "../grpc/proto-schema.js";
-import { HttpClientName } from "../http-client/enums.js";
-import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
-import { EffectPerformer } from "../interpreter/effect-performer.js";
+import { GrpcConnection } from "../grpc/grpc.connection.js";
 import { McpClient } from "../mcp/mcp.client.js";
+import { HttpClientName } from "../network/enums.js";
+import { ResponseSizeLimit } from "../network/response-size-limit.js";
 import { AutomationModule } from "./automation.module.js";
 import { sandboxConfig } from "./configs.js";
-import { sandboxLimits } from "./host.presets.js";
+import { processPlatform, sandboxLimits } from "./host.presets.js";
 import { OutboundModule } from "./outbound.module.js";
 
 @Module({
@@ -130,10 +137,17 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: ReceivedMessages, useClass: PostgresReceivedMessageStore },
     { provide: ReceiverQueries, useClass: PostgresReceiverQueries },
     PostgresLockStore,
-    EffectPerformer,
-    { provide: EffectClient, useExisting: EffectPerformer },
+    HttpGateway,
+    OpenApiGateway,
+    GrpcGateway,
+    McpGateway,
+    A2aGateway,
+    AsyncApiGateway,
+    SandboxGateway,
+    EffectDispatcher,
+    { provide: EffectClient, useExisting: EffectDispatcher },
     ProtoSchema,
-    GrpcClient,
+    GrpcConnection,
     McpClient,
     A2aClient,
     AsyncApiDocuments,
@@ -146,7 +160,7 @@ import { OutboundModule } from "./outbound.module.js";
     AsyncApiClient,
     { provide: SubscriptionClient, useExisting: AsyncApiClient },
     { provide: SandboxLimits, useValue: sandboxLimits },
-    SandboxClient,
+    { provide: ProcessPlatform, useValue: processPlatform },
   ],
 })
 export class AutomationBackgroundModule {}

@@ -4,14 +4,17 @@ import type { AsyncApiInboundMessage, JsonObject } from "interpreter";
 import { Agent } from "undici";
 import type { AsyncApiInbox } from "../../src/interface-adapters/messaging/interfaces.js";
 import { responseSizeLimit } from "../../src/frameworks/di/host.presets.js";
-import type { AddressPolicy } from "../../src/frameworks/http-client/address-policy.js";
-import { AuthorizationServer } from "../../src/frameworks/http-client/authorization-server.js";
-import { HttpAuthentication } from "../../src/frameworks/http-client/http-authentication.js";
+import type { AddressPolicy } from "../../src/frameworks/network/address-policy.js";
 import { HttpClient } from "../../src/frameworks/http-client/http.client.js";
 import { OpenApiOperations } from "../../src/frameworks/http-client/openapi-operations.js";
 import { ResponseContent } from "../../src/frameworks/http-client/response-content.js";
-import { TransportFailures } from "../../src/frameworks/http-client/transport-failures.js";
-import type { CallContext } from "../../src/frameworks/interpreter/interfaces.js";
+import { HOST_PROFILE } from "../../src/frameworks/interpreter/host-profile.js";
+import { OpenIdAuthorizationServer } from "../../src/frameworks/oauth/openid.authorization-server.js";
+import { Authenticator } from "../../src/interface-adapters/workflows/effects/authenticator.js";
+import type { CallContext } from "../../src/interface-adapters/workflows/effects/interfaces.js";
+import { ResourceGateway } from "../../src/interface-adapters/workflows/effects/resource.gateway.js";
+import { TransportFailures } from "../../src/interface-adapters/workflows/effects/transport-failures.js";
+import type { ResourceClient } from "../../src/interface-adapters/workflows/interfaces.js";
 
 export const SELF_SIGNED = {
   cert: `-----BEGIN CERTIFICATE-----
@@ -47,8 +50,9 @@ export function trustingIdentityProvider(): NestHttpClient {
   return fetchClientOf(dispatcher);
 }
 
-export function authenticationOf(identity: NestHttpClient): HttpAuthentication {
-  return new HttpAuthentication(new AuthorizationServer(identity));
+export function authenticationOf(identity: NestHttpClient): Authenticator {
+  const server = new OpenIdAuthorizationServer(identity);
+  return new Authenticator(server, HOST_PROFILE);
 }
 
 export function httpClientOf(
@@ -64,6 +68,14 @@ export function httpClientOf(
     new ResponseContent(),
     resilience,
   );
+}
+
+export function resourcesOf(
+  policy: AddressPolicy,
+  resilience: ResilienceService,
+): ResourceClient {
+  const client = httpClientOf(policy, resilience);
+  return new ResourceGateway(client);
 }
 
 export function callContextOf(

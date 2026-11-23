@@ -10,9 +10,9 @@ import type {
   RespondedHttpOutcome,
   RpcOutcome,
 } from "interpreter";
+import type { CallContext } from "../../interface-adapters/workflows/effects/interfaces.js";
+import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
 import { HttpClient } from "../http-client/http.client.js";
-import { TransportFailures } from "../http-client/transport-failures.js";
-import type { CallContext } from "../interpreter/interfaces.js";
 import { AgentCard } from "./agent-card.js";
 import { AGENT_CARD } from "./agent-card.schema.js";
 import type { Agent } from "./interfaces.js";

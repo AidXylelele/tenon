@@ -8,20 +8,23 @@ import { CircuitOpenError, ResilienceService } from "@nestjs/resilience";
 import { Test } from "@nestjs/testing";
 import type { Script, Shell } from "interpreter";
 import { ResilienceModule } from "@nestjs/resilience";
-import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { SandboxClient } from "../../../../src/frameworks/go-judge/sandbox.client.js";
-import { SandboxLimits } from "../../../../src/frameworks/go-judge/sandbox-limits.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
-import type { HttpClient } from "../../../../src/frameworks/http-client/http.client.js";
-import { ResponseSizeLimit } from "../../../../src/frameworks/http-client/response-size-limit.js";
-import type { CallContext } from "../../../../src/frameworks/interpreter/interfaces.js";
-import type { SandboxedProcessRequest } from "../../../../src/interface-adapters/workflows/interfaces.js";
+import {
+  processPlatform,
+  resiliencePresets,
+} from "../../../../../src/frameworks/di/host.presets.js";
+import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import type { ResourceClient } from "../../../../../src/interface-adapters/workflows/interfaces.js";
+import { ResponseSizeLimit } from "../../../../../src/frameworks/network/response-size-limit.js";
+import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import { SandboxGateway } from "../../../../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
+import { SandboxLimits } from "../../../../../src/interface-adapters/workflows/effects/sandbox-limits.js";
+import type { SandboxedProcessRequest } from "../../../../../src/interface-adapters/workflows/interfaces.js";
 import {
   closedPort,
   startStubServer,
   type StubServer,
-} from "../../../support/stub-server.js";
-import { callContextOf, httpClientOf } from "../../../support/outbound.js";
+} from "../../../../support/stub-server.js";
+import { callContextOf, resourcesOf } from "../../../../support/outbound.js";
 
 const SANDBOX_TOKEN = "sandbox-token";
 const LIMITS = new SandboxLimits({
@@ -38,14 +41,14 @@ interface Answer {
   readonly body: string;
 }
 
-describe("a process the sandbox runs for a run", () => {
+describe("a process the sandbox gateway runs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let http: HttpClient;
+  let resources: ResourceClient;
   let sandbox: StubServer;
   let sources: StubServer;
-  let client: SandboxClient;
+  let gateway: SandboxGateway;
   let answer: Answer | null = null;
 
   beforeAll(async () => {
@@ -55,7 +58,7 @@ describe("a process the sandbox runs for a run", () => {
     context = await moduleRef.init();
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
-    http = httpClientOf(policy, resilience);
+    resources = resourcesOf(policy, resilience);
     sandbox = await startStubServer((request, response) => {
       const authorized =
         request.headers.authorization === `Bearer ${SANDBOX_TOKEN}`;
@@ -79,7 +82,7 @@ describe("a process the sandbox runs for a run", () => {
       response.writeHead(200, { "content-type": "text/javascript" });
       response.end("console.log(greeting);");
     });
-    client = sandboxClientOf(sandbox.origin);
+    gateway = gatewayOf(sandbox.origin);
   });
 
   afterAll(async () => {
@@ -89,7 +92,7 @@ describe("a process the sandbox runs for a run", () => {
     await context.close();
   });
 
-  function sandboxClientOf(baseUrl: string): SandboxClient {
+  function gatewayOf(baseUrl: string): SandboxGateway {
     const runs = new NestHttpClient({
       baseUrl,
       headers: { authorization: `Bearer ${SANDBOX_TOKEN}` },
@@ -98,7 +101,13 @@ describe("a process the sandbox runs for a run", () => {
       redirect: "manual",
       interceptors: [new ResponseSizeLimit(LIMITS.responseBytes())],
     });
-    return new SandboxClient(runs, http, LIMITS, resilience);
+    return new SandboxGateway(
+      runs,
+      resources,
+      LIMITS,
+      processPlatform,
+      resilience,
+    );
   }
 
   beforeEach(() => {
@@ -163,7 +172,7 @@ describe("a process the sandbox runs for a run", () => {
         files: { stdout: "Foo\n", stderr: "" },
       });
 
-      const outcome = await client.run(shellOf(), contextOf());
+      const outcome = await gateway.perform(shellOf(), contextOf());
 
       expect(outcome).toEqual({
         kind: "exited",
@@ -180,7 +189,7 @@ describe("a process the sandbox runs for a run", () => {
         files: { stdout: "", stderr: "boom\n" },
       });
 
-      const outcome = await client.run(shellOf(), contextOf());
+      const outcome = await gateway.perform(shellOf(), contextOf());
 
       expect(outcome).toEqual({
         kind: "exited",
@@ -193,7 +202,7 @@ describe("a process the sandbox runs for a run", () => {
     it("a_process_the_sandbox_stopped_at_its_time_limit_expires", async () => {
       answer = resultOf({ status: "Time Limit Exceeded", exitStatus: 0 });
 
-      const outcome = await client.run(shellOf(), contextOf());
+      const outcome = await gateway.perform(shellOf(), contextOf());
 
       expect(outcome).toEqual({ kind: "expired" });
     });
@@ -205,7 +214,7 @@ describe("a process the sandbox runs for a run", () => {
         files: { stdout: "", stderr: "" },
       });
 
-      const outcome = await client.run(shellOf(), contextOf());
+      const outcome = await gateway.perform(shellOf(), contextOf());
 
       expect(outcome).toEqual({
         kind: "exited",
@@ -220,7 +229,7 @@ describe("a process the sandbox runs for a run", () => {
       async (status) => {
         answer = resultOf({ status, exitStatus: 0, files: { stdout: "x" } });
 
-        const outcome = await client.run(shellOf(), contextOf());
+        const outcome = await gateway.perform(shellOf(), contextOf());
 
         expect(outcome).toEqual({
           kind: "killed",
@@ -240,7 +249,7 @@ describe("a process the sandbox runs for a run", () => {
         },
       });
 
-      const outcome = await client.run(
+      const outcome = await gateway.perform(
         shellOf({ directory: "/missing" }),
         contextOf(),
       );
@@ -259,7 +268,7 @@ describe("a process the sandbox runs for a run", () => {
         files: { stdout: "", stderr: "boom\n", directory: "" },
       });
 
-      const outcome = await client.run(
+      const outcome = await gateway.perform(
         shellOf({ directory: "/tmp" }),
         contextOf(),
       );
@@ -277,7 +286,7 @@ describe("a process the sandbox runs for a run", () => {
       async (status) => {
         answer = resultOf({ status, error: "no such file" });
 
-        const outcome = await client.run(shellOf(), contextOf());
+        const outcome = await gateway.perform(shellOf(), contextOf());
 
         expect(outcome).toEqual({
           kind: "unstarted",
@@ -286,21 +295,35 @@ describe("a process the sandbox runs for a run", () => {
       },
     );
 
-    it("a_process_the_sandbox_refuses_is_unstarted_with_its_reason", async () => {
-      answer = { status: 400, body: JSON.stringify("invalid request") };
+    it.each([400, 404])(
+      "a_process_the_sandbox_refuses_with_%s_is_unstarted_with_its_reason",
+      async (status) => {
+        answer = { status, body: JSON.stringify("invalid request") };
 
-      const outcome = await client.run(shellOf(), contextOf());
+        const outcome = await gateway.perform(shellOf(), contextOf());
 
-      expect(outcome).toEqual({
-        kind: "unstarted",
-        detail: "The sandbox refused the process: invalid request",
-      });
+        expect(outcome).toEqual({
+          kind: "unstarted",
+          detail: "The sandbox refused the process: invalid request",
+        });
+      },
+    );
+
+    it("a_result_under_a_failing_status_rejects_as_a_sandbox_outage", async () => {
+      const result = resultOf({ status: "Accepted", exitStatus: 0, files: {} });
+      answer = { status: 500, body: result.body };
+
+      const pending = gateway.perform(shellOf(), contextOf());
+
+      await expect(pending).rejects.toThrow(
+        new Error("The sandbox answered other than with a result, status 500"),
+      );
     });
 
     it("an_answer_that_is_not_the_sandbox_s_rejects_as_a_sandbox_outage", async () => {
       answer = { status: 502, body: "<html>Bad Gateway</html>" };
 
-      const pending = client.run(shellOf(), contextOf());
+      const pending = gateway.perform(shellOf(), contextOf());
 
       await expect(pending).rejects.toThrow(
         new Error("The sandbox answered other than with a result, status 502"),
@@ -308,16 +331,16 @@ describe("a process the sandbox runs for a run", () => {
     });
 
     it("a_process_still_running_at_its_deadline_expires", async () => {
-      const outcome = await client.run(shellOf(), contextOf(200));
+      const outcome = await gateway.perform(shellOf(), contextOf(200));
 
       expect(outcome).toEqual({ kind: "expired" });
     });
 
     it("a_sandbox_nobody_listens_on_rejects_with_the_connection_failure", async () => {
       const port = await closedPort();
-      const unreachable = sandboxClientOf(`http://127.0.0.1:${String(port)}`);
+      const unreachable = gatewayOf(`http://127.0.0.1:${String(port)}`);
 
-      const pending = unreachable.run(shellOf(), contextOf());
+      const pending = unreachable.perform(shellOf(), contextOf());
 
       await expect(pending).rejects.toMatchObject({
         cause: { code: "ECONNREFUSED" },
@@ -331,12 +354,12 @@ describe("a process the sandbox runs for a run", () => {
 
       try {
         for (let call = 0; call < 10; call++)
-          await expect(client.run(shellOf(), contextOf())).rejects.toThrow(
+          await expect(gateway.perform(shellOf(), contextOf())).rejects.toThrow(
             "status 500",
           );
         const reached = sandbox.received.length;
 
-        const pending = client.run(shellOf(), contextOf());
+        const pending = gateway.perform(shellOf(), contextOf());
 
         await expect(pending).rejects.toBeInstanceOf(CircuitOpenError);
         expect(breaker.state).toBe("open");
@@ -358,7 +381,7 @@ describe("a process the sandbox runs for a run", () => {
         environment: { GREETING: "hi" },
       });
 
-      await client.run(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(commandSent()).toEqual({
         args: ["/bin/sh", "-c", 'echo "$1"', "sh", "Foo"],
@@ -379,7 +402,7 @@ describe("a process the sandbox runs for a run", () => {
     it("a_shell_command_runs_in_its_directory", async () => {
       const request = shellOf({ directory: "/tmp/it's" });
 
-      await client.run(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(commandSent()).toMatchObject({
         args: [
@@ -405,7 +428,7 @@ describe("a process the sandbox runs for a run", () => {
       const command = 'printf "%s|%s|%s" "$PWD" "$1" "$#"';
       const request = shellOf({ directory, command });
 
-      await client.run(request, contextOf());
+      await gateway.perform(request, contextOf());
       const [shell = "", ...args] = commandSent().args as string[];
       const ran = spawnSync(shell, args, {
         encoding: "utf8",
@@ -421,7 +444,7 @@ describe("a process the sandbox runs for a run", () => {
         arguments: { message: "Hello World", count: 2 },
       });
 
-      await client.run(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(commandSent()).toMatchObject({
         args: ["/usr/local/bin/node", "script"],
@@ -441,7 +464,7 @@ describe("a process the sandbox runs for a run", () => {
         arguments: { message: { text: 'Hi "you"' } },
       });
 
-      await client.run(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(commandSent()).toMatchObject({
         args: ["/usr/bin/python3", "script"],
@@ -457,7 +480,7 @@ describe("a process the sandbox runs for a run", () => {
     it("a_script_argument_that_is_not_a_variable_name_is_misconfigured", async () => {
       const request = scriptOf({ arguments: { "not-a-name": 1 } });
 
-      const outcome = await client.run(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "misconfigured",
@@ -478,7 +501,7 @@ describe("a process the sandbox runs for a run", () => {
       async (language, name) => {
         const request = scriptOf({ language, arguments: { [name]: 1 } });
 
-        const outcome = await client.run(request, contextOf());
+        const outcome = await gateway.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "misconfigured",
@@ -496,7 +519,7 @@ describe("a process the sandbox runs for a run", () => {
         arguments: { match: 1 },
       });
 
-      await client.run(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(commandSent()).toMatchObject({
         copyIn: {
@@ -520,7 +543,7 @@ describe("a process the sandbox runs for a run", () => {
         arguments: { greeting: "hi" },
       });
 
-      await client.run(request, contextOf());
+      await gateway.perform(request, contextOf());
 
       expect(commandSent()).toMatchObject({
         copyIn: {
@@ -541,7 +564,7 @@ describe("a process the sandbox runs for a run", () => {
         },
       });
 
-      const outcome = await client.run(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -567,7 +590,7 @@ describe("a process the sandbox runs for a run", () => {
         },
       });
 
-      const outcome = await client.run(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "forbidden",
@@ -577,7 +600,7 @@ describe("a process the sandbox runs for a run", () => {
     });
 
     it("the_time_limit_is_the_nearer_of_the_deadline_and_the_sandbox_s", async () => {
-      await client.run(shellOf(), contextOf(5_000));
+      await gateway.perform(shellOf(), contextOf(5_000));
 
       const limit = Number(commandSent().clockLimit);
       expect(limit).toBeGreaterThan(4_000_000_000);

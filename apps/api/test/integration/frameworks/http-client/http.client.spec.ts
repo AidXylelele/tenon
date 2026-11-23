@@ -12,12 +12,11 @@ import type {
   ResourceRequest,
 } from "interpreter";
 import { ResilienceModule } from "@nestjs/resilience";
-import { PermanentFault } from "../../../../src/interface-adapters/workflows/permanent-fault.error.js";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
 import type { HttpClient } from "../../../../src/frameworks/http-client/http.client.js";
-import { TransportFailures } from "../../../../src/frameworks/http-client/transport-failures.js";
-import type { CallContext } from "../../../../src/frameworks/interpreter/interfaces.js";
+import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
   type ReceivedRequest,
@@ -668,7 +667,7 @@ describe("a call the HTTP client performs for a run", () => {
       });
     });
 
-    it("digest_authentication_is_a_permanent_fault_before_any_request", async () => {
+    it("digest_authentication_the_profile_refuses_throws_before_any_request", async () => {
       const request = httpOf("/json", {
         kind: "digest",
         username: "Mufasa",
@@ -677,7 +676,9 @@ describe("a call the HTTP client performs for a run", () => {
 
       const sent = client.send(request, contextOf());
 
-      await expect(sent).rejects.toThrow(PermanentFault);
+      await expect(sent).rejects.toThrow(
+        "The host does not perform 'authentication.digest'",
+      );
       expect(stub.received).toHaveLength(0);
     });
 

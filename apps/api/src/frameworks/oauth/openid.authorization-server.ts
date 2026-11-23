@@ -21,13 +21,15 @@ import {
   None,
   ResponseBodyError,
 } from "openid-client";
-import { HttpClientName } from "./enums.js";
-import type { OAuth2Credentials } from "./interfaces.js";
-import { ResponseSizeLimit } from "./response-size-limit.js";
+import { RefusalCode } from "../../interface-adapters/workflows/effects/enums.js";
+import type {
+  AuthorizationServer,
+  OAuth2Credentials,
+} from "../../interface-adapters/workflows/effects/interfaces.js";
+import { HttpClientName } from "../network/enums.js";
 
 @Injectable()
-export class AuthorizationServer {
-  static readonly REFUSED = "ERR_TOKEN_REFUSED";
+export class OpenIdAuthorizationServer implements AuthorizationServer {
   private static readonly JWT_BEARER =
     "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
@@ -201,7 +203,7 @@ export class AuthorizationServer {
 
   #assertedBy(assertion: string): ClientAuth {
     return (_server, _client, body) => {
-      body.set("client_assertion_type", AuthorizationServer.JWT_BEARER);
+      body.set("client_assertion_type", OpenIdAuthorizationServer.JWT_BEARER);
       body.set("client_assertion", assertion);
     };
   }
@@ -323,11 +325,11 @@ export class AuthorizationServer {
 
     const code: unknown =
       cause instanceof Error ? Reflect.get(cause, "code") : undefined;
-    return code === ResponseSizeLimit.EXCEEDED;
+    return code === RefusalCode.ResponseSize;
   }
 
   #refused(message: string): Error {
     const error = new Error(message);
-    return Object.assign(error, { code: AuthorizationServer.REFUSED });
+    return Object.assign(error, { code: RefusalCode.Token });
   }
 }

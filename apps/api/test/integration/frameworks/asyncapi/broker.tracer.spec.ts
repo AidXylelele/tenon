@@ -26,7 +26,7 @@ import {
   resiliencePresets,
   responseSizeLimit,
 } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
 import type { BrokerSubscription } from "../../../../src/interface-adapters/messaging/interfaces.js";
 import {
   startStubServer,
@@ -37,7 +37,7 @@ import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
-  httpClientOf,
+  resourcesOf,
   inboxOf,
 } from "../../../support/outbound.js";
 
@@ -132,7 +132,7 @@ describe("the trace context of the messages the AsyncAPI client sends and receiv
     const redis = new RedisBroker(policy);
     brokers = [amqp, kafka, mqtt, natsBroker, redis];
     client = new AsyncApiClient(
-      httpClientOf(policy, resilience),
+      resourcesOf(policy, resilience),
       authenticationOf(fetchClientOf(policy.dispatcher)),
       new AsyncApiDocuments(),
       new BrokerTracer(),

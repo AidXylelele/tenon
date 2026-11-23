@@ -5,7 +5,7 @@ import { ResilienceService } from "@nestjs/resilience";
 import type { INestApplicationContext } from "@nestjs/common";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
 import { DeliveryClient } from "../../../../src/frameworks/http-client/delivery.client.js";
 import type { EventDelivery } from "../../../../src/interface-adapters/messaging/interfaces.js";
 import { authenticationOf, fetchClientOf } from "../../../support/outbound.js";

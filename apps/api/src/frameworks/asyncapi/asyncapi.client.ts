@@ -14,18 +14,22 @@ import type {
   JsonObject,
   JsonValue,
 } from "interpreter";
-import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
-import { HttpAuthentication } from "../http-client/http-authentication.js";
-import { HttpClient } from "../http-client/http.client.js";
-import type { UnusableSecret } from "../http-client/interfaces.js";
-import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
 import type {
   AsyncApiInbox,
   Subscribed,
   SubscriptionClient,
 } from "../../interface-adapters/messaging/interfaces.js";
-import type { StepCall } from "../../interface-adapters/workflows/interfaces.js";
-import type { CallContext } from "../interpreter/interfaces.js";
+import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
+import type {
+  CallContext,
+  UnusableSecret,
+} from "../../interface-adapters/workflows/effects/interfaces.js";
+import {
+  ResourceClient,
+  type StepCall,
+} from "../../interface-adapters/workflows/interfaces.js";
+import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
+import { ResponseSizeLimit } from "../network/response-size-limit.js";
 import { AmqpBroker } from "./amqp.broker.js";
 import { AsyncApiDocuments } from "./asyncapi-documents.js";
 import { BrokerTracer } from "./broker.tracer.js";
@@ -52,8 +56,8 @@ export class AsyncApiClient implements SubscriptionClient {
   private readonly brokers: ReadonlyMap<string, BrokerClient>;
 
   constructor(
-    private readonly http: HttpClient,
-    private readonly authentication: HttpAuthentication,
+    private readonly resources: ResourceClient,
+    private readonly authentication: Authenticator,
     private readonly documents: AsyncApiDocuments,
     private readonly tracer: BrokerTracer,
     private readonly limit: ResponseSizeLimit,
@@ -91,7 +95,7 @@ export class AsyncApiClient implements SubscriptionClient {
         "A receive is a wait of the run that the host's receivers answer",
       );
 
-    const document = await this.http.text(request.document, call);
+    const document = await this.resources.text(request.document, call);
 
     if (document.kind !== "text") return document;
 
@@ -118,7 +122,7 @@ export class AsyncApiClient implements SubscriptionClient {
       secrets: step.secrets,
       remaining: null,
     };
-    const document = await this.http.text(request.document, call);
+    const document = await this.resources.text(request.document, call);
 
     if (document.kind !== "text") return document;
 

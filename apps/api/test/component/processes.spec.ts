@@ -9,9 +9,9 @@ import { sql } from "drizzle-orm";
 import { ApiModule } from "../../src/frameworks/di/api.module.js";
 import { WorkerModule } from "../../src/frameworks/di/worker.module.js";
 import { AsyncApiClient } from "../../src/frameworks/asyncapi/asyncapi.client.js";
-import { SandboxClient } from "../../src/frameworks/go-judge/sandbox.client.js";
 import { IdempotencyJobs } from "../../src/interface-adapters/jobs/idempotency.jobs.js";
 import { AsyncApiHandler } from "../../src/interface-adapters/messaging/asyncapi.handler.js";
+import { SandboxGateway } from "../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import { EffectClient } from "../../src/interface-adapters/workflows/interfaces.js";
 import { DeliveryRun } from "../../src/interface-adapters/workflows/runners/delivery.run.js";
@@ -87,7 +87,7 @@ describe("the API process, from its root module alone", () => {
 
   it("holds_no_mail_transport_sandbox_broker_receiver_or_effect_client", () => {
     expect(() => api.get(MailTransport)).toThrow(UNKNOWN);
-    expect(() => api.get(SandboxClient)).toThrow(UNKNOWN);
+    expect(() => api.get(SandboxGateway)).toThrow(UNKNOWN);
     expect(() => api.get(AsyncApiClient)).toThrow(UNKNOWN);
     expect(() => api.get(AsyncApiHandler)).toThrow(UNKNOWN);
     expect(() => api.get(EffectClient)).toThrow(UNKNOWN);

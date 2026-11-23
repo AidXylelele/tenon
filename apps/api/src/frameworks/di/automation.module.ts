@@ -42,23 +42,29 @@ import { EngineRunGateway } from "../../interface-adapters/workflows/gateways/en
 import { EngineScheduleGateway } from "../../interface-adapters/workflows/gateways/engine-schedule.gateway.js";
 import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
 import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
-import { InterpreterClient } from "../../interface-adapters/workflows/interfaces.js";
+import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
+import { AuthorizationServer } from "../../interface-adapters/workflows/effects/interfaces.js";
+import { ResourceGateway } from "../../interface-adapters/workflows/effects/resource.gateway.js";
+import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
+import {
+  InterpreterClient,
+  ResourceClient,
+} from "../../interface-adapters/workflows/interfaces.js";
 import { DefinitionMapper } from "../../interface-adapters/workflows/mappers/definition.mapper.js";
 import { ProtocolMapper } from "../../interface-adapters/workflows/mappers/protocol.mapper.js";
 import { RunTurnMapper } from "../../interface-adapters/workflows/mappers/run-turn.mapper.js";
 import { ProgramCalls } from "../../interface-adapters/workflows/program-calls.js";
 import { AesGcmCipher } from "../crypto/aes-gcm.cipher.js";
-import { AddressPolicy } from "../http-client/address-policy.js";
-import { AuthorizationServer } from "../http-client/authorization-server.js";
 import { DeliveryClient } from "../http-client/delivery.client.js";
-import { HttpClientName } from "../http-client/enums.js";
-import { HttpAuthentication } from "../http-client/http-authentication.js";
 import { HttpClient } from "../http-client/http.client.js";
 import { OpenApiOperations } from "../http-client/openapi-operations.js";
 import { ResponseContent } from "../http-client/response-content.js";
-import { ResponseSizeLimit } from "../http-client/response-size-limit.js";
-import { TransportFailures } from "../http-client/transport-failures.js";
+import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
+import { AddressPolicy } from "../network/address-policy.js";
+import { HttpClientName } from "../network/enums.js";
+import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { OpenIdAuthorizationServer } from "../oauth/openid.authorization-server.js";
 import { linksConfig, secretsConfig } from "./configs.js";
 import { OutboundModule } from "./outbound.module.js";
 
@@ -128,12 +134,19 @@ import { OutboundModule } from "./outbound.module.js";
     },
     PiscinaInterpreterClient,
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
-    AuthorizationServer,
-    HttpAuthentication,
+    { provide: AuthorizationServer, useClass: OpenIdAuthorizationServer },
+    {
+      provide: Authenticator,
+      inject: [AuthorizationServer],
+      useFactory: (server: AuthorizationServer) =>
+        new Authenticator(server, HOST_PROFILE),
+    },
     OpenApiOperations,
     TransportFailures,
     ResponseContent,
     HttpClient,
+    ResourceGateway,
+    { provide: ResourceClient, useExisting: ResourceGateway },
     DeliveryClient,
     { provide: EventDeliveries, useExisting: DeliveryClient },
     EventDeliveryGateway,
@@ -161,9 +174,11 @@ import { OutboundModule } from "./outbound.module.js";
     Cipher,
     PiscinaInterpreterClient,
     InterpreterClient,
-    HttpAuthentication,
+    Authenticator,
     TransportFailures,
     HttpClient,
+    ResourceGateway,
+    ResourceClient,
     EventSender,
   ],
 })

@@ -3,10 +3,9 @@ import type {
   HttpHandler,
   HttpRequest,
 } from "@nestjs/http-client";
+import { RefusalCode } from "../../interface-adapters/workflows/effects/enums.js";
 
 export class ResponseSizeLimit implements HttpClientInterceptor {
-  static readonly EXCEEDED = "ERR_RESPONSE_TOO_LARGE";
-
   constructor(readonly bytes: number) {}
 
   async intercept(request: HttpRequest, next: HttpHandler): Promise<Response> {
@@ -45,6 +44,6 @@ export class ResponseSizeLimit implements HttpClientInterceptor {
   #exceeded(): Error {
     const size = this.inMebibytes();
     const error = new Error(`The response is larger than ${size}`);
-    return Object.assign(error, { code: ResponseSizeLimit.EXCEEDED });
+    return Object.assign(error, { code: RefusalCode.ResponseSize });
   }
 }

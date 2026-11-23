@@ -11,9 +11,9 @@ import type {
 import { A2aClient } from "../../../../src/frameworks/a2a/a2a.client.js";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../src/frameworks/http-client/address-policy.js";
-import { TransportFailures } from "../../../../src/frameworks/http-client/transport-failures.js";
-import type { CallContext } from "../../../../src/frameworks/interpreter/interfaces.js";
+import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
+import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
   type ReceivedRequest,

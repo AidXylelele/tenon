@@ -9,28 +9,31 @@ import {
   ResilienceTimeoutError,
 } from "@nestjs/resilience";
 import type { ProcessOutcome, Script, Shell } from "interpreter";
-import type {
-  FetchedText,
-  SandboxedProcessRequest,
-} from "../../interface-adapters/workflows/interfaces.js";
-import { HttpClientName } from "../http-client/enums.js";
-import { HttpClient } from "../http-client/http.client.js";
-import type { CallContext } from "../interpreter/interfaces.js";
+import { ProcessPlatform } from "../../../application/automation/host/queries.js";
+import type { SandboxResult } from "../../../frameworks/go-judge/interfaces.js";
+import {
+  SANDBOX_REFUSAL,
+  SANDBOX_RESULTS,
+} from "../../../frameworks/go-judge/sandbox-result.schema.js";
+import { HttpClientName } from "../../../frameworks/network/enums.js";
+import {
+  type FetchedText,
+  ResourceClient,
+  type SandboxedProcessRequest,
+} from "../interfaces.js";
 import type {
   BuiltCommand,
+  CallContext,
   SandboxCommand,
   SandboxFile,
-  SandboxResult,
   ScriptLanguage,
 } from "./interfaces.js";
 import { JavaScript } from "./javascript.js";
 import { Python } from "./python.js";
 import { SandboxLimits } from "./sandbox-limits.js";
-import { SANDBOX_REFUSAL, SANDBOX_RESULTS } from "./sandbox-result.schema.js";
-import shellPlatform from "./shell-platform.json" with { type: "json" };
 
 @Injectable()
-export class SandboxClient {
+export class SandboxGateway {
   private static readonly DIRECTORY = "directory";
   private static readonly ENTER_DIRECTORY =
     'cd -- "$1" 2>&3 || exit\nexec 3>&-\nshift\n';
@@ -43,14 +46,15 @@ export class SandboxClient {
   constructor(
     @InjectHttpClient(HttpClientName.Sandbox)
     private readonly sandbox: NestHttpClient,
-    private readonly http: HttpClient,
+    private readonly resources: ResourceClient,
     private readonly limits: SandboxLimits,
+    private readonly platform: ProcessPlatform,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("processes");
   }
 
-  async run(
+  async perform(
     request: SandboxedProcessRequest,
     context: CallContext,
   ): Promise<ProcessOutcome> {
@@ -85,12 +89,12 @@ export class SandboxClient {
   }
 
   #shellArgumentsOf(shell: Shell): readonly string[] {
-    const invoked = [shellPlatform.shell, "-c"];
+    const invoked = [this.platform.shell.shell, "-c"];
 
     if (shell.directory === null)
       return invoked.concat(shell.command, "sh", shell.arguments);
 
-    const entering = `${SandboxClient.ENTER_DIRECTORY}${shell.command}`;
+    const entering = `${SandboxGateway.ENTER_DIRECTORY}${shell.command}`;
     return invoked.concat(entering, "sh", shell.directory, shell.arguments);
   }
 
@@ -129,7 +133,7 @@ export class SandboxClient {
     if (script.source === null)
       return { kind: "text", text: script.code ?? "" };
 
-    return this.http.text(script.source, context);
+    return this.resources.text(script.source, context);
   }
 
   #sandboxCommandOf(
@@ -166,7 +170,7 @@ export class SandboxClient {
 
     if (!entering) return files;
 
-    return files.concat({ name: SandboxClient.DIRECTORY, max: 1024 });
+    return files.concat({ name: SandboxGateway.DIRECTORY, max: 1024 });
   }
 
   async #ran(
@@ -203,7 +207,7 @@ export class SandboxClient {
   #outcomeOf(result: SandboxResult): ProcessOutcome {
     const stdout = result.files.stdout ?? "";
     const stderr = result.files.stderr ?? "";
-    const unentered = result.files[SandboxClient.DIRECTORY] ?? "";
+    const unentered = result.files[SandboxGateway.DIRECTORY] ?? "";
 
     if (unentered !== "")
       return {
