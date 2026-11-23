@@ -1,12 +1,11 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { SIDEBAR_COOKIE_NAME } from "@/libs/ui/components/sidebar-cookie";
 import { type Viewport, VIEWPORT_COOKIE, viewportOf } from "./viewport";
-
-const SIDEBAR_COOKIE = "sidebar_state";
 
 export async function savedSidebarChoice(): Promise<boolean | null> {
   const store = await cookies();
-  const saved = store.get(SIDEBAR_COOKIE)?.value;
+  const saved = store.get(SIDEBAR_COOKIE_NAME)?.value;
 
   if (saved === "true") return true;
 

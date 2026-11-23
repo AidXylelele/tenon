@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SIDEBAR_COOKIE_NAME } from "@/libs/ui/components/sidebar-cookie";
 import { lastViewport, savedSidebarChoice } from "./saved-sidebar";
 
 const jar = vi.hoisted(() => new Map<string, string>());
@@ -24,7 +25,7 @@ describe("what the browser told the server about the sidebar", () => {
     ["false", false],
     ["maybe", null],
   ])("a_saved_choice_of_%s_reads_as_%s", async (value, choice) => {
-    jar.set("sidebar_state", value);
+    jar.set(SIDEBAR_COOKIE_NAME, value);
 
     const saved = await savedSidebarChoice();
 
