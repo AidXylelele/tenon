@@ -35,6 +35,10 @@ export function problemsOf(snapshot: Snapshot): readonly Problem[] {
   return [...diagnostics, ...addressed, ...written];
 }
 
+export function isWarning(problem: Problem): boolean {
+  return problem.code === "written-reference";
+}
+
 function writtenReferencesOf(
   snapshot: Snapshot,
 ): readonly WrittenReferenceDiagnostic[] {

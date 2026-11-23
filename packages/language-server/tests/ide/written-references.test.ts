@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { documentOf } from "../../src/ide/document/index.js";
 import { problemsOf } from "../../src/ide/snapshot/index.js";
 import { inlineHeader } from "../support/documents.js";
 import { snapshotOf } from "../support/snapshot.js";
@@ -31,4 +32,10 @@ test("a reference written inside a text warns that it is sent as text", () => {
     subject: "New digest: ${ .title }",
   });
   expect(only?.range).not.toBeNull();
+});
+
+test("a warning alone never refuses the document", () => {
+  const reading = documentOf(snapshotOf(posted));
+
+  expect(reading.kind).toBe("document");
 });

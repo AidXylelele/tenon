@@ -3,7 +3,7 @@ import { DiagnosticSeverity } from "vscode-languageserver/browser";
 import type * as lsp from "vscode-languageserver/browser";
 import { titleOf } from "../ide/forms/index.js";
 import { lastTokenOf } from "../ide/pointers/index.js";
-import type { Problem } from "../ide/snapshot/index.js";
+import { isWarning, type Problem } from "../ide/snapshot/index.js";
 import { lspRangeOf } from "./positions.js";
 
 const index = /^\d+$/;
@@ -43,7 +43,7 @@ function placedRangeOf(range: Range | null): lsp.Range {
 }
 
 function severityOf(diagnostic: Problem): DiagnosticSeverity {
-  if (diagnostic.code === "written-reference") {
+  if (isWarning(diagnostic)) {
     return DiagnosticSeverity.Warning;
   }
 
