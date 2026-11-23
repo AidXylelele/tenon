@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { CreateDraft } from "../../application/automation/drafts/create-draft.js";
 import { DraftRepository } from "../../application/automation/drafts/ports.js";
+import { DraftCompilation } from "../../application/automation/drafts/draft-compilation.js";
 import { PublishDraft } from "../../application/automation/drafts/publish-draft.js";
 import { DraftQueries } from "../../application/automation/drafts/queries.js";
 import { SaveDraft } from "../../application/automation/drafts/save-draft.js";
@@ -108,6 +109,7 @@ import { HttpModule } from "./http.module.js";
     TurnWorkflowOff,
     CreateDraft,
     SaveDraft,
+    DraftCompilation,
     PublishDraft,
     TestDraft,
     FetchImport,

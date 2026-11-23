@@ -1,3 +1,4 @@
+import { DraftCompilation } from "../../../../../src/application/automation/drafts/draft-compilation.js";
 import { TestDraft } from "../../../../../src/application/automation/drafts/test-draft.js";
 import { Missing } from "../../../../../src/application/automation/enums.js";
 import type { InputProblem } from "../../../../../src/application/automation/instances/interfaces.js";
@@ -40,10 +41,13 @@ async function setUp(problems: readonly InputProblem[] = []) {
   });
   await drafts.save(draft);
   const runtime = inputsChecked(problems);
-  const testDraft = new TestDraft(
+  const compilation = new DraftCompilation(
     drafts,
-    compiler,
     new StoredSecrets(),
+    compiler,
+  );
+  const testDraft = new TestDraft(
+    compilation,
     workflows,
     instances,
     runs,

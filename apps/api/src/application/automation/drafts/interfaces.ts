@@ -1,15 +1,18 @@
+import type { Draft } from "../../../domain/automation/drafts/draft.js";
 import type { DraftRefusal } from "../../../domain/automation/drafts/enums.js";
 import type { DraftAuthor } from "../../../domain/automation/drafts/interfaces.js";
 import type {
   JsonObject,
   JsonValue,
 } from "../../../domain/automation/interfaces.js";
+import type { CheckedDefinition } from "../../../domain/automation/workflows/checked-definition.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { Result } from "../../../domain/interfaces.js";
 import type { Missing } from "../enums.js";
 import type { InputProblem, StartedInstance } from "../instances/interfaces.js";
 import type { NameRefusal } from "./enums.js";
 import type {
+  DefinitionFailure,
   PublishedVersion,
   PublishFailure,
 } from "../workflows/interfaces.js";
@@ -50,6 +53,16 @@ export interface DraftConflict {
   readonly refusal: DraftRefusal;
   readonly current: DraftView | null;
 }
+
+export interface CompiledDraft {
+  readonly draft: Draft;
+  readonly definition: CheckedDefinition;
+}
+
+export type DraftCompilationResult = Result<
+  CompiledDraft,
+  DefinitionFailure | DraftConflict | Missing
+>;
 
 export type CreateDraftResult = Result<DraftView, DraftConflict | NameRefusal>;
 

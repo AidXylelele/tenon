@@ -2,6 +2,7 @@ import { Missing } from "../../../../../src/application/automation/enums.js";
 import { ArchiveWorkflow } from "../../../../../src/application/automation/workflows/archive-workflow.js";
 import { CheckDefinition } from "../../../../../src/application/automation/workflows/check-definition.js";
 import { DefinitionRefusal } from "../../../../../src/application/automation/workflows/enums.js";
+import { DraftCompilation } from "../../../../../src/application/automation/drafts/draft-compilation.js";
 import { PublishDraft } from "../../../../../src/application/automation/drafts/publish-draft.js";
 import {
   WorkflowRefusal,
@@ -32,13 +33,8 @@ function setUp() {
   const schedules = new RecordingSchedules();
   const drafts = new StoredDrafts();
   const check = new CheckDefinition(compiler, workflows, secrets, schedules);
-  const publishDraft = new PublishDraft(
-    drafts,
-    compiler,
-    workflows,
-    secrets,
-    schedules,
-  );
+  const compilation = new DraftCompilation(drafts, secrets, compiler);
+  const publishDraft = new PublishDraft(compilation, workflows, schedules);
   const publish = {
     execute: async (command: DraftPublication) => {
       const author = { id: command.publisherId, name: "Author" };

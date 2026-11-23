@@ -1,26 +1,20 @@
 import { Injectable } from "@nestjs/common";
 import { Transactional } from "@nestjs-cls/transactional";
-import { DraftRefusal } from "../../../domain/automation/drafts/enums.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
-import { Missing } from "../enums.js";
 import {
   InstanceRuns,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../instances/ports.js";
-import { SecretRepository } from "../secrets/ports.js";
-import { DefinitionRefusal } from "../workflows/enums.js";
-import { DefinitionCompiler, WorkflowRepository } from "../workflows/ports.js";
+import { WorkflowRepository } from "../workflows/ports.js";
+import { DraftCompilation } from "./draft-compilation.js";
 import type { TestDraftCommand, TestDraftResult } from "./interfaces.js";
-import { DraftRepository } from "./ports.js";
 
 @Injectable()
 export class TestDraft {
   constructor(
-    private readonly drafts: DraftRepository,
-    private readonly compiler: DefinitionCompiler,
-    private readonly secrets: SecretRepository,
+    private readonly compilation: DraftCompilation,
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
     private readonly runs: InstanceRuns,
@@ -29,28 +23,16 @@ export class TestDraft {
 
   @Transactional()
   async execute(command: TestDraftCommand): Promise<TestDraftResult> {
-    const draft = await this.drafts.findByName(command.name);
-
-    if (draft === null) return { ok: false, failure: Missing.Draft };
-
-    const current = draft.isAt(command.expected);
-
-    if (!current)
-      return {
-        ok: false,
-        failure: { refusal: DraftRefusal.Stale, current: draft.snapshot },
-      };
-
-    const owned = await this.secrets.findOwnedBy(command.starterId);
-    const compiled = await this.compiler.compile(draft.source, owned);
+    const compiled = await this.compilation.compile(
+      command.name,
+      command.expected,
+      command.starterId,
+    );
 
     if (!compiled.ok) return compiled;
 
-    const definition = compiled.value;
-    const foreign = !draft.name.equals(definition.name);
-
-    if (foreign) return { ok: false, failure: DefinitionRefusal.OtherWorkflow };
-
+    const draft = compiled.value.draft;
+    const definition = compiled.value.definition;
     const now = new Date();
     const found = await this.workflows.findByName(definition.name);
     const workflow = found ?? Workflow.register(definition.name);
