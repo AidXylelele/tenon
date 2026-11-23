@@ -90,6 +90,8 @@ function AsideContent({
   onForm,
 }: EditingAsideProps) {
   const { structure, selected, selectedId } = editing;
+  const triggers = structure?.workflow.triggers ?? [];
+  const scheduled = triggers.some((trigger) => trigger.kind !== "on");
 
   function close() {
     onSelect(null);
@@ -114,6 +116,7 @@ function AsideContent({
       <TestRunPanel
         state={test.state}
         lost={test.lost}
+        scheduled={scheduled}
         steps={steps}
         onRun={onRun}
         onAgain={test.reset}

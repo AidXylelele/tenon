@@ -56,6 +56,7 @@ import type { TestRunState } from "./use-test-run";
 interface TestRunPanelProps {
   readonly state: TestRunState;
   readonly lost: boolean;
+  readonly scheduled: boolean;
   readonly steps: readonly Step[];
   readonly onRun: (input: JsonValue) => void;
   readonly onAgain: () => void;
@@ -100,6 +101,7 @@ const RUNNING: Banner = {
 export function TestRunPanel({
   state,
   lost,
+  scheduled,
   steps,
   onRun,
   onAgain,
@@ -138,7 +140,12 @@ export function TestRunPanel({
             </div>
           </>
         ) : (
-          <TestStart state={state} steps={steps} onRun={onRun} />
+          <TestStart
+            state={state}
+            scheduled={scheduled}
+            steps={steps}
+            onRun={onRun}
+          />
         )}
       </div>
     </section>
@@ -147,10 +154,12 @@ export function TestRunPanel({
 
 function TestStart({
   state,
+  scheduled,
   steps,
   onRun,
 }: {
   readonly state: TestRunState;
+  readonly scheduled: boolean;
   readonly steps: readonly Step[];
   readonly onRun: (input: JsonValue) => void;
 }) {
@@ -186,25 +195,32 @@ function TestStart({
 
   return (
     <>
-      <Field>
-        <FieldLabel htmlFor={id}>Run with</FieldLabel>
-        <Select
-          value={way}
-          onValueChange={(chosen) => {
-            setWay(chosen === "typed" ? "typed" : "empty");
-          }}
-        >
-          <SelectTrigger id={id} className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="empty">
-              An empty input (usual for a schedule)
-            </SelectItem>
-            <SelectItem value="typed">Input I type…</SelectItem>
-          </SelectContent>
-        </Select>
-      </Field>
+      {scheduled ? (
+        <p className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">Run with</span>
+          Empty: this workflow starts on a schedule.
+        </p>
+      ) : (
+        <Field>
+          <FieldLabel htmlFor={id}>Run with</FieldLabel>
+          <Select
+            value={way}
+            onValueChange={(chosen) => {
+              setWay(chosen === "typed" ? "typed" : "empty");
+            }}
+          >
+            <SelectTrigger id={id} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="empty">
+                An empty input (usual for a schedule)
+              </SelectItem>
+              <SelectItem value="typed">Input I type…</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      )}
       {way === "typed" && (
         <Field data-invalid={refusal !== null}>
           <FieldLabel htmlFor={typedId}>The input, as JSON</FieldLabel>

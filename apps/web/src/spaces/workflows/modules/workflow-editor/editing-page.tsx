@@ -207,6 +207,9 @@ function EditingBody({
   const selectedId = editing.selectedId;
   const startsByItself = (structure?.workflow.triggers.length ?? 0) > 0;
   const tested = testedText !== null && testedText === readMine();
+  const hasSteps = steps.length > 0;
+  const ready = hasSteps && errors.length === 0 && tested;
+  const testFirst = hasSteps && !ready;
 
   const onEdit = useCallback(
     (list: readonly EditAction[]) => {
@@ -461,6 +464,7 @@ function EditingBody({
         shown={shown}
         problems={revealProblems ? errors.length : 0}
         testing={test.state.kind === "starting"}
+        testFirst={testFirst}
         onShown={(next) => {
           setShown(next);
           setLanguageTerms(next === "code" || languageTerms);
@@ -487,6 +491,7 @@ function EditingBody({
           title={title}
           startsByItself={startsByItself}
           tested={tested}
+          ready={ready}
           onTest={openTest}
           changesOf={publishing.changesSincePublished}
           setVersion={publishing.setVersion}

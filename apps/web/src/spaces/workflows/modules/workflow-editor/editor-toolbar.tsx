@@ -41,6 +41,7 @@ interface EditorToolbarProps {
   readonly shown: CodeShown;
   readonly problems: number;
   readonly testing: boolean;
+  readonly testFirst: boolean;
   readonly onShown: (shown: CodeShown) => void;
   readonly onProblems: () => void;
   readonly onTest: () => void;
@@ -59,6 +60,7 @@ export function EditorToolbar({
   shown,
   problems,
   testing,
+  testFirst,
   onShown,
   onProblems,
   onTest,
@@ -122,7 +124,11 @@ export function EditorToolbar({
             {counted}
           </Button>
         )}
-        <Button variant="outline" disabled={testing} onClick={onTest}>
+        <Button
+          variant={testFirst ? "default" : "outline"}
+          disabled={testing}
+          onClick={onTest}
+        >
           <PlayIcon data-icon="inline-start" />
           Test run
         </Button>

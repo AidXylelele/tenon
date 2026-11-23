@@ -33,6 +33,7 @@ interface PublishBarProps {
   readonly title: string;
   readonly startsByItself: boolean;
   readonly tested: boolean;
+  readonly ready: boolean;
   readonly onTest: () => void;
   readonly changesOf: () => Promise<ChangeReading>;
   readonly setVersion: (version: string) => Promise<void>;
@@ -62,6 +63,7 @@ export function PublishBar({
   title,
   startsByItself,
   tested,
+  ready,
   onTest,
   changesOf,
   setVersion,
@@ -188,7 +190,11 @@ export function PublishBar({
           Use version {offered}
         </Button>
       )}
-      <Button disabled={busy} onClick={openDialog}>
+      <Button
+        variant={ready ? "default" : "outline"}
+        disabled={busy}
+        onClick={openDialog}
+      >
         <SendIcon data-icon="inline-start" />
         Publish
       </Button>

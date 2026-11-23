@@ -67,7 +67,7 @@ function ranWith(records: readonly TaskRecord[], phase: string): TestRunState {
   return { kind: "ran", test };
 }
 
-function show(state: TestRunState, lost = false) {
+function show(state: TestRunState, lost = false, scheduled = false) {
   const onReadAgain = vi.fn();
   render(
     <TooltipProvider>
@@ -75,6 +75,7 @@ function show(state: TestRunState, lost = false) {
         <TestRunPanel
           state={state}
           lost={lost}
+          scheduled={scheduled}
           steps={STEPS}
           onRun={vi.fn()}
           onAgain={vi.fn()}
@@ -94,6 +95,15 @@ describe("the test run panel", () => {
     const back = screen.getAllByRole("button", { name: /Back/ });
 
     expect(back).toHaveLength(1);
+  });
+
+  it("a_scheduled_workflow_runs_with_an_empty_input_and_says_why", () => {
+    show({ kind: "idle" }, false, true);
+
+    const empty = screen.getByText(/Empty: this workflow starts on a schedule/);
+
+    expect(empty).toBeVisible();
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 
   it("a_run_that_reached_every_step_says_it_succeeded_and_how_long_it_took", () => {

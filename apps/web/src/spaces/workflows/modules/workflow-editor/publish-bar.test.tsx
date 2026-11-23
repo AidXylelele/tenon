@@ -33,6 +33,7 @@ const PUBLISHING = {
   title: "Daily digest",
   startsByItself: true,
   tested: false,
+  ready: false,
   onTest: vi.fn(),
   changesOf: () => Promise.resolve({ kind: "read" as const, changes: [] }),
   setVersion: () => Promise.resolve(),
@@ -189,5 +190,30 @@ describe("the publish bar", () => {
     expect(
       screen.getByRole("button", { name: /^Publish 1\.0\.1/ }),
     ).toBeEnabled();
+  });
+
+  it.each([
+    [false, "outline"],
+    [true, "default"],
+  ])("publish_is_primary_only_once_ready_%s", (ready, variant) => {
+    const session = {} as unknown as WorkflowSession;
+    render(
+      <PublishBar
+        session={session}
+        problems={0}
+        onPlatformProblems={vi.fn()}
+        publish={vi.fn()}
+        onPublished={() => Promise.resolve()}
+        currentVersion={null}
+        onUseVersion={vi.fn()}
+        onShowProblems={vi.fn()}
+        {...PUBLISHING}
+        ready={ready}
+      />,
+    );
+
+    const publish = screen.getByRole("button", { name: "Publish" });
+
+    expect(publish).toHaveAttribute("data-variant", variant);
   });
 });
