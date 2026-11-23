@@ -318,6 +318,8 @@ describe("a child a run asks for", () => {
     expect(child?.originEffectId).toBe(CHILD);
     expect(child?.trigger).toBe(TriggerKind.Parent);
     expect(fixture.events.started[0]?.stored).toBe(true);
+    const kinds = fixture.events.kindsOf(child?.id ?? "");
+    expect(kinds).toEqual([InstanceEventKind.Started]);
     expect(fixture.runs.responded).toEqual([]);
   });
 
@@ -425,18 +427,5 @@ describe("a receive a run waits on", () => {
     await fixture.receive.execute(command);
 
     expect(fixture.runs.received).toEqual([]);
-  });
-});
-
-describe("dispatching what a child start raised", () => {
-  it("dispatches_the_child_start", async () => {
-    const fixture = await setUp([anEffect("/do/0/price", EffectKind.Child)]);
-    const command = commandOf("/do/0/price");
-
-    await fixture.startChild.execute(command);
-
-    const child = fixture.events.started[0]?.instance;
-    const kinds = fixture.events.kindsOf(child?.id ?? "");
-    expect(kinds).toEqual([InstanceEventKind.Started]);
   });
 });
