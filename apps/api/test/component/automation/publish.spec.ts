@@ -63,8 +63,9 @@ describe("publishing workflow definitions over HTTP", () => {
       on: false,
       currentVersion: "1.0.0",
       schedule: null,
-      starts: 0,
+      week: { runs: 0, failed: 0 },
       lastRun: null,
+      title: null,
     });
     expect(stored.body).toEqual(document);
   });
@@ -298,8 +299,9 @@ describe("publishing workflow definitions over HTTP", () => {
         on: false,
         currentVersion: "1.0.0",
         schedule: null,
-        starts: 0,
+        week: { runs: 0, failed: 0 },
         lastRun: null,
+        title: null,
       },
     ]);
     expect((active.body as Page<unknown>).items).toEqual([]);

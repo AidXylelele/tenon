@@ -25,7 +25,7 @@ interface Summary {
 }
 
 interface WorkflowBody {
-  readonly starts: number;
+  readonly week: { readonly runs: number; readonly failed: number };
   readonly lastRun: { readonly id: string } | null;
 }
 
@@ -135,7 +135,7 @@ describe("a test run of a draft over HTTP", () => {
       .expect(200);
 
     const body = workflow.body as WorkflowBody;
-    expect(body.starts).toBe(0);
+    expect(body.week.runs).toBe(0);
     expect(body.lastRun).toBeNull();
     expect(versions.body).toHaveLength(1);
   });
