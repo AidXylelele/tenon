@@ -1,4 +1,5 @@
 import type {
+  InstanceCounts,
   InstancePage,
   ListedInstance,
   Read,
@@ -6,6 +7,7 @@ import type {
   VersionStructure,
   Workflow,
 } from "@/libs/data-access/types";
+import { windowsOf } from "@/operations/run-periods";
 import { ORDER_ROUTER as ROUTER_FLOW } from "@/features/workflow-flow/workflows.test-support";
 
 export const ORDER_ROUTER: Workflow = {
@@ -140,3 +142,42 @@ export const NO_RUNS: Read<InstancePage> = {
   exact: true,
   readAt: Date.parse("2026-11-23T09:15:00.000Z"),
 };
+
+const COUNTED_AT = "2026-11-23T09:15:00.000Z";
+
+const ROUTER_WINDOWS = windowsOf("7d", COUNTED_AT, "UTC");
+
+const NO_PHASES = {
+  pending: 0,
+  running: 0,
+  waiting: 0,
+  suspended: 0,
+  completed: 0,
+  faulted: 0,
+  cancelled: 0,
+};
+
+const ROUTER_BUCKETS = ROUTER_WINDOWS.buckets.map((bucket, index) => {
+  const completed = 2 + (index % 3);
+  const faulted = index % 2;
+  const counts = { ...NO_PHASES, completed, faulted };
+  return { start: bucket.from, counts };
+});
+
+const ROUTER_TOTAL: InstanceCounts = {
+  to: COUNTED_AT,
+  buckets: ROUTER_BUCKETS,
+  total: { ...NO_PHASES, completed: 20, faulted: 3, running: 1 },
+  previous: {
+    from: ROUTER_WINDOWS.previous.from,
+    counts: { ...NO_PHASES, completed: 18, faulted: 5 },
+  },
+  now: { pending: 0, running: 1, waiting: 0, suspended: 0 },
+};
+
+export const ROUTER_COUNTS = {
+  period: "7d",
+  zone: "UTC",
+  windows: ROUTER_WINDOWS,
+  counts: ROUTER_TOTAL,
+} as const;

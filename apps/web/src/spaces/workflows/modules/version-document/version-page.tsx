@@ -76,10 +76,13 @@ export function VersionPage({
         description={
           <span className="flex flex-wrap gap-x-1">
             {facts !== undefined && (
-              <span>
-                Published by {facts.publishedBy.name}{" "}
-                <AbsoluteTime value={facts.publishedAt} /> ·
-              </span>
+              <>
+                <span>
+                  Published by {facts.publishedBy.name}{" "}
+                  <AbsoluteTime value={facts.publishedAt} /> ·
+                </span>
+                <span>{facts.runs} runs ·</span>
+              </>
             )}
             <span className="font-mono">
               {namespace}/{name}

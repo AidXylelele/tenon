@@ -1,10 +1,12 @@
 import { ArchiveIcon, PencilIcon, WorkflowIcon } from "lucide-react";
 import type {
+  InstanceCounts,
   InstancePage,
   Version,
   VersionStructure,
   Workflow,
 } from "@/libs/data-access/types";
+import { LiveUpdates } from "@/libs/live/live-updates";
 import { Link } from "@/libs/routing/link";
 import {
   editorHref,
@@ -33,6 +35,16 @@ import { EmptyState } from "@/libs/ui/composites/empty-state";
 import { PageHeader } from "@/libs/ui/composites/page-header";
 import { RouteTabs } from "@/libs/ui/composites/route-tabs";
 import { TableFrame } from "@/libs/ui/composites/table-frame";
+import {
+  type FigureKind,
+  figuresOf,
+  inProgressOf,
+  type Period,
+  type PeriodWindows,
+  seriesOf,
+} from "@/operations/run-periods";
+import { isUnended } from "@/operations/run-progress";
+import { PeriodFigures, PeriodPicker, RunsChart } from "@/features/runs-chart";
 import { PhaseStatus } from "@/features/run-status";
 import { RunTable } from "@/features/run-table";
 import { AutomaticStarts } from "@/features/automatic-starts";
@@ -59,7 +71,18 @@ export interface WorkflowPageProps {
   readonly structure: VersionStructure | null;
   readonly author: boolean;
   readonly operator: boolean;
+  readonly period: Period;
+  readonly zone: string;
+  readonly windows: PeriodWindows;
+  readonly counts: InstanceCounts;
 }
+
+const STATUS_OF: Readonly<Record<FigureKind, string | undefined>> = {
+  started: undefined,
+  succeeded: "succeeded",
+  failed: "failed",
+  cancelled: "cancelled",
+};
 
 const READ = { kind: "read" } as const;
 
@@ -71,6 +94,10 @@ export function WorkflowPage({
   structure,
   author,
   operator,
+  period,
+  zone,
+  windows,
+  counts,
 }: WorkflowPageProps) {
   const namespace = workflow.namespace;
   const name = workflow.name;
@@ -88,6 +115,22 @@ export function WorkflowPage({
   const versionCount = String(versions.length);
   const inputSchema = structure?.input.schema ?? null;
   const viewer = !author && !operator;
+  const live = runs.items.some((run) => isUnended(run.phase));
+  const activity = live ? "in-flight" : "open";
+  const periodHrefs: Readonly<Record<Period, string>> = {
+    "24h": workflowHref(namespace, name),
+    "7d": workflowHref(namespace, name, { period: "7d" }),
+    "30d": workflowHref(namespace, name, { period: "30d" }),
+  };
+  const counted = (
+    <PeriodCounts
+      workflow={workflow}
+      period={period}
+      zone={zone}
+      windows={windows}
+      counts={counts}
+    />
+  );
   const overview = workflowHref(namespace, name);
   const runsTab = workflowHref(namespace, name, { tab: "runs" });
   const versionsTab = workflowHref(namespace, name, { tab: "versions" });
@@ -124,8 +167,10 @@ export function WorkflowPage({
             <span>· {startWords}</span>
             {published !== undefined && (
               <span>
-                · version {published.version}, published by{" "}
-                {published.publishedBy.name}{" "}
+                <span>
+                  · version {published.version}, {published.runs} runs
+                </span>{" "}
+                · published by {published.publishedBy.name}{" "}
                 <AbsoluteTime value={published.publishedAt} />
               </span>
             )}
@@ -133,6 +178,9 @@ export function WorkflowPage({
         }
         actions={
           <>
+            {tab === "overview" && current !== null && (
+              <PeriodPicker period={period} hrefs={periodHrefs} />
+            )}
             {viewer && <ViewerLine />}
             {edits && (
               <Button variant="outline" asChild>
@@ -183,6 +231,7 @@ export function WorkflowPage({
           />
         )
       )}
+      <LiveUpdates activity={activity} />
       <RouteTabs tabs={tabs} label="Workflow" />
       {tab === "overview" && (
         <Overview
@@ -190,6 +239,7 @@ export function WorkflowPage({
           runs={runs}
           structure={structure}
           edits={edits}
+          counted={counted}
         />
       )}
       {tab === "runs" && (
@@ -210,11 +260,13 @@ function Overview({
   runs,
   structure,
   edits,
+  counted,
 }: {
   readonly workflow: Workflow;
   readonly runs: InstancePage;
   readonly structure: VersionStructure | null;
   readonly edits: boolean;
+  readonly counted: React.ReactNode;
 }) {
   const namespace = workflow.namespace;
   const name = workflow.name;
@@ -246,12 +298,15 @@ function Overview({
 
   return (
     <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-      <Runs
-        runs={runs}
-        title="Recent runs"
-        more={runsTab}
-        moreLabel="All runs of this workflow"
-      />
+      <div className="flex min-w-0 flex-col gap-6">
+        {counted}
+        <Runs
+          runs={runs}
+          title="Recent runs"
+          more={runsTab}
+          moreLabel="All runs of this workflow"
+        />
+      </div>
       <section aria-labelledby="what-it-does" className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="what-it-does" className="text-body font-semibold">
@@ -329,6 +384,7 @@ function Versions({
               <TableHead>Version</TableHead>
               <TableHead>Published</TableHead>
               <TableHead>By</TableHead>
+              <TableHead className="text-right">Runs</TableHead>
               {runs && (
                 <TableHead className="w-0">
                   <span className="sr-only">Actions</span>
@@ -374,11 +430,57 @@ function VersionRow({
         <AbsoluteTime value={version.publishedAt} />
       </TableCell>
       <TableCell>{version.publishedBy.name}</TableCell>
+      <TableCell className="text-right tabular-nums">{version.runs}</TableCell>
       {runs && (
         <TableCell className="relative z-10 text-right">
           <RunVersionButton version={chosen} label="Run this version" />
         </TableCell>
       )}
     </TableRow>
+  );
+}
+
+function PeriodCounts({
+  workflow,
+  period,
+  zone,
+  windows,
+  counts,
+}: {
+  readonly workflow: Workflow;
+  readonly period: Period;
+  readonly zone: string;
+  readonly windows: PeriodWindows;
+  readonly counts: InstanceCounts;
+}) {
+  const namespace = workflow.namespace;
+  const name = workflow.name;
+  const figures = figuresOf(counts.total, counts.previous?.counts ?? null);
+  const inProgress = inProgressOf(counts.now);
+  const bars = seriesOf(windows.buckets, counts.buckets);
+  const barHrefs = bars.map((bar) =>
+    runsHref({ namespace, name, from: bar.from, to: bar.to }),
+  );
+  const figureHrefOf = (kind: FigureKind) =>
+    runsHref({ namespace, name, status: STATUS_OF[kind], started: period });
+  const inProgressHref = runsHref({ namespace, name, status: "in-progress" });
+
+  return (
+    <section
+      aria-labelledby="workflow-period"
+      className="flex flex-col gap-4 rounded-xl border bg-card p-4"
+    >
+      <h2 id="workflow-period" className="sr-only">
+        Runs of the period
+      </h2>
+      <PeriodFigures
+        period={period}
+        figures={figures}
+        inProgress={inProgress}
+        hrefOf={figureHrefOf}
+        inProgressHref={inProgressHref}
+      />
+      <RunsChart bars={bars} hrefs={barHrefs} unit={windows.unit} zone={zone} />
+    </section>
   );
 }

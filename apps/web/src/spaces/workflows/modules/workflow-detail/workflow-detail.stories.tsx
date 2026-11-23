@@ -6,6 +6,7 @@ import {
   MONTH_END,
   NO_RUNS,
   ORDER_ROUTER,
+  ROUTER_COUNTS,
   ROUTER_RUNS,
   ROUTER_STRUCTURE,
   ROUTER_VERSIONS,
@@ -39,6 +40,7 @@ const meta = {
     structure: ROUTER_STRUCTURE,
     author: true,
     operator: true,
+    ...ROUTER_COUNTS,
   },
 } satisfies Meta<typeof WorkflowPage>;
 
