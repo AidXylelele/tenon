@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { Outbox } from "@nestjs/outbox";
 import { and, eq } from "drizzle-orm";
 import { EventOrigin } from "../../../application/automation/events/enums.js";
@@ -15,7 +11,6 @@ import type { EventStore } from "../../../application/automation/events/ports.js
 import type { WebhookEvent } from "../../../domain/automation/webhooks/interfaces.js";
 import { MessageTopic } from "../../messaging/enums.js";
 import type { AcceptedEventMessage } from "../../messaging/interfaces.js";
-import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type {
   EventRow,
   LifecycleCloudEvent,
@@ -35,10 +30,8 @@ export class PostgresEventStore implements EventStore {
     private readonly txHost: TransactionHost<Transaction>,
     private readonly outbox: Outbox,
     private readonly webhookEventMapper: WebhookEventMapper,
-    private readonly tracer: OutboxTracer,
   ) {}
 
-  @Transactional(Propagation.Required)
   accept(
     cloudEvent: CloudEvent,
     origin: EventOrigin,
@@ -61,7 +54,6 @@ export class PostgresEventStore implements EventStore {
     });
   }
 
-  @Transactional(Propagation.Required)
   acceptLifecycle(
     told: LifecycleCloudEvent,
     instanceId: string,
@@ -85,7 +77,6 @@ export class PostgresEventStore implements EventStore {
     });
   }
 
-  @Transactional(Propagation.Required)
   acceptWebhookEvent(event: WebhookEvent): Promise<number | null> {
     const cloudEvent = this.webhookEventMapper.toCloudEvent(event);
     return this.accept(cloudEvent, EventOrigin.Webhook, null, event.at);
@@ -102,13 +93,11 @@ export class PostgresEventStore implements EventStore {
 
     const sequence = accepted.sequence;
     const payload: AcceptedEventMessage = { sequence };
-    const headers = this.tracer.headers();
     await this.outbox.add(this.txHost.tx, [
       {
         topic: MessageTopic.EventAccepted,
         key: PostgresEventStore.KEY,
         payload,
-        headers,
       },
     ]);
     return sequence;

@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { Outbox } from "@nestjs/outbox";
 import {
   and,
@@ -22,7 +18,6 @@ import {
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { InstanceMessage } from "../../messaging/interfaces.js";
-import { OutboxTracer } from "../../messaging/outbox.tracer.js";
 import type { Transaction } from "../interfaces.js";
 import { WorkflowInstanceMapper } from "../mappers/workflow-instance.mapper.js";
 import {
@@ -39,7 +34,6 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
     private readonly outbox: Outbox,
     private readonly lifecycle: PostgresLifecycleEventStore,
     private readonly workflowInstanceMapper: WorkflowInstanceMapper,
-    private readonly tracer: OutboxTracer,
   ) {}
 
   async find(id: string): Promise<WorkflowInstance | null> {
@@ -122,7 +116,6 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
     return row !== undefined;
   }
 
-  @Transactional(Propagation.Mandatory)
   async save(instance: WorkflowInstance): Promise<void> {
     const row = this.workflowInstanceMapper.toRow(instance);
     const nextVersion = instance.version + 1;
@@ -155,7 +148,6 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
     await this.#record(instance);
   }
 
-  @Transactional(Propagation.Mandatory)
   async remove(instance: WorkflowInstance): Promise<void> {
     await this.txHost.tx.delete(instances).where(eq(instances.id, instance.id));
     await this.#record(instance);
@@ -241,7 +233,6 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
         topic: change.kind,
         key,
         payload,
-        headers: this.tracer.headers(),
       };
     });
     await this.lifecycle.record(instance, now);

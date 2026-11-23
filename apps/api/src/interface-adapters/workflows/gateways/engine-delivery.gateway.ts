@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { WorkflowClient } from "@nestjs/workflows";
 import type { AcceptedEvent } from "../../../application/automation/events/interfaces.js";
 import type { Deliveries } from "../../../application/automation/subscriptions/ports.js";
@@ -18,7 +14,6 @@ export class EngineDeliveryGateway implements Deliveries {
     private readonly txHost: TransactionHost<Transaction>,
   ) {}
 
-  @Transactional(Propagation.Mandatory)
   async schedule(
     subscription: Subscription,
     event: AcceptedEvent,

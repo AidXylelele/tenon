@@ -1,11 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { Outbox } from "@nestjs/outbox";
+import { UnitOfWork } from "../../application/unit-of-work.js";
 import type { RecoveryMailer } from "../../application/identity/accounts/ports.js";
 import type { InvitationMailer } from "../../application/identity/invitations/ports.js";
 import type { Invitation } from "../../domain/identity/invitations/invitation.js";
 import type { InvitationToken } from "../../domain/identity/invitations/invitation-token.js";
-import { OutboxTracer } from "../messaging/outbox.tracer.js";
 import type { Transaction } from "../persistence/interfaces.js";
 import { MailTopic } from "./enums.js";
 import type {
@@ -19,7 +19,7 @@ export class MailGateway implements InvitationMailer, RecoveryMailer {
   constructor(
     private readonly outbox: Outbox,
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly tracer: OutboxTracer,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async sendInvitation(
@@ -54,9 +54,8 @@ export class MailGateway implements InvitationMailer, RecoveryMailer {
   }
 
   async #queue<T>(topic: MailTopic, payload: QueuedMail<T>): Promise<void> {
-    await this.txHost.withTransaction(async () => {
-      const headers = this.tracer.headers();
-      await this.outbox.add(this.txHost.tx, { topic, payload, headers });
+    await this.unitOfWork.run(async () => {
+      await this.outbox.add(this.txHost.tx, { topic, payload });
     });
   }
 }
