@@ -1,3 +1,4 @@
+import type { JsonValue } from "interpreter/front-end";
 import type { TextChange } from "../text/index.js";
 import {
   isJsonObject,
@@ -37,6 +38,8 @@ import {
   removalOf,
 } from "./collection-text.js";
 
+const unedited: Editing = { kind: "edited", changes: [], ids: [] };
+
 export function combinedOf(editings: readonly Editing[]): Editing {
   const refusal = editings.find((editing) => editing.kind === "refused");
 
@@ -69,6 +72,34 @@ export function fieldEditingOf(
     case "setCondition":
       return conditionSettingOf(editable, action);
   }
+}
+
+export function fieldWritingOf(
+  editable: EditableText,
+  pointer: string,
+  value: JsonValue | null,
+): Editing {
+  const written = valueAt(editable.document, pointer);
+  const isWritten = written !== undefined;
+  const writtenText = JSON.stringify(written);
+  const valueText = JSON.stringify(value);
+  const isStanding = writtenText === valueText;
+
+  if (value !== null && isStanding) {
+    return unedited;
+  }
+
+  if (value !== null) {
+    const setting: SetField = { kind: "setField", pointer, value };
+    return fieldSettingOf(editable, setting);
+  }
+
+  if (!isWritten) {
+    return unedited;
+  }
+
+  const clearing: ClearField = { kind: "clearField", pointer };
+  return fieldClearingOf(editable, clearing);
 }
 
 export function fieldSettingOf(

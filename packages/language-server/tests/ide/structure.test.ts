@@ -70,6 +70,7 @@ test("a step is its id, kind, family, summary, ranges and flow", () => {
     pointer: "/do/0/greet",
     name: "greet",
     kind: "set",
+    variant: "set",
     family: "data",
     summary: "message",
     milliseconds: null,
@@ -81,8 +82,16 @@ test("a step is its id, kind, family, summary, ranges and flow", () => {
     },
     lists: [],
     flow: [
-      { on: "done", case: null, when: null, kind: "next", to: "/do/guard" },
+      {
+        on: "done",
+        case: null,
+        when: null,
+        condition: null,
+        kind: "next",
+        to: "/do/guard",
+      },
     ],
+    catch: null,
   });
 });
 
@@ -131,8 +140,22 @@ test("a catch that writes then flows when caught", () => {
 
   const guard = stepNamed(reading.workflow, "guard");
   expect(guard?.flow).toEqual([
-    { on: "done", case: null, when: null, kind: "next", to: "/do/route" },
-    { on: "caught", case: null, when: null, kind: "end", to: null },
+    {
+      on: "done",
+      case: null,
+      when: null,
+      condition: null,
+      kind: "next",
+      to: "/do/route",
+    },
+    {
+      on: "caught",
+      case: null,
+      when: null,
+      condition: null,
+      kind: "end",
+      to: null,
+    },
   ]);
 });
 
@@ -372,4 +395,282 @@ test("a fork's branches are a list of role branches", () => {
     list.role,
   ]);
   expect(lists).toEqual([["/do/race/fork/branches", "branches", "branches"]]);
+});
+
+test.each([
+  [
+    "an HTTP call",
+    "fetch: { call: http, with: { method: get, endpoint: https://api.test } }",
+    "http",
+  ],
+  [
+    "a JavaScript script",
+    "code: { run: { script: { language: js, code: x } } }",
+    "script-js",
+  ],
+  [
+    "a Python script",
+    "code: { run: { script: { language: python, code: x } } }",
+    "script-python",
+  ],
+  ["a shell command", "list: { run: { shell: { command: ls } } }", "shell"],
+  ["a wait", "pause: { wait: PT1S }", "wait"],
+  ["a call of a function", "hello: { call: greet }", null],
+])("%s carries its catalog variant", (_, step, variant) => {
+  const functions =
+    "use:\n  functions:\n    greet:\n      set:\n        a: 1\n";
+  const text = `${inlineHeader}${functions}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.variant).toBe(variant);
+});
+
+const tried =
+  "[ { fetch: { call: http, with: { method: get, endpoint: https://api.test } } } ]";
+
+const growingRetry =
+  "{ delay: { seconds: 2 }, backoff: { exponential: {} }, limit: { attempt: { count: 3 } } }";
+
+test.each([
+  [
+    "a retry with nothing after it retries, then stops",
+    `guard: { try: ${tried}, catch: { retry: ${growingRetry} } }`,
+    {
+      errors: null,
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "exponential",
+        when: null,
+        exceptWhen: null,
+        on: { kind: "any" },
+      },
+      afterward: "stop",
+    },
+  ],
+  [
+    "a retry on one status with steps after it runs them when the retries are spent",
+    `guard: { try: ${tried}, catch: { errors: { with: { status: 503 } }, retry: ${growingRetry}, do: [ { note: { set: { failed: true } } } ] } }`,
+    {
+      errors: {
+        type: null,
+        status: 503,
+        instance: null,
+        title: null,
+        detail: null,
+      },
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "exponential",
+        when: null,
+        exceptWhen: null,
+        on: { kind: "any" },
+      },
+      afterward: "handle",
+    },
+  ],
+  [
+    "a catch of one error type with no retry goes on",
+    `guard: { try: ${tried}, catch: { errors: { with: { type: https://open-workflow-specification.org/spec/1.0.0/errors/communication } } } }`,
+    {
+      errors: {
+        type: "https://open-workflow-specification.org/spec/1.0.0/errors/communication",
+        status: null,
+        instance: null,
+        title: null,
+        detail: null,
+      },
+      when: null,
+      exceptWhen: null,
+      retry: null,
+      afterward: "continue",
+    },
+  ],
+  [
+    "a catch with steps and no retry runs them at once",
+    `guard: { try: ${tried}, catch: { when: '\${ .status > 499 }', do: [ { note: { set: { failed: true } } } ] } }`,
+    {
+      errors: null,
+      when: ".status > 499",
+      exceptWhen: null,
+      retry: null,
+      afterward: "handle",
+    },
+  ],
+  [
+    "a retry with a then and no steps goes on once the retries are spent",
+    `guard: { try: ${tried}, catch: { retry: ${growingRetry}, then: end } }`,
+    {
+      errors: null,
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: 3,
+        milliseconds: 2000,
+        backoff: "exponential",
+        when: null,
+        exceptWhen: null,
+        on: { kind: "any" },
+      },
+      afterward: "continue",
+    },
+  ],
+  [
+    "a retry with no delay retries at once, and without a count retries with no count",
+    `guard: { try: ${tried}, catch: { retry: { backoff: { constant: {} }, limit: { duration: { minutes: 5 } } } } }`,
+    {
+      errors: null,
+      when: null,
+      exceptWhen: null,
+      retry: {
+        retries: null,
+        milliseconds: 0,
+        backoff: "constant",
+        when: null,
+        exceptWhen: null,
+        on: { kind: "any" },
+      },
+      afterward: "stop",
+    },
+  ],
+])("a try's catch is data: %s", (_, step, policy) => {
+  const text = `${inlineHeader}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch).toEqual(policy);
+});
+
+test("a retry named among the workflow's components is read from there", () => {
+  const retries = `use:\n  retries:\n    patient: ${growingRetry}\n`;
+  const text = `${inlineHeader}${retries}do:\n  - guard: { try: ${tried}, catch: { retry: patient } }\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch?.retry).toEqual({
+    retries: 3,
+    milliseconds: 2000,
+    backoff: "exponential",
+    when: null,
+    exceptWhen: null,
+    on: { kind: "any" },
+  });
+});
+
+test("a step that is not a try has no catch", () => {
+  const text = `${inlineHeader}do:\n  - pause: { wait: PT1S }\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch).toBeNull();
+});
+
+const routes = `route: { switch: [ { paid: { when: '\${ .status == "paid" }', then: continue } }, { odd: { when: '\${ .name | test("x") }', then: continue } }, { fresh: { when: "", then: continue } }, { default: { then: end } } ] }`;
+
+test("each case of a switch carries its condition as rows, or its text where the builder cannot show it", () => {
+  const text = `${inlineHeader}do:\n  - ${routes}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  const conditions = first?.flow.map((way) => [way.case, way.condition]);
+  expect(conditions).toEqual([
+    [
+      "paid",
+      {
+        kind: "condition",
+        condition: {
+          join: "all",
+          rows: [
+            {
+              left: ".status",
+              comparison: "is",
+              right: { kind: "value", value: "paid" },
+            },
+          ],
+        },
+      },
+    ],
+    ["odd", { kind: "expression", text: '${ .name | test("x") }' }],
+    ["fresh", { kind: "condition", condition: { join: "all", rows: [] } }],
+    ["default", null],
+    [null, null],
+  ]);
+});
+
+const timeoutType =
+  "https://open-workflow-specification.org/spec/1.0.0/errors/timeout";
+
+test.each([
+  ["no condition retries any error", "retry: {}", { kind: "any" }],
+  [
+    "a status retries that status",
+    "retry: { when: '${ $error.status == 503 }' }",
+    { kind: "statuses", statuses: [503] },
+  ],
+  [
+    "statuses joined by or retry those statuses",
+    "retry: { when: '${ ($error.status == 503) or ($error.status == 429) }' }",
+    { kind: "statuses", statuses: [503, 429] },
+  ],
+  [
+    "the timeout type retries the time-outs",
+    `retry: { when: '\${ $error.type == "${timeoutType}" }' }`,
+    { kind: "timeouts" },
+  ],
+  [
+    "a status the catch names otherwise is read under its name",
+    "as: failure, retry: { when: '${ $failure.status == 503 }' }",
+    { kind: "statuses", statuses: [503] },
+  ],
+  [
+    "statuses joined by and are written conditions",
+    "retry: { when: '${ ($error.status == 503) and ($error.status == 429) }' }",
+    { kind: "written" },
+  ],
+  [
+    "another condition is written",
+    "retry: { when: '${ .attempt < 2 }' }",
+    { kind: "written" },
+  ],
+  [
+    "an exception is written",
+    "retry: { exceptWhen: '${ $error.status == 404 }' }",
+    { kind: "written" },
+  ],
+])("which errors a retry retries: %s", (_, caught, on) => {
+  const step = `guard: { try: ${tried}, catch: { ${caught} } }`;
+  const text = `${inlineHeader}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch?.retry?.on).toEqual(on);
+});
+
+test("an ISO delay is read as its milliseconds", () => {
+  const step = `guard: { try: ${tried}, catch: { retry: { delay: PT2S } } }`;
+  const text = `${inlineHeader}do:\n  - ${step}\n`;
+  const snapshot = snapshotOf(text);
+
+  const reading = check(snapshot);
+
+  const [first] = reading.workflow.steps.steps;
+  expect(first?.catch?.retry?.milliseconds).toBe(2000);
 });

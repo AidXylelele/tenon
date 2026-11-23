@@ -65,7 +65,7 @@ export function stepMillisecondsOf(task: ast.Task): number | null {
   return millisecondsOf(task.wait);
 }
 
-function millisecondsOf(duration: ast.Duration): number | null {
+export function millisecondsOf(duration: ast.Duration): number | null {
   switch (duration.kind) {
     case "fixed":
       return duration.milliseconds;

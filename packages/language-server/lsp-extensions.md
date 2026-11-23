@@ -300,6 +300,7 @@ interface Step {
   pointer: string;
   name: string;
   kind: TaskKind;
+  variant: StepVariant | null; // its catalog entry (workflow/stepVariants); null for a call of a function
   family: "flow" | "call" | "data" | "event" | "time" | "error";
   summary: string | null; // one line from what the step writes; empty parts left out
   milliseconds: number | null; // a wait's duration, where fixed
@@ -308,12 +309,35 @@ interface Step {
   selectionRange: Range | null; // its name
   lists: NestedList[];
   flow: Transition[];
+  catch: CatchPolicy | null; // a try's; null for every other step
+}
+
+interface CatchPolicy {
+  errors: {
+    type: string | null;
+    status: number | null;
+    instance: string | null;
+    title: string | null;
+    detail: string | null;
+  } | null; // null: any error
+  when: string | null; // the catch's condition, its source
+  exceptWhen: string | null;
+  retry: {
+    retries: number | null; // limit.attempt.count: the language counts retries; null: no count is written, so it retries until its duration limit, if any
+    milliseconds: number | null; // the delay: 0 where none is written; null where it is not fixed (calendar, expression, mistake)
+    backoff: "constant" | "linear" | "exponential";
+    when: string | null;
+    exceptWhen: string | null;
+    on: RetriedErrors | { kind: "written" }; // which errors it retries; written: another condition (workflow/edit's RetriedErrors)
+  } | null;
+  afterward: "stop" | "continue" | "handle"; // once the retries are spent, or at once with no retry
 }
 
 interface Transition {
   on: "done" | "case" | "caught";
   case: string | null;
   when: string | null; // the case's condition, its source
+  condition: ConditionReading | null; // a case's condition as workflow/readCondition reads it; null for a default case and every other way
   kind: "next" | "jump" | "exit" | "end";
   to: string | null; // the step id it reaches; null where it leaves the list
 }
@@ -322,6 +346,8 @@ interface Transition {
 - **Ids.** A step's id is its pointer with each list index removed (`/do/1/guard/try/0/fetch` becomes `/do/guard/try/fetch`); a list's id is its step's id and the list's pointer below the step. A repeated name's second and later occurrences in one list, and everything below them, take `#` and their full pointer (`#/do/1/greet`). A reorder keeps every id; a rename and a move to another list change the ids of the subtree, which `workflow/edit` reports.
 - **Broken text.** When the version does not analyse, the steps are those of the last version that did, `stale` is `true`, and each range is placed again by pointer in the current text, or `null` where it no longer stands or the text does not read.
 - **Summaries.** A summary joins what the step writes and leaves out what is still empty: an HTTP call with no address yet is `GET`, a container with no image `container`, a loop with no list yet its item's name, and a call that writes none of its parts has no summary.
+- **Conditions.** A case's `condition` is its `when` read as `workflow/readCondition` reads the field's text: rows and a join where the text is in the builder's one form (an empty `when` has no row yet), else `expression` with the text, so the client words the condition or shows it as written.
+- **A try's catch.** `catch` gives the policy the interpreter runs: which errors it catches (`errors`, `when`, `exceptWhen`), the retry, its own or a named one of `use.retries`, and `afterward`, what follows once the retries are spent or at once with no retry: `stop` where a retry has neither `catch.do` nor `catch.then` (the error is raised again), `handle` where `catch.do` runs, else `continue`; a `catch.then` is the step's `caught` transition. So "Retry on 503: 3 times, 2 s apart, growing; then stop" is `{ errors: { status: 503, … }, retry: { retries: 3, milliseconds: 2000, backoff: "exponential", on: { kind: "any" } }, afterward: "stop" }`.
 - **Durations.** A trigger's and a wait's `summary` is the duration as written; `milliseconds` is the same duration as a number, whichever form it is written in (`PT1H` and `{ hours: 1 }` both give 3600000), so a client words a number and reads no grammar. It is `null` where the duration is not fixed: a calendar one (`P1M`), an expression, or a mistake.
 - **Published versions.** The API reads the same `WorkflowStructure` from `language-server/structure` for a version it holds, every range `null`.
 - **Errors:** `ContentModified` (-32801), `RequestFailed` (-32803) when the document is not open, `InvalidParams` (-32602).
@@ -366,6 +392,7 @@ do:
           "pointer": "/do/0/pause",
           "name": "pause",
           "kind": "wait",
+          "variant": "wait",
           "family": "time",
           "summary": "PT1S",
           "milliseconds": 1000,
@@ -396,16 +423,19 @@ do:
               "on": "done",
               "case": null,
               "when": null,
+              "condition": null,
               "kind": "jump",
               "to": "/do/greet"
             }
-          ]
+          ],
+          "catch": null
         },
         {
           "id": "/do/greet",
           "pointer": "/do/1/greet",
           "name": "greet",
           "kind": "set",
+          "variant": "set",
           "family": "data",
           "summary": "message",
           "milliseconds": null,
@@ -436,10 +466,12 @@ do:
               "on": "done",
               "case": null,
               "when": null,
+              "condition": null,
               "kind": "next",
               "to": null
             }
-          ]
+          ],
+          "catch": null
         }
       ]
     }
@@ -463,6 +495,7 @@ interface StepFormResult {
   version: number;
   step: string;
   failure: "stop" | "continue" | "retry" | "handle"; // "If it fails", in force
+  retry: RetryPlan | null; // the protecting try's retry (workflow/structure's catch.retry)
   result: {
     value: StepResult; // what the step passes on, as written
     choices: ChosenResult[];
@@ -508,7 +541,7 @@ interface FormField {
 - **Essential fields.** A field with an `essentialRank` is shown first, in rank order, with its own `fields`; every other field is behind "More options", where a field that holds essential ones shows only the rest. They are at most five per step, by its variant (`workflow/stepVariants`): an HTTP call's `with.method`, `with.endpoint`, and `with.body` where the method sends one (`post`, `put`, `patch`); an OpenAPI call's description address, operation and parameters; a gRPC call's proto address, service name and host, method and arguments; an AsyncAPI call's document address, operation and message; an MCP call's server address and parameters; an A2A call's server and parameters; a call of a function, its `with`; a script's language, code and arguments; a shell's command; a container's image and command; another workflow's namespace, name, version and input; an emit's event type and data; a for's list and item name; a fork's branches and `compete`; a listen's `to`; a raise's error title, type and status; a set's values; a switch's cases; a try's `catch.retry` and `catch.do`; a wait's duration; a `do`, none. In the workflow form they are `/document/title` and `/schedule`. Below the second level a group is one `structured` field, unless it holds an essential field: then it is a `group` opened down to it (a script's `run.script` holds `language` and `code`).
 - **The step's result.** A script offers what it passes on: `printedJson`, the JSON it prints (its `output.as` is `${ fromjson }`, the run returns what it prints); `printedText`, the text it prints (no `output.as`); `exitCode` (`run.return: code`, no `output.as`). A set offers `inputAndValues`, the data that came in with its values beside it (`output.as: ${ $input + . }`, research D13; jq adds an object only to an object or `null`, so the step fails at run time on any other input, and `workflow/dataAt` warns where its input is not known to be an object), or `valuesOnly`, its values alone, as the language passes them on (dsl.md, "Data Flow", step 5). Anything else written is `written`, and the client shows the fields as they stand. It is changed with `workflow/edit`'s `setResult`.
 - **Titles and descriptions.** `title` labels the field for people: the server's own words for the members an author meets most (`if` is "Run only if", `then` "Then go to", `timeout` "Time limit", `call` "Kind of call", `with` "Arguments"), else the key in words (`exceptWhen` is "Except when"). `description` describes the field itself, from the grammar; the grammar describes a call on its task, so the `call` field carries the task's ("Defines the HTTP call to perform.").
-- **If it fails.** `failure` is the choice in force for the step: `stop` for a step no try protects; for a protecting try (a try whose `try` list holds one step), `handle` where its `catch` writes `do`, `retry` where it writes `retry`, else `continue`. The web shows it and changes it with `workflow/edit`'s `setFailure`; the retry's own values are the `catch` group's fields.
+- **If it fails.** `failure` is the choice in force for the step: `stop` for a step no try protects; for a protecting try (a try whose `try` list holds one step), what its catch's `afterward` says (`workflow/structure`): `retry` where it is `stop` (a retry with neither `do` nor `then`), else `continue` or `handle`, so a retry with a `then` and no `do` is `continue`. The web shows it and changes it with `workflow/edit`'s `setFailure`. `retry` is that try's retry as data, read as `workflow/structure` reads it, whatever form its delay is written in (`PT2S` and `{ seconds: 2 }` both give 2000); `null` where no try protects the step or its catch writes no retry. Its `on` says which errors it retries in the form `setFailure` writes (`any`, `statuses`, `timeouts`), or `written` for any other `when` or an `exceptWhen`, which the web shows as the text holds it.
 - **Input.** `choice` where the grammar admits only the values it lists (its `closed` places, such as an HTTP call's `with.output`), with those values as `choices`; else `boolean` or `number` where that is the only type; `text` where a string is admitted and the written value is one or nothing is written, with the grammar's values as suggestions in `choices` (a `then` suggests the flow directives and the names of the step's list); `duration` for the standard's duration, an ISO 8601 text or an object of units, with its `fields` the units `days`, `hours`, `minutes`, `seconds` and `milliseconds`, each a `number` whose `value` is the amount the text gives, whichever form it is written in (`PT1H30M` gives `hours` 1 and `minutes` 30), and `null` where it gives none or what is written is not a duration the units hold (an expression, or a mistake, which the field's diagnostics name); `group` for an object with named members; `oneOf` for an object whose members are alternatives, its `fields` being those alternatives (the workflow form's schedule where the host runs one trigger, below); `structured` otherwise, for the text editor.
 - **Duration edits.** A duration is set whole, as an object of units, by `setField` at its pointer, e.g. `{ "minutes": 15 }`, whatever form it was written in.
 - **Broken text.** A form stands while the text is wrong, so a mistake is a diagnostic at its field, never a refused form: a value the grammar does not admit is a diagnostic of a version that still analyses; where the grammar refuses the text's structure, the fields are read from the text as it stands and a step is found by the steps of the last version that analysed, where the text still holds it. `setField` and `clearField` act on such a text; the step actions and `setFailure` need a version that analyses.
@@ -528,6 +561,7 @@ interface FormField {
   "version": 1,
   "step": "/do/pause",
   "failure": "stop",
+  "retry": null,
   "result": null,
   "fields": [
     {
@@ -710,6 +744,8 @@ interface DataAtParams {
   textDocument: VersionedTextDocumentIdentifier;
   step: string; // a step id of workflow/structure
   field: string; // the pointer of the field the data goes into, under the step
+  samples?: { [step: string]: JsonValue }; // the last test run's outputs, by step id
+  typed?: string; // a field name the person typed, e.g. "items.title"
 }
 
 interface DataAtResult {
@@ -726,14 +762,17 @@ interface DataEntry extends DataMember {
   source: "step" | "workflowInput" | "variable" | "secret" | "time";
   step: string | null; // the step id of a step's output
   needsExport: boolean; // using it writes the step's export (useData)
+  typed: DataMember | null; // the typed field of a step's output
 }
 
 interface DataMember {
   name: string;
   expression: string; // jq, e.g. "$context.fetch.items"
   value: string; // the field holding only it, e.g. "${ $context.fetch.items }"
+  isPath: boolean; // the expression is a path; false for the times
   shape: "object" | "list" | "text" | "number" | "boolean" | "unknown";
-  members: DataMember[]; // where the shape is known before the run
+  size: number | null; // a list's length in the sample; null otherwise
+  members: DataMember[]; // where the shape is known before the run, or from a sample
 }
 ```
 
@@ -743,11 +782,14 @@ interface DataMember {
 - **Through the context.** Any other step before reaches only through `$context` (step 7): its entry reads `$context.<name>` and `needsExport` is true until the step writes the export that adds it, `export.as: ${ $context + { "<name>": . } }`. A step that writes another `export.as` is not offered, and neither is any step before a step that does, or before a block holding one (in any of its lists, a listen's or a subscription's `foreach` export included), since that export replaces the context. A block that holds the field's step counts the same way for the steps before it where its list runs again or after other steps of it: a loop (`for`, a `foreach`) whose list replaces the context hides them from the second item on, and so does a try whose tried steps replace it, for the steps that handle its failure. Step names are unique only within a list, so a step whose name another step already exports under is not offered, and `useData` refuses to export it, naming both steps. `$context` starts as the workflow's transformed input (the interpreter's initial context), so the exported keys share its names, and `$context + { … }` fails at run time where that input is not an object or `null`.
 - **Shapes.** An `output.schema` gives a step's output (step 6). Else a `set` gives its values, with its input's members beside them where its `output.as` keeps the input (research D13); a script passes on the text it prints (`text`), its exit code (`number`), or, parsed by `output.as: ${ fromjson }`, JSON whose fields are not known before the run (`unknown`, research D14); everything else is `unknown`. The workflow's input is `$workflow.input`, its raw input (dsl.md, "Workflow Descriptor"), shaped by `input.schema`.
 - **Scope.** The server writes `${ . }` into the field, analyses that copy of the document again and reads what the interpreter resolves there. This second analysis departs from one analysis per version (rubric A3, P19); a request costs 9.5 ms on a document of 62 steps, 27.6 ms on 201 and 45.8 ms on 401 (steps that each merge their input, measured on the reference machine), growing linearly with the steps and most of it that second analysis, and it ends once the interpreter answers the scope at a pointer from the model it already holds, which is asked of it. What the scope gives: the workflow's input needs `$workflow`, the steps through the context `$context`, the secrets `$secrets`, and the variables are the binders in scope (a `for`'s `each` and `at`, a catch's error).
+- **References.** Every reference the client inserts comes from here: `expression` to put into an expression, `value` for a field that holds only it, and `isPath` where a field takes only a path (`.items`, `$context.fetch["a name"]`, `$secrets.token`); the times are computed, so they are no paths. A client builds no reference of its own.
+- **Samples.** `samples` gives what each step put out in the last test run, as plain JSON keyed by step id. A step whose shape gives no members before the run takes its `shape` and `members` from its sample: each field of the sample's objects, at any depth, with its own expression and, for a list, its length as `size` (lists are not looked into). A step whose members are known before the run keeps them, whatever its sample holds.
+- **Typed fields.** `typed`, where it is a field name once the spaces around it are dropped (names of letters, digits, `_` and `-`, not starting with a digit or `-`, joined by `.`), gives each entry that is a path and whose shape is `object` or `unknown` (a step's output, the workflow's input, a variable) the field it names in that data as `typed`: its `name` the trimmed text, its `expression` the path (`items.title` on `$context.fetch` is `$context.fetch.items.title`, `first-name` is `$context.fetch["first-name"]`, `id` on the variable `order` is `$order.id`), its `shape` `unknown`. It is `null` on the other entries (the times, the secrets), where no field name is typed, and where the entry already offers that member. The test run shows whether the output has it.
 - **Secrets** are offered only in fields where credentials go: under `authentication` or `headers`, or an address (`endpoint`, `uri`, `server`) (research D16). Each reads `$secrets.<name>`.
 - **Times** are UTC times jq computes from the run's clock: `now` (`now | todate`), `today` and `yesterday` (the start of the day, `now | strftime("%Y-%m-%dT00:00:00Z")`, a day earlier for `yesterday`).
 - **Warnings.** `inputNotKnownObject` on a set that keeps its input (`output.as: ${ $input + . }`) where that input is not known to be an object: jq adds an object only to an object or `null`. `mayHoldNothing` for a step offered through the context that has an `if`, or sits in a block that has one apart from the field's step: when it is skipped it exports nothing, and inside a loop the previous item's value stays. A step a jump passes over reads `null` too; no warning names it. `contextNotKnownObject` where data is read through the context and the workflow's transformed input is not known to be an object.
 - **Broken text.** A text whose structure the grammar refuses answers from the steps of the last version that analysed.
-- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a field outside the step, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602).
+- **Errors:** `ContentModified` (-32801); `RequestFailed` (-32803) for an unknown step id, a field outside the step, a text that does not read, and a document that has never analysed; `InvalidParams` (-32602), also for `samples` that are not an object and a `typed` that is not text.
 
 **Example**, at the first condition of `route` in a document whose `greet` sets a message and whose `guard` then runs a try:
 
@@ -755,7 +797,9 @@ interface DataMember {
 {
   "textDocument": { "uri": "file:///flow.yaml", "version": 1 },
   "step": "/do/route",
-  "field": "/do/2/route/switch/0/again/when"
+  "field": "/do/2/route/switch/0/again/when",
+  "samples": { "/do/guard": { "status": 200 } },
+  "typed": "body.id"
 }
 ```
 
@@ -769,9 +813,30 @@ interface DataMember {
       "step": "/do/guard",
       "expression": ".",
       "value": "${ . }",
-      "shape": "unknown",
+      "isPath": true,
+      "shape": "object",
+      "size": null,
       "needsExport": false,
-      "members": []
+      "members": [
+        {
+          "name": "status",
+          "expression": ".status",
+          "value": "${ .status }",
+          "isPath": true,
+          "shape": "number",
+          "size": null,
+          "members": []
+        }
+      ],
+      "typed": {
+        "name": "body.id",
+        "expression": ".body.id",
+        "value": "${ .body.id }",
+        "isPath": true,
+        "shape": "unknown",
+        "size": null,
+        "members": []
+      }
     },
     {
       "source": "step",
@@ -779,17 +844,30 @@ interface DataMember {
       "step": "/do/greet",
       "expression": "$context.greet",
       "value": "${ $context.greet }",
+      "isPath": true,
       "shape": "object",
+      "size": null,
       "needsExport": true,
       "members": [
         {
           "name": "message",
           "expression": "$context.greet.message",
           "value": "${ $context.greet.message }",
+          "isPath": true,
           "shape": "text",
+          "size": null,
           "members": []
         }
-      ]
+      ],
+      "typed": {
+        "name": "body.id",
+        "expression": "$context.greet.body.id",
+        "value": "${ $context.greet.body.id }",
+        "isPath": true,
+        "shape": "unknown",
+        "size": null,
+        "members": []
+      }
     },
     {
       "source": "workflowInput",
@@ -797,9 +875,12 @@ interface DataMember {
       "step": null,
       "expression": "$workflow.input",
       "value": "${ $workflow.input }",
+      "isPath": true,
       "shape": "unknown",
+      "size": null,
       "needsExport": false,
-      "members": []
+      "members": [],
+      "typed": null
     },
     {
       "source": "time",
@@ -807,9 +888,12 @@ interface DataMember {
       "step": null,
       "expression": "now | todate",
       "value": "${ now | todate }",
+      "isPath": false,
       "shape": "text",
+      "size": null,
       "needsExport": false,
-      "members": []
+      "members": [],
+      "typed": null
     }
   ],
   "warnings": [{ "kind": "contextNotKnownObject" }]
@@ -828,7 +912,8 @@ interface ReadConditionParams {
 }
 
 type ReadConditionResult =
-  { kind: "condition"; condition: Condition } | { kind: "expression" }; // open the field as jq
+  | { kind: "condition"; condition: Condition }
+  | { kind: "expression"; text: string }; // open the field as jq; the text as given
 
 interface Condition {
   join: "all" | "any";
@@ -950,8 +1035,20 @@ type EditAction =
 type Failure =
   | { kind: "stop" }
   | { kind: "continue" }
-  | { kind: "retry"; retries: number; seconds: number; growing: boolean }
-  | { kind: "handle" };
+  | { kind: "retry"; retry: RetrySetting } // retry, then stop
+  | { kind: "handle"; retry?: RetrySetting }; // run the catch's steps, after the retry where one is given
+
+interface RetrySetting {
+  retries: number | null; // a whole number from 0; null: no count
+  milliseconds: number; // the delay, a whole number from 0; 0 waits not at all
+  backoff: "constant" | "linear" | "exponential";
+  on: RetriedErrors | { kind: "written" }; // written: keep the retry's when and exceptWhen as they stand
+}
+
+type RetriedErrors =
+  | { kind: "any" }
+  | { kind: "statuses"; statuses: number[] } // at least one
+  | { kind: "timeouts" };
 
 interface EditResult {
   edits: TextEdit[];
@@ -962,6 +1059,7 @@ interface EditResult {
 - **Ids** are the structure's. `index` is the step's index in the target list after the action. `ids` lists every id the action changes: `renameStep`, and `moveStep` into another list, give the step and every step and list below it; the others give none.
 - **Names.** A new step without a name takes its kind's name, whatever its variant (`call` for an HTTP or MCP call, `run` for a script or a shell), then `<kind>-2`, `-3`, …; a duplicate takes the next free `<name>-2`.
 - **Starting content.** A new step is its variant's starting content (`workflow/stepVariants`).
+- **A catch's first step.** `insertStep` into `<id>/catch/do`, `<id>` being the try's id, where the try's catch writes no `do`, writes that list with the new step and keeps the rest of the catch, its `retry` included, so the step's `catch.afterward` becomes `handle`. The list has no steps yet, so any index other than 0 is refused.
 - **Fields.** `setField` and `clearField` act at any member of a step or of the document, such as `/schedule/cron`. `setField` also writes the holders the text lacks, as an author would: a member added to a block mapping is written in block style, so `setField` at `/input/schema` on a workflow with no `input` writes `input:`, then `schema:` and the value below it; one added to a flow mapping stays on its line.
 - **Text with line breaks.** A string with a line break, set in a block mapping or sequence, is written as a literal block scalar indented under its key or dash: `|` when it ends in one line break, `|-` when it ends in none, `|+` when it ends in more, the indentation indicator where its first line starts with a space; a comment after the old value moves to the block's header, and a block's header comment stays beside a value that becomes one line. Where a block would take in what follows it (an empty line after a value that ends in several line breaks, or a comment indented under the key) the value is written double-quoted instead; an old block that keeps its final line breaks (`|+`) is replaced with them. A one-line string keeps the style it was written in, a block scalar's included (`code: |-` and the line). In a flow collection a string stays on its line, double-quoted where it holds a line break.
 - **A step on a branch** (`insertStepOnBranch`). The new step goes directly after the switch, in the switch's list, because flow directives name only tasks of their own list (dsl.md, "Task Flow") and the only step that can run into that place is the switch itself. Where the branch led stays where it leads, through the new step:
@@ -990,15 +1088,18 @@ interface EditResult {
 
 - **If it fails** (`setFailure`: `stop`, `continue`, `retry` or `handle`), on a step's id:
   - on a step no try protects, `continue`, `retry` and `handle` wrap the author's step text, re-indented, in a try of the same name, and move the step's `then` to the try; `stop` changes nothing;
-  - on a protecting try (a try whose `try` list holds one step), `continue`, `retry` and `handle` replace its `catch`, and `stop` gives the step its own text back in the try's place, with the try's `then`;
-  - the `catch` written: `continue` `{}`; `retry` `{ retry: { delay: { seconds }, backoff: { constant: {} } or { exponential: {} } when growing, limit: { attempt: { count: retries } } } }`, the language counting retries in `count`; `handle` `{ do: [] }`, an empty list the web fills with `insertStep` into `<id>/catch/do`; a `handle` on a try whose catch already writes `do` changes nothing;
+  - on a protecting try (a try whose `try` list holds one step), `stop` gives the step its own text back in the try's place, with the try's `then`; `continue` replaces the `catch`;
+  - a `retry` or a `handle` with a retry, on a try whose catch already writes a retry, keeps the catch and changes only the retry's `delay`, `backoff`, `limit.attempt.count` and, unless `on` is `written`, its `when` (removing its `exceptWhen`), each as `setField` and `clearField` would and only where it differs; its `jitter`, `limit.duration` and the rest stay. A retry named from `use.retries` is changed where it is defined, for every catch that names it, and the catch keeps naming it. Then `retry` removes the catch's `do` and `then`, so the error is raised again, and `handle` writes `do: []` where the catch has none;
+  - a `handle` on a try whose catch writes `do` and no retry keeps the catch and its steps and only writes its `retry`, or removes it where the `handle` gives none; any other `retry` or `handle` replaces the `catch`;
+  - the `catch` written: `continue` `{}`; `retry` `{ retry: <policy> }`; `handle` `{ do: [] }`, or `{ retry: <policy>, do: [] }` with a retry, an empty list the web fills with `insertStep` into `<id>/catch/do`; each with the catch's `as` first where it names the error otherwise than `error`;
+  - the policy written from a `RetrySetting`: `when` for the errors it retries, `delay` (`{ seconds }` for whole seconds, else `{ milliseconds }`, none for 0), `backoff` (`{ constant: {} }`, `{ linear: {} }` or `{ exponential: {} }`) and `limit: { attempt: { count: retries } }`, the language counting retries in `count` (no `limit` for a `null` count, and for `written` no `when`). `when` is a condition in the one form of `workflow/readCondition` on the caught error, named by the catch's `as` (`$error` where none is written): `statuses` is `${ $error.status == 503 }`, several joined by `or`; `timeouts` is `${ $error.type == "https://open-workflow-specification.org/spec/1.0.0/errors/timeout" }`; `any` writes no `when`. The retry's own `when` is used, not the catch's `errors` filter, so an error the retry does not take is still caught and goes on to what follows, the catch's steps or a stop;
   - `ids`: wrapping moves the step and everything below it under `<id>/try` (`/do/greet` to `/do/greet/try/greet`); unwrapping moves them back; the try keeps the step's former id.
 - **The step's result** (`setResult`) writes the members of the chosen result and removes the others: `output.as`, and the `output` that holds nothing else; a script's `run.return`, set to the mode the result needs (`stdout` or `code`) where the step returns another. A result the step does not offer is refused.
 - **Conditions** (`setCondition`) write the condition at the field in its one form (`workflow/readCondition`), as `setField` would its text.
 - **Data** (`useData`) sets the field to the value and, with `export`, writes that step's `export.as: ${ $context + { "<name>": . } }`, the export a `$context.<name>` entry of `workflow/dataAt` reads; a step that already writes it is left as it is, and a step that writes another export is refused.
 - **Errors:**
   - `ContentModified` (-32801), when the version is not the store's;
-  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a condition with no row or with a path that is not one, a wrap of no step, of steps not next to each other in one list, of several fork branches or whose directives cannot keep their meaning, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
+  - `RequestFailed` (-32803), with its reason, for a step action or `setFailure` on a version that does not analyse, a field action on a text that does not read, an unknown step or list id, an index outside the list, a step on a branch of a step that is not a switch, of a branch the switch does not have, or of a switch that is a fork's branch, a condition with no row or with a path that is not one, a retry on no status, a wrap of no step, of steps not next to each other in one list, of several fork branches or whose directives cannot keep their meaning, a result the step does not offer, data whose export names a step that writes its own export, a move into the step's own lists, an empty name, a flow directive as a name, a name a sibling has, a field below a value that holds no object, and a field to clear that is not written;
   - `InvalidParams` (-32602), when the params are of another shape.
 
 **Example:**

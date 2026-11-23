@@ -48,6 +48,42 @@ test("a field outside the step fails with its reason", async () => {
   });
 });
 
+test("the last test run's samples and a typed field name come back as members with their expressions", async () => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = {
+    ...atRoute,
+    samples: { "/do/guard": { status: 200 } },
+    typed: "body.id",
+  };
+
+  const answered = await session.client.sendRequest(dataAtRequest, params);
+  const steps = answered.entries.filter((entry) => entry.source === "step");
+  const fields = steps.map((entry) => [
+    entry.name,
+    entry.members.map((member) => member.expression),
+    entry.typed?.expression ?? null,
+  ]);
+
+  expect(fields).toEqual([
+    ["guard", [".status"], ".body.id"],
+    ["greet", ["$context.greet.message"], "$context.greet.body.id"],
+  ]);
+});
+
+test.each([
+  ["samples that are not an object", { samples: [1] }],
+  ["a typed name that is not text", { typed: 1 }],
+])("params with %s are invalid", async (_, wrong) => {
+  useFakeClock();
+  const session = await sessionWith(guardedFlow);
+  const params = { ...atRoute, ...wrong };
+
+  const refused = session.client.sendRequest(dataAtRequest.method, params);
+
+  await expect(refused).rejects.toMatchObject({ code: -32602 });
+});
+
 test("params with no field are invalid", async () => {
   useFakeClock();
   const session = await sessionWith(guardedFlow);
