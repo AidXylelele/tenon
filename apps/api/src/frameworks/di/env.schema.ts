@@ -111,6 +111,10 @@ export const outboundEnvSchema = z.object({
   OUTBOUND_ALLOW_LIST: allowedPrivateAddresses,
 });
 
+export const interpreterEnvSchema = z.object({
+  LEGACY_EVENT_TYPES: z.stringbool().default(false),
+});
+
 export const sandboxEnvSchema = z.preprocess(
   (input, context) => withSecretFiles(input, context, ["SANDBOX_TOKEN"]),
   z.object({

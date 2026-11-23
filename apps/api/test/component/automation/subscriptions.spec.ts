@@ -179,7 +179,7 @@ describe("delivering events to other applications", () => {
   it("the_standards_lifecycle_events_are_delivered_too", async () => {
     const received = receiver(200, 200, 200);
     await subscribe({
-      with: { type: "io.serverlessworkflow.workflow.completed.v1" },
+      with: { type: "org.open-workflow-specification.workflow.completed.v1" },
     });
     await publish(t, editor, aDocument());
 
@@ -189,7 +189,7 @@ describe("delivering events to other applications", () => {
     await drain(t);
 
     expect(received.map((item) => item.event.type)).toEqual([
-      "io.serverlessworkflow.workflow.completed.v1",
+      "org.open-workflow-specification.workflow.completed.v1",
     ]);
   });
 

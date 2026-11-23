@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { HttpClientModule } from "@nestjs/http-client";
+import { ResilienceService } from "@nestjs/resilience";
 import { EventStore } from "../../application/automation/events/ports.js";
 import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import {
@@ -74,13 +75,14 @@ import { HttpClientName } from "../network/enums.js";
 import { OutboundHttpConnection } from "../network/outbound.http-connection.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
 import { OpenIdAuthorizationServer } from "../oauth/openid.authorization-server.js";
-import { linksConfig, secretsConfig } from "./configs.js";
+import { interpreterConfig, linksConfig, secretsConfig } from "./configs.js";
 import { OutboundModule } from "./outbound.module.js";
 
 @Module({
   imports: [
     ConfigModule.forFeature(secretsConfig),
     ConfigModule.forFeature(linksConfig),
+    ConfigModule.forFeature(interpreterConfig),
     OutboundModule,
     HttpClientModule.registerAsync({
       name: HttpClientName.Outbound,
@@ -142,7 +144,17 @@ import { OutboundModule } from "./outbound.module.js";
       useFactory: (secrets: ConfigType<typeof secretsConfig>) =>
         new AesGcmCipher(secrets.SECRETS_KEY),
     },
-    PiscinaInterpreterClient,
+    {
+      provide: PiscinaInterpreterClient,
+      inject: [ResilienceService, interpreterConfig.KEY],
+      useFactory: (
+        resilience: ResilienceService,
+        interpreter: ConfigType<typeof interpreterConfig>,
+      ) =>
+        new PiscinaInterpreterClient(resilience, {
+          legacyEventTypes: interpreter.LEGACY_EVENT_TYPES,
+        }),
+    },
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
     { provide: AuthorizationServer, useClass: OpenIdAuthorizationServer },
     AccessTokens,

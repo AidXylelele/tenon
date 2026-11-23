@@ -14,9 +14,7 @@ import {
   ApiNotFoundResponse,
   ApiPayloadTooLargeResponse,
   ApiTags,
-  ApiTooManyRequestsResponse,
 } from "@nestjs/swagger";
-import { minutes, Throttle } from "@nestjs/throttler";
 import type { IncomingHttpHeaders } from "node:http";
 import { ReceiveWebhookCall } from "../../../application/automation/webhooks/receive-webhook-call.js";
 import { WebhookToken } from "../../../domain/automation/webhooks/webhook-token.js";
@@ -35,11 +33,9 @@ export class HooksController {
 
   @Post(":token")
   @Public()
-  @Throttle({ default: { limit: 300, ttl: minutes(1) } })
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiAcceptedResponse()
   @ApiNotFoundResponse()
-  @ApiTooManyRequestsResponse()
   @ApiPayloadTooLargeResponse()
   async call(
     @Param({ schema: HookParams }) params: HookParams,

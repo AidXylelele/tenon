@@ -7,6 +7,8 @@ One image runs two processes:
 - **api** (`frameworks/main.ts`): HTTP for the console, webhooks, events and health; OpenAPI at `/api/v1/docs`.
 - **worker** (`frameworks/worker.ts`): no listener; runs the workflows, relays the outbox, keeps the AsyncAPI receivers.
 
+The api scales horizontally; request rate limits belong to the infrastructure gateway in front of it (such as Envoy).
+
 `src/` follows Clean Architecture (R. C. Martin, 2012); a layer imports only the layers inside it:
 
 - `domain/`: aggregates and their rules. `application/`: use cases and their ports.

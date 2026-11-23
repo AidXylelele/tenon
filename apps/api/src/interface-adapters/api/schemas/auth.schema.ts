@@ -5,11 +5,6 @@ const AccountKey = z.string().trim().normalize("NFC").toLowerCase();
 
 export const Email = AccountKey.pipe(z.email()).meta({ format: "email" });
 
-export const AccountTracker = z
-  .object({ email: AccountKey })
-  .transform((body) => body.email)
-  .catch("");
-
 export const NewPassword = z.string().min(12).max(128);
 
 export const SignInBody = z.strictObject({

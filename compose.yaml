@@ -112,6 +112,7 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:?set SESSION_COOKIE_SECURE in .env}
       SECRETS_KEY_FILE: /run/secrets/secrets-key
       OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST?set OUTBOUND_ALLOW_LIST in .env}
+      LEGACY_EVENT_TYPES: ${LEGACY_EVENT_TYPES:-false}
       LOG_LEVEL: ${LOG_LEVEL:?set LOG_LEVEL in .env}
     secrets: [api-database-url, secrets-key]
     extra_hosts: [host.docker.internal:host-gateway]
@@ -160,6 +161,7 @@ services:
       API_BASE_URL: ${API_BASE_URL:?set API_BASE_URL in .env}
       SECRETS_KEY_FILE: /run/secrets/secrets-key
       OUTBOUND_ALLOW_LIST: ${OUTBOUND_ALLOW_LIST?set OUTBOUND_ALLOW_LIST in .env}
+      LEGACY_EVENT_TYPES: ${LEGACY_EVENT_TYPES:-false}
       SANDBOX_URL: http://go-judge:5050
       SANDBOX_TOKEN_FILE: /run/secrets/sandbox-token
       SMTP_HOST: mailpit

@@ -36,7 +36,8 @@ The console answers at `http://localhost:3001`, the API at `http://localhost:530
 `http://localhost:58025` and Grafana at `http://localhost:58888`. The `migrate` service runs as the owner `tenon` and
 creates the first administrator at `ADMIN_EMAIL` with no password (set it through password recovery, in Mailpit); the
 api connects as `tenon_app`, which only reads and writes data. `docker compose down` stops the stand, `--volumes` also
-deletes its data. In production the console goes behind a proxy that appends `X-Forwarded-For`.
+deletes its data. In production the console goes behind a proxy that appends `X-Forwarded-For`. The api
+scales horizontally; request rate limits belong to the infrastructure gateway in front of it (such as Envoy).
 
 ## Observability
 

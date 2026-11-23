@@ -1,3 +1,5 @@
+import type { InterpreterOptions } from "../api/index.js";
+
 const lifecycleEvents = [
   {
     name: "workflow.started",
@@ -124,25 +126,35 @@ export type TaskEventName = Extract<
   { readonly subject: "task" }
 >["name"];
 
-const lifecycleEventNamespaces = [
-  "org.open-workflow-specification",
-  "io.serverlessworkflow",
-] as const;
+const standardNamespace = "org.open-workflow-specification";
 
-function lifecycleEventTypesOf(name: LifecycleEventName): readonly string[] {
-  return lifecycleEventNamespaces.map((namespace) => `${namespace}.${name}.v1`);
-}
+const legacyNamespace = "io.serverlessworkflow";
 
 interface LifecycleEventEntry {
   readonly at: string;
   readonly once: boolean;
   readonly ending: boolean;
-  readonly types: readonly string[];
 }
+
+export type LifecycleEventTypes = Readonly<
+  Record<LifecycleEventName, readonly string[]>
+>;
 
 export const lifecycleEventCatalogue: Readonly<
   Record<LifecycleEventName, LifecycleEventEntry>
 > = catalogueOf(lifecycleEvents);
+
+const standardTypes = typesOf([standardNamespace]);
+
+const standardAndLegacyTypes = typesOf([standardNamespace, legacyNamespace]);
+
+export function lifecycleEventTypesOf(
+  options: InterpreterOptions,
+): LifecycleEventTypes {
+  return options.legacyEventTypes === true
+    ? standardAndLegacyTypes
+    : standardTypes;
+}
 
 function catalogueOf(
   events: typeof lifecycleEvents,
@@ -160,15 +172,35 @@ function catalogueOf(
 function entryOf(
   event: (typeof lifecycleEvents)[number],
 ): readonly [LifecycleEventName, LifecycleEventEntry] {
-  const named = lifecycleEventTypesOf(event.name);
-  const types = Object.freeze(named);
   const built: LifecycleEventEntry = {
     at: event.at,
     once: event.once,
     ending: event.ending,
-    types,
   };
   const entry = Object.freeze(built);
 
   return [event.name, entry];
+}
+
+function typesOf(namespaces: readonly string[]): LifecycleEventTypes {
+  const entries = lifecycleEvents.map((event) =>
+    typedEntryOf(event.name, namespaces),
+  );
+
+  const typed = Object.fromEntries(entries) as Record<
+    LifecycleEventName,
+    readonly string[]
+  >;
+
+  return Object.freeze(typed);
+}
+
+function typedEntryOf(
+  name: LifecycleEventName,
+  namespaces: readonly string[],
+): readonly [LifecycleEventName, readonly string[]] {
+  const named = namespaces.map((namespace) => `${namespace}.${name}.v1`);
+  const types = Object.freeze(named);
+
+  return [name, types];
 }

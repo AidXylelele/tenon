@@ -12,6 +12,7 @@ import type {
   InputProblem,
   JsonObject,
   JsonValue,
+  LifecycleEventTypes,
   Manifest,
   ProcessRequest,
   Resource,
@@ -237,6 +238,7 @@ export abstract class InterpreterClient {
   abstract profile(secrets: readonly string[]): Required<HostProfile>;
   abstract runtime(): RuntimeDescriptor;
   abstract ending(end: HostEnd): Ending;
+  abstract lifecycleEventTypes(): LifecycleEventTypes;
 }
 
 export abstract class StructureClient {

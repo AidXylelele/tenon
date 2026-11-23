@@ -11,6 +11,7 @@ import type {
   Transform,
 } from "../core/index.js";
 import type { ExpressionLanguage, SchemaCompiler } from "../runtime/index.js";
+import type { LifecycleEventTypes } from "../standard/index.js";
 import type { Acceptances } from "./frames/index.js";
 import type { FiberId, RunRecord, Store } from "./registers/index.js";
 import type { TermTable } from "./state/index.js";
@@ -19,6 +20,7 @@ import type { Owner } from "./time/index.js";
 export interface MachineServices {
   readonly expressions: ExpressionLanguage;
   readonly schemas: SchemaCompiler;
+  readonly eventTypes: LifecycleEventTypes;
 }
 
 export type HeldTemplate = EffectTemplate | SubscriptionSource;
