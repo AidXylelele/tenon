@@ -1,27 +1,20 @@
-import { DownloadIcon, PencilIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import {
   versionDocument,
-  versions,
   versionSource,
+  versionStructure,
+  versions as versionsOf,
+  workflow as workflowOf,
 } from "@/libs/data-access/automation";
 import { available, UNAVAILABLE } from "@/libs/data-access/http";
 import { currentSession } from "@/libs/data-access/identity";
-import { Link } from "@/libs/routing/link";
-import {
-  editorHref,
-  workflowHref,
-  WORKFLOWS_HREF,
-} from "@/libs/routing/routes";
-import { segment } from "@/libs/routing/segment";
-import { Badge } from "@/libs/ui/components/badge";
-import { Button } from "@/libs/ui/components/button";
-import { CopyButton } from "@/libs/ui/composites/copy-button";
-import { PageHeader } from "@/libs/ui/composites/page-header";
-import { Time } from "@/libs/ui/composites/time";
-import { SourceView } from "@/features/code-editor";
+import { versionHref } from "@/libs/routing/routes";
+import { type Query, segment } from "@/libs/routing/segment";
 import { Unavailable } from "@/libs/ui/composites/unavailable";
+import { VersionQuery } from "./query";
+import type { SourceFile } from "./version-menu";
+import { VersionPage } from "./version-page";
 
 interface VersionParams {
   readonly namespace: string;
@@ -37,80 +30,70 @@ export function versionMetadata(params: VersionParams): Metadata {
 
 export async function VersionDocument({
   params,
+  query,
 }: {
   readonly params: VersionParams;
+  readonly query: Query;
 }) {
   const namespace = segment(params.namespace);
   const name = segment(params.name);
   const version = segment(params.version);
+  const view = VersionQuery.parse(query).view;
   const read = await available(
     Promise.all([
       currentSession(),
+      workflowOf(namespace, name),
+      versionsOf(namespace, name),
       versionSource(namespace, name, version),
-      versions(namespace, name),
+      versionStructure(namespace, name, version),
     ]),
   );
 
   if (read === UNAVAILABLE) return <Unavailable />;
 
-  const [session, source, published] = read;
+  const [session, workflow, published, source, structure] = read;
   const reading =
     source === null ? versionDocument(namespace, name, version) : null;
   const document = await available(Promise.resolve(reading));
 
   if (document === UNAVAILABLE) return <Unavailable />;
 
-  if (source === null && document === null) notFound();
+  if (workflow === null || (source === null && document === null)) notFound();
 
-  const text = source ?? `${JSON.stringify(document, null, 2)}\n`;
-  const format = source === null ? "json" : "yaml";
-  const download = `data:application/${format};charset=utf-8,${encodeURIComponent(text)}`;
-  const facts = published.find((each) => each.version === version);
-  const title = `Version ${version}`;
-  const file = `${name}-${version}.${format}`;
+  const file = sourceFileOf(name, version, source, document);
+  const page = versionHref(namespace, name, version);
+  const hrefs = { flow: page, code: `${page}?view=code` };
+  const newestFirst = published.slice().reverse();
+  const author = session?.capabilities.author === true;
+  const operator = session?.capabilities.operator === true;
 
   return (
-    <>
-      <PageHeader
-        crumbs={[
-          { label: "Workflows", href: WORKFLOWS_HREF },
-          { label: namespace },
-          { label: name, href: workflowHref(namespace, name) },
-          { label: title },
-        ]}
-        title={title}
-        description={
-          facts === undefined ? undefined : (
-            <span className="flex flex-wrap items-center gap-2">
-              <span>
-                Published <Time value={facts.publishedAt} /> by{" "}
-                {facts.publishedBy.name}
-              </span>
-              {facts.current && <Badge variant="secondary">Current</Badge>}
-            </span>
-          )
-        }
-        actions={
-          <>
-            <CopyButton value={text} label="Copy" size="sm" />
-            <Button variant="outline" asChild>
-              <a href={download} download={file}>
-                <DownloadIcon data-icon="inline-start" />
-                Download
-              </a>
-            </Button>
-            {session?.capabilities.author === true && (
-              <Button asChild>
-                <Link href={editorHref(namespace, name)}>
-                  <PencilIcon data-icon="inline-start" />
-                  Edit
-                </Link>
-              </Button>
-            )}
-          </>
-        }
-      />
-      <SourceView text={text} label={title} />
-    </>
+    <VersionPage
+      workflow={workflow}
+      version={version}
+      versions={newestFirst}
+      structure={structure}
+      file={file}
+      view={view}
+      hrefs={hrefs}
+      author={author}
+      operator={operator}
+    />
   );
+}
+
+function sourceFileOf(
+  name: string,
+  version: string,
+  source: string | null,
+  document: unknown,
+): SourceFile {
+  const json = source === null;
+  const text = source ?? `${JSON.stringify(document, null, 2)}\n`;
+  const kind = json ? "JSON" : "YAML";
+  const extension = json ? "json" : "yaml";
+  const encoded = encodeURIComponent(text);
+  const href = `data:application/${extension};charset=utf-8,${encoded}`;
+  const file = `${name}-${version}.${extension}`;
+  return { text, kind, href, name: file };
 }
