@@ -1,3 +1,4 @@
+import type { RetrySetting } from "language-server/protocol";
 import { describe, expect, it } from "vitest";
 import {
   CONTINUING,
@@ -6,6 +7,7 @@ import {
   REPORT_FORM,
   REPORT_INNER_STEP,
   REPORT_STEP,
+  RETRY_PLAN,
   RETRYING,
   RETRYING_THEN_HANDLING,
   RETRY_POLICY,
@@ -20,18 +22,29 @@ import {
   FIRST_RETRY,
   retryChangeOf,
   retryCommitOf,
+  retryWhenCommitOf,
 } from "./failure";
 
 const INNER = REPORT_INNER_STEP;
 const AT_TRY = { step: REPORT_STEP.id, pointer: REPORT_STEP.pointer };
 const AT_STEP = { step: WAIT_STEP.id, pointer: WAIT_STEP.pointer };
-const SLOWER = { retries: 5, seconds: 10, growing: false };
+const SLOWER: RetrySetting = {
+  retries: 5,
+  milliseconds: 10_000,
+  backoff: "constant",
+  on: { kind: "any" },
+};
 
 describe("reading what happens when a step fails", () => {
   it("a_step_no_try_protects_stops_the_run_and_is_its_own_target", () => {
     const reading = failureOf(WAIT_STEP, WAIT_FORM, null);
 
-    expect(reading).toEqual({ choice: "stop", retry: null, target: AT_STEP });
+    expect(reading).toEqual({
+      choice: "stop",
+      retry: null,
+      isWrittenOtherwise: false,
+      target: AT_STEP,
+    });
   });
 
   it("a_protected_step_reads_its_try's_retry_and_targets_the_try", () => {
@@ -39,9 +52,20 @@ describe("reading what happens when a step fails", () => {
 
     expect(reading).toEqual({
       choice: "retryThenStop",
-      retry: { retries: 3, seconds: 2, growing: true },
+      retry: FIRST_RETRY,
+      isWrittenOtherwise: false,
       target: AT_TRY,
     });
+  });
+
+  it("a_delay_the_language_server_cannot_read_is_said_to_be_written_otherwise", () => {
+    const plan = { ...RETRY_PLAN, milliseconds: null };
+    const protection = protectionOf({ retry: RETRY_POLICY }, "retry", plan);
+
+    const reading = failureOf(INNER, REPORT_FORM, protection);
+
+    expect(reading.isWrittenOtherwise).toBe(true);
+    expect(reading.retry).toEqual(FIRST_RETRY);
   });
 
   it.each([
@@ -59,34 +83,6 @@ describe("reading what happens when a step fails", () => {
   });
 });
 
-describe("reading a retry policy", () => {
-  it("delays_in_any_units_count_in_seconds", () => {
-    const policy = {
-      delay: { minutes: 1, seconds: 30 },
-      backoff: { constant: {} },
-      limit: { attempt: { count: 4 } },
-    };
-    const protection = protectionOf({ retry: policy }, "retry");
-
-    const reading = failureOf(INNER, REPORT_FORM, protection);
-
-    expect(reading.retry).toEqual({ retries: 4, seconds: 90, growing: false });
-  });
-
-  it.each([
-    ["a_linear_backoff", { ...RETRY_POLICY, backoff: { linear: {} } }],
-    ["a_delay_as_text", { ...RETRY_POLICY, delay: "PT2S" }],
-    ["no_attempt_count", { ...RETRY_POLICY, limit: {} }],
-    ["a_reference_by_name", "standard"],
-  ])("%s_is_not_shown_as_settings", (_, policy) => {
-    const protection = protectionOf({ retry: policy }, "retry");
-
-    const reading = failureOf(INNER, REPORT_FORM, protection);
-
-    expect(reading.retry).toBeNull();
-  });
-});
-
 describe("a retry's count typed in the form", () => {
   it.each([["later"], ["-"], ["2.5"], [""]])("%s_is_refused", (text) => {
     const reading = failureOf(INNER, REPORT_FORM, RETRYING);
@@ -99,13 +95,56 @@ describe("a retry's count typed in the form", () => {
   it("the_count_in_force_sends_nothing_and_another_one_sends_the_change", () => {
     const reading = failureOf(INNER, REPORT_FORM, RETRYING);
 
-    const same = retryCommitOf(reading, "retries", "3");
+    const same = retryCommitOf(reading, "seconds", "2");
     const more = retryCommitOf(reading, "retries", " 5 ");
 
     const changed = { ...FIRST_RETRY, retries: 5 };
     const edits = retryChangeOf(reading, changed);
     expect(same).toEqual({ kind: "edits", edits: [] });
     expect(more).toEqual({ kind: "edits", edits });
+  });
+
+  it("seconds_are_written_as_milliseconds", () => {
+    const reading = failureOf(INNER, REPORT_FORM, RETRYING);
+
+    const commit = retryCommitOf(reading, "seconds", "10");
+
+    const changed = { ...FIRST_RETRY, milliseconds: 10_000 };
+    const edits = retryChangeOf(reading, changed);
+    expect(commit).toEqual({ kind: "edits", edits });
+  });
+});
+
+describe("which errors a retry takes", () => {
+  it("statuses_are_read_from_the_typed_list", () => {
+    const reading = failureOf(INNER, REPORT_FORM, RETRYING);
+
+    const commit = retryWhenCommitOf(reading, "statuses", "503, 429");
+
+    const on = { kind: "statuses", statuses: [503, 429] } as const;
+    const changed = { ...FIRST_RETRY, on };
+    const edits = retryChangeOf(reading, changed);
+    expect(commit).toEqual({ kind: "edits", edits });
+  });
+
+  it.each([
+    ["", "no status"],
+    ["503, soon", "not a number"],
+    ["42", "no HTTP status"],
+  ])("%s_is_refused_as_%s", (text) => {
+    const reading = failureOf(INNER, REPORT_FORM, RETRYING);
+
+    const commit = retryWhenCommitOf(reading, "statuses", text);
+
+    expect(commit.kind).toBe("refused");
+  });
+
+  it("the_errors_in_force_send_nothing", () => {
+    const reading = failureOf(INNER, REPORT_FORM, RETRYING);
+
+    const commit = retryWhenCommitOf(reading, "any", "");
+
+    expect(commit).toEqual({ kind: "edits", edits: [] });
   });
 });
 
@@ -127,7 +166,7 @@ describe("the edits a failure choice sends", () => {
       {
         kind: "setFailure",
         step: WAIT_STEP.id,
-        failure: { kind: "retry", retries: 3, seconds: 2, growing: true },
+        failure: { kind: "retry", retry: FIRST_RETRY },
       },
     ]);
   });
@@ -145,48 +184,26 @@ describe("the edits a failure choice sends", () => {
     ]);
   });
 
-  it("retrying_then_running_other_steps_from_a_plain_step_wraps_it_then_adds_the_lane", () => {
-    const reading = failureOf(WAIT_STEP, WAIT_FORM, null);
+  it.each([
+    ["a_plain_step", WAIT_STEP, WAIT_FORM, null, WAIT_STEP.id],
+    ["a_retry", INNER, REPORT_FORM, RETRYING, REPORT_STEP.id],
+    ["a_lane", INNER, REPORT_FORM, HANDLING, REPORT_STEP.id],
+  ] as const)(
+    "retrying_then_running_other_steps_from_%s_is_one_handle_with_its_retry",
+    (_, step, form, protection, target) => {
+      const reading = failureOf(step, form, protection);
 
-    const edits = failureEditsOf(reading, "retryThenHandle", FIRST_RETRY);
+      const edits = failureEditsOf(reading, "retryThenHandle", FIRST_RETRY);
 
-    expect(edits).toEqual([
-      {
-        kind: "setFailure",
-        step: WAIT_STEP.id,
-        failure: { kind: "retry", retries: 3, seconds: 2, growing: true },
-      },
-      { kind: "setField", pointer: `${WAIT_STEP.pointer}/catch/do`, value: [] },
-    ]);
-  });
-
-  it("retrying_then_running_other_steps_after_a_retry_only_adds_the_lane", () => {
-    const reading = failureOf(INNER, REPORT_FORM, RETRYING);
-
-    const edits = failureEditsOf(reading, "retryThenHandle", FIRST_RETRY);
-
-    expect(edits).toEqual([
-      {
-        kind: "setField",
-        pointer: `${REPORT_STEP.pointer}/catch/do`,
-        value: [],
-      },
-    ]);
-  });
-
-  it("adding_a_retry_to_a_lane_keeps_its_steps", () => {
-    const reading = failureOf(INNER, REPORT_FORM, HANDLING);
-
-    const edits = failureEditsOf(reading, "retryThenHandle", FIRST_RETRY);
-
-    expect(edits).toEqual([
-      {
-        kind: "setField",
-        pointer: `${REPORT_STEP.pointer}/catch/retry`,
-        value: RETRY_POLICY,
-      },
-    ]);
-  });
+      expect(edits).toEqual([
+        {
+          kind: "setFailure",
+          step: target,
+          failure: { kind: "handle", retry: FIRST_RETRY },
+        },
+      ]);
+    },
+  );
 
   it("dropping_the_retry_of_a_lane_clears_only_the_retry", () => {
     const reading = failureOf(INNER, REPORT_FORM, RETRYING_THEN_HANDLING);
@@ -223,25 +240,21 @@ describe("the edits a change of retry settings sends", () => {
       {
         kind: "setFailure",
         step: REPORT_STEP.id,
-        failure: { kind: "retry", retries: 5, seconds: 10, growing: false },
+        failure: { kind: "retry", retry: SLOWER },
       },
     ]);
   });
 
-  it("a_retry_before_a_lane_writes_only_the_retry", () => {
+  it("a_retry_before_a_lane_is_set_again_as_a_handle_with_its_retry", () => {
     const reading = failureOf(INNER, REPORT_FORM, RETRYING_THEN_HANDLING);
 
     const edits = retryChangeOf(reading, SLOWER);
 
     expect(edits).toEqual([
       {
-        kind: "setField",
-        pointer: `${REPORT_STEP.pointer}/catch/retry`,
-        value: {
-          delay: { seconds: 10 },
-          backoff: { constant: {} },
-          limit: { attempt: { count: 5 } },
-        },
+        kind: "setFailure",
+        step: REPORT_STEP.id,
+        failure: { kind: "handle", retry: SLOWER },
       },
     ]);
   });

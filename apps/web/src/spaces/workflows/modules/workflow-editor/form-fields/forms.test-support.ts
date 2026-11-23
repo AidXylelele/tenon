@@ -1,5 +1,6 @@
 import type {
   FormField,
+  RetryPlan,
   Step,
   StepFormResult,
   WorkflowFormResult,
@@ -103,6 +104,7 @@ export function stepOf(name: string, index: number, kind: Step["kind"]): Step {
     pointer: `/do/${String(index)}/${name}`,
     name,
     kind,
+    variant: null,
     family: "call",
     summary: null,
     milliseconds: null,
@@ -111,6 +113,7 @@ export function stepOf(name: string, index: number, kind: Step["kind"]): Step {
     selectionRange: null,
     lists: [],
     flow: [],
+    catch: null,
   };
 }
 
@@ -216,6 +219,7 @@ export const FETCH_FORM: StepFormResult = {
   version: 1,
   step: FETCH_STEP.id,
   failure: "stop",
+  retry: null,
   result: null,
   fields: httpFields(FETCH_STEP.pointer, "get", "https://httpbin.org/json", []),
 };
@@ -224,6 +228,7 @@ export const POST_FORM: StepFormResult = {
   version: 1,
   step: POST_STEP.id,
   failure: "stop",
+  retry: null,
   result: null,
   fields: httpFields(POST_STEP.pointer, "post", "", [
     "Endpoint is not in the form the standard requires.",
@@ -234,6 +239,7 @@ export const REPORT_FORM: StepFormResult = {
   version: 1,
   step: REPORT_INNER_STEP.id,
   failure: "stop",
+  retry: null,
   result: null,
   fields: httpFields(
     REPORT_INNER_STEP.pointer,
@@ -243,9 +249,19 @@ export const REPORT_FORM: StepFormResult = {
   ),
 };
 
+export const RETRY_PLAN: RetryPlan = {
+  retries: 3,
+  milliseconds: 2000,
+  backoff: "exponential",
+  when: null,
+  exceptWhen: null,
+  on: { kind: "any" },
+};
+
 export function protectionOf(
   catchValue: JsonObject,
   failure: StepFormResult["failure"],
+  plan: RetryPlan | null = null,
 ): StepFormResult {
   const pointer = REPORT_STEP.pointer;
   const retry = catchValue.retry;
@@ -254,6 +270,7 @@ export function protectionOf(
     version: 1,
     step: REPORT_STEP.id,
     failure,
+    retry: plan,
     result: null,
     fields: [
       ...commonFields(pointer, NAMES),
@@ -308,7 +325,11 @@ export const RETRY_POLICY: JsonObject = {
   limit: { attempt: { count: 3 } },
 };
 
-export const RETRYING = protectionOf({ retry: RETRY_POLICY }, "retry");
+export const RETRYING = protectionOf(
+  { retry: RETRY_POLICY },
+  "retry",
+  RETRY_PLAN,
+);
 
 export const CONTINUING = protectionOf({}, "continue");
 
@@ -317,6 +338,7 @@ export const HANDLING = protectionOf({ do: [] }, "handle");
 export const RETRYING_THEN_HANDLING = protectionOf(
   { retry: RETRY_POLICY, do: [] },
   "handle",
+  RETRY_PLAN,
 );
 
 export const SWITCH_CASES: Json = [
@@ -333,6 +355,7 @@ export const SWITCH_FORM: StepFormResult = {
   version: 1,
   step: SWITCH_STEP.id,
   failure: "stop",
+  retry: null,
   result: null,
   fields: [
     ...commonFields(SWITCH_STEP.pointer, NAMES),
@@ -357,6 +380,7 @@ export function setFormOf(
     version: 1,
     step: SET_STEP.id,
     failure: "stop",
+    retry: null,
     result: { value: result, choices: ["inputAndValues", "valuesOnly"] },
     fields: [
       ...commonFields(SET_STEP.pointer, NAMES),
@@ -385,6 +409,7 @@ export const SCRIPT_FORM: StepFormResult = {
   version: 1,
   step: SCRIPT_STEP.id,
   failure: "stop",
+  retry: null,
   result: {
     value: "printedJson",
     choices: ["printedJson", "printedText", "exitCode"],
@@ -488,6 +513,7 @@ export const WAIT_FORM: StepFormResult = {
   version: 1,
   step: WAIT_STEP.id,
   failure: "stop",
+  retry: null,
   result: null,
   fields: [
     ...commonFields(WAIT_STEP.pointer, NAMES),

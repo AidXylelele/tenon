@@ -15,6 +15,8 @@ import {
   protectionOf,
   REPORT_FORM,
   REPORT_INNER_STEP,
+  RETRY_PLAN,
+  RETRY_POLICY,
   RETRYING,
   SCRIPT_FORM,
   SCRIPT_STEP,
@@ -45,6 +47,7 @@ const RAISE_FORM: StepFormResult = {
   version: 1,
   step: RAISE.id,
   failure: "stop",
+  retry: null,
   result: null,
   fields: [
     fieldOf({
@@ -622,10 +625,8 @@ describe("retry settings", () => {
   });
 
   it("a_retry_written_in_another_form_says_so", () => {
-    const linear = protectionOf(
-      { retry: { delay: "PT2S", limit: { attempt: { count: 3 } } } },
-      "retry",
-    );
+    const plan = { ...RETRY_PLAN, milliseconds: null };
+    const linear = protectionOf({ retry: RETRY_POLICY }, "retry", plan);
     shown({ step: REPORT_INNER_STEP, form: REPORT_FORM, protection: linear });
     open("If this step fails");
 

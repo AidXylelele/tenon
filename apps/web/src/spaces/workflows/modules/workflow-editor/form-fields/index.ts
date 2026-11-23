@@ -1,4 +1,5 @@
 export {
+  BACKOFF_CHOICES,
   FAILURE_CHOICES,
   failureEditsOf,
   failureNoteOf,
@@ -7,6 +8,10 @@ export {
   FIRST_RETRY,
   retryChangeOf,
   retryCommitOf,
+  retryCountsOf,
+  RETRY_WHEN_CHOICES,
+  retryWhenCommitOf,
+  statusesText,
 } from "./failure";
 export {
   caseAdditionOf,
@@ -39,7 +44,6 @@ export type {
   FormKind,
   FormLayout,
   RetryCount,
-  RetrySettings,
   StartReading,
   StartWay,
   ValueRow,

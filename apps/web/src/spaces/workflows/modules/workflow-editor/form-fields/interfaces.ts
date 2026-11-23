@@ -1,4 +1,9 @@
-import type { EditAction, FormField, Step } from "language-server/protocol";
+import type {
+  EditAction,
+  FormField,
+  RetrySetting,
+  Step,
+} from "language-server/protocol";
 
 export type CallKind =
   "http" | "openapi" | "grpc" | "asyncapi" | "mcp" | "a2a" | "function";
@@ -53,12 +58,6 @@ export interface FormLayout {
 export type FailureChoice =
   "stop" | "retryThenStop" | "retryThenHandle" | "continue" | "handle";
 
-export interface RetrySettings {
-  readonly retries: number;
-  readonly seconds: number;
-  readonly growing: boolean;
-}
-
 export type RetryCount = "retries" | "seconds";
 
 export interface FailureTarget {
@@ -68,7 +67,8 @@ export interface FailureTarget {
 
 export interface FailureReading {
   readonly choice: FailureChoice;
-  readonly retry: RetrySettings | null;
+  readonly retry: RetrySetting | null;
+  readonly isWrittenOtherwise: boolean;
   readonly target: FailureTarget;
 }
 

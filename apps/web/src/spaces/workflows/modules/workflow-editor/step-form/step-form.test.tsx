@@ -23,6 +23,7 @@ import {
   WAIT_FORM,
   WAIT_STEP,
 } from "../form-fields/forms.test-support";
+import { FIRST_RETRY } from "../form-fields";
 import type { StepFormProps } from "./interfaces";
 
 const SWITCH_CASES_FIRST = {
@@ -653,7 +654,10 @@ describe("if this step fails", () => {
       {
         kind: "setFailure",
         step: REPORT_STEP.id,
-        failure: { kind: "retry", retries: 5, seconds: 2, growing: true },
+        failure: {
+          kind: "retry",
+          retry: { ...FIRST_RETRY, retries: 5 },
+        },
       },
     ]);
   });
@@ -675,7 +679,10 @@ describe("if this step fails", () => {
       {
         kind: "setFailure",
         step: REPORT_STEP.id,
-        failure: { kind: "retry", retries: 3, seconds: 2, growing: false },
+        failure: {
+          kind: "retry",
+          retry: { ...FIRST_RETRY, backoff: "constant" },
+        },
       },
     ]);
   });
@@ -692,6 +699,30 @@ describe("if this step fails", () => {
     expect(pressTheLane).toBeInTheDocument();
   });
 
+  it("a_retry_on_statuses_is_written_from_the_typed_list", () => {
+    const { onEdit } = shown({
+      step: REPORT_INNER_STEP,
+      form: REPORT_FORM,
+      protection: RETRYING,
+    });
+    open("If this step fails");
+    const when = screen.getByRole("combobox", { name: "Retry when" });
+
+    choose(when, "The answer has one of these statuses");
+    const statuses = screen.getByRole("textbox", { name: "Statuses" });
+    leave(statuses, "503, 429");
+
+    const on = { kind: "statuses", statuses: [503, 429] };
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onEdit).toHaveBeenCalledWith([
+      {
+        kind: "setFailure",
+        step: REPORT_STEP.id,
+        failure: { kind: "retry", retry: { ...FIRST_RETRY, on } },
+      },
+    ]);
+  });
+
   it("a_step_without_a_try_wraps_itself_to_retry", () => {
     const { onEdit } = shown({ step: WAIT_STEP, form: WAIT_FORM });
     open("If this step fails");
@@ -705,7 +736,7 @@ describe("if this step fails", () => {
       {
         kind: "setFailure",
         step: WAIT_STEP.id,
-        failure: { kind: "retry", retries: 3, seconds: 2, growing: true },
+        failure: { kind: "retry", retry: FIRST_RETRY },
       },
     ]);
   });
