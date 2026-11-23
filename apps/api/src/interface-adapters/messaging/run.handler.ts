@@ -18,6 +18,7 @@ import type {
   InstanceMessage,
   RespondMessage,
 } from "./interfaces.js";
+import { RunDataMapper } from "./mappers/run-data.mapper.js";
 
 @Injectable()
 export class RunHandler {
@@ -26,6 +27,7 @@ export class RunHandler {
   constructor(
     private readonly span: ConsumerSpan,
     private readonly outbox: Outbox,
+    private readonly runData: RunDataMapper,
     private readonly beginRun: BeginRun,
     private readonly respondToEffect: RespondToEffect,
     private readonly answerChildren: AnswerChildren,
@@ -49,7 +51,8 @@ export class RunHandler {
     message: RespondMessage,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    const answer = { effectId: message.effectId, outcome: message.outcome };
+    const outcome = this.runData.dataOf(message.sealedOutcome);
+    const answer = { effectId: message.effectId, outcome };
     const command = {
       instanceId: message.instanceId,
       answer,

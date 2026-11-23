@@ -26,6 +26,7 @@ import { WorkflowQueries } from "../../application/automation/workflows/queries.
 import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
 import { HttpDeliveryGateway } from "../../interface-adapters/messaging/http-delivery.gateway.js";
 import { InstanceMessagesGateway } from "../../interface-adapters/messaging/instance-messages.gateway.js";
+import { RunDataMapper } from "../../interface-adapters/messaging/mappers/run-data.mapper.js";
 import { WorkflowMessagesGateway } from "../../interface-adapters/messaging/workflow-messages.gateway.js";
 import {
   DeliveryAdmission,
@@ -107,6 +108,7 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: WorkflowRuntime, useExisting: InterpreterRuntimeGateway },
     InterpreterFilterGateway,
     { provide: SubscriptionFilters, useExisting: InterpreterFilterGateway },
+    RunDataMapper,
     InstanceMessagesGateway,
     { provide: InstanceEvents, useExisting: InstanceMessagesGateway },
     { provide: InstanceRuns, useExisting: InstanceMessagesGateway },
@@ -192,6 +194,7 @@ import { OutboundModule } from "./outbound.module.js";
     DefinitionMapper,
     WorkflowRuntime,
     SubscriptionFilters,
+    RunDataMapper,
     InstanceEvents,
     InstanceRuns,
     WorkflowEvents,

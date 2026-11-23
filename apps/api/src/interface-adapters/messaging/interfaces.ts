@@ -5,7 +5,6 @@ import type {
   JsonObject,
 } from "interpreter";
 import type { EffectKind } from "../../domain/automation/instances/enums.js";
-import type { JsonObject as DomainObject } from "../../domain/automation/interfaces.js";
 import type { StepCall } from "../workflows/interfaces.js";
 
 export interface AcceptedEventMessage {
@@ -52,7 +51,7 @@ export interface DeliveryMessage {
 export interface RespondMessage {
   readonly instanceId: string;
   readonly effectId: string;
-  readonly outcome: DomainObject;
+  readonly sealedOutcome: string;
 }
 
 export interface ScheduleMessage {

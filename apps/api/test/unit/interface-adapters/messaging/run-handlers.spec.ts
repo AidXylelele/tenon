@@ -16,10 +16,15 @@ import type { RespondToEffect } from "../../../../src/application/automation/ins
 import type { StartChildForEffect } from "../../../../src/application/automation/instances/start-child-for-effect.js";
 import type { StartDetachedProcess } from "../../../../src/application/automation/instances/start-detached-process.js";
 import { EffectKind } from "../../../../src/domain/automation/instances/enums.js";
+import { AesGcmCipher } from "../../../../src/frameworks/crypto/aes-gcm.cipher.js";
 import { ConsumerSpan } from "../../../../src/interface-adapters/messaging/consumer-span.js";
 import { EffectHandler } from "../../../../src/interface-adapters/messaging/effect.handler.js";
+import { RunDataMapper } from "../../../../src/interface-adapters/messaging/mappers/run-data.mapper.js";
 import { RunHandler } from "../../../../src/interface-adapters/messaging/run.handler.js";
 import { PermanentFault } from "../../../../src/interface-adapters/workflows/permanent-fault.error.js";
+
+const KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+const runData = new RunDataMapper(new AesGcmCipher(KEY));
 
 class Recorder {
   readonly calls: string[] = [];
@@ -73,6 +78,7 @@ function runHandlerOf(recorder: Recorder): RunHandler {
   return new RunHandler(
     new ConsumerSpan(),
     recorder.outbox(),
+    runData,
     recorder.use<BeginRun>("begin"),
     recorder.use<RespondToEffect>("respond"),
     recorder.use<AnswerChildren>("children"),
@@ -110,13 +116,15 @@ describe("the run commands an instance's key orders", () => {
     expect(recorder.notified).toBe(1);
   });
 
-  it("an_answer_reaches_the_run_with_its_outcome", async () => {
+  it("an_answer_reaches_the_run_with_its_outcome_unsealed", async () => {
     const recorder = new Recorder();
     const handler = runHandlerOf(recorder);
+    const outcome = { kind: "responded" };
+    const sealedOutcome = runData.sealedOf(outcome);
     const message = {
       instanceId: "instance-1",
       effectId: "/do/0/fetch",
-      outcome: { kind: "responded" },
+      sealedOutcome,
     };
     const context = contextAt(1);
 

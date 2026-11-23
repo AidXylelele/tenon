@@ -10,8 +10,11 @@ import {
 import { RunSecrets } from "../../../../src/domain/automation/secrets/run-secrets.js";
 import { Workflow } from "../../../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../../../src/domain/automation/workflows/workflow-name.js";
+import { AesGcmCipher } from "../../../../src/frameworks/crypto/aes-gcm.cipher.js";
 import { MessageTopic } from "../../../../src/interface-adapters/messaging/enums.js";
 import { InstanceMessagesGateway } from "../../../../src/interface-adapters/messaging/instance-messages.gateway.js";
+import type { RespondMessage } from "../../../../src/interface-adapters/messaging/interfaces.js";
+import { RunDataMapper } from "../../../../src/interface-adapters/messaging/mappers/run-data.mapper.js";
 import type { Transaction } from "../../../../src/interface-adapters/persistence/interfaces.js";
 import {
   aCall,
@@ -22,6 +25,8 @@ import {
 import { anInstanceIn, T0 } from "../../../support/fakes.js";
 
 const TX = { id: "tx-1" };
+const KEY = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+const runData = new RunDataMapper(new AesGcmCipher(KEY));
 
 class RecordingOutbox {
   readonly added: NewOutboxMessage[] = [];
@@ -46,6 +51,7 @@ function setUp() {
   const gateway = new InstanceMessagesGateway(
     txHost,
     outbox as unknown as Outbox,
+    runData,
   );
   return { outbox, gateway };
 }
@@ -162,24 +168,24 @@ describe("the outbox messages of an instance's events", () => {
 });
 
 describe("the run commands of an instance", () => {
-  it("an_answer_carries_its_outcome_under_the_instance_key", async () => {
+  it("an_answer_carries_its_outcome_sealed_under_the_instance_key", async () => {
     const fixture = setUp();
     const instance = anInstanceIn(Phase.Running);
-    const answer = { effectId: "/do/0/fetch", outcome: { kind: "responded" } };
+    const outcome = { kind: "responded", body: "card 4111" };
+    const answer = { effectId: "/do/0/fetch", outcome };
 
     await fixture.gateway.respond(instance, answer);
 
-    expect(fixture.outbox.added).toEqual([
-      {
-        topic: MessageTopic.RunRespond,
-        key: "instance-1",
-        payload: {
-          instanceId: "instance-1",
-          effectId: "/do/0/fetch",
-          outcome: { kind: "responded" },
-        },
-      },
-    ]);
+    const sent = fixture.outbox.added[0];
+    const payload = sent?.payload as RespondMessage;
+    const text = JSON.stringify(sent);
+    const opened = runData.dataOf(payload.sealedOutcome);
+    expect(sent?.topic).toBe(MessageTopic.RunRespond);
+    expect(sent?.key).toBe("instance-1");
+    expect(payload.instanceId).toBe("instance-1");
+    expect(payload.effectId).toBe("/do/0/fetch");
+    expect(text).not.toContain("card 4111");
+    expect(opened).toEqual(outcome);
   });
 
   it("receives_and_failures_are_commands_under_the_instance_key", async () => {

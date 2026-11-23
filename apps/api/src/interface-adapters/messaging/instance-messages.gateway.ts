@@ -23,12 +23,14 @@ import type {
   RespondMessage,
   TimerMessage,
 } from "./interfaces.js";
+import { RunDataMapper } from "./mappers/run-data.mapper.js";
 
 @Injectable()
 export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
     private readonly outbox: Outbox,
+    private readonly runData: RunDataMapper,
   ) {}
 
   async dispatch(instance: WorkflowInstance): Promise<void> {
@@ -43,10 +45,11 @@ export class InstanceMessagesGateway implements InstanceEvents, InstanceRuns {
     instance: WorkflowInstance,
     answer: EffectAnswer,
   ): Promise<void> {
+    const sealedOutcome = this.runData.sealedOf(answer.outcome);
     const payload: RespondMessage = {
       instanceId: instance.id,
       effectId: answer.effectId,
-      outcome: answer.outcome,
+      sealedOutcome,
     };
     const message = {
       topic: MessageTopic.RunRespond,
