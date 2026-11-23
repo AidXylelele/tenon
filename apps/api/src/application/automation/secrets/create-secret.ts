@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { SecretRefusal } from "../../../domain/automation/secrets/enums.js";
 import { Secret } from "../../../domain/automation/secrets/secret.js";
 import type { CreateSecretResult, SecretValueCommand } from "./interfaces.js";
@@ -7,9 +7,11 @@ import { SecretRepository } from "./ports.js";
 
 @Injectable()
 export class CreateSecret {
-  constructor(private readonly secrets: SecretRepository) {}
+  constructor(
+    private readonly secrets: SecretRepository,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  @Transactional()
   async execute(command: SecretValueCommand): Promise<CreateSecretResult> {
     const now = new Date();
     const existing = await this.secrets.find(command.ownerId, command.name);
@@ -27,7 +29,7 @@ export class CreateSecret {
     if (!created.ok) return created;
 
     const secret = created.value;
-    await this.secrets.save(secret);
+    await this.unitOfWork.run(() => this.secrets.save(secret));
     const view = {
       name: secret.name,
       createdAt: secret.createdAt,

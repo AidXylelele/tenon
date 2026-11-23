@@ -16,9 +16,12 @@ import type {
   DraftPublication,
   DraftRefusal,
   DraftRevision,
+  DraftTestRun,
   DraftWrite,
+  InstanceSummary,
   Version,
 } from "./types";
+import type { JsonValue } from "@/libs/json/json";
 
 const NOT_MODIFIED = 304;
 const NOT_FOUND = 404;
@@ -93,6 +96,28 @@ export async function publishDraft(
 
   const version: Version = await response.json();
   return { kind: "published", version };
+}
+
+export async function testDraft(
+  namespace: string,
+  name: string,
+  etag: string,
+  input: JsonValue,
+  idempotencyKey: string,
+): Promise<DraftTestRun> {
+  const headers = { "if-match": etag, "idempotency-key": idempotencyKey };
+  const options = { method: "POST" as const, json: { input }, headers };
+  const path = `${draftPath(namespace, name)}/test-runs`;
+  const answer = await answerOf(path, options);
+
+  if (answer.kind === "refused") return answer;
+
+  const response = answer.response;
+
+  if (!response.ok) return refusalOf(response);
+
+  const run: InstanceSummary = await response.json();
+  return { kind: "started", run };
 }
 
 function draftPath(namespace: string, name: string): string {

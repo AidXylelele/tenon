@@ -1,27 +1,28 @@
 import type {
+  CountWindow,
+  FailingWorkflows,
+  FailureWindow,
+  InstanceCounts,
   InstanceDetail,
-  InstanceFilter,
   InstancePage,
-  InstancePosition,
-  PhaseCount,
+  InstancePageRequest,
   ReceiverView,
   TaskOutput,
   TaskPage,
 } from "./interfaces.js";
 
 export abstract class InstanceQueries {
-  abstract list(
-    filter: InstanceFilter,
-    after: InstancePosition | null,
-    limit: number,
-  ): Promise<InstancePage>;
+  static readonly MOST_COUNTED = 10_000;
+
+  abstract list(request: InstancePageRequest): Promise<InstancePage>;
   abstract get(id: string): Promise<InstanceDetail | null>;
   abstract tasks(
     id: string,
     after: number | null,
     limit: number,
   ): Promise<TaskPage | null>;
-  abstract countsByPhase(from: Date, to: Date): Promise<readonly PhaseCount[]>;
+  abstract counts(window: CountWindow): Promise<InstanceCounts>;
+  abstract failing(window: FailureWindow): Promise<FailingWorkflows>;
   abstract taskOutput(
     id: string,
     execution: string,

@@ -84,6 +84,17 @@ describe("a request to the API", () => {
     expect(init.method).toBe("POST");
   });
 
+  it("a_parameter_of_several_values_is_repeated_in_their_order", async () => {
+    fetchApi.mockResolvedValue(answer(200, []));
+
+    await send("/instances", {
+      query: { phase: ["faulted", "cancelled"], none: [] },
+    });
+
+    const { url } = lastRequest();
+    expect(url.search).toBe("?phase=faulted&phase=cancelled");
+  });
+
   it("the_persons_address_goes_to_the_api_even_when_anonymous", async () => {
     fetchApi.mockResolvedValue(answer(204));
     requestHeaders.set("x-forwarded-for", "203.0.113.7");
@@ -189,18 +200,18 @@ describe("a request to the API", () => {
     expect(redirect).not.toHaveBeenCalled();
   });
 
-  it("a_platform_that_does_not_answer_fails_with_what_to_do", async () => {
+  it("tenon_not_answering_fails_with_what_to_do", async () => {
     const networkError = new TypeError("fetch failed: ECONNREFUSED");
     fetchApi.mockRejectedValue(networkError);
 
     const sending = send("/workflows");
 
     await expect(sending).rejects.toEqual(
-      new ApiError(503, "The platform is not answering; try again in a moment"),
+      new ApiError(503, "Tenon is not answering; try again in a moment"),
     );
   });
 
-  it("a_platform_that_does_not_answer_keeps_its_cause_for_the_server_log", async () => {
+  it("tenon_not_answering_keeps_its_cause_for_the_server_log", async () => {
     const networkError = new TypeError("fetch failed");
     fetchApi.mockRejectedValue(networkError);
 
@@ -361,7 +372,7 @@ describe("a command", () => {
     });
   });
 
-  it("a_platform_that_does_not_answer_is_a_problem_the_form_can_show", async () => {
+  it("tenon_not_answering_is_a_problem_the_form_can_show", async () => {
     const networkError = new TypeError("fetch failed");
     fetchApi.mockRejectedValue(networkError);
 
@@ -369,7 +380,7 @@ describe("a command", () => {
 
     expect(outcome).toMatchObject({
       ok: false,
-      problem: { status: 503, title: "The platform is not answering" },
+      problem: { status: 503, title: "Tenon is not answering" },
     });
   });
 

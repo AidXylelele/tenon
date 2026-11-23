@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { and, eq, sql } from "drizzle-orm";
 import type { SecretRepository } from "../../../application/automation/secrets/ports.js";
 import type { Secret } from "../../../domain/automation/secrets/secret.js";
@@ -51,7 +47,6 @@ export class PostgresSecretRepository implements SecretRepository {
     return rows.map((row) => this.secretMapper.toEntity(row.secret));
   }
 
-  @Transactional(Propagation.Mandatory)
   async save(secret: Secret): Promise<void> {
     const row = this.secretMapper.toRow(secret);
     const nextVersion = secret.version + 1;
@@ -77,7 +72,6 @@ export class PostgresSecretRepository implements SecretRepository {
     if (saved.length === 0) throw new StaleWriteError();
   }
 
-  @Transactional(Propagation.Mandatory)
   async remove(secret: Secret): Promise<void> {
     await this.txHost.tx.delete(secrets).where(eq(secrets.id, secret.id));
   }

@@ -11,7 +11,6 @@ import {
   type Consumer,
   SubscriptionClient,
 } from "./interfaces.js";
-import { ReceiveRefused } from "./receive-refused.error.js";
 
 @Injectable()
 export class AsyncApiHandler implements OnModuleDestroy {
@@ -182,7 +181,8 @@ export class AsyncApiHandler implements OnModuleDestroy {
     if (taken) return;
 
     lost.abort();
-    throw new ReceiveRefused(receiver.instanceId, receiver.execution);
+    const refused = `The instance ${receiver.instanceId} no longer receives on ${receiver.execution}`;
+    throw new Error(refused);
   }
 
   async #told(

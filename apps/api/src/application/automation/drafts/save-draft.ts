@@ -1,14 +1,16 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { DraftRefusal } from "../../../domain/automation/drafts/enums.js";
 import type { DraftResult, SaveDraftCommand } from "./interfaces.js";
 import { DraftRepository } from "./ports.js";
 
 @Injectable()
 export class SaveDraft {
-  constructor(private readonly drafts: DraftRepository) {}
+  constructor(
+    private readonly drafts: DraftRepository,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  @Transactional()
   async execute(command: SaveDraftCommand): Promise<DraftResult> {
     const now = new Date();
     const draft = await this.drafts.findByName(command.name);
@@ -33,7 +35,7 @@ export class SaveDraft {
         failure: { refusal: saved.failure, current: draft.snapshot },
       };
 
-    if (saved.value) await this.drafts.save(draft);
+    if (saved.value) await this.unitOfWork.run(() => this.drafts.save(draft));
 
     return { ok: true, value: draft.snapshot };
   }

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import type { RestartInstanceCommand, StartResult } from "./interfaces.js";
@@ -11,9 +11,9 @@ export class RestartInstance {
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
     private readonly runs: InstanceRuns,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: RestartInstanceCommand): Promise<StartResult> {
     const previous = await this.instances.find(command.instanceId);
 
@@ -38,8 +38,10 @@ export class RestartInstance {
     if (!restarted.ok) return restarted;
 
     const instance = restarted.value;
-    await this.instances.save(instance);
-    await this.runs.start(instance);
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.runs.start(instance);
+    });
     return { ok: true, value: { instanceId: instance.id } };
   }
 }

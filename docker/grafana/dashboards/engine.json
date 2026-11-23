@@ -1,7 +1,7 @@
 {
   "uid": "tenon-engine",
-  "title": "Tenon \u00b7 Workflow engine",
-  "description": "The durable engine: executions, step attempts with journaling, effects, and the outbox.",
+  "title": "Tenon · Workflow engine",
+  "description": "The durable engine: executions, step attempts with journaling, and the outbox.",
   "tags": ["tenon"],
   "editable": false,
   "graphTooltip": 1,
@@ -131,7 +131,7 @@
     {
       "type": "timeseries",
       "title": "Runs ended per minute",
-      "description": "Throughput (thesis \u04133): runs ended per minute; read it against the number of worker replicas.",
+      "description": "Throughput (thesis Г3): runs ended per minute; read it against the number of worker replicas.",
       "id": 3,
       "datasource": {
         "type": "prometheus",
@@ -202,7 +202,7 @@
     {
       "type": "timeseries",
       "title": "Attempts per second",
-      "description": "RED \u00b7 rate: step attempts that ran, failed ones included (replays make no span), by kind; from the step spans.",
+      "description": "RED · rate: step attempts that ran, failed ones included (replays make no span), by kind; from the step spans.",
       "id": 5,
       "datasource": {
         "type": "prometheus",
@@ -260,7 +260,7 @@
     {
       "type": "timeseries",
       "title": "Attempt errors per second",
-      "description": "RED \u00b7 errors: attempts that threw, by kind; from the step spans with an error status.",
+      "description": "RED · errors: attempts that threw, by kind; from the step spans with an error status.",
       "id": 6,
       "datasource": {
         "type": "prometheus",
@@ -318,7 +318,7 @@
     {
       "type": "timeseries",
       "title": "Attempt duration",
-      "description": "RED \u00b7 duration: p50 and p99 of a completed step attempt without the journal write, by kind.",
+      "description": "RED · duration: p50 and p99 of a completed step attempt without the journal write, by kind.",
       "id": 7,
       "datasource": {
         "type": "prometheus",
@@ -387,7 +387,7 @@
     {
       "type": "timeseries",
       "title": "Compensation failures",
-      "description": "RED \u00b7 errors: undos that gave up halfway and need a person, by workflow.",
+      "description": "RED · errors: undos that gave up halfway and need a person, by workflow.",
       "id": 8,
       "datasource": {
         "type": "prometheus",
@@ -445,7 +445,7 @@
     {
       "type": "timeseries",
       "title": "Lock losses",
-      "description": "RED \u00b7 errors: leases another worker took over while this one held them.",
+      "description": "RED · errors: leases another worker took over while this one held them.",
       "id": 9,
       "datasource": {
         "type": "prometheus",
@@ -502,345 +502,14 @@
     },
     {
       "type": "row",
-      "title": "Effects",
-      "collapsed": false,
-      "id": 10,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 26
-      },
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "Effects per second",
-      "description": "RED \u00b7 rate: effects performed, by kind and outcome.",
-      "id": 11,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 27
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 30,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "normal",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "sum by (tenon_effect_kind, tenon_effect_outcome) (rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval]))",
-          "legendFormat": "{{tenon_effect_kind}} {{tenon_effect_outcome}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Effect errors",
-      "description": "RED \u00b7 errors: the share of effects that threw, by kind.",
-      "id": 12,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 27
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          },
-          "max": 1
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "(sum by (tenon_effect_kind) (rate(tenon_effect_duration_seconds_count{error_type!=\"\", service_name=~\"$service\"}[$__rate_interval])) or sum by (tenon_effect_kind) (rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval])) * 0) / sum by (tenon_effect_kind) (rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval]))",
-          "legendFormat": "{{tenon_effect_kind}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Effect duration",
-      "description": "RED \u00b7 duration: p50 and p99 of an effect alone, by kind.",
-      "id": 13,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 27
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.5, sum by (le, tenon_effect_kind) (rate(tenon_effect_duration_seconds_bucket{service_name=~\"$service\"}[$__rate_interval])))",
-          "legendFormat": "p50 {{tenon_effect_kind}}",
-          "range": true,
-          "exemplar": false
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, tenon_effect_kind) (rate(tenon_effect_duration_seconds_bucket{service_name=~\"$service\"}[$__rate_interval])))",
-          "legendFormat": "p99 {{tenon_effect_kind}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Step overhead around effects",
-      "description": "The mean effect-step attempt (without the journal write) over the mean effect alone, minus one: what the step adds around its effect; the line marks 10 %. The journal writes sit beside the step in its trace: see Journaling.",
-      "id": 14,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 18,
-        "x": 0,
-        "y": 35
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0,
-            "thresholdsStyle": {
-              "mode": "line"
-            }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "(sum(rate(tenon_workflow_step_duration_seconds_sum{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__rate_interval])) / sum(rate(tenon_workflow_step_duration_seconds_count{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__rate_interval]))) / (sum(rate(tenon_effect_duration_seconds_sum{service_name=~\"$service\"}[$__rate_interval])) / sum(rate(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__rate_interval]))) - 1",
-          "legendFormat": "overhead",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "stat",
-      "title": "Step overhead over the range",
-      "description": "For the whole time range: the mean effect-step attempt over the mean effect alone, minus one.",
-      "id": 15,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 18,
-        "y": 35
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area",
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "(sum(increase(tenon_workflow_step_duration_seconds_sum{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__range])) / sum(increase(tenon_workflow_step_duration_seconds_count{tenon_step_kind=\"effect\", service_name=~\"$service\"}[$__range]))) / (sum(increase(tenon_effect_duration_seconds_sum{service_name=~\"$service\"}[$__range])) / sum(increase(tenon_effect_duration_seconds_count{service_name=~\"$service\"}[$__range]))) - 1",
-          "legendFormat": "",
-          "range": true,
-          "exemplar": false
-        }
-      ]
-    },
-    {
-      "type": "row",
-      "title": "Journaling (thesis \u04134)",
+      "title": "Journaling (thesis Г4)",
       "collapsed": false,
       "id": 16,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 26
       },
       "panels": []
     },
@@ -857,7 +526,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 44
+        "y": 27
       },
       "fieldConfig": {
         "defaults": {
@@ -941,150 +610,6 @@
       ]
     },
     {
-      "type": "stat",
-      "title": "Journaling share of an effect step",
-      "description": "Thesis \u04134, for the whole time range: the two journal writes of an attempt over the mean effect-step attempt, which excludes them. Takes a journal write to cost the same whatever the step; read it on workflows without child runs or waits; red above 10 %.",
-      "id": 18,
-      "datasource": {
-        "type": "tempo",
-        "uid": "tempo"
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 12,
-        "x": 12,
-        "y": 44
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 0.1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "none",
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "refId": "J",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ kind = consumer && name =~ \"execute .+\" } > { span.db.system.name = \"postgresql\" } | sum_over_time(duration)",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "W",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ kind = consumer && name =~ \"execute .+\" } > { span.db.query.text =~ `(?s)INSERT INTO \\S+\\.journal .*` } | count_over_time()",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "S",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ name = \"step effect\" } | sum_over_time(duration)",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "N",
-          "datasource": {
-            "type": "tempo",
-            "uid": "tempo"
-          },
-          "queryType": "traceql",
-          "query": "{ name = \"step effect\" } | count_over_time()",
-          "metricsQueryType": "instant",
-          "hide": true
-        },
-        {
-          "refId": "RJ",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "J",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "RW",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "W",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "RS",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "S",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "RN",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "reduce",
-          "expression": "N",
-          "reducer": "last",
-          "hide": true
-        },
-        {
-          "refId": "X",
-          "datasource": {
-            "type": "__expr__",
-            "uid": "__expr__"
-          },
-          "type": "math",
-          "expression": "2 * $RJ / $RW / ($RS / $RN)"
-        }
-      ]
-    },
-    {
       "type": "row",
       "title": "Outbox",
       "collapsed": false,
@@ -1093,67 +618,9 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 33
       },
       "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "Publish duration",
-      "description": "RED \u00b7 duration: p99 of publishing a message, by topic.",
-      "id": 20,
-      "datasource": {
-        "type": "prometheus",
-        "uid": "mimir"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 51
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 1,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "mode": "none",
-              "group": "A"
-            },
-            "axisSoftMin": 0
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom",
-          "calcs": ["mean", "max", "lastNotNull"]
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, tenon_outbox_topic) (rate(tenon_outbox_publish_duration_seconds_bucket{service_name=~\"$service\"}[$__rate_interval])))",
-          "legendFormat": "{{tenon_outbox_topic}}",
-          "range": true,
-          "exemplar": false
-        }
-      ]
     },
     {
       "type": "timeseries",
@@ -1166,9 +633,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 51
+        "w": 12,
+        "x": 0,
+        "y": 34
       },
       "fieldConfig": {
         "defaults": {
@@ -1216,7 +683,7 @@
     {
       "type": "timeseries",
       "title": "Failures per second",
-      "description": "RED \u00b7 errors: retries and dead letters, by topic.",
+      "description": "RED · errors: retries and dead letters, by topic.",
       "id": 22,
       "datasource": {
         "type": "prometheus",
@@ -1224,9 +691,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 51
+        "w": 12,
+        "x": 12,
+        "y": 34
       },
       "fieldConfig": {
         "defaults": {

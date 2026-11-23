@@ -20,7 +20,7 @@ import type { WorkflowName } from "../../../domain/automation/workflows/workflow
 import type { Result } from "../../../domain/interfaces.js";
 import type { Person } from "../../identity/users/interfaces.js";
 import type { Missing } from "../enums.js";
-import type { TaskStatus } from "./enums.js";
+import type { InstanceOrder, TaskStatus } from "./enums.js";
 
 export interface StartInstanceCommand {
   readonly name: WorkflowName;
@@ -29,7 +29,7 @@ export interface StartInstanceCommand {
   readonly starterId: string;
 }
 
-interface StartedInstance {
+export interface StartedInstance {
   readonly instanceId: string;
 }
 
@@ -92,6 +92,7 @@ export interface InstanceSummary {
   readonly version: string;
   readonly phase: Phase;
   readonly trigger: TriggerKind;
+  readonly test: boolean;
   readonly createdAt: Date;
   readonly startedAt: Date | null;
   readonly endedAt: Date | null;
@@ -120,23 +121,100 @@ export interface PhaseCount {
   readonly count: number;
 }
 
+export interface CountWindow {
+  readonly buckets: readonly Date[];
+  readonly to: Date;
+  readonly previousFrom: Date | null;
+  readonly namespace: string | null;
+  readonly name: string | null;
+  readonly tests: boolean;
+}
+
+export interface BucketCount {
+  readonly start: Date;
+  readonly counts: readonly PhaseCount[];
+}
+
+export interface WindowCount {
+  readonly from: Date;
+  readonly counts: readonly PhaseCount[];
+}
+
+export interface InstanceCounts {
+  readonly to: Date;
+  readonly buckets: readonly BucketCount[];
+  readonly total: readonly PhaseCount[];
+  readonly previous: WindowCount | null;
+  readonly live: readonly PhaseCount[];
+}
+
+export interface FailureWindow {
+  readonly from: Date;
+  readonly to: Date;
+  readonly limit: number;
+  readonly tests: boolean;
+}
+
+export interface FailureCause {
+  readonly status: number | null;
+  readonly type: string | null;
+  readonly title: string | null;
+  readonly detail: string | null;
+}
+
+export interface FailingWorkflow {
+  readonly namespace: string;
+  readonly name: string;
+  readonly failed: number;
+  readonly runs: number;
+  readonly firstFailedAt: Date;
+  readonly lastFailedAt: Date;
+  readonly lastError: FailureCause;
+  readonly stillFailing: boolean;
+}
+
+export interface FailingWorkflows {
+  readonly items: readonly FailingWorkflow[];
+  readonly workflows: number;
+  readonly failed: number;
+}
+
 export interface InstanceFilter {
   readonly namespace: string | null;
   readonly name: string | null;
   readonly version: string | null;
-  readonly phase: Phase | null;
-  readonly startedFrom: Date | null;
-  readonly startedTo: Date | null;
+  readonly phases: readonly Phase[];
+  readonly from: Date | null;
+  readonly to: Date | null;
+  readonly tests: boolean;
 }
 
-export interface InstancePosition {
-  readonly createdAt: Date;
-  readonly id: string;
+export interface InstancePageRequest {
+  readonly filter: InstanceFilter;
+  readonly order: InstanceOrder;
+  readonly page: number;
+  readonly limit: number;
 }
 
-export interface InstancePage {
-  readonly items: readonly InstanceSummary[];
-  readonly next: InstancePosition | null;
+export interface ListedWait {
+  readonly kind: WaitKind;
+  readonly until: Date | null;
+  readonly stream: string | null;
+}
+
+export interface ListedInstance extends InstanceSummary {
+  readonly startedBy: Person | null;
+  readonly durationMs: number | null;
+  readonly waits: readonly ListedWait[];
+}
+
+export interface InstanceTotal {
+  readonly total: number;
+  readonly exact: boolean;
+}
+
+export interface InstancePage extends InstanceTotal {
+  readonly items: readonly ListedInstance[];
 }
 
 export interface TaskRecordView {

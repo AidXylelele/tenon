@@ -68,6 +68,10 @@ export interface EventDelivery {
   readonly event: JsonObject;
 }
 
+export abstract class DeliveryAdmission {
+  abstract admits(uri: string): Promise<boolean>;
+}
+
 export abstract class EventDeliveries {
   abstract admits(uri: string): Promise<boolean>;
   abstract deliver(delivery: EventDelivery): Promise<string | null>;

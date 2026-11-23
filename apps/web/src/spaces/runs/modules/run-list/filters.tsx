@@ -3,8 +3,7 @@
 import { XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
-import type { Phase } from "@/libs/data-access/types";
-import { RUNS_HREF, runsHref, STARTED_WITHIN } from "@/libs/routing/routes";
+import { RUNS_HREF } from "@/libs/routing/routes";
 import { Button } from "@/libs/ui/components/button";
 import { Input } from "@/libs/ui/components/input";
 import {
@@ -15,9 +14,24 @@ import {
   SelectValue,
 } from "@/libs/ui/components/select";
 import { Spinner } from "@/libs/ui/components/spinner";
-import { PHASES } from "@/operations/run-progress";
-import { PhaseStatus } from "@/features/run-status";
-import { PERIODS, RunListQuery } from "./query";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/libs/ui/components/toggle-group";
+import {
+  periodLabel,
+  type RunStatus,
+  STARTED,
+  type Started,
+  startedOf,
+  STATUSES,
+  statusesOf,
+  statusLabel,
+  type TimeWindow,
+  windowPhrase,
+} from "@/operations/run-periods";
+import { phaseLabel } from "@/operations/run-progress";
+import { isFiltered, type RunsAddress, runsHrefOf } from "./runs-address";
 
 export interface KnownWorkflow {
   readonly namespace: string;
@@ -26,33 +40,29 @@ export interface KnownWorkflow {
 
 const ANY = "any";
 
-type Changes = Partial<Record<keyof RunListQuery, string>>;
+type Changes = Partial<RunsAddress>;
 
 export function Filters({
-  query,
-  filtered,
+  address,
   workflows,
+  zone,
 }: {
-  readonly query: RunListQuery;
-  readonly filtered: boolean;
+  readonly address: RunsAddress;
   readonly workflows: readonly KnownWorkflow[];
+  readonly zone: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const workflow =
-    query.namespace !== undefined && query.name !== undefined
-      ? keyOf(query.namespace, query.name)
-      : ANY;
+  const filtered = isFiltered(address);
+  const workflow = keyOf(address.namespace, address.name);
+  const chosen = address.statuses.slice();
+  const startedChoice = address.between === null ? address.started : "";
 
   function apply(changes: Changes) {
-    const next = RunListQuery.parse({
-      ...query,
-      ...changes,
-      cursor: undefined,
-    });
-    const address = runsHref(next);
+    const next: RunsAddress = { ...address, ...changes, page: 1 };
+    const href = runsHrefOf(next);
     start(() => {
-      router.replace(address);
+      router.replace(href);
     });
   }
 
@@ -60,7 +70,28 @@ export function Filters({
     const found = workflows.find(
       (each) => keyOf(each.namespace, each.name) === value,
     );
-    apply({ namespace: found?.namespace, name: found?.name, version: "" });
+    apply({
+      namespace: found?.namespace,
+      name: found?.name,
+      version: undefined,
+    });
+  }
+
+  function chooseStatuses(values: string[]) {
+    const joined = values.join(",");
+    const statuses = statusesOf(joined);
+    apply({ statuses });
+  }
+
+  function chooseStarted(value: string) {
+    const started: Started = startedOf(value) ?? address.started;
+    apply({ started, between: null });
+  }
+
+  function chooseVersion(value: string) {
+    const version = value.trim();
+    const kept = version === "" ? undefined : version;
+    apply({ version: kept });
   }
 
   function clear() {
@@ -76,72 +107,65 @@ export function Filters({
       aria-label="Filters"
     >
       <Select value={workflow} onValueChange={chooseWorkflow}>
-        <SelectTrigger aria-label="Workflow" className="w-48">
+        <SelectTrigger aria-label="Workflow" className="w-52">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={ANY}>Any workflow</SelectItem>
-          {workflows.map((each) => {
-            const key = keyOf(each.namespace, each.name);
-            return (
-              <SelectItem key={key} value={key}>
-                {each.name}
-                <span className="text-muted-foreground">{each.namespace}</span>
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
-      <Input
-        key={query.version ?? ""}
-        aria-label="Version"
-        placeholder="Version"
-        defaultValue={query.version}
-        onBlur={(event) => {
-          apply({ version: event.target.value.trim() });
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter")
-            apply({ version: event.currentTarget.value.trim() });
-        }}
-        className="w-28"
-      />
-      <Select
-        value={query.phase ?? ANY}
-        onValueChange={(phase) => {
-          apply({ phase });
-        }}
-      >
-        <SelectTrigger aria-label="Phase" className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>Any phase</SelectItem>
-          {PHASES.map((phase: Phase) => (
-            <SelectItem key={phase} value={phase}>
-              <PhaseStatus phase={phase} />
-            </SelectItem>
+          {workflows.map((each) => (
+            <WorkflowOption
+              key={keyOf(each.namespace, each.name)}
+              workflow={each}
+            />
           ))}
         </SelectContent>
       </Select>
-      <Select
-        value={query.started ?? ANY}
-        onValueChange={(started) => {
-          apply({ started });
-        }}
+      {address.name !== undefined && (
+        <Input
+          key={address.version ?? ""}
+          aria-label="Version"
+          placeholder="Version"
+          defaultValue={address.version}
+          onBlur={(event) => {
+            chooseVersion(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") chooseVersion(event.currentTarget.value);
+          }}
+          className="w-28"
+        />
+      )}
+      <ToggleGroup
+        type="multiple"
+        variant="outline"
+        aria-label="Status"
+        value={chosen}
+        onValueChange={chooseStatuses}
       >
-        <SelectTrigger aria-label="Started" className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ANY}>Any time</SelectItem>
-          {STARTED_WITHIN.map((each) => (
-            <SelectItem key={each} value={each}>
-              {PERIODS[each].label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        {STATUSES.map((status) => (
+          <StatusOption key={status} status={status} />
+        ))}
+      </ToggleGroup>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        aria-label="Started"
+        value={startedChoice}
+        onValueChange={chooseStarted}
+      >
+        {STARTED.map((each) => (
+          <StartedOption key={each} started={each} />
+        ))}
+      </ToggleGroup>
+      {address.between !== null && (
+        <RangeChip
+          range={address.between}
+          zone={zone}
+          onClear={() => {
+            apply({ between: null });
+          }}
+        />
+      )}
       {filtered && (
         <Button variant="ghost" onClick={clear}>
           <XIcon data-icon="inline-start" />
@@ -155,6 +179,52 @@ export function Filters({
   );
 }
 
-function keyOf(namespace: string, name: string): string {
+function WorkflowOption({ workflow }: { readonly workflow: KnownWorkflow }) {
+  const key = keyOf(workflow.namespace, workflow.name);
+
+  return (
+    <SelectItem value={key}>
+      {workflow.name}
+      <span className="text-muted-foreground">{workflow.namespace}</span>
+    </SelectItem>
+  );
+}
+
+function StatusOption({ status }: { readonly status: RunStatus }) {
+  const label = statusLabel(status, phaseLabel);
+
+  return <ToggleGroupItem value={status}>{label}</ToggleGroupItem>;
+}
+
+function RangeChip({
+  range,
+  zone,
+  onClear,
+}: {
+  readonly range: TimeWindow;
+  readonly zone: string;
+  readonly onClear: () => void;
+}) {
+  const phrase = windowPhrase(range, zone);
+  const label = `Started ${phrase}`;
+  const clearLabel = `Clear the range: ${label}`;
+
+  return (
+    <Button variant="outline" onClick={onClear} aria-label={clearLabel}>
+      {label}
+      <XIcon data-icon="inline-end" />
+    </Button>
+  );
+}
+
+function StartedOption({ started }: { readonly started: Started }) {
+  const label = periodLabel(started);
+
+  return <ToggleGroupItem value={started}>{label}</ToggleGroupItem>;
+}
+
+function keyOf(namespace: string | undefined, name: string | undefined) {
+  if (namespace === undefined || name === undefined) return ANY;
+
   return `${namespace}/${name}`;
 }

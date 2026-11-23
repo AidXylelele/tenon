@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { Control } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
@@ -18,9 +18,9 @@ export class SuspendInstance {
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
     private readonly runs: InstanceRuns,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: InstanceCommand): Promise<InstanceResult> {
     const instance = await this.instances.find(command.instanceId);
 
@@ -35,8 +35,10 @@ export class SuspendInstance {
     const now = new Date();
     const turn = await this.runtime.suspend(instance, secrets, now);
     instance.advance(turn, secrets, now);
-    await this.instances.save(instance);
-    await this.runs.wakeOnControl(instance, Control.Suspend);
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.runs.wakeOnControl(instance, Control.Suspend);
+    });
     return { ok: true, value: undefined };
   }
 }

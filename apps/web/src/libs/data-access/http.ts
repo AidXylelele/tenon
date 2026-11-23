@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { apiUrl, isSessionCookieSecure } from "./environment";
 import { type Outcome, type Problem, problemOf, unreachable } from "./problem";
+import { ZONE_COOKIE, zoneOf } from "./viewer-zone";
 import {
   issuedSession,
   SIGN_IN_AGAIN_HEADER,
@@ -21,7 +22,10 @@ export interface RequestOptions {
   readonly text?: string;
   readonly contentType?: string;
   readonly headers?: Record<string, string>;
-  readonly query?: Record<string, string | number | undefined>;
+  readonly query?: Record<
+    string,
+    string | number | readonly string[] | undefined
+  >;
   readonly anonymous?: boolean;
   readonly immutable?: boolean;
 }
@@ -59,11 +63,9 @@ export async function send(
       signal,
     });
   } catch (error) {
-    throw new ApiError(
-      503,
-      "The platform is not answering; try again in a moment",
-      { cause: error },
-    );
+    throw new ApiError(503, "Tenon is not answering; try again in a moment", {
+      cause: error,
+    });
   }
 
   const sessionEnded = response.status === 401 && options.anonymous !== true;
@@ -127,6 +129,13 @@ export async function command<T = void>(
   return { ok: true, value: body as T };
 }
 
+export async function viewerZone(): Promise<string> {
+  const store = await cookies();
+  const kept = store.get(ZONE_COOKIE)?.value;
+  const text = kept === undefined ? undefined : decodeURIComponent(kept);
+  return zoneOf(text);
+}
+
 export async function sessionPair(): Promise<string | null> {
   const store = await cookies();
   const secure = isSessionCookieSecure();
@@ -171,12 +180,16 @@ function urlOf(path: string, query: RequestOptions["query"] = {}): URL {
   const url = new URL(pathname, base);
 
   for (const [key, value] of Object.entries(query)) {
-    const omitted = value === undefined || value === "";
+    const values = [value].flat();
 
-    if (omitted) continue;
+    for (const each of values) {
+      const omitted = each === undefined || each === "";
 
-    const parameter = String(value);
-    url.searchParams.set(key, parameter);
+      if (omitted) continue;
+
+      const parameter = String(each);
+      url.searchParams.append(key, parameter);
+    }
   }
 
   return url;

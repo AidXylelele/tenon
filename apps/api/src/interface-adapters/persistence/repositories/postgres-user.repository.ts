@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import { eq, type SQL } from "drizzle-orm";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
 import type { User } from "../../../domain/identity/users/user.js";
@@ -19,7 +15,6 @@ export class PostgresUserRepository implements UserRepository {
     private readonly userMapper: UserMapper,
   ) {}
 
-  @Transactional(Propagation.Mandatory)
   async add(user: User): Promise<void> {
     const row = this.userMapper.toRow(user);
     const inserted = await this.txHost.tx

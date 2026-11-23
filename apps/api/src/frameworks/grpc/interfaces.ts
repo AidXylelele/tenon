@@ -1,20 +1,5 @@
+import type { CallOptions, Metadata, ServiceError } from "@grpc/grpc-js";
 import type { MethodDefinition } from "@grpc/proto-loader";
-import type { Failure } from "interpreter";
-import type { Message, Root } from "protobufjs";
-
-export type Misconfigured = Extract<
-  Failure,
-  { readonly kind: "misconfigured" }
->;
-
-export interface PreparedCall {
-  readonly kind: "call";
-  readonly method: MethodDefinition<object, object>;
-  readonly argument: Message;
-}
-
-export type ParsedProto =
-  { readonly kind: "root"; readonly root: Root } | Misconfigured;
 
 export interface ServiceAddress {
   readonly target: string;
@@ -22,3 +7,24 @@ export interface ServiceAddress {
   readonly port: number;
   readonly plaintext: boolean;
 }
+
+export interface GrpcCall {
+  readonly method: MethodDefinition<object, object>;
+  readonly argument: object;
+  readonly metadata: Metadata;
+  readonly options: CallOptions;
+}
+
+export type MessageCheck = (message: object) => boolean;
+
+export interface FailedAnswer {
+  readonly kind: "failed";
+  readonly error: ServiceError;
+  readonly connected: boolean;
+}
+
+export type GrpcAnswer =
+  | { readonly kind: "message"; readonly message: object | undefined }
+  | { readonly kind: "messages"; readonly messages: readonly object[] }
+  | { readonly kind: "stopped" }
+  | FailedAnswer;

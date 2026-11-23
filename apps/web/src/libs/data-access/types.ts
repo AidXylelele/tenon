@@ -45,6 +45,17 @@ export interface Invitation {
   readonly createdAt: string;
 }
 
+export type MemberStatus = "active" | "suspended" | "invited";
+
+export interface Member {
+  readonly id: string;
+  readonly email: string;
+  readonly name: string | null;
+  readonly role: Role;
+  readonly status: MemberStatus;
+  readonly since: string;
+}
+
 export interface InvitationPreview {
   readonly email: string;
   readonly role: Role;
@@ -67,6 +78,7 @@ interface LastRun {
 export interface Workflow {
   readonly namespace: string;
   readonly name: string;
+  readonly title: string | null;
   readonly status: WorkflowStatus;
   readonly on: boolean;
   readonly currentVersion: string | null;
@@ -153,6 +165,9 @@ export type DraftWrite =
 export type DraftPublication =
   { readonly kind: "published"; readonly version: Version } | DraftRefusal;
 
+export type DraftTestRun =
+  { readonly kind: "started"; readonly run: InstanceSummary } | DraftRefusal;
+
 export type DraftAnswer =
   { readonly kind: "answered"; readonly response: Response } | DraftRefused;
 
@@ -180,9 +195,28 @@ export interface InstanceSummary {
   readonly version: string;
   readonly phase: Phase;
   readonly trigger: Trigger;
+  readonly test: boolean;
   readonly createdAt: string;
   readonly startedAt: string | null;
   readonly endedAt: string | null;
+}
+
+export interface ListedWait {
+  readonly kind: Wait["kind"];
+  readonly until: string | null;
+  readonly stream: string | null;
+}
+
+export interface ListedInstance extends InstanceSummary {
+  readonly startedBy: Person | null;
+  readonly durationMs: number | null;
+  readonly waits: readonly ListedWait[];
+}
+
+export interface InstancePage {
+  readonly items: readonly ListedInstance[];
+  readonly total: number;
+  readonly exact: boolean;
 }
 
 interface WorkflowError {
@@ -241,19 +275,85 @@ export interface CloudEvent {
   readonly data?: JsonValue;
 }
 
-export interface InstanceCounts {
-  readonly counts: Readonly<Record<Phase, number>>;
+export type PhaseCounts = Readonly<Record<Phase, number>>;
+
+export type LivePhase = "pending" | "running" | "waiting" | "suspended";
+
+export interface CountedBucket {
+  readonly start: string;
+  readonly counts: PhaseCounts;
 }
+
+export interface InstanceCounts {
+  readonly to: string;
+  readonly buckets: readonly CountedBucket[];
+  readonly total: PhaseCounts;
+  readonly previous: {
+    readonly from: string;
+    readonly counts: PhaseCounts;
+  } | null;
+  readonly now: Readonly<Record<LivePhase, number>>;
+}
+
+export interface CountWindow {
+  readonly buckets: readonly string[];
+  readonly to: string;
+  readonly previousFrom?: string;
+  readonly namespace?: string;
+  readonly name?: string;
+}
+
+export type InstanceOrder = "started" | "duration";
 
 export interface InstanceFilter {
   readonly namespace?: string;
   readonly name?: string;
   readonly version?: string;
-  readonly phase?: Phase;
-  readonly startedFrom?: string;
-  readonly startedTo?: string;
-  readonly cursor?: string;
+  readonly phases?: readonly Phase[];
+  readonly from?: string;
+  readonly to?: string;
+  readonly sort?: InstanceOrder;
+  readonly page?: number;
   readonly limit?: number;
+}
+
+export interface FailureWindow {
+  readonly from: string;
+  readonly to: string;
+  readonly limit: number;
+}
+
+export interface LastError {
+  readonly status: number | null;
+  readonly type: string | null;
+  readonly title: string | null;
+  readonly detail: string | null;
+}
+
+export interface FailingWorkflow {
+  readonly namespace: string;
+  readonly name: string;
+  readonly failed: number;
+  readonly runs: number;
+  readonly firstFailedAt: string;
+  readonly lastFailedAt: string;
+  readonly lastError: LastError;
+  readonly stillFailing: boolean;
+}
+
+export interface FailingWorkflows {
+  readonly items: readonly FailingWorkflow[];
+  readonly workflows: number;
+  readonly failed: number;
+}
+
+export interface ExpectedStarts {
+  readonly namespace: string;
+  readonly name: string;
+  readonly schedule: Schedule | null;
+  readonly next: readonly string[];
+  readonly missed: number;
+  readonly missedSince: string;
 }
 
 export interface Webhook {

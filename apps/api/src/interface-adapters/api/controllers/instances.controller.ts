@@ -39,12 +39,16 @@ import type { User } from "../../../domain/identity/users/user.js";
 import { InstancePresenter } from "../presenters/instance.presenter.js";
 import { Missing } from "../../../application/automation/enums.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
+import { InstanceReadBack } from "../read-backs/instance.read-back.js";
 import {
+  FailingWorkflowsQuery,
+  FailingWorkflowsResponse,
   InstanceCountsQuery,
   InstanceCountsResponse,
   InstancePageResponse,
   InstanceParams,
   InstanceResponse,
+  InputProblemsResponse,
   InstanceSummaryResponse,
   LATEST,
   ListInstancesQuery,
@@ -73,6 +77,7 @@ export class InstancesController {
     private readonly eventQueries: EventQueries,
     private readonly instancePresenter: InstancePresenter,
     private readonly problemPresenter: ProblemPresenter,
+    private readonly instanceReadBack: InstanceReadBack,
   ) {}
 
   @Post("workflows/:namespace/:name/instances")
@@ -81,7 +86,7 @@ export class InstancesController {
   @ApiCreatedResponse({ standardSchema: InstanceSummaryResponse })
   @ApiNotFoundResponse()
   @ApiConflictResponse()
-  @ApiUnprocessableEntityResponse()
+  @ApiUnprocessableEntityResponse({ standardSchema: InputProblemsResponse })
   async start(
     @Param({ schema: WorkflowParams }) params: WorkflowParams,
     @Body({ schema: StartInstanceBody }) body: StartInstanceBody,
@@ -98,7 +103,7 @@ export class InstancesController {
 
     if (!started.ok) throw this.problemPresenter.ofStart(started.failure);
 
-    return this.#summaryOf(started.value.instanceId);
+    return this.instanceReadBack.summaryOf(started.value.instanceId);
   }
 
   @Get("instances")
@@ -107,20 +112,21 @@ export class InstancesController {
   async list(
     @Query({ schema: ListInstancesQuery }) query: ListInstancesQuery,
   ): Promise<InstancePageResponse> {
-    const startedFrom =
-      query.startedFrom === undefined ? null : new Date(query.startedFrom);
-    const startedTo =
-      query.startedTo === undefined ? null : new Date(query.startedTo);
     const filter = {
       namespace: query.namespace ?? null,
       name: query.name ?? null,
       version: query.version ?? null,
-      phase: query.phase ?? null,
-      startedFrom,
-      startedTo,
+      phases: query.phase ?? [],
+      from: query.from ?? null,
+      to: query.to ?? null,
+      tests: query.tests,
     };
-    const after = query.cursor ?? null;
-    const page = await this.instances.list(filter, after, query.limit);
+    const page = await this.instances.list({
+      filter,
+      order: query.sort,
+      page: query.page,
+      limit: query.limit,
+    });
     return this.instancePresenter.page(page);
   }
 
@@ -130,10 +136,31 @@ export class InstancesController {
   async counts(
     @Query({ schema: InstanceCountsQuery }) query: InstanceCountsQuery,
   ): Promise<InstanceCountsResponse> {
-    const from = new Date(query.from);
-    const to = new Date(query.to);
-    const counted = await this.instances.countsByPhase(from, to);
-    return this.instancePresenter.counts(from, to, counted);
+    const window = {
+      buckets: query.bucket,
+      to: query.to,
+      previousFrom: query.previousFrom ?? null,
+      namespace: query.namespace ?? null,
+      name: query.name ?? null,
+      tests: query.tests,
+    };
+    const counted = await this.instances.counts(window);
+    return this.instancePresenter.counts(counted);
+  }
+
+  @Get("failing-workflows")
+  @Can.Anyone()
+  @ApiOkResponse({ standardSchema: FailingWorkflowsResponse })
+  async failing(
+    @Query({ schema: FailingWorkflowsQuery }) query: FailingWorkflowsQuery,
+  ): Promise<FailingWorkflowsResponse> {
+    const failing = await this.instances.failing({
+      from: query.from,
+      to: query.to,
+      limit: query.limit,
+      tests: query.tests,
+    });
+    return this.instancePresenter.failing(failing);
   }
 
   @Get("instances/:id")
@@ -259,7 +286,7 @@ export class InstancesController {
 
     if (!restarted.ok) throw this.problemPresenter.of(restarted.failure);
 
-    return this.#summaryOf(restarted.value.instanceId);
+    return this.instanceReadBack.summaryOf(restarted.value.instanceId);
   }
 
   @Delete("instances/:id")
@@ -274,14 +301,6 @@ export class InstancesController {
       instanceId: params.id,
     });
     this.#refusedUnless(deleted);
-  }
-
-  async #summaryOf(id: string): Promise<InstanceSummaryResponse> {
-    const instance = await this.instances.get(id);
-
-    if (instance === null) throw this.problemPresenter.of(Missing.Instance);
-
-    return this.instancePresenter.summary(instance);
   }
 
   #refusedUnless(result: InstanceResult): void {

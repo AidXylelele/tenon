@@ -36,6 +36,7 @@ import { Workflow } from "../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../src/domain/automation/workflows/workflow-name.js";
 import type { WorkflowVersion } from "../../src/domain/automation/workflows/workflow-version.js";
 import type { Result } from "../../src/domain/interfaces.js";
+import { UnitOfWork } from "../../src/application/unit-of-work.js";
 import {
   AccountRepository,
   PasswordHasher,
@@ -52,6 +53,12 @@ import { StaleWriteError } from "../../src/domain/stale-write.error.js";
 import type { Invitation } from "../../src/domain/identity/invitations/invitation.js";
 import type { InvitationToken } from "../../src/domain/identity/invitations/invitation-token.js";
 import type { User } from "../../src/domain/identity/users/user.js";
+
+export class FakeUnitOfWork extends UnitOfWork {
+  run<T>(work: () => Promise<T>): Promise<T> {
+    return work();
+  }
+}
 
 export class InMemoryUserRepository extends UserRepository {
   readonly users = new Map<string, User>();
@@ -256,6 +263,7 @@ function instanceRow(
     endedAt: instance.endedAt,
     cancelReason: instance.cancelReason,
     run: instance.run,
+    test: instance.test,
     version,
   };
 }
@@ -495,6 +503,7 @@ export interface InstanceOverrides {
   readonly input?: WorkflowInstanceProps["input"];
   readonly startedAt?: Date | null;
   readonly endedAt?: Date | null;
+  readonly test?: boolean;
   readonly version?: number;
 }
 
@@ -526,6 +535,7 @@ export function anInstanceIn(
     endedAt: overrides.endedAt === undefined ? endedAt : overrides.endedAt,
     cancelReason: null,
     run: overrides.run ?? null,
+    test: overrides.test ?? false,
     version: overrides.version ?? 1,
   });
 }

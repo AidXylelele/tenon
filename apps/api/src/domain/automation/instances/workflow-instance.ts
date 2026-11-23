@@ -40,6 +40,7 @@ export class WorkflowInstance {
   readonly #originEffectId: string | null;
   readonly #input: JsonValue;
   readonly #createdAt: Date;
+  readonly #test: boolean;
   readonly #version: number;
   #phase: Phase;
   #output: JsonValue | null;
@@ -69,6 +70,7 @@ export class WorkflowInstance {
     this.#endedAt = props.endedAt;
     this.#cancelReason = props.cancelReason;
     this.#run = props.run;
+    this.#test = props.test;
     this.#version = props.version;
   }
 
@@ -83,7 +85,7 @@ export class WorkflowInstance {
       versionId: input.version.id,
       trigger: input.trigger,
       starterId: input.starterId,
-      originId: input.originId,
+      originId: input.origin?.id ?? null,
       originEffectId: input.originEffectId,
       input: input.input,
       phase: Phase.Pending,
@@ -94,6 +96,7 @@ export class WorkflowInstance {
       endedAt: null,
       cancelReason: null,
       run: null,
+      test: WorkflowInstance.#testOf(input),
       version: 0,
     });
   }
@@ -112,6 +115,10 @@ export class WorkflowInstance {
 
   get trigger(): TriggerKind {
     return this.#trigger;
+  }
+
+  get test(): boolean {
+    return this.#test;
   }
 
   get starterId(): string | null {
@@ -256,6 +263,14 @@ export class WorkflowInstance {
 
     const awaited = this.awaitsChild(child);
     return !awaited;
+  }
+
+  static livePhases(): Phase[] {
+    const phases = Object.values(Phase);
+    return phases.filter((phase) => {
+      const ended = WorkflowInstance.#ENDED.includes(phase);
+      return !ended;
+    });
   }
 
   static controlsIn(phase: Phase): Control[] {
@@ -435,6 +450,12 @@ export class WorkflowInstance {
     if (ended) return null;
 
     return InstanceRefusal.NotEnded;
+  }
+
+  static #testOf(input: NewInstance): boolean {
+    if (input.version.test) return true;
+
+    return input.origin?.test === true;
   }
 
   #raise(kind: InstanceEventKind): void {

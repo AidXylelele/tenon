@@ -1,11 +1,16 @@
 import { z } from "zod";
-import { TaskStatus } from "../../../application/automation/instances/enums.js";
+import {
+  InstanceOrder,
+  TaskStatus,
+} from "../../../application/automation/instances/enums.js";
+import { InstanceQueries } from "../../../application/automation/instances/queries.js";
 import {
   Control,
   Phase,
   TriggerKind,
   WaitKind,
 } from "../../../domain/automation/instances/enums.js";
+import { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 
 export const ResponseJson = z.json();
 
@@ -33,49 +38,22 @@ export const TaskOutputParams = z.strictObject({
 
 export type TaskOutputParams = z.infer<typeof TaskOutputParams>;
 
-const INSTANCE_CURSOR = /^\d+_[^_]+$/;
-
-const CURSOR_SEPARATOR = "_";
-
-const InstancePosition = z.object({ createdAt: z.date(), id: z.uuid() });
-
-export const InstanceCursor = z.codec(
-  z.string().regex(INSTANCE_CURSOR),
-  InstancePosition,
-  {
-    decode: (cursor) => {
-      const [epoch = "", id = ""] = cursor.split(CURSOR_SEPARATOR);
-      const milliseconds = Number(epoch);
-      const createdAt = new Date(milliseconds);
-      return { createdAt, id };
-    },
-    encode: (position) => {
-      const epoch = position.createdAt.getTime();
-      const milliseconds = String(epoch);
-      return `${milliseconds}${CURSOR_SEPARATOR}${position.id}`;
-    },
-  },
-);
-
-export const ListInstancesQuery = z.strictObject({
-  namespace: z.string().optional(),
-  name: z.string().optional(),
-  version: z.string().min(1).optional(),
-  phase: z.enum(Phase).optional(),
-  startedFrom: z.iso.datetime({ offset: true }).optional(),
-  startedTo: z.iso.datetime({ offset: true }).optional(),
-  cursor: InstanceCursor.optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(50),
-});
-
-export type ListInstancesQuery = z.infer<typeof ListInstancesQuery>;
-
 export const TasksQuery = z.strictObject({
   cursor: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 
 export type TasksQuery = z.infer<typeof TasksQuery>;
+
+export const InputProblemsResponse = z
+  .object({
+    type: z.string(),
+    title: z.string(),
+    status: z.number().int(),
+    detail: z.string(),
+    errors: z.array(z.object({ pointer: z.string(), detail: z.string() })),
+  })
+  .meta({ id: "InputProblemsResponse" });
 
 export const InstanceSummaryResponse = z.object({
   id: z.uuid(),
@@ -84,6 +62,7 @@ export const InstanceSummaryResponse = z.object({
   version: z.string(),
   phase: z.enum(Phase),
   trigger: z.enum(TriggerKind),
+  test: z.boolean(),
   createdAt: z.iso.datetime(),
   startedAt: z.iso.datetime().nullable(),
   endedAt: z.iso.datetime().nullable(),
@@ -91,12 +70,14 @@ export const InstanceSummaryResponse = z.object({
 
 export type InstanceSummaryResponse = z.infer<typeof InstanceSummaryResponse>;
 
+const StarterResponse = z.object({ id: z.uuid(), name: z.string() });
+
 export const InstanceResponse = InstanceSummaryResponse.extend({
   input: z.json(),
   output: z.json().nullable(),
   error: z.json().nullable(),
   originId: z.uuid().nullable(),
-  startedBy: z.object({ id: z.uuid(), name: z.string() }).nullable(),
+  startedBy: StarterResponse.nullable(),
   controls: z.array(z.enum(Control)),
   cancelReason: z.string().nullable(),
   waits: z.array(
@@ -111,9 +92,22 @@ export const InstanceResponse = InstanceSummaryResponse.extend({
 
 export type InstanceResponse = z.infer<typeof InstanceResponse>;
 
+const ListedInstanceResponse = InstanceSummaryResponse.extend({
+  startedBy: StarterResponse.nullable(),
+  durationMs: z.number().int().nullable(),
+  waits: z.array(
+    z.object({
+      kind: z.enum(WaitKind),
+      until: z.iso.datetime().nullable(),
+      stream: z.string().nullable(),
+    }),
+  ),
+});
+
 export const InstancePageResponse = z.object({
-  items: z.array(InstanceSummaryResponse),
-  next: z.string().nullable(),
+  items: z.array(ListedInstanceResponse),
+  total: z.number().int(),
+  exact: z.boolean(),
 });
 
 export type InstancePageResponse = z.infer<typeof InstancePageResponse>;
@@ -146,23 +140,160 @@ export const EventPageResponse = z.object({
 
 export type EventPageResponse = z.infer<typeof EventPageResponse>;
 
+export const Instant = z.codec(z.iso.datetime({ offset: true }), z.date(), {
+  decode: (text) => new Date(text),
+  encode: (date) => date.toISOString(),
+});
+
+const MOST_BUCKETS = 100;
+
+const LONGEST_SPAN = 92 * 24 * 60 * 60 * 1_000;
+
+function spans(from: Date, to: Date): boolean {
+  const span = to.getTime() - from.getTime();
+  return span <= LONGEST_SPAN;
+}
+
+const Buckets = z
+  .union([Instant, z.array(Instant).min(1).max(MOST_BUCKETS)])
+  .transform((value) => [value].flat());
+
+const Included = z
+  .enum(["true", "false"])
+  .transform((value) => value === "true");
+
+const Phases = z
+  .union([z.enum(Phase), z.array(z.enum(Phase))])
+  .transform((value) => [value].flat());
+
+export const ListInstancesQuery = z
+  .strictObject({
+    namespace: z.string().optional(),
+    name: z.string().optional(),
+    version: z.string().min(1).optional(),
+    phase: Phases.optional(),
+    from: Instant.optional(),
+    to: Instant.optional(),
+    tests: Included.default(false),
+    sort: z.enum(InstanceOrder).default(InstanceOrder.Started),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .refine(
+    (query) => {
+      const skipped = (query.page - 1) * query.limit;
+      return skipped < InstanceQueries.MOST_COUNTED;
+    },
+    { message: "the page starts beyond the counted runs", path: ["page"] },
+  );
+
+export type ListInstancesQuery = z.infer<typeof ListInstancesQuery>;
+
 export const InstanceCountsQuery = z
-  .strictObject({ from: z.iso.datetime(), to: z.iso.datetime() })
+  .strictObject({
+    bucket: Buckets,
+    to: Instant,
+    previousFrom: Instant.optional(),
+    namespace: z.string().optional(),
+    name: z.string().optional(),
+    tests: Included.default(false),
+  })
+  .refine(
+    (window) =>
+      window.bucket.every((start, index) => {
+        const next = window.bucket[index + 1] ?? window.to;
+        return start < next;
+      }),
+    { message: "the buckets ascend and end before to", path: ["bucket"] },
+  )
   .refine(
     (window) => {
-      const from = Date.parse(window.from);
-      const to = Date.parse(window.to);
-      return from < to;
+      const first = window.bucket[0] ?? window.to;
+      return window.previousFrom === undefined || window.previousFrom < first;
     },
-    { message: "from is before to", path: ["to"] },
+    {
+      message: "the previous window ends at the first bucket",
+      path: ["previousFrom"],
+    },
+  )
+  .refine(
+    (window) => {
+      const first = window.bucket[0] ?? window.to;
+      const from = window.previousFrom ?? first;
+      return spans(from, window.to);
+    },
+    { message: "the counts span at most 92 days", path: ["previousFrom"] },
   );
 
 export type InstanceCountsQuery = z.infer<typeof InstanceCountsQuery>;
 
+const PhaseCounts = z.record(z.enum(Phase), z.number().int());
+
+export type PhaseCounts = z.infer<typeof PhaseCounts>;
+
+const LivePhases = WorkflowInstance.livePhases();
+
+const LiveCounts = z.record(z.enum(LivePhases), z.number().int());
+
 export const InstanceCountsResponse = z.object({
-  from: z.iso.datetime(),
   to: z.iso.datetime(),
-  counts: z.record(z.enum(Phase), z.number().int()),
+  buckets: z.array(z.object({ start: z.iso.datetime(), counts: PhaseCounts })),
+  total: PhaseCounts,
+  previous: z
+    .object({ from: z.iso.datetime(), counts: PhaseCounts })
+    .nullable(),
+  now: LiveCounts,
 });
 
 export type InstanceCountsResponse = z.infer<typeof InstanceCountsResponse>;
+
+const MOST_FAILING = 100;
+
+const FEW_FAILING = 5;
+
+export const FailingWorkflowsQuery = z
+  .strictObject({
+    from: Instant,
+    to: Instant,
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MOST_FAILING)
+      .default(FEW_FAILING),
+    tests: Included.default(false),
+  })
+  .refine((window) => window.from < window.to, {
+    message: "from is before to",
+    path: ["to"],
+  })
+  .refine((window) => spans(window.from, window.to), {
+    message: "the window spans at most 92 days",
+    path: ["from"],
+  });
+
+export type FailingWorkflowsQuery = z.infer<typeof FailingWorkflowsQuery>;
+
+export const FailingWorkflowsResponse = z.object({
+  items: z.array(
+    z.object({
+      namespace: z.string(),
+      name: z.string(),
+      failed: z.number().int(),
+      runs: z.number().int(),
+      firstFailedAt: z.iso.datetime(),
+      lastFailedAt: z.iso.datetime(),
+      lastError: z.object({
+        status: z.number().int().nullable(),
+        type: z.string().nullable(),
+        title: z.string().nullable(),
+        detail: z.string().nullable(),
+      }),
+      stillFailing: z.boolean(),
+    }),
+  ),
+  workflows: z.number().int(),
+  failed: z.number().int(),
+});
+
+export type FailingWorkflowsResponse = z.infer<typeof FailingWorkflowsResponse>;

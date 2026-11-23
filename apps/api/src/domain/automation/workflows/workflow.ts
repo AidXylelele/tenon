@@ -113,17 +113,33 @@ export class Workflow {
     if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
 
     const version = WorkflowVersion.publish(input);
-    this.#versions = this.#versions.concat([version]);
-    this.#publications.push({
-      version,
-      document: definition.document,
-      imports: definition.imports,
-      source: input.source,
-    });
+    this.#add(version, input);
     this.#currentVersionId = version.id;
 
     if (this.#on) this.#raise(WorkflowEventKind.ScheduleChanged);
 
+    return { ok: true, value: { version, created: true } };
+  }
+
+  testDraft(input: NewPublication): Result<Publication, WorkflowRefusal> {
+    const definition = input.definition;
+    const own = definition.name.equals(this.#name);
+
+    if (!own) throw new TypeError("The definition belongs to another workflow");
+
+    const archived = this.#isArchived();
+
+    if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
+
+    const tested = this.#versions.find((version) =>
+      version.isTestOf(definition, input.publisherId),
+    );
+
+    if (tested !== undefined)
+      return { ok: true, value: { version: tested, created: false } };
+
+    const version = WorkflowVersion.forTest(input);
+    this.#add(version, input);
     return { ok: true, value: { version, created: true } };
   }
 
@@ -138,18 +154,26 @@ export class Workflow {
     return found ?? null;
   }
 
-  archive(now: Date): boolean {
+  archive(now: Date): Result<boolean, WorkflowRefusal> {
+    const unpublished = this.#currentVersionId === null;
+
+    if (unpublished) return { ok: false, failure: WorkflowRefusal.Unpublished };
+
     const archived = this.#isArchived();
 
-    if (archived) return false;
+    if (archived) return { ok: true, value: false };
 
     this.#status = WorkflowStatus.Archived;
     this.#archivedAt = now;
     this.turnOff();
-    return true;
+    return { ok: true, value: true };
   }
 
   turnOn(): Result<boolean, WorkflowRefusal> {
+    const unpublished = this.#currentVersionId === null;
+
+    if (unpublished) return { ok: false, failure: WorkflowRefusal.Unpublished };
+
     const archived = this.#isArchived();
 
     if (archived) return { ok: false, failure: WorkflowRefusal.Archived };
@@ -214,7 +238,7 @@ export class Workflow {
       input: start.input,
       trigger: start.trigger,
       starterId: null,
-      originId: null,
+      origin: null,
       originEffectId: null,
       now: start.now,
     });
@@ -242,9 +266,20 @@ export class Workflow {
       input: previous.input,
       trigger: TriggerKind.Restart,
       starterId: restart.starterId,
-      originId: previous.id,
+      origin: previous,
       originEffectId: null,
       now: restart.now,
+    });
+  }
+
+  #add(version: WorkflowVersion, input: NewPublication): void {
+    const definition = input.definition;
+    this.#versions = this.#versions.concat([version]);
+    this.#publications.push({
+      version,
+      document: definition.document,
+      imports: definition.imports,
+      source: input.source,
     });
   }
 
@@ -258,7 +293,7 @@ export class Workflow {
   }
 
   #versionAt(semver: string): WorkflowVersion | null {
-    const found = this.#versions.find((version) => version.semver === semver);
+    const found = this.#versions.find((version) => version.isNumbered(semver));
     return found ?? null;
   }
 

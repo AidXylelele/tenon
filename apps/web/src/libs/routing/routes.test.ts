@@ -63,11 +63,15 @@ describe("the addresses of the console", () => {
       runsHref({
         namespace: "sales",
         name: "",
-        phase: "faulted",
+        status: "in-progress,failed",
         started: "24h",
-        cursor: undefined,
+        page: 2,
+        size: undefined,
+        sort: "duration",
       }),
-    ).toBe("/runs?namespace=sales&phase=faulted&started=24h");
+    ).toBe(
+      "/runs?namespace=sales&status=in-progress%2Cfailed&started=24h&page=2&sort=duration",
+    );
   });
 
   it("sign_in_says_why_and_where_to_return", () => {

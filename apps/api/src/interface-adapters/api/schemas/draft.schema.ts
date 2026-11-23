@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { InputProblemsResponse } from "./instance.schema.js";
+import { DefinitionProblemsResponse } from "./workflow.schema.js";
 
 export const DraftLayout = z.record(z.string(), z.json());
 
@@ -27,3 +29,14 @@ export const DraftConflictResponse = z.object({
   detail: z.string(),
   current: DraftResponse.optional(),
 });
+
+export const TestRunBody = z.strictObject({ input: z.json().default({}) });
+
+export type TestRunBody = z.infer<typeof TestRunBody>;
+
+export const TestRunFingerprint = TestRunBody.or(z.unknown());
+
+export const TestRunProblemsResponse = z.union([
+  DefinitionProblemsResponse,
+  InputProblemsResponse,
+]);

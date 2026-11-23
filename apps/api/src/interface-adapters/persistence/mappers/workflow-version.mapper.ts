@@ -24,6 +24,7 @@ export class WorkflowVersionMapper {
       source: publication.source,
       publisherId: version.publisherId,
       publishedAt: version.publishedAt,
+      test: version.test,
     };
   }
 
@@ -38,6 +39,7 @@ export class WorkflowVersionMapper {
       secrets: row.secrets,
       publisherId: row.publisherId,
       publishedAt: row.publishedAt,
+      test: row.test,
     });
   }
 }

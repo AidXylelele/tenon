@@ -42,6 +42,7 @@ export interface WorkflowVersionProps {
   readonly secrets: readonly string[];
   readonly publisherId: string;
   readonly publishedAt: Date;
+  readonly test: boolean;
 }
 
 export type ImportTexts = Readonly<Record<string, string>>;
@@ -83,7 +84,7 @@ export interface NewInstance {
   readonly input: JsonValue;
   readonly trigger: TriggerKind;
   readonly starterId: string | null;
-  readonly originId: string | null;
+  readonly origin: WorkflowInstance | null;
   readonly originEffectId: string | null;
   readonly now: Date;
 }

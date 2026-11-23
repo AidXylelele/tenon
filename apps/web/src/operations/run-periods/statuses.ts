@@ -52,6 +52,11 @@ export function phasesOf(status: RunStatus): readonly Phase[] {
   return [group.phase];
 }
 
+export function statusOf(phase: Phase): RunStatus {
+  const found = STATUSES.find((status) => phasesOf(status).includes(phase));
+  return found ?? "in-progress";
+}
+
 export function statusParamOf(statuses: readonly RunStatus[]): string {
   const chosen = inOrder(statuses);
   return chosen.join(SEPARATOR);
@@ -67,12 +72,15 @@ export function summaryOf(
   started: Started,
   phaseWord: PhaseWord,
 ): string {
-  const runs = runsOf(statuses, phaseWord);
+  const runs = runsPhraseOf(statuses, phaseWord);
   const phrase = periodPhrase(started);
   return `${runs} ${phrase}`;
 }
 
-function runsOf(statuses: readonly RunStatus[], phaseWord: PhaseWord): string {
+export function runsPhraseOf(
+  statuses: readonly RunStatus[],
+  phaseWord: PhaseWord,
+): string {
   const chosen = inOrder(statuses);
 
   if (chosen.length === 0) return ALL_RUNS;

@@ -57,6 +57,16 @@ describe("Workflow on and off", () => {
     expect(changes(workflow)).toEqual([changed.kind]);
   });
 
+  it("a_workflow_never_published_refuses_to_turn_on", () => {
+    const workflow = Workflow.register(name);
+
+    const turned = workflow.turnOn();
+
+    expect(turned).toEqual({ ok: false, failure: WorkflowRefusal.Unpublished });
+    expect(workflow.on).toBe(false);
+    expect(workflow.events).toEqual([]);
+  });
+
   it("an_archived_workflow_refuses_to_turn_on", () => {
     const workflow = Workflow.register(name);
     published(workflow);

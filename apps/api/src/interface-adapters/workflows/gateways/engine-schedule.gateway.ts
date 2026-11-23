@@ -1,9 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import {
-  Propagation,
-  Transactional,
-  TransactionHost,
-} from "@nestjs-cls/transactional";
+import { TransactionHost } from "@nestjs-cls/transactional";
 import {
   WorkflowClient,
   WorkflowSchedules as EngineSchedules,
@@ -21,6 +17,7 @@ import { ScheduleRun } from "../runners/schedule.run.js";
 
 @Injectable()
 export class EngineScheduleGateway implements WorkflowSchedules {
+  static readonly PREFIX = "schedule-";
   private static readonly UTC = "UTC";
   private static readonly CRON_POINTER = "/schedule/cron";
 
@@ -106,7 +103,6 @@ export class EngineScheduleGateway implements WorkflowSchedules {
     await this.schedules.remove(id);
   }
 
-  @Transactional(Propagation.Mandatory)
   async continueAfter(
     instance: WorkflowInstance,
     version: WorkflowVersion,
@@ -127,6 +123,6 @@ export class EngineScheduleGateway implements WorkflowSchedules {
   }
 
   #idOf(workflowId: string): string {
-    return `schedule-${workflowId}`;
+    return `${EngineScheduleGateway.PREFIX}${workflowId}`;
   }
 }

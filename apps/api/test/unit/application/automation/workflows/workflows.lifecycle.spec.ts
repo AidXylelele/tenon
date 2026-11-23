@@ -2,6 +2,7 @@ import { Missing } from "../../../../../src/application/automation/enums.js";
 import { ArchiveWorkflow } from "../../../../../src/application/automation/workflows/archive-workflow.js";
 import { CheckDefinition } from "../../../../../src/application/automation/workflows/check-definition.js";
 import { DefinitionRefusal } from "../../../../../src/application/automation/workflows/enums.js";
+import { DraftCompilation } from "../../../../../src/application/automation/drafts/draft-compilation.js";
 import { PublishDraft } from "../../../../../src/application/automation/drafts/publish-draft.js";
 import {
   WorkflowRefusal,
@@ -17,7 +18,10 @@ import {
   RecordingSchedules,
   StoredWorkflowRepository,
   T0,
+  FakeUnitOfWork,
 } from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
 
 const later = new Date("2026-11-03T12:00:00.000Z");
 const name = new WorkflowName("sales", "route-lead");
@@ -32,12 +36,12 @@ function setUp() {
   const schedules = new RecordingSchedules();
   const drafts = new StoredDrafts();
   const check = new CheckDefinition(compiler, workflows, secrets, schedules);
+  const compilation = new DraftCompilation(drafts, secrets, compiler);
   const publishDraft = new PublishDraft(
-    drafts,
-    compiler,
+    compilation,
     workflows,
-    secrets,
     schedules,
+    unitOfWork,
   );
   const publish = {
     execute: async (command: DraftPublication) => {
@@ -57,7 +61,7 @@ function setUp() {
       });
     },
   };
-  const archive = new ArchiveWorkflow(workflows);
+  const archive = new ArchiveWorkflow(workflows, unitOfWork);
   return { compiler, workflows, check, publish, archive };
 }
 

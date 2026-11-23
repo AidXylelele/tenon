@@ -21,3 +21,24 @@ export interface PeriodWindows {
   readonly unit: BucketUnit;
   readonly buckets: readonly Bucket[];
 }
+
+export type FigureKind = "started" | "succeeded" | "failed" | "cancelled";
+
+export interface Figure {
+  readonly kind: FigureKind;
+  readonly count: number;
+  readonly previous: number | null;
+}
+
+export interface Bar extends Bucket {
+  readonly succeeded: number;
+  readonly failed: number;
+  readonly cancelled: number;
+  readonly inProgress: number;
+}
+
+export interface CountRequest {
+  readonly buckets: readonly string[];
+  readonly to: string;
+  readonly previousFrom: string;
+}

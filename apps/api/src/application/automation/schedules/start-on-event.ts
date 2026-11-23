@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Transactional } from "@nestjs-cls/transactional";
+import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { EventStore } from "../events/ports.js";
@@ -21,9 +21,9 @@ export class StartOnEvent {
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
     private readonly runs: InstanceRuns,
+    private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  @Transactional()
   async execute(command: TriggerCommand): Promise<void> {
     const event = await this.events.find(command.sequence);
     const workflow = await this.workflows.findById(command.workflowId);
@@ -58,7 +58,10 @@ export class StartOnEvent {
 
     if (!started.ok) return;
 
-    await this.instances.save(started.value);
-    await this.runs.start(started.value);
+    const instance = started.value;
+    await this.unitOfWork.run(async () => {
+      await this.instances.save(instance);
+      await this.runs.start(instance);
+    });
   }
 }

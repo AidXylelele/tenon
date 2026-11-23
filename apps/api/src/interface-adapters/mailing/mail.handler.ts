@@ -5,7 +5,7 @@ import {
   OnOutboxMessage,
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
-import { OutboxTracer } from "../messaging/outbox.tracer.js";
+import { type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { MailTopic } from "./enums.js";
 import type {
   InvitationMailData,
@@ -17,10 +17,9 @@ import { PasswordResetMail } from "./templates/password-reset.mail.js";
 
 @Injectable()
 export class MailHandler {
-  constructor(
-    private readonly mailer: Mailer,
-    private readonly tracer: OutboxTracer,
-  ) {}
+  readonly #tracer = trace.getTracer("tenon-api");
+
+  constructor(private readonly mailer: Mailer) {}
 
   @OnOutboxMessage(MailTopic.Invitation, { consumer: "invitation-mail" })
   sendInvitation(
@@ -60,7 +59,44 @@ export class MailHandler {
     context: OutboxHandlerContext,
     send: () => Promise<MailSendResult>,
   ): Promise<void> {
-    return this.tracer.processed(context, () => this.#sent(send));
+    const topic = context.message.topic;
+    const name = `process ${topic}`;
+    const options = {
+      kind: SpanKind.CONSUMER,
+      attributes: {
+        "messaging.system": "outbox",
+        "messaging.operation.name": "process",
+        "messaging.operation.type": "process",
+        "messaging.destination.name": topic,
+      },
+    };
+    return this.#tracer.startActiveSpan(name, options, (span) =>
+      this.#traced(span, send),
+    );
+  }
+
+  async #traced(
+    span: Span,
+    send: () => Promise<MailSendResult>,
+  ): Promise<void> {
+    try {
+      await this.#sent(send);
+    } catch (error) {
+      this.#failed(span, error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+
+  #failed(span: Span, error: unknown): void {
+    if (!(error instanceof Error)) {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+      return;
+    }
+
+    span.recordException(error);
+    span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
   }
 
   async #sent(send: () => Promise<MailSendResult>): Promise<void> {

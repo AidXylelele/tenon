@@ -1,7 +1,7 @@
 import request from "supertest";
 import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
 import { getHttpClientToken, HttpClient } from "@nestjs/http-client";
-import { HttpClientName } from "../../../src/frameworks/http-client/enums.js";
+import { HttpClientName } from "../../../src/frameworks/network/enums.js";
 import { Role } from "../../../src/domain/identity/users/enums.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
@@ -139,18 +139,20 @@ describe("running sub-workflows and processes as runs of their own", () => {
     const ended = await Promise.all(
       parents.map((parent) => instanceOf(t, editor, parent.id)),
     );
-    const response = await request(t.server)
-      .get("/api/v1/instances?name=child&limit=200")
+    const children = await request(t.server)
+      .get("/api/v1/instances?name=child&limit=1")
       .set(editor)
       .expect(200);
-    const completed = (response.body as Page<InstanceBody>).items.filter(
-      (child) => child.phase === "completed",
-    );
+    const completed = await request(t.server)
+      .get("/api/v1/instances?name=child&phase=completed&limit=1")
+      .set(editor)
+      .expect(200);
 
     expect(ended.map((parent) => parent.phase)).toEqual(
       Array.from({ length: 20 }, () => "completed"),
     );
-    expect(completed).toHaveLength(200);
+    expect((children.body as { total: number }).total).toBe(200);
+    expect((completed.body as { total: number }).total).toBe(200);
   }, 180_000);
 
   it("a_parent_cancelled_while_it_awaits_a_child_ends_cancelled_and_cancels_its_child", async () => {
