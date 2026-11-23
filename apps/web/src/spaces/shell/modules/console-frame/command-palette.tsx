@@ -24,11 +24,13 @@ import { useWorkflowSearch } from "./workflow-results";
 
 interface CommandPaletteProps {
   readonly capabilities: Capabilities | null;
+  readonly userId: string | null;
   readonly keepTheme: KeepTheme;
 }
 
 export function CommandPalette({
   capabilities,
+  userId,
   keepTheme,
 }: CommandPaletteProps) {
   const router = useRouter();
@@ -96,6 +98,7 @@ export function CommandPalette({
           <DialogTitle className="sr-only">Search and commands</DialogTitle>
           <PaletteContent
             capabilities={capabilities}
+            userId={userId}
             keepTheme={keepTheme}
             workflows={workflows}
             onFollow={follow}

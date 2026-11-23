@@ -32,7 +32,11 @@ export async function ConsoleFrame({
         search={
           <Suspense
             fallback={
-              <CommandPalette capabilities={null} keepTheme={keepThemeAction} />
+              <CommandPalette
+                capabilities={null}
+                userId={null}
+                keepTheme={keepThemeAction}
+              />
             }
           >
             <SignedInSearch />
@@ -77,9 +81,14 @@ async function SignedInSidebar() {
 async function SignedInSearch() {
   const session = await signedIn();
   const capabilities = session?.capabilities ?? null;
+  const userId = session?.user.id ?? null;
 
   return (
-    <CommandPalette capabilities={capabilities} keepTheme={keepThemeAction} />
+    <CommandPalette
+      capabilities={capabilities}
+      userId={userId}
+      keepTheme={keepThemeAction}
+    />
   );
 }
 

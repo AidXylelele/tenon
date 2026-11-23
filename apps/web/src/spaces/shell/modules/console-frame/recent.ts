@@ -9,24 +9,34 @@ export interface Visit {
 }
 
 const KEY = "console.recent";
+const NOBODY = "";
 const CHANGED = "console:recent-changed";
 const KEPT = 5;
 
 const Visits = z.array(z.object({ label: z.string(), href: z.string() }));
 
-export function useRecent(): readonly Visit[] {
-  const stored = useSyncExternalStore(subscribe, storedText, nothingOnServer);
+export function useRecent(userId: string | null): readonly Visit[] {
+  const key = keyOf(userId);
+  const stored = useSyncExternalStore(
+    subscribe,
+    () => storedText(key),
+    nothingOnServer,
+  );
   return visitsOf(stored);
 }
 
-export function remember(visit: Visit): void {
-  const stored = storedText();
+export function remember(userId: string | null, visit: Visit): void {
+  const key = keyOf(userId);
+
+  if (key === NOBODY) return;
+
+  const stored = storedText(key);
   const earlier = visitsOf(stored).filter((each) => each.href !== visit.href);
   const kept = [visit].concat(earlier).slice(0, KEPT);
   const text = JSON.stringify(kept);
 
   try {
-    window.localStorage.setItem(KEY, text);
+    window.localStorage.setItem(key, text);
   } catch {
     return;
   }
@@ -43,9 +53,17 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-function storedText(): string {
+function keyOf(userId: string | null): string {
+  if (userId === null) return NOBODY;
+
+  return `${KEY}.${userId}`;
+}
+
+function storedText(key: string): string {
+  if (key === NOBODY) return "";
+
   try {
-    return window.localStorage.getItem(KEY) ?? "";
+    return window.localStorage.getItem(key) ?? "";
   } catch {
     return "";
   }

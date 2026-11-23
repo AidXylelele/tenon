@@ -49,12 +49,19 @@ async function answer(): Promise<Response> {
   return Response.json(found);
 }
 
+const ADA = "7c41e2d0-ada";
+const ADA_RECENT = `console.recent.${ADA}`;
+
 function renderFor(capabilities: Capabilities | null) {
   return render(
     <TooltipProvider>
       <Announcer>
         <button type="button">Elsewhere</button>
-        <CommandPalette capabilities={capabilities} keepTheme={keepTheme} />
+        <CommandPalette
+          capabilities={capabilities}
+          userId={ADA}
+          keepTheme={keepTheme}
+        />
       </Announcer>
     </TooltipProvider>,
   );
@@ -325,7 +332,7 @@ describe("the search of the console", () => {
     const stored = JSON.stringify([
       { label: "Platform", href: "/settings/platform" },
     ]);
-    window.localStorage.setItem("console.recent", stored);
+    window.localStorage.setItem(ADA_RECENT, stored);
     renderFor(VIEWER);
     pressK("metaKey");
 
@@ -341,7 +348,20 @@ describe("the search of the console", () => {
     ["text_that_is_not_json", "not json"],
     ["json_of_another_shape", '{"label":"Runs"}'],
   ])("recent_visits_kept_as_%s_are_left_out", (_, stored) => {
-    window.localStorage.setItem("console.recent", stored);
+    window.localStorage.setItem(ADA_RECENT, stored);
+    renderFor(VIEWER);
+
+    pressK("metaKey");
+
+    const groups = groupNames();
+    expect(groups).toEqual(["Go to", "Actions"]);
+  });
+
+  it("another_person's_recent_visits_are_left_out", () => {
+    const stored = JSON.stringify([
+      { label: "Platform", href: "/settings/platform" },
+    ]);
+    window.localStorage.setItem("console.recent.5b0e-grace", stored);
     renderFor(VIEWER);
 
     pressK("metaKey");

@@ -48,6 +48,7 @@ const RUN_PROMPT = "Which workflow to run?";
 
 interface PaletteContentProps {
   readonly capabilities: Capabilities | null;
+  readonly userId: string | null;
   readonly keepTheme: KeepTheme;
   readonly workflows: WorkflowSearch;
   readonly onFollow: (href: string) => void;
@@ -55,13 +56,14 @@ interface PaletteContentProps {
 
 export function PaletteContent({
   capabilities,
+  userId,
   keepTheme,
   workflows,
   onFollow,
 }: PaletteContentProps) {
   const scheme = useColorScheme();
   const { choose } = useThemeChoice(keepTheme);
-  const recent = useRecent();
+  const recent = useRecent(userId);
   const [view, setView] = useState<View>("everything");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState("");
@@ -77,7 +79,7 @@ export function PaletteContent({
   const prompt = view === "run" ? RUN_PROMPT : PROMPT;
 
   function visit(visited: Visit) {
-    remember(visited);
+    remember(userId, visited);
     onFollow(visited.href);
   }
 

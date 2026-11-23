@@ -79,6 +79,7 @@ function FrameStory({
             search={
               <CommandPalette
                 capabilities={capabilities}
+                userId={ADA.id}
                 keepTheme={keepTheme}
               />
             }
