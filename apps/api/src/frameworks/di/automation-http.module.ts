@@ -58,6 +58,7 @@ import { DraftPresenter } from "../../interface-adapters/api/presenters/draft.pr
 import { HostPresenter } from "../../interface-adapters/api/presenters/host.presenter.js";
 import { ImportPresenter } from "../../interface-adapters/api/presenters/import.presenter.js";
 import { InstancePresenter } from "../../interface-adapters/api/presenters/instance.presenter.js";
+import { InstanceReadBack } from "../../interface-adapters/api/read-backs/instance.read-back.js";
 import { SecretPresenter } from "../../interface-adapters/api/presenters/secret.presenter.js";
 import { SubscriptionPresenter } from "../../interface-adapters/api/presenters/subscription.presenter.js";
 import { WebhookPresenter } from "../../interface-adapters/api/presenters/webhook.presenter.js";
@@ -149,6 +150,7 @@ import { HttpModule } from "./http.module.js";
     DraftPresenter,
     WorkflowPresenter,
     InstancePresenter,
+    InstanceReadBack,
     HostPresenter,
     ImportPresenter,
     SecretPresenter,

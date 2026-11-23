@@ -39,6 +39,7 @@ import type { User } from "../../../domain/identity/users/user.js";
 import { InstancePresenter } from "../presenters/instance.presenter.js";
 import { Missing } from "../../../application/automation/enums.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";
+import { InstanceReadBack } from "../read-backs/instance.read-back.js";
 import {
   FailingWorkflowsQuery,
   FailingWorkflowsResponse,
@@ -76,6 +77,7 @@ export class InstancesController {
     private readonly eventQueries: EventQueries,
     private readonly instancePresenter: InstancePresenter,
     private readonly problemPresenter: ProblemPresenter,
+    private readonly instanceReadBack: InstanceReadBack,
   ) {}
 
   @Post("workflows/:namespace/:name/instances")
@@ -101,7 +103,7 @@ export class InstancesController {
 
     if (!started.ok) throw this.problemPresenter.ofStart(started.failure);
 
-    return this.#summaryOf(started.value.instanceId);
+    return this.instanceReadBack.summaryOf(started.value.instanceId);
   }
 
   @Get("instances")
@@ -284,7 +286,7 @@ export class InstancesController {
 
     if (!restarted.ok) throw this.problemPresenter.of(restarted.failure);
 
-    return this.#summaryOf(restarted.value.instanceId);
+    return this.instanceReadBack.summaryOf(restarted.value.instanceId);
   }
 
   @Delete("instances/:id")
@@ -299,14 +301,6 @@ export class InstancesController {
       instanceId: params.id,
     });
     this.#refusedUnless(deleted);
-  }
-
-  async #summaryOf(id: string): Promise<InstanceSummaryResponse> {
-    const instance = await this.instances.get(id);
-
-    if (instance === null) throw this.problemPresenter.of(Missing.Instance);
-
-    return this.instancePresenter.summary(instance);
   }
 
   #refusedUnless(result: InstanceResult): void {

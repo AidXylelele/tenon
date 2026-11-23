@@ -21,14 +21,11 @@ import {
   ApiUnprocessableEntityResponse,
 } from "@nestjs/swagger";
 import { TestDraft } from "../../../application/automation/drafts/test-draft.js";
-import { Missing } from "../../../application/automation/enums.js";
-import { InstanceQueries } from "../../../application/automation/instances/queries.js";
 import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { User } from "../../../domain/identity/users/user.js";
 import { EntityTagMapper } from "../mappers/entity-tag.mapper.js";
 import { DraftPresenter } from "../presenters/draft.presenter.js";
-import { InstancePresenter } from "../presenters/instance.presenter.js";
-import { ProblemPresenter } from "../presenters/problem.presenter.js";
+import { InstanceReadBack } from "../read-backs/instance.read-back.js";
 import {
   DraftConflictResponse,
   TestRunBody,
@@ -44,10 +41,8 @@ import { WorkflowParams } from "../schemas/workflow.schema.js";
 export class TestRunsController {
   constructor(
     private readonly testDraft: TestDraft,
-    private readonly instances: InstanceQueries,
-    private readonly instancePresenter: InstancePresenter,
+    private readonly instanceReadBack: InstanceReadBack,
     private readonly draftPresenter: DraftPresenter,
-    private readonly problemPresenter: ProblemPresenter,
     private readonly entityTagMapper: EntityTagMapper,
   ) {}
 
@@ -90,10 +85,6 @@ export class TestRunsController {
 
     if (!tested.ok) throw this.draftPresenter.testRefusalOf(tested.failure);
 
-    const instance = await this.instances.get(tested.value.instanceId);
-
-    if (instance === null) throw this.problemPresenter.of(Missing.Instance);
-
-    return this.instancePresenter.summary(instance);
+    return this.instanceReadBack.summaryOf(tested.value.instanceId);
   }
 }
