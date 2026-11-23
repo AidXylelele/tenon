@@ -2,19 +2,25 @@ import type { Phase } from "@/libs/data-access/types";
 import type { RunStatus, Started } from "./interfaces";
 import { periodPhrase } from "./periods";
 
-interface StatusWords {
-  readonly label: string;
-  readonly phases: readonly Phase[];
-}
+type PhaseWord = (phase: Phase) => string;
 
-const STATUS: Record<RunStatus, StatusWords> = {
+type StatusGroup =
+  | {
+      readonly kind: "group";
+      readonly label: string;
+      readonly phases: readonly Phase[];
+    }
+  | { readonly kind: "phase"; readonly phase: Phase };
+
+const STATUS: Record<RunStatus, StatusGroup> = {
   "in-progress": {
+    kind: "group",
     label: "In progress",
     phases: ["pending", "running", "waiting", "suspended"],
   },
-  succeeded: { label: "Succeeded", phases: ["completed"] },
-  failed: { label: "Failed", phases: ["faulted"] },
-  cancelled: { label: "Cancelled", phases: ["cancelled"] },
+  succeeded: { kind: "phase", phase: "completed" },
+  failed: { kind: "phase", phase: "faulted" },
+  cancelled: { kind: "phase", phase: "cancelled" },
 };
 
 export const STATUSES: readonly RunStatus[] = [
@@ -30,12 +36,20 @@ const ALL_RUNS = "All runs";
 
 const disjunction = new Intl.ListFormat("en-GB", { type: "disjunction" });
 
-export function statusLabel(status: RunStatus): string {
-  return STATUS[status].label;
+export function statusLabel(status: RunStatus, phaseWord: PhaseWord): string {
+  const group = STATUS[status];
+
+  if (group.kind === "group") return group.label;
+
+  return phaseWord(group.phase);
 }
 
 export function phasesOf(status: RunStatus): readonly Phase[] {
-  return STATUS[status].phases;
+  const group = STATUS[status];
+
+  if (group.kind === "group") return group.phases;
+
+  return [group.phase];
 }
 
 export function statusParamOf(statuses: readonly RunStatus[]): string {
@@ -51,18 +65,21 @@ export function statusesOf(param: string | undefined): readonly RunStatus[] {
 export function summaryOf(
   statuses: readonly RunStatus[],
   started: Started,
+  phaseWord: PhaseWord,
 ): string {
-  const runs = runsOf(statuses);
+  const runs = runsOf(statuses, phaseWord);
   const phrase = periodPhrase(started);
   return `${runs} ${phrase}`;
 }
 
-function runsOf(statuses: readonly RunStatus[]): string {
+function runsOf(statuses: readonly RunStatus[], phaseWord: PhaseWord): string {
   const chosen = inOrder(statuses);
 
   if (chosen.length === 0) return ALL_RUNS;
 
-  const words = chosen.map((status) => STATUS[status].label.toLowerCase());
+  const words = chosen.map((status) =>
+    statusLabel(status, phaseWord).toLowerCase(),
+  );
   const listed = disjunction.format(words);
   return capitalised(listed);
 }

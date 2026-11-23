@@ -16,13 +16,17 @@ import {
   search,
   searchKeymap,
 } from "@codemirror/search";
-import { Compartment, EditorState, type Extension } from "@codemirror/state";
+import {
+  Compartment,
+  EditorState,
+  type Extension,
+  Prec,
+} from "@codemirror/state";
 import {
   crosshairCursor,
   type EditorView,
   drawSelection,
   dropCursor,
-  highlightActiveLine,
   highlightActiveLineGutter,
   highlightSpecialChars,
   keymap,
@@ -38,12 +42,14 @@ export function forgetHistory(view: EditorView): void {
 }
 
 export function baseSetup(): Extension {
+  const numbers = lineNumbers();
+  const folds = foldGutter();
+  const afterProblems = Prec.low([numbers, folds]);
   return [
-    lineNumbers(),
+    afterProblems,
     highlightActiveLineGutter(),
     highlightSpecialChars(),
     remembered.of(history()),
-    foldGutter(),
     drawSelection(),
     dropCursor(),
     EditorState.allowMultipleSelections.of(true),
@@ -52,7 +58,6 @@ export function baseSetup(): Extension {
     closeBrackets(),
     rectangularSelection(),
     crosshairCursor(),
-    highlightActiveLine(),
     highlightSelectionMatches(),
     search(),
     keymap.of([

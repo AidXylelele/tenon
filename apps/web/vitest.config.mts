@@ -16,20 +16,59 @@ const LIB_FLOOR = {
   statements: 85,
 };
 
+const FEATURE_FLOOR = {
+  lines: 85,
+  branches: 85,
+  functions: 85,
+  statements: 85,
+};
+
+const FEATURES_DELETED_IN_M5 = [
+  "code-editor",
+  "step-inspector",
+  "workflow-canvas",
+];
+
+const FEATURES_WAITING_FOR_TESTS = [
+  "draft-conflict",
+  "new-password-field",
+  "problems",
+  "run-status",
+  "viewer-notice",
+];
+
+const FEATURES_BELOW_THE_FLOOR = FEATURES_DELETED_IN_M5.concat(
+  FEATURES_WAITING_FOR_TESTS,
+);
+
 type Floor = typeof OPERATION_FLOOR;
 
-const operations = new URL("./src/operations/", import.meta.url);
+function floorsOf(
+  tier: string,
+  floor: Floor,
+  exempt: readonly string[],
+): [string, Floor][] {
+  const folder = new URL(`./src/${tier}/`, import.meta.url);
 
-const operationFloors = readdirSync(operations, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry): [string, Floor] => [
-    `src/operations/${entry.name}/**`,
-    OPERATION_FLOOR,
-  ]);
+  return readdirSync(folder, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !exempt.includes(entry.name))
+    .map((entry): [string, Floor] => [`src/${tier}/${entry.name}/**`, floor]);
+}
+
+const operationFloors = floorsOf("operations", OPERATION_FLOOR, []);
+
+const featureFloors = floorsOf(
+  "features",
+  FEATURE_FLOOR,
+  FEATURES_BELOW_THE_FLOOR,
+);
 
 const libFloors: [string, Floor][] = [
+  ["src/features/workflow-flow/**", LIB_FLOOR],
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
+  ["src/libs/flow/**", LIB_FLOOR],
+  ["src/libs/language-client/**", LIB_FLOOR],
   ["src/libs/ui/components/**", LIB_FLOOR],
   ["src/libs/ui/components/dialog.tsx", LIB_FLOOR],
   ["src/libs/ui/components/dropdown-menu.tsx", LIB_FLOOR],
@@ -42,7 +81,22 @@ const libFloors: [string, Floor][] = [
   ["src/libs/ui/tokens/**", LIB_FLOOR],
 ];
 
-const floors = operationFloors.concat(libFloors);
+const modulePartFloors: [string, Floor][] = [
+  [
+    "src/spaces/workflows/modules/workflow-editor/script-field/**",
+    FEATURE_FLOOR,
+  ],
+  [
+    "src/spaces/workflows/modules/workflow-editor/step-catalog/**",
+    FEATURE_FLOOR,
+  ],
+];
+
+const floors = operationFloors.concat(
+  libFloors,
+  featureFloors,
+  modulePartFloors,
+);
 
 const thresholds = Object.fromEntries(floors);
 
@@ -62,7 +116,10 @@ export default defineConfig({
     },
     coverage: {
       provider: "v8",
-      include: ["src/{operations,features,libs}/**/*.{ts,tsx}"],
+      include: [
+        "src/{operations,features,libs}/**/*.{ts,tsx}",
+        "src/spaces/workflows/modules/workflow-editor/**/*.{ts,tsx}",
+      ],
       exclude: ["src/**/*.stories.tsx", "src/**/*.test-support.ts"],
       thresholds,
     },

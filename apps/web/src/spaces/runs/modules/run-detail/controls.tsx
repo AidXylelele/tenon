@@ -69,7 +69,7 @@ export function Controls({
             variant="outline"
             disabled={pending}
             onClick={() => {
-              control("suspend", "Suspended: it waits until resumed");
+              control("suspend", "Paused: it waits until resumed");
             }}
           >
             <PauseIcon data-icon="inline-start" />
