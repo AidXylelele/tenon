@@ -72,7 +72,8 @@ export class EngineScheduleGateway
     const spec = this.#specOf(schedule);
     const workflowId = schedule.id.slice(EngineScheduleGateway.PREFIX.length);
     const due = now - EngineScheduleGateway.GRACE;
-    const since = Math.max(from.getTime(), schedule.createdAt);
+    const windowStart = from.getTime();
+    const since = Math.max(windowStart, schedule.createdAt);
     const passed = await this.#passedOf(spec, since, due);
     const last = passed.at(-1) ?? due;
     const [following] = await this.#preview(spec, last, 1);
@@ -101,7 +102,8 @@ export class EngineScheduleGateway
     if (reached || ended) return earliest.filter((at) => at <= due);
 
     const span = last - first;
-    const latest = await this.#preview(spec, due - span - 1, most);
+    const before = due - span - 1;
+    const latest = await this.#preview(spec, before, most);
     return latest.filter((at) => at <= due);
   }
 
@@ -257,6 +259,6 @@ export class EngineScheduleGateway
   }
 
   #idOf(workflowId: string): string {
-    return `schedule-${workflowId}`;
+    return `${EngineScheduleGateway.PREFIX}${workflowId}`;
   }
 }

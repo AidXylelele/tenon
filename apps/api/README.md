@@ -48,6 +48,13 @@ tick (`@OnOneInstance`), and each AsyncAPI receiver is held by one worker under 
   the publishes made while offline.
 - Telemetry from a run of the sources needs `start` or `start:worker`: the `dev` scripts do not preload the
   instrumentation.
+- A run belongs to a period by its start: a run cancelled or failed before it began has no start time and is in no
+  period's counts and in no list filtered by a start window.
+- The runs list counts its total up to 10,000 and says when there are more (`exact: false`). Counts, failing
+  workflows and the order by duration read every run of the window: at 1,000,000 runs they stay under 50 ms for a
+  day, and take about 0.1 s for a week and 0.4 s for 30 days with the previous period.
+- Missed starts are counted from the moment a workflow's schedule was turned on; after a change of the schedule's
+  timing the occurrences of the earlier timing in the window are counted against the new one.
 
 ## Structure
 
