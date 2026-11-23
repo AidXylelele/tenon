@@ -20,25 +20,26 @@ import { ResilienceModule } from "@nestjs/resilience";
 import {
   resiliencePresets,
   responseSizeLimit,
-} from "../../../../src/frameworks/di/host.presets.js";
-import { GrpcClient } from "../../../../src/frameworks/grpc/grpc.client.js";
-import { ProtoSchema } from "../../../../src/frameworks/grpc/proto-schema.js";
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
-import type { Authenticator } from "../../../../src/interface-adapters/workflows/effects/authenticator.js";
-import type { ResourceClient } from "../../../../src/interface-adapters/workflows/interfaces.js";
-import { TransportFailures } from "../../../../src/interface-adapters/workflows/effects/transport-failures.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+} from "../../../../../src/frameworks/di/host.presets.js";
+import { GrpcConnection } from "../../../../../src/frameworks/grpc/grpc.connection.js";
+import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import type { Authenticator } from "../../../../../src/interface-adapters/workflows/effects/authenticator.js";
+import type { ResourceClient } from "../../../../../src/interface-adapters/workflows/interfaces.js";
+import { GrpcGateway } from "../../../../../src/interface-adapters/workflows/effects/grpc.gateway.js";
+import { ProtoSchema } from "../../../../../src/interface-adapters/workflows/effects/proto-schema.js";
+import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
   startStubServer,
   type StubServer,
-} from "../../../support/stub-server.js";
+} from "../../../../support/stub-server.js";
 import {
   authenticationOf,
   callContextOf,
   fetchClientOf,
   resourcesOf,
-} from "../../../support/outbound.js";
+} from "../../../../support/outbound.js";
 
 const TOKEN = "token-1";
 const PUBLIC_ADDRESS = "8.8.8.8";
@@ -95,19 +96,32 @@ class PublicAddresses extends AddressPolicy {
   }
 }
 
+class PublicLoopback extends AddressPolicy {
+  override isPrivate(): boolean {
+    return false;
+  }
+}
+
+class NoAddresses extends AddressPolicy {
+  override resolve(): Promise<readonly LookupAddress[]> {
+    return Promise.resolve([]);
+  }
+}
+
 interface Received {
   readonly method: string;
   readonly authorization: string | null;
   readonly idempotencyKey: string | null;
 }
 
-describe("a call the gRPC client performs for a run", () => {
+describe("a call the gRPC gateway performs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
   let resources: ResourceClient;
   let authentication: Authenticator;
-  let client: GrpcClient;
+  let connection: GrpcConnection;
+  let gateway: GrpcGateway;
   let protos: StubServer;
   let server: Server;
   let port = 0;
@@ -122,15 +136,8 @@ describe("a call the gRPC client performs for a run", () => {
     policy = new AddressPolicy(["127.0.0.1"]);
     resources = resourcesOf(policy, resilience);
     authentication = authenticationOf(fetchClientOf(policy.dispatcher));
-    client = new GrpcClient(
-      policy,
-      resources,
-      authentication,
-      new ProtoSchema(),
-      new TransportFailures(),
-      responseSizeLimit,
-      resilience,
-    );
+    connection = new GrpcConnection(policy, responseSizeLimit);
+    gateway = gatewayOf(connection);
     protos = await startStubServer((request, response) => {
       if (
         request.url === "/private.proto" &&
@@ -180,7 +187,7 @@ describe("a call the gRPC client performs for a run", () => {
 
   afterAll(async () => {
     server.forceShutdown();
-    client.onApplicationShutdown();
+    connection.onApplicationShutdown();
     await protos.close();
     await policy.onApplicationShutdown();
     await context.close();
@@ -237,6 +244,18 @@ describe("a call the gRPC client performs for a run", () => {
       return;
     }
 
+    if (name === "deadline") {
+      const left = Number(call.getDeadline()) - Date.now();
+      const near = left > 4_000 && left <= 5_000;
+      callback(null, { message: near ? "near" : `far: ${String(left)}` });
+      return;
+    }
+
+    if (name === "busy") {
+      callback({ code: status.UNAVAILABLE, details: "Try later" });
+      return;
+    }
+
     if (name === "nobody") {
       callback({ code: status.NOT_FOUND, details: "No such person" });
       return;
@@ -272,6 +291,18 @@ describe("a call the gRPC client performs for a run", () => {
     call.end();
   }
 
+  function gatewayOf(connection: GrpcConnection): GrpcGateway {
+    return new GrpcGateway(
+      connection,
+      resources,
+      authentication,
+      new ProtoSchema(),
+      new TransportFailures(),
+      responseSizeLimit,
+      resilience,
+    );
+  }
+
   function contextOf(
     secrets: JsonObject = {},
     remaining: number | null = null,
@@ -299,7 +330,7 @@ describe("a call the gRPC client performs for a run", () => {
 
   describe("methods", () => {
     it("a_unary_method_replies_with_its_message_in_json", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         grpcOf("SayHello", { name: "Ada" }),
         contextOf(),
       );
@@ -316,7 +347,7 @@ describe("a call the gRPC client performs for a run", () => {
     });
 
     it("a_oneof_replies_with_its_member_and_no_field_of_its_own", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         grpcOf("SayHello", { name: "moody" }),
         contextOf(),
       );
@@ -336,7 +367,7 @@ describe("a call the gRPC client performs for a run", () => {
     it.each(["Infinity", "NaN"])(
       "a_double_of_%s_replies_as_the_mapping_s_string",
       async (name) => {
-        const outcome = await client.call(
+        const outcome = await gateway.perform(
           grpcOf("SayHello", { name }),
           contextOf(),
         );
@@ -349,7 +380,7 @@ describe("a call the gRPC client performs for a run", () => {
     );
 
     it("a_server_streaming_method_replies_with_its_messages_in_order", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         grpcOf("SayHellos", { name: "Ada", times: 3 }),
         contextOf(),
       );
@@ -370,7 +401,7 @@ describe("a call the gRPC client performs for a run", () => {
     ])(
       "arguments_named_as_the_%s_names_the_fields_are_sent",
       async (_names, values) => {
-        const outcome = await client.call(
+        const outcome = await gateway.perform(
           grpcOf("SayHello", values),
           contextOf(),
         );
@@ -383,7 +414,7 @@ describe("a call the gRPC client performs for a run", () => {
     );
 
     it("the_step_s_idempotency_key_travels_as_metadata", async () => {
-      await client.call(grpcOf("SayHello", { name: "Ada" }), contextOf());
+      await gateway.perform(grpcOf("SayHello", { name: "Ada" }), contextOf());
 
       expect(received).toEqual([
         {
@@ -394,8 +425,33 @@ describe("a call the gRPC client performs for a run", () => {
       ]);
     });
 
+    it("the_remaining_time_travels_as_the_call_deadline", async () => {
+      const outcome = await gateway.perform(
+        grpcOf("SayHello", { name: "deadline" }),
+        contextOf({}, 5_000),
+      );
+
+      expect(outcome).toMatchObject({
+        kind: "replied",
+        message: { message: "near" },
+      });
+    });
+
+    it("an_unavailable_status_from_a_connected_service_is_answered_as_a_status", async () => {
+      const outcome = await gateway.perform(
+        grpcOf("SayHello", { name: "busy" }),
+        contextOf(),
+      );
+
+      expect(outcome).toEqual({
+        kind: "status",
+        code: 14,
+        message: "Try later",
+      });
+    });
+
     it("a_status_other_than_ok_is_answered_as_a_status", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         grpcOf("SayHello", { name: "nobody" }),
         contextOf(),
       );
@@ -418,7 +474,7 @@ describe("a call the gRPC client performs for a run", () => {
       async (_scheme, authentication) => {
         const request = grpcOf("SayHello", { name: "Ada" }, authentication);
 
-        const outcome = await client.call(
+        const outcome = await gateway.perform(
           request,
           contextOf({ greeter: { token: TOKEN } }),
         );
@@ -449,7 +505,7 @@ describe("a call the gRPC client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({ kind: "replied" });
     });
@@ -467,7 +523,7 @@ describe("a call the gRPC client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -491,15 +547,7 @@ describe("a call the gRPC client performs for a run", () => {
           throw chosen;
         });
       const addresses = new PublicAddresses([]);
-      const tls = new GrpcClient(
-        addresses,
-        resources,
-        authentication,
-        new ProtoSchema(),
-        new TransportFailures(),
-        responseSizeLimit,
-        resilience,
-      );
+      const tls = gatewayOf(new GrpcConnection(addresses, responseSizeLimit));
       const request = grpcOf(
         "SayHello",
         { name: "Ada" },
@@ -509,53 +557,109 @@ describe("a call the gRPC client performs for a run", () => {
         },
       );
 
-      const called = tls.call(request, contextOf());
+      const called = tls.perform(request, contextOf());
 
       await expect(called).rejects.toBe(chosen);
       expect(secure).toHaveBeenCalledOnce();
       await addresses.onApplicationShutdown();
     });
 
-    it("calls_to_one_service_share_its_channel_until_the_client_shuts_down", async () => {
-      client.onApplicationShutdown();
+    it("calls_to_one_service_share_its_channel_until_the_connection_shuts_down", async () => {
+      connection.onApplicationShutdown();
       const opened = vi.spyOn(credentials, "createInsecure");
       const request = grpcOf("SayHello", { name: "Ada" });
 
-      await client.call(request, contextOf());
-      await client.call(request, contextOf());
-      client.onApplicationShutdown();
-      const reopened = await client.call(request, contextOf());
+      await gateway.perform(request, contextOf());
+      await gateway.perform(request, contextOf());
+      connection.onApplicationShutdown();
+      const reopened = await gateway.perform(request, contextOf());
 
       expect(reopened).toMatchObject({ kind: "replied" });
       expect(opened).toHaveBeenCalledTimes(2);
     });
 
     it("a_private_service_on_another_port_is_called_in_plaintext", async () => {
-      client.onApplicationShutdown();
+      connection.onApplicationShutdown();
       const plain = vi.spyOn(credentials, "createInsecure");
       const request = grpcOf("SayHello", { name: "Ada" });
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toMatchObject({ kind: "replied" });
       expect(plain).toHaveBeenCalledOnce();
     });
 
-    it("a_private_service_on_the_tls_port_is_called_over_tls", async () => {
-      const secure = vi
-        .spyOn(credentials, "createSsl")
-        .mockImplementation(() => {
-          throw chosen;
+    it.each([443, null])(
+      "a_private_service_on_the_tls_port_%s_is_called_over_tls",
+      async (tlsPort) => {
+        const secure = vi
+          .spyOn(credentials, "createSsl")
+          .mockImplementation(() => {
+            throw chosen;
+          });
+        const request: GrpcRequest = {
+          ...grpcOf("SayHello", { name: "Ada" }),
+          service: {
+            name: "GreeterApi.Greeter",
+            host: "127.0.0.1",
+            port: tlsPort,
+          },
+        };
+
+        const called = gateway.perform(request, contextOf());
+
+        await expect(called).rejects.toBe(chosen);
+        expect(secure).toHaveBeenCalledOnce();
+      },
+    );
+
+    describe("over tls", () => {
+      let addresses: AddressPolicy;
+      let tls: GrpcConnection;
+
+      beforeEach(() => {
+        vi.spyOn(credentials, "createSsl").mockImplementation(() =>
+          credentials.createInsecure(),
+        );
+        addresses = new PublicLoopback(["127.0.0.1"]);
+        tls = new GrpcConnection(addresses, responseSizeLimit);
+      });
+
+      afterEach(async () => {
+        tls.onApplicationShutdown();
+        await addresses.onApplicationShutdown();
+      });
+
+      it("credentials_travel_as_the_authorization_metadata", async () => {
+        const request = grpcOf(
+          "SayHello",
+          { name: "guarded" },
+          { kind: "bearer", token: TOKEN },
+        );
+
+        const outcome = await gatewayOf(tls).perform(request, contextOf());
+
+        expect(outcome).toMatchObject({ kind: "replied" });
+        expect(received).toMatchObject([
+          { method: "SayHello", authorization: `Bearer ${TOKEN}` },
+        ]);
+      });
+
+      it("a_secret_the_run_does_not_hold_is_forbidden_before_the_call", async () => {
+        const request = grpcOf(
+          "SayHello",
+          { name: "guarded" },
+          { kind: "secret", scheme: "bearer", secret: "missing" },
+        );
+
+        const outcome = await gatewayOf(tls).perform(request, contextOf());
+
+        expect(outcome).toEqual({
+          kind: "forbidden",
+          detail: "The secret is not among the secrets of this run",
         });
-      const request: GrpcRequest = {
-        ...grpcOf("SayHello", { name: "Ada" }),
-        service: { name: "GreeterApi.Greeter", host: "127.0.0.1", port: 443 },
-      };
-
-      const called = client.call(request, contextOf());
-
-      await expect(called).rejects.toBe(chosen);
-      expect(secure).toHaveBeenCalledOnce();
+        expect(received).toHaveLength(0);
+      });
     });
   });
 
@@ -608,7 +712,7 @@ describe("a call the gRPC client performs for a run", () => {
         ...change,
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "misconfigured", detail });
       expect(received).toHaveLength(0);
@@ -633,7 +737,7 @@ describe("a call the gRPC client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({ kind: "misconfigured", detail });
     });
@@ -651,7 +755,7 @@ describe("a call the gRPC client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "rejected",
@@ -663,12 +767,30 @@ describe("a call the gRPC client performs for a run", () => {
 
   describe("failures", () => {
     it("a_call_still_unanswered_at_its_deadline_expires", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         grpcOf("SayHello", { name: "hang" }),
         contextOf({}, 300),
       );
 
       expect(outcome).toEqual({ kind: "expired" });
+    });
+
+    it("a_host_that_resolves_to_no_address_is_unreachable", async () => {
+      const addresses = new NoAddresses([]);
+      const unresolved = gatewayOf(
+        new GrpcConnection(addresses, responseSizeLimit),
+      );
+
+      const outcome = await unresolved.perform(
+        grpcOf("SayHello", { name: "Ada" }),
+        contextOf(),
+      );
+
+      expect(outcome).toEqual({
+        kind: "unreachable",
+        detail: "The host name could not be resolved",
+      });
+      await addresses.onApplicationShutdown();
     });
 
     it("a_port_nobody_listens_on_is_unreachable", async () => {
@@ -682,7 +804,7 @@ describe("a call the gRPC client performs for a run", () => {
         },
       };
 
-      const outcome = await client.call(request, contextOf());
+      const outcome = await gateway.perform(request, contextOf());
 
       expect(outcome).toEqual({
         kind: "unreachable",
@@ -693,21 +815,16 @@ describe("a call the gRPC client performs for a run", () => {
     it.each(["127.0.0.1", "localhost"])(
       "a_private_destination_%s_is_refused_before_any_connection",
       async (host) => {
-        const guarded = new GrpcClient(
-          new AddressPolicy([]),
-          resources,
-          authentication,
-          new ProtoSchema(),
-          new TransportFailures(),
-          responseSizeLimit,
-          resilience,
+        const refusing = new AddressPolicy([]);
+        const guarded = gatewayOf(
+          new GrpcConnection(refusing, responseSizeLimit),
         );
         const request: GrpcRequest = {
           ...grpcOf("SayHello", { name: "Ada" }),
           service: { name: "GreeterApi.Greeter", host, port },
         };
 
-        const outcome = await guarded.call(request, contextOf());
+        const outcome = await guarded.perform(request, contextOf());
 
         expect(outcome).toEqual({
           kind: "unreachable",
@@ -718,7 +835,7 @@ describe("a call the gRPC client performs for a run", () => {
     );
 
     it("a_stream_larger_than_its_bound_is_resource_exhausted", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         grpcOf("SayHellos", { name: "flood" }),
         contextOf(),
       );
@@ -731,7 +848,7 @@ describe("a call the gRPC client performs for a run", () => {
     });
 
     it("a_message_larger_than_its_bound_is_resource_exhausted", async () => {
-      const outcome = await client.call(
+      const outcome = await gateway.perform(
         grpcOf("SayHello", { name: "huge" }),
         contextOf(),
       );

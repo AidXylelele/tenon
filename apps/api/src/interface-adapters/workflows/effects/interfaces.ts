@@ -1,9 +1,13 @@
+import type { ServiceError } from "@grpc/grpc-js";
+import type { MethodDefinition } from "@grpc/proto-loader";
 import type {
   AuthenticationScheme,
   Failure,
+  GrpcOutcome,
   ResolvedAuthentication,
   RevealedAuthorization,
 } from "interpreter";
+import type { Message, Root } from "protobufjs";
 import type { StepCall } from "../interfaces.js";
 
 export interface CallContext extends StepCall {
@@ -29,6 +33,11 @@ export type UnusableSecret = Extract<
   { readonly kind: "forbidden" | "misconfigured" }
 >;
 
+export type Misconfigured = Extract<
+  Failure,
+  { readonly kind: "misconfigured" }
+>;
+
 export type Authorization =
   | { readonly kind: "anonymous" }
   | { readonly kind: "header"; readonly header: RevealedAuthorization };
@@ -41,3 +50,16 @@ export abstract class AuthorizationServer {
     signal: AbortSignal,
   ): Promise<string>;
 }
+
+export interface PreparedCall {
+  readonly kind: "call";
+  readonly method: MethodDefinition<object, object>;
+  readonly argument: Message;
+}
+
+export type ParsedProto =
+  { readonly kind: "root"; readonly root: Root } | Misconfigured;
+
+export type GrpcReply =
+  | Extract<GrpcOutcome, { readonly kind: "replied" | "status" }>
+  | { readonly kind: "failed"; readonly error: ServiceError };

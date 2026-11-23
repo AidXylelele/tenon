@@ -54,6 +54,7 @@ import { GrpcGateway } from "../../interface-adapters/workflows/effects/grpc.gat
 import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
 import { McpGateway } from "../../interface-adapters/workflows/effects/mcp.gateway.js";
 import { OpenApiGateway } from "../../interface-adapters/workflows/effects/openapi.gateway.js";
+import { ProtoSchema } from "../../interface-adapters/workflows/effects/proto-schema.js";
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { EffectClient } from "../../interface-adapters/workflows/interfaces.js";
 import { RunController } from "../../interface-adapters/workflows/run.controller.js";
@@ -72,8 +73,7 @@ import { NatsBroker } from "../asyncapi/nats.broker.js";
 import { RedisBroker } from "../asyncapi/redis.broker.js";
 import { SandboxClient } from "../go-judge/sandbox.client.js";
 import { SandboxLimits } from "../go-judge/sandbox-limits.js";
-import { GrpcClient } from "../grpc/grpc.client.js";
-import { ProtoSchema } from "../grpc/proto-schema.js";
+import { GrpcConnection } from "../grpc/grpc.connection.js";
 import { McpClient } from "../mcp/mcp.client.js";
 import { HttpClientName } from "../network/enums.js";
 import { ResponseSizeLimit } from "../network/response-size-limit.js";
@@ -147,7 +147,7 @@ import { OutboundModule } from "./outbound.module.js";
     EffectDispatcher,
     { provide: EffectClient, useExisting: EffectDispatcher },
     ProtoSchema,
-    GrpcClient,
+    GrpcConnection,
     McpClient,
     A2aClient,
     AsyncApiDocuments,
