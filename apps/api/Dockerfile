@@ -19,7 +19,7 @@ RUN --mount=type=cache,id=pnpm,target=/var/cache/pnpm \
     pnpm --filter api --prod deploy /prod/api --store-dir /var/cache/pnpm \
  && pnpm --filter api deploy /prod/migrate --store-dir /var/cache/pnpm
 
-FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:1d736cf8b5716c07a245301f92717143215d248fd55771ee1936ef4b3302e531 AS node
+FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:ffa8a7545403036c94ec76674b5dbac2d425af2d679147cdf3e30180071487b7 AS node
 WORKDIR /app
 ENV NODE_ENV=production
 USER 65532:65532
