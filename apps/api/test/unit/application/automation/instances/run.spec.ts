@@ -635,6 +635,18 @@ describe("children answered by their parent's own run", () => {
   });
 });
 
+class StrayMessages extends StoredMessages {
+  override async awaitedBy(
+    instance: WorkflowInstance,
+  ): Promise<readonly Receipt[]> {
+    const receipts = await super.awaitedBy(instance);
+    return receipts.map((receipt) => ({
+      inbound: receipt.inbound,
+      wait: { ...receipt.wait, effectId: "/do/9/gone" },
+    }));
+  }
+}
+
 describe("receives answered from the stored messages", () => {
   it("a_receipt_whose_receive_an_earlier_answer_ended_never_reaches_the_interpreter", async () => {
     const pending = anInstanceIn(Phase.Pending, AWAITED);
@@ -675,5 +687,34 @@ describe("receives answered from the stored messages", () => {
     expect(fixture.messages.kindsOf(pending.id)).toEqual([
       InstanceEventKind.ChildEnded,
     ]);
+  });
+
+  it("a_receipt_no_receive_awaits_opens_no_unit_of_work", async () => {
+    const pending = anInstanceIn(Phase.Pending, AWAITED);
+    const waiting = aTurn({
+      requested: [aReceive("/fork/0/a@message[0]", "/fork/0/a")],
+    });
+    const begun = setUp(pending, waiting);
+    await begun.begin.execute({ instanceId: pending.id, signal });
+    const fixture = setUp(pending, waiting);
+    const stored = await begun.instances.find(pending.id);
+
+    if (stored === null) throw new Error("the instance was not stored");
+
+    fixture.instances.put(stored);
+    const counted = new FakeUnitOfWork();
+    const answer = new AnswerReceives(
+      fixture.instances,
+      new StrayMessages(),
+      fixture.runtime,
+      new StoredSecrets(),
+      fixture.events,
+      counted,
+    );
+
+    await answer.execute({ instanceId: pending.id, signal });
+
+    expect(fixture.runtime.calls).toEqual([]);
+    expect(counted.runs).toBe(0);
   });
 });

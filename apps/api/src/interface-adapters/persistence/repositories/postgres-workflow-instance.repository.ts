@@ -16,7 +16,13 @@ import {
 } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
-import type { Transaction } from "../interfaces.js";
+import type {
+  KeptWaits,
+  ListenerRow,
+  ReceiverRow,
+  Transaction,
+  WorkflowInstanceRow,
+} from "../interfaces.js";
 import { WorkflowInstanceMapper } from "../mappers/workflow-instance.mapper.js";
 import {
   listener as listeners,
@@ -27,6 +33,10 @@ import { PostgresTaskValueStore } from "../stores/postgres-task-value.store.js";
 
 @Injectable()
 export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepository {
+  private static readonly NO_WAITS = "[]";
+
+  private readonly kept = new WeakMap<WorkflowInstance, KeptWaits>();
+
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
     private readonly taskValues: PostgresTaskValueStore,
@@ -41,7 +51,7 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
 
     if (!row) return null;
 
-    return this.workflowInstanceMapper.toEntity(row);
+    return this.#entityOf(row);
   }
 
   async findChild(
@@ -60,7 +70,7 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
 
     if (!row) return null;
 
-    return this.workflowInstanceMapper.toEntity(row);
+    return this.#entityOf(row);
   }
 
   async findAwaitedChildren(parentId: string): Promise<WorkflowInstance[]> {
@@ -74,7 +84,7 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
           isNull(instances.endedAt),
         ),
       );
-    return rows.map((row) => this.workflowInstanceMapper.toEntity(row));
+    return rows.map((row) => this.#entityOf(row));
   }
 
   async findEndedChildren(
@@ -95,7 +105,7 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
           isNotNull(instances.endedAt),
         ),
       );
-    return rows.map((row) => this.workflowInstanceMapper.toEntity(row));
+    return rows.map((row) => this.#entityOf(row));
   }
 
   async hasUnendedScheduled(workflowId: string): Promise<boolean> {
@@ -140,8 +150,18 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
 
     if (saved.length === 0) throw new StaleWriteError();
 
-    await this.#listen(instance);
-    await this.#receive(instance);
+    const kept = this.kept.get(instance);
+    const waits = this.#waitsOf(instance);
+    const listened =
+      kept?.listening ?? PostgresWorkflowInstanceRepository.NO_WAITS;
+    const received =
+      kept?.receiving ?? PostgresWorkflowInstanceRepository.NO_WAITS;
+
+    if (waits.listening !== listened) await this.#listen(instance);
+
+    if (waits.receiving !== received) await this.#receive(instance);
+
+    this.kept.set(instance, waits);
     const now = new Date();
     await this.taskValues.keep(instance, now);
   }
@@ -150,33 +170,64 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
     await this.txHost.tx.delete(instances).where(eq(instances.id, instance.id));
   }
 
+  #entityOf(row: WorkflowInstanceRow): WorkflowInstance {
+    const instance = this.workflowInstanceMapper.toEntity(row);
+    const waits = this.#waitsOf(instance);
+    this.kept.set(instance, waits);
+    return instance;
+  }
+
+  #waitsOf(instance: WorkflowInstance): KeptWaits {
+    const listened = this.#listenersOf(instance);
+    const received = this.#receiversOf(instance);
+    const listening = JSON.stringify(listened);
+    const receiving = JSON.stringify(received);
+    return { listening, receiving };
+  }
+
+  #receiversOf(instance: WorkflowInstance): ReceiverRow[] {
+    const waits = instance.waits.filter(
+      (wait) => wait.kind === WaitKind.Message,
+    );
+    return instance.receiving.map((receive) => {
+      const closesAt =
+        receive.closesAt === null ? null : new Date(receive.closesAt);
+      const wait = waits.find((each) => each.execution === receive.execution);
+      const awaiting = wait?.position ?? null;
+      return {
+        instanceId: instance.id,
+        execution: receive.execution,
+        request: receive.request,
+        closesAt,
+        awaiting,
+      };
+    });
+  }
+
+  #listenersOf(instance: WorkflowInstance): ListenerRow[] {
+    return instance.listening.map((listen) => ({
+      instanceId: instance.id,
+      execution: listen.execution,
+      effectId: listen.effectId,
+      stream: listen.stream,
+      position: listen.position,
+      open: listen.open,
+    }));
+  }
+
   async #receive(instance: WorkflowInstance): Promise<void> {
-    const receiving = instance.receiving;
-    const executions = receiving.map((receive) => receive.execution);
+    const rows = this.#receiversOf(instance);
+    const executions = rows.map((row) => row.execution);
     const closed = and(
       eq(receivers.instanceId, instance.id),
       notInArray(receivers.execution, executions),
     );
     await this.txHost.tx.delete(receivers).where(closed);
 
-    const waits = instance.waits.filter(
-      (wait) => wait.kind === WaitKind.Message,
-    );
-
-    for (const receive of receiving) {
-      const closesAt =
-        receive.closesAt === null ? null : new Date(receive.closesAt);
-      const wait = waits.find((each) => each.execution === receive.execution);
-      const awaiting = wait?.position ?? null;
+    for (const row of rows)
       await this.txHost.tx
         .insert(receivers)
-        .values({
-          instanceId: instance.id,
-          execution: receive.execution,
-          request: receive.request,
-          closesAt,
-          awaiting,
-        })
+        .values(row)
         .onConflictDoUpdate({
           target: [receivers.instanceId, receivers.execution],
           set: {
@@ -185,12 +236,11 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
             awaiting: sql`excluded.awaiting`,
           },
         });
-    }
   }
 
   async #listen(instance: WorkflowInstance): Promise<void> {
-    const listening = instance.listening;
-    const executions = listening.map((listen) => listen.execution);
+    const rows = this.#listenersOf(instance);
+    const executions = rows.map((row) => row.execution);
     const closed = and(
       eq(listeners.instanceId, instance.id),
       notInArray(listeners.execution, executions),
@@ -198,16 +248,16 @@ export class PostgresWorkflowInstanceRepository implements WorkflowInstanceRepos
     await this.txHost.tx.delete(listeners).where(closed);
     const since = new Date();
 
-    for (const listen of listening)
+    for (const row of rows)
       await this.txHost.tx
         .insert(listeners)
         .values({
-          instanceId: instance.id,
-          execution: listen.execution,
-          effectId: listen.effectId,
-          stream: listen.stream,
-          position: listen.position,
-          open: listen.open,
+          instanceId: row.instanceId,
+          execution: row.execution,
+          effectId: row.effectId,
+          stream: row.stream,
+          position: row.position,
+          open: row.open,
           since,
         })
         .onConflictDoUpdate({

@@ -43,12 +43,16 @@ class RecordingOffers {
   }
 }
 
-function setUp(matches: readonly RoutingMatch[]) {
+function setUp(
+  matches: readonly RoutingMatch[],
+  offered: readonly InstanceOffer[] = [OFFER],
+  triggered: readonly string[] = ["workflow-1"],
+) {
   const events = { find: () => Promise.resolve(PAID) };
   const listeners = {
     programsFor: () => Promise.resolve([{ versionId: "version-1" }]),
-    instancesFor: () => Promise.resolve([OFFER]),
-    workflowsFor: () => Promise.resolve(["workflow-1"]),
+    instancesFor: () => Promise.resolve(offered.slice()),
+    workflowsFor: () => Promise.resolve(triggered.slice()),
   };
   const routing = { accepting: () => Promise.resolve(matches) };
   const offers = new RecordingOffers();
@@ -78,6 +82,15 @@ describe("dispatching an accepted event", () => {
 
   it("an_event_no_program_accepts_opens_no_unit_of_work", async () => {
     const fixture = setUp([]);
+
+    await fixture.dispatch.execute({ sequence: 7, signal });
+
+    expect(fixture.offers.offered).toEqual([]);
+    expect(fixture.unitOfWork.runs).toBe(0);
+  });
+
+  it("a_match_no_instance_or_workflow_takes_opens_no_unit_of_work", async () => {
+    const fixture = setUp([MATCH], [], []);
 
     await fixture.dispatch.execute({ sequence: 7, signal });
 

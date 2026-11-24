@@ -52,6 +52,8 @@ export class AnswerReceives {
       answered.push(receipt);
     }
 
+    if (answered.length === 0) return;
+
     await this.unitOfWork.run(async () => {
       await this.messages.forget(instance, answered);
       await this.instances.save(instance);

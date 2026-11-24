@@ -193,3 +193,17 @@ export abstract class Cipher {
   abstract seal(value: string): string;
   abstract open(sealed: string): string;
 }
+
+export interface DeclaredSecrets {
+  readonly publisherId: string;
+  readonly names: readonly string[];
+}
+
+export interface KeptWaits {
+  readonly listening: string;
+  readonly receiving: string;
+}
+
+export type ReceiverRow = typeof schema.receiver.$inferInsert;
+
+export type ListenerRow = Omit<typeof schema.listener.$inferInsert, "since">;

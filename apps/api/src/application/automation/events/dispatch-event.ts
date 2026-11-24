@@ -34,6 +34,9 @@ export class DispatchEvent {
 
     const offers = await this.listeners.instancesFor(matches, event);
     const workflowIds = await this.listeners.workflowsFor(matches);
+
+    if (offers.length === 0 && workflowIds.length === 0) return;
+
     await this.unitOfWork.run(async () => {
       await this.offers.offer(offers, event);
       await this.offers.trigger(workflowIds, event);
