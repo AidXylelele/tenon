@@ -20,25 +20,26 @@ import { ResilienceModule } from "@nestjs/resilience";
 import {
   resiliencePresets,
   responseSizeLimit,
-} from "../../../../../src/frameworks/di/host.presets.js";
-import { GrpcConnection } from "../../../../../src/frameworks/grpc/grpc.connection.js";
-import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
-import type { Authenticator } from "../../../../../src/interface-adapters/auth/authenticator.js";
-import type { ResourceGateway } from "../../../../../src/interface-adapters/http/resource.gateway.js";
-import { GrpcGateway } from "../../../../../src/interface-adapters/workflows/effects/grpc.gateway.js";
-import { ProtoSchema } from "../../../../../src/interface-adapters/workflows/effects/proto-schema.js";
-import { TransportFaults } from "../../../../../src/frameworks/http/transport-faults.js";
-import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
+} from "../../../../src/frameworks/di/host.presets.js";
+import { GrpcConnection } from "../../../../src/frameworks/grpc/grpc.connection.js";
+import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
+import type { Authenticator } from "../../../../src/interface-adapters/auth/authenticator.js";
+import type { ResourceGateway } from "../../../../src/interface-adapters/http/resource.gateway.js";
+import { ProtoGrpcClient } from "../../../../src/frameworks/grpc/proto.grpc-client.js";
+import { ProtoSchema } from "../../../../src/frameworks/grpc/proto-schema.js";
+import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
+import { GrpcCallGateway } from "../../../../src/interface-adapters/grpc/grpc-call.gateway.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
   startStubServer,
   type StubServer,
-} from "../../../../support/stub-server.js";
+} from "../../../support/stub-server.js";
 import {
   authenticationOf,
   callContextOf,
   resourcesOf,
-} from "../../../../support/outbound.js";
+} from "../../../support/outbound.js";
 
 const TOKEN = "token-1";
 const PUBLIC_ADDRESS = "8.8.8.8";
@@ -120,7 +121,7 @@ describe("a call the gRPC gateway performs for a run", () => {
   let resources: ResourceGateway;
   let authentication: Authenticator;
   let connection: GrpcConnection;
-  let gateway: GrpcGateway;
+  let gateway: GrpcCallGateway;
   let protos: StubServer;
   let server: Server;
   let port = 0;
@@ -295,16 +296,15 @@ describe("a call the gRPC gateway performs for a run", () => {
     call.end();
   }
 
-  function gatewayOf(connection: GrpcConnection): GrpcGateway {
-    return new GrpcGateway(
+  function gatewayOf(connection: GrpcConnection): GrpcCallGateway {
+    const client = new ProtoGrpcClient(
       connection,
-      resources,
-      authentication,
       new ProtoSchema(),
       new TransportFaults(),
       responseSizeLimit,
       resilience,
     );
+    return new GrpcCallGateway(client, resources, authentication);
   }
 
   function contextOf(

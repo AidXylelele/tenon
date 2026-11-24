@@ -1,19 +1,16 @@
 import $RefParser from "@apidevtools/json-schema-ref-parser";
 import { Injectable } from "@nestjs/common";
-import type { HttpOutcome, JsonObject, OpenApiRequest } from "interpreter";
+import type { JsonObject, OpenApiRequest } from "interpreter";
 import SwaggerClient, { type BuiltRequest } from "swagger-client";
-import { HttpCallGateway } from "../../http/http-call.gateway.js";
 import type {
-  CallContext,
-  LocatedOperation,
-  OpenApiDocument,
-  OperationRequest,
-} from "./interfaces.js";
+  OpenApiClient,
+  OpenApiOperation,
+} from "../../interface-adapters/http/interfaces.js";
+import type { LocatedOperation, OpenApiDocument } from "./interfaces.js";
 import { OPENAPI_DOCUMENT } from "./openapi-document.schema.js";
-import { ResourceGateway } from "../../http/resource.gateway.js";
 
 @Injectable()
-export class OpenApiGateway {
+export class SwaggerOpenApiClient implements OpenApiClient {
   private static readonly METHODS = [
     "get",
     "put",
@@ -26,54 +23,28 @@ export class OpenApiGateway {
   ] as const;
   private static readonly BODY = "body";
 
-  constructor(
-    private readonly resources: ResourceGateway,
-    private readonly http: HttpCallGateway,
-  ) {}
-
-  async perform(
-    request: OpenApiRequest,
-    context: CallContext,
-  ): Promise<HttpOutcome> {
-    const document = await this.resources.text(request.document, context);
-
-    if (document.kind !== "text") return document;
-
-    const operation = await this.#requestOf(document.text, request);
-
-    if (operation.kind === "misconfigured") return operation;
-
-    const outbound = operation.request;
-    const authentication = request.authentication;
-    return this.http.exchange(outbound, authentication, request, context);
-  }
-
-  async #requestOf(
+  async operationOf(
     text: string,
     request: OpenApiRequest,
-  ): Promise<OperationRequest> {
+  ): Promise<OpenApiOperation> {
     const documentUri = request.document.endpoint.uri;
     const operationId = request.operationId;
     const document = await this.#documentOf(text, documentUri);
 
     if (document === null)
-      return {
-        kind: "misconfigured",
-        detail: "The OpenAPI document cannot be parsed",
-      };
+      return this.#unusable("The OpenAPI document cannot be parsed");
 
     const located = this.#locatedOf(document, operationId);
 
     if (located === null)
-      return {
-        kind: "misconfigured",
-        detail: `The OpenAPI document has no operation "${operationId}"`,
-      };
+      return this.#unusable(
+        `The OpenAPI document has no operation "${operationId}"`,
+      );
 
     const parameters = request.parameters;
     const refusal = this.#refusalOf(document, located, operationId, parameters);
 
-    if (refusal !== null) return { kind: "misconfigured", detail: refusal };
+    if (refusal !== null) return this.#unusable(refusal);
 
     return this.#built(document, documentUri, operationId, parameters);
   }
@@ -104,7 +75,7 @@ export class OpenApiGateway {
     operationId: string,
   ): LocatedOperation | null {
     for (const item of Object.values(document.paths))
-      for (const method of OpenApiGateway.METHODS) {
+      for (const method of SwaggerOpenApiClient.METHODS) {
         const operation = item[method];
 
         if (operation?.operationId === operationId) return { item, operation };
@@ -123,15 +94,15 @@ export class OpenApiGateway {
       .concat(located.operation.parameters)
       .map((parameter) => parameter.name);
     const swagger = document.swagger !== undefined;
-    const namesBody = declared.includes(OpenApiGateway.BODY);
+    const namesBody = declared.includes(SwaggerOpenApiClient.BODY);
 
     if (!swagger && namesBody)
-      return `The operation "${operationId}" declares a parameter named "${OpenApiGateway.BODY}", the name of its request body`;
+      return `The operation "${operationId}" declares a parameter named "${SwaggerOpenApiClient.BODY}", the name of its request body`;
 
     const requestBody = located.operation.requestBody;
     const bodyMissing =
       requestBody?.required === true &&
-      parameters[OpenApiGateway.BODY] === undefined;
+      parameters[SwaggerOpenApiClient.BODY] === undefined;
 
     if (bodyMissing)
       return `The operation "${operationId}" requires a request body`;
@@ -139,7 +110,7 @@ export class OpenApiGateway {
     const placesBody = requestBody !== undefined;
     const unknown = Object.keys(parameters).find((name) => {
       const listed = declared.includes(name);
-      const body = name === OpenApiGateway.BODY && placesBody;
+      const body = name === SwaggerOpenApiClient.BODY && placesBody;
       return !listed && !body;
     });
 
@@ -154,9 +125,11 @@ export class OpenApiGateway {
     documentUri: string,
     operationId: string,
     parameters: JsonObject,
-  ): OperationRequest {
+  ): OpenApiOperation {
     const swagger = document.swagger !== undefined;
-    const requestBody = swagger ? undefined : parameters[OpenApiGateway.BODY];
+    const requestBody = swagger
+      ? undefined
+      : parameters[SwaggerOpenApiClient.BODY];
 
     try {
       const built = SwaggerClient.buildRequest({
@@ -169,19 +142,17 @@ export class OpenApiGateway {
       return this.#operationOf(built);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      return {
-        kind: "misconfigured",
-        detail: `The operation "${operationId}" cannot be called: ${reason}`,
-      };
+      return this.#unusable(
+        `The operation "${operationId}" cannot be called: ${reason}`,
+      );
     }
   }
 
-  #operationOf(built: BuiltRequest): OperationRequest {
+  #operationOf(built: BuiltRequest): OpenApiOperation {
     if (built.body instanceof FormData)
-      return {
-        kind: "misconfigured",
-        detail: "The host does not send multipart/form-data request bodies",
-      };
+      return this.#unusable(
+        "The host does not send multipart/form-data request bodies",
+      );
 
     const headers = new Headers(built.headers);
     const body = this.#bodyOf(built.body);
@@ -195,5 +166,9 @@ export class OpenApiGateway {
     if (typeof body === "string") return body;
 
     return JSON.stringify(body);
+  }
+
+  #unusable(detail: string): OpenApiOperation {
+    return { kind: "unusable", detail };
   }
 }

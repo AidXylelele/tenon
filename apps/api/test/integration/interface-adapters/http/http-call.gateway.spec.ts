@@ -15,11 +15,12 @@ import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
 import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
 import type { OutboundHttpClient } from "../../../../src/frameworks/http/outbound.http-client.js";
+import { SwaggerOpenApiClient } from "../../../../src/frameworks/openapi/swagger.openapi-client.js";
 import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
 import type { HttpCallGateway } from "../../../../src/interface-adapters/http/http-call.gateway.js";
+import { OpenApiCallGateway } from "../../../../src/interface-adapters/http/openapi-call.gateway.js";
 import type { ResourceGateway } from "../../../../src/interface-adapters/http/resource.gateway.js";
 import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
-import { OpenApiGateway } from "../../../../src/interface-adapters/workflows/effects/openapi.gateway.js";
 import {
   closedPort,
   type ReceivedRequest,
@@ -59,7 +60,7 @@ describe("a call the HTTP gateways perform for a run", () => {
   let policy: AddressPolicy;
   let gateway: HttpCallGateway;
   let client: OutboundHttpClient;
-  let openApi: OpenApiGateway;
+  let openApi: OpenApiCallGateway;
   let resources: ResourceGateway;
   let stub: StubServer;
   let idp: StubServer;
@@ -77,7 +78,11 @@ describe("a call the HTTP gateways perform for a run", () => {
     gateway = httpGatewayOf(policy, resilience, identity);
     resources = resourcesOf(policy, resilience, identity);
     client = clientOf(policy, resilience);
-    openApi = new OpenApiGateway(resources, gateway);
+    openApi = new OpenApiCallGateway(
+      resources,
+      gateway,
+      new SwaggerOpenApiClient(),
+    );
     stub = await startStubServer((request, response) => {
       answer(request, response);
     });

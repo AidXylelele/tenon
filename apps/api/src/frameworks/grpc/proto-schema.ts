@@ -1,6 +1,6 @@
 import { fromJSON } from "@grpc/proto-loader";
 import { Injectable } from "@nestjs/common";
-import type { GrpcRequest, JsonObject, JsonValue } from "interpreter";
+import type { JsonObject, JsonValue } from "interpreter";
 import {
   common,
   type Field,
@@ -9,14 +9,15 @@ import {
   type Root,
   Type,
 } from "protobufjs";
-import type { Misconfigured, ParsedProto, PreparedCall } from "./interfaces.js";
+import type { GrpcCall } from "../../interface-adapters/grpc/interfaces.js";
+import type { ParsedProto, PreparedCall, Unusable } from "./interfaces.js";
 
 @Injectable()
 export class ProtoSchema {
-  preparedOf(text: string, request: GrpcRequest): PreparedCall | Misconfigured {
-    const parsed = this.#parsedOf(text);
+  preparedOf(request: GrpcCall): PreparedCall | Unusable {
+    const parsed = this.#parsedOf(request.proto);
 
-    if (parsed.kind === "misconfigured") return parsed;
+    if (parsed.kind === "unusable") return parsed;
 
     const serviceName = request.service.name;
     const json = parsed.root.toJSON();
@@ -31,19 +32,17 @@ export class ProtoSchema {
     const service = definition[serviceName];
 
     if (service === undefined || "format" in service)
-      return this.#misconfigured(
-        `The proto describes no service ${serviceName}`,
-      );
+      return this.#unusable(`The proto describes no service ${serviceName}`);
 
     const method = service[request.method];
 
     if (method === undefined)
-      return this.#misconfigured(
+      return this.#unusable(
         `The service ${serviceName} has no method ${request.method}`,
       );
 
     if (method.requestStream)
-      return this.#misconfigured(
+      return this.#unusable(
         `The method ${request.method} streams its requests, and a call sends one message`,
       );
 
@@ -52,7 +51,7 @@ export class ProtoSchema {
       return { kind: "call", method, argument };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      return this.#misconfigured(
+      return this.#unusable(
         `The arguments do not fit the request of ${request.method}: ${reason}`,
       );
     }
@@ -70,7 +69,7 @@ export class ProtoSchema {
       });
 
       if (unknown !== undefined)
-        return this.#misconfigured(
+        return this.#unusable(
           `The proto imports ${unknown}, which is not a well-known type`,
         );
 
@@ -83,11 +82,11 @@ export class ProtoSchema {
       return { kind: "root", root: parsed.root };
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      return this.#misconfigured(`The proto cannot be read: ${reason}`);
+      return this.#unusable(`The proto cannot be read: ${reason}`);
     }
   }
 
-  #argumentOf(root: Root, request: GrpcRequest): Message {
+  #argumentOf(root: Root, request: GrpcCall): Message {
     const service = root.lookupService(request.service.name);
     const type = service.methods[request.method]?.resolvedRequestType ?? null;
 
@@ -158,7 +157,7 @@ export class ProtoSchema {
     return typeof value === "object" && value !== null && !list;
   }
 
-  #misconfigured(detail: string): Misconfigured {
-    return { kind: "misconfigured", detail };
+  #unusable(detail: string): Unusable {
+    return { kind: "unusable", detail };
   }
 }

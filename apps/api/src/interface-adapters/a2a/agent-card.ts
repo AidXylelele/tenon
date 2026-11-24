@@ -1,8 +1,8 @@
 import type { Authentication } from "interpreter";
-import type { Agent, AgentCardProperties, AgentOffer } from "./interfaces.js";
+import type { Agent, AgentCardData, AgentOffer } from "./interfaces.js";
 
 export class AgentCard {
-  constructor(private readonly properties: AgentCardProperties) {}
+  constructor(private readonly properties: AgentCardData) {}
 
   jsonRpcEndpoint(credentials: Authentication | null, cardUri: string): Agent {
     const chosen = this.#offers().find((offer) => {

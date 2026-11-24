@@ -9,13 +9,13 @@ import type {
   StepCall,
 } from "../interfaces.js";
 import { ProtocolMapper } from "../mappers/protocol.mapper.js";
-import { A2aGateway } from "./a2a.gateway.js";
+import { A2aCallGateway } from "../../a2a/a2a-call.gateway.js";
 import { AsyncApiGateway } from "./asyncapi.gateway.js";
-import { GrpcGateway } from "./grpc.gateway.js";
+import { GrpcCallGateway } from "../../grpc/grpc-call.gateway.js";
 import { HttpCallGateway } from "../../http/http-call.gateway.js";
 import type { CallContext } from "./interfaces.js";
-import { McpGateway } from "./mcp.gateway.js";
-import { OpenApiGateway } from "./openapi.gateway.js";
+import { McpCallGateway } from "../../mcp/mcp-call.gateway.js";
+import { OpenApiCallGateway } from "../../http/openapi-call.gateway.js";
 import { ResourceGateway } from "../../http/resource.gateway.js";
 import { SandboxGateway } from "./sandbox.gateway.js";
 
@@ -25,11 +25,11 @@ export class EffectDispatcher implements EffectClient {
 
   constructor(
     private readonly http: HttpCallGateway,
-    private readonly openApi: OpenApiGateway,
+    private readonly openApi: OpenApiCallGateway,
     private readonly resource: ResourceGateway,
-    private readonly grpc: GrpcGateway,
-    private readonly mcp: McpGateway,
-    private readonly a2a: A2aGateway,
+    private readonly grpc: GrpcCallGateway,
+    private readonly mcp: McpCallGateway,
+    private readonly a2a: A2aCallGateway,
     private readonly asyncApi: AsyncApiGateway,
     private readonly sandbox: SandboxGateway,
     private readonly protocol: ProtocolMapper,
