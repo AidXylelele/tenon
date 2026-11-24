@@ -18,7 +18,7 @@ RUN --mount=type=cache,id=pnpm,target=/var/cache/pnpm \
 RUN --mount=type=cache,id=next,target=/app/apps/web/.next/cache \
     pnpm --filter web... run build
 
-FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:1d736cf8b5716c07a245301f92717143215d248fd55771ee1936ef4b3302e531
+FROM gcr.io/distroless/nodejs26-debian13:nonroot@sha256:ffa8a7545403036c94ec76674b5dbac2d425af2d679147cdf3e30180071487b7
 WORKDIR /app
 ENV NODE_ENV=production PORT=3001 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
 COPY --from=build /app/apps/web/.next/standalone ./
