@@ -79,7 +79,7 @@ describe("a run taken over by another application after a crash", () => {
     expect(instance.phase).toBe("completed");
     expect(instance.output).toEqual({ done: true });
     expect(statusesOf(tasks)).toEqual(["fetch:completed", "after:completed"]);
-    const key = `run:${id}:1:/do/0/fetch`;
+    const key = `${id}:/do/0/fetch`;
 
     expect(keys).toEqual([key, key]);
   });

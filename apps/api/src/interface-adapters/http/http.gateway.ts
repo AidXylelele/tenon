@@ -3,7 +3,7 @@ import type { Authentication, HttpOutcome, HttpRequest } from "interpreter";
 import { Authenticator } from "../auth/authenticator.js";
 import type { Authorization } from "../auth/interfaces.js";
 import type { CallContext } from "../interpreter/interfaces.js";
-import { BodyReading } from "./enums.js";
+import { BodyReading, TransportFailure } from "./enums.js";
 import {
   HttpClient,
   type OutboundRequest,
@@ -17,16 +17,27 @@ export class HttpGateway {
     "authorization",
     "proxy-authorization",
   ];
+  private static readonly INVALID_REQUEST =
+    "The request cannot be sent: its URI, method, headers or body are not valid";
 
   constructor(
     private readonly client: HttpClient,
     private readonly authenticator: Authenticator,
   ) {}
 
-  perform(request: HttpRequest, context: CallContext): Promise<HttpOutcome> {
-    const outbound = this.#outboundOf(request);
-    const authentication = request.endpoint.authentication;
-    return this.exchange(outbound, authentication, request, context);
+  async perform(
+    request: HttpRequest,
+    context: CallContext,
+  ): Promise<HttpOutcome> {
+    try {
+      const outbound = this.#outboundOf(request);
+      const authentication = request.endpoint.authentication;
+      return await this.exchange(outbound, authentication, request, context);
+    } catch (error) {
+      if (error instanceof TransportFault) return error.failure();
+
+      throw error;
+    }
   }
 
   async exchange(
@@ -83,7 +94,7 @@ export class HttpGateway {
     const declared = request.body;
     const structured = declared !== null && typeof declared !== "string";
     const body = structured ? JSON.stringify(declared) : declared;
-    const headers = new Headers(request.headers);
+    const headers = this.#headersOf(request.headers);
     const untyped = structured && !headers.has("content-type");
 
     if (untyped) headers.set("content-type", "application/json");
@@ -112,6 +123,20 @@ export class HttpGateway {
       headers,
       body: request.body,
     };
+  }
+
+  #headersOf(declared: HttpRequest["headers"]): Headers {
+    try {
+      return new Headers(declared);
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+
+      throw new TransportFault(
+        TransportFailure.Misconfigured,
+        HttpGateway.INVALID_REQUEST,
+        { cause: error },
+      );
+    }
   }
 
   #withoutCredentials(headers: Headers): Readonly<Record<string, string>> {

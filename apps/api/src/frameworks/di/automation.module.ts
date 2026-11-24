@@ -195,6 +195,7 @@ import { OutboundModule } from "./outbound.module.js";
     InstanceEvents,
     InstanceRuns,
     ChildCancellations,
+    EventAnnouncements,
     EventOffers,
     WorkflowEvents,
     WorkflowRepository,
