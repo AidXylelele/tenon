@@ -39,7 +39,6 @@ const operationFloors = floorsOf("operations", OPERATION_FLOOR);
 const featureFloors = floorsOf("features", FEATURE_FLOOR);
 
 const libFloors: [string, Floor][] = [
-  ["src/features/workflow-flow/**", LIB_FLOOR],
   ["src/libs/code-formatting/**", LIB_FLOOR],
   ["src/libs/codemirror/**", LIB_FLOOR],
   ["src/libs/flow/**", LIB_FLOOR],
