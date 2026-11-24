@@ -3,7 +3,9 @@ import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { type AckHandler, connectAsync, type MqttClient } from "mqtt";
 import { AddressPolicy } from "../http/address-policy.js";
 import { BrokerConnections } from "../asyncapi/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../asyncapi/interfaces.js";
+import type { BrokerServer } from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import type { Lost } from "../asyncapi/interfaces.js";
 import type { MqttVersion } from "./interfaces.js";
 
 @Injectable()
@@ -23,7 +25,7 @@ export class MqttConnection implements OnApplicationShutdown {
 
   clientOf(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
     version: MqttVersion,
   ): Promise<MqttClient> {
     const variant = String(version);
@@ -34,7 +36,7 @@ export class MqttConnection implements OnApplicationShutdown {
 
   subscriberOf(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
     version: MqttVersion,
     acked: AckHandler,
     lost: Lost,
@@ -51,7 +53,7 @@ export class MqttConnection implements OnApplicationShutdown {
   async #connected(
     server: BrokerServer,
     address: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     version: MqttVersion,
     lost: Lost,
     acked?: AckHandler,

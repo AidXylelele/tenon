@@ -1,10 +1,8 @@
 import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
 import { BrokerConnections } from "../../../../src/frameworks/asyncapi/broker-connections.js";
-import type {
-  BrokerServer,
-  Login,
-  Lost,
-} from "../../../../src/frameworks/asyncapi/interfaces.js";
+import type { Lost } from "../../../../src/frameworks/asyncapi/interfaces.js";
+import type { BrokerServer } from "../../../../src/interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../../../src/interface-adapters/auth/interfaces.js";
 
 interface Connection {
   readonly address: string;
@@ -13,7 +11,7 @@ interface Connection {
 
 const KEPT = 64;
 const ANONYMOUS = null;
-const LOGIN: Login = {
+const LOGIN: PasswordCredentials = {
   username: "ada",
   password: "lovelace",
 };
@@ -21,6 +19,8 @@ const LOGIN: Login = {
 function serverAt(hostname: string): BrokerServer {
   return {
     url: `redis://${hostname}:6379`,
+    protocol: "redis",
+    protocolVersion: null,
     hostname,
     port: 6379,
     pathname: "",

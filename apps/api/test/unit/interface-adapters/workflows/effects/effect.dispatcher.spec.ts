@@ -7,7 +7,7 @@ import type {
   Resource,
 } from "interpreter";
 import { A2aGateway } from "../../../../../src/interface-adapters/a2a/a2a.gateway.js";
-import { AsyncApiGateway } from "../../../../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
+import { AsyncApiGateway } from "../../../../../src/interface-adapters/asyncapi/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../../../../src/interface-adapters/workflows/effects/effect.dispatcher.js";
 import { GrpcGateway } from "../../../../../src/interface-adapters/grpc/grpc.gateway.js";
 import { HttpGateway } from "../../../../../src/interface-adapters/http/http.gateway.js";

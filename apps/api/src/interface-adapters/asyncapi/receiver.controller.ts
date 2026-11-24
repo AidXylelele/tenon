@@ -11,8 +11,9 @@ import { ReceiveInbound } from "../../application/automation/instances/receive-i
 import { SecretQueries } from "../../application/automation/secrets/queries.js";
 import { InboundKind } from "../../domain/automation/instances/enums.js";
 import type { InboundMessage } from "../../domain/automation/instances/interfaces.js";
-import type { JsonOf, Receiver } from "./interfaces.js";
-import { ProtocolMapper } from "./mappers/protocol.mapper.js";
+import type { JsonOf } from "../workflows/interfaces.js";
+import { ProtocolMapper } from "../workflows/mappers/protocol.mapper.js";
+import type { Receiver } from "./interfaces.js";
 
 @Injectable()
 export class ReceiverController {

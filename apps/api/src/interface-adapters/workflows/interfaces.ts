@@ -1,5 +1,4 @@
 import type {
-  AsyncApiRequest,
   CloudEvent,
   Diagnostic,
   Effect,
@@ -131,13 +130,6 @@ export interface StepCall {
   readonly idempotencyKey: string;
   readonly signal: AbortSignal;
   readonly secrets: JsonObject;
-}
-
-export interface Receiver {
-  readonly instanceId: string;
-  readonly execution: string;
-  readonly request: AsyncApiRequest;
-  readonly closesAt: number | null;
 }
 
 export interface ResolvedCompilation {

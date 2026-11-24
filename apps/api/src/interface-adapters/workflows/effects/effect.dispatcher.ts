@@ -10,7 +10,7 @@ import type {
 } from "../interfaces.js";
 import { ProtocolMapper } from "../mappers/protocol.mapper.js";
 import { A2aGateway } from "../../a2a/a2a.gateway.js";
-import { AsyncApiGateway } from "./asyncapi.gateway.js";
+import { AsyncApiGateway } from "../../asyncapi/asyncapi.gateway.js";
 import { GrpcGateway } from "../../grpc/grpc.gateway.js";
 import { HttpGateway } from "../../http/http.gateway.js";
 import type { CallContext } from "./interfaces.js";

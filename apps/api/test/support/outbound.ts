@@ -2,7 +2,7 @@ import { HttpClient as NestHttpClient } from "@nestjs/http-client";
 import type { ResilienceService } from "@nestjs/resilience";
 import type { AsyncApiInboundMessage, JsonObject } from "interpreter";
 import { Agent } from "undici";
-import type { AsyncApiInbox } from "../../src/interface-adapters/messaging/interfaces.js";
+import type { AsyncApiInbox } from "../../src/interface-adapters/asyncapi/interfaces.js";
 import { responseSizeLimit } from "../../src/frameworks/di/host.presets.js";
 import type { AddressPolicy } from "../../src/frameworks/http/address-policy.js";
 import { UndiciHttpClient } from "../../src/frameworks/http/undici.http-client.js";

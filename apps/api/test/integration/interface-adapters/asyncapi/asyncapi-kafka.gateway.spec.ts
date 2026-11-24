@@ -20,36 +20,37 @@ import type {
   AsyncApiRequest,
   JsonObject,
 } from "interpreter";
-import { AmqpConnection } from "../../../../../src/frameworks/amqp/amqp.connection.js";
-import { parserOptions } from "../../../../../src/frameworks/asyncapi/parser.options.js";
+import { AmqpConnection } from "../../../../src/frameworks/amqp/amqp.connection.js";
+import { parserOptions } from "../../../../src/frameworks/asyncapi/parser.options.js";
 import {
   resiliencePresets,
   responseSizeLimit,
-} from "../../../../../src/frameworks/di/host.presets.js";
-import { KafkaConnection } from "../../../../../src/frameworks/kafka/kafka.connection.js";
-import { MqttConnection } from "../../../../../src/frameworks/mqtt/mqtt.connection.js";
-import { NatsConnection } from "../../../../../src/frameworks/nats/nats.connection.js";
-import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
-import { RedisConnection } from "../../../../../src/frameworks/redis/redis.connection.js";
-import type { BrokerSubscription } from "../../../../../src/interface-adapters/messaging/interfaces.js";
-import { AmqpGateway } from "../../../../../src/interface-adapters/workflows/effects/amqp.gateway.js";
-import { AsyncApiDocuments } from "../../../../../src/interface-adapters/workflows/effects/asyncapi-documents.js";
-import { AsyncApiGateway } from "../../../../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
-import { KafkaGateway } from "../../../../../src/interface-adapters/workflows/effects/kafka.gateway.js";
-import { MqttGateway } from "../../../../../src/interface-adapters/workflows/effects/mqtt.gateway.js";
-import { NatsGateway } from "../../../../../src/interface-adapters/workflows/effects/nats.gateway.js";
-import { RedisGateway } from "../../../../../src/interface-adapters/workflows/effects/redis.gateway.js";
-import { TransportFaults } from "../../../../../src/frameworks/http/transport-faults.js";
+} from "../../../../src/frameworks/di/host.presets.js";
+import { KafkaConnection } from "../../../../src/frameworks/kafka/kafka.connection.js";
+import { MqttConnection } from "../../../../src/frameworks/mqtt/mqtt.connection.js";
+import { NatsConnection } from "../../../../src/frameworks/nats/nats.connection.js";
+import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
+import { RedisConnection } from "../../../../src/frameworks/redis/redis.connection.js";
+import { AmqpBroker } from "../../../../src/frameworks/amqp/amqp.broker.js";
+import { ParserAsyncApiDocuments } from "../../../../src/frameworks/asyncapi/parser.asyncapi-documents.js";
+import { RoutedBrokerClient } from "../../../../src/frameworks/asyncapi/routed.broker-client.js";
+import { KafkaBroker } from "../../../../src/frameworks/kafka/kafka.broker.js";
+import { MqttBroker } from "../../../../src/frameworks/mqtt/mqtt.broker.js";
+import { NatsBroker } from "../../../../src/frameworks/nats/nats.broker.js";
+import { RedisBroker } from "../../../../src/frameworks/redis/redis.broker.js";
+import { AsyncApiGateway } from "../../../../src/interface-adapters/asyncapi/asyncapi.gateway.js";
+import type { BrokerSubscription } from "../../../../src/interface-adapters/asyncapi/interfaces.js";
+import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
 import {
   startStubServer,
   type StubServer,
-} from "../../../../support/stub-server.js";
+} from "../../../support/stub-server.js";
 import {
   authenticationOf,
   callContextOf,
   inboxOf,
   resourcesOf,
-} from "../../../../support/outbound.js";
+} from "../../../support/outbound.js";
 
 const HOST = "127.0.0.1";
 const LOOPBACK = ["127.0.0.1", "::1"];
@@ -105,15 +106,17 @@ describe("the AsyncAPI gateway on a Kafka cluster a document names", () => {
     new AsyncApiGateway(
       resourcesOf(new AddressPolicy([HOST]), resilience),
       authenticationOf(policy, resilience),
-      new AsyncApiDocuments(new Parser(parserOptions)),
-      responseSizeLimit,
-      new TransportFaults(),
-      new AmqpGateway(new AmqpConnection(policy)),
-      new KafkaGateway(kafkaOn),
-      new MqttGateway(new MqttConnection(policy)),
-      new NatsGateway(new NatsConnection(policy)),
-      new RedisGateway(new RedisConnection(policy)),
-      resilience,
+      new ParserAsyncApiDocuments(new Parser(parserOptions)),
+      new RoutedBrokerClient(
+        responseSizeLimit,
+        new TransportFaults(),
+        new AmqpBroker(new AmqpConnection(policy)),
+        new KafkaBroker(kafkaOn),
+        new MqttBroker(new MqttConnection(policy)),
+        new NatsBroker(new NatsConnection(policy)),
+        new RedisBroker(new RedisConnection(policy)),
+        resilience,
+      ),
     );
 
   const requestOf = (

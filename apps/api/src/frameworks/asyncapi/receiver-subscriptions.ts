@@ -4,16 +4,16 @@ import { Injectable, Logger, type OnModuleDestroy } from "@nestjs/common";
 import { type Duration, type Lock, Locks } from "@nestjs/locks";
 import { Interval } from "@nestjs/schedule";
 import type { AsyncApiInboundMessage, Failure } from "interpreter";
-import type { Receiver } from "../workflows/interfaces.js";
-import { ReceiverController } from "../workflows/receiver.controller.js";
-import {
-  type AsyncApiInbox,
-  type Consumer,
-  SubscriptionClient,
-} from "./interfaces.js";
+import { AsyncApiGateway } from "../../interface-adapters/asyncapi/asyncapi.gateway.js";
+import type {
+  AsyncApiInbox,
+  Receiver,
+} from "../../interface-adapters/asyncapi/interfaces.js";
+import { ReceiverController } from "../../interface-adapters/asyncapi/receiver.controller.js";
+import type { Consumer } from "./interfaces.js";
 
 @Injectable()
-export class AsyncApiHandler implements OnModuleDestroy {
+export class ReceiverSubscriptions implements OnModuleDestroy {
   private static readonly SYNC_MS = 2_000;
   private static readonly RETRY_MS = 30_000;
   private static readonly DEMAND_MS = 250;
@@ -23,17 +23,17 @@ export class AsyncApiHandler implements OnModuleDestroy {
     "expired",
   ];
 
-  private readonly logger = new Logger(AsyncApiHandler.name);
+  private readonly logger = new Logger(ReceiverSubscriptions.name);
   private readonly consumers = new Map<string, Consumer>();
   private closing = false;
 
   constructor(
     private readonly receivers: ReceiverController,
-    private readonly client: SubscriptionClient,
+    private readonly asyncApi: AsyncApiGateway,
     private readonly locks: Locks,
   ) {}
 
-  @Interval(AsyncApiHandler.SYNC_MS)
+  @Interval(ReceiverSubscriptions.SYNC_MS)
   async sync(): Promise<void> {
     if (this.closing) return;
 
@@ -84,7 +84,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
     receiver: Receiver,
     stopped: AbortSignal,
   ): Promise<void> {
-    const lease = { ttl: AsyncApiHandler.LEASE, signal: stopped };
+    const lease = { ttl: ReceiverSubscriptions.LEASE, signal: stopped };
     const lock = await this.locks.acquire(key, lease);
 
     if (lock === null) return;
@@ -127,7 +127,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
         lost.abort();
       },
     };
-    const subscribed = await this.client.subscribe(
+    const subscribed = await this.asyncApi.subscribe(
       receiver.request,
       step,
       inbox,
@@ -159,7 +159,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
 
       if (demanded) return;
 
-      await setTimeout(AsyncApiHandler.DEMAND_MS, undefined, {
+      await setTimeout(ReceiverSubscriptions.DEMAND_MS, undefined, {
         signal: ended,
       });
     }
@@ -208,7 +208,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
   ): Promise<void> {
     if (held.aborted) return;
 
-    const retried = AsyncApiHandler.RETRIED.includes(failure.kind);
+    const retried = ReceiverSubscriptions.RETRIED.includes(failure.kind);
 
     if (!retried) {
       await this.receivers.failReceive(
@@ -273,7 +273,7 @@ export class AsyncApiHandler implements OnModuleDestroy {
   }
 
   #retry(): AbortSignal {
-    return AbortSignal.timeout(AsyncApiHandler.RETRY_MS);
+    return AbortSignal.timeout(ReceiverSubscriptions.RETRY_MS);
   }
 
   #keyOf(receiver: Receiver): string {

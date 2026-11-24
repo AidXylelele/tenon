@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
 import { LRUCache } from "lru-cache";
 import type { AddressPolicy } from "../http/address-policy.js";
-import type { BrokerServer, Login, Lost, Opening } from "./interfaces.js";
+import type { BrokerServer } from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import type { Lost, Opening } from "./interfaces.js";
 
 export class BrokerConnections<C extends object> {
   static readonly CONNECT_MS = 5_000;
@@ -32,7 +34,7 @@ export class BrokerConnections<C extends object> {
   of(
     server: BrokerServer,
     variant: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     open: (address: string, lost: Lost) => Promise<C>,
   ): Promise<C> {
     const key = this.#keyOf(server, variant, login);
@@ -105,7 +107,11 @@ export class BrokerConnections<C extends object> {
     void settled.then(() => this.closings.delete(settled));
   }
 
-  #keyOf(server: BrokerServer, variant: string, login: Login | null): string {
+  #keyOf(
+    server: BrokerServer,
+    variant: string,
+    login: PasswordCredentials | null,
+  ): string {
     const identity = JSON.stringify([
       server.url,
       server.secure,

@@ -1,49 +1,44 @@
 import { Injectable } from "@nestjs/common";
-import type { AsyncApiOutcome, Failure } from "interpreter";
 import type { AckHandler, IClientPublishOptions, IPublishPacket } from "mqtt";
-import type { MqttVersion } from "../../../frameworks/mqtt/interfaces.js";
-import { MqttConnection } from "../../../frameworks/mqtt/mqtt.connection.js";
-import type { Subscribed } from "../../messaging/interfaces.js";
-import { MQTT_OPERATION } from "./asyncapi-bindings.schema.js";
-import type { BasicCredentials } from "../../auth/interfaces.js";
 import type {
-  BrokerGateway,
-  BrokerInbox,
-  BrokerMessage,
+  BrokerSubscription,
   BrokerTarget,
-  MqttBinding,
+} from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import { TransportFailure } from "../../interface-adapters/http/enums.js";
+import { TransportFault } from "../../interface-adapters/http/transport-fault.error.js";
+import type {
+  Broker,
+  EncodedInbox,
+  EncodedMessage,
   ReceivedBrokerMessage,
-} from "./interfaces.js";
+} from "../asyncapi/interfaces.js";
+import type { MqttBinding, MqttVersion } from "./interfaces.js";
+import { MQTT_OPERATION } from "./mqtt-binding.schema.js";
+import { MqttConnection } from "./mqtt.connection.js";
 
 @Injectable()
-export class MqttGateway implements BrokerGateway {
+export class MqttBroker implements Broker {
   private static readonly VERSION_5: MqttVersion = 5;
   private static readonly VERSION_3_1_1: MqttVersion = 4;
   private static readonly REFUSED_LOGINS = [4, 5, 134, 135];
   private static readonly AT_MOST_ONCE = 0;
   private static readonly SUCCESS = 0;
-  private static readonly UNREAD_BINDING: Failure = {
-    kind: "misconfigured",
-    detail: "The operation's mqtt binding is not one the host reads",
-  };
+  private static readonly UNREAD_BINDING =
+    "The operation's mqtt binding is not one the host reads";
 
   constructor(private readonly mqtt: MqttConnection) {}
 
-  async publish(
-    target: BrokerTarget,
-    message: BrokerMessage,
-  ): Promise<AsyncApiOutcome> {
+  async publish(target: BrokerTarget, message: EncodedMessage): Promise<void> {
     const version = this.#versionOf(target);
     const headed = Object.keys(message.headers).length > 0;
+
+    if (headed && version !== MqttBroker.VERSION_5)
+      throw this.#misconfigured(
+        "MQTT 3.1.1 carries no headers; name protocolVersion 5",
+      );
+
     const binding = this.#bindingOf(target);
-
-    if (headed && version !== MqttGateway.VERSION_5)
-      return {
-        kind: "misconfigured",
-        detail: "MQTT 3.1.1 carries no headers; name protocolVersion 5",
-      };
-
-    if (binding === null) return MqttGateway.UNREAD_BINDING;
 
     try {
       const client = await this.mqtt.clientOf(
@@ -53,20 +48,17 @@ export class MqttGateway implements BrokerGateway {
       );
       const options = this.#optionsOf(binding, message, version);
       await client.publishAsync(target.address, message.body, options);
-      return { kind: "published" };
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
   async subscribe(
     target: BrokerTarget,
-    login: BasicCredentials | null,
-    inbox: BrokerInbox,
-  ): Promise<Subscribed> {
+    login: PasswordCredentials | null,
+    inbox: EncodedInbox,
+  ): Promise<BrokerSubscription> {
     const binding = this.#bindingOf(target);
-
-    if (binding === null) return MqttGateway.UNREAD_BINDING;
 
     const version = this.#versionOf(target);
     const lost = () => {
@@ -91,7 +83,7 @@ export class MqttGateway implements BrokerGateway {
       );
       const subscription = { close: () => client.endAsync() };
       client.on("message", (_topic, payload, packet) => {
-        if (packet.qos !== MqttGateway.AT_MOST_ONCE) return;
+        if (packet.qos !== MqttBroker.AT_MOST_ONCE) return;
 
         this.#delivered(payload, packet, inbox);
       });
@@ -102,22 +94,22 @@ export class MqttGateway implements BrokerGateway {
           await Promise.allSettled([closed]);
           throw error;
         });
-      return { kind: "subscribed", subscription };
+      return subscription;
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
   #acked(
     payload: Buffer,
     packet: IPublishPacket,
-    inbox: BrokerInbox,
+    inbox: EncodedInbox,
     done: Parameters<AckHandler>[3],
   ): void {
     const received = this.#receivedOf(payload, packet);
     inbox.deliver(received).then(
       () => {
-        done(MqttGateway.SUCCESS);
+        done(MqttBroker.SUCCESS);
       },
       () => {
         inbox.lost();
@@ -128,7 +120,7 @@ export class MqttGateway implements BrokerGateway {
   #delivered(
     payload: Buffer,
     packet: IPublishPacket,
-    inbox: BrokerInbox,
+    inbox: EncodedInbox,
   ): void {
     const received = this.#receivedOf(payload, packet);
     inbox.deliver(received).catch(() => {
@@ -148,24 +140,24 @@ export class MqttGateway implements BrokerGateway {
     };
   }
 
-  #bindingOf(target: BrokerTarget): MqttBinding | null {
+  #bindingOf(target: BrokerTarget): MqttBinding {
     const declared = target.bindings.operation.mqtt ?? {};
     const binding = MQTT_OPERATION.safeParse(declared);
 
-    if (!binding.success) return null;
+    if (!binding.success) throw this.#misconfigured(MqttBroker.UNREAD_BINDING);
 
     return binding.data;
   }
 
   #optionsOf(
     binding: MqttBinding,
-    message: BrokerMessage,
+    message: EncodedMessage,
     version: MqttVersion,
   ): IClientPublishOptions {
     const qos = binding.qos;
     const retain = binding.retain;
 
-    if (version !== MqttGateway.VERSION_5) return { qos, retain };
+    if (version !== MqttBroker.VERSION_5) return { qos, retain };
 
     const userProperties: Record<string, string> = {};
 
@@ -196,18 +188,22 @@ export class MqttGateway implements BrokerGateway {
     const five =
       server.protocol === "mqtt5" ||
       (server.protocolVersion?.startsWith("5") ?? false);
-    return five ? MqttGateway.VERSION_5 : MqttGateway.VERSION_3_1_1;
+    return five ? MqttBroker.VERSION_5 : MqttBroker.VERSION_3_1_1;
   }
 
-  #failureOf(error: unknown): Failure {
+  #faultOf(error: unknown): TransportFault {
     const code: unknown =
       error instanceof Error ? Reflect.get(error, "code") : undefined;
     const detail = error instanceof Error ? error.message : String(error);
     const refused =
-      typeof code === "number" && MqttGateway.REFUSED_LOGINS.includes(code);
+      typeof code === "number" && MqttBroker.REFUSED_LOGINS.includes(code);
+    const reason = refused
+      ? TransportFailure.Unauthenticated
+      : TransportFailure.Unreachable;
+    return new TransportFault(reason, detail);
+  }
 
-    if (refused) return { kind: "unauthenticated", detail };
-
-    return { kind: "unreachable", detail };
+  #misconfigured(detail: string): TransportFault {
+    return new TransportFault(TransportFailure.Misconfigured, detail);
   }
 }

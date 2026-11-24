@@ -1,57 +1,50 @@
 import { Injectable } from "@nestjs/common";
 import type { Channel, ConfirmChannel, ConsumeMessage, Options } from "amqplib";
-import type { AsyncApiOutcome, Failure } from "interpreter";
-import { AmqpConnection } from "../../../frameworks/amqp/amqp.connection.js";
-import type { Subscribed } from "../../messaging/interfaces.js";
-import type { BasicCredentials } from "../../auth/interfaces.js";
-import { AMQP_CHANNEL } from "./asyncapi-bindings.schema.js";
 import type {
-  AmqpBinding,
-  BrokerGateway,
-  BrokerInbox,
-  BrokerMessage,
+  BrokerSubscription,
   BrokerTarget,
+} from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import { TransportFailure } from "../../interface-adapters/http/enums.js";
+import { TransportFault } from "../../interface-adapters/http/transport-fault.error.js";
+import type {
+  Broker,
+  EncodedInbox,
+  EncodedMessage,
   ReceivedBrokerMessage,
-} from "./interfaces.js";
+} from "../asyncapi/interfaces.js";
+import { AMQP_CHANNEL } from "./amqp-binding.schema.js";
+import { AmqpConnection } from "./amqp.connection.js";
+import type { AmqpBinding } from "./interfaces.js";
 
 @Injectable()
-export class AmqpGateway implements BrokerGateway {
+export class AmqpBroker implements Broker {
   private static readonly QUEUE_PREFIX = "tenon.";
   private static readonly QUEUE_EXPIRES_MS = 15 * 60 * 1000;
   private static readonly REFUSED_LOGIN = "ACCESS_REFUSED";
-  private static readonly UNREAD_BINDING: Failure = {
-    kind: "misconfigured",
-    detail: "The channel's amqp binding is not one the host reads",
-  };
+  private static readonly UNREAD_BINDING =
+    "The channel's amqp binding is not one the host reads";
 
   constructor(private readonly amqp: AmqpConnection) {}
 
-  async publish(
-    target: BrokerTarget,
-    message: BrokerMessage,
-  ): Promise<AsyncApiOutcome> {
+  async publish(target: BrokerTarget, message: EncodedMessage): Promise<void> {
     const binding = this.#bindingOf(target);
-
-    if (binding === null) return AmqpGateway.UNREAD_BINDING;
 
     try {
       const channel = await this.amqp.channelOf(target.server, message.login);
       this.#sent(channel, binding, target.address, message);
       await channel.waitForConfirms();
-      return { kind: "published" };
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
   async subscribe(
     target: BrokerTarget,
-    login: BasicCredentials | null,
-    inbox: BrokerInbox,
-  ): Promise<Subscribed> {
+    login: PasswordCredentials | null,
+    inbox: EncodedInbox,
+  ): Promise<BrokerSubscription> {
     const binding = this.#bindingOf(target);
-
-    if (binding === null) return AmqpGateway.UNREAD_BINDING;
 
     const exchange = this.#exchangeOf(binding);
     const shared = exchange === null;
@@ -72,18 +65,21 @@ export class AmqpGateway implements BrokerGateway {
         handle,
         lost,
       );
-      const subscription = { close: () => model.close() };
-      return { kind: "subscribed", subscription };
+      return { close: () => model.close() };
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
-  #bindingOf(target: BrokerTarget): AmqpBinding | null {
+  #bindingOf(target: BrokerTarget): AmqpBinding {
     const declared = target.bindings.channel.amqp ?? {};
     const binding = AMQP_CHANNEL.safeParse(declared);
 
-    if (!binding.success) return null;
+    if (!binding.success)
+      throw new TransportFault(
+        TransportFailure.Misconfigured,
+        AmqpBroker.UNREAD_BINDING,
+      );
 
     return binding.data;
   }
@@ -92,7 +88,7 @@ export class AmqpGateway implements BrokerGateway {
     channel: ConfirmChannel,
     binding: AmqpBinding,
     address: string,
-    message: BrokerMessage,
+    message: EncodedMessage,
   ): void {
     const options: Options.Publish = {
       headers: { ...message.headers },
@@ -114,7 +110,7 @@ export class AmqpGateway implements BrokerGateway {
   async #handled(
     channel: Channel,
     message: ConsumeMessage,
-    inbox: BrokerInbox,
+    inbox: EncodedInbox,
     shared: boolean,
   ): Promise<void> {
     try {
@@ -142,14 +138,14 @@ export class AmqpGateway implements BrokerGateway {
     channel: Channel,
     binding: AmqpBinding,
     address: string,
-    inbox: BrokerInbox,
+    inbox: EncodedInbox,
   ): Promise<string> {
     const exchange = this.#exchangeOf(binding);
 
     if (exchange === null) return binding.queue.name ?? address;
 
-    const name = `${AmqpGateway.QUEUE_PREFIX}${inbox.subscriber}`;
-    const options = { durable: true, expires: AmqpGateway.QUEUE_EXPIRES_MS };
+    const name = `${AmqpBroker.QUEUE_PREFIX}${inbox.subscriber}`;
+    const options = { durable: true, expires: AmqpBroker.QUEUE_EXPIRES_MS };
     await channel.assertQueue(name, options);
     await channel.bindQueue(name, exchange, address);
     return name;
@@ -167,12 +163,12 @@ export class AmqpGateway implements BrokerGateway {
     return typeof value === "string" ? value : null;
   }
 
-  #failureOf(error: unknown): Failure {
+  #faultOf(error: unknown): TransportFault {
     const detail = error instanceof Error ? error.message : String(error);
-    const refusedLogin = detail.includes(AmqpGateway.REFUSED_LOGIN);
-
-    if (refusedLogin) return { kind: "unauthenticated", detail };
-
-    return { kind: "unreachable", detail };
+    const refusedLogin = detail.includes(AmqpBroker.REFUSED_LOGIN);
+    const reason = refusedLogin
+      ? TransportFailure.Unauthenticated
+      : TransportFailure.Unreachable;
+    return new TransportFault(reason, detail);
   }
 }

@@ -6,43 +6,42 @@ import {
   type MsgHdrs,
   type NatsConnection as NatsClient,
 } from "@nats-io/transport-node";
-import type { AsyncApiOutcome, Failure } from "interpreter";
-import { NatsConnection } from "../../../frameworks/nats/nats.connection.js";
-import type { Subscribed } from "../../messaging/interfaces.js";
-import type { BasicCredentials } from "../../auth/interfaces.js";
 import type {
-  BrokerGateway,
-  BrokerInbox,
-  BrokerMessage,
+  BrokerSubscription,
   BrokerTarget,
-} from "./interfaces.js";
+} from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import { TransportFailure } from "../../interface-adapters/http/enums.js";
+import { TransportFault } from "../../interface-adapters/http/transport-fault.error.js";
+import type {
+  Broker,
+  EncodedInbox,
+  EncodedMessage,
+} from "../asyncapi/interfaces.js";
+import { NatsConnection } from "./nats.connection.js";
 
 @Injectable()
-export class NatsGateway implements BrokerGateway {
+export class NatsBroker implements Broker {
   private static readonly MESSAGE_ID = "Nats-Msg-Id";
 
   constructor(private readonly nats: NatsConnection) {}
 
-  async publish(
-    target: BrokerTarget,
-    message: BrokerMessage,
-  ): Promise<AsyncApiOutcome> {
+  async publish(target: BrokerTarget, message: EncodedMessage): Promise<void> {
     try {
       const client = await this.nats.clientOf(target.server, message.login);
       const sent = this.#headersOf(message);
       client.publish(target.address, message.body, { headers: sent });
       await client.flush();
-      return { kind: "published" };
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
   async subscribe(
     target: BrokerTarget,
-    login: BasicCredentials | null,
-    inbox: BrokerInbox,
-  ): Promise<Subscribed> {
+    login: PasswordCredentials | null,
+    inbox: EncodedInbox,
+  ): Promise<BrokerSubscription> {
     const lost = () => {
       inbox.lost();
     };
@@ -57,16 +56,16 @@ export class NatsGateway implements BrokerGateway {
           throw error;
         },
       );
-      return { kind: "subscribed", subscription };
+      return subscription;
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
   async #consumed(
     client: NatsClient,
     subject: string,
-    inbox: BrokerInbox,
+    inbox: EncodedInbox,
   ): Promise<void> {
     client.subscribe(subject, {
       callback: (error, message) => {
@@ -81,7 +80,7 @@ export class NatsGateway implements BrokerGateway {
     await client.flush();
   }
 
-  #delivered(message: Msg, inbox: BrokerInbox): void {
+  #delivered(message: Msg, inbox: EncodedInbox): void {
     const body = Buffer.from(message.data);
     const headers = this.#receivedHeadersOf(message.headers);
     const received = { body, contentType: null, headers, correlationId: null };
@@ -99,7 +98,7 @@ export class NatsGateway implements BrokerGateway {
     return headers;
   }
 
-  #headersOf(message: BrokerMessage): MsgHdrs {
+  #headersOf(message: EncodedMessage): MsgHdrs {
     const sent = headers();
 
     for (const [name, value] of Object.entries(message.headers)) {
@@ -107,16 +106,16 @@ export class NatsGateway implements BrokerGateway {
       sent.set(name, text);
     }
 
-    sent.set(NatsGateway.MESSAGE_ID, message.idempotencyKey);
+    sent.set(NatsBroker.MESSAGE_ID, message.idempotencyKey);
     return sent;
   }
 
-  #failureOf(error: unknown): Failure {
+  #faultOf(error: unknown): TransportFault {
     const detail = error instanceof Error ? error.message : String(error);
-
-    if (error instanceof errors.AuthorizationError)
-      return { kind: "unauthenticated", detail };
-
-    return { kind: "unreachable", detail };
+    const reason =
+      error instanceof errors.AuthorizationError
+        ? TransportFailure.Unauthenticated
+        : TransportFailure.Unreachable;
+    return new TransportFault(reason, detail);
   }
 }

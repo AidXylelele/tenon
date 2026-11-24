@@ -11,8 +11,8 @@ import {
   Wait,
 } from "testcontainers";
 import { Role } from "../../../src/domain/identity/users/enums.js";
-import { AsyncApiHandler } from "../../../src/interface-adapters/messaging/asyncapi.handler.js";
-import { ReceiverController } from "../../../src/interface-adapters/workflows/receiver.controller.js";
+import { ReceiverSubscriptions } from "../../../src/frameworks/asyncapi/receiver-subscriptions.js";
+import { ReceiverController } from "../../../src/interface-adapters/asyncapi/receiver.controller.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import type { TestApp } from "../../support/create-test-app.js";
@@ -159,7 +159,7 @@ describe("a run that publishes and receives on a server its AsyncAPI document na
     await publish(t, editor, workflow);
     const started = await start(t, editor, { input: {} }, "sales/collector");
     await drain(t);
-    const receivers = t.app.get(AsyncApiHandler);
+    const receivers = t.app.get(ReceiverSubscriptions);
 
     await vi.waitFor(
       async () => {
@@ -218,7 +218,7 @@ describe("a run that publishes and receives on a server its AsyncAPI document na
     await publish(t, editor, workflow);
     const started = await start(t, editor, { input: {} }, "sales/approver");
     await drain(t);
-    const receivers = t.app.get(AsyncApiHandler);
+    const receivers = t.app.get(ReceiverSubscriptions);
     await vi.waitFor(
       async () => {
         await receivers.sync();
@@ -280,7 +280,7 @@ describe("a run that publishes and receives on a server its AsyncAPI document na
     await publish(t, editor, workflow);
     const started = await start(t, editor, { input: {} }, "sales/misdirected");
     await drain(t);
-    const receivers = t.app.get(AsyncApiHandler);
+    const receivers = t.app.get(ReceiverSubscriptions);
 
     const ended = await vi.waitFor(
       async () => {
@@ -322,7 +322,7 @@ describe("a run that publishes and receives on a server its AsyncAPI document na
     await publish(t, editor, workflow);
     const started = await start(t, editor, { input: {} }, "sales/worker");
     await drain(t);
-    const receivers = t.app.get(AsyncApiHandler);
+    const receivers = t.app.get(ReceiverSubscriptions);
 
     const ended = await vi.waitFor(
       async () => {

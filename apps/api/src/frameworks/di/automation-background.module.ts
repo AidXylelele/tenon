@@ -40,6 +40,12 @@ import {
   Deliveries,
   DeliveryLog,
 } from "../../application/automation/subscriptions/ports.js";
+import { AsyncApiGateway } from "../../interface-adapters/asyncapi/asyncapi.gateway.js";
+import {
+  AsyncApiDocuments,
+  BrokerClient,
+} from "../../interface-adapters/asyncapi/interfaces.js";
+import { ReceiverController } from "../../interface-adapters/asyncapi/receiver.controller.js";
 import { A2aGateway } from "../../interface-adapters/a2a/a2a.gateway.js";
 import { A2aClient } from "../../interface-adapters/a2a/interfaces.js";
 import { GrpcGateway } from "../../interface-adapters/grpc/grpc.gateway.js";
@@ -49,7 +55,6 @@ import { OpenApiGateway } from "../../interface-adapters/http/openapi.gateway.js
 import { McpClient } from "../../interface-adapters/mcp/interfaces.js";
 import { McpGateway } from "../../interface-adapters/mcp/mcp.gateway.js";
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
-import { AsyncApiHandler } from "../../interface-adapters/messaging/asyncapi.handler.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
 import { ConsumerSpan } from "../../interface-adapters/messaging/consumer-span.js";
 import { DeliveryMessagesGateway } from "../../interface-adapters/messaging/delivery-messages.gateway.js";
@@ -57,7 +62,6 @@ import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.han
 import { EffectHandler } from "../../interface-adapters/messaging/effect.handler.js";
 import { RunHandler } from "../../interface-adapters/messaging/run.handler.js";
 import { ScheduleHandler } from "../../interface-adapters/messaging/schedule.handler.js";
-import { SubscriptionClient } from "../../interface-adapters/messaging/interfaces.js";
 import { InboundMapper } from "../../interface-adapters/persistence/mappers/inbound.mapper.js";
 import { PostgresReceiverQueries } from "../../interface-adapters/persistence/queries/postgres-receiver.queries.js";
 import { PostgresDeliveryLogStore } from "../../interface-adapters/persistence/stores/postgres-delivery-log.store.js";
@@ -65,30 +69,30 @@ import { PostgresEventListenerStore } from "../../interface-adapters/persistence
 import { PostgresLockStore } from "../../interface-adapters/persistence/stores/postgres-lock.store.js";
 import { PostgresReceivedMessageStore } from "../../interface-adapters/persistence/stores/postgres-received-message.store.js";
 import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
-import { AmqpGateway } from "../../interface-adapters/workflows/effects/amqp.gateway.js";
-import { AsyncApiDocuments } from "../../interface-adapters/workflows/effects/asyncapi-documents.js";
-import { AsyncApiGateway } from "../../interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
-import { KafkaGateway } from "../../interface-adapters/workflows/effects/kafka.gateway.js";
-import { MqttGateway } from "../../interface-adapters/workflows/effects/mqtt.gateway.js";
-import { NatsGateway } from "../../interface-adapters/workflows/effects/nats.gateway.js";
-import { RedisGateway } from "../../interface-adapters/workflows/effects/redis.gateway.js";
 import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
-import { ReceiverController } from "../../interface-adapters/workflows/receiver.controller.js";
+import { AmqpBroker } from "../amqp/amqp.broker.js";
 import { AmqpConnection } from "../amqp/amqp.connection.js";
+import { ParserAsyncApiDocuments } from "../asyncapi/parser.asyncapi-documents.js";
 import { parserOptions } from "../asyncapi/parser.options.js";
+import { ReceiverSubscriptions } from "../asyncapi/receiver-subscriptions.js";
+import { RoutedBrokerClient } from "../asyncapi/routed.broker-client.js";
 import { JsonRpcA2aClient } from "../a2a/json-rpc.a2a-client.js";
 import { GrpcConnection } from "../grpc/grpc.connection.js";
 import { ProtoGrpcClient } from "../grpc/proto.grpc-client.js";
 import { ProtoSchema } from "../grpc/proto-schema.js";
+import { KafkaBroker } from "../kafka/kafka.broker.js";
 import { KafkaConnection } from "../kafka/kafka.connection.js";
 import { StreamableHttpMcpClient } from "../mcp/streamable-http.mcp-client.js";
+import { MqttBroker } from "../mqtt/mqtt.broker.js";
 import { MqttConnection } from "../mqtt/mqtt.connection.js";
+import { NatsBroker } from "../nats/nats.broker.js";
 import { NatsConnection } from "../nats/nats.connection.js";
 import { HttpClientName } from "../http/enums.js";
 import { ResponseSizeLimit } from "../http/response-size-limit.js";
 import { SwaggerOpenApiClient } from "../openapi/swagger.openapi-client.js";
+import { RedisBroker } from "../redis/redis.broker.js";
 import { RedisConnection } from "../redis/redis.connection.js";
 import { AutomationModule } from "./automation.module.js";
 import { sandboxConfig } from "./configs.js";
@@ -146,7 +150,7 @@ import { OutboundModule } from "./outbound.module.js";
     EffectHandler,
     DeliveryHandler,
     ScheduleHandler,
-    AsyncApiHandler,
+    ReceiverSubscriptions,
     RetentionJobs,
     InboundMapper,
     { provide: EventListeners, useClass: PostgresEventListenerStore },
@@ -174,13 +178,13 @@ import { OutboundModule } from "./outbound.module.js";
     NatsConnection,
     RedisConnection,
     { provide: Parser, useFactory: () => new Parser(parserOptions) },
-    AsyncApiDocuments,
-    AmqpGateway,
-    KafkaGateway,
-    MqttGateway,
-    NatsGateway,
-    RedisGateway,
-    { provide: SubscriptionClient, useExisting: AsyncApiGateway },
+    { provide: AsyncApiDocuments, useClass: ParserAsyncApiDocuments },
+    AmqpBroker,
+    KafkaBroker,
+    MqttBroker,
+    NatsBroker,
+    RedisBroker,
+    { provide: BrokerClient, useClass: RoutedBrokerClient },
     { provide: SandboxLimits, useValue: sandboxLimits },
     { provide: ProcessPlatform, useValue: processPlatform },
   ],

@@ -14,7 +14,9 @@ import {
 } from "@platformatic/kafka";
 import { AddressPolicy } from "../http/address-policy.js";
 import { BrokerConnections } from "../asyncapi/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../asyncapi/interfaces.js";
+import type { BrokerServer } from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import type { Lost } from "../asyncapi/interfaces.js";
 import type {
   KafkaConsumer,
   KafkaProducer,
@@ -38,7 +40,7 @@ export class KafkaConnection implements OnApplicationShutdown {
 
   async send(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
     record: KafkaRecord,
   ): Promise<void> {
     const producer = await this.connections.of(
@@ -53,7 +55,7 @@ export class KafkaConnection implements OnApplicationShutdown {
 
   async consume(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
     groupId: string,
     topic: string,
     lost: Lost,
@@ -78,7 +80,7 @@ export class KafkaConnection implements OnApplicationShutdown {
   #producer(
     server: BrokerServer,
     address: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     lost: Lost,
   ): Promise<KafkaProducer> {
     const bootstrap = this.#bootstrapOf(server, address);
@@ -110,7 +112,7 @@ export class KafkaConnection implements OnApplicationShutdown {
   #consumer(
     server: BrokerServer,
     address: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     groupId: string,
     lost: Lost,
   ): Promise<KafkaConsumer> {
@@ -186,7 +188,7 @@ export class KafkaConnection implements OnApplicationShutdown {
     return server.secure && named ? server.hostname : undefined;
   }
 
-  #saslOf(login: Login | null): SASLOptions | undefined {
+  #saslOf(login: PasswordCredentials | null): SASLOptions | undefined {
     if (login === null) return undefined;
 
     return {

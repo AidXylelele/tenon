@@ -1,50 +1,52 @@
 import { Injectable } from "@nestjs/common";
-import type { AsyncApiOutcome, Failure } from "interpreter";
 import { ErrorReply } from "redis";
-import { RedisConnection } from "../../../frameworks/redis/redis.connection.js";
-import type { Subscribed } from "../../messaging/interfaces.js";
-import type { BasicCredentials } from "../../auth/interfaces.js";
 import type {
-  BrokerGateway,
-  BrokerInbox,
-  BrokerMessage,
+  BrokerSubscription,
   BrokerTarget,
-} from "./interfaces.js";
+} from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import { TransportFailure } from "../../interface-adapters/http/enums.js";
+import { TransportFault } from "../../interface-adapters/http/transport-fault.error.js";
+import type {
+  Broker,
+  EncodedInbox,
+  EncodedMessage,
+} from "../asyncapi/interfaces.js";
+import { RedisConnection } from "./redis.connection.js";
 
 @Injectable()
-export class RedisGateway implements BrokerGateway {
+export class RedisBroker implements Broker {
   private static readonly REFUSED_LOGINS = /^(WRONGPASS|NOAUTH|NOPERM)/;
 
   constructor(private readonly redis: RedisConnection) {}
 
   async publish(
     target: BrokerTarget,
-    message: BrokerMessage,
+    message: EncodedMessage,
     signal: AbortSignal,
-  ): Promise<AsyncApiOutcome> {
+  ): Promise<void> {
     const headed = Object.keys(message.headers).length > 0;
 
     if (headed)
-      return {
-        kind: "misconfigured",
-        detail: "A Redis channel carries no headers",
-      };
+      throw new TransportFault(
+        TransportFailure.Misconfigured,
+        "A Redis channel carries no headers",
+      );
 
     try {
       const client = await this.redis.clientOf(target.server, message.login);
       const abortable = client.withAbortSignal(signal);
       await abortable.publish(target.address, message.body);
-      return { kind: "published" };
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
   async subscribe(
     target: BrokerTarget,
-    login: BasicCredentials | null,
-    inbox: BrokerInbox,
-  ): Promise<Subscribed> {
+    login: PasswordCredentials | null,
+    inbox: EncodedInbox,
+  ): Promise<BrokerSubscription> {
     const lost = () => {
       inbox.lost();
     };
@@ -62,13 +64,13 @@ export class RedisGateway implements BrokerGateway {
           await Promise.allSettled([closed]);
           throw error;
         });
-      return { kind: "subscribed", subscription };
+      return subscription;
     } catch (error) {
-      return this.#failureOf(error);
+      throw this.#faultOf(error);
     }
   }
 
-  #delivered(body: Buffer, inbox: BrokerInbox): void {
+  #delivered(body: Buffer, inbox: EncodedInbox): void {
     const received = {
       body,
       contentType: null,
@@ -80,13 +82,13 @@ export class RedisGateway implements BrokerGateway {
     });
   }
 
-  #failureOf(error: unknown): Failure {
+  #faultOf(error: unknown): TransportFault {
     const detail = error instanceof Error ? error.message : String(error);
     const refused =
-      error instanceof ErrorReply && RedisGateway.REFUSED_LOGINS.test(detail);
-
-    if (refused) return { kind: "unauthenticated", detail };
-
-    return { kind: "unreachable", detail };
+      error instanceof ErrorReply && RedisBroker.REFUSED_LOGINS.test(detail);
+    const reason = refused
+      ? TransportFailure.Unauthenticated
+      : TransportFailure.Unreachable;
+    return new TransportFault(reason, detail);
   }
 }

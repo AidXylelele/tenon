@@ -8,11 +8,15 @@ import {
   type ServerInterface,
 } from "@asyncapi/parser";
 import type { AsyncApiRequest, JsonObject, JsonValue } from "interpreter";
+import type {
+  AsyncApiDocuments,
+  BrokerServer,
+  Targeted,
+} from "../../interface-adapters/asyncapi/interfaces.js";
 import { BrokerProtocol } from "./enums.js";
-import type { AsyncApiServer, Targeted } from "./interfaces.js";
 
 @Injectable()
-export class AsyncApiDocuments {
+export class ParserAsyncApiDocuments implements AsyncApiDocuments {
   private static readonly CONTENT_TYPE = "application/json";
   private static readonly SECURE_PROTOCOLS: readonly string[] = [
     BrokerProtocol.Amqps,
@@ -26,6 +30,7 @@ export class AsyncApiDocuments {
     "tls:",
   ];
   private static readonly VARIABLE = /\{([^{}]+)\}/g;
+
   constructor(private readonly parser: Parser) {}
 
   async targetOf(text: string, request: AsyncApiRequest): Promise<Targeted> {
@@ -38,9 +43,7 @@ export class AsyncApiDocuments {
     const channel = this.#channelOf(document, operation, request);
 
     if (channel === undefined)
-      return this.#misconfigured(
-        "The document has no such operation or channel",
-      );
+      return this.#unusable("The document has no such operation or channel");
 
     return this.#targetOn(document, operation, channel, request);
   }
@@ -55,14 +58,14 @@ export class AsyncApiDocuments {
     const parameterised = address.includes("{");
 
     if (address === "" || parameterised)
-      return this.#misconfigured(
+      return this.#unusable(
         "The channel has no address of its own, or one with parameters the call cannot give",
       );
 
     const named = this.#serverOf(channel, request);
 
     if (named === undefined)
-      return this.#misconfigured(
+      return this.#unusable(
         "No server of the document serves the channel with the protocol asked for",
       );
 
@@ -70,7 +73,7 @@ export class AsyncApiDocuments {
     const url = this.#urlOf(named, variables);
 
     if (url === null)
-      return this.#misconfigured(
+      return this.#unusable(
         "The server's address has a variable the call and the document leave unset, or is no URL",
       );
 
@@ -128,7 +131,7 @@ export class AsyncApiDocuments {
     const defaults = new Map(entries);
     const declared = server
       .url()
-      .replace(AsyncApiDocuments.VARIABLE, (written, name: string) => {
+      .replace(ParserAsyncApiDocuments.VARIABLE, (written, name: string) => {
         const fallback = defaults.get(name);
         return this.#variableOf(variables[name], fallback) ?? written;
       });
@@ -153,13 +156,13 @@ export class AsyncApiDocuments {
     return JSON.stringify(given);
   }
 
-  #brokerOf(server: ServerInterface, url: URL): AsyncApiServer {
+  #brokerOf(server: ServerInterface, url: URL): BrokerServer {
     const protocol = server.protocol();
     const port = url.port === "" ? null : Number(url.port);
     const hostname = url.hostname.replace(/^\[(.*)\]$/, "$1");
     const secure =
-      AsyncApiDocuments.SECURE_PROTOCOLS.includes(protocol) ||
-      AsyncApiDocuments.SECURE_SCHEMES.includes(url.protocol);
+      ParserAsyncApiDocuments.SECURE_PROTOCOLS.includes(protocol) ||
+      ParserAsyncApiDocuments.SECURE_SCHEMES.includes(url.protocol);
     return {
       url: url.href,
       protocol,
@@ -179,7 +182,7 @@ export class AsyncApiDocuments {
     const messages = operation?.messages() ?? channel.messages();
     const [message] = messages.all();
     const declared = message?.contentType() ?? document.defaultContentType();
-    return declared ?? AsyncApiDocuments.CONTENT_TYPE;
+    return declared ?? ParserAsyncApiDocuments.CONTENT_TYPE;
   }
 
   #bindingsOf(
@@ -198,10 +201,10 @@ export class AsyncApiDocuments {
       (left, right) => left.severity - right.severity,
     );
     const reason = worst?.message ?? "it could not be read";
-    return this.#misconfigured(`The AsyncAPI document is not valid: ${reason}`);
+    return this.#unusable(`The AsyncAPI document is not valid: ${reason}`);
   }
 
-  #misconfigured(detail: string): Targeted {
-    return { kind: "misconfigured", detail };
+  #unusable(detail: string): Targeted {
+    return { kind: "unusable", detail };
   }
 }

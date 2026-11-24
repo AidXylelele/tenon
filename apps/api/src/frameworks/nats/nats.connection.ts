@@ -6,7 +6,9 @@ import {
 } from "@nats-io/transport-node";
 import { AddressPolicy } from "../http/address-policy.js";
 import { BrokerConnections } from "../asyncapi/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../asyncapi/interfaces.js";
+import type { BrokerServer } from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import type { Lost } from "../asyncapi/interfaces.js";
 import type { NatsTls } from "./interfaces.js";
 
 @Injectable()
@@ -22,7 +24,10 @@ export class NatsConnection implements OnApplicationShutdown {
     );
   }
 
-  clientOf(server: BrokerServer, login: Login | null): Promise<NatsClient> {
+  clientOf(
+    server: BrokerServer,
+    login: PasswordCredentials | null,
+  ): Promise<NatsClient> {
     return this.connections.of(server, "", login, (address, lost) =>
       this.#connected(server, address, login, lost),
     );
@@ -30,7 +35,7 @@ export class NatsConnection implements OnApplicationShutdown {
 
   subscriberOf(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
     lost: Lost,
   ): Promise<NatsClient> {
     return this.connections.dedicated(server, (address) =>
@@ -45,7 +50,7 @@ export class NatsConnection implements OnApplicationShutdown {
   async #connected(
     server: BrokerServer,
     address: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     lost: Lost,
   ): Promise<NatsClient> {
     const ipv6 = isIP(address) === 6;
