@@ -5,7 +5,8 @@ FROM criyle/go-judge:v1.13.3@sha256:97bec66d054e4d844e0ad29dfdd5c79ef3d09efba25b
 FROM node:26.13.1-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc
 RUN apt-get update \
  && apt-get install --yes --no-install-recommends python3=3.13.* \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+ && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 WORKDIR /opt
 COPY --from=go-judge /opt/go-judge /opt/mount.yaml /opt/
 # Runs as root: go-judge builds each sandbox from namespaces and cgroups (compose.yaml grants privileged).
