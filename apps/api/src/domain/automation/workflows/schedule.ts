@@ -7,6 +7,7 @@ export class Schedule {
   static readonly #ZONE = "UTC";
   static readonly #REFERENCE = new Date(Date.UTC(2000, 0, 1));
   static readonly #MOST_COUNTED = 1_000;
+  static readonly #UNBOUNDED = Number.POSITIVE_INFINITY;
 
   readonly #spec: ScheduleSpec;
   readonly #cron: CronTime | null;
@@ -41,7 +42,8 @@ export class Schedule {
 
   followingAt(now: Date): number | null {
     const from = now.getTime();
-    const next = this.#occurrencesAfter(from, 1);
+    const unbounded = Schedule.#UNBOUNDED;
+    const next = this.#occurrencesAfter(from, unbounded, 1);
     return next[0] ?? null;
   }
 
@@ -61,7 +63,8 @@ export class Schedule {
     if (first === undefined || last === undefined)
       return { from: since, to: since, count: 0 };
 
-    const following = this.#occurrencesAfter(last, 1);
+    const unbounded = Schedule.#UNBOUNDED;
+    const following = this.#occurrencesAfter(last, unbounded, 1);
     const to = following[0] ?? until;
     return { from: first, to, count: passed.length };
   }
@@ -72,67 +75,76 @@ export class Schedule {
   }
 
   upcoming(after: number, until: number, count: number): number[] {
-    const next = this.#occurrencesAfter(after, count);
-    return next.filter((at) => at <= until);
+    return this.#occurrencesAfter(after, until, count);
   }
 
   #passedBetween(since: number, until: number): number[] {
     const most = Schedule.#MOST_COUNTED;
-    const earliest = this.#occurrencesAfter(since, most);
+    const earliest = this.#occurrencesAfter(since, until, most);
     const first = earliest[0];
     const last = earliest.at(-1);
 
     if (first === undefined || last === undefined) return [];
 
-    const reached = last >= until;
-    const ended = earliest.length < most;
-
-    if (reached || ended) return earliest.filter((at) => at <= until);
+    if (earliest.length < most) return earliest;
 
     const span = last - first;
     const before = until - span - 1;
-    const latest = this.#occurrencesAfter(before, most);
-    return latest.filter((at) => at <= until);
+    return this.#occurrencesAfter(before, until, most);
   }
 
-  #occurrencesAfter(from: number, count: number): number[] {
+  #occurrencesAfter(from: number, until: number, count: number): number[] {
     const spec = this.#spec;
 
     switch (spec.kind) {
       case ScheduleKind.Every:
-        return Schedule.#everyAfter(spec.interval, from, count);
+        return Schedule.#everyAfter(spec.interval, from, until, count);
       case ScheduleKind.Cron:
-        return this.#cronAfter(from, count);
+        return this.#cronAfter(from, until, count);
       case ScheduleKind.After:
       case ScheduleKind.On:
         return [];
     }
   }
 
-  #cronAfter(from: number, count: number): number[] {
+  #cronAfter(from: number, until: number, count: number): number[] {
     const cron = this.#cron;
 
     if (cron === null) return [];
 
-    return Schedule.#cronSlots(cron, from, count);
+    return Schedule.#cronSlots(cron, from, until, count);
   }
 
-  static #cronSlots(cron: CronTime, from: number, count: number): number[] {
+  static #cronSlots(
+    cron: CronTime,
+    from: number,
+    until: number,
+    count: number,
+  ): number[] {
     if (count === 0) return [];
 
     const start = new Date(from);
     const next = cron.getNextDateFrom(start, Schedule.#ZONE).toMillis();
-    const later = Schedule.#cronSlots(cron, next, count - 1);
+
+    if (next > until) return [];
+
+    const later = Schedule.#cronSlots(cron, next, until, count - 1);
     return [next].concat(later);
   }
 
-  static #everyAfter(interval: number, from: number, count: number): number[] {
+  static #everyAfter(
+    interval: number,
+    from: number,
+    until: number,
+    count: number,
+  ): number[] {
     const passed = Math.floor(from / interval);
     const first = (passed + 1) * interval;
-    return Array.from({ length: count }, (_, index) => {
+    const slots = Array.from({ length: count }, (_, index) => {
       const slot = first + index * interval;
       return slot;
     });
+    return slots.filter((slot) => slot <= until);
   }
 
   static #cronOf(spec: ScheduleSpec): CronTime | null {
