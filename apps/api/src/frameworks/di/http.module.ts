@@ -8,9 +8,7 @@ import { AuthenticationModule } from "@nestjs/authentication";
 import { AuthorizationModule } from "@nestjs/authorization";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { APP_FILTER, APP_PIPE } from "@nestjs/core";
-import { IdempotencyModule } from "@nestjs/idempotency";
 import { TerminusModule } from "@nestjs/terminus";
-import type { User } from "../../domain/identity/users/user.js";
 import { HealthController } from "../../interface-adapters/api/controllers/health.controller.js";
 import { JsonOnlyMiddleware } from "../../interface-adapters/api/pipeline/json-only.middleware.js";
 import { ProblemDetailsFilter } from "../../interface-adapters/api/pipeline/problem-details.filter.js";
@@ -49,9 +47,6 @@ import { httpConfig, linksConfig } from "./configs.js";
       }),
     }),
     AuthorizationModule.forRoot(),
-    IdempotencyModule.forRoot({
-      scope: (request: { readonly user?: User }) => request.user?.id,
-    }),
     TerminusModule.forRoot({ gracefulShutdownTimeoutMs: 5_000 }),
   ],
   controllers: [HealthController],

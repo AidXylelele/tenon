@@ -18,6 +18,7 @@ const PROCESS_TIMEOUT = PROCESS_SECONDS * MILLISECONDS;
 const INTERPRETER_WORK = 5 * MILLISECONDS;
 const INTERPRETER_QUEUE_TIMEOUT = 2 * MILLISECONDS;
 const INTERPRETER_TIMEOUT = INTERPRETER_WORK + INTERPRETER_QUEUE_TIMEOUT;
+const QUEUED_PER_THREAD = 32;
 const RESPONSE_BYTES = 1024 * 1024;
 const SANDBOX_TIME = Temporal.Duration.from({ seconds: 30 });
 const SANDBOX_MEMORY_BYTES = 256 * 1024 * 1024;
@@ -89,7 +90,7 @@ export const interpreterPresetsOf = (
     timeout: INTERPRETER_TIMEOUT,
     bulkhead: {
       maxConcurrent: threads.runs,
-      maxQueue: threads.runs ** 2,
+      maxQueue: threads.runs * QUEUED_PER_THREAD,
       queueTimeout: INTERPRETER_QUEUE_TIMEOUT,
     },
   },
@@ -97,7 +98,7 @@ export const interpreterPresetsOf = (
     timeout: INTERPRETER_TIMEOUT,
     bulkhead: {
       maxConcurrent: threads.checks,
-      maxQueue: threads.checks ** 2,
+      maxQueue: threads.checks * QUEUED_PER_THREAD,
       queueTimeout: INTERPRETER_QUEUE_TIMEOUT,
     },
   },
