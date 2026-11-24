@@ -37,17 +37,10 @@ export type {
   Commit,
   FailureChoice,
   FailureReading,
-  FailureTarget,
   Authentication,
-  AuthScheme,
-  FieldControl,
   FieldState,
   FieldWords,
-  FlowChoice,
-  FormKind,
-  FormLayout,
   RetryCount,
-  SendAs,
   StartReading,
   StartWay,
   ValueRow,
@@ -72,5 +65,5 @@ export {
   renameCommitOf,
   rowsOf,
 } from "./values";
-export { isObject, type Json, type JsonObject } from "./json";
+export { isObject, type Json } from "./json";
 export { CONTINUE, flowChoicesOf, resultText, wordsOf } from "./words";

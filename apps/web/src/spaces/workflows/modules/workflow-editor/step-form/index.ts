@@ -4,8 +4,6 @@ export type {
   DataSlot,
   DataUse,
   Edit,
-  StartFormProps,
-  StepFormProps,
   Webhook,
 } from "./interfaces";
 export { blurOnEnter } from "./field-shell";

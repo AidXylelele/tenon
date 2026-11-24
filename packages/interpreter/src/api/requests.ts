@@ -161,7 +161,7 @@ export interface A2aRequest {
   readonly parameters: JsonValue;
 }
 
-export type A2aMethod =
+type A2aMethod =
   | "message/send"
   | "message/stream"
   | "tasks/get"

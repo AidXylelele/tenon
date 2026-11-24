@@ -69,13 +69,13 @@ export type Schedule =
   | { readonly kind: "after"; readonly delay: number }
   | { readonly kind: "on"; readonly stream: string };
 
-export interface LastRun {
+interface LastRun {
   readonly id: string;
   readonly phase: Phase;
   readonly createdAt: string;
 }
 
-export interface WeekRuns {
+interface WeekRuns {
   readonly runs: number;
   readonly failed: number;
 }
@@ -102,7 +102,7 @@ export interface Version {
   readonly runs: number;
 }
 
-export interface LifecycleEvent {
+interface LifecycleEvent {
   readonly name: string;
   readonly types: readonly string[];
 }
@@ -209,7 +209,7 @@ export interface InstanceSummary {
   readonly endedAt: string | null;
 }
 
-export interface ListedWait {
+interface ListedWait {
   readonly kind: Wait["kind"];
   readonly until: string | null;
   readonly stream: string | null;
@@ -332,7 +332,7 @@ export interface FailureWindow {
   readonly limit: number;
 }
 
-export interface LastError {
+interface LastError {
   readonly status: number | null;
   readonly type: string | null;
   readonly title: string | null;

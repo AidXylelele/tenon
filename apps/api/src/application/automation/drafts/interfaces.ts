@@ -61,7 +61,7 @@ export interface DraftConflict {
   readonly current: DraftView | null;
 }
 
-export interface CompiledDraft {
+interface CompiledDraft {
   readonly draft: Draft;
   readonly definition: CheckedDefinition;
 }

@@ -346,7 +346,7 @@ export const RETRYING_THEN_HANDLING = protectionOf(
   RETRY_PLAN,
 );
 
-export const SWITCH_CASES: Json = [
+const SWITCH_CASES: Json = [
   {
     "Has items": {
       when: '${ .slideshow.slides | . != null and . != "" and . != [] and . != {} }',

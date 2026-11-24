@@ -1,6 +1,6 @@
 export const ZONE_COOKIE = "console_zone";
 
-export const UTC = "UTC";
+const UTC = "UTC";
 
 export function zoneOf(text: string | undefined): string {
   if (text === undefined || text === "") return UTC;

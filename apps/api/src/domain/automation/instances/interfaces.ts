@@ -34,38 +34,38 @@ export interface WorkflowInstanceProps {
   readonly version: number;
 }
 
-export interface InstanceStarted {
+interface InstanceStarted {
   readonly kind: InstanceEventKind.Started;
   readonly instanceId: string;
 }
 
-export interface EffectRequested {
+interface EffectRequested {
   readonly kind: InstanceEventKind.EffectRequested;
   readonly instanceId: string;
   readonly effectId: string;
   readonly effect: EffectKind;
 }
 
-export interface TimerSet {
+interface TimerSet {
   readonly kind: InstanceEventKind.TimerSet;
   readonly instanceId: string;
   readonly effectId: string;
   readonly at: number;
 }
 
-export interface ChildEnded {
+interface ChildEnded {
   readonly kind: InstanceEventKind.ChildEnded;
   readonly instanceId: string;
   readonly parentId: string;
 }
 
-export interface ScheduledCompleted {
+interface ScheduledCompleted {
   readonly kind: InstanceEventKind.ScheduledCompleted;
   readonly instanceId: string;
   readonly workflowId: string;
 }
 
-export interface ChildrenAbandoned {
+interface ChildrenAbandoned {
   readonly kind: InstanceEventKind.ChildrenAbandoned;
   readonly instanceId: string;
 }

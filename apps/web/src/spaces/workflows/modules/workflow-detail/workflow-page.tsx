@@ -61,7 +61,7 @@ import {
 import { turnAction } from "./actions";
 import { WorkflowMenu } from "./workflow-menu";
 
-export type WorkflowTab = "overview" | "runs" | "versions";
+type WorkflowTab = "overview" | "runs" | "versions";
 
 export interface WorkflowPageProps {
   readonly workflow: Workflow;

@@ -2,7 +2,7 @@ import type { TimeName } from "../jq-text/index.js";
 
 export type Literal = string | number | boolean | null;
 
-export interface ValueOperand {
+interface ValueOperand {
   readonly kind: "value";
   readonly value: Literal;
 }
@@ -12,7 +12,7 @@ export type Operand =
   | ValueOperand
   | { readonly kind: "time"; readonly time: TimeName };
 
-export interface EmptinessRow {
+interface EmptinessRow {
   readonly left: string;
   readonly comparison: "isEmpty" | "isNotEmpty";
   readonly right: null;

@@ -35,7 +35,7 @@ Q97nmNWnWkfB2uiAD/VQUec9KyWhRANCAAQd8fC9hYxG9aKnI70VD8FYr2h6cjx6
 -----END PRIVATE KEY-----`,
 };
 
-export function fetchClientOf(dispatcher: Agent): NestHttpClient {
+function fetchClientOf(dispatcher: Agent): NestHttpClient {
   return new NestHttpClient({
     dispatcher,
     retry: false,

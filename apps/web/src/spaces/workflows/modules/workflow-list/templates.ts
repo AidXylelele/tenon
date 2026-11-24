@@ -11,7 +11,7 @@ import {
   WebhookIcon,
 } from "lucide-react";
 
-export interface TemplateStep {
+interface TemplateStep {
   readonly icon: LucideIcon;
   readonly words: string;
 }

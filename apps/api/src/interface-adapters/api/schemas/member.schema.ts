@@ -3,7 +3,7 @@ import { MemberStatus } from "../../../application/identity/users/enums.js";
 import { Role } from "../../../domain/identity/users/enums.js";
 import { Email } from "./auth.schema.js";
 
-export const MemberResponse = z.object({
+const MemberResponse = z.object({
   id: z.uuid(),
   email: Email,
   name: z.string().nullable(),
@@ -11,8 +11,6 @@ export const MemberResponse = z.object({
   status: z.enum(MemberStatus),
   since: z.iso.datetime(),
 });
-
-export type MemberResponse = z.infer<typeof MemberResponse>;
 
 export const MemberListResponse = z.array(MemberResponse);
 

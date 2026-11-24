@@ -4,7 +4,6 @@ export type {
   FlowHandle,
   FlowMode,
   InsertPlace,
-  Iteration,
   ListPlace,
   RunMode,
   RunStart,

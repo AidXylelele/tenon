@@ -7,7 +7,7 @@ import type {
 type EntryShape = Partial<DataEntry> &
   Pick<DataEntry, "source" | "name" | "expression">;
 
-export function entryOf(shape: EntryShape): DataEntry {
+function entryOf(shape: EntryShape): DataEntry {
   return {
     step: null,
     value: `\${ ${shape.expression} }`,
@@ -56,19 +56,19 @@ export const GREET_ENTRY = entryOf({
   members: [memberOf("message", "$context.Greet.message", "text")],
 });
 
-export const INPUT_ENTRY = entryOf({
+const INPUT_ENTRY = entryOf({
   source: "workflowInput",
   name: "input",
   expression: "$workflow.input",
 });
 
-export const ITEM_ENTRY = entryOf({
+const ITEM_ENTRY = entryOf({
   source: "variable",
   name: "item",
   expression: "$item",
 });
 
-export const TIME_ENTRIES = [
+const TIME_ENTRIES = [
   entryOf({
     source: "time",
     name: "now",
@@ -92,7 +92,7 @@ export const TIME_ENTRIES = [
   }),
 ];
 
-export const SECRET_ENTRY = entryOf({
+const SECRET_ENTRY = entryOf({
   source: "secret",
   name: "SLACK_WEBHOOK_URL",
   expression: "$secrets.SLACK_WEBHOOK_URL",
@@ -124,7 +124,7 @@ export const FIRST_STEP = dataOf([INPUT_ENTRY, ...TIME_ENTRIES]);
 
 export const IN_A_LOOP = dataOf([FETCH_ENTRY, INPUT_ENTRY, ITEM_ENTRY]);
 
-export const TESTED_FETCH_ENTRY: DataEntry = {
+const TESTED_FETCH_ENTRY: DataEntry = {
   ...FETCH_ENTRY,
   shape: "object",
   members: [

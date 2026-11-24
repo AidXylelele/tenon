@@ -104,10 +104,6 @@ export async function versionSource(
   return found?.source ?? null;
 }
 
-export function checkDocument(document: JsonObject): Promise<Outcome<void>> {
-  return command("/workflows/check", { method: "POST", json: document });
-}
-
 export function archiveWorkflow(
   namespace: string,
   name: string,

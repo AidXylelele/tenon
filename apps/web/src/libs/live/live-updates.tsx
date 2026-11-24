@@ -23,7 +23,7 @@ const EVERY_MS: Readonly<Record<Activity, number | null>> = {
   ended: null,
 };
 
-export function useLiveRefresh(activity: Activity): LiveRefresh {
+function useLiveRefresh(activity: Activity): LiveRefresh {
   const router = useRouter();
   const [, start] = useTransition();
   const visible = useSyncExternalStore(

@@ -4,7 +4,6 @@ export type {
   ResultReading,
   ReturnMode,
   StepResult,
-  WrittenResult,
 } from "./interfaces.js";
 export { startingContentOf } from "./contents.js";
 export {

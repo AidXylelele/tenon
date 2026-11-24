@@ -57,7 +57,6 @@ export type {
 } from "./outcomes.js";
 export type { InputProblem, Program } from "./program.js";
 export type {
-  A2aMethod,
   A2aRequest,
   AsyncApiMessage,
   AsyncApiRequest,

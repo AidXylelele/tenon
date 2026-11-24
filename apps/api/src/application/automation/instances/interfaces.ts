@@ -153,7 +153,7 @@ export interface CountWindow {
   readonly tests: boolean;
 }
 
-export interface BucketCount {
+interface BucketCount {
   readonly start: Date;
   readonly counts: readonly PhaseCount[];
 }
@@ -178,14 +178,14 @@ export interface FailureWindow {
   readonly tests: boolean;
 }
 
-export interface FailureCause {
+interface FailureCause {
   readonly status: number | null;
   readonly type: string | null;
   readonly title: string | null;
   readonly detail: string | null;
 }
 
-export interface FailingWorkflow {
+interface FailingWorkflow {
   readonly namespace: string;
   readonly name: string;
   readonly title: string | null;
@@ -220,7 +220,7 @@ export interface InstancePageRequest {
   readonly limit: number;
 }
 
-export interface ListedWait {
+interface ListedWait {
   readonly kind: WaitKind;
   readonly until: Date | null;
   readonly stream: string | null;

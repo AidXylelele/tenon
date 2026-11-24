@@ -4,7 +4,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 import { FLAG } from "./flag";
 
-export type AddressChanges = Readonly<Record<string, string | null>>;
+type AddressChanges = Readonly<Record<string, string | null>>;
 
 interface AddressState {
   readonly flagged: (name: string) => boolean;

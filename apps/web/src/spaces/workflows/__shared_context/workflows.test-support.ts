@@ -42,7 +42,7 @@ export const DAILY_DIGEST: Workflow = {
   },
 };
 
-export const LEAD_INTAKE: Workflow = {
+const LEAD_INTAKE: Workflow = {
   namespace: "sales",
   name: "lead-intake",
   title: "Lead intake",

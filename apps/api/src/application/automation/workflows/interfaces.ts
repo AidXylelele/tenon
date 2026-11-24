@@ -61,7 +61,7 @@ export interface LastRun {
   readonly createdAt: Date;
 }
 
-export interface WeekRuns {
+interface WeekRuns {
   readonly runs: number;
   readonly failed: number;
 }

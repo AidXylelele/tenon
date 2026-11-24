@@ -1,4 +1,3 @@
-export type { EntryAction, StepCatalogProps } from "./interfaces";
+export type { EntryAction } from "./interfaces";
 export { StepCatalog } from "./step-catalog";
 export { catalogOf } from "./catalog";
-export { ENTRY_ICONS } from "./entry-icons";

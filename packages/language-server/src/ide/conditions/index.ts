@@ -8,7 +8,6 @@ export type {
   Join,
   Literal,
   Operand,
-  SecondValue,
 } from "./interfaces.js";
 export { isPathOf, pathSource } from "./patterns.js";
 export { conditionOf } from "./read.js";

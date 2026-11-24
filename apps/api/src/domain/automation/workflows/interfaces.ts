@@ -127,14 +127,14 @@ export interface ScheduledStart {
   readonly now: Date;
 }
 
-export interface ScheduleArmed {
+interface ScheduleArmed {
   readonly kind: WorkflowEventKind.ScheduleArmed;
   readonly workflowId: string;
   readonly arming: number;
   readonly at: number;
 }
 
-export interface ScheduleFired {
+interface ScheduleFired {
   readonly kind: WorkflowEventKind.ScheduleFired;
   readonly workflowId: string;
   readonly at: number;

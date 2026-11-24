@@ -1,8 +1,5 @@
 export type {
   Bar,
-  Bucket,
-  BucketUnit,
-  CountRequest,
   Figure,
   FigureKind,
   Period,

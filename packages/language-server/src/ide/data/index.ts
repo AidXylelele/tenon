@@ -1,8 +1,6 @@
 export type {
   DataEntry,
   DataMember,
-  DataReading,
-  DataRequest,
   DataShape,
   DataSource,
   DataWarning,

@@ -15,7 +15,7 @@ export type FormKind =
 
 export type WordsKind = FormKind | "start";
 
-export type FieldControl =
+type FieldControl =
   | "value"
   | "data"
   | "condition"

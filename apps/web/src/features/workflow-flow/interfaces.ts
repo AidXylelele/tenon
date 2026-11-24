@@ -12,7 +12,7 @@ import type { RovingItemProps } from "@/libs/ui/hooks/use-roving-focus";
 import type { StepStatus } from "@/operations/run-progress";
 import type { FlowViewStore } from "./flow-view-store";
 
-export interface Iteration {
+interface Iteration {
   readonly shown: number;
   readonly count: number;
 }

@@ -20,7 +20,7 @@ export const WEBHOOKS: readonly Webhook[] = [
   },
 ];
 
-export const ON_CALL: Subscription = {
+const ON_CALL: Subscription = {
   id: "ae769898-1c2d-4e5f-8a9b-0c1d2e3f4a5b",
   name: "Failed runs to the on-call channel",
   endpoint: { uri: "https://httpbin.org/anything/on-call" },
@@ -30,7 +30,7 @@ export const ON_CALL: Subscription = {
   createdAt: "2026-11-23T15:28:00.000Z",
 };
 
-export const BILLING: Subscription = {
+const BILLING: Subscription = {
   id: "bf870909-2d3e-4f6a-9b0c-1d2e3f4a5b6c",
   name: "Invoices to billing",
   endpoint: {

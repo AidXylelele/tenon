@@ -160,10 +160,7 @@ function addressObjectSettingOf(
   return { kind: "setField", pointer: endpoint, value };
 }
 
-export function fieldClearingOf(
-  editable: EditableText,
-  action: ClearField,
-): Editing {
+function fieldClearingOf(editable: EditableText, action: ClearField): Editing {
   const document = editable.document;
   const pointer = action.pointer;
   const isDocument = pointer === "";
