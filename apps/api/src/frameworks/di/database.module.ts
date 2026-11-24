@@ -7,6 +7,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { ClsModule } from "nestjs-cls";
 import type { Pool } from "pg";
 import { UnitOfWork } from "../../application/unit-of-work.js";
+import { MessageInbox } from "../../interface-adapters/messaging/message-inbox.js";
 import type { Database } from "../../interface-adapters/persistence/interfaces.js";
 import { PostgresUnitOfWork } from "../../interface-adapters/persistence/postgres-unit-of-work.js";
 import * as schema from "../../interface-adapters/persistence/schema/index.js";
@@ -43,8 +44,11 @@ import { databaseConfig } from "./configs.js";
       ],
     }),
   ],
-  providers: [{ provide: UnitOfWork, useClass: PostgresUnitOfWork }],
-  exports: [UnitOfWork],
+  providers: [
+    MessageInbox,
+    { provide: UnitOfWork, useClass: PostgresUnitOfWork },
+  ],
+  exports: [MessageInbox, UnitOfWork],
 })
 export class DatabaseModule implements OnModuleInit {
   constructor(

@@ -78,6 +78,10 @@ export interface EffectCommand extends EffectReference {
   readonly signal: AbortSignal;
 }
 
+export interface ChildCommand extends EffectCommand {
+  readonly childId: string;
+}
+
 export interface TimerCommand extends EffectReference {
   readonly at: number;
 }

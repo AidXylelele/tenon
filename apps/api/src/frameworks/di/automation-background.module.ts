@@ -57,6 +57,7 @@ import { McpGateway } from "../../interface-adapters/mcp/mcp.gateway.js";
 import { SandboxClient } from "../../interface-adapters/sandbox/interfaces.js";
 import { SandboxGateway } from "../../interface-adapters/sandbox/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/sandbox/sandbox-limits.js";
+import { MessageRetries } from "../../interface-adapters/messaging/message-retries.js";
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/handlers/automation.handler.js";
 import { DeliveryMessagesProducer } from "../../interface-adapters/messaging/producers/delivery-messages.producer.js";
@@ -97,7 +98,11 @@ import { RedisBroker } from "../redis/redis.broker.js";
 import { RedisConnection } from "../redis/redis.connection.js";
 import { AutomationModule } from "./automation.module.js";
 import { sandboxConfig } from "./configs.js";
-import { processPlatform, sandboxLimits } from "./host.presets.js";
+import {
+  messageRetries,
+  processPlatform,
+  sandboxLimits,
+} from "./host.presets.js";
 import { OutboundModule } from "./outbound.module.js";
 
 @Module({
@@ -188,6 +193,7 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: BrokerClient, useClass: RoutedBrokerClient },
     { provide: SandboxLimits, useValue: sandboxLimits },
     { provide: ProcessPlatform, useValue: processPlatform },
+    { provide: MessageRetries, useValue: messageRetries },
   ],
 })
 export class AutomationBackgroundModule {}

@@ -16,15 +16,15 @@ import { FailDelivery } from "../../../application/automation/subscriptions/fail
 import type { DeliveryCommand } from "../../../application/automation/subscriptions/interfaces.js";
 import { MessageTopic, SpanAttribute } from "../enums.js";
 import type { DeliveryMessage } from "../interfaces.js";
+import { MessageRetries } from "../message-retries.js";
 
 @Injectable()
 export class DeliveryHandler {
-  static readonly ATTEMPTS = 36;
-
   private readonly tracer = trace.getTracer("tenon-api");
 
   constructor(
     private readonly outbox: Outbox,
+    private readonly retries: MessageRetries,
     private readonly deliverEvent: DeliverEvent,
     private readonly failDelivery: FailDelivery,
   ) {}
@@ -49,7 +49,7 @@ export class DeliveryHandler {
         this.#delivered(command),
       );
     } catch (error) {
-      const exhausted = context.attempt >= DeliveryHandler.ATTEMPTS;
+      const exhausted = this.retries.exhausted(context);
 
       if (!exhausted) throw error;
 

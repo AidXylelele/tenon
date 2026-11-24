@@ -194,6 +194,15 @@ function commandOf(effectId: string) {
   return { instanceId: "parent-1", effectId, signal };
 }
 
+function childCommandOf(effectId: string) {
+  return {
+    instanceId: "parent-1",
+    effectId,
+    signal,
+    childId: "0190a1b2-0000-5000-8000-00000000c41d",
+  };
+}
+
 describe("an effect the world performs", () => {
   it("is_performed_under_a_key_stable_across_redeliveries_and_answered_with_its_outcome", async () => {
     const fixture = await setUp([anEffect("/do/0/fetch", EffectKind.Call)]);
@@ -299,11 +308,12 @@ describe("a child a run asks for", () => {
 
   it("an_awaited_child_is_started_with_its_run_dispatched_and_left_unanswered", async () => {
     const fixture = await setUp([anEffect(CHILD, EffectKind.Child)]);
-    const command = commandOf(CHILD);
+    const command = childCommandOf(CHILD);
 
     await fixture.startChild.execute(command);
 
     const child = fixture.messages.started[0]?.instance;
+    expect(child?.id).toBe(command.childId);
     expect(child?.originId).toBe("parent-1");
     expect(child?.originEffectId).toBe(CHILD);
     expect(child?.trigger).toBe(TriggerKind.Parent);
@@ -316,7 +326,7 @@ describe("a child a run asks for", () => {
   it("a_detached_child_is_started_and_answered_started", async () => {
     const detached = aChildRequest(TriggerKind.Detached);
     const fixture = await setUp([anEffect(CHILD, EffectKind.Child)], detached);
-    const command = commandOf(CHILD);
+    const command = childCommandOf(CHILD);
 
     await fixture.startChild.execute(command);
 
@@ -328,7 +338,7 @@ describe("a child a run asks for", () => {
 
   it("a_repeat_starts_no_second_child", async () => {
     const fixture = await setUp([anEffect(CHILD, EffectKind.Child)]);
-    const command = commandOf(CHILD);
+    const command = childCommandOf(CHILD);
 
     await fixture.startChild.execute(command);
     await fixture.startChild.execute(command);
@@ -340,7 +350,7 @@ describe("a child a run asks for", () => {
     const unknown = new WorkflowName("sales", "nobody");
     const request = aChildRequest(TriggerKind.Parent, unknown);
     const fixture = await setUp([anEffect(CHILD, EffectKind.Child)], request);
-    const command = commandOf(CHILD);
+    const command = childCommandOf(CHILD);
 
     await fixture.startChild.execute(command);
 
@@ -359,7 +369,7 @@ describe("a child a run asks for", () => {
     };
     const fixture = await setUp([anEffect(CHILD, EffectKind.Child)], request);
 
-    await fixture.startChild.execute(commandOf(CHILD));
+    await fixture.startChild.execute(childCommandOf(CHILD));
 
     expect(fixture.messages.started).toEqual([]);
     expect(fixture.runs.responded[0]?.answer.outcome).toEqual({

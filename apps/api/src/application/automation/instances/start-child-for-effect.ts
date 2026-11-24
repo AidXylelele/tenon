@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import { EffectResult } from "./enums.js";
-import type { EffectCommand } from "./interfaces.js";
+import type { ChildCommand } from "./interfaces.js";
 import { InstanceEvents } from "./instance-events.js";
 import {
   InstanceRuns,
@@ -21,7 +21,7 @@ export class StartChildForEffect {
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async execute(command: EffectCommand): Promise<void> {
+  async execute(command: ChildCommand): Promise<void> {
     const parent = await this.instances.find(command.instanceId);
     const request = parent?.requestOf(command.effectId) ?? null;
 
@@ -38,7 +38,7 @@ export class StartChildForEffect {
     const workflow = await this.workflows.findByName(requested.name);
     const now = new Date();
     const started = workflow?.startChild({
-      instanceId: null,
+      instanceId: command.childId,
       version: requested.version,
       input: requested.input,
       trigger: requested.trigger,

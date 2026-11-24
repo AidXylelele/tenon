@@ -11,10 +11,12 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
+import { v5 } from "uuid";
 import { AnswerTimer } from "../../../application/automation/instances/answer-timer.js";
 import { EmitForEffect } from "../../../application/automation/instances/emit-for-effect.js";
 import { GiveUpEffect } from "../../../application/automation/instances/give-up-effect.js";
 import type {
+  ChildCommand,
   EffectCommand,
   EffectReference,
 } from "../../../application/automation/instances/interfaces.js";
@@ -24,14 +26,15 @@ import { StartChildForEffect } from "../../../application/automation/instances/s
 import { StartDetachedProcess } from "../../../application/automation/instances/start-detached-process.js";
 import { EffectKind } from "../../../domain/automation/instances/enums.js";
 import { PermanentFault } from "../../interpreter/permanent-fault.error.js";
-import { MessageTopic, SpanAttribute } from "../enums.js";
+import { IdNamespace, MessageTopic, SpanAttribute } from "../enums.js";
 import type {
   EffectMessage,
   ProcessMessage,
   TimerMessage,
 } from "../interfaces.js";
 import { RunDataMapper } from "../mappers/run-data.mapper.js";
-import { RunHandler } from "./run.handler.js";
+import { MessageInbox } from "../message-inbox.js";
+import { MessageRetries } from "../message-retries.js";
 
 @Injectable()
 export class EffectHandler {
@@ -40,6 +43,8 @@ export class EffectHandler {
 
   constructor(
     private readonly outbox: Outbox,
+    private readonly inbox: MessageInbox,
+    private readonly retries: MessageRetries,
     private readonly runData: RunDataMapper,
     private readonly performEffect: PerformEffect,
     private readonly startDetachedProcess: StartDetachedProcess,
@@ -67,7 +72,7 @@ export class EffectHandler {
     };
     const traced = () =>
       this.#traced(MessageTopic.RunEffect, attributes, () =>
-        this.#routed(message.effect, command),
+        this.#routed(message.effect, command, context),
       );
     return this.#reacted(context, message, traced);
   }
@@ -111,7 +116,7 @@ export class EffectHandler {
       );
     } catch (error) {
       const permanent = error instanceof PermanentFault;
-      const exhausted = context.attempt >= RunHandler.ATTEMPTS;
+      const exhausted = this.retries.exhausted(context);
 
       if (!permanent && !exhausted) throw error;
 
@@ -126,22 +131,45 @@ export class EffectHandler {
     }
   }
 
-  #routed(effect: EffectKind, command: EffectCommand): Promise<void> {
+  #routed(
+    effect: EffectKind,
+    command: EffectCommand,
+    context: OutboxHandlerContext,
+  ): Promise<void> {
     switch (effect) {
       case EffectKind.Call:
       case EffectKind.Process:
         return this.performEffect.execute(command);
       case EffectKind.Detached:
-        return this.startDetachedProcess.execute(command);
-      case EffectKind.Child:
-        return this.startChildForEffect.execute(command);
+        return this.inbox.recording(context, () =>
+          this.startDetachedProcess.execute(command),
+        );
+      case EffectKind.Child: {
+        const child = this.#childCommandOf(command);
+        return this.inbox.recording(context, () =>
+          this.startChildForEffect.execute(child),
+        );
+      }
       case EffectKind.Emit:
-        return this.emitForEffect.execute(command);
+        return this.inbox.recording(context, () =>
+          this.emitForEffect.execute(command),
+        );
       case EffectKind.Timer:
       case EffectKind.Listen:
       case EffectKind.Receive:
         return Promise.resolve();
     }
+  }
+
+  #childCommandOf(command: EffectCommand): ChildCommand {
+    const slot = `${command.instanceId}/${command.effectId}`;
+    const childId = v5(slot, IdNamespace.Instances);
+    return {
+      instanceId: command.instanceId,
+      effectId: command.effectId,
+      signal: command.signal,
+      childId,
+    };
   }
 
   async #reacted(
@@ -153,7 +181,7 @@ export class EffectHandler {
       await work();
     } catch (error) {
       const permanent = error instanceof PermanentFault;
-      const exhausted = context.attempt >= RunHandler.ATTEMPTS;
+      const exhausted = this.retries.exhausted(context);
 
       if (!permanent && !exhausted) throw error;
 

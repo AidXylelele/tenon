@@ -1,13 +1,12 @@
 import type { ResiliencePreset } from "@nestjs/resilience";
-import type { OutboxMessage, OutboxRetryOptions } from "@nestjs/outbox";
+import type { OutboxRetryOptions } from "@nestjs/outbox";
 import {
   HostLimits,
   ProcessPlatform,
 } from "../../application/automation/host/queries.js";
 import { SandboxLimits } from "../../interface-adapters/sandbox/sandbox-limits.js";
 import shellPlatform from "../go-judge/shell-platform.json" with { type: "json" };
-import { DeliveryHandler } from "../../interface-adapters/messaging/handlers/delivery.handler.js";
-import { MessageTopic } from "../../interface-adapters/messaging/enums.js";
+import { MessageRetries } from "../../interface-adapters/messaging/message-retries.js";
 import type { InterpreterThreads } from "../interpreter/interfaces.js";
 import { ResponseSizeLimit } from "../http/response-size-limit.js";
 
@@ -19,9 +18,6 @@ const PROCESS_TIMEOUT = PROCESS_SECONDS * MILLISECONDS;
 const INTERPRETER_WORK = 5 * MILLISECONDS;
 const INTERPRETER_QUEUE_TIMEOUT = 2 * MILLISECONDS;
 const INTERPRETER_TIMEOUT = INTERPRETER_WORK + INTERPRETER_QUEUE_TIMEOUT;
-const RUN_BACKOFF_CAP = 60 * MILLISECONDS;
-const DELIVERY_BACKOFF_CAP = 60 * 60 * MILLISECONDS;
-const DELIVERY_TOPIC: string = MessageTopic.DeliveryRequested;
 const RESPONSE_BYTES = 1024 * 1024;
 const SANDBOX_TIME = Temporal.Duration.from({ seconds: 30 });
 const SANDBOX_MEMORY_BYTES = 256 * 1024 * 1024;
@@ -44,21 +40,14 @@ export const sandboxLimits = new SandboxLimits({
   outputBytes: SANDBOX_OUTPUT_BYTES,
 });
 
-function backoffCapOf(message: OutboxMessage): number {
-  if (message.topic === DELIVERY_TOPIC) return DELIVERY_BACKOFF_CAP;
-
-  return RUN_BACKOFF_CAP;
-}
+export const messageRetries = new MessageRetries();
 
 export const relayRetry: OutboxRetryOptions = {
-  attempts: DeliveryHandler.ATTEMPTS,
-  backoff: (attempt, _error, message) => {
-    const cap = backoffCapOf(message);
-    const doubled = MILLISECONDS * 2 ** (attempt - 1);
-    const delay = Math.min(cap, doubled);
-    const jitter = Math.random() * (delay / 2);
-    return delay / 2 + jitter;
-  },
+  attempts: messageRetries.most,
+  backoff: (attempt, _error, message) =>
+    messageRetries.delayAfter(attempt, message.topic),
+  retryIf: (_error, attempt, message) =>
+    messageRetries.retriesAfter(attempt, message.topic),
 };
 
 export const resiliencePresets: Readonly<Record<string, ResiliencePreset>> = {

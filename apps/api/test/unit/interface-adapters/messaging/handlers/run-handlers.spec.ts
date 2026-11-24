@@ -1,4 +1,5 @@
 import type { Outbox } from "@nestjs/outbox";
+import { v5 } from "uuid";
 import type { AnswerChildren } from "../../../../../src/application/automation/instances/answer-children.js";
 import type { AnswerReceives } from "../../../../../src/application/automation/instances/answer-receives.js";
 import type { AnswerTimer } from "../../../../../src/application/automation/instances/answer-timer.js";
@@ -12,13 +13,21 @@ import type { RespondToEffect } from "../../../../../src/application/automation/
 import type { StartChildForEffect } from "../../../../../src/application/automation/instances/start-child-for-effect.js";
 import type { StartDetachedProcess } from "../../../../../src/application/automation/instances/start-detached-process.js";
 import { EffectKind } from "../../../../../src/domain/automation/instances/enums.js";
-import { MessageTopic } from "../../../../../src/interface-adapters/messaging/enums.js";
+import {
+  IdNamespace,
+  MessageTopic,
+} from "../../../../../src/interface-adapters/messaging/enums.js";
 import { EffectHandler } from "../../../../../src/interface-adapters/messaging/handlers/effect.handler.js";
 import { RunHandler } from "../../../../../src/interface-adapters/messaging/handlers/run.handler.js";
+import { MessageInbox } from "../../../../../src/interface-adapters/messaging/message-inbox.js";
+import { MessageRetries } from "../../../../../src/interface-adapters/messaging/message-retries.js";
 import { PermanentFault } from "../../../../../src/interface-adapters/interpreter/permanent-fault.error.js";
 import { aHandlerContext, runDataMapper } from "../../../../support/outbox.js";
 
 const runData = runDataMapper;
+const retries = new MessageRetries();
+const RUN_ATTEMPTS = retries.attemptsOf(MessageTopic.RunBegin);
+
 const contextAt = (attempt: number) =>
   aHandlerContext(MessageTopic.RunBegin, "runs", attempt);
 
@@ -52,6 +61,7 @@ class Recorder {
 function runHandlerOf(recorder: Recorder): RunHandler {
   return new RunHandler(
     recorder.outbox(),
+    retries,
     runData,
     recorder.use<BeginRun>("begin"),
     recorder.use<RespondToEffect>("respond"),
@@ -64,6 +74,8 @@ function runHandlerOf(recorder: Recorder): RunHandler {
 function effectHandlerOf(recorder: Recorder) {
   return new EffectHandler(
     recorder.outbox(),
+    new MessageInbox(),
+    retries,
     runData,
     recorder.use<PerformEffect>("perform"),
     recorder.use<StartDetachedProcess>("detach"),
@@ -150,7 +162,7 @@ describe("the run commands an instance's key orders", () => {
     const recorder = new Recorder();
     recorder.failure = new Error("The database is busy");
     const handler = runHandlerOf(recorder);
-    const context = contextAt(RunHandler.ATTEMPTS);
+    const context = contextAt(RUN_ATTEMPTS);
 
     await handler.received({ instanceId: "instance-1" }, context);
 
@@ -186,6 +198,27 @@ describe("the effects a run asks for", () => {
     },
   );
 
+  it("a_child_is_started_under_the_id_its_parent_and_effect_name", async () => {
+    const recorder = new Recorder();
+    const handler = effectHandlerOf(recorder);
+    const message = {
+      instanceId: "instance-1",
+      effectId: "/do/0/x",
+      effect: EffectKind.Child,
+    };
+    const childId = v5("instance-1//do/0/x", IdNamespace.Instances);
+
+    await handler.requested(message, contextAt(1));
+    await handler.requested(message, contextAt(2));
+
+    const started = recorder.calls.map((call) => call.slice("child ".length));
+    const ids = started.map((command) => {
+      const parsed = JSON.parse(command) as { readonly childId: string };
+      return parsed.childId;
+    });
+    expect(ids).toEqual([childId, childId]);
+  });
+
   it("a_wait_asks_nothing_of_the_world", async () => {
     const recorder = new Recorder();
     const handler = effectHandlerOf(recorder);
@@ -210,7 +243,7 @@ describe("the effects a run asks for", () => {
       effectId: "/do/0/x",
       effect: EffectKind.Call,
     };
-    const context = contextAt(RunHandler.ATTEMPTS);
+    const context = contextAt(RUN_ATTEMPTS);
 
     await handler.requested(message, context);
 
@@ -264,7 +297,7 @@ describe("the effects a run asks for", () => {
       versionId: "version-1",
       sealedRequest,
     };
-    const context = contextAt(RunHandler.ATTEMPTS);
+    const context = contextAt(RUN_ATTEMPTS);
 
     await handler.detached(message, context);
 

@@ -24,15 +24,15 @@ import type {
   RespondMessage,
 } from "../interfaces.js";
 import { RunDataMapper } from "../mappers/run-data.mapper.js";
+import { MessageRetries } from "../message-retries.js";
 
 @Injectable()
 export class RunHandler {
-  static readonly ATTEMPTS = 10;
-
   private readonly tracer = trace.getTracer("tenon-api");
 
   constructor(
     private readonly outbox: Outbox,
+    private readonly retries: MessageRetries,
     private readonly runData: RunDataMapper,
     private readonly beginRun: BeginRun,
     private readonly respondToEffect: RespondToEffect,
@@ -142,7 +142,7 @@ export class RunHandler {
       await work();
     } catch (error) {
       const permanent = error instanceof PermanentFault;
-      const exhausted = context.attempt >= RunHandler.ATTEMPTS;
+      const exhausted = this.retries.exhausted(context);
 
       if (!permanent && !exhausted) throw error;
 

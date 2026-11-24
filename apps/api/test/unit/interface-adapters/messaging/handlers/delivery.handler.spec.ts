@@ -6,6 +6,7 @@ import type { FailDelivery } from "../../../../../src/application/automation/sub
 import type { AttemptResult } from "../../../../../src/application/automation/subscriptions/interfaces.js";
 import { Subscription } from "../../../../../src/domain/automation/subscriptions/subscription.js";
 import { DeliveryMessagesProducer } from "../../../../../src/interface-adapters/messaging/producers/delivery-messages.producer.js";
+import { MessageRetries } from "../../../../../src/interface-adapters/messaging/message-retries.js";
 import { DeliveryHandler } from "../../../../../src/interface-adapters/messaging/handlers/delivery.handler.js";
 import { MessageTopic } from "../../../../../src/interface-adapters/messaging/enums.js";
 import type { Transaction } from "../../../../../src/interface-adapters/persistence/interfaces.js";
@@ -48,6 +49,7 @@ function setUp(refusals: number) {
   const outbox = { notify: () => undefined } as unknown as Outbox;
   const handler = new DeliveryHandler(
     outbox,
+    new MessageRetries(),
     deliveries as unknown as DeliverEvent,
     failures as unknown as FailDelivery,
   );
@@ -77,8 +79,11 @@ describe("the delivery of an event to a subscriber", () => {
   });
 
   it("a_delivery_its_attempts_never_brought_through_is_recorded_failed_once", async () => {
-    const fixture = setUp(DeliveryHandler.ATTEMPTS);
-    const context = contextAt(DeliveryHandler.ATTEMPTS);
+    const attempts = new MessageRetries().attemptsOf(
+      MessageTopic.DeliveryRequested,
+    );
+    const fixture = setUp(attempts);
+    const context = contextAt(attempts);
 
     await fixture.handler.requested(DELIVERY, context);
 
