@@ -3,18 +3,17 @@ import type { Effect, EffectOutcome } from "interpreter";
 import type { EffectCall } from "../../application/automation/instances/interfaces.js";
 import type { EffectPerformer } from "../../application/automation/instances/ports.js";
 import type { JsonObject } from "../../domain/automation/interfaces.js";
-import type { SandboxedProcessRequest } from "../sandbox/interfaces.js";
-import type { JsonOf, StepCall } from "./interfaces.js";
-import { ProtocolMapper } from "./mappers/protocol.mapper.js";
 import { A2aGateway } from "../a2a/a2a.gateway.js";
 import { AsyncApiGateway } from "../asyncapi/asyncapi.gateway.js";
 import { GrpcGateway } from "../grpc/grpc.gateway.js";
 import { HttpGateway } from "../http/http.gateway.js";
-import type { CallContext } from "../interpreter/interfaces.js";
-import { McpGateway } from "../mcp/mcp.gateway.js";
 import { OpenApiGateway } from "../http/openapi.gateway.js";
 import { ResourceGateway } from "../http/resource.gateway.js";
+import { McpGateway } from "../mcp/mcp.gateway.js";
+import type { SandboxedProcessRequest } from "../sandbox/interfaces.js";
 import { SandboxGateway } from "../sandbox/sandbox.gateway.js";
+import type { CallContext, JsonOf, StepCall } from "./interfaces.js";
+import { ProtocolMapper } from "./mappers/protocol.mapper.js";
 
 @Injectable()
 export class EffectGateway implements EffectPerformer {
