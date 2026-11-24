@@ -1,9 +1,9 @@
 import { isIP } from "node:net";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { type AckHandler, connectAsync, type MqttClient } from "mqtt";
-import { AddressPolicy } from "../network/address-policy.js";
-import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { BrokerConnections } from "../asyncapi/broker-connections.js";
+import type { BrokerServer, Login, Lost } from "../asyncapi/interfaces.js";
 import type { MqttVersion } from "./interfaces.js";
 
 @Injectable()

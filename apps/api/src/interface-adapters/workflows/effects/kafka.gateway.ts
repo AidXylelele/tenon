@@ -5,8 +5,8 @@ import type { KafkaStream } from "../../../frameworks/kafka/interfaces.js";
 import { KafkaConnection } from "../../../frameworks/kafka/kafka.connection.js";
 import type { Subscribed } from "../../messaging/interfaces.js";
 import { KAFKA_CHANNEL } from "./asyncapi-bindings.schema.js";
+import type { BasicCredentials } from "../../auth/interfaces.js";
 import type {
-  BasicCredentials,
   BrokerGateway,
   BrokerInbox,
   BrokerMessage,

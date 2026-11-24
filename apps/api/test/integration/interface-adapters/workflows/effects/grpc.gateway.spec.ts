@@ -22,12 +22,12 @@ import {
   responseSizeLimit,
 } from "../../../../../src/frameworks/di/host.presets.js";
 import { GrpcConnection } from "../../../../../src/frameworks/grpc/grpc.connection.js";
-import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
-import type { Authenticator } from "../../../../../src/interface-adapters/workflows/effects/authenticator.js";
-import type { ResourceClient } from "../../../../../src/interface-adapters/workflows/interfaces.js";
+import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
+import type { Authenticator } from "../../../../../src/interface-adapters/auth/authenticator.js";
+import type { ResourceGateway } from "../../../../../src/interface-adapters/http/resource.gateway.js";
 import { GrpcGateway } from "../../../../../src/interface-adapters/workflows/effects/grpc.gateway.js";
 import { ProtoSchema } from "../../../../../src/interface-adapters/workflows/effects/proto-schema.js";
-import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import { TransportFaults } from "../../../../../src/frameworks/http/transport-faults.js";
 import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
@@ -37,7 +37,6 @@ import {
 import {
   authenticationOf,
   callContextOf,
-  fetchClientOf,
   resourcesOf,
 } from "../../../../support/outbound.js";
 
@@ -118,7 +117,7 @@ describe("a call the gRPC gateway performs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let resources: ResourceClient;
+  let resources: ResourceGateway;
   let authentication: Authenticator;
   let connection: GrpcConnection;
   let gateway: GrpcGateway;
@@ -135,7 +134,7 @@ describe("a call the gRPC gateway performs for a run", () => {
     resilience = context.get(ResilienceService);
     policy = new AddressPolicy(["127.0.0.1"]);
     resources = resourcesOf(policy, resilience);
-    authentication = authenticationOf(fetchClientOf(policy.dispatcher));
+    authentication = authenticationOf(policy, resilience);
     connection = new GrpcConnection(policy, responseSizeLimit);
     gateway = gatewayOf(connection);
     protos = await startStubServer((request, response) => {
@@ -302,7 +301,7 @@ describe("a call the gRPC gateway performs for a run", () => {
       resources,
       authentication,
       new ProtoSchema(),
-      new TransportFailures(),
+      new TransportFaults(),
       responseSizeLimit,
       resilience,
     );

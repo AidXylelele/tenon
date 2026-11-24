@@ -12,9 +12,9 @@ import {
   processPlatform,
   resiliencePresets,
 } from "../../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
-import type { ResourceClient } from "../../../../../src/interface-adapters/workflows/interfaces.js";
-import { ResponseSizeLimit } from "../../../../../src/frameworks/network/response-size-limit.js";
+import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
+import type { ResourceGateway } from "../../../../../src/interface-adapters/http/resource.gateway.js";
+import { ResponseSizeLimit } from "../../../../../src/frameworks/http/response-size-limit.js";
 import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import { SandboxGateway } from "../../../../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
 import { SandboxLimits } from "../../../../../src/interface-adapters/workflows/effects/sandbox-limits.js";
@@ -45,7 +45,7 @@ describe("a process the sandbox gateway runs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let resources: ResourceClient;
+  let resources: ResourceGateway;
   let sandbox: StubServer;
   let sources: StubServer;
   let gateway: SandboxGateway;

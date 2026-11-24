@@ -4,11 +4,10 @@ import { isIP, type LookupFunction } from "node:net";
 import type { OnApplicationShutdown } from "@nestjs/common";
 import ipaddr from "ipaddr.js";
 import { Agent, buildConnector } from "undici";
-import type { DeliveryAdmission } from "../../interface-adapters/messaging/interfaces.js";
-import { RefusalCode } from "../../interface-adapters/workflows/effects/enums.js";
+import { RefusalCode } from "./enums.js";
 import type { AddressRange, AddressRanges, IpAddress } from "./interfaces.js";
 
-export class AddressPolicy implements OnApplicationShutdown, DeliveryAdmission {
+export class AddressPolicy implements OnApplicationShutdown {
   private static readonly IPV4_COMPATIBLE = "::/96";
   private static readonly UNLISTED = "unlisted";
   private static readonly HOST_BITS = { ipv4: 32, ipv6: 128 } as const;

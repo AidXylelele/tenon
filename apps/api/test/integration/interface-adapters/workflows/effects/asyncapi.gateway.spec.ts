@@ -41,7 +41,7 @@ import {
 import { KafkaConnection } from "../../../../../src/frameworks/kafka/kafka.connection.js";
 import { MqttConnection } from "../../../../../src/frameworks/mqtt/mqtt.connection.js";
 import { NatsConnection } from "../../../../../src/frameworks/nats/nats.connection.js";
-import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
 import { RedisConnection } from "../../../../../src/frameworks/redis/redis.connection.js";
 import type { BrokerSubscription } from "../../../../../src/interface-adapters/messaging/interfaces.js";
 import { AmqpGateway } from "../../../../../src/interface-adapters/workflows/effects/amqp.gateway.js";
@@ -51,7 +51,7 @@ import { KafkaGateway } from "../../../../../src/interface-adapters/workflows/ef
 import { MqttGateway } from "../../../../../src/interface-adapters/workflows/effects/mqtt.gateway.js";
 import { NatsGateway } from "../../../../../src/interface-adapters/workflows/effects/nats.gateway.js";
 import { RedisGateway } from "../../../../../src/interface-adapters/workflows/effects/redis.gateway.js";
-import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import { TransportFaults } from "../../../../../src/frameworks/http/transport-faults.js";
 import {
   closedPort,
   startStubServer,
@@ -60,7 +60,6 @@ import {
 import {
   authenticationOf,
   callContextOf,
-  fetchClientOf,
   inboxOf,
   resourcesOf,
 } from "../../../../support/outbound.js";
@@ -207,7 +206,7 @@ describe("the AsyncAPI gateway publishing on the servers a document names", () =
     const resilience = context.get(ResilienceService);
     const policy = new AddressPolicy([HOST]);
     const resources = resourcesOf(policy, resilience);
-    const authentication = authenticationOf(fetchClientOf(policy.dispatcher));
+    const authentication = authenticationOf(policy, resilience);
     const amqp = new AmqpConnection(policy);
     const kafka = new KafkaConnection(policy);
     const mqtt = new MqttConnection(policy);
@@ -219,7 +218,7 @@ describe("the AsyncAPI gateway publishing on the servers a document names", () =
       authentication,
       new AsyncApiDocuments(new Parser(parserOptions)),
       responseSizeLimit,
-      new TransportFailures(),
+      new TransportFaults(),
       new AmqpGateway(amqp),
       new KafkaGateway(kafka),
       new MqttGateway(mqtt),

@@ -1,20 +1,20 @@
 import { randomUUID } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import type { Failure } from "interpreter";
-import { ImportRefusal } from "../../../application/automation/imports/enums.js";
+import { ImportRefusal } from "../../application/automation/imports/enums.js";
 import type {
   ImportFailure,
   ImportResult,
-} from "../../../application/automation/imports/interfaces.js";
-import type { ImportFetcher } from "../../../application/automation/imports/ports.js";
-import { ResourceClient } from "../interfaces.js";
+} from "../../application/automation/imports/interfaces.js";
+import type { ImportFetcher } from "../../application/automation/imports/ports.js";
+import { ResourceGateway } from "./resource.gateway.js";
 
 @Injectable()
-export class HttpImportGateway implements ImportFetcher {
+export class ImportGateway implements ImportFetcher {
   private static readonly IMPORT_EXPIRED =
     "The import's server did not answer within the time limit";
 
-  constructor(private readonly resources: ResourceClient) {}
+  constructor(private readonly resources: ResourceGateway) {}
 
   async fetch(uri: string): Promise<ImportResult> {
     const endpoint = { uri, authentication: null };
@@ -36,7 +36,7 @@ export class HttpImportGateway implements ImportFetcher {
       case "expired":
         return {
           refusal: ImportRefusal.Expired,
-          detail: HttpImportGateway.IMPORT_EXPIRED,
+          detail: ImportGateway.IMPORT_EXPIRED,
         };
       case "unreachable":
         return { refusal: ImportRefusal.Unreachable, detail: failure.detail };

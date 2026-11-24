@@ -10,10 +10,10 @@ import type {
 } from "interpreter";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
-import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
+import { TransportFaults } from "../../../../../src/frameworks/http/transport-faults.js";
 import { A2aGateway } from "../../../../../src/interface-adapters/workflows/effects/a2a.gateway.js";
-import { ResponseContent } from "../../../../../src/interface-adapters/workflows/effects/response-content.js";
+import { ResponseContent } from "../../../../../src/frameworks/http/response-content.js";
 import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
@@ -24,8 +24,7 @@ import {
 import {
   authenticationOf,
   callContextOf,
-  fetchClientOf,
-  httpGatewayOf,
+  clientOf,
   resourcesOf,
 } from "../../../../support/outbound.js";
 
@@ -90,13 +89,13 @@ describe("a call the A2A gateway performs for a run", () => {
   });
 
   function a2aGatewayOf(guard: AddressPolicy): A2aGateway {
-    const authentication = authenticationOf(fetchClientOf(guard.dispatcher));
+    const authentication = authenticationOf(guard, resilience);
     return new A2aGateway(
       resourcesOf(guard, resilience),
-      httpGatewayOf(guard, resilience),
+      clientOf(guard, resilience),
       authentication,
       new ResponseContent(),
-      new TransportFailures(),
+      new TransportFaults(),
       resilience,
     );
   }

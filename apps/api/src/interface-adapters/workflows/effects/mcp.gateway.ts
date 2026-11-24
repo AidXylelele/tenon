@@ -9,8 +9,9 @@ import type {
   RpcOutcome,
 } from "interpreter";
 import { $ZodError } from "zod/v4/core";
-import { Authenticator } from "./authenticator.js";
-import { HttpGateway } from "./http.gateway.js";
+import { Authenticator } from "../../auth/authenticator.js";
+import { OutboundHttpClient } from "../../../frameworks/http/outbound.http-client.js";
+import type { Authorization } from "../../auth/interfaces.js";
 import {
   type CallContext,
   type HttpMcpRequest,
@@ -18,7 +19,7 @@ import {
   McpConnection,
   type McpSession,
 } from "./interfaces.js";
-import { TransportFailures } from "./transport-failures.js";
+import { TransportFaults } from "../../../frameworks/http/transport-faults.js";
 
 @Injectable()
 export class McpGateway {
@@ -27,8 +28,8 @@ export class McpGateway {
   constructor(
     private readonly connection: McpConnection,
     private readonly authenticator: Authenticator,
-    private readonly http: HttpGateway,
-    private readonly failures: TransportFailures,
+    private readonly http: OutboundHttpClient,
+    private readonly failures: TransportFaults,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("mcp-calls");
@@ -70,7 +71,7 @@ export class McpGateway {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.failures.of(error, context.signal);
+      return this.failures.of(error, context.signal).failure();
     }
   }
 
@@ -96,7 +97,8 @@ export class McpGateway {
       headers: transport.headers,
       client: request.client,
       protocolVersion: request.protocolVersion,
-      fetchOf: (scope) => this.http.fetchFor(authorization, scope),
+      fetchOf: (scope) => (url, init) =>
+        this.#fetched(authorization, url, init, scope),
     };
     const call = {
       method: request.method,
@@ -144,7 +146,7 @@ export class McpGateway {
         detail: "The MCP server answered other than the protocol describes",
       };
 
-    const failure = this.failures.classified(error);
+    const failure = this.failures.classified(error)?.failure() ?? null;
 
     if (failure !== null) return failure;
 
@@ -186,6 +188,30 @@ export class McpGateway {
       statusCode: status,
       detail: `The MCP server answered with status ${String(status)}`,
     };
+  }
+
+  #fetched(
+    authorization: Authorization,
+    url: string | URL,
+    init: RequestInit | undefined,
+    signal: AbortSignal,
+  ): Promise<Response> {
+    const headers = new Headers(init?.headers);
+    const signals = init?.signal ? [signal, init.signal] : [signal];
+    const scoped = AbortSignal.any(signals);
+
+    if (authorization.kind === "header") {
+      const value = this.authenticator.headerValueOf(authorization.header);
+      headers.set("authorization", value);
+    }
+
+    return this.http.fetch(url, {
+      method: init?.method,
+      headers,
+      body: init?.body,
+      redirect: init?.redirect,
+      signal: scoped,
+    });
   }
 
   #jsonOf(value: unknown): JsonValue {

@@ -12,26 +12,28 @@ import type {
   ResourceRequest,
 } from "interpreter";
 import { ResilienceModule } from "@nestjs/resilience";
-import { resiliencePresets } from "../../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
-import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
-import type { HttpGateway } from "../../../../../src/interface-adapters/workflows/effects/http.gateway.js";
-import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
-import { OpenApiGateway } from "../../../../../src/interface-adapters/workflows/effects/openapi.gateway.js";
-import type { ResourceGateway } from "../../../../../src/interface-adapters/workflows/effects/resource.gateway.js";
+import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
+import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
+import type { OutboundHttpClient } from "../../../../src/frameworks/http/outbound.http-client.js";
+import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
+import type { HttpCallGateway } from "../../../../src/interface-adapters/http/http-call.gateway.js";
+import type { ResourceGateway } from "../../../../src/interface-adapters/http/resource.gateway.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import { OpenApiGateway } from "../../../../src/interface-adapters/workflows/effects/openapi.gateway.js";
 import {
   closedPort,
   type ReceivedRequest,
   startStubServer,
   type StubServer,
-} from "../../../../support/stub-server.js";
+} from "../../../support/stub-server.js";
 import {
   callContextOf,
+  clientOf,
   httpGatewayOf,
   resourcesOf,
   SELF_SIGNED,
   trustingIdentityProvider,
-} from "../../../../support/outbound.js";
+} from "../../../support/outbound.js";
 
 type OAuth2Properties = Omit<
   Extract<Authentication, { kind: "oauth2" | "oidc" }>,
@@ -55,7 +57,8 @@ describe("a call the HTTP gateways perform for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let gateway: HttpGateway;
+  let gateway: HttpCallGateway;
+  let client: OutboundHttpClient;
   let openApi: OpenApiGateway;
   let resources: ResourceGateway;
   let stub: StubServer;
@@ -73,12 +76,8 @@ describe("a call the HTTP gateways perform for a run", () => {
     const identity = trustingIdentityProvider();
     gateway = httpGatewayOf(policy, resilience, identity);
     resources = resourcesOf(policy, resilience, identity);
-    openApi = new OpenApiGateway(
-      resources,
-      gateway,
-      new TransportFailures(),
-      resilience,
-    );
+    client = clientOf(policy, resilience);
+    openApi = new OpenApiGateway(resources, gateway);
     stub = await startStubServer((request, response) => {
       answer(request, response);
     });
@@ -1598,21 +1597,17 @@ describe("a call the HTTP gateways perform for a run", () => {
   });
 
   describe("a fetch a protocol client makes", () => {
-    const anonymous = { kind: "anonymous" } as const;
-
     it("a_redirect_is_not_followed_unless_the_request_asks", async () => {
-      const fetch = gateway.fetchFor(anonymous, new AbortController().signal);
-
-      const response = await fetch(`${origin}/moved`);
+      const response = await client.fetch(`${origin}/moved`);
 
       expect(response.status).toBe(302);
       expect(stub.received.map((received) => received.url)).toEqual(["/moved"]);
     });
 
     it("a_redirect_the_request_asks_to_follow_is_followed", async () => {
-      const fetch = gateway.fetchFor(anonymous, new AbortController().signal);
-
-      const response = await fetch(`${origin}/moved`, { redirect: "follow" });
+      const response = await client.fetch(`${origin}/moved`, {
+        redirect: "follow",
+      });
 
       expect(response.status).toBe(200);
       expect(stub.received.map((received) => received.url)).toEqual([
@@ -1622,12 +1617,12 @@ describe("a call the HTTP gateways perform for a run", () => {
     });
 
     it("a_followed_redirect_to_a_refused_address_is_unreachable", async () => {
-      const fetch = gateway.fetchFor(anonymous, new AbortController().signal);
-      const fetched = fetch(`${origin}/escape`, { redirect: "follow" });
+      const fetched = client.fetch(`${origin}/escape`, { redirect: "follow" });
 
       const failure = await fetched.then(
         () => null,
-        (error: unknown) => new TransportFailures().classified(error),
+        (error: unknown) =>
+          new TransportFaults().classified(error)?.failure() ?? null,
       );
 
       expect(failure).toEqual({ kind: "unreachable", detail: REFUSED_ADDRESS });

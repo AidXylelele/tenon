@@ -23,8 +23,8 @@ import type {
 import { z } from "zod";
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
-import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
+import { TransportFaults } from "../../../../../src/frameworks/http/transport-faults.js";
 import { StreamableHttpMcpConnection } from "../../../../../src/frameworks/mcp/streamable-http.mcp-connection.js";
 import type {
   CallContext,
@@ -35,8 +35,7 @@ import { closedPort } from "../../../../support/stub-server.js";
 import {
   authenticationOf,
   callContextOf,
-  fetchClientOf,
-  httpGatewayOf,
+  clientOf,
 } from "../../../../support/outbound.js";
 
 const TOKEN = "token-1";
@@ -90,13 +89,13 @@ describe("a call the MCP gateway performs for a run", () => {
   });
 
   function mcpGatewayOf(guard: AddressPolicy): McpGateway {
-    const authentication = authenticationOf(fetchClientOf(guard.dispatcher));
-    const http = httpGatewayOf(guard, resilience);
+    const authentication = authenticationOf(guard, resilience);
+    const http = clientOf(guard, resilience);
     return new McpGateway(
       new StreamableHttpMcpConnection(),
       authentication,
       http,
-      new TransportFailures(),
+      new TransportFaults(),
       resilience,
     );
   }

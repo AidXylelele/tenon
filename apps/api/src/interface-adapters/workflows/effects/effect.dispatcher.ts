@@ -12,11 +12,11 @@ import { ProtocolMapper } from "../mappers/protocol.mapper.js";
 import { A2aGateway } from "./a2a.gateway.js";
 import { AsyncApiGateway } from "./asyncapi.gateway.js";
 import { GrpcGateway } from "./grpc.gateway.js";
-import { HttpGateway } from "./http.gateway.js";
+import { HttpCallGateway } from "../../http/http-call.gateway.js";
 import type { CallContext } from "./interfaces.js";
 import { McpGateway } from "./mcp.gateway.js";
 import { OpenApiGateway } from "./openapi.gateway.js";
-import { ResourceGateway } from "./resource.gateway.js";
+import { ResourceGateway } from "../../http/resource.gateway.js";
 import { SandboxGateway } from "./sandbox.gateway.js";
 
 @Injectable()
@@ -24,7 +24,7 @@ export class EffectDispatcher implements EffectClient {
   private static readonly LONGEST_TIMER = 2 ** 31 - 1;
 
   constructor(
-    private readonly http: HttpGateway,
+    private readonly http: HttpCallGateway,
     private readonly openApi: OpenApiGateway,
     private readonly resource: ResourceGateway,
     private readonly grpc: GrpcGateway,

@@ -1,21 +1,50 @@
 import { Injectable } from "@nestjs/common";
 import { HttpClientError } from "@nestjs/http-client";
+import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import { decodeJwt, type JWTPayload } from "jose";
 import { ClientError, ResponseBodyError } from "openid-client";
-import { RefusalCode } from "./enums.js";
-import {
-  AuthorizationServer,
-  type ClientAuthentication,
-  type OAuth2Credentials,
-  type TokenClient,
-  type TokenEndpoint,
+import type {
+  AccessTokens,
+  OAuth2Credentials,
+} from "../../interface-adapters/auth/interfaces.js";
+import { TransportFailure } from "../../interface-adapters/http/enums.js";
+import { TransportFault } from "../../interface-adapters/http/transport-fault.error.js";
+import { RefusalCode } from "../http/enums.js";
+import { TransportFaults } from "../http/transport-faults.js";
+import type {
+  ClientAuthentication,
+  TokenClient,
+  TokenEndpoint,
 } from "./interfaces.js";
+import { OpenIdAuthorizationServer } from "./openid.authorization-server.js";
 
 @Injectable()
-export class AccessTokens {
-  constructor(private readonly server: AuthorizationServer) {}
+export class OpenIdAccessTokens implements AccessTokens {
+  private readonly policy: ResiliencePolicy;
+
+  constructor(
+    private readonly server: OpenIdAuthorizationServer,
+    private readonly faults: TransportFaults,
+    resilience: ResilienceService,
+  ) {
+    this.policy = resilience.preset("service-calls");
+  }
 
   async accessTokenFor(
+    credentials: OAuth2Credentials,
+    signal: AbortSignal,
+  ): Promise<string> {
+    try {
+      return await this.policy.execute(
+        (attempt) => this.#issued(credentials, attempt.signal),
+        { signal },
+      );
+    } catch (error) {
+      throw this.faults.of(error, signal);
+    }
+  }
+
+  async #issued(
     credentials: OAuth2Credentials,
     signal: AbortSignal,
   ): Promise<string> {
@@ -222,8 +251,7 @@ export class AccessTokens {
     return code === RefusalCode.ResponseSize;
   }
 
-  #refused(message: string): Error {
-    const error = new Error(message);
-    return Object.assign(error, { code: RefusalCode.Token });
+  #refused(message: string): TransportFault {
+    return new TransportFault(TransportFailure.Unauthenticated, message);
   }
 }

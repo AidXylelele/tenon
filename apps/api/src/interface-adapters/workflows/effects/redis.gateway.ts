@@ -3,8 +3,8 @@ import type { AsyncApiOutcome, Failure } from "interpreter";
 import { ErrorReply } from "redis";
 import { RedisConnection } from "../../../frameworks/redis/redis.connection.js";
 import type { Subscribed } from "../../messaging/interfaces.js";
+import type { BasicCredentials } from "../../auth/interfaces.js";
 import type {
-  BasicCredentials,
   BrokerGateway,
   BrokerInbox,
   BrokerMessage,

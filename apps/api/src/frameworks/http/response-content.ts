@@ -1,57 +1,37 @@
 import { isUtf8 } from "node:buffer";
 import { MIMEType } from "node:util";
 import { Injectable } from "@nestjs/common";
-import type { HttpRequest, JsonValue, RespondedHttpOutcome } from "interpreter";
-import type { OutboundRequest, ResponseOptions, Signed } from "./interfaces.js";
+import type { JsonValue } from "interpreter";
+import { BodyReading } from "../../interface-adapters/http/enums.js";
+import type {
+  HttpReply,
+  TextReply,
+} from "../../interface-adapters/http/interfaces.js";
 
 @Injectable()
 export class ResponseContent {
-  private static readonly CREDENTIAL_HEADERS: readonly string[] = [
-    "authorization",
-    "proxy-authorization",
-  ];
   private static readonly TEXT_APPLICATIONS: readonly string[] = [
     "xml",
     "javascript",
     "x-www-form-urlencoded",
   ];
 
-  async respondedOf(
-    request: OutboundRequest,
-    signed: Signed,
-    options: ResponseOptions,
-  ): Promise<RespondedHttpOutcome> {
-    const response = signed.response;
+  async replyOf(response: Response, reading: BodyReading): Promise<HttpReply> {
     const body = await this.#bodyOf(response);
-    const content = this.#contentOf(body, response, options.output);
+    const content = this.#contentOf(body, response, reading);
     const headers = this.#headersOf(response);
-    const authorization = options.revealAuthorization
-      ? signed.authorization
-      : null;
-    const shown = this.#withoutCredentials(request.headers);
-    const sent = { method: request.method, uri: request.uri, headers: shown };
-    return {
-      kind: "responded",
-      request: sent,
-      statusCode: response.status,
-      headers,
-      content,
-      authorization,
-    };
+    return { statusCode: response.status, headers, content };
+  }
+
+  async textReplyOf(response: Response): Promise<TextReply> {
+    const text = await this.textOf(response);
+    return { statusCode: response.status, text };
   }
 
   async textOf(response: Response): Promise<string> {
     const body = await this.#bodyOf(response);
     const media = this.mediaOf(response);
     return this.#decoded(body, media);
-  }
-
-  documentOf(text: string): JsonValue {
-    try {
-      return JSON.parse(text) as JsonValue;
-    } catch {
-      return text;
-    }
   }
 
   mediaOf(response: Response): MIMEType | null {
@@ -64,14 +44,6 @@ export class ResponseContent {
     } catch {
       return null;
     }
-  }
-
-  #withoutCredentials(headers: Headers): Readonly<Record<string, string>> {
-    const shown = new Headers(headers);
-
-    for (const name of ResponseContent.CREDENTIAL_HEADERS) shown.delete(name);
-
-    return Object.fromEntries(shown);
   }
 
   #headersOf(response: Response): Readonly<Record<string, string>> {
@@ -91,18 +63,18 @@ export class ResponseContent {
   #contentOf(
     body: Buffer,
     response: Response,
-    output: HttpRequest["output"],
+    reading: BodyReading,
   ): JsonValue {
     if (body.length === 0) return null;
 
-    if (output === "raw") return body.toString("base64");
+    if (reading === BodyReading.Raw) return body.toString("base64");
 
     const media = this.mediaOf(response);
     const json = this.#readsAsJson(media, body);
 
     if (json) {
       const text = this.#decoded(body, media);
-      return this.documentOf(text);
+      return this.#documentOf(text);
     }
 
     const textual = this.#readsAsText(media);
@@ -110,6 +82,14 @@ export class ResponseContent {
     if (textual) return this.#decoded(body, media);
 
     return body.toString("base64");
+  }
+
+  #documentOf(text: string): JsonValue {
+    try {
+      return JSON.parse(text) as JsonValue;
+    } catch {
+      return text;
+    }
   }
 
   #readsAsJson(media: MIMEType | null, body: Buffer): boolean {

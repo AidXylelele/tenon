@@ -29,7 +29,7 @@ import {
 import { KafkaConnection } from "../../../../../src/frameworks/kafka/kafka.connection.js";
 import { MqttConnection } from "../../../../../src/frameworks/mqtt/mqtt.connection.js";
 import { NatsConnection } from "../../../../../src/frameworks/nats/nats.connection.js";
-import { AddressPolicy } from "../../../../../src/frameworks/network/address-policy.js";
+import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
 import { RedisConnection } from "../../../../../src/frameworks/redis/redis.connection.js";
 import type { BrokerSubscription } from "../../../../../src/interface-adapters/messaging/interfaces.js";
 import { AmqpGateway } from "../../../../../src/interface-adapters/workflows/effects/amqp.gateway.js";
@@ -39,7 +39,7 @@ import { KafkaGateway } from "../../../../../src/interface-adapters/workflows/ef
 import { MqttGateway } from "../../../../../src/interface-adapters/workflows/effects/mqtt.gateway.js";
 import { NatsGateway } from "../../../../../src/interface-adapters/workflows/effects/nats.gateway.js";
 import { RedisGateway } from "../../../../../src/interface-adapters/workflows/effects/redis.gateway.js";
-import { TransportFailures } from "../../../../../src/interface-adapters/workflows/effects/transport-failures.js";
+import { TransportFaults } from "../../../../../src/frameworks/http/transport-faults.js";
 import {
   startStubServer,
   type StubServer,
@@ -47,7 +47,6 @@ import {
 import {
   authenticationOf,
   callContextOf,
-  fetchClientOf,
   inboxOf,
   resourcesOf,
 } from "../../../../support/outbound.js";
@@ -105,10 +104,10 @@ describe("the AsyncAPI gateway on a Kafka cluster a document names", () => {
   const gatewayOn = (policy: AddressPolicy, kafkaOn: KafkaConnection) =>
     new AsyncApiGateway(
       resourcesOf(new AddressPolicy([HOST]), resilience),
-      authenticationOf(fetchClientOf(policy.dispatcher)),
+      authenticationOf(policy, resilience),
       new AsyncApiDocuments(new Parser(parserOptions)),
       responseSizeLimit,
-      new TransportFailures(),
+      new TransportFaults(),
       new AmqpGateway(new AmqpConnection(policy)),
       new KafkaGateway(kafkaOn),
       new MqttGateway(new MqttConnection(policy)),

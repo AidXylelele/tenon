@@ -9,19 +9,23 @@ import type {
   JsonObject,
   JsonValue,
 } from "interpreter";
-import { ResponseSizeLimit } from "../../../frameworks/network/response-size-limit.js";
+import { ResponseSizeLimit } from "../../../frameworks/http/response-size-limit.js";
 import type {
   AsyncApiInbox,
   Subscribed,
   SubscriptionClient,
 } from "../../messaging/interfaces.js";
-import { ResourceClient, type StepCall } from "../interfaces.js";
+import { ResourceGateway } from "../../http/resource.gateway.js";
+import type { StepCall } from "../interfaces.js";
 import { AmqpGateway } from "./amqp.gateway.js";
 import { AsyncApiDocuments } from "./asyncapi-documents.js";
-import { Authenticator } from "./authenticator.js";
-import { BrokerProtocol } from "./enums.js";
+import { Authenticator } from "../../auth/authenticator.js";
 import type {
   BasicCredentials,
+  UnusableSecret,
+} from "../../auth/interfaces.js";
+import { BrokerProtocol } from "./enums.js";
+import type {
   BrokerGateway,
   BrokerInbox,
   BrokerMessage,
@@ -30,13 +34,12 @@ import type {
   Expired,
   ReceivedBrokerMessage,
   Targeted,
-  UnusableSecret,
 } from "./interfaces.js";
 import { KafkaGateway } from "./kafka.gateway.js";
 import { MqttGateway } from "./mqtt.gateway.js";
 import { NatsGateway } from "./nats.gateway.js";
 import { RedisGateway } from "./redis.gateway.js";
-import { TransportFailures } from "./transport-failures.js";
+import { TransportFaults } from "../../../frameworks/http/transport-faults.js";
 
 @Injectable()
 export class AsyncApiGateway implements SubscriptionClient {
@@ -47,11 +50,11 @@ export class AsyncApiGateway implements SubscriptionClient {
   private readonly brokers: ReadonlyMap<string, BrokerGateway>;
 
   constructor(
-    private readonly resources: ResourceClient,
+    private readonly resources: ResourceGateway,
     private readonly authentication: Authenticator,
     private readonly documents: AsyncApiDocuments,
     private readonly limit: ResponseSizeLimit,
-    private readonly failures: TransportFailures,
+    private readonly failures: TransportFaults,
     amqp: AmqpGateway,
     kafka: KafkaGateway,
     mqtt: MqttGateway,
@@ -186,7 +189,7 @@ export class AsyncApiGateway implements SubscriptionClient {
     try {
       return await this.#within(publishing, signal);
     } catch (error) {
-      return this.failures.of(error, signal);
+      return this.failures.of(error, signal).failure();
     }
   }
 

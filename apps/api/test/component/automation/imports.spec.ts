@@ -1,6 +1,6 @@
 import request from "supertest";
 import { Role } from "../../../src/domain/identity/users/enums.js";
-import { AddressPolicy } from "../../../src/frameworks/network/address-policy.js";
+import { AddressPolicy } from "../../../src/frameworks/http/address-policy.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import { createTestApp, type TestApp } from "../../support/create-test-app.js";

@@ -8,12 +8,12 @@ import {
   type RevealedAuthorization,
   type SecretPolicies,
 } from "interpreter";
-import { AccessTokens } from "./access-tokens.js";
-import type {
-  Authorized,
-  Credentials,
-  PasswordCredentials,
-  UnusableSecret,
+import {
+  AccessTokens,
+  type Authorized,
+  type Credentials,
+  type PasswordCredentials,
+  type UnusableSecret,
 } from "./interfaces.js";
 
 @Injectable()

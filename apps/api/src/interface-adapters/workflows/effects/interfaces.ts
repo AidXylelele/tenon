@@ -1,21 +1,19 @@
 import type { MethodDefinition } from "@grpc/proto-loader";
 import type {
   AsyncApiOutcome,
-  AuthenticationScheme,
   Endpoint,
   Failure,
-  HttpRequest,
   JsonObject,
   JsonValue,
   McpRequest,
   ProcessOutcome,
-  ResolvedAuthentication,
-  RevealedAuthorization,
 } from "interpreter";
 import type { Message, Root } from "protobufjs";
 import type { z } from "zod";
-import type { BrokerServer } from "../../../frameworks/network/interfaces.js";
+import type { BrokerServer } from "../../../frameworks/asyncapi/interfaces.js";
 import type { Subscribed } from "../../messaging/interfaces.js";
+import type { BasicCredentials } from "../../auth/interfaces.js";
+import type { OutboundRequest } from "../../http/interfaces.js";
 import type { StepCall } from "../interfaces.js";
 import type { AGENT_CARD } from "./agent-card.schema.js";
 import type {
@@ -32,52 +30,10 @@ export interface CallContext extends StepCall {
   readonly remaining: number | null;
 }
 
-export type Credentials = ResolvedAuthentication & {
-  readonly kind: Exclude<AuthenticationScheme, "digest">;
-};
-
-export type OAuth2Credentials = Extract<
-  Credentials,
-  { readonly kind: "oauth2" | "oidc" }
->;
-
-export interface PasswordCredentials {
-  readonly username: string;
-  readonly password: string;
-}
-
-export type UnusableSecret = Extract<
-  Failure,
-  { readonly kind: "forbidden" | "misconfigured" }
->;
-
 export type Misconfigured = Extract<
   Failure,
   { readonly kind: "misconfigured" }
 >;
-
-export type Authorization =
-  | { readonly kind: "anonymous" }
-  | { readonly kind: "header"; readonly header: RevealedAuthorization };
-
-export type Authorized = Authorization | UnusableSecret;
-
-export type ClientAuthentication =
-  | {
-      readonly kind:
-        "client_secret_basic" | "client_secret_post" | "client_secret_jwt";
-      readonly secret: string;
-    }
-  | { readonly kind: "assertion"; readonly assertion: string }
-  | { readonly kind: "none" };
-
-export interface TokenClient {
-  readonly authority: string;
-  readonly tokenEndpoint: string | null;
-  readonly id: string;
-  readonly authentication: ClientAuthentication;
-  readonly encoding: OAuth2Credentials["encoding"];
-}
 
 export interface PreparedCall {
   readonly kind: "call";
@@ -121,19 +77,6 @@ export interface SandboxCommand {
 export type BuiltCommand =
   | { readonly kind: "command"; readonly command: SandboxCommand }
   | ProcessOutcome;
-
-export interface TokenEndpoint {
-  readonly issuer: string;
-  readonly located: boolean;
-  grant(type: string, parameters: URLSearchParams): Promise<string>;
-}
-
-export abstract class AuthorizationServer {
-  abstract endpointOf(
-    client: TokenClient,
-    signal: AbortSignal,
-  ): Promise<TokenEndpoint>;
-}
 
 export type AgentCardProperties = z.infer<typeof AGENT_CARD>;
 
@@ -189,27 +132,6 @@ export abstract class McpConnection {
   ): Promise<McpAnswer>;
 }
 
-export interface OutboundRequest {
-  readonly method: string;
-  readonly uri: string;
-  readonly headers: Headers;
-  readonly body: string | null;
-}
-
-export interface Signed {
-  readonly response: Response;
-  readonly authorization: RevealedAuthorization | null;
-}
-
-export type ResponseOptions = Pick<
-  HttpRequest,
-  "output" | "revealAuthorization"
->;
-
-export abstract class HttpConnection {
-  abstract fetch(url: string | URL, init?: RequestInit): Promise<Response>;
-}
-
 export type OpenApiDocument = z.infer<typeof OPENAPI_DOCUMENT>;
 
 type OpenApiPath = z.infer<typeof OPENAPI_PATH>;
@@ -224,8 +146,6 @@ export interface LocatedOperation {
 export type OperationRequest =
   | { readonly kind: "operation"; readonly request: OutboundRequest }
   | Extract<Failure, { readonly kind: "misconfigured" }>;
-
-export type BasicCredentials = Extract<Credentials, { readonly kind: "basic" }>;
 
 export interface AsyncApiServer extends BrokerServer {
   readonly protocol: string;

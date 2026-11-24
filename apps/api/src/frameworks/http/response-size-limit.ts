@@ -3,7 +3,7 @@ import type {
   HttpHandler,
   HttpRequest,
 } from "@nestjs/http-client";
-import { RefusalCode } from "../../interface-adapters/workflows/effects/enums.js";
+import { RefusalCode } from "./enums.js";
 
 export class ResponseSizeLimit implements HttpClientInterceptor {
   constructor(readonly bytes: number) {}

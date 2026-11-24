@@ -9,7 +9,7 @@ import shellPlatform from "../go-judge/shell-platform.json" with { type: "json" 
 import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.handler.js";
 import { MessageTopic } from "../../interface-adapters/messaging/enums.js";
 import type { InterpreterThreads } from "../interpreter/interfaces.js";
-import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { ResponseSizeLimit } from "../http/response-size-limit.js";
 
 const CALL_SECONDS = 30;
 const PROCESS_SECONDS = 35;

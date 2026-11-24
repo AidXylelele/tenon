@@ -75,7 +75,7 @@ import { PostgresSubscriptionQueries } from "../../interface-adapters/persistenc
 import { PostgresWebhookQueries } from "../../interface-adapters/persistence/queries/postgres-webhook.queries.js";
 import { PostgresDraftRepository } from "../../interface-adapters/persistence/repositories/postgres-draft.repository.js";
 import { PostgresWebhookRepository } from "../../interface-adapters/persistence/repositories/postgres-webhook.repository.js";
-import { HttpImportGateway } from "../../interface-adapters/workflows/gateways/http-import.gateway.js";
+import { ImportGateway } from "../../interface-adapters/http/import.gateway.js";
 import { InterpreterCapabilitiesGateway } from "../../interface-adapters/workflows/gateways/interpreter-capabilities.gateway.js";
 import { InterpreterCompilerGateway } from "../../interface-adapters/workflows/gateways/interpreter-compiler.gateway.js";
 import { StructureClient } from "../../interface-adapters/workflows/interfaces.js";
@@ -129,8 +129,8 @@ import { HttpModule } from "./http.module.js";
     CreateSubscription,
     DeleteSubscription,
     AutomationPolicy,
-    HttpImportGateway,
-    { provide: ImportFetcher, useExisting: HttpImportGateway },
+    ImportGateway,
+    { provide: ImportFetcher, useExisting: ImportGateway },
     InterpreterCompilerGateway,
     { provide: DefinitionCompiler, useExisting: InterpreterCompilerGateway },
     InterpreterCapabilitiesGateway,

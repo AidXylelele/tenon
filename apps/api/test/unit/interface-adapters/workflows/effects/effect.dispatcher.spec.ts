@@ -10,11 +10,11 @@ import { A2aGateway } from "../../../../../src/interface-adapters/workflows/effe
 import { AsyncApiGateway } from "../../../../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../../../../src/interface-adapters/workflows/effects/effect.dispatcher.js";
 import { GrpcGateway } from "../../../../../src/interface-adapters/workflows/effects/grpc.gateway.js";
-import { HttpGateway } from "../../../../../src/interface-adapters/workflows/effects/http.gateway.js";
+import { HttpCallGateway } from "../../../../../src/interface-adapters/http/http-call.gateway.js";
 import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import { McpGateway } from "../../../../../src/interface-adapters/workflows/effects/mcp.gateway.js";
 import { OpenApiGateway } from "../../../../../src/interface-adapters/workflows/effects/openapi.gateway.js";
-import { ResourceGateway } from "../../../../../src/interface-adapters/workflows/effects/resource.gateway.js";
+import { ResourceGateway } from "../../../../../src/interface-adapters/http/resource.gateway.js";
 import { SandboxGateway } from "../../../../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
 import type { EffectCall } from "../../../../../src/application/automation/instances/interfaces.js";
 import type { JsonObject } from "../../../../../src/domain/automation/interfaces.js";
@@ -199,7 +199,7 @@ describe("the dispatcher every effect passes through", () => {
       providers: [
         EffectDispatcher,
         ProtocolMapper,
-        { provide: HttpGateway, useValue: http },
+        { provide: HttpCallGateway, useValue: http },
         { provide: OpenApiGateway, useValue: others.openapi },
         { provide: ResourceGateway, useValue: others.resource },
         { provide: GrpcGateway, useValue: others.grpc },

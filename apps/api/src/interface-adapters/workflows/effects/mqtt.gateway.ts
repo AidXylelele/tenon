@@ -5,8 +5,8 @@ import type { MqttVersion } from "../../../frameworks/mqtt/interfaces.js";
 import { MqttConnection } from "../../../frameworks/mqtt/mqtt.connection.js";
 import type { Subscribed } from "../../messaging/interfaces.js";
 import { MQTT_OPERATION } from "./asyncapi-bindings.schema.js";
+import type { BasicCredentials } from "../../auth/interfaces.js";
 import type {
-  BasicCredentials,
   BrokerGateway,
   BrokerInbox,
   BrokerMessage,

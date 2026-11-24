@@ -1,7 +1,7 @@
 import request from "supertest";
 import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
 import { getHttpClientToken, HttpClient } from "@nestjs/http-client";
-import { HttpClientName } from "../../../src/frameworks/network/enums.js";
+import { HttpClientName } from "../../../src/frameworks/http/enums.js";
 import { Role } from "../../../src/domain/identity/users/enums.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";

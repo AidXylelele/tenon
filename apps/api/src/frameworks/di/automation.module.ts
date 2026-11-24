@@ -29,16 +29,16 @@ import {
   WorkflowRepository,
 } from "../../application/automation/workflows/ports.js";
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
-import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
+import { Authenticator } from "../../interface-adapters/auth/authenticator.js";
+import { AccessTokens } from "../../interface-adapters/auth/interfaces.js";
+import { HttpCallGateway } from "../../interface-adapters/http/http-call.gateway.js";
+import { HttpClient } from "../../interface-adapters/http/interfaces.js";
+import { ResourceGateway } from "../../interface-adapters/http/resource.gateway.js";
+import { SubscriberDeliveryGateway } from "../../interface-adapters/http/subscriber-delivery.gateway.js";
 import { EventMessagesGateway } from "../../interface-adapters/messaging/event-messages.gateway.js";
-import { HttpDeliveryGateway } from "../../interface-adapters/messaging/http-delivery.gateway.js";
 import { InstanceMessagesGateway } from "../../interface-adapters/messaging/instance-messages.gateway.js";
 import { RunDataMapper } from "../../interface-adapters/messaging/mappers/run-data.mapper.js";
 import { WorkflowMessagesGateway } from "../../interface-adapters/messaging/workflow-messages.gateway.js";
-import {
-  DeliveryAdmission,
-  EventDeliveries,
-} from "../../interface-adapters/messaging/interfaces.js";
 import { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 import { LifecycleEventMapper } from "../../interface-adapters/persistence/mappers/lifecycle-event.mapper.js";
 import { SecretMapper } from "../../interface-adapters/persistence/mappers/secret.mapper.js";
@@ -59,20 +59,7 @@ import { PostgresLifecycleEventStore } from "../../interface-adapters/persistenc
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
 import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
 import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
-import { AccessTokens } from "../../interface-adapters/workflows/effects/access-tokens.js";
-import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
-import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
-import {
-  AuthorizationServer,
-  HttpConnection,
-} from "../../interface-adapters/workflows/effects/interfaces.js";
-import { ResourceGateway } from "../../interface-adapters/workflows/effects/resource.gateway.js";
-import { ResponseContent } from "../../interface-adapters/workflows/effects/response-content.js";
-import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
-import {
-  InterpreterClient,
-  ResourceClient,
-} from "../../interface-adapters/workflows/interfaces.js";
+import { InterpreterClient } from "../../interface-adapters/workflows/interfaces.js";
 import { DefinitionMapper } from "../../interface-adapters/workflows/mappers/definition.mapper.js";
 import { ProtocolMapper } from "../../interface-adapters/workflows/mappers/protocol.mapper.js";
 import { RunTurnMapper } from "../../interface-adapters/workflows/mappers/run-turn.mapper.js";
@@ -80,10 +67,13 @@ import { ProgramCalls } from "../../interface-adapters/workflows/program-calls.j
 import { AesGcmCipher } from "../crypto/aes-gcm.cipher.js";
 import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
-import { AddressPolicy } from "../network/address-policy.js";
-import { HttpClientName } from "../network/enums.js";
-import { OutboundHttpConnection } from "../network/outbound.http-connection.js";
-import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { HttpClientName } from "../http/enums.js";
+import { OutboundHttpClient } from "../http/outbound.http-client.js";
+import { ResponseContent } from "../http/response-content.js";
+import { ResponseSizeLimit } from "../http/response-size-limit.js";
+import { TransportFaults } from "../http/transport-faults.js";
+import { OpenIdAccessTokens } from "../oauth/openid.access-tokens.js";
 import { OpenIdAuthorizationServer } from "../oauth/openid.authorization-server.js";
 import { interpreterConfig, linksConfig, secretsConfig } from "./configs.js";
 import { OutboundModule } from "./outbound.module.js";
@@ -177,25 +167,22 @@ import { OutboundModule } from "./outbound.module.js";
       },
     },
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
-    { provide: AuthorizationServer, useClass: OpenIdAuthorizationServer },
-    AccessTokens,
+    TransportFaults,
+    ResponseContent,
+    OutboundHttpClient,
+    { provide: HttpClient, useExisting: OutboundHttpClient },
+    OpenIdAuthorizationServer,
+    { provide: AccessTokens, useClass: OpenIdAccessTokens },
     {
       provide: Authenticator,
       inject: [AccessTokens],
       useFactory: (tokens: AccessTokens) =>
         new Authenticator(tokens, HOST_PROFILE),
     },
-    { provide: HttpConnection, useClass: OutboundHttpConnection },
-    TransportFailures,
-    ResponseContent,
-    HttpGateway,
+    HttpCallGateway,
     ResourceGateway,
-    { provide: ResourceClient, useExisting: ResourceGateway },
-    { provide: DeliveryAdmission, useExisting: AddressPolicy },
-    HttpDeliveryGateway,
-    { provide: EventDeliveries, useExisting: HttpDeliveryGateway },
-    EventDeliveryGateway,
-    { provide: EventSender, useExisting: EventDeliveryGateway },
+    SubscriberDeliveryGateway,
+    { provide: EventSender, useExisting: SubscriberDeliveryGateway },
   ],
   exports: [
     CancelInstance,
@@ -223,11 +210,11 @@ import { OutboundModule } from "./outbound.module.js";
     PiscinaInterpreterClient,
     InterpreterClient,
     Authenticator,
-    TransportFailures,
+    TransportFaults,
     ResponseContent,
-    HttpGateway,
+    OutboundHttpClient,
+    HttpCallGateway,
     ResourceGateway,
-    ResourceClient,
     EventSender,
   ],
 })

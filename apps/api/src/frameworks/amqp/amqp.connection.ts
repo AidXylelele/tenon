@@ -8,9 +8,9 @@ import {
   type RecoveringChannelModel,
   type RecoveryOptions,
 } from "amqplib";
-import { AddressPolicy } from "../network/address-policy.js";
-import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { BrokerConnections } from "../asyncapi/broker-connections.js";
+import type { BrokerServer, Login, Lost } from "../asyncapi/interfaces.js";
 import { AmqpPublisher } from "./amqp-publisher.js";
 import type { MessageHandler, QueueDeclaration } from "./interfaces.js";
 

@@ -9,12 +9,13 @@ import type {
   GrpcCall,
   MessageCheck,
 } from "../../../frameworks/grpc/interfaces.js";
-import { ResponseSizeLimit } from "../../../frameworks/network/response-size-limit.js";
-import { ResourceClient } from "../interfaces.js";
-import { Authenticator } from "./authenticator.js";
-import type { Authorization, CallContext, PreparedCall } from "./interfaces.js";
+import { ResponseSizeLimit } from "../../../frameworks/http/response-size-limit.js";
+import { ResourceGateway } from "../../http/resource.gateway.js";
+import { Authenticator } from "../../auth/authenticator.js";
+import type { Authorization } from "../../auth/interfaces.js";
+import type { CallContext, PreparedCall } from "./interfaces.js";
 import { ProtoSchema } from "./proto-schema.js";
-import { TransportFailures } from "./transport-failures.js";
+import { TransportFaults } from "../../../frameworks/http/transport-faults.js";
 
 @Injectable()
 export class GrpcGateway {
@@ -22,10 +23,10 @@ export class GrpcGateway {
 
   constructor(
     private readonly connection: GrpcConnection,
-    private readonly resources: ResourceClient,
+    private readonly resources: ResourceGateway,
     private readonly authentication: Authenticator,
     private readonly schema: ProtoSchema,
-    private readonly failures: TransportFailures,
+    private readonly failures: TransportFaults,
     private readonly limit: ResponseSizeLimit,
     resilience: ResilienceService,
   ) {
@@ -50,7 +51,7 @@ export class GrpcGateway {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.failures.of(error, context.signal);
+      return this.failures.of(error, context.signal).failure();
     }
   }
 

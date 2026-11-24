@@ -9,8 +9,8 @@ import {
 import type { AsyncApiOutcome, Failure } from "interpreter";
 import { NatsConnection } from "../../../frameworks/nats/nats.connection.js";
 import type { Subscribed } from "../../messaging/interfaces.js";
+import type { BasicCredentials } from "../../auth/interfaces.js";
 import type {
-  BasicCredentials,
   BrokerGateway,
   BrokerInbox,
   BrokerMessage,

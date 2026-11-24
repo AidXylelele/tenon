@@ -1,10 +1,10 @@
-import { AddressPolicy } from "../../../../src/frameworks/network/address-policy.js";
-import { BrokerConnections } from "../../../../src/frameworks/network/broker-connections.js";
+import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
+import { BrokerConnections } from "../../../../src/frameworks/asyncapi/broker-connections.js";
 import type {
   BrokerServer,
   Login,
   Lost,
-} from "../../../../src/frameworks/network/interfaces.js";
+} from "../../../../src/frameworks/asyncapi/interfaces.js";
 
 interface Connection {
   readonly address: string;

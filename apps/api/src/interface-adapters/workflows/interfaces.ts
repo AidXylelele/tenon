@@ -5,7 +5,6 @@ import type {
   Effect,
   EffectResponse,
   Ending,
-  Failure,
   HostEnd,
   HostProfile,
   InputProblem,
@@ -14,7 +13,6 @@ import type {
   LifecycleEventTypes,
   Manifest,
   ProcessRequest,
-  Resource,
   RoutingFilter,
   RuntimeDescriptor,
   Script,
@@ -221,11 +219,4 @@ export abstract class StructureClient {
     source: ProgramSource,
   ): Promise<VersionStructure | null>;
   abstract tagOf(digest: string): string;
-}
-
-export type FetchedText =
-  { readonly kind: "text"; readonly text: string } | Failure;
-
-export abstract class ResourceClient {
-  abstract text(resource: Resource, step: StepCall): Promise<FetchedText>;
 }

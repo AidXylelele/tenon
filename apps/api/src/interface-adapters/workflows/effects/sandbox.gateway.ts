@@ -15,12 +15,10 @@ import {
   SANDBOX_REFUSAL,
   SANDBOX_RESULTS,
 } from "../../../frameworks/go-judge/sandbox-result.schema.js";
-import { HttpClientName } from "../../../frameworks/network/enums.js";
-import {
-  type FetchedText,
-  ResourceClient,
-  type SandboxedProcessRequest,
-} from "../interfaces.js";
+import { HttpClientName } from "../../../frameworks/http/enums.js";
+import type { FetchedText } from "../../http/interfaces.js";
+import { ResourceGateway } from "../../http/resource.gateway.js";
+import type { SandboxedProcessRequest } from "../interfaces.js";
 import type {
   BuiltCommand,
   CallContext,
@@ -46,7 +44,7 @@ export class SandboxGateway {
   constructor(
     @InjectHttpClient(HttpClientName.Sandbox)
     private readonly sandbox: NestHttpClient,
-    private readonly resources: ResourceClient,
+    private readonly resources: ResourceGateway,
     private readonly limits: SandboxLimits,
     private readonly platform: ProcessPlatform,
     resilience: ResilienceService,

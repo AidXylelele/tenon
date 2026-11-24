@@ -3,7 +3,7 @@ import type { TestingModuleBuilder } from "@nestjs/testing";
 import { sql } from "drizzle-orm";
 import request, { type Response } from "supertest";
 import type { JsonObject } from "../../src/domain/automation/interfaces.js";
-import { AddressPolicy } from "../../src/frameworks/network/address-policy.js";
+import { AddressPolicy } from "../../src/frameworks/http/address-policy.js";
 import { aDocument, type DocumentHeader } from "./builders.js";
 import { createTestApp, type TestApp } from "./create-test-app.js";
 import type { Page } from "./bodies.js";

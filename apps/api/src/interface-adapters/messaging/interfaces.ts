@@ -2,7 +2,6 @@ import type {
   AsyncApiInboundMessage,
   AsyncApiRequest,
   Failure,
-  JsonObject,
 } from "interpreter";
 import type { EffectKind } from "../../domain/automation/instances/enums.js";
 import type { StepCall } from "../workflows/interfaces.js";
@@ -102,20 +101,4 @@ export abstract class SubscriptionClient {
     step: StepCall,
     inbox: AsyncApiInbox,
   ): Promise<Subscribed>;
-}
-
-export interface EventDelivery {
-  readonly uri: string;
-  readonly scheme: "basic" | "bearer" | null;
-  readonly credential: JsonObject | null;
-  readonly event: JsonObject;
-}
-
-export abstract class DeliveryAdmission {
-  abstract admits(uri: string): Promise<boolean>;
-}
-
-export abstract class EventDeliveries {
-  abstract admits(uri: string): Promise<boolean>;
-  abstract deliver(delivery: EventDelivery): Promise<string | null>;
 }

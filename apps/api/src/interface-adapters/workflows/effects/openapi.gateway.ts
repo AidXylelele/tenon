@@ -1,9 +1,8 @@
 import $RefParser from "@apidevtools/json-schema-ref-parser";
 import { Injectable } from "@nestjs/common";
-import { type ResiliencePolicy, ResilienceService } from "@nestjs/resilience";
 import type { HttpOutcome, JsonObject, OpenApiRequest } from "interpreter";
 import SwaggerClient, { type BuiltRequest } from "swagger-client";
-import { HttpGateway } from "./http.gateway.js";
+import { HttpCallGateway } from "../../http/http-call.gateway.js";
 import type {
   CallContext,
   LocatedOperation,
@@ -11,8 +10,7 @@ import type {
   OperationRequest,
 } from "./interfaces.js";
 import { OPENAPI_DOCUMENT } from "./openapi-document.schema.js";
-import { ResourceGateway } from "./resource.gateway.js";
-import { TransportFailures } from "./transport-failures.js";
+import { ResourceGateway } from "../../http/resource.gateway.js";
 
 @Injectable()
 export class OpenApiGateway {
@@ -28,41 +26,16 @@ export class OpenApiGateway {
   ] as const;
   private static readonly BODY = "body";
 
-  private readonly policy: ResiliencePolicy;
-
   constructor(
     private readonly resources: ResourceGateway,
-    private readonly http: HttpGateway,
-    private readonly failures: TransportFailures,
-    resilience: ResilienceService,
-  ) {
-    this.policy = resilience.preset("service-calls");
-  }
+    private readonly http: HttpCallGateway,
+  ) {}
 
   async perform(
     request: OpenApiRequest,
     context: CallContext,
   ): Promise<HttpOutcome> {
-    try {
-      return await this.policy.execute(
-        (attempt) => this.#called(request, context, attempt.signal),
-        { signal: context.signal },
-      );
-    } catch (error) {
-      return this.failures.of(error, context.signal);
-    }
-  }
-
-  async #called(
-    request: OpenApiRequest,
-    context: CallContext,
-    signal: AbortSignal,
-  ): Promise<HttpOutcome> {
-    const document = await this.resources.read(
-      request.document,
-      context,
-      signal,
-    );
+    const document = await this.resources.text(request.document, context);
 
     if (document.kind !== "text") return document;
 
@@ -72,13 +45,7 @@ export class OpenApiGateway {
 
     const outbound = operation.request;
     const authentication = request.authentication;
-    return this.http.exchange(
-      outbound,
-      authentication,
-      request,
-      context,
-      signal,
-    );
+    return this.http.exchange(outbound, authentication, request, context);
   }
 
   async #requestOf(

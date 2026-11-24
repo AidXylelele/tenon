@@ -8,15 +8,15 @@ import type {
   JsonValue,
   RpcOutcome,
 } from "interpreter";
-import { ResourceClient } from "../interfaces.js";
+import { ResourceGateway } from "../../http/resource.gateway.js";
 import { AgentCard } from "./agent-card.js";
 import { AGENT_CARD } from "./agent-card.schema.js";
-import { Authenticator } from "./authenticator.js";
-import { HttpGateway } from "./http.gateway.js";
+import { Authenticator } from "../../auth/authenticator.js";
+import { OutboundHttpClient } from "../../../frameworks/http/outbound.http-client.js";
 import type { Agent, CallContext } from "./interfaces.js";
 import { JSON_RPC_RESPONSE } from "./json-rpc.schema.js";
-import { ResponseContent } from "./response-content.js";
-import { TransportFailures } from "./transport-failures.js";
+import { ResponseContent } from "../../../frameworks/http/response-content.js";
+import { TransportFaults } from "../../../frameworks/http/transport-faults.js";
 
 @Injectable()
 export class A2aGateway {
@@ -25,11 +25,11 @@ export class A2aGateway {
   private readonly policy: ResiliencePolicy;
 
   constructor(
-    private readonly resources: ResourceClient,
-    private readonly http: HttpGateway,
+    private readonly resources: ResourceGateway,
+    private readonly http: OutboundHttpClient,
     private readonly authenticator: Authenticator,
     private readonly content: ResponseContent,
-    private readonly failures: TransportFailures,
+    private readonly failures: TransportFaults,
     resilience: ResilienceService,
   ) {
     this.policy = resilience.preset("a2a-calls");
@@ -51,7 +51,7 @@ export class A2aGateway {
         { signal: context.signal },
       );
     } catch (error) {
-      return this.failures.of(error, context.signal);
+      return this.failures.of(error, context.signal).failure();
     }
   }
 
@@ -92,14 +92,20 @@ export class A2aGateway {
     if (authorization.kind === "misconfigured") return authorization;
 
     const streamed = this.#streams(request);
-    const fetch = this.http.fetchFor(authorization, signal);
     const headers = this.#headersOf(streamed, context.idempotencyKey);
+
+    if (authorization.kind === "header") {
+      const value = this.authenticator.headerValueOf(authorization.header);
+      headers.set("authorization", value);
+    }
+
     const envelope = this.#envelopeOf(request, context.idempotencyKey);
     const body = JSON.stringify(envelope);
-    const response = await fetch(endpoint.uri, {
+    const response = await this.http.fetch(endpoint.uri, {
       method: "POST",
       headers,
       body,
+      signal,
     });
     const text = await this.content.textOf(response);
     return this.#outcomeOf(response, text, streamed);

@@ -4,9 +4,9 @@ import {
   connect,
   type NatsConnection as NatsClient,
 } from "@nats-io/transport-node";
-import { AddressPolicy } from "../network/address-policy.js";
-import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { BrokerConnections } from "../asyncapi/broker-connections.js";
+import type { BrokerServer, Login, Lost } from "../asyncapi/interfaces.js";
 import type { NatsTls } from "./interfaces.js";
 
 @Injectable()
