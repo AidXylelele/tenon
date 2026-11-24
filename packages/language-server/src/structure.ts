@@ -3,8 +3,6 @@ import { workflowStructureOf } from "./ide/structure/index.js";
 import { lspWorkflowOf } from "./lsp/positions.js";
 import type { WorkflowStructure } from "./protocol/index.js";
 
-export type { WorkflowStructure } from "./protocol/index.js";
-
 export function structureOf(analysis: Analysis): WorkflowStructure | null {
   switch (analysis.kind) {
     case "analyzed": {

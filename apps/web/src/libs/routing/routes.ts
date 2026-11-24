@@ -36,7 +36,7 @@ interface SignInQuery {
   readonly next?: string;
 }
 
-export interface RunsQuery {
+interface RunsQuery {
   readonly namespace?: string;
   readonly name?: string;
   readonly version?: string;

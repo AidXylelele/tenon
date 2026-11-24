@@ -142,7 +142,7 @@ async function draftCreated(
   return String(created.headers.etag);
 }
 
-export interface Started {
+interface Started {
   readonly id: string;
   readonly body: Record<string, unknown>;
 }

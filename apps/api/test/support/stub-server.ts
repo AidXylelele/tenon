@@ -16,10 +16,7 @@ export interface ReceivedRequest {
   readonly body: string;
 }
 
-export type StubHandler = (
-  request: ReceivedRequest,
-  response: ServerResponse,
-) => void;
+type StubHandler = (request: ReceivedRequest, response: ServerResponse) => void;
 
 export interface StubServer {
   readonly origin: string;
@@ -28,7 +25,7 @@ export interface StubServer {
   close(): Promise<void>;
 }
 
-export interface StubCertificate {
+interface StubCertificate {
   readonly cert: string;
   readonly key: string;
 }

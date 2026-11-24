@@ -17,7 +17,7 @@ import { TableFrame } from "@/libs/ui/composites/table-frame";
 import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { type RunEvent, whenOf } from "../../__shared_context/notifications";
 
-export interface NotificationListPageProps {
+interface NotificationListPageProps {
   readonly subscriptions: readonly Subscription[];
   readonly runEvents: readonly RunEvent[];
 }

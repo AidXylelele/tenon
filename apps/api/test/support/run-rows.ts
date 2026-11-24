@@ -22,14 +22,14 @@ export interface WorkflowRows {
   readonly versionId: string;
 }
 
-export interface NewWorkflowRows {
+interface NewWorkflowRows {
   readonly namespace?: string;
   readonly name: string;
   readonly on?: boolean;
   readonly schedule?: ScheduleSpec | null;
 }
 
-export interface NewRunRow {
+interface NewRunRow {
   readonly phase: Phase;
   readonly startedAt: Date | null;
   readonly endedAt?: Date | null;

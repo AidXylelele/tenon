@@ -18,7 +18,7 @@ import { ProblemMessage } from "./problem-message";
 
 type FocusTarget = () => HTMLElement | null | undefined;
 
-export interface ConfirmDialogProps {
+interface ConfirmDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: string;

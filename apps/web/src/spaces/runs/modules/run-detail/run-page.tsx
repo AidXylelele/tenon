@@ -19,7 +19,7 @@ import type { RunPanel } from "./query";
 import { RunFacts } from "./run-facts";
 import { RunView } from "./run-view";
 
-export interface RunPageProps {
+interface RunPageProps {
   readonly instance: Instance;
   readonly workflow: WorkflowStructure | null;
   readonly records: Read<Page<TaskRecord>>;

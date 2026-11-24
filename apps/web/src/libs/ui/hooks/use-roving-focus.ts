@@ -13,7 +13,7 @@ export interface RovingItemProps {
   readonly tabIndex: 0 | -1;
 }
 
-export interface RovingFocus {
+interface RovingFocus {
   readonly itemProps: (item: string) => RovingItemProps;
   readonly onFocus: (event: FocusEvent<HTMLElement>) => void;
   readonly onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;

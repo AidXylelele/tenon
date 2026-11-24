@@ -175,7 +175,7 @@ export class FakePasswordHasher extends PasswordHasher {
   }
 }
 
-export interface SentInvitation {
+interface SentInvitation {
   readonly invitation: Invitation;
   readonly token: InvitationToken;
   readonly inviterName: string;
@@ -448,7 +448,7 @@ export class StoredWorkflowRepository extends WorkflowRepository {
   }
 }
 
-export interface StartedRun {
+interface StartedRun {
   readonly instance: WorkflowInstance;
   readonly stored: boolean;
 }
@@ -485,12 +485,12 @@ export class RecordingInstanceMessages extends InstanceMessages {
   }
 }
 
-export interface RecordedAnswer {
+interface RecordedAnswer {
   readonly instanceId: string;
   readonly answer: EffectAnswer;
 }
 
-export interface RecordedProcess {
+interface RecordedProcess {
   readonly instanceId: string;
   readonly effectId: string;
   readonly request: JsonObject;
@@ -522,7 +522,7 @@ export class AppendingLifecycleEvents extends LifecycleEvents {
   }
 }
 
-export interface RecordedAnnouncement {
+interface RecordedAnnouncement {
   readonly sequence: number;
   readonly origin: EventOrigin;
 }
@@ -574,7 +574,7 @@ export class RecordingInstanceRuns extends InstanceRuns {
 
 export const T0 = new Date("2026-11-03T10:00:00.000Z");
 
-export interface InstanceOverrides {
+interface InstanceOverrides {
   readonly id?: string;
   readonly workflowId?: string;
   readonly versionId?: string;

@@ -27,7 +27,7 @@ import {
 
 export type PlaceGroup = "work" | "connect" | "settings";
 
-export interface Page {
+interface Page {
   readonly label: string;
   readonly href: string;
   readonly icon: LucideIcon;

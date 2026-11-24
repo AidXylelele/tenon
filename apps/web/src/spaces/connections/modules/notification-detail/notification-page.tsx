@@ -23,7 +23,7 @@ import { AbsoluteTime } from "@/libs/ui/composites/absolute-time";
 import { type RunEvent, whenOf } from "../../__shared_context/notifications";
 import { NotificationMenu } from "./notification-menu";
 
-export interface NotificationPageProps {
+interface NotificationPageProps {
   readonly subscription: Read<SubscriptionDetail>;
   readonly runEvents: readonly RunEvent[];
 }

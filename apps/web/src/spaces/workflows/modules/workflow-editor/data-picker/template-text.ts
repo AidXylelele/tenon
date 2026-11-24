@@ -21,7 +21,7 @@ interface PlacedChip {
   readonly words: string;
 }
 
-export type WordsOfPart = (part: DataPart) => string;
+type WordsOfPart = (part: DataPart) => string;
 
 const CHIP_MARK = "￼";
 

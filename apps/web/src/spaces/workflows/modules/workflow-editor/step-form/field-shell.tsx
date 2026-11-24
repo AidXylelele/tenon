@@ -36,7 +36,7 @@ export interface ControlWiring {
   readonly onRefuse: (reason: string | null) => void;
 }
 
-export interface FieldProblems {
+interface FieldProblems {
   readonly ids: {
     readonly control: string;
     readonly label: string;

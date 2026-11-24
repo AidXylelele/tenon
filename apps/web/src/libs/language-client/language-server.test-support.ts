@@ -12,7 +12,7 @@ const INCOMING = z.object({
   params: z.unknown(),
 });
 
-export interface ScriptedServer {
+interface ScriptedServer {
   readonly transport: Transport;
   readonly received: Received[];
 }

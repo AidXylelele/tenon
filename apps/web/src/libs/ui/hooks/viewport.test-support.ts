@@ -5,7 +5,7 @@ interface FakeMediaList {
   readonly removeEventListener: (type: string, listener: () => void) => void;
 }
 
-export interface FakeViewport {
+interface FakeViewport {
   readonly matchMedia: (query: string) => FakeMediaList;
   readonly resize: (width: number) => void;
 }

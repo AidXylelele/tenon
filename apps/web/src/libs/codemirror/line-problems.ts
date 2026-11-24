@@ -8,7 +8,7 @@ import type { EditorState, Extension, Text } from "@codemirror/state";
 import type { ViewUpdate } from "@codemirror/view";
 import type { CodeProblem } from "./interfaces";
 
-export type LineCheck = (text: string) => Promise<readonly CodeProblem[]>;
+type LineCheck = (text: string) => Promise<readonly CodeProblem[]>;
 
 export function lineProblemLinter(check: LineCheck): Extension {
   return linter(async (view) => {

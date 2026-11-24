@@ -10,7 +10,7 @@ import {
 } from "@/libs/ui/components/alert";
 import { Button } from "@/libs/ui/components/button";
 
-export type Activity = "in-flight" | "open" | "ended";
+type Activity = "in-flight" | "open" | "ended";
 
 interface LiveRefresh {
   readonly paused: boolean;
