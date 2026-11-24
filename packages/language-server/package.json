@@ -1,0 +1,50 @@
+{
+  "name": "language-server",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "default": "./dist/worker.js"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.ts",
+      "default": "./dist/protocol/index.js"
+    },
+    "./structure": {
+      "types": "./dist/structure.d.ts",
+      "default": "./dist/structure.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "interpreter": "workspace:*",
+    "jq-wasm": "3.0.0-jq-1.8.2",
+    "temporal-polyfill": "1.0.8",
+    "vscode-languageserver": "11.0.0",
+    "vscode-languageserver-textdocument": "1.0.16",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "eslint": "10.15.0",
+    "eslint-config-prettier": "10.1.8",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0",
+    "vitest": "5.1.0"
+  },
+  "engines": {
+    "node": ">=26.13.1"
+  }
+}

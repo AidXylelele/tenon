@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-proto-resource
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            name: greeter-proto
+            endpoint:
+              uri: https://protos.example.com/greet.proto
+              authentication:
+                basic:
+                  username: reader
+                  password: ${ .protoPassword }
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: SayHello
+input: { protoPassword: pr0to }
+end:
+  waiting:
+    effect:
+      id: /do/0/greet
+      kind: grpc
+      deadline: null
+      proto:
+        name: greeter-proto
+        endpoint:
+          uri: https://protos.example.com/greet.proto
+          authentication: { kind: basic, username: reader, password: pr0to }
+      authentication: null
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }

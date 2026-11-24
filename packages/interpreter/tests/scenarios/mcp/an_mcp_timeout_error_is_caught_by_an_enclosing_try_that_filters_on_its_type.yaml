@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-timeout-caught
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - callTool:
+              call: mcp
+              with:
+                method: tools/list
+                timeout: PT10S
+                transport:
+                  http:
+                    endpoint: https://mcp.example.com/mcp
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+          do:
+            - report:
+                set:
+                  status: ${ $error.status }
+                  instance: ${ $error.instance }
+input: {}
+script:
+  - effect:
+      { id: /do/0/guard/try/0/callTool, kind: mcp, deadline: 1767225610000 }
+    outcome: { kind: expired }
+    now: 1767225610000
+end:
+  completed:
+    output: { status: 408, instance: /do/0/guard/try/0/callTool }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/callTool }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

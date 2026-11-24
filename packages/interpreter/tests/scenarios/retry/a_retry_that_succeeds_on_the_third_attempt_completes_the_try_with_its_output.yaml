@@ -1,0 +1,55 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-succeeds
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              if: '${ now < 1767225602 }'
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+          - done:
+              set:
+                succeededAt: '${ now }'
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 5
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#3@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  completed:
+    output: { succeededAt: 1767225602 }
+facts:
+  including:
+    - { kind: task.faulted, execution: "/do/0/guard#2/try/0/fail" }
+    - { kind: task.completed, execution: "/do/0/guard#3/try/0/fail" }
+    - { kind: task.completed, execution: "/do/0/guard#3/try/1/done" }
+    - { kind: task.completed, task: /do/0/guard, execution: /do/0/guard }
+    - kind: workflow.completed

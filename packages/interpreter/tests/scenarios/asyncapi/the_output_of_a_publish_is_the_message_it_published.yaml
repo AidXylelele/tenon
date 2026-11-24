@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-publish-output
+    version: '1.0.0'
+  do:
+    - publishGreeting:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: greet
+          message:
+            payload:
+              greetings: ${ .greeting }
+            headers:
+              traceId: trace-1
+input: { greeting: hello }
+script:
+  - effect: { id: /do/0/publishGreeting, kind: asyncapi, deadline: null }
+    outcome: { kind: published }
+    now: 1767225601000
+end:
+  completed:
+    output: { payload: { greetings: hello }, headers: { traceId: trace-1 } }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/publishGreeting }
+    - { kind: task.started, task: /do/0/publishGreeting }
+    - {
+        kind: task.completed,
+        task: /do/0/publishGreeting,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

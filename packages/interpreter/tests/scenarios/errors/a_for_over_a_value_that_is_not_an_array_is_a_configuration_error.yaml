@@ -1,0 +1,28 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: configuration-error
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: .items
+        do:
+          - never:
+              set: { never: true }
+input: { items: { a: 1 } }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      title: Configuration Error
+      instance: /do/0/loop
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/loop }
+    - { kind: task.started, task: /do/0/loop }
+    - { kind: task.faulted, task: /do/0/loop }
+    - kind: workflow.faulted

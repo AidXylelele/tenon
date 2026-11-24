@@ -1,0 +1,49 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  timeout:
+    after: PT1M
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+  do:
+    - pause:
+        wait: PT10M
+correlate: true
+script:
+  - effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { order: o-1 },
+        }
+    now: 1767229200000
+end:
+  waiting:
+    effect:
+      {
+        id: /do/0/pause,
+        kind: timer,
+        deadline: 1767229260000,
+        until: 1767229800000,
+      }
+facts:
+  including:
+    - { kind: workflow.started, startedAt: "2026-01-01T01:00:00.000Z" }

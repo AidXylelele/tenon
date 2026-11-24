@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-container-arguments
+    version: '1.0.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: hello-world
+            arguments:
+              - --count
+              - ${ .count }
+              - ${ .name }
+              - ${ .options }
+input: { count: 3, name: ann, options: { verbose: true } }
+end:
+  waiting:
+    effect:
+      id: /do/0/runContainer
+      kind: process
+      deadline: null
+      process:
+        kind: container
+        image: hello-world
+        command: null
+        stdin: null
+        arguments: [--count, "3", ann, '{"verbose":true}']
+        name: null
+        ports: {}
+        volumes: {}
+        environment: {}
+        lifetime: { cleanup: never, after: null }
+        pullPolicy: ifNotPresent
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runContainer }

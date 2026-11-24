@@ -1,0 +1,28 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - attempt:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/failed
+                  status: 500
+        catch:
+          as: failure
+          do:
+            - note:
+                set:
+                  status: '${ $failure.status }'
+    - after:
+        set:
+          status: '${ $failure.status }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/1/after/set/status
+    subject: $failure
+    range: { start: { line: 22, column: 17 } }

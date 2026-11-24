@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-endpoint-object
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint:
+                uri: https://mcp.example.com/mcp
+                authentication:
+                  bearer:
+                    token: ${ .token }
+input: { token: mcp-t0ken }
+end:
+  waiting:
+    effect:
+      id: /do/0/callTool
+      kind: mcp
+      deadline: null
+      transport:
+        kind: http
+        endpoint:
+          {
+            uri: https://mcp.example.com/mcp,
+            authentication: { kind: bearer, token: mcp-t0ken },
+          }
+        headers: {}
+facts:
+  including:
+    - { kind: task.started, task: /do/0/callTool }

@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: raise-instance
+    version: '1.0.0'
+  do:
+    - refuse:
+        raise:
+          error:
+            type: https://example.com/errors/refused
+            status: 409
+            instance: /custom/place
+input: {}
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/refused
+      status: 409
+      instance: /custom/place
+      title: null
+      detail: null
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/refuse }
+    - kind: workflow.faulted

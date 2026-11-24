@@ -1,0 +1,69 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cancel-attempt
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - pause:
+              wait: PT1S
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 2
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/guard/try/0/pause,
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/guard#2/try/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225603000,
+      }
+    cancel: true
+    now: 1767225602500
+end:
+  cancelled: {}
+facts:
+  including:
+    - kind: task.started
+      task: /do/0/guard/try/0/pause
+      execution: "/do/0/guard#2/try/0/pause"
+    - kind: task.cancelled
+      task: /do/0/guard/try/0/pause
+      execution: "/do/0/guard#2/try/0/pause"
+      cancelledAt: "2026-01-01T00:00:02.500Z"
+    - kind: task.cancelled
+      task: /do/0/guard
+      execution: /do/0/guard
+      cancelledAt: "2026-01-01T00:00:02.500Z"
+    - kind: workflow.cancelled
+      cancelledAt: "2026-01-01T00:00:02.500Z"

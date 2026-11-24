@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-query-tilde
+    version: '1.0.0'
+  do:
+    - search:
+        call: http
+        with:
+          method: get
+          endpoint: https://example.com/search
+          query:
+            pa~th: ~home_dir-1.0
+input: {}
+script:
+  - effect:
+      id: /do/0/search
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://example.com/search?pa~th=~home_dir-1.0
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://example.com/search?pa~th=~home_dir-1.0
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { ok: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/search }
+    - kind: workflow.completed

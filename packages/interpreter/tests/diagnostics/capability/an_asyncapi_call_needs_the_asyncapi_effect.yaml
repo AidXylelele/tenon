@@ -1,0 +1,36 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - publish:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: greet
+          message:
+            payload:
+              greetings: hello
+profile:
+  effects:
+    [
+      http,
+      openapi,
+      grpc,
+      a2a,
+      mcp,
+      process,
+      workflow,
+      fork,
+      timer,
+      emit,
+      listen,
+      resource,
+    ]
+diagnostics:
+  - code: capability
+    pointer: /do/0/publish
+    subject: effect.asyncapi

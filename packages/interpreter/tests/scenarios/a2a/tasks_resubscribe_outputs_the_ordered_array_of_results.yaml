@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-resubscribe
+    version: '1.0.0'
+  do:
+    - follow:
+        call: a2a
+        with:
+          method: tasks/resubscribe
+          server: https://agent.example.com/a2a
+          parameters:
+            id: task-1
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/follow,
+        kind: a2a,
+        deadline: null,
+        method: tasks/resubscribe,
+        parameters: { id: task-1 },
+      }
+    outcome:
+      kind: answered
+      result:
+        [{ state: working }, { state: input-required }, { state: completed }]
+    now: 1767225601000
+end:
+  completed:
+    output:
+      [{ state: working }, { state: input-required }, { state: completed }]
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/follow }
+    - kind: workflow.completed

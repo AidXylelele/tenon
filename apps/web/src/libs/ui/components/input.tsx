@@ -1,0 +1,18 @@
+import * as React from "react";
+import { cn } from "@/libs/ui/tokens/cn";
+
+function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  return (
+    <input
+      type={type}
+      data-slot="input"
+      className={cn(
+        "h-8 w-full min-w-0 rounded-md border border-control bg-surface px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-semibold file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-hover disabled:text-faint aria-invalid:border-destructive md:text-sm",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export { Input };

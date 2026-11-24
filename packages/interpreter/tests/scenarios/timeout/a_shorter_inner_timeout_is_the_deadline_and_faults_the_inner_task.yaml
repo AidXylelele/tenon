@@ -1,0 +1,48 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-inner-shorter
+    version: '1.0.0'
+  do:
+    - outer:
+        timeout:
+          after: PT10S
+        do:
+          - pause:
+              wait: PT1M
+              timeout:
+                after: PT3S
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/outer/do/0/pause,
+        kind: timer,
+        deadline: 1767225603000,
+        until: 1767225660000,
+      }
+    outcome: { kind: expired }
+    now: 1767225603000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/outer/do/0/pause
+      title: Timeout
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/do/0/pause }
+    - { kind: task.started, task: /do/0/outer/do/0/pause }
+    - kind: task.faulted
+      task: /do/0/outer/do/0/pause
+      faultedAt: "2026-01-01T00:00:03.000Z"
+    - kind: task.faulted
+      task: /do/0/outer
+      faultedAt: "2026-01-01T00:00:03.000Z"
+    - kind: workflow.faulted
+      faultedAt: "2026-01-01T00:00:03.000Z"

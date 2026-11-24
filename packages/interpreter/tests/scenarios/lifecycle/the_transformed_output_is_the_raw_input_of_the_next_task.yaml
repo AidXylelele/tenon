@@ -1,0 +1,21 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: output-to-next-input
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        output:
+          as: '${ .a + 1 }'
+    - second:
+        set: '${ { received: ., raw: $task.input } }'
+input: {}
+end:
+  completed:
+    output: { received: 2, raw: 2 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

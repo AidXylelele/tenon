@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-timeout-nearer
+    version: '1.0.0'
+  do:
+    - callTool:
+        timeout:
+          after: PT1M
+        call: mcp
+        with:
+          method: tools/list
+          timeout: PT10S
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/callTool,
+        kind: mcp,
+        deadline: 1767225610000,
+        method: tools/list,
+      }
+    outcome: { kind: answered, result: { tools: [{ name: fetch }] } }
+    now: 1767225601000
+end:
+  completed:
+    output: { tools: [{ name: fetch }] }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/callTool }
+    - kind: workflow.completed

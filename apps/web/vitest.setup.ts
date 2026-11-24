@@ -1,6 +1,16 @@
-import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+class SilentResizeObserver {
+  observe = () => undefined;
+  unobserve = () => undefined;
+  disconnect = () => undefined;
+}
+
+globalThis.ResizeObserver = SilentResizeObserver;
+
+if ("Element" in globalThis) Element.prototype.scrollIntoView = () => undefined;
 
 afterEach(() => {
   cleanup();

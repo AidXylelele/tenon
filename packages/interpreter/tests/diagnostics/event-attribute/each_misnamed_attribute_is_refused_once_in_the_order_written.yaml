@@ -1,0 +1,23 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emits
+    version: '0.1.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.ping
+              my-ext: x
+              Subject: s
+diagnostics:
+  - code: event-attribute
+    pointer: /do/0/notify/emit/event/with/my-ext
+    subject: my-ext
+    range: { start: { line: 12, column: 21 } }
+  - code: event-attribute
+    pointer: /do/0/notify/emit/event/with/Subject
+    subject: Subject
+    range: { start: { line: 13, column: 22 } }

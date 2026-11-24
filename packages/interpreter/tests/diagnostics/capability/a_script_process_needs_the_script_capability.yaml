@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - greet:
+        run:
+          script:
+            language: js
+            code: console.log('hello')
+profile:
+  processes: [container, shell]
+diagnostics:
+  - code: capability
+    pointer: /do/0/greet
+    subject: process.script
+    range: { start: { line: 8, column: 7 } }

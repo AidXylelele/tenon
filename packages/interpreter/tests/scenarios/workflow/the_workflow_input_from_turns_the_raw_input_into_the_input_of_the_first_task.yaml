@@ -1,0 +1,19 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: input-from
+    version: '1.0.0'
+  input:
+    from: .order
+  do:
+    - receive:
+        set: '${ { received: . } }'
+input: { order: { id: 7 }, noise: true }
+end:
+  completed:
+    output: { received: { id: 7 } }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

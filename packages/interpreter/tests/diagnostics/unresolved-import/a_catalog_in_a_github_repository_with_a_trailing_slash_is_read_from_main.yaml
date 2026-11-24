@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://github.com/acme/catalog/
+  do:
+    - log:
+        call: log:1.0.0@global
+diagnostics:
+  - code: unresolved-import
+    pointer: /do/0/log/call
+    subject: log:1.0.0@global
+    import:
+      reference: log:1.0.0@global
+      uri: https://raw.githubusercontent.com/acme/catalog/refs/heads/main/functions/log/1.0.0/function.yaml

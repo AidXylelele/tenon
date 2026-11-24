@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-endpoint-uri-expression
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: ${ "https://petstore.swagger.io/v2/pet/\(.petId)" }
+input: { petId: 3 }
+script:
+  - effect:
+      id: /do/0/getPet
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://petstore.swagger.io/v2/pet/3
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/3
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 3 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 3 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - kind: workflow.completed

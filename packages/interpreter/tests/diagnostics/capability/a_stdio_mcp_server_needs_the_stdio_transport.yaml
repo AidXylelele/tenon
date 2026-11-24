@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - listTools:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            stdio:
+              command: npx
+              arguments: [ some-mcp-server ]
+profile:
+  mcpTransports: [http]
+diagnostics:
+  - code: capability
+    pointer: /do/0/listTools
+    subject: mcp.stdio
+    range: { start: { line: 8, column: 7 } }

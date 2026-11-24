@@ -1,0 +1,42 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-service-bearer
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 443
+            authentication:
+              bearer:
+                token: ${ .token }
+          method: SayHello
+input: { token: grpc-t0ken }
+end:
+  waiting:
+    effect:
+      id: /do/0/greet
+      kind: grpc
+      deadline: null
+      proto:
+        {
+          name: null,
+          endpoint:
+            {
+              uri: https://example.com/protos/greet.proto,
+              authentication: null,
+            },
+        }
+      service:
+        { name: GreeterApi.Greeter, host: greeter.example.com, port: 443 }
+      authentication: { kind: bearer, token: grpc-t0ken }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/greet }

@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-expression
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT1M
+        timeout:
+          after: '${ "PT" + "9S" }'
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: /do/0/pause,
+        kind: timer,
+        deadline: 1767225609000,
+        until: 1767225660000,
+      }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/pause }

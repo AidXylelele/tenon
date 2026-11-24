@@ -1,0 +1,55 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-during-retry-delay
+    version: '1.0.0'
+  do:
+    - guard:
+        timeout:
+          after: PT5S
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 10
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225610000,
+      }
+    outcome: { kind: expired }
+    now: 1767225605000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/guard
+      title: Timeout
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/fail }
+    - { kind: task.started, task: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - { kind: task.retried, task: /do/0/guard, execution: /do/0/guard }
+    - kind: task.faulted
+      task: /do/0/guard
+      execution: /do/0/guard
+      faultedAt: "2026-01-01T00:00:05.000Z"
+    - kind: workflow.faulted

@@ -1,9 +1,10 @@
-import type { InvitationStatus, RoleName } from '../../../domain/interfaces.js';
-import { Invitation } from '../../../domain/invitation.js';
-import type { InvitationRow } from '../../interfaces.js';
+import { Injectable } from "@nestjs/common";
+import { Invitation } from "../../../domain/identity/invitations/invitation.js";
+import type { InvitationRow } from "../interfaces.js";
 
+@Injectable()
 export class InvitationMapper {
-  static toRow(invitation: Invitation): InvitationRow {
+  toRow(invitation: Invitation): InvitationRow {
     return {
       id: invitation.id,
       email: invitation.email,
@@ -20,11 +21,20 @@ export class InvitationMapper {
     };
   }
 
-  static toEntity(row: InvitationRow): Invitation {
+  toEntity(row: InvitationRow): Invitation {
     return new Invitation({
-      ...row,
-      role: row.role as RoleName,
-      status: row.status as InvitationStatus,
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      tokenHash: row.tokenHash,
+      status: row.status,
+      expiresAt: row.expiresAt,
+      invitedBy: row.invitedBy,
+      acceptedAt: row.acceptedAt,
+      acceptedUserId: row.acceptedUserId,
+      createdAt: row.createdAt,
+      revokedAt: row.revokedAt,
+      version: row.version,
     });
   }
 }

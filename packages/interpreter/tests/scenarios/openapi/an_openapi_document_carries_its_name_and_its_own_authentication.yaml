@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: openapi-document-authentication
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: openapi
+        with:
+          document:
+            name: petstore
+            endpoint:
+              uri: https://petstore.example.com/openapi.json
+              authentication:
+                bearer:
+                  token: ${ .documentToken }
+          operationId: getPetById
+          parameters:
+            petId: 1
+input: { documentToken: doc-token }
+script:
+  - effect:
+      id: /do/0/getPet
+      kind: openapi
+      deadline: null
+      document:
+        name: petstore
+        endpoint:
+          uri: https://petstore.example.com/openapi.json
+          authentication: { kind: bearer, token: doc-token }
+      authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.example.com/v3/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - kind: workflow.completed

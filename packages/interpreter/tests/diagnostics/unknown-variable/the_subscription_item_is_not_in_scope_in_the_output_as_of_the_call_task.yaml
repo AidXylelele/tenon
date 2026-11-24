@@ -1,0 +1,25 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+            foreach:
+              output:
+                as: '${ $item }'
+        output:
+          as: '${ { last: $item } }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/watch/output/as
+    subject: $item

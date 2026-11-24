@@ -1,0 +1,48 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  timeout: long
+  use:
+    authentications:
+      petStore:
+        bearer:
+          token: abc
+    errors:
+      notFound:
+        type: https://example.com/errors/not-found
+        status: 404
+    functions:
+      getPet:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://petstore.swagger.io/v2/pet/1
+            authentication:
+              use: petStore
+    retries:
+      fast:
+        delay:
+          seconds: 1
+    timeouts:
+      long:
+        after:
+          minutes: 5
+      short:
+        after:
+          seconds: 5
+  do:
+    - attempt:
+        timeout: short
+        try:
+          - getPet:
+              call: getPet
+        catch:
+          retry: fast
+    - fail:
+        raise:
+          error: notFound
+diagnostics: []

@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-header-null
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/1
+          headers:
+            x-kept: kept
+            x-left-out: ${ .missing }
+input: {}
+script:
+  - effect:
+      id: /do/0/getPet
+      kind: http
+      deadline: null
+      headers: { x-kept: kept }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { ok: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - kind: workflow.completed

@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-container
+    version: '0.1.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: hello-world
+input: {}
+script:
+  - effect:
+      id: /do/0/runContainer
+      kind: process
+      deadline: null
+      process:
+        kind: container
+        image: hello-world
+        command: null
+        stdin: null
+        arguments: []
+        name: null
+        ports: {}
+        volumes: {}
+        environment: {}
+        lifetime: { cleanup: never, after: null }
+        pullPolicy: ifNotPresent
+      await: true
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runContainer }
+    - { kind: task.started, task: /do/0/runContainer }
+    - {
+        kind: task.cancelled,
+        task: /do/0/runContainer,
+        execution: /do/0/runContainer,
+        cancelledAt: "2026-01-01T00:00:05.000Z",
+      }
+    - { kind: workflow.cancelled, cancelledAt: "2026-01-01T00:00:05.000Z" }

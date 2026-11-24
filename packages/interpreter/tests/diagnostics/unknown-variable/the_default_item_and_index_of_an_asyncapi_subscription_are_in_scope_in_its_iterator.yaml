@@ -1,0 +1,27 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+            foreach:
+              do:
+                - keep:
+                    set:
+                      value: '${ $item.payload }'
+                      position: '${ $index }'
+              output:
+                as: '${ { value: $item.payload, at: $index } }'
+              export:
+                as: '${ $context + { last: $item, at: $index } }'
+diagnostics: []

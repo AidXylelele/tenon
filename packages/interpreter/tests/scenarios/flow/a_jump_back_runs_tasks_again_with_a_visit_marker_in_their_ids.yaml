@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: jump-back
+    version: '1.0.0'
+  do:
+    - tick:
+        wait: PT1S
+    - count:
+        set:
+          n: '${ .n + 1 }'
+    - again:
+        switch:
+          - more:
+              when: .n < 2
+              then: tick
+input: { n: 0 }
+script:
+  - effect:
+      { id: /do/0/tick, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      { id: /do/0/tick~2, kind: timer, deadline: null, until: 1767225602000 }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  completed:
+    output: { n: 2 }
+facts:
+  including:
+    - { kind: task.created, task: /do/0/tick, execution: /do/0/tick }
+    - { kind: task.completed, task: /do/1/count, execution: /do/1/count }
+    - { kind: task.completed, task: /do/2/again, execution: /do/2/again }
+    - { kind: task.created, task: /do/0/tick, execution: /do/0/tick~2 }
+    - { kind: task.completed, task: /do/0/tick, execution: /do/0/tick~2 }
+    - { kind: task.completed, task: /do/1/count, execution: /do/1/count~2 }
+    - { kind: task.completed, task: /do/2/again, execution: /do/2/again~2 }
+    - kind: workflow.completed

@@ -1,0 +1,87 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-read-raw-text
+    version: '1.0.0'
+  do:
+    - greeting:
+        listen:
+          to:
+            all:
+              - with:
+                  type: com.example.text
+              - with:
+                  type: com.example.json
+              - with:
+                  type: com.example.suffix
+          read: raw
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/greeting@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/greeting,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: g-1,
+          source: https://chat.example.com,
+          type: com.example.text,
+          datacontenttype: text/plain,
+          data: abc,
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/greeting@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/greeting,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: g-2,
+          source: https://chat.example.com,
+          type: com.example.json,
+          datacontenttype: application/json; charset=utf-8,
+          data: abc,
+        }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/greeting@event[2]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/greeting,
+        position: 2,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: g-3,
+          source: https://chat.example.com,
+          type: com.example.suffix,
+          datacontenttype: application/vnd.example+json,
+          data: abc,
+        }
+    now: 1767225603000
+end:
+  completed:
+    output: [YWJj, ImFiYyI=, ImFiYyI=]
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/greeting }
+    - kind: workflow.completed

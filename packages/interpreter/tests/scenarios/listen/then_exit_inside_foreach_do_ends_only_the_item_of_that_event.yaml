@@ -1,0 +1,107 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-foreach-exit
+    version: '1.0.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until: '${ length == 2 }'
+        foreach:
+          do:
+            - check:
+                set:
+                  value: ${ $item.value }
+                then: exit
+            - never:
+                call: http
+                with:
+                  method: post
+                  endpoint: https://audit.example.com/readings
+          output:
+            as: ${ $item.value }
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/readings@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { value: a },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/readings@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/readings,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-2,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { value: b },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output: [a, b]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/readings }
+    - { kind: task.started, task: /do/0/readings }
+    - {
+        kind: task.created,
+        task: "/do/0/readings/foreach/do/0/check",
+        execution: "/do/0/readings[0]/foreach/do/0/check",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/readings/foreach/do/0/check",
+        execution: "/do/0/readings[0]/foreach/do/0/check",
+      }
+    - {
+        kind: task.completed,
+        task: "/do/0/readings/foreach/do/0/check",
+        execution: "/do/0/readings[0]/foreach/do/0/check",
+      }
+    - {
+        kind: task.created,
+        task: "/do/0/readings/foreach/do/0/check",
+        execution: "/do/0/readings[1]/foreach/do/0/check",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/readings/foreach/do/0/check",
+        execution: "/do/0/readings[1]/foreach/do/0/check",
+      }
+    - {
+        kind: task.completed,
+        task: "/do/0/readings/foreach/do/0/check",
+        execution: "/do/0/readings[1]/foreach/do/0/check",
+      }
+    - { kind: task.completed, task: /do/0/readings }
+    - kind: workflow.completed

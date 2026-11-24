@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          when: '$output != null'
+          after:
+            - note:
+                set: { noted: true }
+  do:
+    - greet:
+        set: { greeting: Hello }
+diagnostics:
+  - code: unknown-variable
+    pointer: /use/extensions/0/audit/when
+    subject: $output

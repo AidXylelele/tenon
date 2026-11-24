@@ -1,0 +1,23 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-zero-workflow
+    version: '1.0.0'
+  timeout:
+    after: PT0S
+  do:
+    - compute:
+        set:
+          a: 1
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: ""
+facts:
+  exactly:
+    - kind: workflow.started
+    - kind: workflow.faulted

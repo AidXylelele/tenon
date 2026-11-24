@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - attempt:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/failed
+                  status: 500
+        catch:
+          when: '${ $error.status == 500 }'
+          do:
+            - note:
+                set:
+                  status: '${ $error.status }'
+diagnostics: []

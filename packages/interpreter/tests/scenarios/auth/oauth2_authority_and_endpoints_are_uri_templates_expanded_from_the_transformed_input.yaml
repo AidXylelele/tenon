@@ -1,0 +1,69 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: oauth2-templates
+    version: '1.0.0'
+  do:
+    - sampleTask:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://secured.example.com/sample
+            authentication:
+              oauth2:
+                authority: https://auth.example.com/realms/{realm}
+                endpoints:
+                  token: /realms/{realm}/token
+                grant: client_credentials
+                client:
+                  id: workflow-runtime
+                  secret: workflow-runtime-secret
+input: { realm: pets }
+script:
+  - effect:
+      id: /do/0/sampleTask
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://secured.example.com/sample
+        authentication:
+          kind: oauth2
+          authority: https://auth.example.com/realms/pets
+          endpoints:
+            token: /realms/pets/token
+            revocation: /oauth2/revoke
+            introspection: /oauth2/introspect
+          grant: client_credentials
+          client:
+            id: workflow-runtime
+            secret: workflow-runtime-secret
+            assertion: null
+            authentication: client_secret_post
+          encoding: application/x-www-form-urlencoded
+          issuers: []
+          scopes: []
+          audiences: []
+          username: null
+          password: null
+          subject: null
+          actor: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://secured.example.com/sample
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { ok: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/sampleTask }
+    - kind: workflow.completed

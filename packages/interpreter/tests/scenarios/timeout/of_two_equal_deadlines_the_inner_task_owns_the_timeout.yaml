@@ -1,0 +1,43 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-equal
+    version: '1.0.0'
+  do:
+    - outer:
+        timeout:
+          after: PT5S
+        do:
+          - pause:
+              wait: PT1M
+              timeout:
+                after: PT5S
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/outer/do/0/pause,
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225660000,
+      }
+    outcome: { kind: expired }
+    now: 1767225605000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/outer/do/0/pause
+      title: Timeout
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/do/0/pause }
+    - { kind: task.started, task: /do/0/outer/do/0/pause }
+    - { kind: task.faulted, task: /do/0/outer/do/0/pause }
+    - { kind: task.faulted, task: /do/0/outer }
+    - kind: workflow.faulted

@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-except-when
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          as: failure
+          retry:
+            exceptWhen: '${ $failure.status == 503 }'
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/busy
+      status: 503
+      instance: /do/0/guard/try/0/fail
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, execution: /do/0/guard }
+    - { kind: task.started, execution: /do/0/guard }
+    - { kind: task.created, execution: /do/0/guard/try/0/fail }
+    - { kind: task.started, execution: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, execution: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, execution: /do/0/guard }
+    - kind: workflow.faulted

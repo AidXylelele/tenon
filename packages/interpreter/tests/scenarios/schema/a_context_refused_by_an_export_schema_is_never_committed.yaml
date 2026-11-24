@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: export-refused-inline
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - e:
+              set: { x: str, k: K }
+              export:
+                as: '${ . }'
+                schema:
+                  document:
+                    type: object
+                    properties:
+                      x: { type: number }
+        catch:
+          do:
+            - c:
+                set:
+                  ctx: '${ $context }'
+input: { start: 1 }
+end:
+  completed:
+    output: { ctx: { start: 1 } }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/e }
+    - { kind: task.completed, task: /do/0/guard/catch/do/0/c }
+    - kind: workflow.completed

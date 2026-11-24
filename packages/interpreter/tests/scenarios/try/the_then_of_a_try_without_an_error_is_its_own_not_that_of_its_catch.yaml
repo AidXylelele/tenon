@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: try-then
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fine:
+              set: '${ . + { fine: true } }'
+        catch:
+          then: finish
+        then: end
+    - skipped:
+        set: '${ . + { skipped: true } }'
+    - finish:
+        set: '${ . + { finished: true } }'
+input: { a: 1 }
+end:
+  completed:
+    output: { a: 1, fine: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: aliases
+    version: '0.1.0'
+  do:
+    - loop: &loop
+        do:
+          - again: *loop
+diagnostics:
+  - code: syntax
+    pointer: ""
+    range: { start: { line: 9, column: 18 } }

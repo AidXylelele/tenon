@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-context
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [a, b]
+        do:
+          - remember:
+              set: '${ . }'
+              export:
+                as: '${ $context + { seen: ($context.seen + [$item]) } }'
+    - recall:
+        set: '${ $context }'
+input: {}
+end:
+  completed:
+    output: { seen: [a, b] }
+facts:
+  including:
+    - { kind: task.completed, task: /do/1/recall }
+    - kind: workflow.completed

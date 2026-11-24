@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  do:
+    - notify:
+        call: sendEmail
+        with:
+          to: someone@example.com
+diagnostics:
+  - code: undeclared-component
+    pointer: /do/0/notify/call
+    subject: sendEmail
+    range: { start: { line: 8, column: 13 } }

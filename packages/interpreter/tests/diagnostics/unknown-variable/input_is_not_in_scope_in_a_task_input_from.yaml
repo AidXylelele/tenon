@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - compute:
+        input:
+          from: '${ $input }'
+        set:
+          a: 1
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/compute/input/from
+    subject: $input
+    range: { start: { line: 9, column: 15 } }

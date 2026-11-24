@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://catalog.example.com/
+  do:
+    - log:
+        call: log:1.0.0@global
+diagnostics:
+  - code: unresolved-import
+    pointer: /do/0/log/call
+    subject: log:1.0.0@global
+    range: { start: { line: 12, column: 13 } }
+    import:
+      reference: log:1.0.0@global
+      uri: https://catalog.example.com/functions/log/1.0.0/function.yaml

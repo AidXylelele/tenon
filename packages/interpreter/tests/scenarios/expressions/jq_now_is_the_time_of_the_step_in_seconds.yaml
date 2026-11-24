@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: jq-now
+    version: '1.0.0'
+  do:
+    - before:
+        set:
+          before: '${ now }'
+    - pause:
+        wait: PT1S
+    - after:
+        set: '${ . + { after: now } }'
+input: {}
+start:
+  now: 1767225600500
+script:
+  - effect:
+      { id: /do/1/pause, kind: timer, deadline: null, until: 1767225601500 }
+    outcome: { kind: elapsed }
+    now: 1767225605500
+end:
+  completed:
+    output: { before: 1767225600.5, after: 1767225605.5 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

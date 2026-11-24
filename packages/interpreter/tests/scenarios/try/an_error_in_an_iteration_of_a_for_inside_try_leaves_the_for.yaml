@@ -1,0 +1,58 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-in-try
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - loop:
+              for:
+                in: [1, 2, 3]
+              do:
+                - check:
+                    if: '${ $item == 2 }'
+                    raise:
+                      error:
+                        type: https://example.com/errors/broken
+                        status: 503
+        catch:
+          do:
+            - keep:
+                set:
+                  failedAt: '${ $error.instance }'
+input: {}
+end:
+  completed:
+    output: { failedAt: /do/0/guard/try/0/loop/do/0/check }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, execution: /do/0/guard }
+    - { kind: task.started, execution: /do/0/guard }
+    - { kind: task.created, execution: /do/0/guard/try/0/loop }
+    - { kind: task.started, execution: /do/0/guard/try/0/loop }
+    - kind: task.created
+      task: /do/0/guard/try/0/loop/do/0/check
+      execution: "/do/0/guard/try/0/loop[0]/do/0/check"
+    - kind: task.completed
+      task: /do/0/guard/try/0/loop/do/0/check
+      execution: "/do/0/guard/try/0/loop[0]/do/0/check"
+    - kind: task.created
+      task: /do/0/guard/try/0/loop/do/0/check
+      execution: "/do/0/guard/try/0/loop[1]/do/0/check"
+    - kind: task.started
+      task: /do/0/guard/try/0/loop/do/0/check
+      execution: "/do/0/guard/try/0/loop[1]/do/0/check"
+    - kind: task.faulted
+      task: /do/0/guard/try/0/loop/do/0/check
+      execution: "/do/0/guard/try/0/loop[1]/do/0/check"
+    - kind: task.faulted
+      task: /do/0/guard/try/0/loop
+      execution: /do/0/guard/try/0/loop
+    - { kind: task.created, execution: /do/0/guard/catch/do/0/keep }
+    - { kind: task.started, execution: /do/0/guard/catch/do/0/keep }
+    - { kind: task.completed, execution: /do/0/guard/catch/do/0/keep }
+    - { kind: task.completed, execution: /do/0/guard }
+    - kind: workflow.completed

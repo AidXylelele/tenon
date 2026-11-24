@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - route:
+        switch:
+          - known:
+              when: '${ .known }'
+              then: nowhere
+          - fallback:
+              then: end
+diagnostics:
+  - code: unknown-task
+    pointer: /do/0/route/switch/0/known/then
+    subject: nowhere
+    range: { start: { line: 11, column: 19 } }

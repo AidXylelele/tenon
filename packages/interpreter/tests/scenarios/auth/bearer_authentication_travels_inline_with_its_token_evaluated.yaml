@@ -1,0 +1,43 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: bearer-inline
+    version: '1.0.0'
+  do:
+    - sampleTask:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://secured.example.com/sample
+            authentication:
+              bearer:
+                token: ${ .user.token }
+input: { user: { token: eyJhbGciOiJIUzI1NiJ9 } }
+script:
+  - effect:
+      id: /do/0/sampleTask
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://secured.example.com/sample
+        authentication: { kind: bearer, token: eyJhbGciOiJIUzI1NiJ9 }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://secured.example.com/sample
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { ok: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/sampleTask }
+    - kind: workflow.completed

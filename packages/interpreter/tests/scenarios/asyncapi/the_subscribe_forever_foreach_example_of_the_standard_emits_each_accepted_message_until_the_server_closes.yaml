@@ -1,0 +1,195 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: bearer-auth
+    version: '0.1.0'
+  do:
+    - getNotifications:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://fake.com/docs/asyncapi.json
+          operation: getNotifications
+          subscription:
+            filter: '${ .correlationId == $context.userId and .payload.from.firstName == $context.contact.firstName and .payload.from.lastName == $context.contact.lastName }'
+            consume:
+              while: '${ true }'
+            foreach:
+              item: message
+              do:
+                - publishCloudEvent:
+                    emit:
+                      event:
+                        with:
+                          source: https://open-workflow-specification.org/samples
+                          type: org.open-workflow-specification.samples.asyncapi.message.consumed.v1
+                          data:
+                            message: '${ $message }'
+input: { userId: u-1, contact: { firstName: Ann, lastName: Lee } }
+script:
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m0 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/getNotifications[0]/with/subscription/foreach/do/0/publishCloudEvent"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: dc7f4dad-42cc-5837-9370-cfa0c264d3cd
+        source: https://open-workflow-specification.org/samples
+        type: org.open-workflow-specification.samples.asyncapi.message.consumed.v1
+        time: "2026-01-01T00:00:01.000Z"
+        data:
+          message:
+            {
+              payload: { from: { firstName: Ann, lastName: Lee }, text: m0 },
+              headers: {},
+              correlationId: u-1,
+            }
+    outcome: { kind: emitted }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[1]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 1,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Bob, lastName: Lee }, text: skipped },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225603000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[2]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 2,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m1 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225604000
+  - effect:
+      id: "/do/0/getNotifications[1]/with/subscription/foreach/do/0/publishCloudEvent"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: 20de9ff0-02ab-587f-b0f6-f347e11ddfd5
+        source: https://open-workflow-specification.org/samples
+        type: org.open-workflow-specification.samples.asyncapi.message.consumed.v1
+        time: "2026-01-01T00:00:04.000Z"
+        data:
+          message:
+            {
+              payload: { from: { firstName: Ann, lastName: Lee }, text: m1 },
+              headers: {},
+              correlationId: u-1,
+            }
+    outcome: { kind: emitted }
+    now: 1767225605000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[3]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 3,
+            closesAt: null,
+          },
+      }
+    outcome: { kind: closed }
+    now: 1767225606000
+end:
+  completed:
+    output:
+      - specversion: "1.0"
+        id: dc7f4dad-42cc-5837-9370-cfa0c264d3cd
+        source: https://open-workflow-specification.org/samples
+        type: org.open-workflow-specification.samples.asyncapi.message.consumed.v1
+        time: "2026-01-01T00:00:01.000Z"
+        data:
+          message:
+            {
+              payload: { from: { firstName: Ann, lastName: Lee }, text: m0 },
+              headers: {},
+              correlationId: u-1,
+            }
+      - specversion: "1.0"
+        id: 20de9ff0-02ab-587f-b0f6-f347e11ddfd5
+        source: https://open-workflow-specification.org/samples
+        type: org.open-workflow-specification.samples.asyncapi.message.consumed.v1
+        time: "2026-01-01T00:00:04.000Z"
+        data:
+          message:
+            {
+              payload: { from: { firstName: Ann, lastName: Lee }, text: m1 },
+              headers: {},
+              correlationId: u-1,
+            }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/getNotifications/with/subscription/foreach/do/0/publishCloudEvent,
+        execution: "/do/0/getNotifications[1]/with/subscription/foreach/do/0/publishCloudEvent",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/getNotifications,
+        completedAt: "2026-01-01T00:00:06.000Z",
+      }
+    - kind: workflow.completed

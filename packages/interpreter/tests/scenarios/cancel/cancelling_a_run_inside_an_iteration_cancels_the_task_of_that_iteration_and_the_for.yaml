@@ -1,0 +1,53 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cancel-for
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [a, b]
+        do:
+          - pause:
+              wait: PT1S
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/loop[0]/do/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/loop[1]/do/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    cancel: true
+    now: 1767225601500
+end:
+  cancelled: {}
+facts:
+  including:
+    - kind: task.completed
+      task: /do/0/loop/do/0/pause
+      execution: "/do/0/loop[0]/do/0/pause"
+    - kind: task.started
+      task: /do/0/loop/do/0/pause
+      execution: "/do/0/loop[1]/do/0/pause"
+    - kind: task.cancelled
+      task: /do/0/loop/do/0/pause
+      execution: "/do/0/loop[1]/do/0/pause"
+      cancelledAt: "2026-01-01T00:00:01.500Z"
+    - kind: task.cancelled
+      task: /do/0/loop
+      execution: /do/0/loop
+      cancelledAt: "2026-01-01T00:00:01.500Z"
+    - kind: workflow.cancelled
+      cancelledAt: "2026-01-01T00:00:01.500Z"

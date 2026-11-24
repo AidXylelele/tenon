@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-shell-stdin-null
+    version: '1.0.0'
+  do:
+    - runShell:
+        run:
+          shell:
+            command: cat
+            stdin: ${ .amount }
+input: { amount: null }
+end:
+  waiting:
+    effect:
+      id: /do/0/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: cat
+        stdin: "null"
+        arguments: []
+        directory: null
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runShell }

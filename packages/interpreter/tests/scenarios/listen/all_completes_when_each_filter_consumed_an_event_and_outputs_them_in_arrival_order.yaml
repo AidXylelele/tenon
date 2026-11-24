@@ -1,0 +1,66 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-all-order
+    version: '1.0.0'
+  do:
+    - callDoctor:
+        listen:
+          to:
+            all:
+              - with:
+                  type: com.example.temperature
+              - with:
+                  type: com.example.bpm
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/callDoctor@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/callDoctor,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: b-1,
+          source: https://hospital.example.com,
+          type: com.example.bpm,
+          data: { bpm: 50 },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/callDoctor@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/callDoctor,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: t-1,
+          source: https://hospital.example.com,
+          type: com.example.temperature,
+          data: { temperature: 39 },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output: [{ bpm: 50 }, { temperature: 39 }]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/callDoctor,
+        completedAt: "2026-01-01T00:00:02.000Z",
+      }
+    - kind: workflow.completed

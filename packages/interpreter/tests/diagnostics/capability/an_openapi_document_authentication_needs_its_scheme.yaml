@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - findPets:
+        call: openapi
+        with:
+          document:
+            endpoint:
+              uri: https://petstore.swagger.io/v2/swagger.json
+              authentication:
+                digest:
+                  username: admin
+                  password: secret
+          operationId: findPetsByStatus
+profile:
+  authentications: [basic, bearer, oauth2, oidc]
+diagnostics:
+  - code: capability
+    pointer: /do/0/findPets
+    subject: authentication.digest

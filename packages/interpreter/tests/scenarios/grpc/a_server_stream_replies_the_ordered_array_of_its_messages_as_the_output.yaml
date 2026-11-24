@@ -1,0 +1,38 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-server-stream
+    version: '1.0.0'
+  do:
+    - countdown:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+          method: Countdown
+          arguments:
+            from: 3
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/countdown,
+        kind: grpc,
+        deadline: null,
+        method: Countdown,
+        arguments: { from: 3 },
+      }
+    outcome:
+      { kind: replied, message: [{ value: 3 }, { value: 2 }, { value: 1 }] }
+    now: 1767225601000
+end:
+  completed:
+    output: [{ value: 3 }, { value: 2 }, { value: 1 }]
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/countdown }
+    - kind: workflow.completed

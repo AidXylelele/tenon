@@ -1,0 +1,61 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-after-end
+    version: '1.0.0'
+  use:
+    extensions:
+      - close:
+          extend: set
+          after:
+            - closeFirst:
+                set: { closed: true }
+                export:
+                  as: '${ { closedOn: $input } }'
+      - stop:
+          extend: set
+          after:
+            - halt:
+                set: { halted: true }
+                then: end
+  do:
+    - greet:
+        set: { greeting: Hello }
+        output:
+          as: '${ { shown: .greeting } }'
+    - never:
+        set: { never: true }
+  output:
+    as: '${ { result: ., context: $context } }'
+input: {}
+end:
+  completed:
+    output:
+      result: { shown: Hello }
+      context: { closedOn: { shown: Hello } }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/1/stop/after/0/halt
+      execution: "/do/0/greet@after/1/0/halt"
+    - kind: task.started
+      task: /use/extensions/1/stop/after/0/halt
+      execution: "/do/0/greet@after/1/0/halt"
+    - kind: task.completed
+      task: /use/extensions/1/stop/after/0/halt
+      execution: "/do/0/greet@after/1/0/halt"
+    - kind: task.created
+      task: /use/extensions/0/close/after/0/closeFirst
+      execution: "/do/0/greet@after/0/0/closeFirst"
+    - kind: task.started
+      task: /use/extensions/0/close/after/0/closeFirst
+      execution: "/do/0/greet@after/0/0/closeFirst"
+    - kind: task.completed
+      task: /use/extensions/0/close/after/0/closeFirst
+      execution: "/do/0/greet@after/0/0/closeFirst"
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

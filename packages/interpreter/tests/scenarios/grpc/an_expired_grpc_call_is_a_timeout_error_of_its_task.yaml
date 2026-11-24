@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-failure
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: SayHello
+          arguments:
+            name: ${ .name }
+input: { name: Ann }
+script:
+  - effect: { id: /do/0/greet, kind: grpc, deadline: null }
+    outcome: { kind: expired }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/greet
+      title: Timeout
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/greet, execution: /do/0/greet }
+    - kind: workflow.faulted

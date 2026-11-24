@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://github.com/open-workflow-specification/catalog/tree/main
+  do:
+    - log:
+        call: log:1.0.0@global
+        with:
+          message: hello
+diagnostics:
+  - code: unresolved-import
+    pointer: /do/0/log/call
+    subject: log:1.0.0@global
+    range: { start: { line: 12, column: 13 } }
+    message: "Import 'log:1.0.0@global' has not been fetched."
+    import:
+      reference: log:1.0.0@global
+      uri: https://raw.githubusercontent.com/open-workflow-specification/catalog/refs/heads/main/functions/log/1.0.0/function.yaml

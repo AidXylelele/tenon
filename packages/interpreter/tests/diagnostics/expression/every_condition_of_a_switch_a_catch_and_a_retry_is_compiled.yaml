@@ -1,0 +1,39 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expressions
+    version: '0.1.0'
+  do:
+    - route:
+        switch:
+          - high:
+              when: '.a |'
+              then: continue
+    - attempt:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/failed
+                  status: 503
+        catch:
+          when: '.b |'
+          exceptWhen: '.c |'
+          retry:
+            when: '.d |'
+            exceptWhen: '.e |'
+            limit:
+              attempt:
+                count: 2
+diagnostics:
+  - code: expression
+    pointer: /do/0/route/switch/0/high/when
+  - code: expression
+    pointer: /do/1/attempt/catch/when
+  - code: expression
+    pointer: /do/1/attempt/catch/exceptWhen
+  - code: expression
+    pointer: /do/1/attempt/catch/retry/when
+  - code: expression
+    pointer: /do/1/attempt/catch/retry/exceptWhen

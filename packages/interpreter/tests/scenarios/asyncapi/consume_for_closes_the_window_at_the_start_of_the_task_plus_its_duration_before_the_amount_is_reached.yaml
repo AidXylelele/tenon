@@ -1,0 +1,86 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-for
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 5
+              for:
+                seconds: 10
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: 1767225610000,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/watch@message[1]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 1,
+            closesAt: 1767225610000,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: b }, headers: {}, correlationId: null },
+      }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/watch@message[2]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 2,
+            closesAt: 1767225610000,
+          },
+      }
+    outcome: { kind: closed }
+    now: 1767225610000
+end:
+  completed:
+    output:
+      - { payload: { text: a }, headers: {}, correlationId: null }
+      - { payload: { text: b }, headers: {}, correlationId: null }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/watch,
+        completedAt: "2026-01-01T00:00:10.000Z",
+      }
+    - kind: workflow.completed

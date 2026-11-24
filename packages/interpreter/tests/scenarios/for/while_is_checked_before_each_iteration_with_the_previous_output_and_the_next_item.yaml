@@ -1,0 +1,28 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-while
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [1, 2, 3, 4]
+        while: .total + $item <= 6
+        do:
+          - add:
+              set:
+                total: '${ .total + $item }'
+input: { total: 0 }
+end:
+  completed:
+    output: { total: 6 }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/loop/do/0/add,
+        execution: "/do/0/loop[2]/do/0/add",
+      }
+    - { kind: task.completed, task: /do/0/loop }
+    - kind: workflow.completed

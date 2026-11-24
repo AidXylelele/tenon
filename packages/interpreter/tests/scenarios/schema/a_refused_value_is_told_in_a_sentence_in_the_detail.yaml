@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schema-root-refused
+    version: '1.0.0'
+  do:
+    - check:
+        input:
+          schema:
+            document:
+              type: string
+        set: { checked: true }
+input: { order: 7 }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      instance: /do/0/check
+      title: Validation Error
+      detail: The value must be a string.
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/check }
+    - kind: workflow.faulted

@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-do-raises
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 503
+        catch:
+          do:
+            - again:
+                raise:
+                  error:
+                    type: https://example.com/errors/again
+                    status: 500
+input: {}
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/again
+      status: 500
+      instance: /do/0/guard/catch/do/0/again
+      title: null
+      detail: null
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - {
+        kind: task.faulted,
+        task: /do/0/guard/catch/do/0/again,
+        execution: /do/0/guard/catch/do/0/again,
+      }
+    - { kind: task.faulted, task: /do/0/guard }
+    - kind: workflow.faulted

@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-subject-null
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.notified
+              subject: ${ .order }
+input: { order: null }
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: fda1d579-3f69-54e2-affe-94ef3ee98686
+        source: /test/emit-subject-null/1.0.0
+        type: com.example.notified
+        time: "2026-01-01T00:00:00.000Z"
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

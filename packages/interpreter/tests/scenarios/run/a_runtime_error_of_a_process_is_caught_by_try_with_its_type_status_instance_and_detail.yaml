@@ -1,0 +1,63 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-caught
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - runShell:
+              run:
+                shell:
+                  command: exit 3
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+              status: 500
+          do:
+            - report:
+                set:
+                  type: ${ $error.type }
+                  status: ${ $error.status }
+                  instance: ${ $error.instance }
+                  title: ${ $error.title }
+                  detail: ${ $error.detail }
+input: {}
+script:
+  - effect:
+      id: /do/0/guard/try/0/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: exit 3
+        stdin: null
+        arguments: []
+        directory: null
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 3, stdout: "", stderr: exit status 3 }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+      status: 500
+      instance: /do/0/guard/try/0/runShell
+      title: Runtime Error
+      detail: exit status 3
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/runShell }
+    - { kind: task.started, task: /do/0/guard/try/0/runShell }
+    - { kind: task.faulted, task: /do/0/guard/try/0/runShell }
+    - { kind: task.created, task: /do/0/guard/catch/do/0/report }
+    - { kind: task.started, task: /do/0/guard/catch/do/0/report }
+    - { kind: task.completed, task: /do/0/guard/catch/do/0/report }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

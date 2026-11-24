@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: input-schema
+    version: '1.0.0'
+  do:
+    - pick:
+        input:
+          schema:
+            format: json
+            document:
+              type: object
+              required: [order]
+          from: .order
+        set: '${ { picked: . } }'
+input: { order: { id: 7 } }
+end:
+  completed:
+    output: { picked: { id: 7 } }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

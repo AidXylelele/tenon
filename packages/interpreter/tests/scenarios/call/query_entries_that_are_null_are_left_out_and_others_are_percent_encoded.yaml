@@ -1,0 +1,44 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-query-scalars
+    version: '1.0.0'
+  do:
+    - searchCharacters:
+        call: http
+        with:
+          method: get
+          endpoint: https://swapi.dev/api/people/
+          query:
+            search: ${ .search }
+            page: ${ .page }
+            exact: ${ .exact }
+            planet: ${ .planet }
+input: { search: luke & leia, page: 2, exact: true, planet: null }
+script:
+  - effect:
+      id: /do/0/searchCharacters
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://swapi.dev/api/people/?search=luke%20%26%20leia&page=2&exact=true
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://swapi.dev/api/people/?search=luke%20%26%20leia&page=2&exact=true
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { count: 0 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { count: 0 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/searchCharacters }
+    - kind: workflow.completed

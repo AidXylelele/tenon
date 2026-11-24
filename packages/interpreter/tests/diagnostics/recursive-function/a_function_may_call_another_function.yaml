@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: functions
+    version: '0.1.0'
+  use:
+    functions:
+      outer:
+        call: inner
+      inner:
+        set:
+          done: true
+  do:
+    - start:
+        call: outer
+diagnostics: []

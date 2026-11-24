@@ -1,0 +1,19 @@
+import { Injectable } from "@nestjs/common";
+import type { CloudEvent } from "../../../application/automation/events/interfaces.js";
+import type { WebhookEvent } from "../../../domain/automation/webhooks/interfaces.js";
+
+@Injectable()
+export class WebhookEventMapper {
+  toCloudEvent(event: WebhookEvent): CloudEvent {
+    const time = event.at.toISOString();
+    return {
+      specversion: "1.0",
+      id: event.id,
+      source: event.source,
+      type: event.type,
+      time,
+      datacontenttype: "application/json",
+      data: event.data,
+    };
+  }
+}

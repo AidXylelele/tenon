@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-server-no-variables
+    version: '1.0.0'
+  do:
+    - publishGreeting:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: greet
+          server:
+            name: staging
+          message:
+            payload:
+              greetings: hello
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/publishGreeting
+      kind: asyncapi
+      deadline: null
+      server: { name: staging, variables: {} }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/publishGreeting }

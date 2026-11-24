@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-shell-environment
+    version: '1.0.0'
+  do:
+    - runShell:
+        run:
+          shell:
+            command: ./deploy.sh
+            environment:
+              TARGET: ${ .target }
+              REPLICAS: ${ .replicas }
+              DRY_RUN: ${ .dryRun }
+input: { target: staging, replicas: 3, dryRun: true }
+end:
+  waiting:
+    effect:
+      id: /do/0/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: ./deploy.sh
+        stdin: null
+        arguments: []
+        directory: null
+        environment: { TARGET: staging, REPLICAS: "3", DRY_RUN: "true" }
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runShell }

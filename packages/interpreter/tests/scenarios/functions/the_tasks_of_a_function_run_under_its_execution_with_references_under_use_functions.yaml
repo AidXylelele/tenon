@@ -1,0 +1,63 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-tasks
+    version: '1.0.0'
+  use:
+    functions:
+      loadPet:
+        do:
+          - fetch:
+              call: http
+              with:
+                method: get
+                endpoint: https://petstore.swagger.io/v2/pet/{petId}
+          - name:
+              set: ${ .name }
+  do:
+    - load:
+        call: loadPet
+        with:
+          petId: 1
+input: {}
+script:
+  - effect:
+      id: /do/0/load@function/do/0/fetch
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://petstore.swagger.io/v2/pet/1
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: Milou
+facts:
+  including:
+    - kind: task.created
+      task: /use/functions/loadPet
+      execution: /do/0/load@function
+    - kind: task.created
+      task: /use/functions/loadPet/do/0/fetch
+      execution: /do/0/load@function/do/0/fetch
+    - kind: task.completed
+      task: /use/functions/loadPet/do/0/fetch
+      execution: /do/0/load@function/do/0/fetch
+    - kind: task.completed
+      task: /use/functions/loadPet/do/1/name
+      execution: /do/0/load@function/do/1/name
+    - kind: task.completed
+      task: /use/functions/loadPet
+      execution: /do/0/load@function
+    - kind: workflow.completed

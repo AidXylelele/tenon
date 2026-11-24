@@ -1,0 +1,98 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: event-driven-schedule
+    version: '0.1.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.hospital.events.patients.heartbeat.low
+  do:
+    - callNurse:
+        call: http
+        with:
+          method: post
+          endpoint: https://hospital.example.com/api/v1/notify
+          body:
+            patientId: ${ $workflow.input[0].data.patient.id }
+            patientName: ${ $workflow.input[0].data.patient.name }
+            roomNumber: ${ $workflow.input[0].data.patient.room.number }
+            vitals:
+              heartRate: ${ $workflow.input[0].data.patient.vitals.bpm }
+              timestamp: ${ $workflow.input[0].data.timestamp }
+            message: "Alert: Patient's heartbeat is critically low. Immediate attention required."
+correlate: true
+script:
+  - effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        specversion: "1.0"
+        id: hb-1
+        source: https://hospital.example.com/monitors
+        type: com.example.hospital.events.patients.heartbeat.low
+        data:
+          patient:
+            id: p-1
+            name: Ann Lee
+            room: { number: 12 }
+            vitals: { bpm: 38 }
+          timestamp: "2026-01-01T00:00:00.500Z"
+    now: 1767225601000
+  - effect:
+      id: /do/0/callNurse
+      kind: http
+      deadline: null
+      method: POST
+      endpoint:
+        {
+          uri: https://hospital.example.com/api/v1/notify,
+          authentication: null,
+        }
+      body:
+        patientId: null
+        patientName: null
+        roomNumber: null
+        vitals: { heartRate: null, timestamp: null }
+        message: "Alert: Patient's heartbeat is critically low. Immediate attention required."
+    outcome:
+      kind: responded
+      request:
+        {
+          method: POST,
+          uri: https://hospital.example.com/api/v1/notify,
+          headers: {},
+        }
+      statusCode: 202
+      headers: { content-type: application/json }
+      content: { notified: true }
+      authorization: null
+    now: 1767225602000
+end:
+  completed:
+    output: { notified: true }
+facts:
+  exactly:
+    - kind: workflow.correlation-started
+      name: event-driven-schedule-instance-1.examples
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: workflow.correlation-completed
+      name: event-driven-schedule-instance-1.examples
+      completedAt: "2026-01-01T00:00:01.000Z"
+      correlationKeys: {}
+    - kind: workflow.started
+      name: event-driven-schedule-instance-1.examples
+      startedAt: "2026-01-01T00:00:01.000Z"
+    - { kind: task.created, task: /do/0/callNurse }
+    - { kind: task.started, task: /do/0/callNurse }
+    - { kind: task.completed, task: /do/0/callNurse }
+    - kind: workflow.completed

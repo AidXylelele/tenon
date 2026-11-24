@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: workflow-invalid-input
+    version: '1.0.0'
+  input:
+    schema:
+      format: json
+      document:
+        type: object
+        required: [order]
+  do:
+    - never:
+        set: { ran: true }
+input: { noise: true }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      title: Validation Error
+      instance: ""
+facts:
+  exactly:
+    - kind: workflow.started
+    - kind: workflow.faulted

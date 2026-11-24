@@ -1,0 +1,26 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  schedule:
+    every: PT1H
+    cron: '0 0 * * *'
+    after: PT5M
+  do:
+    - greet:
+        set:
+          message: hello
+profile:
+  schedules: [on]
+diagnostics:
+  - code: capability
+    pointer: /schedule/every
+    subject: schedule.every
+  - code: capability
+    pointer: /schedule/cron
+    subject: schedule.cron
+  - code: capability
+    pointer: /schedule/after
+    subject: schedule.after

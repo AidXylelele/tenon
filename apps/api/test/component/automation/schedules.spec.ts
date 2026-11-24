@@ -1,0 +1,325 @@
+import { OutboxRelay } from "@nestjs/outbox";
+import { sql } from "drizzle-orm";
+import request from "supertest";
+import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
+import { Role } from "../../../src/domain/identity/users/enums.js";
+import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
+import { aDocument } from "../../support/builders.js";
+import type { TestApp } from "../../support/create-test-app.js";
+import {
+  createRunApp,
+  drain,
+  publish,
+  publishing,
+  type RunApp,
+  relay,
+} from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
+import type { Problem } from "../../support/bodies.js";
+
+const WORKFLOW = "/api/v1/workflows/sales/route-lead";
+const STRUCTURED = "application/cloudevents+json";
+
+interface InstanceRow {
+  readonly id: string;
+  readonly trigger: string;
+  readonly phase: string;
+  readonly input: unknown;
+}
+
+const aScheduledDocument = (schedule: JsonObject, version = "1.0.0") => ({
+  ...aDocument({ version }, [{ greet: { set: { greeted: true } } }]),
+  schedule,
+});
+
+describe("starting workflows on a schedule and on events", () => {
+  let run: RunApp;
+  let t: TestApp;
+  let editor: Record<string, string>;
+
+  beforeAll(async () => {
+    run = await createRunApp();
+    t = run.t;
+  });
+
+  afterAll(async () => {
+    await t.close();
+  });
+
+  beforeEach(async () => {
+    await truncateAll(t.db);
+    await createUser(t, { email: "editor@example.com", role: Role.Editor });
+    editor = authHeaders(await signIn(t.server, "editor@example.com"));
+  });
+
+  async function turn(state: "on" | "off"): Promise<void> {
+    await request(t.server)
+      .post(`${WORKFLOW}/turn-${state}`)
+      .set(editor)
+      .expect(204);
+    await relay(t);
+  }
+
+  async function instances(): Promise<InstanceRow[]> {
+    const result = await t.db.execute(
+      sql`select id, trigger, phase, input from workflow_instance order by created_at, id`,
+    );
+    return result.rows as unknown as InstanceRow[];
+  }
+
+  async function pass(duration: `${number}${"s" | "m"}`): Promise<void> {
+    run.clock.advance(duration);
+    await drain(t);
+    await relay(t);
+    await drain(t);
+  }
+
+  async function send(event: JsonObject): Promise<void> {
+    await request(t.server)
+      .post("/api/v1/events")
+      .set(editor)
+      .set("content-type", STRUCTURED)
+      .send(JSON.stringify(event))
+      .expect(202);
+    await relay(t);
+    await drain(t);
+  }
+
+  it("a_workflow_is_off_until_turned_on_and_shows_it", async () => {
+    await publish(t, editor, aScheduledDocument({ every: { minutes: 1 } }));
+
+    const before = await request(t.server).get(WORKFLOW).set(editor);
+    await turn("on");
+    const after = await request(t.server).get(WORKFLOW).set(editor);
+
+    expect(before.body).toMatchObject({ on: false });
+    expect(after.body).toMatchObject({ on: true });
+  });
+
+  it("every_interval_starts_one_instance_per_occurrence_while_on", async () => {
+    await publish(t, editor, aScheduledDocument({ every: { minutes: 1 } }));
+    await turn("on");
+
+    await pass("1m");
+    await pass("1m");
+    const started = await instances();
+
+    expect(started).toHaveLength(2);
+    expect(started.every((row) => row.trigger === "schedule")).toBe(true);
+    expect(started.every((row) => row.phase === "completed")).toBe(true);
+  });
+
+  it("turning_off_stops_automatic_starts_but_not_manual_ones", async () => {
+    await publish(t, editor, aScheduledDocument({ every: { minutes: 1 } }));
+    await turn("on");
+    await pass("1m");
+
+    await turn("off");
+    await pass("5m");
+    await request(t.server)
+      .post(`${WORKFLOW}/instances`)
+      .set(editor)
+      .send({ input: {} })
+      .expect(201);
+
+    const triggers = (await instances()).map((row) => row.trigger);
+    expect(triggers).toEqual(["schedule", "manual"]);
+  });
+
+  it("a_cron_occurrence_starts_one_instance_in_utc", async () => {
+    await publish(t, editor, aScheduledDocument({ cron: "* * * * *" }));
+    await turn("on");
+
+    await pass("1m");
+
+    expect(await instances()).toHaveLength(1);
+  });
+
+  it("a_new_version_replaces_the_schedule_of_the_previous_one", async () => {
+    await publish(t, editor, aScheduledDocument({ every: { minutes: 1 } }));
+    await turn("on");
+    await publish(
+      t,
+      editor,
+      aScheduledDocument({ every: { hours: 24 } }, "2.0.0"),
+    );
+    await relay(t);
+
+    await pass("1m");
+
+    expect(await instances()).toHaveLength(0);
+  });
+
+  it("an_event_driven_start_is_described_by_the_event_types_it_takes", async () => {
+    const on = {
+      all: [
+        { with: { type: "com.example.order.paid" } },
+        { with: { type: "com.example.order.shipped" } },
+      ],
+    };
+    await publish(t, editor, aScheduledDocument({ on }));
+
+    const workflow = await request(t.server)
+      .get(WORKFLOW)
+      .set(editor)
+      .expect(200);
+
+    expect((workflow.body as { schedule: unknown }).schedule).toEqual({
+      kind: "on",
+      types: ["com.example.order.paid", "com.example.order.shipped"],
+    });
+  });
+
+  it("an_event_its_schedule_takes_starts_one_instance_with_the_event_as_input", async () => {
+    const on = { one: { with: { type: "com.example.order.paid" } } };
+    await publish(t, editor, aScheduledDocument({ on }));
+    await turn("on");
+    const paid = {
+      specversion: "1.0",
+      id: "order-1",
+      source: "/shop",
+      type: "com.example.order.paid",
+      data: { total: 3 },
+    };
+
+    await send(paid);
+    await send(paid);
+    await relay(t);
+    const started = await instances();
+
+    expect(started).toHaveLength(1);
+    expect(started[0]?.trigger).toBe("event");
+    expect(started[0]?.input).toMatchObject([
+      { id: "order-1", data: { total: 3 } },
+    ]);
+  });
+
+  it("an_instance_its_event_started_correlates_that_event_and_completes", async () => {
+    const on = { one: { with: { type: "com.example.order.paid" } } };
+    await publish(t, editor, aScheduledDocument({ on }));
+    await turn("on");
+
+    await send({
+      specversion: "1.0",
+      id: "order-1",
+      source: "/shop",
+      type: "com.example.order.paid",
+    });
+    await relay(t);
+    await drain(t);
+    const [started] = await instances();
+    const result = await t.db.execute(
+      sql`select type from event where instance_id = ${String(started?.id)} and type like 'org.open-workflow-specification.workflow.%' order by sequence`,
+    );
+
+    expect(started?.phase).toBe("completed");
+    expect(result.rows).toEqual([
+      {
+        type: "org.open-workflow-specification.workflow.correlation-started.v1",
+      },
+      {
+        type: "org.open-workflow-specification.workflow.correlation-completed.v1",
+      },
+      { type: "org.open-workflow-specification.workflow.started.v1" },
+      { type: "org.open-workflow-specification.workflow.completed.v1" },
+    ]);
+  });
+
+  it("an_accepted_event_and_the_starts_it_triggers_are_relayed_in_the_events_own_lane", async () => {
+    const on = { one: { with: { type: "com.example.order.paid" } } };
+    await publish(t, editor, aScheduledDocument({ on }));
+    await turn("on");
+
+    await request(t.server)
+      .post("/api/v1/events")
+      .set(editor)
+      .set("content-type", STRUCTURED)
+      .send(
+        JSON.stringify({
+          specversion: "1.0",
+          id: "order-1",
+          source: "/shop",
+          type: "com.example.order.paid",
+        }),
+      )
+      .expect(202);
+    const accepted = await t.db.execute(
+      sql`select key from nest_outbox.messages where topic = 'event.accepted'`,
+    );
+    await t.app.get(OutboxRelay).runOnce();
+    const triggered = await t.db.execute(
+      sql`select key from nest_outbox.messages where topic = 'trigger.offered'`,
+    );
+
+    expect(accepted.rows).toEqual([{ key: "order-1" }]);
+    expect(triggered.rows).toEqual([{ key: "order-1" }]);
+  });
+
+  it("an_event_of_another_type_or_to_a_workflow_that_is_off_starts_nothing", async () => {
+    const on = { one: { with: { type: "com.example.order.paid" } } };
+    await publish(t, editor, aScheduledDocument({ on }));
+    const paid = {
+      specversion: "1.0",
+      id: "order-1",
+      source: "/shop",
+      type: "com.example.order.paid",
+    };
+
+    await send(paid);
+    await turn("on");
+    await send({ ...paid, id: "order-2", type: "com.example.order.placed" });
+
+    expect(await instances()).toHaveLength(0);
+  });
+
+  it("after_starts_the_next_instance_once_the_previous_completed_and_the_delay_passed", async () => {
+    await publish(t, editor, aScheduledDocument({ after: { minutes: 5 } }));
+    await turn("on");
+    await drain(t);
+
+    expect(await instances()).toHaveLength(1);
+
+    await pass("4m");
+    expect(await instances()).toHaveLength(1);
+
+    await pass("1m");
+    expect(await instances()).toHaveLength(2);
+  });
+
+  it("a_cron_that_never_matches_is_refused_at_publish", async () => {
+    const response = await publishing(
+      t,
+      editor,
+      aScheduledDocument({ cron: "0 0 30 2 *" }),
+    );
+
+    expect(response.status).toBe(422);
+    expect((response.body as Problem).errors).toMatchObject([
+      { code: "cron", pointer: "/schedule/cron" },
+    ]);
+  });
+
+  it("a_workflow_on_its_own_lifecycle_type_is_started_by_others_never_by_itself", async () => {
+    const on = {
+      one: {
+        with: { type: "org.open-workflow-specification.workflow.completed.v1" },
+      },
+    };
+    await publish(t, editor, aScheduledDocument({ on }));
+    await turn("on");
+    await publish(t, editor, aDocument({ name: "other" }));
+
+    await request(t.server)
+      .post("/api/v1/workflows/sales/other/instances")
+      .set(editor)
+      .send({ input: {} })
+      .expect(201);
+    for (let round = 0; round < 3; round += 1) {
+      await drain(t);
+      await relay(t);
+    }
+    const triggers = (await instances()).map((row) => row.trigger);
+
+    expect(triggers.sort()).toEqual(["event", "manual"]);
+  });
+});

@@ -1,0 +1,202 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: bearer-auth
+    version: '0.1.0'
+  do:
+    - getNotifications:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://fake.com/docs/asyncapi.json
+          operation: getNotifications
+          protocol: ws
+          subscription:
+            filter: '${ .correlationId == $context.userId and .payload.from.firstName == $context.contact.firstName and .payload.from.lastName == $context.contact.lastName }'
+            consume:
+              amount: 5
+input: { userId: u-1, contact: { firstName: Ann, lastName: Lee } }
+script:
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        protocol: ws,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m0 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[1]",
+        kind: asyncapi,
+        deadline: null,
+        protocol: ws,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 1,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m1 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[2]",
+        kind: asyncapi,
+        deadline: null,
+        protocol: ws,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 2,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Bob, lastName: Lee }, text: skipped },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225603000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[3]",
+        kind: asyncapi,
+        deadline: null,
+        protocol: ws,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 3,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m2 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225604000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[4]",
+        kind: asyncapi,
+        deadline: null,
+        protocol: ws,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 4,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m3 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225605000
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[5]",
+        kind: asyncapi,
+        deadline: null,
+        protocol: ws,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 5,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m4 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225606000
+end:
+  completed:
+    output:
+      - {
+          payload: { from: { firstName: Ann, lastName: Lee }, text: m0 },
+          headers: {},
+          correlationId: u-1,
+        }
+      - {
+          payload: { from: { firstName: Ann, lastName: Lee }, text: m1 },
+          headers: {},
+          correlationId: u-1,
+        }
+      - {
+          payload: { from: { firstName: Ann, lastName: Lee }, text: m2 },
+          headers: {},
+          correlationId: u-1,
+        }
+      - {
+          payload: { from: { firstName: Ann, lastName: Lee }, text: m3 },
+          headers: {},
+          correlationId: u-1,
+        }
+      - {
+          payload: { from: { firstName: Ann, lastName: Lee }, text: m4 },
+          headers: {},
+          correlationId: u-1,
+        }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getNotifications }
+    - kind: workflow.completed

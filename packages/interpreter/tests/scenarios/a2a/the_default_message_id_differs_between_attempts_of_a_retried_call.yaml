@@ -1,0 +1,88 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-retry
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - askAgent:
+              call: a2a
+              with:
+                method: message/send
+                server: https://agent.example.com/a2a
+                parameters:
+                  message:
+                    parts:
+                      - kind: text
+                        text: hello
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      id: /do/0/guard/try/0/askAgent
+      kind: a2a
+      deadline: null
+      parameters:
+        message:
+          {
+            parts: [{ kind: text, text: hello }],
+            messageId: 3eb08e49-1be4-51ef-bcb3-fb5a911a29ba,
+            role: user,
+          }
+    outcome:
+      { kind: rpcError, code: -32603, message: Internal error, data: null }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      id: "/do/0/guard#2/try/0/askAgent"
+      kind: a2a
+      deadline: null
+      parameters:
+        message:
+          {
+            parts: [{ kind: text, text: hello }],
+            messageId: f120dada-40b2-51b9-804b-e4505fc66a54,
+            role: user,
+          }
+    outcome:
+      {
+        kind: answered,
+        result: { kind: task, id: task-1, status: { state: completed } },
+      }
+    now: 1767225603000
+end:
+  completed:
+    output: { kind: task, id: task-1, status: { state: completed } }
+facts:
+  including:
+    - {
+        kind: task.faulted,
+        task: /do/0/guard/try/0/askAgent,
+        execution: /do/0/guard/try/0/askAgent,
+      }
+    - { kind: task.retried, task: /do/0/guard }
+    - {
+        kind: task.completed,
+        task: /do/0/guard/try/0/askAgent,
+        execution: "/do/0/guard#2/try/0/askAgent",
+      }
+    - kind: workflow.completed

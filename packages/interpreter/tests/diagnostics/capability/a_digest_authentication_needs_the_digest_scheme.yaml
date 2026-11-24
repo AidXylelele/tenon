@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://petstore.swagger.io/v2/pet/1
+            authentication:
+              digest:
+                username: admin
+                password: secret
+profile:
+  authentications: [basic, bearer, oauth2, oidc]
+diagnostics:
+  - code: capability
+    pointer: /do/0/getPet
+    subject: authentication.digest
+    range: { start: { line: 8, column: 7 } }

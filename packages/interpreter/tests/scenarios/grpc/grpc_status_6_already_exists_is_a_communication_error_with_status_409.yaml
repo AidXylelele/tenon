@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-status-6
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: SayHello
+          arguments:
+            name: ${ .name }
+input: { name: Ann }
+script:
+  - effect: { id: /do/0/greet, kind: grpc, deadline: null }
+    outcome: { kind: status, code: 6, message: ALREADY_EXISTS from the service }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 409
+      instance: /do/0/greet
+      title: Communication Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/greet, execution: /do/0/greet }
+    - kind: workflow.faulted

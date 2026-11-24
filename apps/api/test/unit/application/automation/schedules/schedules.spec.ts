@@ -1,0 +1,356 @@
+import type { AcceptedEvent } from "../../../../../src/application/automation/events/interfaces.js";
+import type { EventStore } from "../../../../../src/application/automation/events/ports.js";
+import { InstanceEvents } from "../../../../../src/application/automation/instances/instance-events.js";
+import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
+import { ContinueSchedule } from "../../../../../src/application/automation/schedules/continue-schedule.js";
+import { FireSchedule } from "../../../../../src/application/automation/schedules/fire-schedule.js";
+import { StartOnEvent } from "../../../../../src/application/automation/schedules/start-on-event.js";
+import { StartScheduledInstance } from "../../../../../src/application/automation/schedules/start-scheduled-instance.js";
+import { TurnWorkflowOff } from "../../../../../src/application/automation/workflows/turn-workflow-off.js";
+import { TurnWorkflowOn } from "../../../../../src/application/automation/workflows/turn-workflow-on.js";
+import {
+  InstanceEventKind,
+  Phase,
+  TriggerKind,
+} from "../../../../../src/domain/automation/instances/enums.js";
+import {
+  ScheduleKind,
+  WorkflowEventKind,
+} from "../../../../../src/domain/automation/workflows/enums.js";
+import type { ScheduleSpec } from "../../../../../src/domain/automation/workflows/interfaces.js";
+import { Schedule } from "../../../../../src/domain/automation/workflows/schedule.js";
+import { Workflow } from "../../../../../src/domain/automation/workflows/workflow.js";
+import { WorkflowName } from "../../../../../src/domain/automation/workflows/workflow-name.js";
+import type { WorkflowVersion } from "../../../../../src/domain/automation/workflows/workflow-version.js";
+import { aDefinition } from "../../../../support/builders.js";
+import {
+  anInstanceIn,
+  FakeUnitOfWork,
+  AppendingLifecycleEvents,
+  RecordingAnnouncements,
+  RecordingInstanceMessages,
+  RecordingWorkflowEvents,
+  StoredSecrets,
+  StoredWorkflowInstanceRepository,
+  StoredWorkflowRepository,
+  T0,
+} from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
+const name = new WorkflowName("sales", "route-lead");
+const MINUTE = 60_000;
+const EVERY_MINUTE: ScheduleSpec = {
+  kind: ScheduleKind.Every,
+  interval: MINUTE,
+};
+const AFTER_A_MINUTE: ScheduleSpec = {
+  kind: ScheduleKind.After,
+  delay: MINUTE,
+};
+
+const PAID: AcceptedEvent = {
+  sequence: 7,
+  eventId: "order-1",
+  type: "com.example.order.paid",
+  cloudEvent: { id: "order-1", type: "com.example.order.paid" },
+  acceptedAt: T0,
+  lifecycleOf: null,
+};
+
+function eventsOf(...accepted: AcceptedEvent[]): EventStore {
+  const events = {
+    find: (sequence: number) => {
+      const found = accepted.find((event) => event.sequence === sequence);
+      return Promise.resolve(found ?? null);
+    },
+  };
+  return events as unknown as EventStore;
+}
+
+function runtimeAccepting(accepts: boolean): WorkflowRuntime {
+  const runtime = { accepts: () => Promise.resolve(accepts) };
+  return runtime as unknown as WorkflowRuntime;
+}
+
+function setUp(accepts = true) {
+  const workflows = new StoredWorkflowRepository();
+  const instances = new StoredWorkflowInstanceRepository();
+  const instanceMessages = new RecordingInstanceMessages(instances);
+  const instanceEvents = new InstanceEvents(
+    new AppendingLifecycleEvents(),
+    new RecordingAnnouncements(),
+    instanceMessages,
+  );
+  const workflowEvents = new RecordingWorkflowEvents();
+  return {
+    workflows,
+    instances,
+    instanceMessages,
+    workflowEvents,
+    turnOn: new TurnWorkflowOn(workflows, workflowEvents, unitOfWork),
+    turnOff: new TurnWorkflowOff(workflows, workflowEvents, unitOfWork),
+    fire: new FireSchedule(workflows, workflowEvents, unitOfWork),
+    start: new StartScheduledInstance(
+      workflows,
+      instances,
+      instanceEvents,
+      unitOfWork,
+    ),
+    continued: new ContinueSchedule(
+      instances,
+      workflows,
+      workflowEvents,
+      unitOfWork,
+    ),
+    startOnEvent: new StartOnEvent(
+      eventsOf(PAID),
+      workflows,
+      instances,
+      runtimeAccepting(accepts),
+      new StoredSecrets(),
+      instanceEvents,
+      unitOfWork,
+    ),
+  };
+}
+
+type Fixture = ReturnType<typeof setUp>;
+
+async function aWorkflow(
+  fixture: Fixture,
+  on: boolean,
+  spec: ScheduleSpec = EVERY_MINUTE,
+): Promise<{ workflow: Workflow; version: WorkflowVersion }> {
+  const workflow = Workflow.register(name);
+  const schedule = new Schedule(spec);
+  const definition = aDefinition({}, "content-1", schedule);
+  const result = workflow.publish({
+    definition,
+    source: null,
+    publisherId: "author-1",
+    now: T0,
+  });
+
+  if (!result.ok) throw new Error(result.failure);
+
+  if (on) workflow.turnOn(T0);
+
+  workflow.clearEvents();
+  await fixture.workflows.save(workflow);
+  return { workflow, version: result.value.version };
+}
+
+describe("turning a workflow on and off", () => {
+  it("turning_on_saves_and_dispatches_its_armed_schedule_once", async () => {
+    const fixture = setUp();
+    await aWorkflow(fixture, false);
+    const before = fixture.workflows.saves;
+
+    await fixture.turnOn.execute({ name });
+    await fixture.turnOn.execute({ name });
+
+    const kinds = fixture.workflowEvents.dispatched.map((event) => event.kind);
+    expect(fixture.workflows.saves).toBe(before + 1);
+    expect(kinds).toEqual([WorkflowEventKind.ScheduleArmed]);
+  });
+
+  it("turning_off_a_workflow_that_is_off_writes_nothing", async () => {
+    const fixture = setUp();
+    await aWorkflow(fixture, false);
+    const before = fixture.workflows.saves;
+
+    const result = await fixture.turnOff.execute({ name });
+
+    expect(result.ok).toBe(true);
+    expect(fixture.workflows.saves).toBe(before);
+    expect(fixture.workflowEvents.calls).toEqual([]);
+  });
+
+  it("turning_off_a_workflow_that_is_on_saves_and_dispatches", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, true);
+
+    await fixture.turnOff.execute({ name });
+
+    expect(fixture.workflowEvents.calls).toEqual([workflow.id]);
+  });
+});
+
+describe("a fired schedule", () => {
+  it("saves_the_workflow_alone_and_dispatches_the_fired_slot_and_the_next_arming", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, true);
+    const command = { workflowId: workflow.id, arming: 1, at: T0.getTime() };
+
+    await fixture.fire.execute(command);
+    await fixture.fire.execute(command);
+
+    const kinds = fixture.workflowEvents.dispatched.map((event) => event.kind);
+    const stored = await fixture.workflows.findById(workflow.id);
+    expect(kinds).toEqual([
+      WorkflowEventKind.ScheduleFired,
+      WorkflowEventKind.ScheduleArmed,
+    ]);
+    expect(stored?.arming).toBe(2);
+    expect(fixture.instances.rows.size).toBe(0);
+  });
+
+  it("a_fire_of_a_workflow_turned_off_writes_nothing", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, false);
+    const before = fixture.workflows.saves;
+
+    await fixture.fire.execute({
+      workflowId: workflow.id,
+      arming: 0,
+      at: T0.getTime(),
+    });
+
+    expect(fixture.workflows.saves).toBe(before);
+  });
+});
+
+describe("the instance of a fired slot", () => {
+  const SLOT = "0b7c2f7e-0000-4000-8000-000000000001";
+
+  it("starts_once_per_slot_and_dispatches_its_run", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, true);
+    const command = { workflowId: workflow.id, instanceId: SLOT };
+
+    await fixture.start.execute(command);
+    await fixture.start.execute(command);
+
+    expect(fixture.instances.rows.size).toBe(1);
+    expect(fixture.instanceMessages.started[0]?.stored).toBe(true);
+    expect(fixture.instanceMessages.kindsOf(SLOT)).toEqual([
+      InstanceEventKind.Started,
+    ]);
+    expect(fixture.workflowEvents.calls).toEqual([]);
+  });
+
+  it("a_slot_of_an_unchained_schedule_asks_for_no_running_chain", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, true);
+    const asked = vi.spyOn(fixture.instances, "hasUnendedScheduled");
+
+    await fixture.start.execute({ workflowId: workflow.id, instanceId: SLOT });
+
+    expect(asked).not.toHaveBeenCalled();
+    expect(fixture.instances.rows.size).toBe(1);
+  });
+
+  it("starts_nothing_once_the_workflow_is_off", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, false);
+
+    await fixture.start.execute({ workflowId: workflow.id, instanceId: SLOT });
+
+    expect(fixture.instances.rows.size).toBe(0);
+  });
+
+  it("an_after_chain_starts_nothing_while_the_schedules_instance_runs", async () => {
+    const fixture = setUp();
+    const { workflow, version } = await aWorkflow(
+      fixture,
+      true,
+      AFTER_A_MINUTE,
+    );
+    const running = anInstanceIn(Phase.Running, {
+      id: "running-1",
+      workflowId: workflow.id,
+      versionId: version.id,
+      trigger: TriggerKind.Schedule,
+    });
+    fixture.instances.put(running);
+
+    await fixture.start.execute({ workflowId: workflow.id, instanceId: SLOT });
+
+    expect(fixture.instances.rows.size).toBe(1);
+    expect(fixture.instanceMessages.started).toEqual([]);
+  });
+});
+
+describe("the instance an event starts", () => {
+  const STARTED = "0b7c2f7e-0000-4000-8000-000000000002";
+  const signal = new AbortController().signal;
+
+  it("starts_once_per_event_and_dispatches_its_run", async () => {
+    const fixture = setUp();
+    const { workflow } = await aWorkflow(fixture, true);
+    const command = {
+      workflowId: workflow.id,
+      sequence: PAID.sequence,
+      instanceId: STARTED,
+      signal,
+    };
+
+    await fixture.startOnEvent.execute(command);
+    await fixture.startOnEvent.execute(command);
+
+    const started = await fixture.instances.find(STARTED);
+    expect(fixture.instances.rows.size).toBe(1);
+    expect(started?.trigger).toBe(TriggerKind.Event);
+    expect(started?.input).toEqual([PAID.cloudEvent]);
+    expect(fixture.instanceMessages.started[0]?.stored).toBe(true);
+    expect(fixture.instanceMessages.kindsOf(STARTED)).toEqual([
+      InstanceEventKind.Started,
+    ]);
+  });
+
+  it("an_event_the_workflow_does_not_accept_starts_nothing", async () => {
+    const fixture = setUp(false);
+    const { workflow } = await aWorkflow(fixture, true);
+
+    await fixture.startOnEvent.execute({
+      workflowId: workflow.id,
+      sequence: PAID.sequence,
+      instanceId: STARTED,
+      signal,
+    });
+
+    expect(fixture.instances.rows.size).toBe(0);
+    expect(fixture.instanceMessages.calls).toEqual([]);
+  });
+});
+
+describe("the next link of an after chain", () => {
+  it("a_completed_instance_its_schedule_started_arms_the_next_after_its_delay", async () => {
+    const fixture = setUp();
+    const { workflow, version } = await aWorkflow(
+      fixture,
+      true,
+      AFTER_A_MINUTE,
+    );
+    fixture.instances.put(
+      anInstanceIn(Phase.Completed, {
+        workflowId: workflow.id,
+        versionId: version.id,
+        trigger: TriggerKind.Schedule,
+      }),
+    );
+
+    await fixture.continued.execute({ instanceId: "instance-1" });
+
+    expect(fixture.workflowEvents.dispatched).toHaveLength(1);
+  });
+
+  it("a_manual_instance_arms_nothing", async () => {
+    const fixture = setUp();
+    const { workflow, version } = await aWorkflow(
+      fixture,
+      true,
+      AFTER_A_MINUTE,
+    );
+    fixture.instances.put(
+      anInstanceIn(Phase.Completed, {
+        workflowId: workflow.id,
+        versionId: version.id,
+      }),
+    );
+
+    await fixture.continued.execute({ instanceId: "instance-1" });
+
+    expect(fixture.workflowEvents.dispatched).toEqual([]);
+  });
+});

@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-authorization
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            authentication:
+              bearer:
+                token: grpc-t0ken
+          method: SayHello
+        output:
+          as: '${ { greeting: .message, authorization: $authorization } }'
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/greet,
+        kind: grpc,
+        deadline: null,
+        authentication: { kind: bearer, token: grpc-t0ken },
+      }
+    outcome: { kind: replied, message: { message: Hello } }
+    now: 1767225601000
+end:
+  completed:
+    output: { greeting: Hello, authorization: null }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

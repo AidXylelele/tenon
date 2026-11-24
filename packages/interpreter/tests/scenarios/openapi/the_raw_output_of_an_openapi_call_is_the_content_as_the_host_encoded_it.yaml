@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: openapi-raw-output
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: openapi
+        with:
+          document:
+            endpoint: https://petstore.swagger.io/v2/swagger.json
+          operationId: getPetById
+          parameters:
+            petId: 1
+          output: raw
+input: {}
+script:
+  - effect:
+      id: /do/0/getPet
+      kind: openapi
+      deadline: null
+      output: raw
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: eyJpZCI6MX0=
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: eyJpZCI6MX0=
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - kind: workflow.completed

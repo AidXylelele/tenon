@@ -1,0 +1,27 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - attempt:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/failed
+                  status: 503
+        catch:
+          as: failure
+          when: '${ $failure.status >= 500 }'
+          exceptWhen: '${ $failure.status == 501 }'
+          retry:
+            when: '${ $failure.status == 503 }'
+            exceptWhen: '${ $failure.status == 504 }'
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 2
+diagnostics: []

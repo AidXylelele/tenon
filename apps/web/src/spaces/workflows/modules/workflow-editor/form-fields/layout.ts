@@ -1,0 +1,270 @@
+import type { FormField, Step } from "language-server/protocol";
+import type {
+  CallKind,
+  FormKind,
+  FormLayout,
+  RunKind,
+  WordsKind,
+} from "./interfaces";
+import { isObject } from "./json";
+import { limitSecondsOf } from "./time-limit";
+import { hasWords, wordsOf } from "./words";
+
+const SUMMARY_LIMIT = 3;
+
+const TIME_LIMIT = "timeout";
+
+const TIME_LIMIT_WORDS = "Time limit";
+
+const COMMON_KEYS: ReadonlySet<string> = new Set(["if", "then"]);
+
+export const METHOD_PATH = "with/method";
+
+const BODY_PATH = "with/body";
+
+const BODYLESS_METHODS: ReadonlySet<string> = new Set(["get", "head"]);
+
+const CALL_KINDS: readonly CallKind[] = [
+  "http",
+  "openapi",
+  "grpc",
+  "asyncapi",
+  "mcp",
+  "a2a",
+];
+
+const RUN_KINDS: readonly RunKind[] = [
+  "script",
+  "shell",
+  "container",
+  "workflow",
+];
+
+export function formKindOf(
+  kind: Step["kind"],
+  fields: readonly FormField[],
+): FormKind {
+  if (kind === "call") return callKindOf(fields);
+
+  if (kind === "run") return runKindOf(fields);
+
+  return kind;
+}
+
+function callKindOf(fields: readonly FormField[]): CallKind {
+  const call = fields.find((field) => field.key === "call");
+  const known = CALL_KINDS.find((kind) => kind === call?.value);
+
+  return known ?? "function";
+}
+
+function runKindOf(fields: readonly FormField[]): RunKind {
+  const run = fields.find((field) => field.key === "run");
+  const members = run?.fields ?? [];
+  const written = members.filter((member) => member.written);
+  const kind = RUN_KINDS.find((each) =>
+    written.some((member) => member.key === each),
+  );
+
+  return kind ?? "script";
+}
+
+export function fieldAt(
+  fields: readonly FormField[],
+  pointer: string,
+): FormField | null {
+  const here = fields.find((field) => field.pointer === pointer);
+
+  if (here !== undefined) return here;
+
+  const below = fields.map((field) => fieldAt(field.fields, pointer));
+  return below.find((field) => field !== null) ?? null;
+}
+
+export function pathOf(field: FormField, base: string): string {
+  const start = base.length + 1;
+  return field.pointer.slice(start);
+}
+
+export function layoutOf(fields: readonly FormField[], step: Step): FormLayout {
+  const kind = formKindOf(step.kind, fields);
+  const method = methodOf(fields, step);
+  const place = { kind, step, method };
+  const essentials = essentialsOf(fields);
+  const settings = fields.filter((field) => field.section === "settings");
+  const own = settings.filter((field) => !COMMON_KEYS.has(field.key));
+  const common = settings.filter((field) => COMMON_KEYS.has(field.key));
+  const notes = fields.filter((field) => field.section === "note");
+  const inData = fields.filter((field) => field.section === "data");
+  const inFailure = fields.filter((field) => field.section === "failure");
+  const limits = inFailure.filter((field) => field.key === TIME_LIMIT);
+  const failing = inFailure.filter((field) => field.key !== TIME_LIMIT);
+  const ownRest = restsOf(own, place);
+  const limitRest = restsOf(limits, place);
+  const commonRest = restsOf(common, place);
+  const notesRest = restsOf(notes, place);
+  const more = ownRest.concat(limitRest, commonRest, notesRest);
+  const data = restsOf(inData, place);
+  const failure = restsOf(failing, place);
+
+  return { essentials, more, data, failure };
+}
+
+interface Place {
+  readonly kind: FormKind;
+  readonly step: Step;
+  readonly method: string;
+}
+
+function methodOf(fields: readonly FormField[], step: Step): string {
+  const pointer = `${step.pointer}/${METHOD_PATH}`;
+  const method = fieldAt(fields, pointer)?.value;
+
+  return typeof method === "string" ? method.toLowerCase() : "";
+}
+
+function essentialsOf(fields: readonly FormField[]): FormField[] {
+  const ranked = fields.flatMap(rankedOf);
+  return ranked.toSorted(byRank);
+}
+
+function byRank(one: FormField, other: FormField): number {
+  const first = one.essentialRank ?? 0;
+  const second = other.essentialRank ?? 0;
+  return first - second;
+}
+
+function rankedOf(field: FormField): FormField[] {
+  if (field.essentialRank !== null) return [field];
+
+  return field.fields.flatMap(rankedOf);
+}
+
+function holdsEssentials(field: FormField): boolean {
+  return field.fields.some(
+    (inner) => inner.essentialRank !== null || holdsEssentials(inner),
+  );
+}
+
+function restsOf(fields: readonly FormField[], place: Place): FormField[] {
+  return fields.flatMap((field) => restOf(field, place));
+}
+
+function restOf(field: FormField, place: Place): FormField[] {
+  const path = pathOf(field, place.step.pointer);
+  const words = wordsOf(place.kind, path, field);
+
+  if (field.essentialRank !== null) return [];
+
+  if (words.control === "hidden") return [];
+
+  if (isUnsentBody(field, path, place)) return [];
+
+  if (isFixedChoice(field)) return [];
+
+  if (!holdsEssentials(field)) return [field];
+
+  const offered = field.fields.filter((inner) => isOffered(inner, place));
+
+  return restsOf(offered, place);
+}
+
+function isOffered(field: FormField, place: Place): boolean {
+  const path = pathOf(field, place.step.pointer);
+  const isUnwrittenObject = field.input === "structured" && !field.written;
+
+  return !isUnwrittenObject || hasWords(place.kind, path);
+}
+
+function isUnsentBody(field: FormField, path: string, place: Place): boolean {
+  const isBody = place.kind === "http" && path === BODY_PATH;
+  const isBodyless = BODYLESS_METHODS.has(place.method);
+
+  return isBody && isBodyless && !field.written;
+}
+
+function isFixedChoice(field: FormField): boolean {
+  const [only] = field.choices;
+  const isSingle = field.input === "choice" && field.choices.length === 1;
+  return isSingle && field.written && only === field.value;
+}
+
+export function summaryOf(
+  fields: readonly FormField[],
+  kind: WordsKind,
+  base: string,
+  unwritten: string,
+  timeLimit: number | null = null,
+): string {
+  const said = fields.flatMap((field) =>
+    statementOf(field, kind, base, timeLimit),
+  );
+  const shown = said.slice(0, SUMMARY_LIMIT);
+  const hidden = said.length - shown.length;
+  const more = hidden > 0 ? [`${String(hidden)} more`] : [];
+  const parts = shown.concat(more).map(sentenceCaseOf);
+
+  return parts.length > 0 ? parts.join(" · ") : unwritten;
+}
+
+function sentenceCaseOf(part: string, index: number): string {
+  const first = part.charAt(0);
+  const second = part.charAt(1);
+  const isAcronym = second !== second.toLowerCase();
+  const rest = part.slice(1);
+
+  if (index === 0) return `${first.toUpperCase()}${rest}`;
+
+  if (isAcronym) return part;
+
+  return `${first.toLowerCase()}${rest}`;
+}
+
+function statementOf(
+  field: FormField,
+  kind: WordsKind,
+  base: string,
+  timeLimit: number | null,
+): string[] {
+  const path = pathOf(field, base);
+  const words = wordsOf(kind, path, field);
+
+  switch (words.control) {
+    case "hidden":
+      return [];
+    case "values":
+      return [countedOf(field, words.title)];
+    case "seconds":
+      return field.written ? [limitText(timeLimit)] : [];
+    case "body":
+    case "value":
+    case "data":
+    case "condition":
+    case "flow":
+    case "code":
+    case "language":
+    case "httpMethod":
+    case "cases":
+      return field.written ? [words.title] : [];
+    case "authentication":
+      return field.written
+        ? [words.title]
+        : [`No ${words.title.toLowerCase()}`];
+  }
+}
+
+function countedOf(field: FormField, title: string): string {
+  const count = isObject(field.value) ? Object.keys(field.value).length : 0;
+
+  if (count === 0) return `No ${title.toLowerCase()}`;
+
+  return `${title}: ${String(count)}`;
+}
+
+function limitText(timeLimit: number | null): string {
+  const seconds = limitSecondsOf(timeLimit);
+
+  if (seconds === null) return TIME_LIMIT_WORDS;
+
+  return `${TIME_LIMIT_WORDS} ${String(seconds)} s`;
+}

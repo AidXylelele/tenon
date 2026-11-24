@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-channel
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi-2.6.json
+          channel: /chat
+          subscription:
+            consume:
+              amount: 1
+input: {}
+end:
+  waiting:
+    effect:
+      id: "/do/0/watch@message[0]"
+      kind: asyncapi
+      deadline: null
+      operation: null
+      channel: /chat
+      exchange:
+        {
+          kind: receive,
+          subscription: /do/0/watch,
+          position: 0,
+          closesAt: null,
+        }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/watch }

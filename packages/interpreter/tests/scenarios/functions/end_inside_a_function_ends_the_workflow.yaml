@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-end
+    version: '1.0.0'
+  use:
+    functions:
+      finish:
+        do:
+          - close:
+              set: { closed: true }
+              then: end
+          - never:
+              set: { never: true }
+  do:
+    - closeAll:
+        call: finish
+    - after:
+        set: { after: true }
+input: {}
+end:
+  completed:
+    output: { closed: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/closeAll }
+    - { kind: task.started, task: /do/0/closeAll }
+    - { kind: task.created, task: /use/functions/finish }
+    - { kind: task.started, task: /use/functions/finish }
+    - { kind: task.created, task: /use/functions/finish/do/0/close }
+    - { kind: task.started, task: /use/functions/finish/do/0/close }
+    - { kind: task.completed, task: /use/functions/finish/do/0/close }
+    - { kind: task.completed, task: /use/functions/finish }
+    - { kind: task.completed, task: /do/0/closeAll }
+    - kind: workflow.completed

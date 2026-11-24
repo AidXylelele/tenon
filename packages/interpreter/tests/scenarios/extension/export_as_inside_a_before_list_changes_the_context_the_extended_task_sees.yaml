@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-export
+    version: '1.0.0'
+  use:
+    extensions:
+      - stamp:
+          extend: set
+          when: '$task.name == "greet"'
+          before:
+            - remember:
+                set: { stamped: true }
+                export:
+                  as: '${ $context + { stamped: true } }'
+  do:
+    - greet:
+        set:
+          context: '${ $context }'
+input: { ward: east }
+end:
+  completed:
+    output: { context: { ward: east, stamped: true } }
+facts:
+  including:
+    - { kind: task.completed, task: /use/extensions/0/stamp/before/0/remember }
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

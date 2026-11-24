@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expressions
+    version: '0.1.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+                correlate:
+                  patient:
+                    from: '.a |'
+            until: '.b |'
+diagnostics:
+  - code: expression
+    pointer: /do/0/readings/listen/to/any/0/correlate/patient/from
+  - code: expression
+    pointer: /do/0/readings/listen/to/until

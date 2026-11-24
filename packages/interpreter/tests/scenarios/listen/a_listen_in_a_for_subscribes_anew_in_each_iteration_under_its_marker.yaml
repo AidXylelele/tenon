@@ -1,0 +1,73 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-in-for
+    version: '1.0.0'
+  do:
+    - each:
+        for:
+          in: ${ .orders }
+        do:
+          - waitForPayment:
+              listen:
+                to:
+                  one:
+                    with:
+                      type: com.example.payment.received
+input: { orders: [o-1, o-2] }
+script:
+  - effect:
+      {
+        id: "/do/0/each[0]/do/0/waitForPayment@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "/do/0/each[0]/do/0/waitForPayment",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: p-1,
+          source: https://pay.example.com,
+          type: com.example.payment.received,
+          data: { order: o-1 },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/each[1]/do/0/waitForPayment@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "/do/0/each[1]/do/0/waitForPayment",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: p-2,
+          source: https://pay.example.com,
+          type: com.example.payment.received,
+          data: { order: o-2 },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output: [{ order: o-2 }]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/waitForPayment,
+        execution: "/do/0/each[0]/do/0/waitForPayment",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/waitForPayment,
+        execution: "/do/0/each[1]/do/0/waitForPayment",
+      }
+    - kind: workflow.completed

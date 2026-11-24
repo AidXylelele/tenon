@@ -1,0 +1,19 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: strict-whole
+    version: '1.0.0'
+  do:
+    - compute:
+        set:
+          spaced: '  ${ .x * 2 }  '
+          tight: '${.x}'
+input: { x: 5 }
+end:
+  completed:
+    output: { spaced: 10, tight: 5 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

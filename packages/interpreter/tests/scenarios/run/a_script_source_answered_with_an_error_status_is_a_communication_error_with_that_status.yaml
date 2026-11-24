@@ -1,0 +1,62 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-source-communication
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: js
+            source:
+              endpoint: https://scripts.example.com/greet.js
+input: {}
+script:
+  - effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: js
+        code: null
+        source:
+          {
+            name: null,
+            endpoint:
+              {
+                uri: https://scripts.example.com/greet.js,
+                authentication: null,
+              },
+          }
+        stdin: null
+        arguments: {}
+        environment: {}
+      await: true
+    outcome:
+      {
+        kind: rejected,
+        statusCode: 404,
+        detail: GET https://scripts.example.com/greet.js answered 404,
+      }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 404
+      instance: /do/0/runScript
+      title: Communication Error
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runScript }
+    - { kind: task.started, task: /do/0/runScript }
+    - {
+        kind: task.faulted,
+        task: /do/0/runScript,
+        execution: /do/0/runScript,
+        faultedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:01.000Z" }

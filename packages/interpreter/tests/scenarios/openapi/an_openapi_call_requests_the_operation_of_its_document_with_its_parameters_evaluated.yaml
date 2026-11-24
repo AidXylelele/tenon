@@ -1,0 +1,52 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: openapi-request
+    version: '1.0.0'
+  do:
+    - findPets:
+        call: openapi
+        with:
+          document:
+            endpoint: https://petstore.swagger.io/v2/swagger.json
+          operationId: findPetsByStatus
+          parameters:
+            status: ${ .status }
+input: { status: available }
+script:
+  - effect:
+      id: /do/0/findPets
+      kind: openapi
+      deadline: null
+      document:
+        name: null
+        endpoint:
+          uri: https://petstore.swagger.io/v2/swagger.json
+          authentication: null
+      operationId: findPetsByStatus
+      parameters: { status: available }
+      authentication: null
+      output: content
+      revealAuthorization: false
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/findByStatus?status=available
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: [{ id: 1, name: Milou, status: available }]
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: [{ id: 1, name: Milou, status: available }]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/findPets, execution: /do/0/findPets }
+    - { kind: task.started, task: /do/0/findPets, execution: /do/0/findPets }
+    - { kind: task.completed, task: /do/0/findPets, execution: /do/0/findPets }
+    - kind: workflow.completed

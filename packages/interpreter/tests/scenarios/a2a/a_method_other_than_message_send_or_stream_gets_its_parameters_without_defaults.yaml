@@ -1,0 +1,42 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-tasks-get
+    version: '1.0.0'
+  do:
+    - getTask:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agent.example.com/a2a
+          parameters:
+            id: ${ .taskId }
+            historyLength: 2
+input: { taskId: task-1 }
+script:
+  - effect:
+      id: /do/0/getTask
+      kind: a2a
+      deadline: null
+      method: tasks/get
+      agent:
+        {
+          kind: server,
+          endpoint:
+            { uri: https://agent.example.com/a2a, authentication: null },
+        }
+      parameters: { id: task-1, historyLength: 2 }
+    outcome:
+      {
+        kind: answered,
+        result: { kind: task, id: task-1, status: { state: completed } },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: { kind: task, id: task-1, status: { state: completed } }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getTask }
+    - kind: workflow.completed

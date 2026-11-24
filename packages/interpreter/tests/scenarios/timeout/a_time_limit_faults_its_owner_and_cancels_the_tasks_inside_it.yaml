@@ -1,0 +1,75 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-owner
+    version: '1.0.0'
+  do:
+    - wrapper:
+        do:
+          - owner:
+              timeout:
+                after: PT5S
+              do:
+                - step:
+                    do:
+                      - pause:
+                          wait: PT1M
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/wrapper/do/0/owner/do/0/step/do/0/pause,
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225660000,
+      }
+    outcome: { kind: expired }
+    now: 1767225605000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/wrapper/do/0/owner
+      title: Timeout
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/wrapper }
+    - { kind: task.started, task: /do/0/wrapper }
+    - { kind: task.created, task: /do/0/wrapper/do/0/owner }
+    - { kind: task.started, task: /do/0/wrapper/do/0/owner }
+    - { kind: task.created, task: /do/0/wrapper/do/0/owner/do/0/step }
+    - { kind: task.started, task: /do/0/wrapper/do/0/owner/do/0/step }
+    - {
+        kind: task.created,
+        task: /do/0/wrapper/do/0/owner/do/0/step/do/0/pause,
+      }
+    - {
+        kind: task.started,
+        task: /do/0/wrapper/do/0/owner/do/0/step/do/0/pause,
+      }
+    - kind: task.cancelled
+      workflow: timeout-owner-instance-1.test
+      task: /do/0/wrapper/do/0/owner/do/0/step/do/0/pause
+      execution: /do/0/wrapper/do/0/owner/do/0/step/do/0/pause
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: task.cancelled
+      workflow: timeout-owner-instance-1.test
+      task: /do/0/wrapper/do/0/owner/do/0/step
+      execution: /do/0/wrapper/do/0/owner/do/0/step
+      cancelledAt: "2026-01-01T00:00:05.000Z"
+    - kind: task.faulted
+      workflow: timeout-owner-instance-1.test
+      task: /do/0/wrapper/do/0/owner
+      execution: /do/0/wrapper/do/0/owner
+      faultedAt: "2026-01-01T00:00:05.000Z"
+    - kind: task.faulted
+      workflow: timeout-owner-instance-1.test
+      task: /do/0/wrapper
+      execution: /do/0/wrapper
+      faultedAt: "2026-01-01T00:00:05.000Z"
+    - kind: workflow.faulted
+      name: timeout-owner-instance-1.test
+      faultedAt: "2026-01-01T00:00:05.000Z"

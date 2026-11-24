@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: aliases
+    version: '0.1.0'
+  use:
+    errors:
+      notFound: &notFound
+        type: https://example.com/errors/not-found
+        status: 404
+  do:
+    - fail:
+        raise:
+          error: *notFound
+diagnostics: []

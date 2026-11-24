@@ -1,0 +1,18 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: strict-no-interpolation
+    version: '1.0.0'
+  do:
+    - compute:
+        set:
+          message: 'value is ${ .x }'
+input: { x: 5 }
+end:
+  completed:
+    output: { message: "value is ${ .x }" }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

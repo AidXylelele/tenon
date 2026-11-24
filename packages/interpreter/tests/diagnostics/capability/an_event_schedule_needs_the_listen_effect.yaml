@@ -1,0 +1,36 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+  do:
+    - greet:
+        set:
+          message: hello
+profile:
+  effects:
+    [
+      http,
+      openapi,
+      grpc,
+      asyncapi,
+      a2a,
+      mcp,
+      process,
+      workflow,
+      fork,
+      timer,
+      emit,
+      resource,
+    ]
+diagnostics:
+  - code: capability
+    pointer: /schedule/on
+    subject: effect.listen
+    range: { start: { line: 8, column: 5 } }

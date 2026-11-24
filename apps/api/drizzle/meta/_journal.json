@@ -5,15 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1791719950933,
-      "tag": "0000_brown_pepper_potts",
+      "when": 1795474002444,
+      "tag": "0000_platform_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1791719951546,
-      "tag": "0001_bootstrap_administrator",
+      "when": 1795474003129,
+      "tag": "0001_outbox_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795474003814,
+      "tag": "0002_first_administrator",
       "breakpoints": true
     }
   ]

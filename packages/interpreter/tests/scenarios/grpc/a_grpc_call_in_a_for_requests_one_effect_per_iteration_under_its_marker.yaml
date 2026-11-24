@@ -1,0 +1,59 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-for
+    version: '1.0.0'
+  do:
+    - each:
+        for:
+          in: ${ .names }
+        do:
+          - greet:
+              call: grpc
+              with:
+                proto:
+                  endpoint: https://example.com/protos/greet.proto
+                service:
+                  name: GreeterApi.Greeter
+                  host: greeter.example.com
+                method: SayHello
+                arguments:
+                  name: ${ $item }
+input: { names: [Ann, Bob] }
+script:
+  - effect:
+      {
+        id: "/do/0/each[0]/do/0/greet",
+        kind: grpc,
+        deadline: null,
+        arguments: { name: Ann },
+      }
+    outcome: { kind: replied, message: { message: "Hello, Ann" } }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/each[1]/do/0/greet",
+        kind: grpc,
+        deadline: null,
+        arguments: { name: Bob },
+      }
+    outcome: { kind: replied, message: { message: "Hello, Bob" } }
+    now: 1767225602000
+end:
+  completed:
+    output: { message: "Hello, Bob" }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/greet,
+        execution: "/do/0/each[0]/do/0/greet",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/greet,
+        execution: "/do/0/each[1]/do/0/greet",
+      }
+    - { kind: task.completed, task: /do/0/each, execution: /do/0/each }
+    - kind: workflow.completed

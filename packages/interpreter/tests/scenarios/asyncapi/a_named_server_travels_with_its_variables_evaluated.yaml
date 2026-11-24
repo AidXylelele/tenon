@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-server
+    version: '1.0.0'
+  do:
+    - publishGreeting:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: greet
+          server:
+            name: greetingsServer
+            variables:
+              environment: ${ .environment }
+              region: eu-west
+          message:
+            payload:
+              greetings: hello
+input: { environment: dev }
+end:
+  waiting:
+    effect:
+      id: /do/0/publishGreeting
+      kind: asyncapi
+      deadline: null
+      server:
+        {
+          name: greetingsServer,
+          variables: { environment: dev, region: eu-west },
+        }
+      protocol: null
+facts:
+  including:
+    - { kind: task.started, task: /do/0/publishGreeting }

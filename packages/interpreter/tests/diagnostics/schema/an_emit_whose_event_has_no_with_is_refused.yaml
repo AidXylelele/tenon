@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-schema
+    version: '0.1.0'
+  do:
+    - greet:
+        emit:
+          event:
+            type: com.example.greeted
+diagnostics:
+  - code: schema
+    pointer: /do/0/greet/emit/event

@@ -1,0 +1,202 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { Bar, Figure } from "@/operations/run-periods";
+import { PeriodFigures } from "./period-figures";
+import { PeriodPicker } from "./period-picker";
+import { RunsChart } from "./runs-chart";
+
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/link", () => ({
+  default: ({
+    prefetch,
+    href,
+    children,
+    ...props
+  }: React.ComponentProps<"a"> & { readonly prefetch: boolean | null }) => (
+    <a href={href} data-prefetch={String(prefetch)} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
+class MeasuredResizeObserver {
+  constructor(private readonly report: ResizeObserverCallback) {}
+
+  observe(target: Element) {
+    const contentRect = { width: 640, height: 192 } as DOMRectReadOnly;
+    const entry = { target, contentRect } as ResizeObserverEntry;
+    this.report([entry], this as unknown as ResizeObserver);
+  }
+
+  unobserve() {
+    return undefined;
+  }
+
+  disconnect() {
+    return undefined;
+  }
+}
+
+const FIGURES: readonly Figure[] = [
+  { kind: "started", count: 1234, previous: 1000 },
+  { kind: "succeeded", count: 1200, previous: 1200 },
+  { kind: "failed", count: 30, previous: 40 },
+  { kind: "cancelled", count: 4, previous: null },
+];
+
+const BARS: readonly Bar[] = [
+  {
+    label: "Mon 16",
+    from: "2026-11-16T00:00:00.000Z",
+    to: "2026-11-17T00:00:00.000Z",
+    succeeded: 5,
+    failed: 1,
+    cancelled: 0,
+    inProgress: 2,
+  },
+];
+
+const HREFS = [
+  "/runs?from=2026-11-16T00%3A00%3A00.000Z&to=2026-11-17T00%3A00%3A00.000Z",
+];
+
+const PERIOD_HREFS = {
+  "24h": "/?period=24h",
+  "7d": "/?period=7d",
+  "30d": "/?period=30d",
+};
+
+function hrefOf(kind: string): string {
+  return `/runs?status=${kind}`;
+}
+
+describe("the runs of a period", () => {
+  it("each_period_is_a_segment_the_chosen_one_is_checked_and_another_opens_its_address", () => {
+    render(<PeriodPicker period="7d" hrefs={PERIOD_HREFS} />);
+    const week = screen.getByRole("radio", { name: "7 days" });
+    const day = screen.getByRole("radio", { name: "24 hours" });
+
+    fireEvent.click(day);
+
+    expect(week).toHaveAttribute("aria-checked", "true");
+    expect(day).toHaveAttribute("aria-checked", "false");
+    expect(push).toHaveBeenCalledWith("/?period=24h");
+  });
+
+  it("each_figure_opens_its_runs_and_says_its_change_from_the_previous_period", () => {
+    render(
+      <PeriodFigures
+        period="7d"
+        figures={FIGURES}
+        inProgress={9}
+        hrefOf={hrefOf}
+        inProgressHref="/runs?status=in-progress&started=all"
+      />,
+    );
+    const started = screen.getByRole("link", { name: /^Started/ });
+    const failed = screen.getByRole("link", { name: /^Failed/ });
+    const live = screen.getByRole("link", { name: /^In progress now/ });
+
+    expect(started).toHaveTextContent("1,234↑ from 1,000 the previous 7 days");
+    expect(failed).toHaveAttribute("href", "/runs?status=failed");
+    expect(failed).toHaveTextContent("↓ from 40");
+    expect(live).toHaveTextContent("9live");
+  });
+
+  it("a_figure_without_a_previous_period_says_no_change", () => {
+    render(
+      <PeriodFigures
+        period="30d"
+        figures={FIGURES}
+        inProgress={0}
+        hrefOf={hrefOf}
+        inProgressHref="/runs"
+      />,
+    );
+    const cancelled = screen.getByRole("link", { name: /^Cancelled/ });
+
+    expect(cancelled).toHaveTextContent(/^Cancelled4$/);
+  });
+
+  it("the_chart_says_its_zone_and_gives_the_same_numbers_as_a_table", () => {
+    render(
+      <RunsChart bars={BARS} hrefs={HREFS} unit="day" zone="Europe/Kyiv" />,
+    );
+    const show = screen.getByRole("button", { name: "Show as table" });
+
+    fireEvent.click(show);
+    const table = screen.getByRole("region", {
+      name: "Runs per day as a table",
+    });
+    const row = within(table).getByRole("row", { name: /Mon 16/ });
+
+    expect(
+      screen.getByText("Each bar is a day in your time zone, Europe/Kyiv."),
+    ).toBeInTheDocument();
+    expect(row).toHaveTextContent("Mon 1685102");
+  });
+
+  it("an_hourly_chart_in_utc_says_so_and_names_its_table_by_the_hour", () => {
+    render(<RunsChart bars={BARS} hrefs={HREFS} unit="hour" zone="UTC" />);
+    const show = screen.getByRole("button", { name: "Show as table" });
+
+    fireEvent.click(show);
+    const table = screen.getByRole("region", {
+      name: "Runs per hour as a table",
+    });
+
+    expect(screen.getByText("Each bar is an hour in UTC.")).toBeInTheDocument();
+    expect(
+      within(table).getByRole("columnheader", { name: "Hour" }),
+    ).toBeInTheDocument();
+  });
+
+  it("enter_on_the_bar_the_keyboard_reached_opens_its_runs", () => {
+    vi.stubGlobal("ResizeObserver", MeasuredResizeObserver);
+    const { container } = render(
+      <RunsChart bars={BARS} hrefs={HREFS} unit="day" zone="UTC" />,
+    );
+    const chart = screen.getByRole("group", { name: /^Runs per day/ });
+    const surface = container.querySelector(".recharts-surface");
+
+    if (!(surface instanceof SVGElement)) throw new Error("No chart drawn");
+
+    fireEvent.focus(surface);
+    fireEvent.keyDown(surface, { key: "ArrowRight" });
+    fireEvent.keyDown(chart, { key: "Enter" });
+
+    expect(push).toHaveBeenCalledWith(HREFS[0]);
+    vi.unstubAllGlobals();
+  });
+
+  it("enter_before_any_bar_is_reached_opens_nothing", () => {
+    push.mockReset();
+    render(<RunsChart bars={BARS} hrefs={HREFS} unit="day" zone="UTC" />);
+    const chart = screen.getByRole("group", { name: /^Runs per day/ });
+
+    fireEvent.keyDown(chart, { key: "Enter" });
+    fireEvent.keyDown(chart, { key: "Escape" });
+
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("a_click_on_a_bar_opens_its_runs", () => {
+    push.mockReset();
+    vi.stubGlobal("ResizeObserver", MeasuredResizeObserver);
+    const { container } = render(
+      <RunsChart bars={BARS} hrefs={HREFS} unit="day" zone="UTC" />,
+    );
+    const surface = container.querySelector(".recharts-surface");
+
+    if (!(surface instanceof SVGElement)) throw new Error("No chart drawn");
+
+    fireEvent.focus(surface);
+    fireEvent.keyDown(surface, { key: "ArrowRight" });
+    fireEvent.click(surface);
+
+    expect(push).toHaveBeenCalledWith(HREFS[0]);
+    vi.unstubAllGlobals();
+  });
+});

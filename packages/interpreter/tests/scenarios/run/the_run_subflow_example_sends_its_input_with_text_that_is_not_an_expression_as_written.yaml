@@ -1,0 +1,51 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-subflow
+    version: '0.1.0'
+  do:
+    - registerCustomer:
+        run:
+          workflow:
+            namespace: test
+            name: register-customer
+            version: '0.1.0'
+            input:
+              customer: .user
+input: { user: { name: ann } }
+script:
+  - effect:
+      id: /do/0/registerCustomer
+      kind: workflow
+      deadline: null
+      namespace: test
+      name: register-customer
+      version: "0.1.0"
+      input: { customer: .user }
+      await: true
+    outcome: { kind: completed, output: { customerId: c-1 } }
+    now: 1767225601000
+end:
+  completed:
+    output: { customerId: c-1 }
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/registerCustomer,
+        execution: /do/0/registerCustomer,
+      }
+    - {
+        kind: task.started,
+        task: /do/0/registerCustomer,
+        execution: /do/0/registerCustomer,
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/registerCustomer,
+        execution: /do/0/registerCustomer,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

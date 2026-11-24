@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-retry-delay
+    version: '1.0.0'
+  do:
+    - guard:
+        timeout:
+          after: PT30S
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: 1767225630000,
+        until: 1767225601000,
+      }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }

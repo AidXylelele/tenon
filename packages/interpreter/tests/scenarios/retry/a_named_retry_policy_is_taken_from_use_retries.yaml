@@ -1,0 +1,45 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-named
+    version: '1.0.0'
+  use:
+    retries:
+      patient:
+        delay:
+          seconds: 2
+        limit:
+          attempt:
+            count: 1
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry: patient
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/busy
+      status: 503
+      instance: /do/0/guard/try/0/fail
+facts:
+  including:
+    - { kind: task.faulted, execution: "/do/0/guard#2/try/0/fail" }
+    - kind: workflow.faulted

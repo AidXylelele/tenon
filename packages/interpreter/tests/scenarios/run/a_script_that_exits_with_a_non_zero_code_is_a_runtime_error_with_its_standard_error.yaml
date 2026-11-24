@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-throws
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: python
+            code: raise ValueError("bad input")
+input: {}
+script:
+  - effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: python
+        code: 'raise ValueError("bad input")'
+        source: null
+        stdin: null
+        arguments: {}
+        environment: {}
+      await: true
+    outcome:
+      { kind: exited, code: 1, stdout: "", stderr: "ValueError: bad input" }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+      status: 500
+      instance: /do/0/runScript
+      title: Runtime Error
+      detail: "ValueError: bad input"
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runScript }
+    - { kind: task.started, task: /do/0/runScript }
+    - {
+        kind: task.faulted,
+        task: /do/0/runScript,
+        execution: /do/0/runScript,
+        faultedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:01.000Z" }

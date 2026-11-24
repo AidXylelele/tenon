@@ -1,0 +1,22 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: export-as-fails
+    version: '1.0.0'
+  do:
+    - produce:
+        set: { value: 3 }
+        export:
+          as: '${ error("boom") }'
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      instance: /do/0/produce
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/produce }
+    - kind: workflow.faulted

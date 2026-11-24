@@ -10,9 +10,11 @@ out
 .next
 next-env.d.ts
 *.tsbuildinfo
+storybook-static
 
 # testing
 coverage
+test-results
 
 # env files
 .env*

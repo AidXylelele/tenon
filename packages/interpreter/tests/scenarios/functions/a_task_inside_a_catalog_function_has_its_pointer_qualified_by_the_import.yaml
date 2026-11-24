@@ -1,0 +1,59 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-catalog-tasks
+    version: '1.0.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://github.com/open-workflow-specification/catalog/tree/main
+  do:
+    - log:
+        call: log:1.0.0@global
+        with:
+          message: hello
+imports:
+  log:1.0.0@global: |
+    do:
+      - write:
+          call: http
+          with:
+            method: post
+            endpoint: https://logs.example.com/entries
+            body:
+              message: ${ .message }
+input: {}
+script:
+  - effect:
+      id: /do/0/log@function/do/0/write
+      kind: http
+      deadline: null
+      method: POST
+      body: { message: hello }
+    outcome:
+      kind: responded
+      request:
+        method: POST
+        uri: https://logs.example.com/entries
+        headers: { content-type: application/json }
+      statusCode: 201
+      headers: { content-type: application/json }
+      content: { id: 7 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 7 }
+facts:
+  including:
+    - kind: task.started
+      task: log:1.0.0@global#/do/0/write
+      execution: /do/0/log@function/do/0/write
+    - kind: task.completed
+      task: log:1.0.0@global#/do/0/write
+      execution: /do/0/log@function/do/0/write
+    - kind: task.completed
+      task: log:1.0.0@global#
+      execution: /do/0/log@function
+    - kind: workflow.completed

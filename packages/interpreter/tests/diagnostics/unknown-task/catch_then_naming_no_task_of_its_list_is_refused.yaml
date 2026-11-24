@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - attempt:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/failed
+                  status: 500
+        catch:
+          then: recover
+diagnostics:
+  - code: unknown-task
+    pointer: /do/0/attempt/catch/then
+    subject: recover
+    range: { start: { line: 15, column: 15 } }

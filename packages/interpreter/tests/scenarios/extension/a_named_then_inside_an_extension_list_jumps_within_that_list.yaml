@@ -1,0 +1,55 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-jump
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: wait
+          before:
+            - first:
+                set: { first: true }
+                then: third
+            - second:
+                set: { second: true }
+            - third:
+                set: { third: true }
+  do:
+    - pause:
+        wait: PT1S
+input: {}
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  completed:
+    output: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/pause }
+    - { kind: task.started, task: /do/0/pause }
+    - kind: task.created
+      task: /use/extensions/0/audit/before/0/first
+      execution: "/do/0/pause@before/0/0/first"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/0/first
+      execution: "/do/0/pause@before/0/0/first"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/first
+      execution: "/do/0/pause@before/0/0/first"
+    - kind: task.created
+      task: /use/extensions/0/audit/before/2/third
+      execution: "/do/0/pause@before/0/2/third"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/2/third
+      execution: "/do/0/pause@before/0/2/third"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/2/third
+      execution: "/do/0/pause@before/0/2/third"
+    - { kind: task.completed, task: /do/0/pause }
+    - kind: workflow.completed

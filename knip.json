@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    "apps/api": {
+      "entry": [
+        "src/frameworks/main.ts",
+        "src/frameworks/worker.ts",
+        "src/interface-adapters/api/auth/interfaces.ts",
+        "test/support/*.mjs",
+        "src/frameworks/interpreter/*.thread.ts",
+        "src/frameworks/opentelemetry/*.sdk.ts"
+      ],
+      "ignoreDependencies": ["pino-pretty"]
+    },
+    "apps/web": {
+      "entry": ["e2e/**/*.{ts,mjs}"],
+      "ignoreDependencies": ["postcss"]
+    },
+    "packages/language-server": {
+      "entry": [
+        "src/worker.ts",
+        "src/protocol/index.ts",
+        "src/structure.ts",
+        "tests/support/*.ts"
+      ]
+    },
+    "packages/interpreter": {
+      "entry": ["src/index.ts", "src/front-end.ts"]
+    }
+  }
+}

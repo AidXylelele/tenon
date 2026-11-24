@@ -1,0 +1,15 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-schema
+    version: '0.1.0'
+  do:
+    - greet:
+        emit:
+          event:
+            with:
+              source: https://example.com
+diagnostics:
+  - code: schema
+    pointer: /do/0/greet/emit/event/with

@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-patterns
+    version: '1.0.0'
+  do:
+    - admit:
+        listen:
+          to:
+            all:
+              - with:
+                  type: com.example.heartbeat.low
+                  source: https://hospital.example.com
+                  patientid: 'p-\d+'
+              - with:
+                  type: com.example.nurse.available
+                  priority: 3
+                  subject: '${ startswith("ward-") }'
+                  data: '${ .free == true }'
+input: {}
+end:
+  waiting:
+    effect:
+      id: "/do/0/admit@event[0]"
+      kind: listen
+      deadline: null
+      subscription: /do/0/admit
+      position: 0
+facts:
+  including:
+    - { kind: task.started, task: /do/0/admit }

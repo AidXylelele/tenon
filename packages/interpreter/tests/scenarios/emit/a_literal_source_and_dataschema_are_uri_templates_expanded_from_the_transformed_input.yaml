@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-uri-templates
+    version: '1.0.0'
+  do:
+    - notify:
+        input:
+          from: ${ .order }
+        emit:
+          event:
+            with:
+              source: https://shop.example.com/{tenant}/orders
+              type: com.example.order.placed.v1
+              dataschema: https://schemas.example.com/{tenant}/order.json
+input: { tenant: outer, order: { tenant: eu west } }
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: fda1d579-3f69-54e2-affe-94ef3ee98686
+        source: https://shop.example.com/eu%20west/orders
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        dataschema: https://schemas.example.com/eu%20west/order.json
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

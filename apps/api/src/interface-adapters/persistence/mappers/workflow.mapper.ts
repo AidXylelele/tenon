@@ -1,0 +1,39 @@
+import { Injectable } from "@nestjs/common";
+import { Workflow } from "../../../domain/automation/workflows/workflow.js";
+import { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
+import type { WorkflowVersion } from "../../../domain/automation/workflows/workflow-version.js";
+import type { WorkflowRow } from "../interfaces.js";
+
+@Injectable()
+export class WorkflowMapper {
+  toRow(workflow: Workflow): WorkflowRow {
+    return {
+      id: workflow.id,
+      namespace: workflow.name.namespace,
+      name: workflow.name.name,
+      status: workflow.status,
+      on: workflow.on,
+      currentVersionId: workflow.currentVersionId,
+      archivedAt: workflow.archivedAt,
+      arming: workflow.arming,
+      scheduledSince: workflow.scheduledSince,
+      version: workflow.version,
+    };
+  }
+
+  toEntity(row: WorkflowRow, versions: readonly WorkflowVersion[]): Workflow {
+    const name = new WorkflowName(row.namespace, row.name);
+    return new Workflow({
+      id: row.id,
+      name,
+      status: row.status,
+      on: row.on,
+      currentVersionId: row.currentVersionId,
+      archivedAt: row.archivedAt,
+      arming: row.arming,
+      scheduledSince: row.scheduledSince,
+      version: row.version,
+      versions,
+    });
+  }
+}

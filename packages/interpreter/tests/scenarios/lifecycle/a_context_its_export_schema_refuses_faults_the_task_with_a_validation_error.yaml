@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: invalid-export
+    version: '1.0.0'
+  do:
+    - remember:
+        set: { id: 7 }
+        export:
+          as: '${ { forgotten: true } }'
+          schema:
+            format: json
+            document:
+              type: object
+              required: [remembered]
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      instance: /do/0/remember
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/remember }
+    - { kind: task.started, task: /do/0/remember }
+    - { kind: task.faulted, task: /do/0/remember }
+    - kind: workflow.faulted

@@ -1,9 +1,10 @@
 const config = {
-  '*.{js,mjs,cjs,ts,mts,cts,tsx}': [
-    'eslint --fix --max-warnings=0 --no-warn-ignored',
-    'prettier --write',
+  "*.{ts,tsx,mts,mjs}": [
+    "eslint --fix",
+    "prettier --write",
+    "vitest related --run",
   ],
-  '*.{json,md,css,yml,yaml}': 'prettier --write',
+  "*.{css,json,md}": "prettier --write",
 };
 
 export default config;

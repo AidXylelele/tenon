@@ -1,0 +1,21 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: export-replaces
+    version: '1.0.0'
+  do:
+    - remember:
+        set: { id: 7 }
+        export:
+          as: '${ { remembered: .id } }'
+    - recall:
+        set: '${ { context: $context } }'
+input: { seed: true }
+end:
+  completed:
+    output: { context: { remembered: 7 } }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

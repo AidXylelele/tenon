@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-shell-arguments
+    version: '1.0.0'
+  do:
+    - runShell:
+        run:
+          shell:
+            command: ./report.sh
+            arguments:
+              - --year
+              - ${ .year }
+              - ${ .owner }
+              - ${ .filters }
+input: { year: 2026, owner: ann, filters: [open, late] }
+end:
+  waiting:
+    effect:
+      id: /do/0/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: ./report.sh
+        stdin: null
+        arguments: [--year, "2026", ann, '["open","late"]']
+        directory: null
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runShell }

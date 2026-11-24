@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schemas
+    version: '0.1.0'
+  input:
+    schema:
+      resource:
+        endpoint: https://schemas.example.com/order.json
+  do:
+    - greet:
+        set:
+          message: hello
+imports:
+  https://schemas.example.com/order.json: '{ "type": "objekt" }'
+diagnostics:
+  - code: json-schema
+    pointer: /input/schema/resource/endpoint
+    range: { start: { line: 9, column: 17 } }

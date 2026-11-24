@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schema-workflow-input-refused
+    version: '1.0.0'
+  input:
+    schema:
+      resource:
+        endpoint: ${ "https://schemas.example.com/order.json" }
+  do:
+    - accept:
+        set: '${ { accepted: .order } }'
+input: { item: 7 }
+script:
+  - effect:
+      id: "@/input/schema"
+      kind: resource
+      deadline: null
+      resource:
+        name: null
+        endpoint:
+          {
+            uri: "https://schemas.example.com/order.json",
+            authentication: null,
+          }
+    outcome:
+      kind: fetched
+      document: { type: object, required: [order] }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      instance: ""
+      title: Validation Error
+facts:
+  exactly:
+    - kind: workflow.started
+    - kind: workflow.faulted

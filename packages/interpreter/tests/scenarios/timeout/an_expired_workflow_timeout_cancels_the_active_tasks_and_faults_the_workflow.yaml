@@ -1,0 +1,47 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-workflow-expired
+    version: '1.0.0'
+  timeout:
+    after: PT10S
+  do:
+    - outer:
+        do:
+          - pause:
+              wait: PT1M
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/outer/do/0/pause,
+        kind: timer,
+        deadline: 1767225610000,
+        until: 1767225660000,
+      }
+    outcome: { kind: expired }
+    now: 1767225610000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: ""
+      title: Timeout
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/do/0/pause }
+    - { kind: task.started, task: /do/0/outer/do/0/pause }
+    - kind: task.cancelled
+      task: /do/0/outer/do/0/pause
+      cancelledAt: "2026-01-01T00:00:10.000Z"
+    - kind: task.cancelled
+      task: /do/0/outer
+      cancelledAt: "2026-01-01T00:00:10.000Z"
+    - kind: workflow.faulted
+      name: timeout-workflow-expired-instance-1.test
+      faultedAt: "2026-01-01T00:00:10.000Z"

@@ -1,0 +1,91 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: try-facts
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - step:
+              do:
+                - fail:
+                    raise:
+                      error:
+                        type: https://example.com/errors/broken
+                        status: 503
+        catch: {}
+input: {}
+end:
+  completed:
+    output: {}
+facts:
+  exactly:
+    - kind: workflow.started
+      name: try-facts-instance-1.test
+      definition: { namespace: test, name: try-facts, version: "1.0.0" }
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.created
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard
+      execution: /do/0/guard
+      createdAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.started
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard
+      execution: /do/0/guard
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.created
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard/try/0/step
+      execution: /do/0/guard/try/0/step
+      createdAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.started
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard/try/0/step
+      execution: /do/0/guard/try/0/step
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.created
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard/try/0/step/do/0/fail
+      execution: /do/0/guard/try/0/step/do/0/fail
+      createdAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.started
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard/try/0/step/do/0/fail
+      execution: /do/0/guard/try/0/step/do/0/fail
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.faulted
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard/try/0/step/do/0/fail
+      execution: /do/0/guard/try/0/step/do/0/fail
+      faultedAt: "2026-01-01T00:00:00.000Z"
+      error:
+        {
+          type: https://example.com/errors/broken,
+          status: 503,
+          instance: /do/0/guard/try/0/step/do/0/fail,
+          title: null,
+          detail: null,
+        }
+    - kind: task.faulted
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard/try/0/step
+      execution: /do/0/guard/try/0/step
+      faultedAt: "2026-01-01T00:00:00.000Z"
+      error:
+        {
+          type: https://example.com/errors/broken,
+          status: 503,
+          instance: /do/0/guard/try/0/step/do/0/fail,
+          title: null,
+          detail: null,
+        }
+    - kind: task.completed
+      workflow: try-facts-instance-1.test
+      task: /do/0/guard
+      execution: /do/0/guard
+      completedAt: "2026-01-01T00:00:00.000Z"
+    - kind: workflow.completed
+      name: try-facts-instance-1.test
+      completedAt: "2026-01-01T00:00:00.000Z"

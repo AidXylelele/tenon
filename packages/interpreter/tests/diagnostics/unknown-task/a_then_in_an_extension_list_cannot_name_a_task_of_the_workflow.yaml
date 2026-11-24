@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - note:
+                set: { noted: true }
+                then: finish
+  do:
+    - greet:
+        set: { greeting: Hello }
+    - finish:
+        set: { finished: true }
+diagnostics:
+  - code: unknown-task
+    pointer: /use/extensions/0/audit/before/0/note/then
+    subject: finish
+    range: { start: { line: 13, column: 21 } }

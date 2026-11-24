@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-not-nested
+    version: '1.0.0'
+  use:
+    extensions:
+      - everything:
+          extend: all
+          before:
+            - noteAll:
+                set: { all: true }
+      - sets:
+          extend: set
+          before:
+            - noteSet:
+                set: { set: true }
+  do:
+    - greet:
+        set: { greeting: Hello }
+input: {}
+end:
+  completed:
+    output: { greeting: Hello }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/everything/before/0/noteAll
+      execution: "/do/0/greet@before/0/0/noteAll"
+    - kind: task.started
+      task: /use/extensions/0/everything/before/0/noteAll
+      execution: "/do/0/greet@before/0/0/noteAll"
+    - kind: task.completed
+      task: /use/extensions/0/everything/before/0/noteAll
+      execution: "/do/0/greet@before/0/0/noteAll"
+    - kind: task.created
+      task: /use/extensions/1/sets/before/0/noteSet
+      execution: "/do/0/greet@before/1/0/noteSet"
+    - kind: task.started
+      task: /use/extensions/1/sets/before/0/noteSet
+      execution: "/do/0/greet@before/1/0/noteSet"
+    - kind: task.completed
+      task: /use/extensions/1/sets/before/0/noteSet
+      execution: "/do/0/greet@before/1/0/noteSet"
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: wait-inline
+    version: '1.0.0'
+  do:
+    - pause:
+        wait:
+          days: 1
+          hours: 2
+          minutes: 3
+          seconds: 4
+          milliseconds: 5
+input: { a: 1 }
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767319384005 }
+    outcome: { kind: elapsed }
+    now: 1767319384005
+end:
+  completed:
+    output: { a: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/pause }
+    - kind: workflow.completed

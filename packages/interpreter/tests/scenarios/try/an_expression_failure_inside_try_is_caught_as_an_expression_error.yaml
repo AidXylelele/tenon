@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-expression
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - compute:
+              set:
+                value: '${ .text | tonumber }'
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+          do:
+            - keep:
+                set:
+                  caught: '${ $error | del(.detail) }'
+input: { text: not a number }
+end:
+  completed:
+    output:
+      caught:
+        type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+        status: 400
+        instance: /do/0/guard/try/0/compute
+        title: Expression Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/compute }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

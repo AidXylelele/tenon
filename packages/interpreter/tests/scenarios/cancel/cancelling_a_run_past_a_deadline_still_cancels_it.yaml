@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cancel-past-deadline
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT10S
+        timeout:
+          after: PT5S
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/pause,
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225610000,
+      }
+    cancel: true
+    now: 1767225608000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/pause }
+    - { kind: task.started, task: /do/0/pause }
+    - kind: task.cancelled
+      task: /do/0/pause
+      execution: /do/0/pause
+      cancelledAt: "2026-01-01T00:00:08.000Z"
+    - kind: workflow.cancelled
+      cancelledAt: "2026-01-01T00:00:08.000Z"

@@ -1,0 +1,53 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-function
+    version: '1.0.0'
+  use:
+    functions:
+      sayHello:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+          method: SayHello
+          arguments:
+            name: ${ .name }
+  do:
+    - greet:
+        call: sayHello
+        with:
+          name: Ann
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/greet@function,
+        kind: grpc,
+        deadline: null,
+        method: SayHello,
+        arguments: { name: Ann },
+      }
+    outcome: { kind: replied, message: { message: "Hello, Ann" } }
+    now: 1767225601000
+end:
+  completed:
+    output: { message: "Hello, Ann" }
+facts:
+  including:
+    - {
+        kind: task.started,
+        task: /use/functions/sayHello,
+        execution: /do/0/greet@function,
+      }
+    - {
+        kind: task.completed,
+        task: /use/functions/sayHello,
+        execution: /do/0/greet@function,
+      }
+    - { kind: task.completed, task: /do/0/greet, execution: /do/0/greet }
+    - kind: workflow.completed

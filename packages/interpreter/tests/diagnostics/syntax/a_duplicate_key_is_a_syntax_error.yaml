@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: twice
+    version: '0.1.0'
+    name: again
+  do:
+    - pause:
+        wait: PT1S
+diagnostics:
+  - code: syntax
+    pointer: ""
+    range: { start: { line: 6, column: 3 } }

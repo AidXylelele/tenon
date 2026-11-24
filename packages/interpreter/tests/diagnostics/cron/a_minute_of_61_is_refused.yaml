@@ -1,0 +1,17 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: times
+    version: '0.1.0'
+  schedule:
+    cron: '61 * * * *'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: cron
+    pointer: /schedule/cron
+    range: { start: { line: 7, column: 9 } }
+    message: "Cron expression '61 * * * *' must have five valid fields."

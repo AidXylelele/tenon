@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-query-before-fragment
+    version: '1.0.0'
+  do:
+    - fetch:
+        call: http
+        with:
+          method: get
+          endpoint: 'http://x/a#frag'
+          query:
+            na me: v
+input: {}
+script:
+  - effect:
+      id: /do/0/fetch
+      kind: http
+      deadline: null
+      endpoint:
+        uri: "http://x/a?na%20me=v#frag"
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: "http://x/a?na%20me=v#frag"
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { ok: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/fetch }
+    - kind: workflow.completed

@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-source-template
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: python
+            source:
+              endpoint: https://scripts.example.com/{name}.py
+input: { name: greet }
+end:
+  waiting:
+    effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: python
+        code: null
+        source:
+          {
+            name: null,
+            endpoint:
+              {
+                uri: https://scripts.example.com/greet.py,
+                authentication: null,
+              },
+          }
+        stdin: null
+        arguments: {}
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runScript }

@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-zero-wait
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT1S
+        timeout:
+          after:
+            seconds: 0
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/pause
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/pause }
+    - { kind: task.started, task: /do/0/pause }
+    - { kind: task.faulted, task: /do/0/pause }
+    - kind: workflow.faulted

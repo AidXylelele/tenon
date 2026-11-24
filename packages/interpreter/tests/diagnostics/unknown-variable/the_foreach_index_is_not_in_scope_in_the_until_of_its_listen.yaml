@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until: '${ $index >= 3 }'
+        foreach:
+          do:
+            - keep:
+                set:
+                  value: '${ $item }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/readings/listen/to/until
+    subject: $index
+    range: { start: { line: 13, column: 18 } }

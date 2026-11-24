@@ -1,0 +1,20 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: loose-fallback
+    version: '1.0.0'
+  evaluate:
+    mode: loose
+  do:
+    - compute:
+        set:
+          deep: .x.y
+input: { x: 5 }
+end:
+  completed:
+    output: { deep: .x.y }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

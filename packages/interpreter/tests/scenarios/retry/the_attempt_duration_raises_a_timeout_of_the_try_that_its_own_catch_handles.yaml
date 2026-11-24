@@ -1,0 +1,82 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-attempt-duration
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - pause:
+              wait: PT10S
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+              instance: /do/0/guard
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+                duration:
+                  seconds: 3
+          do:
+            - giveUp:
+                set:
+                  type: '${ $error.type }'
+                  status: '${ $error.status }'
+                  instance: '${ $error.instance }'
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/guard/try/0/pause,
+        kind: timer,
+        deadline: 1767225603000,
+        until: 1767225610000,
+      }
+    outcome: { kind: expired }
+    now: 1767225603000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225604000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225604000
+  - effect:
+      {
+        id: "/do/0/guard#2/try/0/pause",
+        kind: timer,
+        deadline: 1767225607000,
+        until: 1767225614000,
+      }
+    outcome: { kind: expired }
+    now: 1767225607000
+end:
+  completed:
+    output:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/guard
+facts:
+  including:
+    - kind: task.cancelled
+      task: /do/0/guard/try/0/pause
+      execution: /do/0/guard/try/0/pause
+      cancelledAt: "2026-01-01T00:00:03.000Z"
+    - kind: task.retried
+      task: /do/0/guard
+      execution: /do/0/guard
+      retriedAt: "2026-01-01T00:00:03.000Z"
+    - kind: task.cancelled
+      task: /do/0/guard/try/0/pause
+      execution: "/do/0/guard#2/try/0/pause"
+      cancelledAt: "2026-01-01T00:00:07.000Z"
+    - { kind: task.completed, execution: /do/0/guard/catch/do/0/giveUp }
+    - { kind: task.completed, task: /do/0/guard, execution: /do/0/guard }
+    - kind: workflow.completed

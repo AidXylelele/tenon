@@ -1,0 +1,23 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  use:
+    errors:
+      rejected:
+        type: https://example.com/errors/rejected
+        status: 422
+        detail: '${ "order " + ($position | tostring) + " " + $order.id }'
+  do:
+    - each:
+        for:
+          each: order
+          in: '${ .orders }'
+          at: position
+        do:
+          - reject:
+              raise:
+                error: rejected
+diagnostics: []

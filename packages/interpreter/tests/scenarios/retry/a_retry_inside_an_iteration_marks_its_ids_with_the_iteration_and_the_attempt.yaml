@@ -1,0 +1,52 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-in-for
+    version: '1.0.0'
+  do:
+    - loop:
+        for:
+          in: [a]
+        do:
+          - guard:
+              try:
+                - fail:
+                    raise:
+                      error:
+                        type: https://example.com/errors/busy
+                        status: 503
+              catch:
+                retry:
+                  delay:
+                    seconds: 1
+                  limit:
+                    attempt:
+                      count: 1
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/loop[0]/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/busy
+      status: 503
+      instance: /do/0/loop/do/0/guard/try/0/fail
+facts:
+  including:
+    - kind: task.faulted
+      task: /do/0/loop/do/0/guard/try/0/fail
+      execution: "/do/0/loop[0]/do/0/guard/try/0/fail"
+    - kind: task.faulted
+      task: /do/0/loop/do/0/guard/try/0/fail
+      execution: "/do/0/loop[0]/do/0/guard#2/try/0/fail"
+    - { kind: task.faulted, task: /do/0/loop, execution: /do/0/loop }
+    - kind: workflow.faulted

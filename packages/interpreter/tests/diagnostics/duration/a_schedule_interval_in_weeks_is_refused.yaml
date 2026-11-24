@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: times
+    version: '0.1.0'
+  schedule:
+    every: P1W
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: duration
+    pointer: /schedule/every
+    range: { start: { line: 7, column: 10 } }

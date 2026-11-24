@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: set-nested
+    version: '1.0.0'
+  do:
+    - build:
+        set:
+          list:
+            - '${ .a }'
+            - 2
+            - deep: '${ .b }'
+          literal: 3
+          nothing: null
+input: { a: 1, b: x }
+end:
+  completed:
+    output:
+      list: [1, 2, { deep: x }]
+      literal: 3
+      nothing: null
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/build }
+    - kind: workflow.completed

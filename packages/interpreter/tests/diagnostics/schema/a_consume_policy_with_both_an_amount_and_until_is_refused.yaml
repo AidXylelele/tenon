@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-consume
+    version: '0.1.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 5
+              until: ${ true }
+diagnostics:
+  - code: schema
+    pointer: /do/0/watch/with/subscription/consume

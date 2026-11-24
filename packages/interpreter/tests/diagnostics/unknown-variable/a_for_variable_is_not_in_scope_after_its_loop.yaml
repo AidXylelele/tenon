@@ -1,0 +1,23 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - each:
+        for:
+          each: pet
+          in: '${ .pets }'
+        do:
+          - keep:
+              set:
+                name: '${ $pet.name }'
+    - after:
+        set:
+          name: '${ $pet.name }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/1/after/set/name
+    subject: $pet
+    range: { start: { line: 17, column: 15 } }

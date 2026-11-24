@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - attempt:
+        try:
+          - early:
+              set:
+                status: '${ $error.status }'
+        catch:
+          do:
+            - note:
+                set:
+                  caught: true
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/attempt/try/0/early/set/status
+    subject: $error
+    range: { start: { line: 11, column: 23 } }

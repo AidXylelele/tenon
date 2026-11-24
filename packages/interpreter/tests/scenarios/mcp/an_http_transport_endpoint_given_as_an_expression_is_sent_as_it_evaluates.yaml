@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-endpoint-expression
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint: ${ .server }
+input: { server: "https://mcp.example.com/{tenant}/mcp", tenant: acme }
+end:
+  waiting:
+    effect:
+      id: /do/0/callTool
+      kind: mcp
+      deadline: null
+      transport:
+        {
+          kind: http,
+          endpoint:
+            {
+              uri: "https://mcp.example.com/{tenant}/mcp",
+              authentication: null,
+            },
+          headers: {},
+        }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/callTool }

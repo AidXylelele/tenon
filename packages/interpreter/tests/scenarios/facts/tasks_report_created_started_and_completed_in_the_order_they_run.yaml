@@ -1,0 +1,114 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: task-order
+    version: '1.0.0'
+  do:
+    - prepare:
+        set: { step: 1 }
+    - process:
+        do:
+          - first:
+              set: { step: 2 }
+          - second:
+              set: { step: 3 }
+input: {}
+end:
+  completed:
+    output: { step: 3 }
+facts:
+  exactly:
+    - kind: workflow.started
+      name: task-order-instance-1.test
+      definition: { namespace: test, name: task-order, version: "1.0.0" }
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - {
+        kind: task.created,
+        workflow: task-order-instance-1.test,
+        task: /do/0/prepare,
+        execution: /do/0/prepare,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.started,
+        workflow: task-order-instance-1.test,
+        task: /do/0/prepare,
+        execution: /do/0/prepare,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.completed,
+        workflow: task-order-instance-1.test,
+        task: /do/0/prepare,
+        execution: /do/0/prepare,
+        completedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.created,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process,
+        execution: /do/1/process,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.started,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process,
+        execution: /do/1/process,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.created,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process/do/0/first,
+        execution: /do/1/process/do/0/first,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.started,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process/do/0/first,
+        execution: /do/1/process/do/0/first,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.completed,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process/do/0/first,
+        execution: /do/1/process/do/0/first,
+        completedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.created,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process/do/1/second,
+        execution: /do/1/process/do/1/second,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.started,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process/do/1/second,
+        execution: /do/1/process/do/1/second,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.completed,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process/do/1/second,
+        execution: /do/1/process/do/1/second,
+        completedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.completed,
+        workflow: task-order-instance-1.test,
+        task: /do/1/process,
+        execution: /do/1/process,
+        completedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: workflow.completed,
+        name: task-order-instance-1.test,
+        completedAt: "2026-01-01T00:00:00.000Z",
+      }

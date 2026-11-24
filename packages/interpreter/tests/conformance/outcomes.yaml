@@ -1,0 +1,119 @@
+call:
+  Call HTTP With Content Output:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/findByStatus?status=available
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content:
+        - { id: 1, name: Milou, status: available }
+        - { id: 2, name: Idefix, status: available }
+      authorization: null
+  Call HTTP With Response Output:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou, status: available }
+      authorization: null
+  Call HTTP With Response Output And Output Filtering:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou, status: available }
+      authorization: null
+  Call HTTP Using Basic Authentication:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://httpbin.org/basic-auth/serverless-workflow/conformance-test
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { authenticated: true, user: serverless-workflow }
+      authorization: null
+  Call OpenAPI With Content Output:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/findByStatus?status=available
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content:
+        - { id: 1, name: Milou, status: available }
+        - { id: 2, name: Idefix, status: available }
+      authorization: null
+  Call OpenAPI With Response Output:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou, status: available }
+      authorization: null
+data-flow:
+  Output Filtering:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou, status: available }
+      authorization: null
+  Use Non-object Output:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou, status: available }
+      authorization: null
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/2
+        headers: { accept: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 2, name: Idefix, status: available }
+      authorization: null
+emit:
+  Emit Task:
+    - kind: emitted
+try:
+  Try Handle Caught Error:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/getPetByName/Milou
+        headers: { accept: application/json }
+      statusCode: 404
+      headers: { content-type: application/json }
+      content: { code: 404, type: unknown, message: Pet not found }
+      authorization: null
+  Try Raise Uncaught Error:
+    - kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/getPetByName/Milou
+        headers: { accept: application/json }
+      statusCode: 404
+      headers: { content-type: application/json }
+      content: { code: 404, type: unknown, message: Pet not found }
+      authorization: null

@@ -1,0 +1,67 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-for
+    version: '1.0.0'
+  do:
+    - each:
+        for:
+          in: ${ .orders }
+        do:
+          - notify:
+              emit:
+                event:
+                  with:
+                    type: com.example.order.placed.v1
+                    data: ${ $item }
+input: { orders: [o-1, o-2] }
+script:
+  - effect:
+      id: "/do/0/each[0]/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: 9e7b157e-a0fb-5298-a1d4-cb9c5e4b8f55
+        source: /test/emit-for/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+        data: o-1
+    outcome: { kind: emitted }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/each[1]/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: 197a0232-f374-5845-8660-7fd7754ff19f
+        source: /test/emit-for/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:01.000Z"
+        data: o-2
+    outcome: { kind: emitted }
+    now: 1767225602000
+end:
+  completed:
+    output:
+      specversion: "1.0"
+      id: 197a0232-f374-5845-8660-7fd7754ff19f
+      source: /test/emit-for/1.0.0
+      type: com.example.order.placed.v1
+      time: "2026-01-01T00:00:01.000Z"
+      data: o-2
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/notify,
+        execution: "/do/0/each[0]/do/0/notify",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/each/do/0/notify,
+        execution: "/do/0/each[1]/do/0/notify",
+      }
+    - kind: workflow.completed

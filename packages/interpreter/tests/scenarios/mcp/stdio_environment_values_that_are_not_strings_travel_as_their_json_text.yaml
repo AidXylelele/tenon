@@ -1,0 +1,38 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-stdio-environment-texts
+    version: '1.0.0'
+  do:
+    - fetchPage:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            stdio:
+              command: uvx
+              environment:
+                COUNT: ${ .count }
+                OPTIONS: ${ .options }
+                EMPTY: ${ .missing }
+                MODE: strict
+input: { count: 3, options: { verbose: true } }
+end:
+  waiting:
+    effect:
+      id: /do/0/fetchPage
+      kind: mcp
+      deadline: null
+      transport:
+        kind: stdio
+        command: uvx
+        arguments: []
+        environment:
+          COUNT: "3"
+          OPTIONS: '{"verbose":true}'
+          EMPTY: "null"
+          MODE: strict
+facts:
+  including:
+    - { kind: task.started, task: /do/0/fetchPage }

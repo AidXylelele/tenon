@@ -1,29 +1,13 @@
-import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
-import './globals.css';
-
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+import type { Metadata } from "next";
+import { pageTitle, PRODUCT_NAME } from "@/libs/routing/page-title";
+import { RootFrame } from "@/spaces/shell/modules/root-frame";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Workflow Platform',
-  description: 'Build and run automations',
+  title: { template: pageTitle("%s"), default: PRODUCT_NAME },
+  description: "Build, run and watch workflows on the Open Workflow standard",
 };
 
-export default function RootLayout({ children }: LayoutProps<'/'>) {
-  return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
-    </html>
-  );
+export default function RootLayout({ children }: LayoutProps<"/">) {
+  return <RootFrame>{children}</RootFrame>;
 }

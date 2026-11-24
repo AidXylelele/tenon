@@ -1,0 +1,22 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: wait-expression
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: '${ .delay }'
+input: { delay: PT2S }
+script:
+  - effect:
+      { id: /do/0/pause, kind: timer, deadline: null, until: 1767225602000 }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  completed:
+    output: { delay: PT2S }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/pause }
+    - kind: workflow.completed

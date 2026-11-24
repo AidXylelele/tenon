@@ -1,0 +1,69 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-to-one
+    version: '0.1.0'
+  do: 
+    - waitForStartup:
+        listen:
+          to:
+            one:
+              with:
+                type: com.virtual-wf-powered-race.events.race.started.v1
+    - startup:
+        call: http
+        with:
+          method: post
+          endpoint:
+            uri: https://virtual-wf-powered-race.com/api/v4/cars/{carId}/start
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/waitForStartup@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/waitForStartup,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        specversion: "1.0"
+        id: race-1
+        source: https://virtual-wf-powered-race.com
+        type: com.virtual-wf-powered-race.events.race.started.v1
+        data: { race: r-1 }
+    now: 1767225601000
+  - effect: { id: /do/1/startup, kind: http, deadline: null, method: POST }
+    outcome:
+      kind: responded
+      request:
+        {
+          method: POST,
+          uri: "https://virtual-wf-powered-race.com/api/v4/cars//start",
+          headers: {},
+        }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { started: true }
+      authorization: null
+    now: 1767225602000
+end:
+  completed:
+    output: { started: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/waitForStartup }
+    - { kind: task.started, task: /do/0/waitForStartup }
+    - {
+        kind: task.completed,
+        task: /do/0/waitForStartup,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: task.created, task: /do/1/startup }
+    - { kind: task.started, task: /do/1/startup }
+    - { kind: task.completed, task: /do/1/startup }
+    - kind: workflow.completed

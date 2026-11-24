@@ -1,0 +1,45 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-workflow
+    version: '1.0.0'
+  do:
+    - runChild:
+        run:
+          workflow:
+            namespace: billing
+            name: charge
+            version: '1.0.0'
+            input:
+              order: ${ .orderId }
+              amount: ${ .total }
+              currency: EUR
+input: { orderId: o-1, total: 12.5 }
+script:
+  - effect:
+      id: /do/0/runChild
+      kind: workflow
+      deadline: null
+      namespace: billing
+      name: charge
+      version: "1.0.0"
+      input: { order: o-1, amount: 12.5, currency: EUR }
+      await: true
+    outcome: { kind: completed, output: { receipt: r-1 } }
+    now: 1767225601000
+end:
+  completed:
+    output: { receipt: r-1 }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runChild, execution: /do/0/runChild }
+    - { kind: task.started, task: /do/0/runChild, execution: /do/0/runChild }
+    - {
+        kind: task.completed,
+        task: /do/0/runChild,
+        execution: /do/0/runChild,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

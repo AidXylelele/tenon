@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catalogs
+    version: '0.1.0'
+  input:
+    schema:
+      resource:
+        endpoint: https://schemas.example.com/order.json
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: unresolved-import
+    pointer: /input/schema/resource/endpoint
+    subject: https://schemas.example.com/order.json
+    range: { start: { line: 9, column: 17 } }
+    import:
+      reference: https://schemas.example.com/order.json
+      uri: https://schemas.example.com/order.json

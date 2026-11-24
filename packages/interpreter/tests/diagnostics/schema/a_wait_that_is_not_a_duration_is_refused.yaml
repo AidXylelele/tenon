@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: wait-soon
+    version: '0.1.0'
+  do:
+    - pause:
+        wait: soon
+diagnostics:
+  - code: schema
+    pointer: /do/0/pause/wait
+    range: { start: { line: 8, column: 13 } }

@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-empty-message
+    version: '1.0.0'
+  do:
+    - ping:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: ping
+          message: {}
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/ping
+      kind: asyncapi
+      deadline: null
+      exchange:
+        kind: publish
+        message: { payload: null, headers: {} }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/ping }

@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schema-unreachable
+    version: '1.0.0'
+  do:
+    - register:
+        input:
+          schema:
+            resource:
+              endpoint: ${ "https://schemas.example.com/pet.json" }
+        set: '${ { registered: .name } }'
+input: { name: Milou }
+script:
+  - effect:
+      id: "/do/0/register@/input/schema"
+      kind: resource
+      deadline: null
+      resource:
+        name: null
+        endpoint:
+          { uri: "https://schemas.example.com/pet.json", authentication: null }
+    outcome: { kind: unreachable, detail: no route to host }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 503
+      instance: /do/0/register
+      title: Communication Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/register }
+    - kind: workflow.faulted

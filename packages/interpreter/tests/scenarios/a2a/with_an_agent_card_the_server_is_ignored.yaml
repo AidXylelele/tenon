@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-card-and-server
+    version: '1.0.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: tasks/get
+          agentCard:
+            endpoint: https://agent.example.com/.well-known/agent-card.json
+          server: https://elsewhere.example.com/a2a
+          parameters:
+            id: task-1
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/askAgent
+      kind: a2a
+      deadline: null
+      agent:
+        kind: card
+        card:
+          name: null
+          endpoint:
+            {
+              uri: https://agent.example.com/.well-known/agent-card.json,
+              authentication: null,
+            }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/askAgent }

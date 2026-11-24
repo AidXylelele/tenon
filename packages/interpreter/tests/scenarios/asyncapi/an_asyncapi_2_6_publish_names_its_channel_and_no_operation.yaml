@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-publish-channel
+    version: '1.0.0'
+  do:
+    - notify:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi-2.6.json
+          channel: /notifications
+          message:
+            payload:
+              text: hello
+input: {}
+end:
+  waiting:
+    effect:
+      id: /do/0/notify
+      kind: asyncapi
+      deadline: null
+      operation: null
+      channel: /notifications
+      exchange:
+        kind: publish
+        message: { payload: { text: hello }, headers: {} }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

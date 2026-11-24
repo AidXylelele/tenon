@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-schema
+    version: '0.1.0'
+  do:
+    - start:
+        run:
+          container:
+            image: ''
+diagnostics:
+  - code: schema
+    pointer: /do/0/start/run/container/image
+    range: { start: { line: 10, column: 18 } }
+    message: A container must name its image.

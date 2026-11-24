@@ -1,0 +1,52 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-arguments
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - look:
+                input:
+                  from: '${ { seen: . } }'
+                set:
+                  task: '${ $task.reference }'
+                  input: '${ $input }'
+                export:
+                  as: '${ { before: { task: $task.reference, input: $input, output: $output } } }'
+          after:
+            - check:
+                set:
+                  task: '${ $task.reference }'
+                  raw: '${ $task.output }'
+                export:
+                  as: '${ $context + { after: { task: $task.reference, input: $input, output: $output } } }'
+  do:
+    - greet:
+        set: { greeting: Hello }
+  output:
+    as: '${ $context }'
+input: { name: Ann }
+end:
+  completed:
+    output:
+      before:
+        task: /do/0/greet
+        input: { seen: { name: Ann } }
+        output: { task: /do/0/greet, input: { seen: { name: Ann } } }
+      after:
+        task: /do/0/greet
+        input: { greeting: Hello }
+        output: { task: /do/0/greet, raw: { greeting: Hello } }
+facts:
+  including:
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/look
+      execution: "/do/0/greet@before/0/0/look"
+    - kind: task.completed
+      task: /use/extensions/0/audit/after/0/check
+      execution: "/do/0/greet@after/0/0/check"
+    - { kind: task.completed, task: /do/0/greet }

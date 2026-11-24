@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-function
+    version: '1.0.0'
+  use:
+    functions:
+      askReporter:
+        call: a2a
+        with:
+          method: message/send
+          server: https://agent.example.com/a2a
+          parameters:
+            message:
+              parts:
+                - kind: text
+                  text: ${ .prompt }
+  do:
+    - askAgent:
+        call: askReporter
+        with:
+          prompt: hello
+input: {}
+script:
+  - effect:
+      id: /do/0/askAgent@function
+      kind: a2a
+      deadline: null
+      parameters:
+        message:
+          {
+            parts: [{ kind: text, text: hello }],
+            messageId: 1ffd4e90-a505-5769-8520-8ac45eab6fb3,
+            role: user,
+          }
+    outcome:
+      {
+        kind: answered,
+        result: { kind: task, id: task-1, status: { state: completed } },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output: { kind: task, id: task-1, status: { state: completed } }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /use/functions/askReporter,
+        execution: /do/0/askAgent@function,
+      }
+    - { kind: task.completed, task: /do/0/askAgent, execution: /do/0/askAgent }
+    - kind: workflow.completed

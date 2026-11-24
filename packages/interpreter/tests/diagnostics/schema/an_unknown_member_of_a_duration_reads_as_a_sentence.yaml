@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: sentences
+    version: '1.0.0'
+  do:
+    - first:
+        wait:
+          sconds: 5
+diagnostics:
+  - code: schema
+    pointer: /do/0/first/wait
+    message: Unknown property sconds.

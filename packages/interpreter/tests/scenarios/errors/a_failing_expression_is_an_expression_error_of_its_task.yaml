@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expression-error
+    version: '1.0.0'
+  do:
+    - compute:
+        set:
+          value: '${ .text | tonumber }'
+input: { text: not a number }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      title: Expression Error
+      instance: /do/0/compute
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/compute }
+    - { kind: task.started, task: /do/0/compute }
+    - { kind: task.faulted, task: /do/0/compute }
+    - kind: workflow.faulted

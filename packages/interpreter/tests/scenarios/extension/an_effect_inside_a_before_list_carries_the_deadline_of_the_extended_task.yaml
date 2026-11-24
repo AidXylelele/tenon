@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-deadline
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - record:
+                call: http
+                with:
+                  method: post
+                  endpoint: https://audit.example.com/records
+  do:
+    - greet:
+        timeout:
+          after: PT5S
+        set: { greeting: Hello }
+input: {}
+end:
+  waiting:
+    effect:
+      id: "/do/0/greet@before/0/0/record"
+      kind: http
+      deadline: 1767225605000
+      method: POST
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/audit/before/0/record
+      execution: "/do/0/greet@before/0/0/record"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/0/record
+      execution: "/do/0/greet@before/0/0/record"

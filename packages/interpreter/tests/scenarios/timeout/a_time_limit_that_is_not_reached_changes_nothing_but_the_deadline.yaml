@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-not-reached
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT2S
+        timeout:
+          after: PT5S
+input: { a: 1 }
+script:
+  - effect:
+      {
+        id: /do/0/pause,
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  completed:
+    output: { a: 1 }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/pause }
+    - { kind: task.started, task: /do/0/pause }
+    - kind: task.completed
+      task: /do/0/pause
+      completedAt: "2026-01-01T00:00:02.000Z"
+    - kind: workflow.completed

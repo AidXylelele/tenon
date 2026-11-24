@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  do:
+    - log:
+        call: log:1.0.0@missing
+        with:
+          message: hello
+diagnostics:
+  - code: undeclared-component
+    pointer: /do/0/log/call
+    subject: missing
+    range: { start: { line: 8, column: 13 } }

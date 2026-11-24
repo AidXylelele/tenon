@@ -1,0 +1,38 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-cancel
+    version: '1.0.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: SayHello
+          arguments:
+            name: ${ .name }
+input: { name: Ann }
+script:
+  - effect: { id: /do/0/greet, kind: grpc, deadline: null, method: SayHello }
+    cancel: true
+    now: 1767225605000
+end:
+  cancelled: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - {
+        kind: task.cancelled,
+        task: /do/0/greet,
+        execution: /do/0/greet,
+        cancelledAt: "2026-01-01T00:00:05.000Z",
+      }
+    - { kind: workflow.cancelled, cancelledAt: "2026-01-01T00:00:05.000Z" }

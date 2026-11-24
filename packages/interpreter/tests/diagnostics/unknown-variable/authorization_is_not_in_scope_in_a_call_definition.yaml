@@ -1,0 +1,19 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/1
+          headers:
+            X-Token: '${ $authorization.parameter }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/getPet/with/headers/X-Token
+    subject: $authorization
+    range: { start: { line: 13, column: 20 } }

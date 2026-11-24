@@ -1,0 +1,51 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-workflow-example
+    version: '0.1.0'
+  do:
+    - startWorkflow:
+        run:
+          workflow:
+            namespace: another-one
+            name: do-stuff
+            version: '0.1.0'
+            input:
+              foo: bar
+input: {}
+script:
+  - effect:
+      id: /do/0/startWorkflow
+      kind: workflow
+      deadline: null
+      namespace: another-one
+      name: do-stuff
+      version: "0.1.0"
+      input: { foo: bar }
+      await: true
+    outcome: { kind: completed, output: { done: true } }
+    now: 1767225601000
+end:
+  completed:
+    output: { done: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/startWorkflow,
+        execution: /do/0/startWorkflow,
+      }
+    - {
+        kind: task.started,
+        task: /do/0/startWorkflow,
+        execution: /do/0/startWorkflow,
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/startWorkflow,
+        execution: /do/0/startWorkflow,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

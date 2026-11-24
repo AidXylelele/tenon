@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-request
+    version: '1.0.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.order.placed
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: "/do/0/waitForOrder@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/waitForOrder,
+        position: 0,
+      }
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/waitForOrder,
+        execution: /do/0/waitForOrder,
+      }
+    - {
+        kind: task.started,
+        task: /do/0/waitForOrder,
+        execution: /do/0/waitForOrder,
+      }

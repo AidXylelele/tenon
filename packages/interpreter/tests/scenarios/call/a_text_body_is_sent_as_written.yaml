@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-body-text
+    version: '1.0.0'
+  do:
+    - sendNote:
+        call: http
+        with:
+          method: put
+          endpoint: https://notes.example.com/notes/1
+          headers:
+            content-type: text/plain
+          body: Remember .name
+input: { name: Milou }
+script:
+  - effect:
+      id: /do/0/sendNote
+      kind: http
+      deadline: null
+      method: PUT
+      body: Remember .name
+    outcome:
+      kind: responded
+      request:
+        method: PUT
+        uri: https://notes.example.com/notes/1
+        headers: { content-type: text/plain }
+      statusCode: 204
+      headers: {}
+      content: null
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: null
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/sendNote }
+    - kind: workflow.completed

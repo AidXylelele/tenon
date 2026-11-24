@@ -1,0 +1,90 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: oauth2-every-property
+    version: '1.0.0'
+  do:
+    - sampleTask:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://secured.example.com/sample
+            authentication:
+              oauth2:
+                authority: https://auth.example.com/realms/pets
+                endpoints:
+                  token: /protocol/token
+                  revocation: /protocol/revoke
+                  introspection: /protocol/introspect
+                grant: urn:ietf:params:oauth:grant-type:token-exchange
+                client:
+                  id: workflow-runtime
+                  secret: workflow-runtime-secret
+                  assertion: eyJhbGciOiJSUzI1NiJ9
+                  authentication: private_key_jwt
+                request:
+                  encoding: application/json
+                issuers: [ https://auth.example.com/realms/pets ]
+                scopes: [ api, pets ]
+                audiences: [ runtime ]
+                username: alice
+                password: alice-password
+                subject:
+                  token: subject-token
+                  type: urn:ietf:params:oauth:token-type:access_token
+                actor:
+                  token: actor-token
+                  type: urn:ietf:params:oauth:token-type:jwt
+input: {}
+script:
+  - effect:
+      id: /do/0/sampleTask
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://secured.example.com/sample
+        authentication:
+          kind: oauth2
+          authority: https://auth.example.com/realms/pets
+          endpoints:
+            token: /protocol/token
+            revocation: /protocol/revoke
+            introspection: /protocol/introspect
+          grant: urn:ietf:params:oauth:grant-type:token-exchange
+          client:
+            id: workflow-runtime
+            secret: workflow-runtime-secret
+            assertion: eyJhbGciOiJSUzI1NiJ9
+            authentication: private_key_jwt
+          encoding: application/json
+          issuers: [https://auth.example.com/realms/pets]
+          scopes: [api, pets]
+          audiences: [runtime]
+          username: alice
+          password: alice-password
+          subject:
+            token: subject-token
+            type: urn:ietf:params:oauth:token-type:access_token
+          actor:
+            token: actor-token
+            type: urn:ietf:params:oauth:token-type:jwt
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://secured.example.com/sample
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { ok: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { ok: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/sampleTask }
+    - kind: workflow.completed

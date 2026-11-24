@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: schema-2020-12
+    version: '1.0.0'
+  do:
+    - check:
+        input:
+          schema:
+            format: json
+            document:
+              type: array
+              prefixItems:
+                - type: number
+              items: false
+        set: { ran: true }
+input: [1]
+end:
+  completed:
+    output: { ran: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/check }
+    - kind: workflow.completed

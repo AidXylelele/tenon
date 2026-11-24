@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-workflow-faulted
+    version: '1.0.0'
+  do:
+    - runChild:
+        run:
+          workflow:
+            namespace: billing
+            name: charge
+            version: '1.0.0'
+            input: {}
+input: {}
+script:
+  - effect:
+      id: /do/0/runChild
+      kind: workflow
+      deadline: null
+      namespace: billing
+      name: charge
+      version: "1.0.0"
+      input: {}
+      await: true
+    outcome:
+      kind: faulted
+      error:
+        type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+        status: 503
+        instance: /do/1/callBank
+        title: Communication Error
+        detail: GET https://bank.example.com/charge answered 503
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 503
+      instance: /do/0/runChild
+      title: Communication Error
+      detail: GET https://bank.example.com/charge answered 503
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runChild }
+    - { kind: task.started, task: /do/0/runChild }
+    - {
+        kind: task.faulted,
+        task: /do/0/runChild,
+        execution: /do/0/runChild,
+        faultedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:01.000Z" }

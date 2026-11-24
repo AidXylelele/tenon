@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: export-schema
+    version: '1.0.0'
+  do:
+    - remember:
+        set: { id: 7 }
+        export:
+          as: '${ { remembered: .id } }'
+          schema:
+            format: json
+            document:
+              type: object
+              required: [remembered]
+    - recall:
+        set: '${ $context }'
+input: {}
+end:
+  completed:
+    output: { remembered: 7 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-shadowing
+    version: '1.0.0'
+  do:
+    - outer:
+        for:
+          in: [[1, 2], [3]]
+        do:
+          - inner:
+              for:
+                in: '${ $item }'
+              do:
+                - collect:
+                    set: '${ . + { seen: (.seen + [[$item, $index]]) } }'
+input: {}
+end:
+  completed:
+    output: { seen: [[1, 0], [2, 1], [3, 0]] }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/outer/do/0/inner/do/0/collect,
+        execution: "/do/0/outer[1]/do/0/inner[0]/do/0/collect",
+      }
+    - kind: workflow.completed

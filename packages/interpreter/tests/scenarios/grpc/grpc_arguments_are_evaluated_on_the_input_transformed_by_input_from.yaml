@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-input-from
+    version: '1.0.0'
+  do:
+    - greet:
+        input:
+          from: ${ .request }
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+          method: SayHello
+          arguments:
+            name: ${ .name }
+            caller: ${ $input.caller }
+input: { request: { name: Ann, caller: desk }, name: ignored }
+end:
+  waiting:
+    effect:
+      id: /do/0/greet
+      kind: grpc
+      deadline: null
+      arguments: { name: Ann, caller: desk }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/greet }

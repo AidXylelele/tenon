@@ -1,0 +1,19 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: strict-bare-text
+    version: '1.0.0'
+  do:
+    - compute:
+        set:
+          path: .x
+          sum: 1 + 1
+input: { x: 5 }
+end:
+  completed:
+    output: { path: .x, sum: 1 + 1 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

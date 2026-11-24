@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-do-raises-outward
+    version: '1.0.0'
+  do:
+    - outer:
+        try:
+          - inner:
+              try:
+                - fail:
+                    raise:
+                      error:
+                        type: https://example.com/errors/broken
+                        status: 503
+              catch:
+                do:
+                  - again:
+                      raise:
+                        error:
+                          type: https://example.com/errors/again
+                          status: 500
+        catch:
+          errors:
+            with:
+              type: https://example.com/errors/again
+          do:
+            - handle:
+                set:
+                  handled: '${ $error.instance }'
+input: {}
+end:
+  completed:
+    output: { handled: /do/0/outer/try/0/inner/catch/do/0/again }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/try/0/inner }
+    - { kind: task.started, task: /do/0/outer/try/0/inner }
+    - { kind: task.created, task: /do/0/outer/try/0/inner/try/0/fail }
+    - { kind: task.started, task: /do/0/outer/try/0/inner/try/0/fail }
+    - { kind: task.faulted, task: /do/0/outer/try/0/inner/try/0/fail }
+    - { kind: task.created, task: /do/0/outer/try/0/inner/catch/do/0/again }
+    - { kind: task.started, task: /do/0/outer/try/0/inner/catch/do/0/again }
+    - { kind: task.faulted, task: /do/0/outer/try/0/inner/catch/do/0/again }
+    - { kind: task.faulted, task: /do/0/outer/try/0/inner }
+    - { kind: task.created, task: /do/0/outer/catch/do/0/handle }
+    - { kind: task.started, task: /do/0/outer/catch/do/0/handle }
+    - { kind: task.completed, task: /do/0/outer/catch/do/0/handle }
+    - { kind: task.completed, task: /do/0/outer }
+    - kind: workflow.completed

@@ -1,0 +1,50 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: several-defects
+    version: '0.1.0'
+  schedule:
+    cron: '61 * * * *'
+  use:
+    secrets:
+      - stripe
+  do:
+    - first:
+        set:
+          a: '${ .a | }'
+        then: missing
+    - second:
+        wait: PT1.5H30M
+    - third:
+        set:
+          b: '${ $nope }'
+        timeout: short
+profile:
+  secrets: []
+diagnostics:
+  - code: cron
+    pointer: /schedule/cron
+    range: { start: { line: 7, column: 9 } }
+  - code: unknown-secret
+    pointer: /use/secrets/0
+    subject: stripe
+    range: { start: { line: 10, column: 7 } }
+  - code: expression
+    pointer: /do/0/first/set/a
+    range: { start: { line: 14, column: 12 } }
+  - code: unknown-task
+    pointer: /do/0/first/then
+    subject: missing
+    range: { start: { line: 15, column: 13 } }
+  - code: duration
+    pointer: /do/1/second/wait
+    range: { start: { line: 17, column: 13 } }
+  - code: unknown-variable
+    pointer: /do/2/third/set/b
+    subject: $nope
+    range: { start: { line: 20, column: 12 } }
+  - code: undeclared-component
+    pointer: /do/2/third/timeout
+    subject: short
+    range: { start: { line: 21, column: 16 } }

@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-send-own-id
+    version: '1.0.0'
+  do:
+    - askAgent:
+        call: a2a
+        with:
+          method: message/send
+          server: https://agent.example.com/a2a
+          parameters:
+            message:
+              messageId: ${ .messageId }
+              role: agent
+              parts:
+                - kind: text
+                  text: hello
+input: { messageId: msg-42 }
+end:
+  waiting:
+    effect:
+      id: /do/0/askAgent
+      kind: a2a
+      deadline: null
+      parameters:
+        message:
+          {
+            messageId: msg-42,
+            role: agent,
+            parts: [{ kind: text, text: hello }],
+          }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/askAgent }

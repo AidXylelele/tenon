@@ -1,0 +1,17 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: set-expression
+    version: '1.0.0'
+  do:
+    - pickColor:
+        set: '${ .configuration.color }'
+input: { configuration: { color: blue } }
+end:
+  completed:
+    output: blue
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/pickColor }
+    - kind: workflow.completed

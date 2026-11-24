@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-caught
+    version: '1.0.0'
+  use:
+    extensions:
+      - guard:
+          extend: set
+          when: '$task.name == "greet"'
+          after:
+            - deny:
+                raise:
+                  error:
+                    type: https://example.com/errors/denied
+                    status: 403
+  do:
+    - attempt:
+        try:
+          - greet:
+              set: { greeting: Hello }
+        catch:
+          as: failure
+          do:
+            - recover:
+                set:
+                  instance: '${ $failure.instance }'
+input: {}
+end:
+  completed:
+    output: { instance: /use/extensions/0/guard/after/0/deny }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/attempt }
+    - { kind: task.started, task: /do/0/attempt }
+    - { kind: task.created, task: /do/0/attempt/try/0/greet }
+    - { kind: task.started, task: /do/0/attempt/try/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/guard/after/0/deny
+      execution: "/do/0/attempt/try/0/greet@after/0/0/deny"
+    - kind: task.started
+      task: /use/extensions/0/guard/after/0/deny
+      execution: "/do/0/attempt/try/0/greet@after/0/0/deny"
+    - kind: task.faulted
+      task: /use/extensions/0/guard/after/0/deny
+      execution: "/do/0/attempt/try/0/greet@after/0/0/deny"
+    - { kind: task.faulted, task: /do/0/attempt/try/0/greet }
+    - { kind: task.created, task: /do/0/attempt/catch/do/0/recover }
+    - { kind: task.started, task: /do/0/attempt/catch/do/0/recover }
+    - { kind: task.completed, task: /do/0/attempt/catch/do/0/recover }
+    - { kind: task.completed, task: /do/0/attempt }
+    - kind: workflow.completed

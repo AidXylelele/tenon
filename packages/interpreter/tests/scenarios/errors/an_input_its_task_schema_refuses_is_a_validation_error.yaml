@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: validation-error
+    version: '1.0.0'
+  do:
+    - check:
+        input:
+          schema:
+            format: json
+            document:
+              type: object
+              required: [order]
+        set: { ran: true }
+input: { noise: true }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      title: Validation Error
+      instance: /do/0/check
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/check }
+    - { kind: task.started, task: /do/0/check }
+    - { kind: task.faulted, task: /do/0/check }
+    - kind: workflow.faulted

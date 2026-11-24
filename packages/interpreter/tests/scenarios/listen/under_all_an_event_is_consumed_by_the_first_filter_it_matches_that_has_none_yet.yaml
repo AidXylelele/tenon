@@ -1,0 +1,62 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-all-overlap
+    version: '1.0.0'
+  do:
+    - watch:
+        listen:
+          to:
+            all:
+              - with:
+                  type: com.example.reading
+              - with:
+                  type: 'com\.example\..*'
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/watch,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { value: 1 },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/watch@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/watch,
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: a-1,
+          source: https://sensors.example.com,
+          type: com.example.alarm,
+          data: { alarm: true },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output: [{ value: 1 }, { alarm: true }]
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

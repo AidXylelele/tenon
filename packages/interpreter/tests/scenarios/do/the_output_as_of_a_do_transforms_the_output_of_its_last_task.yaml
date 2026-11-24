@@ -1,0 +1,23 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: do-output
+    version: '1.0.0'
+  do:
+    - group:
+        do:
+          - first:
+              set: { a: 1 }
+          - second:
+              set: '${ . + { b: 2 } }'
+        output:
+          as: '${ { group: . } }'
+input: {}
+end:
+  completed:
+    output: { group: { a: 1, b: 2 } }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/group }
+    - kind: workflow.completed

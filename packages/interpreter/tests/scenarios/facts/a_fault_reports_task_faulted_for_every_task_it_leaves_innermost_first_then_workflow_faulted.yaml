@@ -1,0 +1,69 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: fault-order
+    version: '1.0.0'
+  do:
+    - outer:
+        do:
+          - inner:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 500
+    - never:
+        set: { never: true }
+input: {}
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/broken
+      status: 500
+      instance: /do/0/outer/do/0/inner
+      title: null
+      detail: null
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/outer }
+    - { kind: task.started, task: /do/0/outer }
+    - { kind: task.created, task: /do/0/outer/do/0/inner }
+    - { kind: task.started, task: /do/0/outer/do/0/inner }
+    - kind: task.faulted
+      workflow: fault-order-instance-1.test
+      task: /do/0/outer/do/0/inner
+      execution: /do/0/outer/do/0/inner
+      faultedAt: "2026-01-01T00:00:00.000Z"
+      error:
+        {
+          type: https://example.com/errors/broken,
+          status: 500,
+          instance: /do/0/outer/do/0/inner,
+          title: null,
+          detail: null,
+        }
+    - kind: task.faulted
+      workflow: fault-order-instance-1.test
+      task: /do/0/outer
+      execution: /do/0/outer
+      faultedAt: "2026-01-01T00:00:00.000Z"
+      error:
+        {
+          type: https://example.com/errors/broken,
+          status: 500,
+          instance: /do/0/outer/do/0/inner,
+          title: null,
+          detail: null,
+        }
+    - kind: workflow.faulted
+      name: fault-order-instance-1.test
+      faultedAt: "2026-01-01T00:00:00.000Z"
+      error:
+        {
+          type: https://example.com/errors/broken,
+          status: 500,
+          instance: /do/0/outer/do/0/inner,
+          title: null,
+          detail: null,
+        }

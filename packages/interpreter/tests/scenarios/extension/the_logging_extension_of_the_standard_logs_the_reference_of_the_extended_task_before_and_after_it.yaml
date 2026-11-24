@@ -1,0 +1,108 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: logging-extension-example
+    version: '0.1.0'
+  use:
+    extensions:
+      - logging:
+          extend: all
+          before:
+            - sendLog:
+                call: http
+                with:
+                  method: post
+                  endpoint: https://fake.log.collector.com
+                  body:
+                    message: ${ "Executing task '\($task.reference)'..." }
+          after:
+            - sendLog:
+                call: http
+                with:
+                  method: post
+                  endpoint: https://fake.log.collector.com
+                  body:
+                    message: ${ "Executed task '\($task.reference)'..." }
+  do:
+    - sampleTask:
+        call: http
+        with:
+          method: get
+          endpoint: https://fake.com/sample
+input: {}
+script:
+  - effect:
+      id: "/do/0/sampleTask@before/0/0/sendLog"
+      kind: http
+      deadline: null
+      method: POST
+      body: { message: "Executing task '/do/0/sampleTask'..." }
+    outcome:
+      kind: responded
+      request:
+        method: POST
+        uri: https://fake.log.collector.com
+        headers: { content-type: application/json }
+      statusCode: 202
+      headers: {}
+      content: null
+      authorization: null
+    now: 1767225601000
+  - effect: { id: /do/0/sampleTask, kind: http, deadline: null, method: GET }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://fake.com/sample
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { sample: true }
+      authorization: null
+    now: 1767225602000
+  - effect:
+      id: "/do/0/sampleTask@after/0/0/sendLog"
+      kind: http
+      deadline: null
+      method: POST
+      body: { message: "Executed task '/do/0/sampleTask'..." }
+    outcome:
+      kind: responded
+      request:
+        method: POST
+        uri: https://fake.log.collector.com
+        headers: { content-type: application/json }
+      statusCode: 202
+      headers: {}
+      content: null
+      authorization: null
+    now: 1767225603000
+end:
+  completed:
+    output: { sample: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/sampleTask }
+    - { kind: task.started, task: /do/0/sampleTask }
+    - kind: task.created
+      task: /use/extensions/0/logging/before/0/sendLog
+      execution: "/do/0/sampleTask@before/0/0/sendLog"
+    - kind: task.started
+      task: /use/extensions/0/logging/before/0/sendLog
+      execution: "/do/0/sampleTask@before/0/0/sendLog"
+    - kind: task.completed
+      task: /use/extensions/0/logging/before/0/sendLog
+      execution: "/do/0/sampleTask@before/0/0/sendLog"
+    - kind: task.created
+      task: /use/extensions/0/logging/after/0/sendLog
+      execution: "/do/0/sampleTask@after/0/0/sendLog"
+    - kind: task.started
+      task: /use/extensions/0/logging/after/0/sendLog
+      execution: "/do/0/sampleTask@after/0/0/sendLog"
+    - kind: task.completed
+      task: /use/extensions/0/logging/after/0/sendLog
+      execution: "/do/0/sampleTask@after/0/0/sendLog"
+    - { kind: task.completed, task: /do/0/sampleTask }
+    - kind: workflow.completed

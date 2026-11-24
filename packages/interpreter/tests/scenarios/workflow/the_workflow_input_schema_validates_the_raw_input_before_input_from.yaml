@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: workflow-input-schema
+    version: '1.0.0'
+  input:
+    schema:
+      format: json
+      document:
+        type: object
+        required: [order]
+    from: .order
+  do:
+    - keep:
+        set: '${ . }'
+input: { order: { id: 7 } }
+end:
+  completed:
+    output: { id: 7 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order
+        correlate:
+          order:
+            from: '${ .data.order }'
+            expect: '${ $context.order }'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: unknown-variable
+    pointer: /schedule/on/one/correlate/order/expect
+    subject: $context
+    range: { start: { line: 14, column: 19 } }

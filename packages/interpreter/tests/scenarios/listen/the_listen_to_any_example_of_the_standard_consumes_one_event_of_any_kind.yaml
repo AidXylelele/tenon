@@ -1,0 +1,46 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-to-any
+    version: '0.1.0'
+  do:
+    - callDoctor:
+        listen:
+          to:
+            any: []
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/callDoctor@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/callDoctor,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: x-1,
+          source: https://anywhere.example.com,
+          type: com.example.anything,
+          data: { any: thing },
+        }
+    now: 1767225601000
+end:
+  completed:
+    output: [{ any: thing }]
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/callDoctor }
+    - { kind: task.started, task: /do/0/callDoctor }
+    - {
+        kind: task.completed,
+        task: /do/0/callDoctor,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.completed

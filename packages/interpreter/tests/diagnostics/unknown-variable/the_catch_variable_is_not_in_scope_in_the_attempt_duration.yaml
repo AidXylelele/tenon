@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - attempt:
+        try:
+          - pause:
+              wait: PT1S
+        catch:
+          as: failure
+          retry:
+            limit:
+              attempt:
+                duration: '${ if $failure == null then "PT1S" else "PT2S" end }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/attempt/catch/retry/limit/attempt/duration
+    subject: $failure
+    range: { start: { line: 16, column: 25 } }

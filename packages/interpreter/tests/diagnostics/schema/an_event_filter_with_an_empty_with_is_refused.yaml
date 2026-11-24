@@ -1,0 +1,15 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-empty-with
+    version: '0.1.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with: {}
+diagnostics:
+  - code: schema
+    pointer: /do/0/waitForOrder/listen/to/one/with

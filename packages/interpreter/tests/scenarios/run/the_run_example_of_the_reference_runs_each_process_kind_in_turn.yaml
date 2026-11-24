@@ -1,0 +1,103 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-example
+    version: '0.1.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: fake-image
+
+    - runScript:
+        run:
+          script:
+            language: js
+            code: >
+              Some cool multiline script
+
+    - runShell:
+        run:
+          shell:
+            command: 'echo "Hello, ${ .user.name }"'
+            directory: /tmp
+
+    - runWorkflow:
+        run:
+          workflow:
+            namespace: another-one
+            name: do-stuff
+            version: '0.1.0'
+            input: {}
+input: { user: { name: Ann } }
+script:
+  - effect:
+      id: /do/0/runContainer
+      kind: process
+      deadline: null
+      process:
+        kind: container
+        image: fake-image
+        command: null
+        stdin: null
+        arguments: []
+        name: null
+        ports: {}
+        volumes: {}
+        environment: {}
+        lifetime: { cleanup: never, after: null }
+        pullPolicy: ifNotPresent
+      await: true
+    outcome: { kind: exited, code: 0, stdout: from the container, stderr: "" }
+    now: 1767225601000
+  - effect:
+      id: /do/1/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: js
+        code: "Some cool multiline script\n"
+        source: null
+        stdin: null
+        arguments: {}
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: from the script, stderr: "" }
+    now: 1767225602000
+  - effect:
+      id: /do/2/runShell
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: 'echo "Hello, ${ .user.name }"'
+        stdin: null
+        arguments: []
+        directory: /tmp
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: from the shell, stderr: "" }
+    now: 1767225603000
+  - effect:
+      id: /do/3/runWorkflow
+      kind: workflow
+      deadline: null
+      namespace: another-one
+      name: do-stuff
+      version: "0.1.0"
+      input: {}
+      await: true
+    outcome: { kind: completed, output: { from: the child } }
+    now: 1767225604000
+end:
+  completed:
+    output: { from: the child }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/runContainer }
+    - { kind: task.completed, task: /do/1/runScript }
+    - { kind: task.completed, task: /do/2/runShell }
+    - { kind: task.completed, task: /do/3/runWorkflow }
+    - kind: workflow.completed

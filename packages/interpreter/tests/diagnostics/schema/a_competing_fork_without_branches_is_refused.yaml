@@ -1,0 +1,15 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: competing-fork-without-branches
+    version: '0.1.0'
+  do:
+    - alarm:
+        fork:
+          compete: true
+          branches: []
+diagnostics:
+  - code: schema
+    pointer: /do/0/alarm/fork/branches
+    range: { start: { line: 10, column: 19 } }

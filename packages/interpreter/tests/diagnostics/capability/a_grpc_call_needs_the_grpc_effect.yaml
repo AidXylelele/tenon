@@ -1,0 +1,41 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/greeter.proto
+          service:
+            name: GreeterApi.Greeter
+            host: example.com
+            port: 50051
+          method: SayHello
+          arguments:
+            name: world
+profile:
+  effects:
+    [
+      http,
+      openapi,
+      asyncapi,
+      a2a,
+      mcp,
+      process,
+      workflow,
+      fork,
+      timer,
+      emit,
+      listen,
+      resource,
+    ]
+diagnostics:
+  - code: capability
+    pointer: /do/0/greet
+    subject: effect.grpc
+    range: { start: { line: 8, column: 7 } }
+    message: "The host does not provide 'effect.grpc'."

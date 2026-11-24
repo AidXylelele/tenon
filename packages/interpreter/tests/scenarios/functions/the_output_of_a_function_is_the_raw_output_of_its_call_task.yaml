@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-output
+    version: '1.0.0'
+  use:
+    functions:
+      double:
+        set:
+          value: ${ .value * 2 }
+        output:
+          as: ${ .value }
+  do:
+    - compute:
+        call: double
+        with:
+          value: ${ .start }
+        output:
+          as: '${ { doubled: ., input: $input } }'
+input: { start: 21 }
+end:
+  completed:
+    output: { doubled: 42, input: { start: 21 } }
+facts:
+  including:
+    - { kind: task.completed, task: /use/functions/double }
+    - { kind: task.completed, task: /do/0/compute }
+    - kind: workflow.completed

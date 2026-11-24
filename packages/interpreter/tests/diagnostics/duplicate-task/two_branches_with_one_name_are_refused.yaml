@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - race:
+        fork:
+          branches:
+            - probe:
+                set:
+                  a: 1
+            - probe:
+                set:
+                  b: 2
+diagnostics:
+  - code: duplicate-task
+    pointer: /do/0/race/fork/branches/1/probe
+    subject: probe
+    range: { start: { line: 14, column: 15 } }

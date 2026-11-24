@@ -1,0 +1,123 @@
+import { randomUUID } from "node:crypto";
+import type { Result } from "../../interfaces.js";
+import type { CheckedDefinition } from "./checked-definition.js";
+import { WorkflowRefusal } from "./enums.js";
+import type {
+  NewPublication,
+  Publication,
+  WorkflowVersionProps,
+} from "./interfaces.js";
+import type { Schedule } from "./schedule.js";
+
+export class WorkflowVersion {
+  readonly #id: string;
+  readonly #semver: string;
+  readonly #dsl: string;
+  readonly #digest: string;
+  readonly #programFingerprint: string;
+  readonly #schedule: Schedule | null;
+  readonly #secrets: readonly string[];
+  readonly #publisherId: string;
+  readonly #publishedAt: Date;
+  readonly #test: boolean;
+
+  constructor(props: WorkflowVersionProps) {
+    this.#id = props.id;
+    this.#semver = props.semver;
+    this.#dsl = props.dsl;
+    this.#digest = props.digest;
+    this.#programFingerprint = props.programFingerprint;
+    this.#schedule = props.schedule;
+    this.#secrets = props.secrets;
+    this.#publisherId = props.publisherId;
+    this.#publishedAt = props.publishedAt;
+    this.#test = props.test;
+  }
+
+  static publish(input: NewPublication): WorkflowVersion {
+    return WorkflowVersion.#of(input, false);
+  }
+
+  static forTest(input: NewPublication): WorkflowVersion {
+    return WorkflowVersion.#of(input, true);
+  }
+
+  get id(): string {
+    return this.#id;
+  }
+
+  get semver(): string {
+    return this.#semver;
+  }
+
+  get dsl(): string {
+    return this.#dsl;
+  }
+
+  get digest(): string {
+    return this.#digest;
+  }
+
+  get programFingerprint(): string {
+    return this.#programFingerprint;
+  }
+
+  get schedule(): Schedule | null {
+    return this.#schedule;
+  }
+
+  get secrets(): readonly string[] {
+    return this.#secrets;
+  }
+
+  get publisherId(): string {
+    return this.#publisherId;
+  }
+
+  get publishedAt(): Date {
+    return this.#publishedAt;
+  }
+
+  get test(): boolean {
+    return this.#test;
+  }
+
+  isNumbered(semver: string): boolean {
+    const published = !this.#test;
+    const same = this.#semver === semver;
+    return published && same;
+  }
+
+  isTestOf(definition: CheckedDefinition, testerId: string): boolean {
+    const same = this.#digest === definition.digest;
+    const own = this.#publisherId === testerId;
+    return this.#test && same && own;
+  }
+
+  republish(
+    definition: CheckedDefinition,
+  ): Result<Publication, WorkflowRefusal> {
+    const same = definition.digest === this.#digest;
+
+    if (!same) return { ok: false, failure: WorkflowRefusal.VersionTaken };
+
+    return { ok: true, value: { version: this, created: false } };
+  }
+
+  static #of(input: NewPublication, test: boolean): WorkflowVersion {
+    const definition = input.definition;
+    const id = randomUUID();
+    return new WorkflowVersion({
+      id,
+      semver: definition.version,
+      dsl: definition.dsl,
+      digest: definition.digest,
+      programFingerprint: definition.programFingerprint,
+      schedule: definition.schedule,
+      secrets: definition.secrets,
+      publisherId: input.publisherId,
+      publishedAt: input.now,
+      test,
+    });
+  }
+}

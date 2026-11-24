@@ -1,19 +1,61 @@
-import { Injectable } from '@nestjs/common';
-import { Mailer } from '@nestjs/mail';
-import type { InvitationEmail, Mailing } from '../../application/interfaces.js';
-import type { PasswordResetEmail } from '../interfaces.js';
-import { InvitationMail } from './templates/invitation.mail.js';
-import { PasswordResetMail } from './templates/password-reset.mail.js';
+import { Injectable } from "@nestjs/common";
+import { TransactionHost } from "@nestjs-cls/transactional";
+import { Outbox } from "@nestjs/outbox";
+import { UnitOfWork } from "../../application/unit-of-work.js";
+import type { RecoveryMailer } from "../../application/identity/accounts/ports.js";
+import type { InvitationMailer } from "../../application/identity/invitations/ports.js";
+import type { Invitation } from "../../domain/identity/invitations/invitation.js";
+import type { InvitationToken } from "../../domain/identity/invitations/invitation-token.js";
+import type { Transaction } from "../persistence/interfaces.js";
+import { MailTopic } from "./enums.js";
+import type {
+  InvitationMailData,
+  PasswordResetMailData,
+  QueuedMail,
+} from "./interfaces.js";
 
 @Injectable()
-export class MailGateway implements Mailing {
-  constructor(private readonly mailer: Mailer) {}
+export class MailGateway implements InvitationMailer, RecoveryMailer {
+  constructor(
+    private readonly outbox: Outbox,
+    private readonly txHost: TransactionHost<Transaction>,
+    private readonly unitOfWork: UnitOfWork,
+  ) {}
 
-  async sendInvitation(email: InvitationEmail): Promise<void> {
-    await this.mailer.send(InvitationMail, { to: email.to, data: email });
+  async sendInvitation(
+    invitation: Invitation,
+    token: InvitationToken,
+    inviterName: string,
+  ): Promise<void> {
+    const data: InvitationMailData = {
+      token: token.value,
+      inviterName,
+      role: invitation.role,
+      expiresAt: invitation.expiresAt.toISOString(),
+    };
+    const mail: QueuedMail<InvitationMailData> = {
+      to: invitation.email,
+      data,
+    };
+    await this.#queue(MailTopic.Invitation, mail);
   }
 
-  async sendPasswordReset(email: PasswordResetEmail): Promise<void> {
-    await this.mailer.send(PasswordResetMail, { to: email.to, data: email });
+  async sendPasswordReset(
+    to: string,
+    link: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    const data: PasswordResetMailData = {
+      link,
+      expiresAt: expiresAt.toISOString(),
+    };
+    const mail: QueuedMail<PasswordResetMailData> = { to, data };
+    await this.#queue(MailTopic.PasswordReset, mail);
+  }
+
+  async #queue<T>(topic: MailTopic, payload: QueuedMail<T>): Promise<void> {
+    await this.unitOfWork.run(async () => {
+      await this.outbox.add(this.txHost.tx, { topic, payload });
+    });
   }
 }

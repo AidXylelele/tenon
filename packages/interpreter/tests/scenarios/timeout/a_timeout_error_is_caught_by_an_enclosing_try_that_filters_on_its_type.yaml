@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-caught
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - pause:
+              wait: PT10S
+              timeout:
+                after: PT5S
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+          do:
+            - note:
+                set:
+                  caught: '${ $error.instance }'
+                  status: '${ $error.status }'
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/guard/try/0/pause,
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225610000,
+      }
+    outcome: { kind: expired }
+    now: 1767225605000
+end:
+  completed:
+    output: { caught: /do/0/guard/try/0/pause, status: 408 }
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/pause }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

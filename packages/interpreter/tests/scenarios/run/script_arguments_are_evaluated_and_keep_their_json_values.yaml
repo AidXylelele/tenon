@@ -1,0 +1,44 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-arguments
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: python
+            code: print(count * 2)
+            arguments:
+              count: ${ .count }
+              enabled: true
+              user: ${ .user }
+              tags: [ a, '${ .tag }' ]
+              label: plain text
+input: { count: 21, user: { name: ann }, tag: b }
+end:
+  waiting:
+    effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: python
+        code: print(count * 2)
+        source: null
+        stdin: null
+        arguments:
+          {
+            count: 21,
+            enabled: true,
+            user: { name: ann },
+            tags: [a, b],
+            label: plain text,
+          }
+        environment: {}
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runScript }

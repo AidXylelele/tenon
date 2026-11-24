@@ -1,0 +1,19 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: jq-env
+    version: '1.0.0'
+  do:
+    - inspect:
+        set:
+          env: '${ env }'
+          ENV: '${ $ENV }'
+input: {}
+end:
+  completed:
+    output: { env: {}, ENV: {} }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

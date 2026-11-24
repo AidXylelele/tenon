@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: raise-standard-type
+    version: '1.0.0'
+  do:
+    - giveUp:
+        raise:
+          error:
+            type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+            status: 408
+            title: Gave Up
+            detail: Waited long enough
+input: {}
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+      status: 408
+      instance: /do/0/giveUp
+      title: Gave Up
+      detail: Waited long enough
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/giveUp }
+    - kind: workflow.faulted

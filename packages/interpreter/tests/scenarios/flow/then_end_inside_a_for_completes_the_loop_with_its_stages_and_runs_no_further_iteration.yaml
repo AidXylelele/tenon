@@ -1,0 +1,63 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: then-end-for
+    version: '1.0.0'
+  do:
+    - group:
+        do:
+          - loop:
+              for:
+                in: [1, 2, 3]
+              do:
+                - stop:
+                    set: '${ { item: $item } }'
+                    then: end
+              output:
+                as: '${ { looped: . } }'
+    - after:
+        set: { after: true }
+  output:
+    as: '${ { final: . } }'
+input: {}
+end:
+  completed:
+    output: { final: { looped: { item: 1 } } }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/group, execution: /do/0/group }
+    - { kind: task.started, task: /do/0/group, execution: /do/0/group }
+    - {
+        kind: task.created,
+        task: /do/0/group/do/0/loop,
+        execution: /do/0/group/do/0/loop,
+      }
+    - {
+        kind: task.started,
+        task: /do/0/group/do/0/loop,
+        execution: /do/0/group/do/0/loop,
+      }
+    - {
+        kind: task.created,
+        task: /do/0/group/do/0/loop/do/0/stop,
+        execution: "/do/0/group/do/0/loop[0]/do/0/stop",
+      }
+    - {
+        kind: task.started,
+        task: /do/0/group/do/0/loop/do/0/stop,
+        execution: "/do/0/group/do/0/loop[0]/do/0/stop",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/group/do/0/loop/do/0/stop,
+        execution: "/do/0/group/do/0/loop[0]/do/0/stop",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/group/do/0/loop,
+        execution: /do/0/group/do/0/loop,
+      }
+    - { kind: task.completed, task: /do/0/group, execution: /do/0/group }
+    - kind: workflow.completed

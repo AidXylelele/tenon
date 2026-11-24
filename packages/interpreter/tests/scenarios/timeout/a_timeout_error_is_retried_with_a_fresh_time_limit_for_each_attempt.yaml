@@ -1,0 +1,65 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-retried
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - pause:
+              wait: PT10S
+              timeout:
+                after: PT5S
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/timeout
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+          do:
+            - note:
+                set:
+                  status: '${ $error.status }'
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/guard/try/0/pause,
+        kind: timer,
+        deadline: 1767225605000,
+        until: 1767225610000,
+      }
+    outcome: { kind: expired }
+    now: 1767225605000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225606000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225606000
+  - effect:
+      {
+        id: "/do/0/guard#2/try/0/pause",
+        kind: timer,
+        deadline: 1767225611000,
+        until: 1767225616000,
+      }
+    outcome: { kind: expired }
+    now: 1767225611000
+end:
+  completed:
+    output: { status: 408 }
+facts:
+  including:
+    - { kind: task.faulted, execution: /do/0/guard/try/0/pause }
+    - { kind: task.faulted, execution: "/do/0/guard#2/try/0/pause" }
+    - { kind: task.completed, execution: /do/0/guard/catch/do/0/note }
+    - kind: workflow.completed

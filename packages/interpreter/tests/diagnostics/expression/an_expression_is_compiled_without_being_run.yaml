@@ -1,0 +1,12 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: expressions
+    version: '0.1.0'
+  do:
+    - compute:
+        set:
+          endless: '${ last(repeat(1)) }'
+          negative: '${ -1 }'
+diagnostics: []

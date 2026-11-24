@@ -1,0 +1,28 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: skipped-then
+    version: '1.0.0'
+  do:
+    - guarded:
+        if: '${ false }'
+        set: { ran: true }
+        then: last
+    - jumpedOver:
+        set: { jumpedOver: true }
+    - last:
+        set: '${ . + { last: true } }'
+input: { a: 1 }
+end:
+  completed:
+    output: { a: 1, last: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guarded }
+    - { kind: task.completed, task: /do/0/guarded }
+    - { kind: task.created, task: /do/2/last }
+    - { kind: task.started, task: /do/2/last }
+    - { kind: task.completed, task: /do/2/last }
+    - kind: workflow.completed

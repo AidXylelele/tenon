@@ -5,6 +5,9 @@
   "compilerOptions": {
     "builder": "swc",
     "typeCheck": true,
-    "deleteOutDir": true
-  }
+    "deleteOutDir": true,
+    "assets": ["frameworks/go-judge/shell-platform.json"],
+    "watchAssets": true
+  },
+  "entryFile": "frameworks/main"
 }

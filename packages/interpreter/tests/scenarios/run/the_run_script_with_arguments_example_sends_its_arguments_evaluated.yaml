@@ -1,0 +1,43 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: run-script-with-arguments
+    version: 1.0.0
+  do:
+    - setInput:
+        set:
+          message: Hello World
+    - log:
+        run:
+          script:
+            language: js
+            arguments:
+              message : ${.message}
+            code: |
+              console.log(message)
+input: {}
+script:
+  - effect:
+      id: /do/1/log
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: js
+        code: "console.log(message)\n"
+        source: null
+        stdin: null
+        arguments: { message: Hello World }
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: "Hello World\n", stderr: "" }
+    now: 1767225601000
+end:
+  completed:
+    output: "Hello World\n"
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/setInput }
+    - { kind: task.completed, task: /do/1/log }
+    - kind: workflow.completed

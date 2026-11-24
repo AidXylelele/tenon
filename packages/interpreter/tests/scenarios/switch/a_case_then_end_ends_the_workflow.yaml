@@ -1,0 +1,25 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: switch-end
+    version: '1.0.0'
+  do:
+    - outer:
+        do:
+          - route:
+              switch:
+                - done:
+                    when: .done
+                    then: end
+    - never:
+        set: { never: true }
+input: { done: true }
+end:
+  completed:
+    output: { done: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/outer/do/0/route }
+    - { kind: task.completed, task: /do/0/outer }
+    - kind: workflow.completed

@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-service-named-policy
+    version: '1.0.0'
+  use:
+    authentications:
+      greeterAuth:
+        bearer:
+          token: ${ .token }
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            authentication:
+              use: greeterAuth
+          method: SayHello
+input: { token: named-t0ken }
+end:
+  waiting:
+    effect:
+      id: /do/0/greet
+      kind: grpc
+      deadline: null
+      authentication: { kind: bearer, token: named-t0ken }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/greet }

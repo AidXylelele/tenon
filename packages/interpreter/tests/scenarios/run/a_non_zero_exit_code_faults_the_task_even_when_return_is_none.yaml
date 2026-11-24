@@ -1,0 +1,53 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-container
+    version: '0.1.0'
+  do:
+    - runContainer:
+        run:
+          container:
+            image: hello-world
+          return: none
+input: {}
+script:
+  - effect:
+      id: /do/0/runContainer
+      kind: process
+      deadline: null
+      process:
+        kind: container
+        image: hello-world
+        command: null
+        stdin: null
+        arguments: []
+        name: null
+        ports: {}
+        volumes: {}
+        environment: {}
+        lifetime: { cleanup: never, after: null }
+        pullPolicy: ifNotPresent
+      await: true
+    outcome: { kind: exited, code: 1, stdout: "", stderr: failed }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+      status: 500
+      instance: /do/0/runContainer
+      title: Runtime Error
+      detail: failed
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/runContainer }
+    - { kind: task.started, task: /do/0/runContainer }
+    - {
+        kind: task.faulted,
+        task: /do/0/runContainer,
+        execution: /do/0/runContainer,
+        faultedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - { kind: workflow.faulted, faultedAt: "2026-01-01T00:00:01.000Z" }

@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-uri-template-encoded
+    version: '1.0.0'
+  do:
+    - getFile:
+        call: http
+        with:
+          method: get
+          endpoint: https://files.example.com/files/{path}
+input: { path: reports/2026 summary.txt }
+script:
+  - effect:
+      id: /do/0/getFile
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://files.example.com/files/reports%2F2026%20summary.txt
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://files.example.com/files/reports%2F2026%20summary.txt
+        headers: {}
+      statusCode: 200
+      headers: { content-type: text/plain }
+      content: quarterly
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: quarterly
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getFile }
+    - kind: workflow.completed

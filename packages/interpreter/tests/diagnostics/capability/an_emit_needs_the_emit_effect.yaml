@@ -1,0 +1,33 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - greet:
+        emit:
+          event:
+            with:
+              type: com.example.greeted.v1
+profile:
+  effects:
+    [
+      http,
+      openapi,
+      grpc,
+      asyncapi,
+      a2a,
+      mcp,
+      process,
+      workflow,
+      fork,
+      timer,
+      listen,
+      resource,
+    ]
+diagnostics:
+  - code: capability
+    pointer: /do/0/greet
+    subject: effect.emit
+    range: { start: { line: 8, column: 7 } }

@@ -1,0 +1,100 @@
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { fn } from "storybook/test";
+import { TooltipProvider } from "@/libs/ui/components/tooltip";
+import { Announcer } from "@/libs/ui/composites/announcer";
+import { DataPicker } from "../data-picker";
+import { AFTER_A_TEST } from "../data-picker/data-choices/data.test-support";
+import { ConditionBuilder } from "./condition-builder";
+import type { PickerSlot } from "./interfaces";
+import {
+  AN_EXPRESSION,
+  BEFORE_TODAY,
+  NO_ROWS,
+  NON_CANONICAL_TEXT,
+  TWO_ROWS_ALL,
+  TWO_ROWS_ANY,
+  TWO_ROWS_TEXT,
+} from "./readings.test-support";
+
+function Picker({ label, describedBy, onPick }: PickerSlot) {
+  return (
+    <DataPicker
+      data={AFTER_A_TEST}
+      onlyPaths
+      label={label}
+      describedBy={describedBy}
+      onPick={onPick}
+    />
+  );
+}
+
+const meta = {
+  component: ConditionBuilder,
+  decorators: [
+    (Story) => (
+      <Announcer>
+        <TooltipProvider>
+          <div className="w-[400px] p-4">
+            <div
+              role="group"
+              aria-labelledby="branch"
+              className="flex flex-col gap-3 rounded-lg border bg-surface p-3"
+            >
+              <h4 id="branch" className="font-semibold">
+                Has items
+              </h4>
+              <Story />
+            </div>
+          </div>
+        </TooltipProvider>
+      </Announcer>
+    ),
+  ],
+  args: {
+    pointer: "/do/1/Has items/switch/0/Has items/when",
+    text: TWO_ROWS_TEXT,
+    required: true,
+    labelledBy: "branch",
+    describedBy: undefined,
+    invalid: false,
+    reading: TWO_ROWS_ALL,
+    data: AFTER_A_TEST,
+    renderPicker: (slot: PickerSlot) => <Picker {...slot} />,
+    onEdit: fn(),
+  },
+} satisfies Meta<typeof ConditionBuilder>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const TwoRowsAllMustHold: Story = {};
+
+export const TwoRowsAnyMayHold: Story = {
+  args: { reading: TWO_ROWS_ANY },
+};
+
+export const NoConditionYet: Story = {
+  args: { text: "", reading: NO_ROWS },
+};
+
+export const TimesAndDataCompared: Story = {
+  args: { text: "", reading: BEFORE_TODAY },
+};
+
+export const ANonCanonicalExpressionOpensAsAnExpression: Story = {
+  args: { text: NON_CANONICAL_TEXT, reading: AN_EXPRESSION },
+};
+
+export const WrittenAsAnExpressionByChoice: Story = {
+  play: async ({ canvas, userEvent }) => {
+    const write = await canvas.findByRole("button", {
+      name: "Write an expression",
+    });
+    await userEvent.click(write);
+  },
+};
+
+export const ReadingTheCondition: Story = {
+  args: { reading: null },
+};

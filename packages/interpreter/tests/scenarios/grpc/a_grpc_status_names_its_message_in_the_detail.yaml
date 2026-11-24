@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-status-detail
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/pets.proto
+          service:
+            name: PetStore.Pets
+            host: pets.example.com
+          method: GetPet
+          arguments:
+            id: 7
+input: {}
+script:
+  - effect: { id: /do/0/getPet, kind: grpc, deadline: null }
+    outcome: { kind: status, code: 5, message: pet 7 does not exist }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/communication
+      status: 404
+      instance: /do/0/getPet
+      title: Communication Error
+      detail: pet 7 does not exist
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

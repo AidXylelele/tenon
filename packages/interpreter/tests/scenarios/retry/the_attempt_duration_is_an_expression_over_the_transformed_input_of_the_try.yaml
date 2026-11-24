@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-attempt-duration-input
+    version: '1.0.0'
+  do:
+    - guard:
+        input:
+          from: '${ { limit: .limit, task: $task.reference } }'
+        try:
+          - pause:
+              wait: PT10S
+        catch:
+          retry:
+            limit:
+              attempt:
+                count: 1
+                duration: '${ .limit }'
+input: { limit: PT3S }
+end:
+  waiting:
+    effect:
+      {
+        id: /do/0/guard/try/0/pause,
+        kind: timer,
+        deadline: 1767225603000,
+        until: 1767225610000,
+      }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/pause }
+    - { kind: task.started, task: /do/0/guard/try/0/pause }

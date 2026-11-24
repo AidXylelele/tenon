@@ -1,0 +1,68 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-duration
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - pause:
+              wait: PT1S
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              duration:
+                seconds: 5
+              attempt:
+                count: 10
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/guard/try/0/pause,
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      {
+        id: "/do/0/guard#2/try/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225603000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225620000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/busy
+      status: 503
+      instance: /do/0/guard/try/1/fail
+facts:
+  including:
+    - { kind: task.faulted, execution: "/do/0/guard#2/try/1/fail" }
+    - kind: task.faulted
+      task: /do/0/guard
+      execution: /do/0/guard
+      faultedAt: "2026-01-01T00:00:20.000Z"
+    - kind: workflow.faulted

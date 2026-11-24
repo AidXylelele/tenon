@@ -1,0 +1,27 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-binary-text
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.notified
+              data_base64: AQI=
+input: {}
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        type: com.example.notified
+        data_base64: AQI=
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

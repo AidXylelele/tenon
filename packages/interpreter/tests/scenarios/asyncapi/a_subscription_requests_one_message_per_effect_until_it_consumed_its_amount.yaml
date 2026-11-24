@@ -1,0 +1,97 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-amount
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+input: {}
+script:
+  - effect:
+      id: "/do/0/watch@message[0]"
+      kind: asyncapi
+      deadline: null
+      document:
+        {
+          name: null,
+          endpoint:
+            {
+              uri: https://example.com/docs/asyncapi.json,
+              authentication: null,
+            },
+        }
+      authentication: null
+      operation: chat-inbox
+      channel: null
+      server: null
+      protocol: null
+      exchange:
+        {
+          kind: receive,
+          subscription: /do/0/watch,
+          position: 0,
+          closesAt: null,
+        }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/watch@message[1]"
+      kind: asyncapi
+      deadline: null
+      document:
+        {
+          name: null,
+          endpoint:
+            {
+              uri: https://example.com/docs/asyncapi.json,
+              authentication: null,
+            },
+        }
+      authentication: null
+      operation: chat-inbox
+      channel: null
+      server: null
+      protocol: null
+      exchange:
+        {
+          kind: receive,
+          subscription: /do/0/watch,
+          position: 1,
+          closesAt: null,
+        }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: b }, headers: {}, correlationId: null },
+      }
+    now: 1767225602000
+end:
+  completed:
+    output:
+      - { payload: { text: a }, headers: {}, correlationId: null }
+      - { payload: { text: b }, headers: {}, correlationId: null }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/watch, execution: /do/0/watch }
+    - { kind: task.started, task: /do/0/watch, execution: /do/0/watch }
+    - {
+        kind: task.completed,
+        task: /do/0/watch,
+        execution: /do/0/watch,
+        completedAt: "2026-01-01T00:00:02.000Z",
+      }
+    - { kind: workflow.completed, completedAt: "2026-01-01T00:00:02.000Z" }

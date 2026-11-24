@@ -1,0 +1,102 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: retry-count
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/busy
+                  status: 503
+        catch:
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/busy
+      status: 503
+      instance: /do/0/guard/try/0/fail
+      title: null
+      detail: null
+facts:
+  exactly:
+    - kind: workflow.started
+    - kind: task.created
+      task: /do/0/guard
+      execution: /do/0/guard
+      createdAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.started
+      task: /do/0/guard
+      execution: /do/0/guard
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.created
+      task: /do/0/guard/try/0/fail
+      execution: /do/0/guard/try/0/fail
+      createdAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.started
+      task: /do/0/guard/try/0/fail
+      execution: /do/0/guard/try/0/fail
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.faulted
+      task: /do/0/guard/try/0/fail
+      execution: /do/0/guard/try/0/fail
+      faultedAt: "2026-01-01T00:00:00.000Z"
+      error:
+        {
+          type: https://example.com/errors/busy,
+          status: 503,
+          instance: /do/0/guard/try/0/fail,
+          title: null,
+          detail: null,
+        }
+    - kind: task.retried
+      workflow: retry-count-instance-1.test
+      task: /do/0/guard
+      execution: /do/0/guard
+      retriedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.created
+      task: /do/0/guard/try/0/fail
+      execution: "/do/0/guard#2/try/0/fail"
+      createdAt: "2026-01-01T00:00:01.000Z"
+    - kind: task.started
+      task: /do/0/guard/try/0/fail
+      execution: "/do/0/guard#2/try/0/fail"
+      startedAt: "2026-01-01T00:00:01.000Z"
+    - kind: task.faulted
+      task: /do/0/guard/try/0/fail
+      execution: "/do/0/guard#2/try/0/fail"
+      faultedAt: "2026-01-01T00:00:01.000Z"
+      error:
+        {
+          type: https://example.com/errors/busy,
+          status: 503,
+          instance: /do/0/guard/try/0/fail,
+          title: null,
+          detail: null,
+        }
+    - kind: task.faulted
+      task: /do/0/guard
+      execution: /do/0/guard
+      faultedAt: "2026-01-01T00:00:01.000Z"
+    - kind: workflow.faulted
+      faultedAt: "2026-01-01T00:00:01.000Z"

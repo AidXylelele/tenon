@@ -1,0 +1,26 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: switch-continue-over-then
+    version: '1.0.0'
+  do:
+    - route:
+        switch:
+          - onward:
+              when: .go
+              then: continue
+        then: last
+    - next:
+        set: '${ . + { next: true } }'
+    - last:
+        set: '${ . + { last: true } }'
+input: { go: true }
+end:
+  completed:
+    output: { go: true, next: true, last: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/route }
+    - { kind: task.completed, task: /do/1/next }
+    - { kind: task.completed, task: /do/2/last }

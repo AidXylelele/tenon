@@ -1,0 +1,61 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-nested-exit
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - wrap:
+                do:
+                  - leave:
+                      set: { left: true }
+                      then: exit
+                  - skipped:
+                      set: { skipped: true }
+            - next:
+                set: { went: on }
+  do:
+    - greet:
+        set: { greeting: Hello }
+input: {}
+end:
+  completed:
+    output: { greeting: Hello }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/audit/before/0/wrap
+      execution: "/do/0/greet@before/0/0/wrap"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/0/wrap
+      execution: "/do/0/greet@before/0/0/wrap"
+    - kind: task.created
+      task: /use/extensions/0/audit/before/0/wrap/do/0/leave
+      execution: "/do/0/greet@before/0/0/wrap/do/0/leave"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/0/wrap/do/0/leave
+      execution: "/do/0/greet@before/0/0/wrap/do/0/leave"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/wrap/do/0/leave
+      execution: "/do/0/greet@before/0/0/wrap/do/0/leave"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/0/wrap
+      execution: "/do/0/greet@before/0/0/wrap"
+    - kind: task.created
+      task: /use/extensions/0/audit/before/1/next
+      execution: "/do/0/greet@before/0/1/next"
+    - kind: task.started
+      task: /use/extensions/0/audit/before/1/next
+      execution: "/do/0/greet@before/0/1/next"
+    - kind: task.completed
+      task: /use/extensions/0/audit/before/1/next
+      execution: "/do/0/greet@before/0/1/next"
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

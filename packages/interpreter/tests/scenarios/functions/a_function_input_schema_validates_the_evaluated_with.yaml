@@ -1,0 +1,40 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-input-schema
+    version: '1.0.0'
+  use:
+    functions:
+      getPetById:
+        input:
+          schema:
+            document:
+              type: object
+              properties:
+                petId:
+                  type: integer
+              required: [ petId ]
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/{petId}
+  do:
+    - getPet:
+        call: getPetById
+        with:
+          petId: ${ .name }
+input: { name: Milou }
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+      status: 400
+      instance: /use/functions/getPetById
+facts:
+  including:
+    - kind: task.faulted
+      task: /use/functions/getPetById
+      execution: /do/0/getPet@function
+    - { kind: task.faulted, task: /do/0/getPet, execution: /do/0/getPet }
+    - kind: workflow.faulted

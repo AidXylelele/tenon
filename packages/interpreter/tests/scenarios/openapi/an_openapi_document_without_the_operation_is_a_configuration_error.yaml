@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: openapi-operation-missing
+    version: '1.0.0'
+  do:
+    - adoptPet:
+        call: openapi
+        with:
+          document:
+            endpoint: https://petstore.swagger.io/v2/swagger.json
+          operationId: adoptPet
+input: {}
+script:
+  - effect: { id: /do/0/adoptPet, kind: openapi, deadline: null }
+    outcome:
+      kind: misconfigured
+      detail: the document has no operation adoptPet
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/adoptPet
+      title: Configuration Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/adoptPet }
+    - kind: workflow.faulted

@@ -1,0 +1,24 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - raiseAlarm:
+        fork:
+          compete: true
+          branches:
+            - callNurse:
+                set:
+                  called: nurse
+                then: callDoctor
+            - callDoctor:
+                set:
+                  called: doctor
+diagnostics:
+  - code: branch-jump
+    pointer: /do/0/raiseAlarm/fork/branches/0/callNurse/then
+    subject: callDoctor
+    range: { start: { line: 14, column: 21 } }
+    message: "A branch cannot jump to 'callDoctor', a task of another branch."

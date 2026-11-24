@@ -1,0 +1,33 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-catalog-definition
+    version: '1.0.0'
+  use:
+    catalogs:
+      global:
+        endpoint: https://github.com/open-workflow-specification/catalog/tree/main
+  do:
+    - describe:
+        call: describe:1.0.0@global
+imports:
+  describe:1.0.0@global: |
+    do:
+      - self:
+          set:
+            reference: ${ $task.reference }
+            definition: ${ $task.definition }
+input: {}
+end:
+  completed:
+    output:
+      reference: describe:1.0.0@global#/do/0/self
+      definition:
+        set:
+          reference: ${ $task.reference }
+          definition: ${ $task.definition }
+facts:
+  including:
+    - { kind: task.completed, task: "describe:1.0.0@global#/do/0/self" }
+    - kind: workflow.completed

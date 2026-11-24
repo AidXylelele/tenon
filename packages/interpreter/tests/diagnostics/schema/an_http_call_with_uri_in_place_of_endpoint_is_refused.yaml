@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: sample-workflow
+    version: '0.1.0'
+  do:
+    - sampleTask:
+        call: http
+        with:
+          method: get
+          uri: https://fake.com/sample
+diagnostics:
+  - code: schema
+    pointer: /do/0/sampleTask/with/uri
+    range: { start: { line: 11, column: 14 } }

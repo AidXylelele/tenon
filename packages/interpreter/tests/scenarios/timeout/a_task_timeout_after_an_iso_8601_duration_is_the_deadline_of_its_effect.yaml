@@ -1,0 +1,23 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-iso
+    version: '1.0.0'
+  do:
+    - pause:
+        wait: PT1M
+        timeout: { after: PT7S }
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: /do/0/pause,
+        kind: timer,
+        deadline: 1767225607000,
+        until: 1767225660000,
+      }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/pause }

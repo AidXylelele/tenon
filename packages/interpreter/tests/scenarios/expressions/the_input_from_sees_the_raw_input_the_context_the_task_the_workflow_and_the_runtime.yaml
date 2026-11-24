@@ -1,0 +1,28 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: input-from-arguments
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        export:
+          as: '${ { exported: .a } }'
+    - observe:
+        input:
+          from: '${ { dot: ., context: $context, task: ($task | { name, reference, input }), workflow: $workflow.id, runtime: $runtime.name } }'
+        set: '${ . }'
+input: {}
+end:
+  completed:
+    output:
+      dot: { a: 1 }
+      context: { exported: 1 }
+      task: { name: observe, reference: /do/1/observe, input: { a: 1 } }
+      workflow: instance-1
+      runtime: interpreter-tests
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

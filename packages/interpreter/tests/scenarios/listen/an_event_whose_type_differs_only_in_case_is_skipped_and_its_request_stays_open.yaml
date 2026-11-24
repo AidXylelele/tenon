@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-filter-case
+    version: '1.0.0'
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.Order
+input: {}
+script:
+  - effect: { id: "/do/0/waitForOrder@event[0]", kind: listen, deadline: null }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: e-1,
+          source: https://shop.example.com,
+          type: com.example.order,
+          data: { n: 1 },
+        }
+    now: 1767225601000
+  - effect: { id: "/do/0/waitForOrder@event[0]", kind: listen, deadline: null }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: e-2,
+          source: https://shop.example.com,
+          type: com.example.Order,
+          data: { n: 2 },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output: [{ n: 2 }]
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/waitForOrder,
+        completedAt: "2026-01-01T00:00:02.000Z",
+      }
+    - kind: workflow.completed

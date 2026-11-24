@@ -1,0 +1,66 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-exit-order
+    version: '1.0.0'
+  use:
+    extensions:
+      - mock:
+          extend: set
+          before:
+            - inject:
+                set: { mocked: true }
+                then: exit
+          after:
+            - closeMock:
+                set: { closed: mock }
+      - audit:
+          extend: set
+          before:
+            - openAudit:
+                set: { opened: audit }
+          after:
+            - closeAudit:
+                set: { closed: audit }
+  do:
+    - greet:
+        set: { greeting: Hello }
+input: {}
+end:
+  completed:
+    output: { mocked: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/mock/before/0/inject
+      execution: "/do/0/greet@before/0/0/inject"
+    - kind: task.started
+      task: /use/extensions/0/mock/before/0/inject
+      execution: "/do/0/greet@before/0/0/inject"
+    - kind: task.completed
+      task: /use/extensions/0/mock/before/0/inject
+      execution: "/do/0/greet@before/0/0/inject"
+    - kind: task.created
+      task: /use/extensions/1/audit/after/0/closeAudit
+      execution: "/do/0/greet@after/1/0/closeAudit"
+    - kind: task.started
+      task: /use/extensions/1/audit/after/0/closeAudit
+      execution: "/do/0/greet@after/1/0/closeAudit"
+    - kind: task.completed
+      task: /use/extensions/1/audit/after/0/closeAudit
+      execution: "/do/0/greet@after/1/0/closeAudit"
+    - kind: task.created
+      task: /use/extensions/0/mock/after/0/closeMock
+      execution: "/do/0/greet@after/0/0/closeMock"
+    - kind: task.started
+      task: /use/extensions/0/mock/after/0/closeMock
+      execution: "/do/0/greet@after/0/0/closeMock"
+    - kind: task.completed
+      task: /use/extensions/0/mock/after/0/closeMock
+      execution: "/do/0/greet@after/0/0/closeMock"
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

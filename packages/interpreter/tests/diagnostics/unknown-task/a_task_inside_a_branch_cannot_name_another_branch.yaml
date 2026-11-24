@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: flow
+    version: '0.1.0'
+  do:
+    - raiseAlarm:
+        fork:
+          branches:
+            - callNurse:
+                do:
+                  - page:
+                      set: { paged: true }
+                      then: callDoctor
+            - callDoctor:
+                set: { called: doctor }
+diagnostics:
+  - code: unknown-task
+    pointer: /do/0/raiseAlarm/fork/branches/0/callNurse/do/0/page/then
+    subject: callDoctor
+    range: { start: { line: 14, column: 27 } }

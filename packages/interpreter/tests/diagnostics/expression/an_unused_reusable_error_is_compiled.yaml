@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: components
+    version: '0.1.0'
+  use:
+    errors:
+      rejected:
+        type: https://example.com/errors/rejected
+        status: 422
+        detail: '${ .reason | }'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: expression
+    pointer: /use/errors/rejected/detail
+    range: { start: { line: 11, column: 15 } }

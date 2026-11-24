@@ -1,0 +1,59 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: function-nested
+    version: '1.0.0'
+  use:
+    functions:
+      getPetById:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/{petId}
+      getFirstPet:
+        call: getPetById
+        with:
+          petId: 1
+  do:
+    - getPet:
+        call: getFirstPet
+input: {}
+script:
+  - effect:
+      id: /do/0/getPet@function@function
+      kind: http
+      deadline: null
+      endpoint:
+        uri: https://petstore.swagger.io/v2/pet/1
+        authentication: null
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1 }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { id: 1 }
+facts:
+  including:
+    - kind: task.created
+      task: /use/functions/getFirstPet
+      execution: /do/0/getPet@function
+    - kind: task.created
+      task: /use/functions/getPetById
+      execution: /do/0/getPet@function@function
+    - kind: task.completed
+      task: /use/functions/getPetById
+      execution: /do/0/getPet@function@function
+    - kind: task.completed
+      task: /use/functions/getFirstPet
+      execution: /do/0/getPet@function
+    - { kind: task.completed, task: /do/0/getPet, execution: /do/0/getPet }
+    - kind: workflow.completed

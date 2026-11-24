@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-script-environment
+    version: '1.0.0'
+  do:
+    - runScript:
+        run:
+          script:
+            language: js
+            code: console.log(process.env.LIMIT)
+            environment:
+              LIMIT: ${ .limit }
+              NAME: ${ .name }
+input: { limit: 10, name: ann }
+end:
+  waiting:
+    effect:
+      id: /do/0/runScript
+      kind: process
+      deadline: null
+      process:
+        kind: script
+        language: js
+        code: console.log(process.env.LIMIT)
+        source: null
+        stdin: null
+        arguments: {}
+        environment: { LIMIT: "10", NAME: ann }
+      await: true
+facts:
+  including:
+    - { kind: task.started, task: /do/0/runScript }

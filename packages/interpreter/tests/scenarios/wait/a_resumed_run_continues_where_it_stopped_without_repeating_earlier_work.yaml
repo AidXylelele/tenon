@@ -1,0 +1,49 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: resume
+    version: '1.0.0'
+  do:
+    - first:
+        wait: PT1S
+    - second:
+        wait: PT2S
+input: {}
+script:
+  - effect:
+      { id: /do/0/first, kind: timer, deadline: null, until: 1767225601000 }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  waiting:
+    effect:
+      { id: /do/1/second, kind: timer, deadline: null, until: 1767225603000 }
+facts:
+  exactly:
+    - kind: workflow.started
+    - {
+        kind: task.created,
+        task: /do/0/first,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.started,
+        task: /do/0/first,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: task.completed,
+        task: /do/0/first,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - {
+        kind: task.created,
+        task: /do/1/second,
+        createdAt: "2026-01-01T00:00:01.000Z",
+      }
+    - {
+        kind: task.started,
+        task: /do/1/second,
+        startedAt: "2026-01-01T00:00:01.000Z",
+      }

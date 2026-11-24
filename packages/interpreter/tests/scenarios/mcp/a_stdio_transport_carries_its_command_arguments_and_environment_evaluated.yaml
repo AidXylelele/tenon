@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-stdio
+    version: '1.0.0'
+  do:
+    - fetchPage:
+        call: mcp
+        with:
+          method: tools/call
+          parameters:
+            name: fetch
+            arguments:
+              url: https://example.com
+          transport:
+            stdio:
+              command: ${ .command }
+              arguments: [ mcp-server-fetch, '${ .flag }' ]
+              environment:
+                LOG_LEVEL: ${ .level }
+                MODE: strict
+input: { command: uvx, flag: --ignore-robots-txt, level: debug }
+end:
+  waiting:
+    effect:
+      id: /do/0/fetchPage
+      kind: mcp
+      deadline: null
+      transport:
+        kind: stdio
+        command: uvx
+        arguments: [mcp-server-fetch, --ignore-robots-txt]
+        environment: { LOG_LEVEL: debug, MODE: strict }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/fetchPage }

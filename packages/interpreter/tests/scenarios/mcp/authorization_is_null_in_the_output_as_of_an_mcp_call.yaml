@@ -1,0 +1,32 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-authorization
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint:
+                uri: https://mcp.example.com/mcp
+                authentication:
+                  bearer:
+                    token: mcp-t0ken
+        output:
+          as: '${ { tools: .tools, authorization: $authorization } }'
+input: {}
+script:
+  - effect: { id: /do/0/callTool, kind: mcp, deadline: null }
+    outcome: { kind: answered, result: { tools: [{ name: fetch }] } }
+    now: 1767225601000
+end:
+  completed:
+    output: { tools: [{ name: fetch }], authorization: null }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/callTool }
+    - kind: workflow.completed

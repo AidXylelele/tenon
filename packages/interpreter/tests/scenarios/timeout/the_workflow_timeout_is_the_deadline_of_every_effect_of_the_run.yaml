@@ -1,0 +1,37 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: timeout-workflow
+    version: '1.0.0'
+  timeout:
+    after: PT20S
+  do:
+    - first:
+        wait: PT1S
+    - second:
+        wait: PT1M
+input: {}
+script:
+  - effect:
+      {
+        id: /do/0/first,
+        kind: timer,
+        deadline: 1767225620000,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+end:
+  waiting:
+    effect:
+      {
+        id: /do/1/second,
+        kind: timer,
+        deadline: 1767225620000,
+        until: 1767225661000,
+      }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/first }
+    - { kind: task.started, task: /do/1/second }

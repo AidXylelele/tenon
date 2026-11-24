@@ -1,0 +1,59 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-facts
+    version: '1.0.0'
+  do:
+    - prepare:
+        set: { ready: true }
+    - each:
+        for:
+          in: [a, b]
+        do:
+          - mark:
+              set: '${ { item: $item } }'
+input: {}
+end:
+  completed:
+    output: { item: b }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/prepare, execution: /do/0/prepare }
+    - { kind: task.started, task: /do/0/prepare, execution: /do/0/prepare }
+    - { kind: task.completed, task: /do/0/prepare, execution: /do/0/prepare }
+    - { kind: task.created, task: /do/1/each, execution: /do/1/each }
+    - { kind: task.started, task: /do/1/each, execution: /do/1/each }
+    - {
+        kind: task.created,
+        task: /do/1/each/do/0/mark,
+        execution: "/do/1/each[0]/do/0/mark",
+      }
+    - {
+        kind: task.started,
+        task: /do/1/each/do/0/mark,
+        execution: "/do/1/each[0]/do/0/mark",
+      }
+    - {
+        kind: task.completed,
+        task: /do/1/each/do/0/mark,
+        execution: "/do/1/each[0]/do/0/mark",
+      }
+    - {
+        kind: task.created,
+        task: /do/1/each/do/0/mark,
+        execution: "/do/1/each[1]/do/0/mark",
+      }
+    - {
+        kind: task.started,
+        task: /do/1/each/do/0/mark,
+        execution: "/do/1/each[1]/do/0/mark",
+      }
+    - {
+        kind: task.completed,
+        task: /do/1/each/do/0/mark,
+        execution: "/do/1/each[1]/do/0/mark",
+      }
+    - { kind: task.completed, task: /do/1/each, execution: /do/1/each }
+    - kind: workflow.completed

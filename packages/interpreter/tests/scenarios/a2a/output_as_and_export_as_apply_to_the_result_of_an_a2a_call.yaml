@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-output-export
+    version: '1.0.0'
+  do:
+    - getTask:
+        call: a2a
+        with:
+          method: tasks/get
+          server: https://agent.example.com/a2a
+          parameters:
+            id: task-1
+        output:
+          as: '${ { state: .status.state } }'
+        export:
+          as: '${ { lastState: .state } }'
+    - report:
+        set: '${ { task: ., context: $context } }'
+input: {}
+script:
+  - effect: { id: /do/0/getTask, kind: a2a, deadline: null }
+    outcome:
+      {
+        kind: answered,
+        result: { kind: task, id: task-1, status: { state: completed } },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      task: { state: completed }
+      context: { lastState: completed }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getTask }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

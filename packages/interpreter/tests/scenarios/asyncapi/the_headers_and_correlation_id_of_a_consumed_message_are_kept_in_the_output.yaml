@@ -1,0 +1,54 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-correlation
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 1
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { greetings: "Hello, World!" },
+            headers: { foo: bar, bar: baz },
+            correlationId: "123456",
+          },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      - {
+          payload: { greetings: "Hello, World!" },
+          headers: { foo: bar, bar: baz },
+          correlationId: "123456",
+        }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

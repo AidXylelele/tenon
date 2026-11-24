@@ -1,0 +1,30 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-instance
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: com.example.order.placed.v1
+input: {}
+start:
+  instanceId: instance-2
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: dc3843b4-29de-5910-8f38-f3445a2fdeb8
+        source: /test/emit-instance/1.0.0
+        type: com.example.order.placed.v1
+        time: "2026-01-01T00:00:00.000Z"
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

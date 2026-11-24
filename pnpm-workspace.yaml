@@ -1,8 +1,9 @@
 packages:
   - apps/*
+  - packages/*
 
-# Exact versions only: `pnpm add` writes "1.2.3", never "^1.2.3" (DR-004).
-savePrefix: ''
+# Exact versions only: `pnpm add` writes "1.2.3", never "^1.2.3".
+savePrefix: ""
 # Refuse to install when the running Node does not satisfy `engines`.
 engineStrict: true
 # Supply-chain: ignore versions published less than 24 hours ago.
@@ -14,11 +15,25 @@ audit:
 
 # pnpm blocks dependency install scripts unless explicitly allowed.
 allowBuilds:
-  '@scarf/scarf': false
-  '@swc/core': true
+  "@scarf/scarf": false
+  "@tree-sitter-grammars/tree-sitter-yaml": false
+  "@swc/core": true
   esbuild: true
+  core-js-pure: false
   cpu-features: false
   protobufjs: false
   sharp: false
   ssh2: false
+  tree-sitter: false
+  tree-sitter-json: false
   unrs-resolver: false
+
+# Security override for a transitive pin with a published fix:
+# drizzle-kit's deprecated @esbuild-kit/core-utils pins esbuild 0.18 (dev-server advisory, fixed in 0.25).
+overrides:
+  "@esbuild-kit/core-utils>esbuild": 0.25.12
+
+# cmdk 1.1.1 runs the tasks it queues while flushing in the same pass, before the items re-render,
+# so the input's aria-activedescendant stays empty (dip/cmdk#373, #413); drop with a fixed release.
+patchedDependencies:
+  cmdk@1.1.1: patches/cmdk@1.1.1.patch

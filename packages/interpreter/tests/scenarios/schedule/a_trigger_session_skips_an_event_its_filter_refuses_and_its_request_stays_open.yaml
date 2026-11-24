@@ -1,0 +1,67 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    on:
+      one:
+        with:
+          type: com.example.order.placed
+          data: ${ .total > 100 }
+  do:
+    - keep:
+        set: ${ . }
+correlate: true
+script:
+  - effect: { id: "@event[0]", kind: listen, deadline: null }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-1,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { total: 50 },
+        }
+    now: 1767225601000
+  - effect: { id: "@event[0]", kind: listen, deadline: null }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: o-2,
+          source: https://shop.example.com,
+          type: com.example.order.placed,
+          data: { total: 150 },
+        }
+    now: 1767225602000
+end:
+  completed:
+    output: [{ total: 150 }]
+facts:
+  exactly:
+    - {
+        kind: workflow.correlation-started,
+        name: trigger-instance-1.test,
+        startedAt: "2026-01-01T00:00:00.000Z",
+      }
+    - {
+        kind: workflow.correlation-completed,
+        name: trigger-instance-1.test,
+        completedAt: "2026-01-01T00:00:02.000Z",
+        correlationKeys: {},
+      }
+    - {
+        kind: workflow.started,
+        name: trigger-instance-1.test,
+        definition: { namespace: test, name: trigger, version: "1.0.0" },
+        startedAt: "2026-01-01T00:00:02.000Z",
+      }
+    - { kind: task.created, task: /do/0/keep }
+    - { kind: task.started, task: /do/0/keep }
+    - { kind: task.completed, task: /do/0/keep }
+    - kind: workflow.completed

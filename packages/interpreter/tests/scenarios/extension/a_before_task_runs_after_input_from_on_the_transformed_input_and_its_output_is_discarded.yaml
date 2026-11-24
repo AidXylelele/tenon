@@ -1,0 +1,70 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-before
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          before:
+            - record:
+                call: http
+                with:
+                  method: post
+                  endpoint: https://audit.example.com/records
+                  body: '${ { seen: ., input: $input } }'
+  do:
+    - greet:
+        input:
+          from: '${ { name: .user } }'
+        set:
+          greeting: '${ "Hello " + .name }'
+input: { user: Ann }
+script:
+  - effect:
+      id: "/do/0/greet@before/0/0/record"
+      kind: http
+      deadline: null
+      method: POST
+      body: { seen: { name: Ann }, input: { name: Ann } }
+    outcome:
+      kind: responded
+      request:
+        method: POST
+        uri: https://audit.example.com/records
+        headers: { content-type: application/json }
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { recorded: true }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output: { greeting: Hello Ann }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet, execution: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet, execution: /do/0/greet }
+    - kind: task.created
+      workflow: extension-before-instance-1.test
+      task: /use/extensions/0/audit/before/0/record
+      execution: "/do/0/greet@before/0/0/record"
+      createdAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.started
+      workflow: extension-before-instance-1.test
+      task: /use/extensions/0/audit/before/0/record
+      execution: "/do/0/greet@before/0/0/record"
+      startedAt: "2026-01-01T00:00:00.000Z"
+    - kind: task.completed
+      workflow: extension-before-instance-1.test
+      task: /use/extensions/0/audit/before/0/record
+      execution: "/do/0/greet@before/0/0/record"
+      completedAt: "2026-01-01T00:00:01.000Z"
+    - kind: task.completed
+      task: /do/0/greet
+      execution: /do/0/greet
+      completedAt: "2026-01-01T00:00:01.000Z"
+    - kind: workflow.completed

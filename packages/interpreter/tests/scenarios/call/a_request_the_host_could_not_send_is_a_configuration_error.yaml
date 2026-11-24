@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-misconfigured
+    version: '1.0.0'
+  use:
+    secrets:
+      - petStoreCredentials
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://petstore.swagger.io/v2/pet/1
+            authentication:
+              bearer:
+                use: petStoreCredentials
+profile:
+  secrets: [petStoreCredentials]
+input: {}
+script:
+  - effect: { id: /do/0/getPet, kind: http, deadline: null }
+    outcome:
+      kind: misconfigured
+      detail: the secret holds no token
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/configuration
+      status: 400
+      instance: /do/0/getPet
+      title: Configuration Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/getPet }
+    - kind: workflow.faulted

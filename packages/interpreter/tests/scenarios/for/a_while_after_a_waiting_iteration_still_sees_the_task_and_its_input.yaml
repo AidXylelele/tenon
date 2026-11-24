@@ -1,0 +1,48 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: for-while-after-wait
+    version: '1.0.0'
+  do:
+    - loop:
+        input:
+          from: '${ { limit: .limit } }'
+        for:
+          in: [a, b, c]
+        while: '$index < $input.limit and $task.input.limit == $input.limit'
+        do:
+          - pause:
+              wait: PT1S
+input: { limit: 2, noise: true }
+script:
+  - effect:
+      {
+        id: "/do/0/loop[0]/do/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225601000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/loop[1]/do/0/pause",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+end:
+  completed:
+    output: { limit: 2 }
+facts:
+  including:
+    - {
+        kind: task.completed,
+        task: /do/0/loop/do/0/pause,
+        execution: "/do/0/loop[1]/do/0/pause",
+      }
+    - { kind: task.completed, task: /do/0/loop, execution: /do/0/loop }
+    - kind: workflow.completed

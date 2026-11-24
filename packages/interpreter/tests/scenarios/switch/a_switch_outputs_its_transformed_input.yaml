@@ -1,0 +1,21 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: switch-output
+    version: '1.0.0'
+  do:
+    - route:
+        input:
+          from: '${ { picked: .a } }'
+        switch:
+          - any:
+              then: continue
+input: { a: 1, b: 2 }
+end:
+  completed:
+    output: { picked: 1 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/route }
+    - kind: workflow.completed

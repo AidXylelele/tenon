@@ -1,0 +1,22 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-both
+    version: '0.1.0'
+  do:
+    - publish:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/asyncapi.json
+          operation: greet
+          message:
+            payload:
+              greetings: hello
+          subscription:
+            consume:
+              amount: 1
+diagnostics:
+  - code: schema
+    pointer: /do/0/publish/with

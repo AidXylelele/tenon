@@ -1,0 +1,27 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - greet:
+        call: grpc
+        with:
+          proto:
+            endpoint:
+              uri: https://example.com/greeter.proto
+              authentication:
+                digest:
+                  username: admin
+                  password: secret
+          service:
+            name: GreeterApi.Greeter
+            host: example.com
+          method: SayHello
+profile:
+  authentications: [basic, bearer, oauth2, oidc]
+diagnostics:
+  - code: capability
+    pointer: /do/0/greet
+    subject: authentication.digest

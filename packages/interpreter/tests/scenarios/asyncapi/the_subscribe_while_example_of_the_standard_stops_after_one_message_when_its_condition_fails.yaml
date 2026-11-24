@@ -1,0 +1,60 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: examples
+    name: bearer-auth
+    version: '0.1.0'
+  do:
+    - getNotifications:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://fake.com/docs/asyncapi.json
+          operation: getNotifications
+          subscription:
+            filter: '${ .correlationId == $context.userId and .payload.from.firstName == $context.contact.firstName and .payload.from.lastName == $context.contact.lastName }'
+            consume:
+              while: '${ ($context.consumedMessages | length) < 5 }'
+input:
+  {
+    userId: u-1,
+    contact: { firstName: Ann, lastName: Lee },
+    consumedMessages: [1, 2, 3, 4, 5],
+  }
+script:
+  - effect:
+      {
+        id: "/do/0/getNotifications@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: /do/0/getNotifications,
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message:
+          {
+            payload: { from: { firstName: Ann, lastName: Lee }, text: m0 },
+            headers: {},
+            correlationId: u-1,
+          },
+      }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      - {
+          payload: { from: { firstName: Ann, lastName: Lee }, text: m0 },
+          headers: {},
+          correlationId: u-1,
+        }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getNotifications }
+    - kind: workflow.completed

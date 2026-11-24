@@ -1,0 +1,10 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: nothing-to-do
+    version: '0.1.0'
+diagnostics:
+  - code: schema
+    pointer: ""
+    range: { start: { line: 1, column: 1 } }

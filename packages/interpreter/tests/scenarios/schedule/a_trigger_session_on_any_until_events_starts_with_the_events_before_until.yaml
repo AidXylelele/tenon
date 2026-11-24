@@ -1,0 +1,88 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: trigger
+    version: '1.0.0'
+  schedule:
+    on:
+      any:
+        - with:
+            type: com.example.reading
+      until:
+        one:
+          with:
+            type: com.example.closed
+  do:
+    - keep:
+        set: ${ . }
+correlate: true
+script:
+  - effect:
+      {
+        id: "@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-1,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 1 },
+        }
+    now: 1767225601000
+  - effect:
+      {
+        id: "@event[1]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 1,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: r-2,
+          source: https://sensors.example.com,
+          type: com.example.reading,
+          data: { n: 2 },
+        }
+    now: 1767225602000
+  - effect:
+      {
+        id: "@event[2]",
+        kind: listen,
+        deadline: null,
+        subscription: "",
+        position: 2,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: c-1,
+          source: https://sensors.example.com,
+          type: com.example.closed,
+          data: { n: 99 },
+        }
+    now: 1767225603000
+end:
+  completed:
+    output: [{ n: 1 }, { n: 2 }]
+facts:
+  including:
+    - {
+        kind: workflow.correlation-completed,
+        completedAt: "2026-01-01T00:00:03.000Z",
+      }
+    - { kind: workflow.started, startedAt: "2026-01-01T00:00:03.000Z" }
+    - kind: workflow.completed

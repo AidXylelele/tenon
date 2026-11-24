@@ -1,0 +1,72 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-foreach-error
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          subscription:
+            consume:
+              amount: 2
+            foreach:
+              do:
+                - reject:
+                    raise:
+                      error:
+                        type: https://example.com/errors/bad-message
+                        status: 422
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/watch@message[0]",
+        kind: asyncapi,
+        deadline: null,
+        exchange:
+          {
+            kind: receive,
+            subscription: "/do/0/watch",
+            position: 0,
+            closesAt: null,
+          },
+      }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://example.com/errors/bad-message
+      status: 422
+      instance: "/do/0/watch/with/subscription/foreach/do/0/reject"
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/watch }
+    - { kind: task.started, task: /do/0/watch }
+    - {
+        kind: task.created,
+        task: "/do/0/watch/with/subscription/foreach/do/0/reject",
+        execution: "/do/0/watch[0]/with/subscription/foreach/do/0/reject",
+      }
+    - {
+        kind: task.started,
+        task: "/do/0/watch/with/subscription/foreach/do/0/reject",
+        execution: "/do/0/watch[0]/with/subscription/foreach/do/0/reject",
+      }
+    - {
+        kind: task.faulted,
+        task: "/do/0/watch/with/subscription/foreach/do/0/reject",
+        execution: "/do/0/watch[0]/with/subscription/foreach/do/0/reject",
+      }
+    - { kind: task.faulted, task: /do/0/watch, execution: /do/0/watch }
+    - kind: workflow.faulted

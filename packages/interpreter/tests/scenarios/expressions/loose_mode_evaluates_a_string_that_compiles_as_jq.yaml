@@ -1,0 +1,21 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: loose-evaluates
+    version: '1.0.0'
+  evaluate:
+    mode: loose
+  do:
+    - compute:
+        set:
+          path: .x
+          sum: 1 + 1
+input: { x: 5 }
+end:
+  completed:
+    output: { path: 5, sum: 2 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

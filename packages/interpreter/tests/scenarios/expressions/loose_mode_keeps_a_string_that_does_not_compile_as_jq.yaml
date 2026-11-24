@@ -1,0 +1,21 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: loose-literal
+    version: '1.0.0'
+  evaluate:
+    mode: loose
+  do:
+    - compute:
+        set:
+          greeting: hello world
+          name: John
+input: {}
+end:
+  completed:
+    output: { greeting: hello world, name: John }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

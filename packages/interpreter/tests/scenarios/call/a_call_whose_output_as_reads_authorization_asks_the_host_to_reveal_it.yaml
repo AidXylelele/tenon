@@ -1,0 +1,45 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-reveal-in-output
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint:
+            uri: https://petstore.swagger.io/v2/pet/1
+            authentication:
+              bearer:
+                token: ${ .token }
+        output:
+          as: '${ { pet: .id, authorization: $authorization } }'
+input: { token: eyJhbGciOiJIUzI1NiJ9 }
+script:
+  - effect:
+      id: /do/0/getPet
+      kind: http
+      deadline: null
+      revealAuthorization: true
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1 }
+      authorization: { scheme: Bearer, parameter: eyJhbGciOiJIUzI1NiJ9 }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      pet: 1
+      authorization: { scheme: Bearer, parameter: eyJhbGciOiJIUzI1NiJ9 }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - kind: workflow.completed

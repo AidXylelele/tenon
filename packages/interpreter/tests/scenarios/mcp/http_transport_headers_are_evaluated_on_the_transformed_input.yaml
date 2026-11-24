@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: mcp-headers
+    version: '1.0.0'
+  do:
+    - callTool:
+        call: mcp
+        with:
+          method: tools/list
+          transport:
+            http:
+              endpoint: https://mcp.example.com/mcp
+              headers:
+                x-tenant: ${ .tenant }
+                accept: application/json
+input: { tenant: acme }
+end:
+  waiting:
+    effect:
+      id: /do/0/callTool
+      kind: mcp
+      deadline: null
+      transport:
+        kind: http
+        endpoint: { uri: https://mcp.example.com/mcp, authentication: null }
+        headers: { x-tenant: acme, accept: application/json }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/callTool }

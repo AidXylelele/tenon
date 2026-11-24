@@ -1,0 +1,50 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: extension-after-stages
+    version: '1.0.0'
+  use:
+    extensions:
+      - audit:
+          extend: set
+          after:
+            - record:
+                set: '${ { seen: ., context: $context } }'
+                export:
+                  as: '${ $context + { recorded: . } }'
+  do:
+    - greet:
+        set: { greeting: Hello }
+        output:
+          as: '${ { shown: .greeting } }'
+        export:
+          as: '${ { exported: .shown } }'
+  output:
+    as: '${ { output: ., context: $context } }'
+input: {}
+end:
+  completed:
+    output:
+      output: { shown: Hello }
+      context:
+        exported: Hello
+        recorded:
+          seen: { shown: Hello }
+          context: { exported: Hello }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/greet }
+    - { kind: task.started, task: /do/0/greet }
+    - kind: task.created
+      task: /use/extensions/0/audit/after/0/record
+      execution: "/do/0/greet@after/0/0/record"
+    - kind: task.started
+      task: /use/extensions/0/audit/after/0/record
+      execution: "/do/0/greet@after/0/0/record"
+    - kind: task.completed
+      task: /use/extensions/0/audit/after/0/record
+      execution: "/do/0/greet@after/0/0/record"
+    - { kind: task.completed, task: /do/0/greet }
+    - kind: workflow.completed

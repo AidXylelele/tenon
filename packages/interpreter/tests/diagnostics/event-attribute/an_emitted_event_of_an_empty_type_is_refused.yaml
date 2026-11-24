@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emits
+    version: '0.1.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              type: ''
+diagnostics:
+  - code: event-attribute
+    pointer: /do/0/notify/emit/event/with/type
+    subject: type
+    range: { start: { line: 11, column: 19 } }
+    message: "Event attribute 'type' must not be empty."

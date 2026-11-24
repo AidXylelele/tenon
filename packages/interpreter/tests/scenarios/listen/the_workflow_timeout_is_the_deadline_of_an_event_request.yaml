@@ -1,0 +1,29 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-workflow-deadline
+    version: '1.0.0'
+  timeout:
+    after: PT1M
+  do:
+    - waitForOrder:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.order.placed
+input: {}
+end:
+  waiting:
+    effect:
+      {
+        id: "/do/0/waitForOrder@event[0]",
+        kind: listen,
+        deadline: 1767225660000,
+        subscription: /do/0/waitForOrder,
+        position: 0,
+      }
+facts:
+  including:
+    - { kind: task.started, task: /do/0/waitForOrder }

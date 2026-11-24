@@ -1,0 +1,72 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: asyncapi-subscribe-server
+    version: '1.0.0'
+  do:
+    - watch:
+        call: asyncapi
+        with:
+          document:
+            endpoint: https://example.com/docs/asyncapi.json
+          operation: chat-inbox
+          server:
+            name: chatServer
+            variables:
+              tenant: ${ .tenant }
+          authentication:
+            bearer:
+              token: ${ .token }
+          subscription:
+            consume:
+              amount: 2
+input: { tenant: acme, token: chat-t0ken }
+script:
+  - effect:
+      id: "/do/0/watch@message[0]"
+      kind: asyncapi
+      deadline: null
+      server: { name: chatServer, variables: { tenant: acme } }
+      authentication: { kind: bearer, token: chat-t0ken }
+      exchange:
+        {
+          kind: receive,
+          subscription: /do/0/watch,
+          position: 0,
+          closesAt: null,
+        }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: a }, headers: {}, correlationId: null },
+      }
+    now: 1767225601000
+  - effect:
+      id: "/do/0/watch@message[1]"
+      kind: asyncapi
+      deadline: null
+      server: { name: chatServer, variables: { tenant: acme } }
+      authentication: { kind: bearer, token: chat-t0ken }
+      exchange:
+        {
+          kind: receive,
+          subscription: /do/0/watch,
+          position: 1,
+          closesAt: null,
+        }
+    outcome:
+      {
+        kind: message,
+        message: { payload: { text: b }, headers: {}, correlationId: null },
+      }
+    now: 1767225602000
+end:
+  completed:
+    output:
+      - { payload: { text: a }, headers: {}, correlationId: null }
+      - { payload: { text: b }, headers: {}, correlationId: null }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/watch }
+    - kind: workflow.completed

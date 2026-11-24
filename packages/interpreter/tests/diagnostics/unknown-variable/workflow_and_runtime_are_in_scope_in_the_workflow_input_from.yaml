@@ -1,0 +1,13 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  input:
+    from: '${ { name: $workflow.definition.document.name, runtime: $runtime.name } }'
+  do:
+    - compute:
+        set:
+          a: 1
+diagnostics: []

@@ -1,0 +1,42 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-read-raw-string
+    version: '1.0.0'
+  do:
+    - greeting:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.greeting
+          read: raw
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/greeting@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/greeting,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: g-1,
+          source: https://chat.example.com,
+          type: com.example.greeting,
+          data: hi,
+        }
+    now: 1767225601000
+end:
+  completed:
+    output: [ImhpIg==]
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/greeting }
+    - kind: workflow.completed

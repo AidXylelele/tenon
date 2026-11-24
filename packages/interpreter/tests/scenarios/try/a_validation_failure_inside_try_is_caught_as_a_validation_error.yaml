@@ -1,0 +1,39 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-validation
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - check:
+              input:
+                schema:
+                  format: json
+                  document:
+                    type: object
+                    required: [order]
+              set: { ran: true }
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+          do:
+            - keep:
+                set:
+                  caught: '${ $error | del(.detail) }'
+input: { noise: true }
+end:
+  completed:
+    output:
+      caught:
+        type: https://open-workflow-specification.org/spec/1.0.0/errors/validation
+        status: 400
+        instance: /do/0/guard/try/0/check
+        title: Validation Error
+facts:
+  including:
+    - { kind: task.faulted, task: /do/0/guard/try/0/check }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

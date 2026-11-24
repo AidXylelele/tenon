@@ -1,0 +1,79 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: run-retry
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - flaky:
+              run:
+                shell:
+                  command: ./flaky.sh
+        catch:
+          errors:
+            with:
+              type: https://open-workflow-specification.org/spec/1.0.0/errors/runtime
+          retry:
+            delay:
+              seconds: 1
+            limit:
+              attempt:
+                count: 1
+input: {}
+script:
+  - effect:
+      id: /do/0/guard/try/0/flaky
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: ./flaky.sh
+        stdin: null
+        arguments: []
+        directory: null
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 1, stdout: "", stderr: try again }
+    now: 1767225601000
+  - effect:
+      {
+        id: "/do/0/guard#2@retry",
+        kind: timer,
+        deadline: null,
+        until: 1767225602000,
+      }
+    outcome: { kind: elapsed }
+    now: 1767225602000
+  - effect:
+      id: "/do/0/guard#2/try/0/flaky"
+      kind: process
+      deadline: null
+      process:
+        kind: shell
+        command: ./flaky.sh
+        stdin: null
+        arguments: []
+        directory: null
+        environment: {}
+      await: true
+    outcome: { kind: exited, code: 0, stdout: ok, stderr: "" }
+    now: 1767225603000
+end:
+  completed:
+    output: ok
+facts:
+  including:
+    - {
+        kind: task.faulted,
+        task: /do/0/guard/try/0/flaky,
+        execution: /do/0/guard/try/0/flaky,
+      }
+    - { kind: task.retried, task: /do/0/guard }
+    - {
+        kind: task.completed,
+        task: /do/0/guard/try/0/flaky,
+        execution: "/do/0/guard#2/try/0/flaky",
+      }
+    - kind: workflow.completed

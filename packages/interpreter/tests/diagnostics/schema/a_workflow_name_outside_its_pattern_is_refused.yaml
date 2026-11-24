@@ -1,0 +1,14 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: Bad_Name
+    version: '0.1.0'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: schema
+    pointer: /document/name
+    range: { start: { line: 4, column: 9 } }

@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-then-continue
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 503
+        catch:
+          then: continue
+        then: last
+    - next:
+        set: '${ . + { next: true } }'
+    - last:
+        set: '${ . + { last: true } }'
+input: { a: 1 }
+end:
+  completed:
+    output: { a: 1, next: true, last: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/fail }
+    - { kind: task.started, task: /do/0/guard/try/0/fail }
+    - { kind: task.faulted, task: /do/0/guard/try/0/fail }
+    - { kind: task.completed, task: /do/0/guard }
+    - { kind: task.created, task: /do/1/next }
+    - { kind: task.started, task: /do/1/next }
+    - { kind: task.completed, task: /do/1/next }
+    - { kind: task.created, task: /do/2/last }
+    - { kind: task.started, task: /do/2/last }
+    - { kind: task.completed, task: /do/2/last }
+    - kind: workflow.completed

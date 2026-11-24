@@ -1,0 +1,44 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: a2a-stream
+    version: '1.0.0'
+  do:
+    - streamAgent:
+        call: a2a
+        with:
+          method: message/stream
+          server: https://agent.example.com/a2a
+          parameters:
+            message:
+              parts:
+                - kind: text
+                  text: hello
+input: {}
+script:
+  - effect:
+      id: /do/0/streamAgent
+      kind: a2a
+      deadline: null
+      method: message/stream
+      parameters:
+        message:
+          parts: [{ kind: text, text: hello }]
+          messageId: e582111f-4993-5ea1-a6e2-2afebb78ac49
+          role: user
+    outcome:
+      kind: answered
+      result:
+        - { kind: status-update, status: { state: working } }
+        - { kind: status-update, status: { state: completed }, final: true }
+    now: 1767225601000
+end:
+  completed:
+    output:
+      - { kind: status-update, status: { state: working } }
+      - { kind: status-update, status: { state: completed }, final: true }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/streamAgent }
+    - kind: workflow.completed

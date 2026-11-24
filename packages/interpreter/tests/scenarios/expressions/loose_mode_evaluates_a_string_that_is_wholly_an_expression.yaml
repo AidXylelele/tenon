@@ -1,0 +1,20 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: loose-whole
+    version: '1.0.0'
+  evaluate:
+    mode: loose
+  do:
+    - compute:
+        set:
+          doubled: '${ .x * 2 }'
+input: { x: 5 }
+end:
+  completed:
+    output: { doubled: 10 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

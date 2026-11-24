@@ -30,14 +30,14 @@ export class Mailpit {
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
-    throw new Error(`No message for ${to} within ${timeoutMs} ms`);
+    throw new Error(`No message for ${to} within ${String(timeoutMs)} ms`);
   }
 
   async cleanup(): Promise<void> {
     if (this.created.length === 0) return;
     await fetch(`${this.baseUrl}/api/v1/messages`, {
-      method: 'DELETE',
-      headers: { 'content-type': 'application/json' },
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ IDs: this.created }),
     });
     this.created.length = 0;

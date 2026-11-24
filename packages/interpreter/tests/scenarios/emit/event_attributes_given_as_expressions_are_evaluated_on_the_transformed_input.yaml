@@ -1,0 +1,41 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: emit-attribute-expressions
+    version: '1.0.0'
+  do:
+    - notify:
+        emit:
+          event:
+            with:
+              id: ${ "order-" + .id }
+              source: ${ "https://shop.example.com/" + .shop }
+              type: com.example.order.placed.v1
+              time: ${ .placedAt }
+              subject: ${ .id }
+              dataschema: ${ .schema }
+input:
+  {
+    id: "7",
+    shop: eu,
+    placedAt: "2025-12-24T10:00:00Z",
+    schema: https://schemas.example.com/order.json,
+  }
+end:
+  waiting:
+    effect:
+      id: "/do/0/notify"
+      kind: emit
+      deadline: null
+      event:
+        specversion: "1.0"
+        id: order-7
+        source: https://shop.example.com/eu
+        type: com.example.order.placed.v1
+        time: "2025-12-24T10:00:00Z"
+        subject: "7"
+        dataschema: https://schemas.example.com/order.json
+facts:
+  including:
+    - { kind: task.started, task: /do/0/notify }

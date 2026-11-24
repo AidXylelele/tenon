@@ -1,0 +1,21 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: filters
+    version: '0.1.0'
+  do:
+    - readings:
+        listen:
+          to:
+            any:
+              - with:
+                  type: com.example.reading
+            until:
+              one:
+                with:
+                  subject: 'room-(1'
+diagnostics:
+  - code: regex
+    pointer: /do/0/readings/listen/to/until/one/with/subject
+    range: { start: { line: 16, column: 26 } }

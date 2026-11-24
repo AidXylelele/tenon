@@ -1,0 +1,34 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: try-without-error
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - first:
+              set: '${ . + { first: true } }'
+          - second:
+              set: '${ . + { second: true } }'
+        catch:
+          do:
+            - handle:
+                set: { handled: true }
+input: { a: 1 }
+end:
+  completed:
+    output: { a: 1, first: true, second: true }
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/guard }
+    - { kind: task.started, task: /do/0/guard }
+    - { kind: task.created, task: /do/0/guard/try/0/first }
+    - { kind: task.started, task: /do/0/guard/try/0/first }
+    - { kind: task.completed, task: /do/0/guard/try/0/first }
+    - { kind: task.created, task: /do/0/guard/try/1/second }
+    - { kind: task.started, task: /do/0/guard/try/1/second }
+    - { kind: task.completed, task: /do/0/guard/try/1/second }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

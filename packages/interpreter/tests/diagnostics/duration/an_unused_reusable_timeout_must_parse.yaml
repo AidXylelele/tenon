@@ -1,0 +1,18 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: times
+    version: '0.1.0'
+  use:
+    timeouts:
+      patient:
+        after: PT1.5H30M
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: duration
+    pointer: /use/timeouts/patient/after
+    range: { start: { line: 9, column: 14 } }

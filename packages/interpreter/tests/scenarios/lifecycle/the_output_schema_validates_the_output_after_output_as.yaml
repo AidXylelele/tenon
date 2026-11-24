@@ -1,0 +1,24 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: output-schema
+    version: '1.0.0'
+  do:
+    - produce:
+        set: { value: 3 }
+        output:
+          as: '${ { total: .value } }'
+          schema:
+            format: json
+            document:
+              type: object
+              required: [total]
+input: {}
+end:
+  completed:
+    output: { total: 3 }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

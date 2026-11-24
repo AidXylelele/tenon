@@ -1,0 +1,20 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: scopes
+    version: '0.1.0'
+  do:
+    - each:
+        for:
+          in: '${ .pets }'
+          at: position
+        do:
+          - keep:
+              set:
+                rank: '${ $index }'
+diagnostics:
+  - code: unknown-variable
+    pointer: /do/0/each/do/0/keep/set/rank
+    subject: $index
+    range: { start: { line: 14, column: 21 } }

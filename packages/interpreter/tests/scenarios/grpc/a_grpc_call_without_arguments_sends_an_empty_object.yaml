@@ -1,0 +1,31 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: grpc-no-arguments
+    version: '1.0.0'
+  do:
+    - listGreetings:
+        call: grpc
+        with:
+          proto:
+            endpoint: https://example.com/protos/greet.proto
+          service:
+            name: GreeterApi.Greeter
+            host: greeter.example.com
+            port: 5011
+          method: ListGreetings
+input: { ignored: true }
+end:
+  waiting:
+    effect:
+      id: /do/0/listGreetings
+      kind: grpc
+      deadline: null
+      method: ListGreetings
+      arguments: {}
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/listGreetings }
+    - { kind: task.started, task: /do/0/listGreetings }

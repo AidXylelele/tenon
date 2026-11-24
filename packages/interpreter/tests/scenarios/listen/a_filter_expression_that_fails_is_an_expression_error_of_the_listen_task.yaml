@@ -1,0 +1,53 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: listen-filter-failure
+    version: '1.0.0'
+  do:
+    - hot:
+        listen:
+          to:
+            one:
+              with:
+                type: com.example.temperature
+                data: '${ .temperature | error("no reading") }'
+input: {}
+script:
+  - effect:
+      {
+        id: "/do/0/hot@event[0]",
+        kind: listen,
+        deadline: null,
+        subscription: /do/0/hot,
+        position: 0,
+      }
+    outcome:
+      kind: event
+      event:
+        {
+          specversion: "1.0",
+          id: t-1,
+          source: https://hospital.example.com,
+          type: com.example.temperature,
+          data: { temperature: 39 },
+        }
+    now: 1767225601000
+end:
+  faulted:
+    error:
+      type: https://open-workflow-specification.org/spec/1.0.0/errors/expression
+      status: 400
+      instance: /do/0/hot
+      title: Expression Error
+facts:
+  exactly:
+    - kind: workflow.started
+    - { kind: task.created, task: /do/0/hot }
+    - { kind: task.started, task: /do/0/hot }
+    - {
+        kind: task.faulted,
+        task: /do/0/hot,
+        faultedAt: "2026-01-01T00:00:01.000Z",
+      }
+    - kind: workflow.faulted

@@ -1,0 +1,16 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: cron
+    version: '0.1.0'
+  schedule:
+    cron: '0 0 * * 5-1'
+  do:
+    - greet:
+        set:
+          message: hello
+diagnostics:
+  - code: cron
+    pointer: /schedule/cron
+    range: { start: { line: 7, column: 9 } }

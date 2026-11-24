@@ -1,0 +1,35 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: body-arguments
+    version: '1.0.0'
+  do:
+    - first:
+        set: { a: 1 }
+        export:
+          as: '${ { exported: .a } }'
+    - observe:
+        input:
+          from: '${ { b: .a } }'
+        set:
+          dot: '${ . }'
+          input: '${ $input }'
+          context: '${ $context }'
+          task: '${ $task | { name, reference, input } }'
+          workflow: '${ $workflow.id }'
+          runtime: '${ $runtime.name }'
+input: {}
+end:
+  completed:
+    output:
+      dot: { b: 1 }
+      input: { b: 1 }
+      context: { exported: 1 }
+      task: { name: observe, reference: /do/1/observe, input: { a: 1 } }
+      workflow: instance-1
+      runtime: interpreter-tests
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed

@@ -1,0 +1,36 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: catch-default-name
+    version: '1.0.0'
+  do:
+    - guard:
+        try:
+          - fail:
+              raise:
+                error:
+                  type: https://example.com/errors/broken
+                  status: 503
+                  title: Broken
+                  detail: Nothing works
+        catch:
+          do:
+            - keep:
+                set:
+                  caught: '${ $error }'
+input: {}
+end:
+  completed:
+    output:
+      caught:
+        type: https://example.com/errors/broken
+        status: 503
+        instance: /do/0/guard/try/0/fail
+        title: Broken
+        detail: Nothing works
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/guard/catch/do/0/keep }
+    - { kind: task.completed, task: /do/0/guard }
+    - kind: workflow.completed

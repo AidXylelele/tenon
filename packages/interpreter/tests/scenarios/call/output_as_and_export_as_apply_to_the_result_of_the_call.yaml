@@ -1,0 +1,42 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: http-output-export
+    version: '1.0.0'
+  do:
+    - getPet:
+        call: http
+        with:
+          method: get
+          endpoint: https://petstore.swagger.io/v2/pet/1
+        output:
+          as: '${ { name: .name } }'
+        export:
+          as: '${ { petName: .name } }'
+    - report:
+        set: '${ { pet: ., context: $context } }'
+input: {}
+script:
+  - effect: { id: /do/0/getPet, kind: http, deadline: null }
+    outcome:
+      kind: responded
+      request:
+        method: GET
+        uri: https://petstore.swagger.io/v2/pet/1
+        headers: {}
+      statusCode: 200
+      headers: { content-type: application/json }
+      content: { id: 1, name: Milou }
+      authorization: null
+    now: 1767225601000
+end:
+  completed:
+    output:
+      pet: { name: Milou }
+      context: { petName: Milou }
+facts:
+  including:
+    - { kind: task.completed, task: /do/0/getPet }
+    - { kind: task.completed, task: /do/1/report }
+    - kind: workflow.completed

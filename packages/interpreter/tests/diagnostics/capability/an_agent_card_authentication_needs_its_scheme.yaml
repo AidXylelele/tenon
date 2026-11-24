@@ -1,0 +1,26 @@
+source: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: capabilities
+    version: '0.1.0'
+  do:
+    - getTask:
+        call: a2a
+        with:
+          method: tasks/get
+          agentCard:
+            endpoint:
+              uri: https://agent.example.com/.well-known/agent-card.json
+              authentication:
+                digest:
+                  username: admin
+                  password: secret
+          parameters:
+            id: task-1
+profile:
+  authentications: [basic, bearer, oauth2, oidc]
+diagnostics:
+  - code: capability
+    pointer: /do/0/getTask
+    subject: authentication.digest

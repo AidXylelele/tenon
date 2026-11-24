@@ -1,21 +1,28 @@
-import type { RoleName } from '../../../domain/interfaces.js';
-import { User } from '../../../domain/user.js';
-import type { UserRow } from '../../interfaces.js';
+import { Injectable } from "@nestjs/common";
+import { User } from "../../../domain/identity/users/user.js";
+import type { UserRow } from "../interfaces.js";
 
+@Injectable()
 export class UserMapper {
-  static toRow(user: User): UserRow {
+  toRow(user: User): UserRow {
     return {
       id: user.id,
       email: user.email,
       name: user.name,
       role: user.role,
-      passwordHash: user.passwordHash,
-      suspended: user.suspended,
+      status: user.status,
       createdAt: user.createdAt,
     };
   }
 
-  static toEntity(row: UserRow): User {
-    return new User({ ...row, role: row.role as RoleName });
+  toEntity(row: UserRow): User {
+    return new User({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      status: row.status,
+      createdAt: row.createdAt,
+    });
   }
 }

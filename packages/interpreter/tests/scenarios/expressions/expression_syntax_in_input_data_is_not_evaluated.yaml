@@ -1,0 +1,18 @@
+document: |
+  document:
+    dsl: '1.1.0'
+    namespace: test
+    name: input-is-data
+    version: '1.0.0'
+  do:
+    - copy:
+        set:
+          text: '${ .text }'
+input: { text: "${ $workflow.id }" }
+end:
+  completed:
+    output: { text: "${ $workflow.id }" }
+facts:
+  including:
+    - kind: workflow.started
+    - kind: workflow.completed
