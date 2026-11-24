@@ -4,7 +4,7 @@ import {
   HostLimits,
   ProcessPlatform,
 } from "../../application/automation/host/queries.js";
-import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
+import { SandboxLimits } from "../../interface-adapters/sandbox/sandbox-limits.js";
 import shellPlatform from "../go-judge/shell-platform.json" with { type: "json" };
 import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.handler.js";
 import { MessageTopic } from "../../interface-adapters/messaging/enums.js";

@@ -14,7 +14,7 @@ import { EffectHandler } from "../../src/interface-adapters/messaging/effect.han
 import { RunHandler } from "../../src/interface-adapters/messaging/run.handler.js";
 import { ScheduleHandler } from "../../src/interface-adapters/messaging/schedule.handler.js";
 import { AsyncApiGateway } from "../../src/interface-adapters/asyncapi/asyncapi.gateway.js";
-import { SandboxGateway } from "../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
+import { SandboxGateway } from "../../src/interface-adapters/sandbox/sandbox.gateway.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import { truncateAll } from "../support/db.js";
 

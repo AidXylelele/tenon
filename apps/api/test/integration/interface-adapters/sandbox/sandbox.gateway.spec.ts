@@ -11,20 +11,22 @@ import { ResilienceModule } from "@nestjs/resilience";
 import {
   processPlatform,
   resiliencePresets,
-} from "../../../../../src/frameworks/di/host.presets.js";
-import { AddressPolicy } from "../../../../../src/frameworks/http/address-policy.js";
-import type { ResourceGateway } from "../../../../../src/interface-adapters/http/resource.gateway.js";
-import { ResponseSizeLimit } from "../../../../../src/frameworks/http/response-size-limit.js";
-import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
-import { SandboxGateway } from "../../../../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
-import { SandboxLimits } from "../../../../../src/interface-adapters/workflows/effects/sandbox-limits.js";
-import type { SandboxedProcessRequest } from "../../../../../src/interface-adapters/workflows/interfaces.js";
+} from "../../../../src/frameworks/di/host.presets.js";
+import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
+import type { ResourceGateway } from "../../../../src/interface-adapters/http/resource.gateway.js";
+import { ResponseSizeLimit } from "../../../../src/frameworks/http/response-size-limit.js";
+import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import { GoJudgeSandboxClient } from "../../../../src/frameworks/go-judge/go-judge.sandbox-client.js";
+import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
+import type { SandboxedProcessRequest } from "../../../../src/interface-adapters/sandbox/interfaces.js";
+import { SandboxGateway } from "../../../../src/interface-adapters/sandbox/sandbox.gateway.js";
+import { SandboxLimits } from "../../../../src/interface-adapters/sandbox/sandbox-limits.js";
 import {
   closedPort,
   startStubServer,
   type StubServer,
-} from "../../../../support/stub-server.js";
-import { callContextOf, resourcesOf } from "../../../../support/outbound.js";
+} from "../../../support/stub-server.js";
+import { callContextOf, resourcesOf } from "../../../support/outbound.js";
 
 const SANDBOX_TOKEN = "sandbox-token";
 const LIMITS = new SandboxLimits({
@@ -101,13 +103,12 @@ describe("a process the sandbox gateway runs for a run", () => {
       redirect: "manual",
       interceptors: [new ResponseSizeLimit(LIMITS.responseBytes())],
     });
-    return new SandboxGateway(
+    const client = new GoJudgeSandboxClient(
       runs,
-      resources,
-      LIMITS,
-      processPlatform,
+      new TransportFaults(),
       resilience,
     );
+    return new SandboxGateway(client, resources, LIMITS, processPlatform);
   }
 
   beforeEach(() => {

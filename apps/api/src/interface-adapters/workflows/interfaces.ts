@@ -11,11 +11,8 @@ import type {
   JsonValue,
   LifecycleEventTypes,
   Manifest,
-  ProcessRequest,
   RoutingFilter,
   RuntimeDescriptor,
-  Script,
-  Shell,
   StartContext,
   State,
   Step,
@@ -121,10 +118,6 @@ export type ControlStep = (
 ) => Promise<ProgramStep>;
 
 export type ChildEffect = Effect & WorkflowRequest;
-
-export type SandboxedProcessRequest = ProcessRequest & {
-  readonly process: Script | Shell;
-};
 
 export interface StepCall {
   readonly idempotencyKey: string;

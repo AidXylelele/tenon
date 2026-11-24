@@ -1,30 +1,20 @@
 import { Injectable } from "@nestjs/common";
-import {
-  InjectHttpClient,
-  HttpClient as NestHttpClient,
-} from "@nestjs/http-client";
-import {
-  type ResiliencePolicy,
-  ResilienceService,
-  ResilienceTimeoutError,
-} from "@nestjs/resilience";
 import type { ProcessOutcome, Script, Shell } from "interpreter";
-import { ProcessPlatform } from "../../../application/automation/host/queries.js";
-import type { SandboxResult } from "../../../frameworks/go-judge/interfaces.js";
+import { ProcessPlatform } from "../../application/automation/host/queries.js";
+import { TransportFailure } from "../http/enums.js";
+import type { FetchedText } from "../http/interfaces.js";
+import { ResourceGateway } from "../http/resource.gateway.js";
+import { TransportFault } from "../http/transport-fault.error.js";
+import type { CallContext } from "../workflows/effects/interfaces.js";
 import {
-  SANDBOX_REFUSAL,
-  SANDBOX_RESULTS,
-} from "../../../frameworks/go-judge/sandbox-result.schema.js";
-import { HttpClientName } from "../../../frameworks/http/enums.js";
-import type { FetchedText } from "../../http/interfaces.js";
-import { ResourceGateway } from "../../http/resource.gateway.js";
-import type { SandboxedProcessRequest } from "../interfaces.js";
-import type {
-  BuiltCommand,
-  CallContext,
-  SandboxCommand,
-  SandboxFile,
-  ScriptLanguage,
+  type BuiltCommand,
+  SandboxClient,
+  type SandboxCommand,
+  type SandboxedProcessRequest,
+  type SandboxFile,
+  type SandboxResult,
+  type SandboxRun,
+  type ScriptLanguage,
 } from "./interfaces.js";
 import { JavaScript } from "./javascript.js";
 import { Python } from "./python.js";
@@ -36,21 +26,16 @@ export class SandboxGateway {
   private static readonly ENTER_DIRECTORY =
     'cd -- "$1" 2>&3 || exit\nexec 3>&-\nshift\n';
 
-  private readonly policy: ResiliencePolicy;
   private readonly languages: Readonly<
     Record<Script["language"], ScriptLanguage>
   > = { js: new JavaScript(), python: new Python() };
 
   constructor(
-    @InjectHttpClient(HttpClientName.Sandbox)
-    private readonly sandbox: NestHttpClient,
+    private readonly client: SandboxClient,
     private readonly resources: ResourceGateway,
     private readonly limits: SandboxLimits,
     private readonly platform: ProcessPlatform,
-    resilience: ResilienceService,
-  ) {
-    this.policy = resilience.preset("processes");
-  }
+  ) {}
 
   async perform(
     request: SandboxedProcessRequest,
@@ -61,12 +46,16 @@ export class SandboxGateway {
     if (built.kind !== "command") return built;
 
     try {
-      return await this.policy.execute(
-        (attempt) => this.#ran(built.command, attempt.signal),
-        { signal: context.signal },
-      );
+      const run = await this.client.run(built.command, context.signal);
+      return this.#outcomeOf(run);
     } catch (error) {
-      return this.#failureOf(error, context.signal);
+      const expired =
+        error instanceof TransportFault &&
+        error.reason === TransportFailure.Expired;
+
+      if (expired) return { kind: "expired" };
+
+      throw error;
     }
   }
 
@@ -171,38 +160,17 @@ export class SandboxGateway {
     return files.concat({ name: SandboxGateway.DIRECTORY, max: 1024 });
   }
 
-  async #ran(
-    command: SandboxCommand,
-    signal: AbortSignal,
-  ): Promise<ProcessOutcome> {
-    const response = await this.sandbox.post("/run", {
-      json: { cmd: [command] },
-      signal,
-    });
-    const status = response.status;
-    const refusal = SANDBOX_REFUSAL.safeParse(response.data);
-    const refused = (status === 400 || status === 404) && refusal.success;
-
-    if (refused)
+  #outcomeOf(run: SandboxRun): ProcessOutcome {
+    if (run.kind === "refused")
       return {
         kind: "unstarted",
-        detail: `The sandbox refused the process: ${refusal.data}`,
+        detail: `The sandbox refused the process: ${run.detail}`,
       };
 
-    const results = SANDBOX_RESULTS.safeParse(response.data);
-    const answered = response.ok && results.success;
-
-    if (!answered) {
-      const code = String(status);
-      throw new Error(
-        `The sandbox answered other than with a result, status ${code}`,
-      );
-    }
-
-    return this.#outcomeOf(results.data[0]);
+    return this.#resultOf(run.result);
   }
 
-  #outcomeOf(result: SandboxResult): ProcessOutcome {
+  #resultOf(result: SandboxResult): ProcessOutcome {
     const stdout = result.files.stdout ?? "";
     const stderr = result.files.stderr ?? "";
     const unentered = result.files[SandboxGateway.DIRECTORY] ?? "";
@@ -235,12 +203,5 @@ export class SandboxGateway {
           detail: `The sandbox could not run the process: ${result.status}`,
         };
     }
-  }
-
-  #failureOf(error: unknown, signal: AbortSignal): ProcessOutcome {
-    if (signal.aborted || error instanceof ResilienceTimeoutError)
-      return { kind: "expired" };
-
-    throw error;
   }
 }

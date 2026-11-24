@@ -15,14 +15,12 @@ import type { CallContext } from "../../../../../src/interface-adapters/workflow
 import { McpGateway } from "../../../../../src/interface-adapters/mcp/mcp.gateway.js";
 import { OpenApiGateway } from "../../../../../src/interface-adapters/http/openapi.gateway.js";
 import { ResourceGateway } from "../../../../../src/interface-adapters/http/resource.gateway.js";
-import { SandboxGateway } from "../../../../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
+import { SandboxGateway } from "../../../../../src/interface-adapters/sandbox/sandbox.gateway.js";
 import type { EffectCall } from "../../../../../src/application/automation/instances/interfaces.js";
 import type { JsonObject } from "../../../../../src/domain/automation/interfaces.js";
 import { RunSecrets } from "../../../../../src/domain/automation/secrets/run-secrets.js";
-import type {
-  JsonOf,
-  SandboxedProcessRequest,
-} from "../../../../../src/interface-adapters/workflows/interfaces.js";
+import type { SandboxedProcessRequest } from "../../../../../src/interface-adapters/sandbox/interfaces.js";
+import type { JsonOf } from "../../../../../src/interface-adapters/workflows/interfaces.js";
 import { ProtocolMapper } from "../../../../../src/interface-adapters/workflows/mappers/protocol.mapper.js";
 
 const RESPONDED: HttpOutcome = {

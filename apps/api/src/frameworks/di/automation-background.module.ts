@@ -54,6 +54,9 @@ import { OpenApiClient } from "../../interface-adapters/http/interfaces.js";
 import { OpenApiGateway } from "../../interface-adapters/http/openapi.gateway.js";
 import { McpClient } from "../../interface-adapters/mcp/interfaces.js";
 import { McpGateway } from "../../interface-adapters/mcp/mcp.gateway.js";
+import { SandboxClient } from "../../interface-adapters/sandbox/interfaces.js";
+import { SandboxGateway } from "../../interface-adapters/sandbox/sandbox.gateway.js";
+import { SandboxLimits } from "../../interface-adapters/sandbox/sandbox-limits.js";
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
 import { ConsumerSpan } from "../../interface-adapters/messaging/consumer-span.js";
@@ -70,8 +73,6 @@ import { PostgresLockStore } from "../../interface-adapters/persistence/stores/p
 import { PostgresReceivedMessageStore } from "../../interface-adapters/persistence/stores/postgres-received-message.store.js";
 import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
 import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
-import { SandboxGateway } from "../../interface-adapters/workflows/effects/sandbox.gateway.js";
-import { SandboxLimits } from "../../interface-adapters/workflows/effects/sandbox-limits.js";
 import { AmqpBroker } from "../amqp/amqp.broker.js";
 import { AmqpConnection } from "../amqp/amqp.connection.js";
 import { ParserAsyncApiDocuments } from "../asyncapi/parser.asyncapi-documents.js";
@@ -79,6 +80,7 @@ import { parserOptions } from "../asyncapi/parser.options.js";
 import { ReceiverSubscriptions } from "../asyncapi/receiver-subscriptions.js";
 import { RoutedBrokerClient } from "../asyncapi/routed.broker-client.js";
 import { JsonRpcA2aClient } from "../a2a/json-rpc.a2a-client.js";
+import { GoJudgeSandboxClient } from "../go-judge/go-judge.sandbox-client.js";
 import { GrpcConnection } from "../grpc/grpc.connection.js";
 import { ProtoGrpcClient } from "../grpc/proto.grpc-client.js";
 import { ProtoSchema } from "../grpc/proto-schema.js";
@@ -164,6 +166,7 @@ import { OutboundModule } from "./outbound.module.js";
     A2aGateway,
     AsyncApiGateway,
     SandboxGateway,
+    { provide: SandboxClient, useClass: GoJudgeSandboxClient },
     EffectDispatcher,
     { provide: EffectClient, useExisting: EffectDispatcher },
     { provide: OpenApiClient, useClass: SwaggerOpenApiClient },
