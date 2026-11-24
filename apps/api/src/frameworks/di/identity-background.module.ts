@@ -31,7 +31,12 @@ import { linksConfig, mailConfig } from "./configs.js";
   providers: [
     MailHandler,
     { provide: Mailer, useClass: SmtpMailer },
-    InvitationMail,
+    {
+      provide: InvitationMail,
+      inject: [linksConfig.KEY],
+      useFactory: (links: ConfigType<typeof linksConfig>) =>
+        new InvitationMail(links.WEB_BASE_URL),
+    },
     PasswordResetMail,
   ],
 })
