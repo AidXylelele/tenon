@@ -31,7 +31,7 @@ import {
 import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
 import { Authenticator } from "../../interface-adapters/auth/authenticator.js";
 import { AccessTokens } from "../../interface-adapters/auth/interfaces.js";
-import { HttpCallGateway } from "../../interface-adapters/http/http-call.gateway.js";
+import { HttpGateway } from "../../interface-adapters/http/http.gateway.js";
 import { HttpClient } from "../../interface-adapters/http/interfaces.js";
 import { ResourceGateway } from "../../interface-adapters/http/resource.gateway.js";
 import { SubscriberDeliveryGateway } from "../../interface-adapters/http/subscriber-delivery.gateway.js";
@@ -69,7 +69,7 @@ import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
 import { AddressPolicy } from "../http/address-policy.js";
 import { HttpClientName } from "../http/enums.js";
-import { OutboundHttpClient } from "../http/outbound.http-client.js";
+import { UndiciHttpClient } from "../http/undici.http-client.js";
 import { ResponseContent } from "../http/response-content.js";
 import { ResponseSizeLimit } from "../http/response-size-limit.js";
 import { TransportFaults } from "../http/transport-faults.js";
@@ -169,8 +169,8 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
     TransportFaults,
     ResponseContent,
-    OutboundHttpClient,
-    { provide: HttpClient, useExisting: OutboundHttpClient },
+    UndiciHttpClient,
+    { provide: HttpClient, useExisting: UndiciHttpClient },
     OpenIdAuthorizationServer,
     { provide: AccessTokens, useClass: OpenIdAccessTokens },
     {
@@ -179,7 +179,7 @@ import { OutboundModule } from "./outbound.module.js";
       useFactory: (tokens: AccessTokens) =>
         new Authenticator(tokens, HOST_PROFILE),
     },
-    HttpCallGateway,
+    HttpGateway,
     ResourceGateway,
     SubscriberDeliveryGateway,
     { provide: EventSender, useExisting: SubscriberDeliveryGateway },
@@ -212,8 +212,8 @@ import { OutboundModule } from "./outbound.module.js";
     Authenticator,
     TransportFaults,
     ResponseContent,
-    OutboundHttpClient,
-    HttpCallGateway,
+    UndiciHttpClient,
+    HttpGateway,
     ResourceGateway,
     EventSender,
   ],

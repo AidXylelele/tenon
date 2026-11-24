@@ -7,7 +7,7 @@ import type { CallContext } from "../workflows/effects/interfaces.js";
 import { type GrpcAnswer, GrpcClient } from "./interfaces.js";
 
 @Injectable()
-export class GrpcCallGateway {
+export class GrpcGateway {
   constructor(
     private readonly client: GrpcClient,
     private readonly resources: ResourceGateway,

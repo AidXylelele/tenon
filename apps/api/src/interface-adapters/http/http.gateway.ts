@@ -12,7 +12,7 @@ import {
 import { TransportFault } from "./transport-fault.error.js";
 
 @Injectable()
-export class HttpCallGateway {
+export class HttpGateway {
   private static readonly CREDENTIAL_HEADERS: readonly string[] = [
     "authorization",
     "proxy-authorization",
@@ -117,7 +117,7 @@ export class HttpCallGateway {
   #withoutCredentials(headers: Headers): Readonly<Record<string, string>> {
     const shown = new Headers(headers);
 
-    for (const name of HttpCallGateway.CREDENTIAL_HEADERS) shown.delete(name);
+    for (const name of HttpGateway.CREDENTIAL_HEADERS) shown.delete(name);
 
     return Object.fromEntries(shown);
   }

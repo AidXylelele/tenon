@@ -13,7 +13,7 @@ import {
   genericGrantRequest,
   None,
 } from "openid-client";
-import { OutboundHttpClient } from "../http/outbound.http-client.js";
+import { UndiciHttpClient } from "../http/undici.http-client.js";
 import type {
   ClientAuthentication,
   TokenClient,
@@ -25,7 +25,7 @@ export class OpenIdAuthorizationServer {
   private static readonly JWT_BEARER =
     "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
-  constructor(private readonly http: OutboundHttpClient) {}
+  constructor(private readonly http: UndiciHttpClient) {}
 
   async endpointOf(
     client: TokenClient,

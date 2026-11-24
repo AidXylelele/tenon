@@ -14,11 +14,11 @@ import type {
 import { ResilienceModule } from "@nestjs/resilience";
 import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
 import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
-import type { OutboundHttpClient } from "../../../../src/frameworks/http/outbound.http-client.js";
+import type { UndiciHttpClient } from "../../../../src/frameworks/http/undici.http-client.js";
 import { SwaggerOpenApiClient } from "../../../../src/frameworks/openapi/swagger.openapi-client.js";
 import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
-import type { HttpCallGateway } from "../../../../src/interface-adapters/http/http-call.gateway.js";
-import { OpenApiCallGateway } from "../../../../src/interface-adapters/http/openapi-call.gateway.js";
+import type { HttpGateway } from "../../../../src/interface-adapters/http/http.gateway.js";
+import { OpenApiGateway } from "../../../../src/interface-adapters/http/openapi.gateway.js";
 import type { ResourceGateway } from "../../../../src/interface-adapters/http/resource.gateway.js";
 import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
@@ -58,9 +58,9 @@ describe("a call the HTTP gateways perform for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let gateway: HttpCallGateway;
-  let client: OutboundHttpClient;
-  let openApi: OpenApiCallGateway;
+  let gateway: HttpGateway;
+  let client: UndiciHttpClient;
+  let openApi: OpenApiGateway;
   let resources: ResourceGateway;
   let stub: StubServer;
   let idp: StubServer;
@@ -78,7 +78,7 @@ describe("a call the HTTP gateways perform for a run", () => {
     gateway = httpGatewayOf(policy, resilience, identity);
     resources = resourcesOf(policy, resilience, identity);
     client = clientOf(policy, resilience);
-    openApi = new OpenApiCallGateway(
+    openApi = new OpenApiGateway(
       resources,
       gateway,
       new SwaggerOpenApiClient(),

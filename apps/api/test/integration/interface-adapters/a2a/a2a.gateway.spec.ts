@@ -14,7 +14,7 @@ import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js
 import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
 import { JsonRpcA2aClient } from "../../../../src/frameworks/a2a/json-rpc.a2a-client.js";
 import { ResponseContent } from "../../../../src/frameworks/http/response-content.js";
-import { A2aCallGateway } from "../../../../src/interface-adapters/a2a/a2a-call.gateway.js";
+import { A2aGateway } from "../../../../src/interface-adapters/a2a/a2a.gateway.js";
 import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
@@ -56,7 +56,7 @@ describe("a call the A2A gateway performs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let gateway: A2aCallGateway;
+  let gateway: A2aGateway;
   let stub: StubServer;
   let elsewhere: StubServer;
   let origin = "";
@@ -89,7 +89,7 @@ describe("a call the A2A gateway performs for a run", () => {
     stub.received.length = 0;
   });
 
-  function a2aGatewayOf(guard: AddressPolicy): A2aCallGateway {
+  function a2aGatewayOf(guard: AddressPolicy): A2aGateway {
     const authentication = authenticationOf(guard, resilience);
     const client = new JsonRpcA2aClient(
       clientOf(guard, resilience),
@@ -97,7 +97,7 @@ describe("a call the A2A gateway performs for a run", () => {
       new TransportFaults(),
       resilience,
     );
-    return new A2aCallGateway(
+    return new A2aGateway(
       client,
       resourcesOf(guard, resilience),
       authentication,

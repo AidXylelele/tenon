@@ -13,7 +13,7 @@ import {
 } from "./interfaces.js";
 
 @Injectable()
-export class A2aCallGateway {
+export class A2aGateway {
   private static readonly STREAMING: readonly string[] = [
     "message/stream",
     "tasks/resubscribe",
@@ -82,7 +82,7 @@ export class A2aCallGateway {
       authorization.kind === "header"
         ? this.authenticator.headerValueOf(authorization.header)
         : null;
-    const streamed = A2aCallGateway.STREAMING.includes(request.method);
+    const streamed = A2aGateway.STREAMING.includes(request.method);
     const call = {
       uri: endpoint.uri,
       authorization: credentials,

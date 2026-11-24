@@ -5,14 +5,14 @@ import { Agent } from "undici";
 import type { AsyncApiInbox } from "../../src/interface-adapters/messaging/interfaces.js";
 import { responseSizeLimit } from "../../src/frameworks/di/host.presets.js";
 import type { AddressPolicy } from "../../src/frameworks/http/address-policy.js";
-import { OutboundHttpClient } from "../../src/frameworks/http/outbound.http-client.js";
+import { UndiciHttpClient } from "../../src/frameworks/http/undici.http-client.js";
 import { ResponseContent } from "../../src/frameworks/http/response-content.js";
 import { TransportFaults } from "../../src/frameworks/http/transport-faults.js";
 import { HOST_PROFILE } from "../../src/frameworks/interpreter/host-profile.js";
 import { OpenIdAccessTokens } from "../../src/frameworks/oauth/openid.access-tokens.js";
 import { OpenIdAuthorizationServer } from "../../src/frameworks/oauth/openid.authorization-server.js";
 import { Authenticator } from "../../src/interface-adapters/auth/authenticator.js";
-import { HttpCallGateway } from "../../src/interface-adapters/http/http-call.gateway.js";
+import { HttpGateway } from "../../src/interface-adapters/http/http.gateway.js";
 import { ResourceGateway } from "../../src/interface-adapters/http/resource.gateway.js";
 import type { CallContext } from "../../src/interface-adapters/workflows/effects/interfaces.js";
 
@@ -54,8 +54,8 @@ export function clientOf(
   policy: AddressPolicy,
   resilience: ResilienceService,
   outbound: NestHttpClient = fetchClientOf(policy.dispatcher),
-): OutboundHttpClient {
-  return new OutboundHttpClient(
+): UndiciHttpClient {
+  return new UndiciHttpClient(
     outbound,
     policy,
     new ResponseContent(),
@@ -83,8 +83,8 @@ export function httpGatewayOf(
   policy: AddressPolicy,
   resilience: ResilienceService,
   identity: NestHttpClient = fetchClientOf(policy.dispatcher),
-): HttpCallGateway {
-  return new HttpCallGateway(
+): HttpGateway {
+  return new HttpGateway(
     clientOf(policy, resilience),
     authenticationOf(policy, resilience, identity),
   );

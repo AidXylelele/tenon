@@ -6,14 +6,14 @@ import type {
   ProcessOutcome,
   Resource,
 } from "interpreter";
-import { A2aCallGateway } from "../../../../../src/interface-adapters/a2a/a2a-call.gateway.js";
+import { A2aGateway } from "../../../../../src/interface-adapters/a2a/a2a.gateway.js";
 import { AsyncApiGateway } from "../../../../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
 import { EffectDispatcher } from "../../../../../src/interface-adapters/workflows/effects/effect.dispatcher.js";
-import { GrpcCallGateway } from "../../../../../src/interface-adapters/grpc/grpc-call.gateway.js";
-import { HttpCallGateway } from "../../../../../src/interface-adapters/http/http-call.gateway.js";
+import { GrpcGateway } from "../../../../../src/interface-adapters/grpc/grpc.gateway.js";
+import { HttpGateway } from "../../../../../src/interface-adapters/http/http.gateway.js";
 import type { CallContext } from "../../../../../src/interface-adapters/workflows/effects/interfaces.js";
-import { McpCallGateway } from "../../../../../src/interface-adapters/mcp/mcp-call.gateway.js";
-import { OpenApiCallGateway } from "../../../../../src/interface-adapters/http/openapi-call.gateway.js";
+import { McpGateway } from "../../../../../src/interface-adapters/mcp/mcp.gateway.js";
+import { OpenApiGateway } from "../../../../../src/interface-adapters/http/openapi.gateway.js";
 import { ResourceGateway } from "../../../../../src/interface-adapters/http/resource.gateway.js";
 import { SandboxGateway } from "../../../../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
 import type { EffectCall } from "../../../../../src/application/automation/instances/interfaces.js";
@@ -199,12 +199,12 @@ describe("the dispatcher every effect passes through", () => {
       providers: [
         EffectDispatcher,
         ProtocolMapper,
-        { provide: HttpCallGateway, useValue: http },
-        { provide: OpenApiCallGateway, useValue: others.openapi },
+        { provide: HttpGateway, useValue: http },
+        { provide: OpenApiGateway, useValue: others.openapi },
         { provide: ResourceGateway, useValue: others.resource },
-        { provide: GrpcCallGateway, useValue: others.grpc },
-        { provide: McpCallGateway, useValue: others.mcp },
-        { provide: A2aCallGateway, useValue: others.a2a },
+        { provide: GrpcGateway, useValue: others.grpc },
+        { provide: McpGateway, useValue: others.mcp },
+        { provide: A2aGateway, useValue: others.a2a },
         { provide: AsyncApiGateway, useValue: others.asyncapi },
         { provide: SandboxGateway, useValue: sandbox },
       ],

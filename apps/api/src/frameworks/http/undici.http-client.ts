@@ -17,7 +17,7 @@ import { ResponseContent } from "./response-content.js";
 import { TransportFaults } from "./transport-faults.js";
 
 @Injectable()
-export class OutboundHttpClient implements HttpClient {
+export class UndiciHttpClient implements HttpClient {
   private readonly policy: ResiliencePolicy;
 
   constructor(

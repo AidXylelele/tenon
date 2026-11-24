@@ -9,7 +9,7 @@ import type {
   AgentCardData,
   JsonRpcAnswer,
 } from "../../interface-adapters/a2a/interfaces.js";
-import { OutboundHttpClient } from "../http/outbound.http-client.js";
+import { UndiciHttpClient } from "../http/undici.http-client.js";
 import { ResponseContent } from "../http/response-content.js";
 import { TransportFaults } from "../http/transport-faults.js";
 import { AGENT_CARD } from "./agent-card.schema.js";
@@ -22,7 +22,7 @@ export class JsonRpcA2aClient implements A2aClient {
   private readonly policy: ResiliencePolicy;
 
   constructor(
-    private readonly http: OutboundHttpClient,
+    private readonly http: UndiciHttpClient,
     private readonly content: ResponseContent,
     private readonly faults: TransportFaults,
     resilience: ResilienceService,

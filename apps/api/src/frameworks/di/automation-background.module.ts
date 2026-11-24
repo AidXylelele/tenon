@@ -40,14 +40,14 @@ import {
   Deliveries,
   DeliveryLog,
 } from "../../application/automation/subscriptions/ports.js";
-import { A2aCallGateway } from "../../interface-adapters/a2a/a2a-call.gateway.js";
+import { A2aGateway } from "../../interface-adapters/a2a/a2a.gateway.js";
 import { A2aClient } from "../../interface-adapters/a2a/interfaces.js";
-import { GrpcCallGateway } from "../../interface-adapters/grpc/grpc-call.gateway.js";
+import { GrpcGateway } from "../../interface-adapters/grpc/grpc.gateway.js";
 import { GrpcClient } from "../../interface-adapters/grpc/interfaces.js";
 import { OpenApiClient } from "../../interface-adapters/http/interfaces.js";
-import { OpenApiCallGateway } from "../../interface-adapters/http/openapi-call.gateway.js";
+import { OpenApiGateway } from "../../interface-adapters/http/openapi.gateway.js";
 import { McpClient } from "../../interface-adapters/mcp/interfaces.js";
-import { McpCallGateway } from "../../interface-adapters/mcp/mcp-call.gateway.js";
+import { McpGateway } from "../../interface-adapters/mcp/mcp.gateway.js";
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
 import { AsyncApiHandler } from "../../interface-adapters/messaging/asyncapi.handler.js";
 import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
@@ -154,10 +154,10 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: ReceivedMessages, useClass: PostgresReceivedMessageStore },
     { provide: ReceiverQueries, useClass: PostgresReceiverQueries },
     PostgresLockStore,
-    OpenApiCallGateway,
-    GrpcCallGateway,
-    McpCallGateway,
-    A2aCallGateway,
+    OpenApiGateway,
+    GrpcGateway,
+    McpGateway,
+    A2aGateway,
     AsyncApiGateway,
     SandboxGateway,
     EffectDispatcher,

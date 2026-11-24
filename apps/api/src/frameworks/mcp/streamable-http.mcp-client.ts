@@ -29,7 +29,7 @@ import type {
   McpMethod,
   McpSession,
 } from "../../interface-adapters/mcp/interfaces.js";
-import { OutboundHttpClient } from "../http/outbound.http-client.js";
+import { UndiciHttpClient } from "../http/undici.http-client.js";
 import { TransportFaults } from "../http/transport-faults.js";
 import { RELEASE_VERSION } from "../release.js";
 
@@ -55,7 +55,7 @@ export class StreamableHttpMcpClient implements McpClient {
   private readonly policy: ResiliencePolicy;
 
   constructor(
-    private readonly http: OutboundHttpClient,
+    private readonly http: UndiciHttpClient,
     private readonly faults: TransportFaults,
     resilience: ResilienceService,
   ) {

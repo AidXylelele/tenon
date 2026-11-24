@@ -28,7 +28,7 @@ import type { ResourceGateway } from "../../../../src/interface-adapters/http/re
 import { ProtoGrpcClient } from "../../../../src/frameworks/grpc/proto.grpc-client.js";
 import { ProtoSchema } from "../../../../src/frameworks/grpc/proto-schema.js";
 import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
-import { GrpcCallGateway } from "../../../../src/interface-adapters/grpc/grpc-call.gateway.js";
+import { GrpcGateway } from "../../../../src/interface-adapters/grpc/grpc.gateway.js";
 import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import {
   closedPort,
@@ -121,7 +121,7 @@ describe("a call the gRPC gateway performs for a run", () => {
   let resources: ResourceGateway;
   let authentication: Authenticator;
   let connection: GrpcConnection;
-  let gateway: GrpcCallGateway;
+  let gateway: GrpcGateway;
   let protos: StubServer;
   let server: Server;
   let port = 0;
@@ -296,7 +296,7 @@ describe("a call the gRPC gateway performs for a run", () => {
     call.end();
   }
 
-  function gatewayOf(connection: GrpcConnection): GrpcCallGateway {
+  function gatewayOf(connection: GrpcConnection): GrpcGateway {
     const client = new ProtoGrpcClient(
       connection,
       new ProtoSchema(),
@@ -304,7 +304,7 @@ describe("a call the gRPC gateway performs for a run", () => {
       responseSizeLimit,
       resilience,
     );
-    return new GrpcCallGateway(client, resources, authentication);
+    return new GrpcGateway(client, resources, authentication);
   }
 
   function contextOf(

@@ -15,7 +15,7 @@ import {
 } from "./interfaces.js";
 
 @Injectable()
-export class McpCallGateway {
+export class McpGateway {
   constructor(
     private readonly client: McpClient,
     private readonly authenticator: Authenticator,

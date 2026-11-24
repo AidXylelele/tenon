@@ -27,7 +27,7 @@ import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js
 import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
 import { StreamableHttpMcpClient } from "../../../../src/frameworks/mcp/streamable-http.mcp-client.js";
 import type { HttpMcpRequest } from "../../../../src/interface-adapters/mcp/interfaces.js";
-import { McpCallGateway } from "../../../../src/interface-adapters/mcp/mcp-call.gateway.js";
+import { McpGateway } from "../../../../src/interface-adapters/mcp/mcp.gateway.js";
 import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
 import { closedPort } from "../../../support/stub-server.js";
 import {
@@ -53,7 +53,7 @@ describe("a call the MCP gateway performs for a run", () => {
   let context: INestApplicationContext;
   let resilience: ResilienceService;
   let policy: AddressPolicy;
-  let gateway: McpCallGateway;
+  let gateway: McpGateway;
   let server: Server;
   let origin = "";
   let port = 0;
@@ -86,7 +86,7 @@ describe("a call the MCP gateway performs for a run", () => {
     await context.close();
   });
 
-  function mcpGatewayOf(guard: AddressPolicy): McpCallGateway {
+  function mcpGatewayOf(guard: AddressPolicy): McpGateway {
     const authentication = authenticationOf(guard, resilience);
     const http = clientOf(guard, resilience);
     const client = new StreamableHttpMcpClient(
@@ -94,7 +94,7 @@ describe("a call the MCP gateway performs for a run", () => {
       new TransportFaults(),
       resilience,
     );
-    return new McpCallGateway(client, authentication);
+    return new McpGateway(client, authentication);
   }
 
   beforeEach(() => {

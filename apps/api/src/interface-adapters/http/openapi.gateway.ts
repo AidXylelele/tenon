@@ -1,15 +1,15 @@
 import { Injectable } from "@nestjs/common";
 import type { HttpOutcome, OpenApiRequest } from "interpreter";
 import type { CallContext } from "../workflows/effects/interfaces.js";
-import { HttpCallGateway } from "./http-call.gateway.js";
+import { HttpGateway } from "./http.gateway.js";
 import { OpenApiClient } from "./interfaces.js";
 import { ResourceGateway } from "./resource.gateway.js";
 
 @Injectable()
-export class OpenApiCallGateway {
+export class OpenApiGateway {
   constructor(
     private readonly resources: ResourceGateway,
-    private readonly http: HttpCallGateway,
+    private readonly http: HttpGateway,
     private readonly client: OpenApiClient,
   ) {}
 
