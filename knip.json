@@ -17,7 +17,12 @@
       "ignoreDependencies": ["postcss"]
     },
     "packages/language-server": {
-      "entry": ["src/worker.ts", "src/protocol/index.ts", "tests/support/*.ts"]
+      "entry": [
+        "src/worker.ts",
+        "src/protocol/index.ts",
+        "src/structure.ts",
+        "tests/support/*.ts"
+      ]
     },
     "packages/interpreter": {
       "entry": ["src/index.ts", "src/front-end.ts"]
