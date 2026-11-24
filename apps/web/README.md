@@ -1,17 +1,29 @@
 # web
 
-Tenon's console. A Next.js app whose server reads and writes through the api; the browser never calls the api. The workflow editor runs the language server in a Web Worker.
+Tenon's console: a Next.js app whose server reads and writes through the api, so the browser never calls the api. The
+workflow editor runs the language server in a Web Worker. `src/` follows the Web Module System: `app/` holds the pages
+and layouts, `spaces/` the page modules, then `features/`, `operations/` and `libs/`, each importing only the tiers
+below it.
 
-## Run
+## Scripts
 
-It reads `API_URL` and `SESSION_COOKIE_SECURE` from the root `.env` (see the root README); keep `SESSION_COOKIE_SECURE=false` only for plain http on a local machine. Then `pnpm dev` (port 3001). `pnpm build` and `pnpm start` serve the production build.
+| Script                  | What it does                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------ |
+| `dev`                   | the dev server on port 3001                                                    |
+| `build`, `start`        | the standalone production build, served on `PORT` (default 3001)               |
+| `lint`, `check-types`   | ESLint (Next's presets), TypeScript after `next typegen`                       |
+| `test`, `test:coverage` | Vitest in jsdom; coverage with a floor per folder (`vitest.config.mts`)        |
+| `storybook`             | the Playground of features and libs on port 6006 (`build-storybook` builds it) |
+| `test:e2e`              | builds the Playground and runs the Playwright tests in `e2e/` against it       |
+| `test:e2e:production`   | builds the console and runs `e2e/production` against it and a stubbed api      |
 
-## Test
+Install Playwright's browser once with `pnpm exec playwright install chromium --only-shell`. The Playground of the
+browser tests is served on `PLAYGROUND_PORT` (default 6007), the stubbed api and the console on the next two ports.
 
-`pnpm test`, `pnpm lint` and `pnpm check-types`. `pnpm test:coverage` measures coverage against a floor per folder (`vitest.config.mts`): 75 % for each folder of `operations/` and 85 % for each folder of `features/`, both read from the folder listing, so a new folder is measured without editing the config; the features in `FEATURES_DELETED_IN_M5` and `FEATURES_WAITING_FOR_TESTS` are exempt until they are deleted or tested. Every folder of `libs/` gets its 85 % floor in the slice that touches it.
+## Configuration
 
-`pnpm test:e2e` builds the Playground and runs the Playwright smoke tests against it in Playwright's own Chromium. It serves the Playground on port 6007; set `PLAYGROUND_PORT` to another port when several worktrees run the tests at once. Install it once with `pnpm exec playwright install chromium --only-shell`; a CI job that runs these tests needs `pnpm exec playwright install chromium --with-deps --only-shell`.
-
-## Playground
-
-`pnpm storybook` opens the Playground (Storybook) of features and libs on port 6006; `pnpm build-storybook` builds it into `storybook-static`.
+| Variable                | Default   | Meaning                                                             |
+| ----------------------- | --------- | ------------------------------------------------------------------- |
+| `API_URL`               | required  | the api's address as the console's server reaches it                |
+| `SESSION_COOKIE_SECURE` | `true`    | `false` only for plain http on a local machine                      |
+| `OTEL_*`                | the SDK's | the OpenTelemetry SDK's own variables, read by `instrumentation.ts` |

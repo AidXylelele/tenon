@@ -56,12 +56,11 @@ no-op. Spans are children of the host's active context. Nothing carries inputs, 
 A thrown error marks its span as an error, records the exception and puts `error.type` on the duration; a run
 that faults is an outcome, not an error.
 
-## Test
+## Scripts
 
-```sh
-pnpm --filter interpreter test
-```
+`build` compiles `src` into `dist`, `dev` does it in watch mode; `lint`, `check-types` and `test` (Vitest) check it.
 
-`tests/conformance` plays the standard's conformance features, `tests/diagnostics` the analysis's refusals,
-`tests/scenarios` whole runs step by step; `tests/program.test.ts` and `tests/interpreter.test.ts` hold the rules
-of a run and the public API, `tests/front-end.test.ts` the editor's reads.
+`tests/conformance` plays the standard's conformance features from `spec/1.1.0/ctk`, `tests/diagnostics` the
+analysis's refusals, `tests/scenarios` whole runs step by step; `tests/program.test.ts` and
+`tests/interpreter.test.ts` hold the rules of a run and the public API, `tests/front-end.test.ts` the editor's reads
+and `tests/telemetry.test.ts` the spans and metrics. `spec/1.1.0` is the vendored standard; it is never edited.
