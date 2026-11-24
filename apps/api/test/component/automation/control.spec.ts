@@ -8,18 +8,18 @@ import {
   aWaitingDocument,
   createRunApp,
   drain,
-  engineRunCount,
+  pendingRunMessages,
   eventually,
   instanceOf,
   namesOf,
   publish,
   relay,
   type RunApp,
-  resetRuns,
   start,
   statusesOf,
   tasksOf,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
 import type { Created, Page, Problem } from "../../support/bodies.js";
 
@@ -60,7 +60,7 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     crm.received.length = 0;
     unanswered.length = 0;
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
@@ -318,7 +318,7 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
       expect(namesOf(tasks)).toEqual(["before", "pause"]);
     });
 
-    it("a_cancel_the_engine_has_not_heard_of_yet_stops_the_run_before_its_next_call", async () => {
+    it("a_cancel_before_the_timer_fires_stops_the_run_before_its_next_call", async () => {
       const id = await waitingCallerInstance();
 
       await control(id, "cancel").expect(204);
@@ -596,7 +596,7 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
         .expect(404);
       await control(id, "restart").expect(404);
       const keptTasks = await tasksOf(t, viewer, kept);
-      expect(await engineRunCount(t, id)).toBe(0);
+      expect(await pendingRunMessages(t, id)).toBe(0);
       const items = (listed.body as Page<{ id: string }>).items;
       expect(items.map((item) => item.id)).toEqual([kept]);
       expect(keptTasks).toHaveLength(1);
@@ -646,7 +646,7 @@ describe("suspending, resuming, cancelling, restarting and deleting instances ov
         .get(`/api/v1/instances/${id}/tasks`)
         .set(viewer)
         .expect(404);
-      expect(await engineRunCount(t, id)).toBe(0);
+      expect(await pendingRunMessages(t, id)).toBe(0);
     });
   });
 });

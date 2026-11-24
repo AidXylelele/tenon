@@ -146,7 +146,7 @@ describe("Workflow testing its draft", () => {
   it("a_testing_raises_no_schedule_change_even_when_the_workflow_is_on", () => {
     const workflow = Workflow.register(name);
     published(workflow, "1.0.0");
-    workflow.turnOn();
+    workflow.turnOn(now);
     workflow.clearEvents();
 
     tested(workflow, "draft-1");

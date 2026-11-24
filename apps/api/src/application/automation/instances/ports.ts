@@ -6,13 +6,22 @@ import type {
   RunEnding,
   RunTurn,
 } from "../../../domain/automation/instances/interfaces.js";
-import type { Control } from "../../../domain/automation/instances/enums.js";
+import type { WaitEnd } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import type { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import type { WorkflowVersion } from "../../../domain/automation/workflows/workflow-version.js";
-import type { JsonValue } from "../../../domain/automation/interfaces.js";
+import type {
+  JsonObject,
+  JsonValue,
+} from "../../../domain/automation/interfaces.js";
 import type { AcceptedEvent } from "../events/interfaces.js";
-import type { InputProblem, Receipt } from "./interfaces.js";
+import type { EffectResult } from "./enums.js";
+import type {
+  ChildRequest,
+  EffectCall,
+  InputProblem,
+  Receipt,
+} from "./interfaces.js";
 
 export abstract class WorkflowInstanceRepository {
   abstract find(id: string): Promise<WorkflowInstance | null>;
@@ -47,26 +56,34 @@ export abstract class ReceivedMessages {
   ): Promise<void>;
 }
 
+export abstract class LifecycleEvents {
+  abstract append(instance: WorkflowInstance): Promise<AcceptedEvent[]>;
+}
+
+export abstract class InstanceMessages {
+  abstract dispatch(instance: WorkflowInstance): Promise<void>;
+}
+
 export abstract class InstanceRuns {
-  abstract start(instance: WorkflowInstance): Promise<void>;
-  abstract wakeOnChild(
-    parent: WorkflowInstance,
-    child: WorkflowInstance,
-  ): Promise<void>;
-  abstract wakeOnEvent(
+  abstract respond(
     instance: WorkflowInstance,
-    sequence: number,
+    answer: EffectAnswer,
   ): Promise<void>;
-  abstract wakeOnControl(
+  abstract detach(
     instance: WorkflowInstance,
-    control: Control,
+    effectId: string,
+    request: JsonObject,
   ): Promise<void>;
-  abstract wakeOnInbound(
-    instance: WorkflowInstance,
-    execution: string,
-    position: number,
+  abstract receive(instance: WorkflowInstance): Promise<void>;
+  abstract fail(instance: WorkflowInstance): Promise<void>;
+}
+
+export abstract class EffectPerformer {
+  abstract perform(request: JsonObject, call: EffectCall): Promise<JsonObject>;
+  abstract performDetached(
+    request: JsonObject,
+    call: EffectCall,
   ): Promise<void>;
-  abstract forget(instanceId: string): Promise<void>;
 }
 
 export abstract class WorkflowRuntime {
@@ -135,4 +152,7 @@ export abstract class WorkflowRuntime {
     instance: WorkflowInstance,
     now: Date,
   ): Promise<RunEnding>;
+  abstract childOf(request: JsonObject): ChildRequest;
+  abstract eventOf(request: JsonObject): JsonObject;
+  abstract outcomeOf(result: EffectResult | WaitEnd): JsonObject;
 }

@@ -2,12 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
 import { UnitOfWork } from "../../unit-of-work.js";
+import { InstanceEvents } from "../instances/instance-events.js";
 import {
-  InstanceRuns,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../instances/ports.js";
-import { WorkflowRepository } from "../workflows/ports.js";
+import { WorkflowEvents, WorkflowRepository } from "../workflows/ports.js";
 import { DraftCompilation } from "./draft-compilation.js";
 import type { TestDraftCommand, TestDraftResult } from "./interfaces.js";
 
@@ -16,8 +16,9 @@ export class TestDraft {
   constructor(
     private readonly compilation: DraftCompilation,
     private readonly workflows: WorkflowRepository,
+    private readonly workflowEvents: WorkflowEvents,
     private readonly instances: WorkflowInstanceRepository,
-    private readonly runs: InstanceRuns,
+    private readonly instanceEvents: InstanceEvents,
     private readonly runtime: WorkflowRuntime,
     private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -48,7 +49,10 @@ export class TestDraft {
     const version = tested.value.version;
 
     if (tested.value.created)
-      await this.unitOfWork.run(() => this.workflows.save(workflow));
+      await this.unitOfWork.run(async () => {
+        await this.workflows.save(workflow);
+        await this.workflowEvents.dispatch(workflow);
+      });
 
     const inputProblems = await this.runtime.inputProblemsOf(
       version,
@@ -74,7 +78,7 @@ export class TestDraft {
     const instance = started.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.instanceEvents.dispatch(instance);
     });
     return { ok: true, value: { instanceId: instance.id } };
   }

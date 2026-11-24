@@ -1,9 +1,11 @@
 import { isIP } from "node:net";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { createClient, type RedisClientType } from "redis";
-import { AddressPolicy } from "../network/address-policy.js";
-import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { BrokerConnections } from "../asyncapi/broker-connections.js";
+import type { BrokerServer } from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import type { Lost } from "../asyncapi/interfaces.js";
 
 @Injectable()
 export class RedisConnection implements OnApplicationShutdown {
@@ -20,7 +22,7 @@ export class RedisConnection implements OnApplicationShutdown {
 
   clientOf(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
   ): Promise<RedisClientType> {
     return this.connections.of(server, "", login, (address, lost) =>
       this.#connected(server, address, login, lost),
@@ -29,7 +31,7 @@ export class RedisConnection implements OnApplicationShutdown {
 
   subscriberOf(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
     lost: Lost,
   ): Promise<RedisClientType> {
     return this.connections.dedicated(server, (address) =>
@@ -44,7 +46,7 @@ export class RedisConnection implements OnApplicationShutdown {
   async #connected(
     server: BrokerServer,
     address: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     lost: Lost,
   ): Promise<RedisClientType> {
     const path = server.pathname.slice(1);

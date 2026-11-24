@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import {
   context,
@@ -6,8 +7,10 @@ import {
   propagation,
   ROOT_CONTEXT,
 } from "@opentelemetry/api";
+import canonicalize from "canonicalize";
 import type {
   CloudEvent,
+  Diagnostic,
   EventFilter,
   InputProblem,
   Interpreter,
@@ -27,7 +30,7 @@ import type {
   RouteMatch,
   StartedStep,
   VersionStructure,
-} from "../../interface-adapters/workflows/interfaces.js";
+} from "../../interface-adapters/interpreter/interfaces.js";
 import { Instrumentation } from "../opentelemetry/enums.js";
 import { durationBoundaries } from "../opentelemetry/histogram.presets.js";
 import type {
@@ -52,25 +55,26 @@ export class InterpreterTasks {
   static readonly INTERPRETER = "interpreter";
   private static readonly KEPT = 1_000;
   private static readonly MILLISECONDS_PER_SECOND = 1_000;
+  private static readonly NOT_JSON = "The value is not a JSON value.";
 
-  readonly #programs = new LRUCache<string, KeptProgram, CompileSource>({
+  private readonly programs = new LRUCache<string, KeptProgram, CompileSource>({
     max: InterpreterTasks.KEPT,
     memoMethod: (_versionId, _kept, { context: source }) =>
       this.#keptProgramOf(source),
   });
-  readonly #filters = new LRUCache<string, KeptFilter, JsonValue>({
+  private readonly filters = new LRUCache<string, KeptFilter, JsonValue>({
     max: InterpreterTasks.KEPT,
     memoMethod: (_key, _kept, { context: filter }) =>
       this.#keptFilterOf(filter),
   });
-  readonly #wait: Histogram;
+  private readonly wait: Histogram;
 
   constructor(
     @Inject(InterpreterTasks.INTERPRETER)
     private readonly interpreter: Interpreter,
   ) {
     const meter = metrics.getMeter(Instrumentation.Scope);
-    this.#wait = meter.createHistogram("tenon.interpreter.pool.wait.duration", {
+    this.wait = meter.createHistogram("tenon.interpreter.pool.wait.duration", {
       unit: "s",
       description: "The time a task waits for an interpreter thread.",
       advice: { explicitBucketBoundaries: durationBoundaries },
@@ -175,7 +179,7 @@ export class InterpreterTasks {
     const waited = Date.now() - task.enqueuedAt;
     const seconds = waited / InterpreterTasks.MILLISECONDS_PER_SECOND;
     const attributes = { "tenon.interpreter.pool": task.pool };
-    this.#wait.record(seconds, attributes);
+    this.wait.record(seconds, attributes);
   }
 
   #guarded<C, T>(call: C, answer: (call: C) => TaskAnswer<T>): TaskAnswer<T> {
@@ -198,9 +202,9 @@ export class InterpreterTasks {
   }
 
   #programOf(thread: ThreadProgram): KeptProgram | undefined {
-    if (thread.source === null) return this.#programs.get(thread.versionId);
+    if (thread.source === null) return this.programs.get(thread.versionId);
 
-    return this.#programs.memo(thread.versionId, { context: thread.source });
+    return this.programs.memo(thread.versionId, { context: thread.source });
   }
 
   #playedBy<C extends ProgramTaskCall, T>(
@@ -245,6 +249,11 @@ export class InterpreterTasks {
     const program = compilation.program;
     const manifest = program.manifest;
     const document = this.#documentOf(compilation.analysis);
+    const digest = this.#digestOf(document);
+
+    if (typeof digest !== "string")
+      return { kind: "refused", diagnostics: [digest] };
+
     return {
       kind: "compiled",
       manifest: {
@@ -254,7 +263,34 @@ export class InterpreterTasks {
         schedules: manifest.schedules,
       },
       fingerprint: program.fingerprint,
+      digest,
       document,
+    };
+  }
+
+  #digestOf(document: JsonObject): string | Diagnostic {
+    try {
+      const canonical = canonicalize(document);
+
+      if (canonical === undefined)
+        return this.#unreadable(InterpreterTasks.NOT_JSON);
+
+      return createHash("sha256").update(canonical).digest("hex");
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+
+      return this.#unreadable(error.message);
+    }
+  }
+
+  #unreadable(message: string): Diagnostic {
+    return {
+      code: "syntax",
+      message,
+      pointer: "",
+      range: null,
+      subject: null,
+      import: null,
     };
   }
 
@@ -326,7 +362,7 @@ export class InterpreterTasks {
 
   #filterOf(filter: JsonValue): EventFilter | null {
     const key = JSON.stringify(filter);
-    const kept = this.#filters.memo(key, { context: filter });
+    const kept = this.filters.memo(key, { context: filter });
     return kept.filter;
   }
 

@@ -1,0 +1,429 @@
+import { EventOrigin } from "../../../../../src/application/automation/events/enums.js";
+import type { AcceptedEvent } from "../../../../../src/application/automation/events/interfaces.js";
+import type { EventStore } from "../../../../../src/application/automation/events/ports.js";
+import { AnswerTimer } from "../../../../../src/application/automation/instances/answer-timer.js";
+import { EmitForEffect } from "../../../../../src/application/automation/instances/emit-for-effect.js";
+import type { EffectResult } from "../../../../../src/application/automation/instances/enums.js";
+import { GiveUpEffect } from "../../../../../src/application/automation/instances/give-up-effect.js";
+import { InstanceEvents } from "../../../../../src/application/automation/instances/instance-events.js";
+import type {
+  ChildRequest,
+  EffectCall,
+} from "../../../../../src/application/automation/instances/interfaces.js";
+import { PerformDetachedProcess } from "../../../../../src/application/automation/instances/perform-detached-process.js";
+import { PerformEffect } from "../../../../../src/application/automation/instances/perform-effect.js";
+import {
+  EffectPerformer,
+  type WorkflowRuntime,
+} from "../../../../../src/application/automation/instances/ports.js";
+import { StartChildForEffect } from "../../../../../src/application/automation/instances/start-child-for-effect.js";
+import { StartDetachedProcess } from "../../../../../src/application/automation/instances/start-detached-process.js";
+import {
+  EffectKind,
+  InstanceEventKind,
+  Phase,
+  TriggerKind,
+  WaitEnd,
+  WaitKind,
+} from "../../../../../src/domain/automation/instances/enums.js";
+import type { AwaitedEffect } from "../../../../../src/domain/automation/instances/interfaces.js";
+import type {
+  JsonObject,
+  JsonValue,
+} from "../../../../../src/domain/automation/interfaces.js";
+import { RunSecrets } from "../../../../../src/domain/automation/secrets/run-secrets.js";
+import { Workflow } from "../../../../../src/domain/automation/workflows/workflow.js";
+import { WorkflowName } from "../../../../../src/domain/automation/workflows/workflow-name.js";
+import { aDefinition, aTimer, aTurn } from "../../../../support/builders.js";
+import {
+  anInstanceIn,
+  FakeUnitOfWork,
+  AppendingLifecycleEvents,
+  RecordingAnnouncements,
+  RecordingInstanceMessages,
+  RecordingInstanceRuns,
+  StoredSecrets,
+  StoredWorkflowInstanceRepository,
+  StoredWorkflowRepository,
+  T0,
+} from "../../../../support/fakes.js";
+
+const unitOfWork = new FakeUnitOfWork();
+const signal = new AbortController().signal;
+const name = new WorkflowName("sales", "route-lead");
+
+const anEffect = (
+  id: string,
+  kind: EffectKind,
+  request: JsonObject = { id },
+): AwaitedEffect => ({ id, kind, request, wait: null });
+
+const aClosingReceive = (id: string): AwaitedEffect => ({
+  id,
+  kind: EffectKind.Receive,
+  request: { id },
+  wait: {
+    effectId: id,
+    kind: WaitKind.Message,
+    until: 20_000,
+    stream: null,
+    retryOf: null,
+    execution: "/do/0/orders",
+    position: 0,
+    deadlines: [
+      { at: 20_000, end: WaitEnd.Expired },
+      { at: 10_000, end: WaitEnd.Closed },
+    ],
+  },
+});
+
+class RecordingPerformer extends EffectPerformer {
+  readonly performed: string[] = [];
+  readonly detached: string[] = [];
+  readonly references: string[] = [];
+
+  perform(request: JsonObject, call: EffectCall): Promise<JsonObject> {
+    this.performed.push(JSON.stringify(request.id));
+    this.references.push(`${call.instanceId} ${call.effectId}`);
+    return Promise.resolve({ kind: "responded", statusCode: 200 });
+  }
+
+  performDetached(request: JsonObject, call: EffectCall): Promise<void> {
+    this.detached.push(JSON.stringify(request.id));
+    this.references.push(`${call.instanceId} ${call.effectId}`);
+    return Promise.resolve();
+  }
+}
+
+interface Accepted {
+  readonly event: JsonObject;
+  readonly origin: EventOrigin;
+}
+
+class AcceptingEvents {
+  readonly accepted: Accepted[] = [];
+
+  accept(event: JsonObject, origin: EventOrigin): Promise<AcceptedEvent[]> {
+    this.accepted.push({ event, origin });
+    const sequence = this.accepted.length;
+    const accepted = {
+      sequence,
+      eventId: event.id as string,
+      type: event.type as string,
+      cloudEvent: event,
+      acceptedAt: T0,
+      lifecycleOf: null,
+    };
+    return Promise.resolve([accepted]);
+  }
+}
+
+function runtimeOf(child: ChildRequest): WorkflowRuntime {
+  const runtime = {
+    childOf: () => child,
+    eventOf: (request: JsonObject) => request.event as JsonObject,
+    outcomeOf: (result: EffectResult | WaitEnd) => ({ kind: result }),
+  };
+  return runtime as unknown as WorkflowRuntime;
+}
+
+function aChildRequest(trigger: TriggerKind, workflow = name): ChildRequest {
+  const input: JsonValue = { line: 1 };
+  return { name: workflow, version: null, input, trigger };
+}
+
+async function setUp(
+  awaited: readonly AwaitedEffect[],
+  child: ChildRequest = aChildRequest(TriggerKind.Parent),
+) {
+  const parent = anInstanceIn(Phase.Pending, { id: "parent-1" });
+  parent.begin(aTurn({ requested: awaited }), RunSecrets.of([]), T0);
+  parent.clearEvents();
+  const instances = new StoredWorkflowInstanceRepository(parent);
+  const workflows = new StoredWorkflowRepository();
+  const workflow = Workflow.register(name);
+  const definition = aDefinition({}, "content-1");
+  workflow.publish({ definition, source: null, publisherId: "a-1", now: T0 });
+  await workflows.save(workflow);
+  const secrets = new StoredSecrets();
+  const messages = new RecordingInstanceMessages(instances);
+  const events = new InstanceEvents(
+    new AppendingLifecycleEvents(),
+    new RecordingAnnouncements(),
+    messages,
+  );
+  const runs = new RecordingInstanceRuns();
+  const performer = new RecordingPerformer();
+  const runtime = runtimeOf(child);
+  const accepted = new AcceptingEvents();
+  const store = accepted as unknown as EventStore;
+  const announcements = new RecordingAnnouncements();
+  return {
+    instances,
+    messages,
+    runs,
+    performer,
+    accepted,
+    announcements,
+    perform: new PerformEffect(instances, secrets, performer, runs, unitOfWork),
+    detach: new StartDetachedProcess(instances, runtime, runs, unitOfWork),
+    performDetached: new PerformDetachedProcess(secrets, performer),
+    startChild: new StartChildForEffect(
+      workflows,
+      instances,
+      runtime,
+      events,
+      runs,
+      unitOfWork,
+    ),
+    emit: new EmitForEffect(
+      instances,
+      secrets,
+      runtime,
+      store,
+      announcements,
+      runs,
+      unitOfWork,
+    ),
+    timer: new AnswerTimer(instances, runtime, runs, unitOfWork),
+    giveUp: new GiveUpEffect(instances, runs, unitOfWork),
+  };
+}
+
+function commandOf(effectId: string) {
+  return { instanceId: "parent-1", effectId, signal };
+}
+
+function childCommandOf(effectId: string) {
+  return {
+    instanceId: "parent-1",
+    effectId,
+    signal,
+    childId: "0190a1b2-0000-5000-8000-00000000c41d",
+  };
+}
+
+describe("an effect the world performs", () => {
+  it("is_performed_under_a_key_stable_across_redeliveries_and_answered_with_its_outcome", async () => {
+    const fixture = await setUp([anEffect("/do/0/fetch", EffectKind.Call)]);
+    const command = commandOf("/do/0/fetch");
+
+    await fixture.perform.execute(command);
+
+    expect(fixture.performer.performed).toEqual(['"/do/0/fetch"']);
+    expect(fixture.performer.references).toEqual(["parent-1 /do/0/fetch"]);
+    expect(fixture.runs.responded).toEqual([
+      {
+        instanceId: "parent-1",
+        answer: {
+          effectId: "/do/0/fetch",
+          outcome: { kind: "responded", statusCode: 200 },
+        },
+      },
+    ]);
+  });
+
+  it("is_not_performed_for_a_run_that_has_ended", async () => {
+    const fixture = await setUp([anEffect("/do/0/fetch", EffectKind.Call)]);
+    const stored = await fixture.instances.find("parent-1");
+    stored?.cancel(T0);
+
+    if (stored) await fixture.instances.save(stored);
+
+    const command = commandOf("/do/0/fetch");
+
+    await fixture.perform.execute(command);
+
+    expect(fixture.performer.performed).toEqual([]);
+    expect(fixture.runs.responded).toEqual([]);
+  });
+
+  it("a_detached_process_is_answered_started_and_handed_on_unperformed", async () => {
+    const effect = anEffect("/do/0/report", EffectKind.Detached);
+    const fixture = await setUp([effect]);
+    const command = commandOf("/do/0/report");
+
+    await fixture.detach.execute(command);
+
+    expect(fixture.performer.detached).toEqual([]);
+    expect(fixture.runs.responded[0]?.answer).toEqual({
+      effectId: "/do/0/report",
+      outcome: { kind: "started" },
+    });
+    expect(fixture.runs.detached).toEqual([
+      {
+        instanceId: "parent-1",
+        effectId: "/do/0/report",
+        request: { id: "/do/0/report" },
+      },
+    ]);
+  });
+
+  it("a_detached_process_of_an_ended_run_is_neither_answered_nor_handed_on", async () => {
+    const effect = anEffect("/do/0/report", EffectKind.Detached);
+    const fixture = await setUp([effect]);
+    const stored = await fixture.instances.find("parent-1");
+    stored?.cancel(T0);
+
+    if (stored) await fixture.instances.save(stored);
+
+    const command = commandOf("/do/0/report");
+
+    await fixture.detach.execute(command);
+
+    expect(fixture.runs.responded).toEqual([]);
+    expect(fixture.runs.detached).toEqual([]);
+  });
+
+  it("a_detached_process_is_performed_under_its_effect_key", async () => {
+    const fixture = await setUp([]);
+    const request = { id: "/do/0/report" };
+
+    await fixture.performDetached.execute({
+      instanceId: "parent-1",
+      effectId: "/do/0/report",
+      versionId: "version-1",
+      request,
+      signal,
+    });
+
+    expect(fixture.performer.detached).toEqual(['"/do/0/report"']);
+    expect(fixture.performer.references).toEqual(["parent-1 /do/0/report"]);
+  });
+
+  it("an_effect_given_up_on_fails_the_run_once_it_is_still_awaited", async () => {
+    const fixture = await setUp([anEffect("/do/0/fetch", EffectKind.Call)]);
+    const awaited = commandOf("/do/0/fetch");
+    const gone = commandOf("/do/9/gone");
+
+    await fixture.giveUp.execute(awaited);
+    await fixture.giveUp.execute(gone);
+
+    expect(fixture.runs.failed).toEqual(["parent-1"]);
+  });
+});
+
+describe("a child a run asks for", () => {
+  const CHILD = "/do/0/price";
+
+  it("an_awaited_child_is_started_with_its_run_dispatched_and_left_unanswered", async () => {
+    const fixture = await setUp([anEffect(CHILD, EffectKind.Child)]);
+    const command = childCommandOf(CHILD);
+
+    await fixture.startChild.execute(command);
+
+    const child = fixture.messages.started[0]?.instance;
+    expect(child?.id).toBe(command.childId);
+    expect(child?.originId).toBe("parent-1");
+    expect(child?.originEffectId).toBe(CHILD);
+    expect(child?.trigger).toBe(TriggerKind.Parent);
+    expect(fixture.messages.started[0]?.stored).toBe(true);
+    const kinds = fixture.messages.kindsOf(child?.id ?? "");
+    expect(kinds).toEqual([InstanceEventKind.Started]);
+    expect(fixture.runs.responded).toEqual([]);
+  });
+
+  it("a_detached_child_is_started_and_answered_started", async () => {
+    const detached = aChildRequest(TriggerKind.Detached);
+    const fixture = await setUp([anEffect(CHILD, EffectKind.Child)], detached);
+    const command = childCommandOf(CHILD);
+
+    await fixture.startChild.execute(command);
+
+    expect(fixture.messages.started).toHaveLength(1);
+    expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
+      kind: "started",
+    });
+  });
+
+  it("a_repeat_starts_no_second_child", async () => {
+    const fixture = await setUp([anEffect(CHILD, EffectKind.Child)]);
+    const command = childCommandOf(CHILD);
+
+    await fixture.startChild.execute(command);
+    await fixture.startChild.execute(command);
+
+    expect(fixture.messages.started).toHaveLength(1);
+  });
+
+  it("an_unknown_workflow_is_answered_missing", async () => {
+    const unknown = new WorkflowName("sales", "nobody");
+    const request = aChildRequest(TriggerKind.Parent, unknown);
+    const fixture = await setUp([anEffect(CHILD, EffectKind.Child)], request);
+    const command = childCommandOf(CHILD);
+
+    await fixture.startChild.execute(command);
+
+    expect(fixture.messages.started).toEqual([]);
+    expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
+      kind: "missing",
+    });
+  });
+
+  it("an_unpublished_version_is_answered_missing", async () => {
+    const request = {
+      name,
+      version: "9.9.9",
+      input: null,
+      trigger: TriggerKind.Parent,
+    };
+    const fixture = await setUp([anEffect(CHILD, EffectKind.Child)], request);
+
+    await fixture.startChild.execute(childCommandOf(CHILD));
+
+    expect(fixture.messages.started).toEqual([]);
+    expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
+      kind: "missing",
+    });
+  });
+});
+
+describe("an event a run emits", () => {
+  it("is_accepted_and_announced_as_emitted_and_answered_emitted", async () => {
+    const event = { id: "e-1", source: "/runs", type: "com.example.done" };
+    const effect = anEffect("/do/0/tell", EffectKind.Emit, { event });
+    const fixture = await setUp([effect]);
+    const command = commandOf("/do/0/tell");
+
+    await fixture.emit.execute(command);
+
+    expect(fixture.accepted.accepted.map((each) => each.event)).toEqual([
+      event,
+    ]);
+    expect(fixture.announcements.announced).toEqual([
+      { sequence: 1, origin: EventOrigin.Emit },
+    ]);
+    expect(fixture.runs.responded[0]?.answer.outcome).toEqual({
+      kind: "emitted",
+    });
+  });
+});
+
+describe("a timer a run set", () => {
+  it("answers_the_wait_that_ended_first_at_its_instant", async () => {
+    const fixture = await setUp([aClosingReceive("/do/0/orders@message[0]")]);
+
+    await fixture.timer.execute({
+      instanceId: "parent-1",
+      effectId: "/do/0/orders@message[0]",
+      at: 10_000,
+    });
+
+    expect(fixture.runs.responded[0]?.answer).toEqual({
+      effectId: "/do/0/orders@message[0]",
+      outcome: { kind: WaitEnd.Closed },
+    });
+  });
+
+  it("answers_nothing_for_a_wait_already_answered", async () => {
+    const fixture = await setUp([aTimer("/do/0/pause", 1_000)]);
+
+    await fixture.timer.execute({
+      instanceId: "parent-1",
+      effectId: "/do/9/gone",
+      at: 1_000,
+    });
+
+    expect(fixture.runs.responded).toEqual([]);
+  });
+});

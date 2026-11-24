@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { Outbox } from "@nestjs/outbox";
 import { and, eq } from "drizzle-orm";
 import { EventOrigin } from "../../../application/automation/events/enums.js";
 import type {
@@ -8,9 +7,8 @@ import type {
   CloudEvent,
 } from "../../../application/automation/events/interfaces.js";
 import type { EventStore } from "../../../application/automation/events/ports.js";
+import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import type { WebhookEvent } from "../../../domain/automation/webhooks/interfaces.js";
-import { MessageTopic } from "../../messaging/enums.js";
-import type { AcceptedEventMessage } from "../../messaging/interfaces.js";
 import type {
   EventRow,
   LifecycleCloudEvent,
@@ -26,7 +24,6 @@ import {
 export class PostgresEventStore implements EventStore {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly outbox: Outbox,
     private readonly webhookEventMapper: WebhookEventMapper,
   ) {}
 
@@ -35,11 +32,11 @@ export class PostgresEventStore implements EventStore {
     origin: EventOrigin,
     instanceId: string | null,
     acceptedAt: Date,
-  ): Promise<number | null> {
+  ): Promise<AcceptedEvent[]> {
     const source = cloudEvent.source as string;
     const eventId = cloudEvent.id as string;
     const type = cloudEvent.type as string;
-    return this.#inserted({
+    const row = {
       source,
       eventId,
       type,
@@ -49,56 +46,69 @@ export class PostgresEventStore implements EventStore {
       lifecycle: null,
       cloudEvent,
       acceptedAt,
-    });
+    };
+    return this.#inserted([row], null);
   }
 
   acceptLifecycle(
-    told: LifecycleCloudEvent,
-    instanceId: string,
-    execution: string | null,
+    told: readonly LifecycleCloudEvent[],
+    instance: WorkflowInstance,
     acceptedAt: Date,
-  ): Promise<number | null> {
-    const cloudEvent = told.cloudEvent;
-    const source = cloudEvent.source as string;
-    const eventId = cloudEvent.id as string;
-    const type = cloudEvent.type as string;
-    return this.#inserted({
-      source,
-      eventId,
-      type,
-      origin: EventOrigin.Lifecycle,
-      instanceId,
-      execution,
-      lifecycle: told.lifecycle,
-      cloudEvent,
-      acceptedAt,
+  ): Promise<AcceptedEvent[]> {
+    const rows = told.map((each) => {
+      const cloudEvent = each.cloudEvent;
+      return {
+        source: cloudEvent.source as string,
+        eventId: cloudEvent.id as string,
+        type: cloudEvent.type as string,
+        origin: EventOrigin.Lifecycle,
+        instanceId: instance.id,
+        execution: each.execution,
+        lifecycle: each.lifecycle,
+        cloudEvent,
+        acceptedAt,
+      };
     });
+    return this.#inserted(rows, instance.workflowId);
   }
 
-  acceptWebhookEvent(event: WebhookEvent): Promise<number | null> {
+  acceptWebhookEvent(event: WebhookEvent): Promise<AcceptedEvent[]> {
     const cloudEvent = this.webhookEventMapper.toCloudEvent(event);
     return this.accept(cloudEvent, EventOrigin.Webhook, null, event.at);
   }
 
-  async #inserted(row: EventRow): Promise<number | null> {
-    const [accepted] = await this.txHost.tx
+  async #inserted(
+    rows: EventRow[],
+    lifecycleOf: string | null,
+  ): Promise<AcceptedEvent[]> {
+    const inserted = await this.txHost.tx
       .insert(events)
-      .values(row)
+      .values(rows)
       .onConflictDoNothing({ target: [events.source, events.eventId] })
-      .returning({ sequence: events.sequence });
+      .returning({
+        sequence: events.sequence,
+        source: events.source,
+        eventId: events.eventId,
+      });
+    return inserted.flatMap((accepted) => {
+      const row = rows.find(
+        (each) =>
+          each.source === accepted.source && each.eventId === accepted.eventId,
+      );
 
-    if (accepted === undefined) return null;
+      if (row === undefined) return [];
 
-    const sequence = accepted.sequence;
-    const payload: AcceptedEventMessage = { sequence };
-    await this.outbox.add(this.txHost.tx, [
-      {
-        topic: MessageTopic.EventAccepted,
-        key: row.source,
-        payload,
-      },
-    ]);
-    return sequence;
+      return [
+        {
+          sequence: accepted.sequence,
+          eventId: row.eventId,
+          type: row.type,
+          cloudEvent: row.cloudEvent,
+          acceptedAt: row.acceptedAt,
+          lifecycleOf,
+        },
+      ];
+    });
   }
 
   async find(sequence: number): Promise<AcceptedEvent | null> {

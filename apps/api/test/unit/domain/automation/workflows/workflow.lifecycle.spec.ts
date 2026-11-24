@@ -1,4 +1,5 @@
 import {
+  InstanceEventKind,
   InstanceRefusal,
   Phase,
   TriggerKind,
@@ -311,6 +312,8 @@ describe("Workflow finding its versions", () => {
       on: false,
       currentVersionId: version.id,
       archivedAt: null,
+      arming: 0,
+      scheduledSince: null,
       version: 1,
       versions: [version],
     });
@@ -330,6 +333,8 @@ describe("Workflow finding its versions", () => {
       on: false,
       currentVersionId: version.id,
       archivedAt: null,
+      arming: 0,
+      scheduledSince: null,
       version: 1,
       versions: [version],
     });
@@ -388,7 +393,9 @@ describe("Workflow starting and restarting instances", () => {
     expect(instance?.endedAt).toBeNull();
     expect(instance?.version).toBe(0);
     expect(instance?.ended).toBe(false);
-    expect(instance?.events).toEqual([]);
+    expect(instance?.events).toEqual([
+      { kind: InstanceEventKind.Started, instanceId: instance?.id },
+    ]);
   });
 
   it("an_older_version_still_starts_after_a_newer_one_is_current", () => {

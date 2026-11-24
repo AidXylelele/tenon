@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
-import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
-import type { AgendaResult, Receipt, RunCommand } from "./interfaces.js";
+import type { Receipt, RunCommand } from "./interfaces.js";
+import { InstanceEvents } from "./instance-events.js";
 import {
   ReceivedMessages,
   WorkflowInstanceRepository,
@@ -17,17 +17,18 @@ export class AnswerReceives {
     private readonly messages: ReceivedMessages,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
-  async execute(command: RunCommand): Promise<AgendaResult> {
+  async execute(command: RunCommand): Promise<void> {
     const instance = await this.instances.find(command.instanceId);
 
-    if (instance === null) return { ok: false, failure: Missing.Instance };
+    if (instance === null) return;
 
     const receipts = await this.messages.awaitedBy(instance);
 
-    if (receipts.length === 0) return { ok: true, value: instance.agenda };
+    if (receipts.length === 0) return;
 
     const declared = await this.secrets.findDeclared(instance.versionId);
     const secrets = RunSecrets.of(declared);
@@ -51,10 +52,12 @@ export class AnswerReceives {
       answered.push(receipt);
     }
 
+    if (answered.length === 0) return;
+
     await this.unitOfWork.run(async () => {
       await this.messages.forget(instance, answered);
       await this.instances.save(instance);
+      await this.events.dispatch(instance);
     });
-    return { ok: true, value: instance.agenda };
   }
 }

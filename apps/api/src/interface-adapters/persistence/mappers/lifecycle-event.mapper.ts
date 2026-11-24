@@ -94,7 +94,7 @@ export class LifecycleEventMapper {
         data,
       };
       const lifecycle = index === 0 ? name : null;
-      return { cloudEvent, lifecycle };
+      return { cloudEvent, lifecycle, execution: event.execution };
     });
   }
 

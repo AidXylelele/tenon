@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import { LRUCache } from "lru-cache";
 import type { SecretRepository } from "../../../application/automation/secrets/ports.js";
 import type { Secret } from "../../../domain/automation/secrets/secret.js";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
-import type { Transaction } from "../interfaces.js";
+import type { DeclaredSecrets, Transaction } from "../interfaces.js";
 import { SecretMapper } from "../mappers/secret.mapper.js";
 import {
   secret as secrets,
@@ -13,6 +14,13 @@ import {
 
 @Injectable()
 export class PostgresSecretRepository implements SecretRepository {
+  private static readonly MOST_CACHED_VERSIONS = 10_000;
+
+  private readonly declaredSecrets = new LRUCache<string, DeclaredSecrets>({
+    max: PostgresSecretRepository.MOST_CACHED_VERSIONS,
+    fetchMethod: (versionId) => this.#declaredBy(versionId),
+  });
+
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
     private readonly secretMapper: SecretMapper,
@@ -38,13 +46,21 @@ export class PostgresSecretRepository implements SecretRepository {
   }
 
   async findDeclared(versionId: string): Promise<Secret[]> {
-    const declared = sql`${secrets.name} = any(${versions.secrets})`;
+    const declared = await this.declaredSecrets.fetch(versionId);
+
+    if (declared === undefined || declared.names.length === 0) return [];
+
+    const names = declared.names.slice();
     const rows = await this.txHost.tx
-      .select({ secret: secrets })
-      .from(versions)
-      .innerJoin(secrets, eq(secrets.ownerId, versions.publisherId))
-      .where(and(eq(versions.id, versionId), declared));
-    return rows.map((row) => this.secretMapper.toEntity(row.secret));
+      .select()
+      .from(secrets)
+      .where(
+        and(
+          eq(secrets.ownerId, declared.publisherId),
+          inArray(secrets.name, names),
+        ),
+      );
+    return rows.map((row) => this.secretMapper.toEntity(row));
   }
 
   async save(secret: Secret): Promise<void> {
@@ -74,5 +90,16 @@ export class PostgresSecretRepository implements SecretRepository {
 
   async remove(secret: Secret): Promise<void> {
     await this.txHost.tx.delete(secrets).where(eq(secrets.id, secret.id));
+  }
+
+  async #declaredBy(versionId: string): Promise<DeclaredSecrets | undefined> {
+    const [row] = await this.txHost.tx
+      .select({
+        publisherId: versions.publisherId,
+        names: versions.secrets,
+      })
+      .from(versions)
+      .where(eq(versions.id, versionId));
+    return row;
   }
 }

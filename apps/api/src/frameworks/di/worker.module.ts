@@ -1,37 +1,33 @@
 import { Module } from "@nestjs/common";
+import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { OutboxModule } from "@nestjs/outbox";
-import { AesGcmPayloadCodec, WorkflowsModule } from "@nestjs/workflows";
-import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
 import { AutomationBackgroundModule } from "./automation-background.module.js";
+import { outboxConfig } from "./configs.js";
 import { CoreModule } from "./core.module.js";
-import { DurableStoresModule } from "./durable-stores.module.js";
-import { workflowRetry } from "./host.presets.js";
+import { relayRetry } from "./host.presets.js";
 import { IdentityBackgroundModule } from "./identity-background.module.js";
-import { PayloadCodecModule } from "./payload-codec.module.js";
+import { OutboxStoreModule } from "./outbox-store.module.js";
 import { TelemetryModule } from "./telemetry.module.js";
 
 @Module({
   imports: [
     TelemetryModule,
     CoreModule,
-    WorkflowsModule.forRootAsync({
-      imports: [PayloadCodecModule],
-      inject: [AesGcmPayloadCodec],
-      useFactory: (codec: AesGcmPayloadCodec) => ({
-        retry: workflowRetry,
-        codec,
-        worker: {
-          concurrency: PiscinaInterpreterClient.RUN_THREADS,
-          pollInterval: "100ms",
-          leaseDuration: "120s",
-          shutdownTimeout: "90s",
+    OutboxModule.forRootAsync({
+      imports: [ConfigModule.forFeature(outboxConfig)],
+      inject: [outboxConfig.KEY],
+      useFactory: (outbox: ConfigType<typeof outboxConfig>) => ({
+        relay: {
+          pollInterval: outbox.OUTBOX_POLL_INTERVAL_MS,
+          lease: "180s",
+          publishTimeout: "60s",
+          batchSize: 100,
+          concurrency: outbox.OUTBOX_CONCURRENCY,
         },
+        retry: relayRetry,
       }),
     }),
-    OutboxModule.forRoot({
-      relay: { lease: "120s", publishTimeout: "60s" },
-    }),
-    DurableStoresModule,
+    OutboxStoreModule,
     IdentityBackgroundModule,
     AutomationBackgroundModule,
   ],

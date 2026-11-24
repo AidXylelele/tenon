@@ -16,8 +16,8 @@ export class PostgresDeliveryLogStore implements DeliveryLog {
     subscription: Subscription,
     event: AcceptedEvent,
     at: Date,
-  ): Promise<void> {
-    await this.txHost.tx
+  ): Promise<boolean> {
+    const inserted = await this.txHost.tx
       .insert(deliveries)
       .values({
         subscriptionId: subscription.id,
@@ -27,7 +27,9 @@ export class PostgresDeliveryLogStore implements DeliveryLog {
         status: DeliveryStatus.Pending,
         createdAt: at,
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ sequence: deliveries.sequence });
+    return inserted.length > 0;
   }
 
   async delivered(

@@ -1,12 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
-import { Outbox } from "@nestjs/outbox";
 import { and, eq } from "drizzle-orm";
 import type { WorkflowRepository } from "../../../application/automation/workflows/ports.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { Workflow } from "../../../domain/automation/workflows/workflow.js";
 import { StaleWriteError } from "../../../domain/stale-write.error.js";
-import type { WorkflowMessage } from "../../messaging/interfaces.js";
 import type { Transaction, WorkflowRow } from "../interfaces.js";
 import { WorkflowMapper } from "../mappers/workflow.mapper.js";
 import { WorkflowVersionMapper } from "../mappers/workflow-version.mapper.js";
@@ -19,7 +17,6 @@ import {
 export class PostgresWorkflowRepository implements WorkflowRepository {
   constructor(
     private readonly txHost: TransactionHost<Transaction>,
-    private readonly outbox: Outbox,
     private readonly workflowMapper: WorkflowMapper,
     private readonly workflowVersionMapper: WorkflowVersionMapper,
   ) {}
@@ -68,6 +65,8 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
               on: row.on,
               currentVersionId: row.currentVersionId,
               archivedAt: row.archivedAt,
+              arming: row.arming,
+              scheduledSince: row.scheduledSince,
               version: nextVersion,
             })
             .where(
@@ -81,7 +80,6 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
     if (saved.length === 0) throw new StaleWriteError();
 
     await this.#insertPublications(workflow);
-    await this.#publishEvents(workflow);
   }
 
   async #withCatalogue(row: WorkflowRow): Promise<Workflow> {
@@ -113,19 +111,5 @@ export class PostgresWorkflowRepository implements WorkflowRepository {
     workflow.clearPublications();
 
     if (rows.length > 0) await this.txHost.tx.insert(versions).values(rows);
-  }
-
-  async #publishEvents(workflow: Workflow): Promise<void> {
-    const entries = workflow.events.map((change) => {
-      const payload: WorkflowMessage = { workflowId: change.workflowId };
-      return {
-        topic: change.kind,
-        key: change.workflowId,
-        payload,
-      };
-    });
-    workflow.clearEvents();
-
-    if (entries.length > 0) await this.outbox.add(this.txHost.tx, entries);
   }
 }

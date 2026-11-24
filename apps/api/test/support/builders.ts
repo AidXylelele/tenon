@@ -1,5 +1,7 @@
 import {
+  EffectKind,
   TurnStatus,
+  WaitEnd,
   WaitKind,
 } from "../../src/domain/automation/instances/enums.js";
 import type {
@@ -10,6 +12,7 @@ import type {
 } from "../../src/domain/automation/instances/interfaces.js";
 import type { JsonObject } from "../../src/domain/automation/interfaces.js";
 import { CheckedDefinition } from "../../src/domain/automation/workflows/checked-definition.js";
+import type { Schedule } from "../../src/domain/automation/workflows/schedule.js";
 import { WorkflowName } from "../../src/domain/automation/workflows/workflow-name.js";
 import { Account } from "../../src/domain/identity/accounts/account.js";
 import { Role, UserStatus } from "../../src/domain/identity/users/enums.js";
@@ -90,6 +93,7 @@ export const aDocument = (
 export const aDefinition = (
   header: DocumentHeader = {},
   digest = "digest-1",
+  schedule: Schedule | null = null,
 ): CheckedDefinition => {
   const document = aDocument(header);
   const declared = document.document as Required<DocumentHeader>;
@@ -102,7 +106,7 @@ export const aDefinition = (
     document,
     imports: {},
     programFingerprint: digest,
-    schedule: null,
+    schedule,
     secrets: [],
   });
 };
@@ -154,22 +158,25 @@ export const aCancelledEnding = (): RunEnding => {
   return { events: [event], error: null };
 };
 
-export const aTimer = (id: string): AwaitedEffect => ({
+export const aTimer = (id: string, until = 0): AwaitedEffect => ({
   id,
-  request: { id, kind: "timer", until: 0, deadline: null },
+  kind: EffectKind.Timer,
+  request: { id, kind: "timer", until, deadline: null },
   wait: {
     effectId: id,
     kind: WaitKind.Timer,
-    until: 0,
+    until,
     stream: null,
     retryOf: null,
     execution: null,
     position: null,
+    deadlines: [{ at: until, end: WaitEnd.Elapsed }],
   },
 });
 
 export const aCall = (id: string): AwaitedEffect => ({
   id,
+  kind: EffectKind.Call,
   request: { id, kind: "http", deadline: null },
   wait: null,
 });

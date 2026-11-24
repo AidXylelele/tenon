@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
-import { AddressPolicy } from "../network/address-policy.js";
-import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { ResponseSizeLimit } from "../http/response-size-limit.js";
 import { outboundConfig } from "./configs.js";
 import { responseSizeLimit } from "./host.presets.js";
 

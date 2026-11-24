@@ -1,6 +1,6 @@
 import request from "supertest";
 import { Role } from "../../../src/domain/identity/users/enums.js";
-import { AddressPolicy } from "../../../src/frameworks/network/address-policy.js";
+import { AddressPolicy } from "../../../src/frameworks/http/address-policy.js";
 import { authHeaders, createUser, signIn } from "../../support/auth-helpers.js";
 import { aDocument } from "../../support/builders.js";
 import { createTestApp, type TestApp } from "../../support/create-test-app.js";
@@ -11,7 +11,6 @@ import {
   instanceOf,
   publish,
   publishing,
-  resetRuns,
   start,
 } from "../../support/run-helpers.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
@@ -169,7 +168,7 @@ describe("a workflow that calls a function at a URI", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     await createUser(t, { email: "author@example.com", role: Role.Editor });
     author = authHeaders(await signIn(t.server, "author@example.com"));
   });

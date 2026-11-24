@@ -1,18 +1,24 @@
 import { DraftRepository } from "../../src/application/automation/drafts/ports.js";
 import type { Draft } from "../../src/domain/automation/drafts/draft.js";
+import type { EventOrigin } from "../../src/application/automation/events/enums.js";
+import type { AcceptedEvent } from "../../src/application/automation/events/interfaces.js";
+import { EventAnnouncements } from "../../src/application/automation/events/ports.js";
 import {
+  InstanceMessages,
   InstanceRuns,
+  LifecycleEvents,
   WorkflowInstanceRepository,
 } from "../../src/application/automation/instances/ports.js";
-import { WorkflowSchedules } from "../../src/application/automation/schedules/ports.js";
 import { SecretRepository } from "../../src/application/automation/secrets/ports.js";
 import type { Secret } from "../../src/domain/automation/secrets/secret.js";
 import type {
   VersionPublication,
+  WorkflowEvent,
   WorkflowProps,
 } from "../../src/domain/automation/workflows/interfaces.js";
 import {
   DefinitionCompiler,
+  WorkflowEvents,
   WorkflowRepository,
 } from "../../src/application/automation/workflows/ports.js";
 import type {
@@ -20,11 +26,12 @@ import type {
   DefinitionSource,
 } from "../../src/application/automation/workflows/interfaces.js";
 import {
-  type Control,
+  InstanceEventKind,
   Phase,
   TriggerKind,
 } from "../../src/domain/automation/instances/enums.js";
 import type {
+  EffectAnswer,
   InstanceEvent,
   WorkflowInstanceProps,
 } from "../../src/domain/automation/instances/interfaces.js";
@@ -34,7 +41,6 @@ import type { JsonObject } from "../../src/domain/automation/interfaces.js";
 import { CheckedDefinition } from "../../src/domain/automation/workflows/checked-definition.js";
 import { Workflow } from "../../src/domain/automation/workflows/workflow.js";
 import { WorkflowName } from "../../src/domain/automation/workflows/workflow-name.js";
-import type { WorkflowVersion } from "../../src/domain/automation/workflows/workflow-version.js";
 import type { Result } from "../../src/domain/interfaces.js";
 import { UnitOfWork } from "../../src/application/unit-of-work.js";
 import {
@@ -55,7 +61,10 @@ import type { InvitationToken } from "../../src/domain/identity/invitations/invi
 import type { User } from "../../src/domain/identity/users/user.js";
 
 export class FakeUnitOfWork extends UnitOfWork {
+  runs = 0;
+
   run<T>(work: () => Promise<T>): Promise<T> {
+    this.runs += 1;
     return work();
   }
 }
@@ -276,7 +285,6 @@ function instanceRow(
 
 export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository {
   readonly rows = new Map<string, WorkflowInstanceProps>();
-  readonly outbox: InstanceEvent[] = [];
   saves = 0;
 
   constructor(...instances: WorkflowInstance[]) {
@@ -321,7 +329,7 @@ export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository
   }
 
   findEndedChildren(parent: WorkflowInstance): Promise<WorkflowInstance[]> {
-    const awaited = parent.agenda.awaited.map((effect) => effect.id);
+    const awaited = parent.awaited.map((effect) => effect.id);
     const rows = [...this.rows.values()].filter(
       (row) =>
         row.originId === parent.id &&
@@ -354,23 +362,16 @@ export class StoredWorkflowInstanceRepository extends WorkflowInstanceRepository
     const row = instanceRow(instance, instance.version + 1);
     this.rows.set(instance.id, row);
     this.saves += 1;
-    this.#told(instance);
     return Promise.resolve();
   }
 
   remove(instance: WorkflowInstance): Promise<void> {
     this.rows.delete(instance.id);
-    this.#told(instance);
     return Promise.resolve();
   }
 
   phaseOf(id: string): Phase | undefined {
     return this.rows.get(id)?.phase;
-  }
-
-  #told(instance: WorkflowInstance): void {
-    for (const event of instance.events) this.outbox.push(event);
-    instance.clearEvents();
   }
 }
 
@@ -389,6 +390,8 @@ function workflowRow(workflow: Workflow, version: number): WorkflowRoot {
     on: workflow.on,
     currentVersionId: workflow.currentVersionId,
     archivedAt: workflow.archivedAt,
+    arming: workflow.arming,
+    scheduledSince: workflow.scheduledSince,
     version,
   };
 }
@@ -450,48 +453,121 @@ export interface StartedRun {
   readonly stored: boolean;
 }
 
-export class RecordingInstanceRuns extends InstanceRuns {
+export class RecordingInstanceMessages extends InstanceMessages {
   readonly started: StartedRun[] = [];
+  readonly dispatched: InstanceEvent[] = [];
+  readonly calls: string[] = [];
 
   constructor(private readonly instances: StoredWorkflowInstanceRepository) {
     super();
   }
 
-  readonly woken: string[] = [];
-  readonly causes: string[] = [];
-
-  start(instance: WorkflowInstance): Promise<void> {
+  dispatch(instance: WorkflowInstance): Promise<void> {
     const stored = this.instances.rows.has(instance.id);
-    this.started.push({ instance, stored });
+    const starts = instance.events.some(
+      (event) => event.kind === InstanceEventKind.Started,
+    );
+
+    if (starts) this.started.push({ instance, stored });
+
+    this.calls.push(instance.id);
+
+    for (const event of instance.events) this.dispatched.push(event);
+
+    instance.clearEvents();
     return Promise.resolve();
   }
 
-  wakeOnChild(
-    parent: WorkflowInstance,
-    child: WorkflowInstance,
+  kindsOf(instanceId: string): readonly InstanceEventKind[] {
+    return this.dispatched
+      .filter((event) => event.instanceId === instanceId)
+      .map((event) => event.kind);
+  }
+}
+
+export interface RecordedAnswer {
+  readonly instanceId: string;
+  readonly answer: EffectAnswer;
+}
+
+export interface RecordedProcess {
+  readonly instanceId: string;
+  readonly effectId: string;
+  readonly request: JsonObject;
+}
+
+export class AppendingLifecycleEvents extends LifecycleEvents {
+  readonly appended: AcceptedEvent[] = [];
+
+  append(instance: WorkflowInstance): Promise<AcceptedEvent[]> {
+    const accepted: AcceptedEvent[] = [];
+
+    for (const event of instance.lifecycle) {
+      const sequence = this.appended.length + 1;
+      const eventId = `${instance.id}/${String(sequence)}`;
+      const cloudEvent = { id: eventId, source: instance.id, type: event.name };
+      const appended = {
+        sequence,
+        eventId,
+        type: event.name,
+        cloudEvent,
+        acceptedAt: T0,
+        lifecycleOf: instance.workflowId,
+      };
+      this.appended.push(appended);
+      accepted.push(appended);
+    }
+
+    return Promise.resolve(accepted);
+  }
+}
+
+export interface RecordedAnnouncement {
+  readonly sequence: number;
+  readonly origin: EventOrigin;
+}
+
+export class RecordingAnnouncements extends EventAnnouncements {
+  readonly announced: RecordedAnnouncement[] = [];
+
+  announce(
+    events: readonly AcceptedEvent[],
+    origin: EventOrigin,
   ): Promise<void> {
-    return this.#woken(parent, `child:${child.id}`);
-  }
+    for (const event of events)
+      this.announced.push({ sequence: event.sequence, origin });
 
-  wakeOnEvent(instance: WorkflowInstance, sequence: number): Promise<void> {
-    return this.#woken(instance, `event:${String(sequence)}`);
+    return Promise.resolve();
   }
+}
 
-  wakeOnControl(instance: WorkflowInstance, control: Control): Promise<void> {
-    return this.#woken(instance, control);
-  }
+export class RecordingInstanceRuns extends InstanceRuns {
+  readonly responded: RecordedAnswer[] = [];
+  readonly detached: RecordedProcess[] = [];
+  readonly received: string[] = [];
+  readonly failed: string[] = [];
 
-  wakeOnInbound(instance: WorkflowInstance): Promise<void> {
-    return this.#woken(instance, "inbound");
-  }
-
-  #woken(instance: WorkflowInstance, cause: string): Promise<void> {
-    this.woken.push(instance.id);
-    this.causes.push(cause);
+  respond(instance: WorkflowInstance, answer: EffectAnswer): Promise<void> {
+    this.responded.push({ instanceId: instance.id, answer });
     return Promise.resolve();
   }
 
-  forget(): Promise<void> {
+  detach(
+    instance: WorkflowInstance,
+    effectId: string,
+    request: JsonObject,
+  ): Promise<void> {
+    this.detached.push({ instanceId: instance.id, effectId, request });
+    return Promise.resolve();
+  }
+
+  receive(instance: WorkflowInstance): Promise<void> {
+    this.received.push(instance.id);
+    return Promise.resolve();
+  }
+
+  fail(instance: WorkflowInstance): Promise<void> {
+    this.failed.push(instance.id);
     return Promise.resolve();
   }
 }
@@ -546,35 +622,15 @@ export function anInstanceIn(
   });
 }
 
-export interface ContinuedChain {
-  readonly instanceId: string;
-  readonly versionId: string;
-}
+export class RecordingWorkflowEvents extends WorkflowEvents {
+  readonly dispatched: WorkflowEvent[] = [];
+  readonly calls: string[] = [];
 
-export class RecordingSchedules extends WorkflowSchedules {
-  readonly applied: string[] = [];
-  readonly cleared: string[] = [];
-  readonly continued: ContinuedChain[] = [];
+  dispatch(workflow: Workflow): Promise<void> {
+    for (const event of workflow.events) this.dispatched.push(event);
 
-  check(): Promise<DefinitionProblem | null> {
-    return Promise.resolve(null);
-  }
-
-  apply(workflow: Workflow, version: WorkflowVersion): Promise<void> {
-    this.applied.push(`${workflow.id}@${version.id}`);
-    return Promise.resolve();
-  }
-
-  clear(workflow: Workflow): Promise<void> {
-    this.cleared.push(workflow.id);
-    return Promise.resolve();
-  }
-
-  continueAfter(
-    instance: WorkflowInstance,
-    version: WorkflowVersion,
-  ): Promise<void> {
-    this.continued.push({ instanceId: instance.id, versionId: version.id });
+    this.calls.push(workflow.id);
+    workflow.clearEvents();
     return Promise.resolve();
   }
 }

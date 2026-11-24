@@ -1,9 +1,11 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { MailModule, SmtpTransport } from "@nestjs/mail";
+import { Mailer } from "../../interface-adapters/mailing/interfaces.js";
 import { MailHandler } from "../../interface-adapters/mailing/mail.handler.js";
 import { InvitationMail } from "../../interface-adapters/mailing/templates/invitation.mail.js";
 import { PasswordResetMail } from "../../interface-adapters/mailing/templates/password-reset.mail.js";
+import { SmtpMailer } from "../mail/smtp.mailer.js";
 import { linksConfig, mailConfig } from "./configs.js";
 
 @Module({
@@ -28,6 +30,7 @@ import { linksConfig, mailConfig } from "./configs.js";
   ],
   providers: [
     MailHandler,
+    { provide: Mailer, useClass: SmtpMailer },
     {
       provide: InvitationMail,
       inject: [linksConfig.KEY],

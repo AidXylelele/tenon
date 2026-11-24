@@ -23,6 +23,7 @@ import { RestartInstance } from "../../application/automation/instances/restart-
 import { ResumeInstance } from "../../application/automation/instances/resume-instance.js";
 import { StartInstance } from "../../application/automation/instances/start-instance.js";
 import { SuspendInstance } from "../../application/automation/instances/suspend-instance.js";
+import { ListExpectedStarts } from "../../application/automation/schedules/list-expected-starts.js";
 import { CreateSecret } from "../../application/automation/secrets/create-secret.js";
 import { DeleteSecret } from "../../application/automation/secrets/delete-secret.js";
 import { ReplaceSecret } from "../../application/automation/secrets/replace-secret.js";
@@ -74,10 +75,10 @@ import { PostgresSubscriptionQueries } from "../../interface-adapters/persistenc
 import { PostgresWebhookQueries } from "../../interface-adapters/persistence/queries/postgres-webhook.queries.js";
 import { PostgresDraftRepository } from "../../interface-adapters/persistence/repositories/postgres-draft.repository.js";
 import { PostgresWebhookRepository } from "../../interface-adapters/persistence/repositories/postgres-webhook.repository.js";
-import { HttpImportGateway } from "../../interface-adapters/workflows/gateways/http-import.gateway.js";
-import { InterpreterCapabilitiesGateway } from "../../interface-adapters/workflows/gateways/interpreter-capabilities.gateway.js";
-import { InterpreterCompilerGateway } from "../../interface-adapters/workflows/gateways/interpreter-compiler.gateway.js";
-import { StructureClient } from "../../interface-adapters/workflows/interfaces.js";
+import { ImportGateway } from "../../interface-adapters/http/import.gateway.js";
+import { InterpreterCapabilitiesGateway } from "../../interface-adapters/interpreter/interpreter-capabilities.gateway.js";
+import { InterpreterCompilerGateway } from "../../interface-adapters/interpreter/interpreter-compiler.gateway.js";
+import { StructureClient } from "../../interface-adapters/interpreter/interfaces.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
 import { AutomationModule } from "./automation.module.js";
 import { linksConfig } from "./configs.js";
@@ -105,6 +106,7 @@ import { HttpModule } from "./http.module.js";
     ArchiveWorkflow,
     TurnWorkflowOn,
     TurnWorkflowOff,
+    ListExpectedStarts,
     CreateDraft,
     SaveDraft,
     DiscardDraft,
@@ -127,8 +129,8 @@ import { HttpModule } from "./http.module.js";
     CreateSubscription,
     DeleteSubscription,
     AutomationPolicy,
-    HttpImportGateway,
-    { provide: ImportFetcher, useExisting: HttpImportGateway },
+    ImportGateway,
+    { provide: ImportFetcher, useExisting: ImportGateway },
     InterpreterCompilerGateway,
     { provide: DefinitionCompiler, useExisting: InterpreterCompilerGateway },
     InterpreterCapabilitiesGateway,

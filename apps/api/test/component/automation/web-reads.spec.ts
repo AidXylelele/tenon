@@ -10,10 +10,10 @@ import {
   drain,
   instanceOf,
   publish,
-  resetRuns,
   type RunApp,
   start,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 
 interface WorkflowItem {
   readonly name: string;
@@ -39,7 +39,7 @@ describe("the reads the web console asks for", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     const author = await createUser(t, {
       email: "editor@example.com",
       role: Role.Editor,

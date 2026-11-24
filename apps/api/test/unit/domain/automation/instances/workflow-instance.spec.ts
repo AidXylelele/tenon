@@ -1,13 +1,17 @@
 import {
   CancelReason,
   Control,
+  EffectKind,
   InstanceEventKind,
   InstanceRefusal,
   Phase,
   TaskValueKind,
   TriggerKind,
   TurnStatus,
+  WaitEnd,
+  WaitKind,
 } from "../../../../../src/domain/automation/instances/enums.js";
+import type { AwaitedEffect } from "../../../../../src/domain/automation/instances/interfaces.js";
 import { RunSecrets } from "../../../../../src/domain/automation/secrets/run-secrets.js";
 import { SecretValue } from "../../../../../src/domain/automation/secrets/secret-value.js";
 import {
@@ -23,10 +27,13 @@ import { anInstanceIn, T0 } from "../../../../support/fakes.js";
 const noSecrets = RunSecrets.of([]);
 const later = new Date("2026-11-03T11:00:00.000Z");
 
-function begun(requested = [aTimer("/do/0/pause")]) {
-  const instance = anInstanceIn(Phase.Pending);
+const AWAITED = { trigger: TriggerKind.Parent, originId: "parent-1" };
+
+function begun(requested = [aTimer("/do/0/pause")], overrides = {}) {
+  const instance = anInstanceIn(Phase.Pending, overrides);
   const turn = aTurn({ requested });
   instance.begin(turn, noSecrets, T0);
+  instance.clearEvents();
   return instance;
 }
 
@@ -54,6 +61,115 @@ describe("a run begun on its first turn", () => {
   });
 });
 
+const aReceiveClosing = (id: string): AwaitedEffect => ({
+  id,
+  kind: EffectKind.Receive,
+  request: { id, kind: "asyncapi" },
+  wait: {
+    effectId: id,
+    kind: WaitKind.Message,
+    until: 20_000,
+    stream: null,
+    retryOf: null,
+    execution: "/do/0/orders",
+    position: 0,
+    deadlines: [
+      { at: 20_000, end: WaitEnd.Expired },
+      { at: 10_000, end: WaitEnd.Closed },
+    ],
+  },
+});
+
+describe("what a run asks of the world", () => {
+  it("requests_each_effect_the_world_performs_and_sets_a_timer_per_deadline", () => {
+    const instance = anInstanceIn(Phase.Pending);
+    const turn = aTurn({
+      requested: [
+        aCall("/do/0/fetch"),
+        aTimer("/do/1/pause", 30_000),
+        aReceiveClosing("/do/2/orders@message[0]"),
+      ],
+    });
+
+    instance.begin(turn, noSecrets, T0);
+
+    expect(instance.events).toEqual([
+      {
+        kind: InstanceEventKind.EffectRequested,
+        instanceId: instance.id,
+        effectId: "/do/0/fetch",
+        effect: EffectKind.Call,
+      },
+      {
+        kind: InstanceEventKind.TimerSet,
+        instanceId: instance.id,
+        effectId: "/do/1/pause",
+        at: 30_000,
+      },
+      {
+        kind: InstanceEventKind.EffectRequested,
+        instanceId: instance.id,
+        effectId: "/do/2/orders@message[0]",
+        effect: EffectKind.Receive,
+      },
+      {
+        kind: InstanceEventKind.TimerSet,
+        instanceId: instance.id,
+        effectId: "/do/2/orders@message[0]",
+        at: 20_000,
+      },
+      {
+        kind: InstanceEventKind.TimerSet,
+        instanceId: instance.id,
+        effectId: "/do/2/orders@message[0]",
+        at: 10_000,
+      },
+    ]);
+  });
+
+  it("knows_the_request_of_an_effect_it_awaits", () => {
+    const instance = begun([aCall("/do/0/fetch")]);
+
+    expect(instance.requestOf("/do/0/fetch")).toEqual({
+      id: "/do/0/fetch",
+      kind: "http",
+      deadline: null,
+    });
+    expect(instance.requestOf("/do/9/gone")).toBeNull();
+  });
+
+  it("asks_nothing_of_the_world_once_ended", () => {
+    const instance = begun([aCall("/do/0/fetch")]);
+    instance.cancel(later);
+
+    expect(instance.requestOf("/do/0/fetch")).toBeNull();
+  });
+
+  it("tells_which_wait_ended_first_at_an_instant", () => {
+    const instance = begun([aReceiveClosing("/do/2/orders@message[0]")]);
+
+    const early = instance.waitEndAt("/do/2/orders@message[0]", 9_999);
+    const closed = instance.waitEndAt("/do/2/orders@message[0]", 10_000);
+    const late = instance.waitEndAt("/do/2/orders@message[0]", 25_000);
+
+    expect(early).toBeNull();
+    expect(closed).toBe(WaitEnd.Closed);
+    expect(late).toBe(WaitEnd.Closed);
+  });
+
+  it("a_turn_that_ends_the_run_requests_none_of_its_effects", () => {
+    const instance = anInstanceIn(Phase.Pending);
+    const turn = aTurn({
+      status: TurnStatus.Faulted,
+      requested: [aCall("/do/0/fetch")],
+    });
+
+    instance.begin(turn, noSecrets, T0);
+
+    expect(instance.events).toEqual([]);
+  });
+});
+
 describe("a turn that answers an effect", () => {
   it("leaves_the_answered_effect_out_of_what_the_run_awaits", () => {
     const instance = begun([aCall("/do/0/fetch")]);
@@ -65,7 +181,7 @@ describe("a turn that answers an effect", () => {
     instance.advance(turn, noSecrets, later);
 
     expect(instance.awaits("/do/0/fetch")).toBe(false);
-    expect(instance.agenda.awaited.map((effect) => effect.id)).toEqual([
+    expect(instance.awaited.map((effect) => effect.id)).toEqual([
       "/do/1/pause",
     ]);
   });
@@ -85,11 +201,7 @@ describe("a turn that answers an effect", () => {
     expect(instance.phase).toBe(Phase.Completed);
     expect(instance.output).toEqual({ echoed: "Bearer ***" });
     expect(instance.endedAt).toEqual(later);
-    expect(instance.agenda).toEqual({
-      instanceId: instance.id,
-      ended: true,
-      awaited: [],
-    });
+    expect(instance.awaited).toEqual([]);
   });
 
   it("keeps_the_task_values_it_reports_with_their_secrets_masked", () => {
@@ -206,7 +318,7 @@ describe("the controls of an instance", () => {
   });
 
   it("a_platform_failure_faults_it_with_the_ending_s_error_and_ends_it_once", () => {
-    const instance = begun();
+    const instance = begun(undefined, AWAITED);
     const ending = aFaultedEnding();
 
     instance.fail(ending, later);
@@ -216,7 +328,72 @@ describe("the controls of an instance", () => {
     expect(instance.error).toEqual(ending.error);
     expect(instance.lifecycle).toEqual(ending.events);
     expect(instance.events.map((event) => event.kind)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
+    ]);
+  });
+});
+
+describe("the end of an instance", () => {
+  const completed = aTurn({ status: TurnStatus.Completed });
+
+  it("a_top_level_run_tells_nobody", () => {
+    const instance = begun();
+
+    instance.advance(completed, noSecrets, later);
+
+    expect(instance.events).toEqual([]);
+  });
+
+  it("an_awaited_child_tells_its_parent", () => {
+    const instance = begun(undefined, AWAITED);
+
+    instance.cancel(later);
+
+    expect(instance.events).toEqual([
+      {
+        kind: InstanceEventKind.ChildEnded,
+        instanceId: "instance-1",
+        parentId: "parent-1",
+      },
+    ]);
+  });
+
+  it("a_completed_scheduled_run_tells_its_schedule_and_a_faulted_one_does_not", () => {
+    const scheduled = { trigger: TriggerKind.Schedule };
+    const instance = begun(undefined, scheduled);
+    const faulted = begun(undefined, scheduled);
+
+    instance.advance(completed, noSecrets, later);
+    faulted.fail(aFaultedEnding(), later);
+
+    expect(instance.events).toEqual([
+      {
+        kind: InstanceEventKind.ScheduledCompleted,
+        instanceId: "instance-1",
+        workflowId: "workflow-1",
+      },
+    ]);
+    expect(faulted.events).toEqual([]);
+  });
+
+  it("a_run_ending_while_it_awaits_children_tells_them_once_they_are_abandoned", () => {
+    const child = {
+      id: "/do/0/child",
+      kind: EffectKind.Child,
+      request: { id: "/do/0/child" },
+      wait: null,
+    };
+    const instance = begun([child, aCall("/do/1/other")]);
+    const ended = aTurn({
+      status: TurnStatus.Cancelled,
+      withdrawn: ["/do/1/other"],
+      abandoned: ["/do/1/other"],
+    });
+
+    instance.advance(ended, noSecrets, later);
+
+    expect(instance.events.map((event) => event.kind)).toEqual([
+      InstanceEventKind.ChildrenAbandoned,
     ]);
   });
 });
@@ -247,7 +424,7 @@ describe("a run the platform's interpreter no longer continues", () => {
   }
 
   it("is_cancelled_with_the_reason_that_the_interpreter_changed_and_ends_once", () => {
-    const instance = begun();
+    const instance = begun(undefined, AWAITED);
     const ending = aCancelledEnding();
     const stranded = strandedBy(ending);
 
@@ -260,7 +437,7 @@ describe("a run the platform's interpreter no longer continues", () => {
     expect(instance.error).toBeNull();
     expect(instance.lifecycle).toEqual(ending.events);
     expect(instance.events.map((event) => event.kind)).toEqual([
-      InstanceEventKind.Ended,
+      InstanceEventKind.ChildEnded,
     ]);
   });
 
@@ -270,7 +447,7 @@ describe("a run the platform's interpreter no longer continues", () => {
 
     instance.advance(stranded, noSecrets, later);
 
-    expect(instance.agenda.awaited).toEqual([]);
+    expect(instance.awaited).toEqual([]);
     expect(instance.waits).toEqual([]);
     expect(instance.listening).toEqual([]);
   });

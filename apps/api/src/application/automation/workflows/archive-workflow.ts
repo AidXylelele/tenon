@@ -2,12 +2,13 @@ import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import type { ArchiveResult, ArchiveWorkflowCommand } from "./interfaces.js";
-import { WorkflowRepository } from "./ports.js";
+import { WorkflowEvents, WorkflowRepository } from "./ports.js";
 
 @Injectable()
 export class ArchiveWorkflow {
   constructor(
     private readonly workflows: WorkflowRepository,
+    private readonly events: WorkflowEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -22,7 +23,10 @@ export class ArchiveWorkflow {
     if (!archived.ok) return archived;
 
     if (archived.value)
-      await this.unitOfWork.run(() => this.workflows.save(workflow));
+      await this.unitOfWork.run(async () => {
+        await this.workflows.save(workflow);
+        await this.events.dispatch(workflow);
+      });
 
     return { ok: true, value: undefined };
   }

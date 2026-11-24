@@ -5,11 +5,8 @@ import { Control } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
 import { SecretRepository } from "../secrets/ports.js";
 import type { CancelInstanceCommand, InstanceResult } from "./interfaces.js";
-import {
-  InstanceRuns,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 
 @Injectable()
 export class CancelInstance {
@@ -17,7 +14,7 @@ export class CancelInstance {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
-    private readonly runs: InstanceRuns,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -32,24 +29,23 @@ export class CancelInstance {
 
     const now = new Date();
 
-    if (instance.pending) {
-      instance.cancel(now);
-      await this.unitOfWork.run(() => this.instances.save(instance));
-      return { ok: true, value: undefined };
+    if (instance.pending) instance.cancel(now);
+
+    if (!instance.ended) {
+      const declared = await this.secrets.findDeclared(instance.versionId);
+      const secrets = RunSecrets.of(declared);
+      const turn = await this.runtime.cancel(
+        instance,
+        secrets,
+        now,
+        command.signal,
+      );
+      instance.advance(turn, secrets, now);
     }
 
-    const declared = await this.secrets.findDeclared(instance.versionId);
-    const secrets = RunSecrets.of(declared);
-    const turn = await this.runtime.cancel(
-      instance,
-      secrets,
-      now,
-      command.signal,
-    );
-    instance.advance(turn, secrets, now);
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.wakeOnControl(instance, Control.Cancel);
+      await this.events.dispatch(instance);
     });
     return { ok: true, value: undefined };
   }

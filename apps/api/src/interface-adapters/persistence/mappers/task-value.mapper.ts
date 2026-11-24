@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { TaskValueKind } from "../../../domain/automation/instances/enums.js";
+import type { TaskValue } from "../../../domain/automation/instances/interfaces.js";
 import type { JsonValue } from "../../../domain/automation/interfaces.js";
 import { Cipher, type TaskValueRow, type TaskValues } from "../interfaces.js";
 
@@ -11,11 +12,16 @@ export class TaskValueMapper {
 
   sealedOf(value: JsonValue): string | null {
     const text = JSON.stringify(value);
-    const bytes = Buffer.byteLength(text, "utf8");
 
-    if (bytes > TaskValueMapper.MOST_BYTES) return null;
+    if (!this.#fits(text)) return null;
 
     return this.cipher.seal(text);
+  }
+
+  outputsOf(taskValues: readonly TaskValue[]): string[] {
+    return taskValues
+      .filter((taskValue) => this.#keptOutput(taskValue))
+      .map((taskValue) => taskValue.execution);
   }
 
   valueOf(sealed: string): JsonValue {
@@ -33,6 +39,18 @@ export class TaskValueMapper {
       return [execution, { input, output }] as const;
     });
     return new Map(values);
+  }
+
+  #keptOutput(taskValue: TaskValue): boolean {
+    if (taskValue.kind !== TaskValueKind.Output) return false;
+
+    const text = JSON.stringify(taskValue.value);
+    return this.#fits(text);
+  }
+
+  #fits(text: string): boolean {
+    const bytes = Buffer.byteLength(text, "utf8");
+    return bytes <= TaskValueMapper.MOST_BYTES;
   }
 
   #kindOf(rows: readonly TaskValueRow[], kind: TaskValueKind): JsonValue {

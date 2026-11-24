@@ -11,7 +11,7 @@ import {
 import type { JsonObject } from "../../../domain/automation/interfaces.js";
 import type {
   ImportTexts,
-  Schedule,
+  ScheduleSpec,
 } from "../../../domain/automation/workflows/interfaces.js";
 import { user } from "./user.js";
 import { workflow } from "./workflow.js";
@@ -29,7 +29,7 @@ export const workflowVersion = pgTable(
     imports: jsonb("imports").$type<ImportTexts>().notNull().default({}),
     digest: text("digest").notNull(),
     programFingerprint: text("program_fingerprint").notNull(),
-    schedule: jsonb("schedule").$type<Schedule>(),
+    schedule: jsonb("schedule").$type<ScheduleSpec>(),
     secrets: text("secrets").array().notNull(),
     source: text("source"),
     publisherId: uuid("publisher_id")

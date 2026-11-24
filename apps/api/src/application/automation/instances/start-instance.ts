@@ -3,11 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { Missing } from "../enums.js";
 import { WorkflowRepository } from "../workflows/ports.js";
-import {
-  InstanceRuns,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 import type {
   StartInstanceCommand,
   StartInstanceResult,
@@ -18,7 +15,7 @@ export class StartInstance {
   constructor(
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
-    private readonly runs: InstanceRuns,
+    private readonly events: InstanceEvents,
     private readonly runtime: WorkflowRuntime,
     private readonly unitOfWork: UnitOfWork,
   ) {}
@@ -53,7 +50,7 @@ export class StartInstance {
     const instance = started.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.events.dispatch(instance);
     });
     return { ok: true, value: { instanceId: instance.id } };
   }

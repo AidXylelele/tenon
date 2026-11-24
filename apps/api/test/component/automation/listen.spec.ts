@@ -11,9 +11,9 @@ import {
   publish,
   type RunApp,
   relay,
-  resetRuns,
   start,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 
 const STRUCTURED = "application/cloudevents+json";
 
@@ -54,7 +54,7 @@ describe("a run that listens for events", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));
   });

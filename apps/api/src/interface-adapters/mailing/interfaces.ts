@@ -16,3 +16,20 @@ export interface QueuedMail<T> {
   readonly to: string;
   readonly data: T;
 }
+
+export type MailDelivery =
+  | { readonly kind: "sent" }
+  | { readonly kind: "refused"; readonly reason: string };
+
+export abstract class Mailer {
+  abstract sendInvitation(
+    mail: QueuedMail<InvitationMailData>,
+    idempotencyKey: string,
+    signal: AbortSignal,
+  ): Promise<MailDelivery>;
+  abstract sendPasswordReset(
+    mail: QueuedMail<PasswordResetMailData>,
+    idempotencyKey: string,
+    signal: AbortSignal,
+  ): Promise<MailDelivery>;
+}

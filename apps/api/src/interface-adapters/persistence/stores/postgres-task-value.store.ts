@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { TransactionHost } from "@nestjs-cls/transactional";
 import { sql } from "drizzle-orm";
-import { TaskValueKind } from "../../../domain/automation/instances/enums.js";
 import type { WorkflowInstance } from "../../../domain/automation/instances/workflow-instance.js";
 import type { Transaction } from "../interfaces.js";
 import { TaskValueMapper } from "../mappers/task-value.mapper.js";
@@ -14,9 +13,7 @@ export class PostgresTaskValueStore {
     private readonly taskValueMapper: TaskValueMapper,
   ) {}
 
-  async keep(instance: WorkflowInstance, at: Date): Promise<readonly string[]> {
-    const outputs: string[] = [];
-
+  async keep(instance: WorkflowInstance, at: Date): Promise<void> {
     for (const taskValue of instance.taskValues) {
       const sealedValue = this.taskValueMapper.sealedOf(taskValue.value);
 
@@ -42,11 +39,6 @@ export class PostgresTaskValueStore {
             recordedAt: sql`excluded.recorded_at`,
           },
         });
-
-      if (taskValue.kind === TaskValueKind.Output)
-        outputs.push(taskValue.execution);
     }
-
-    return outputs;
   }
 }

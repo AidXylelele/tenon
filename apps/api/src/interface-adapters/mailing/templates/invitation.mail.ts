@@ -1,6 +1,8 @@
+import { Injectable } from "@nestjs/common";
 import { html, type Mailable, type MailContent } from "@nestjs/mail";
 import type { InvitationMailData } from "../interfaces.js";
 
+@Injectable()
 export class InvitationMail implements Mailable<InvitationMailData> {
   constructor(private readonly webBaseUrl: string) {}
 

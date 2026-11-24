@@ -1,3 +1,4 @@
+import { OutboxRelay } from "@nestjs/outbox";
 import { sql } from "drizzle-orm";
 import request from "supertest";
 import type { JsonObject } from "../../../src/domain/automation/interfaces.js";
@@ -12,8 +13,8 @@ import {
   publishing,
   type RunApp,
   relay,
-  resetRuns,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import type { Problem } from "../../support/bodies.js";
 
 const WORKFLOW = "/api/v1/workflows/sales/route-lead";
@@ -46,8 +47,7 @@ describe("starting workflows on a schedule and on events", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
-    await t.db.execute(sql`truncate table nest_workflows.schedules cascade`);
+    await truncateAll(t.db);
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
     editor = authHeaders(await signIn(t.server, "editor@example.com"));
   });
@@ -225,6 +225,36 @@ describe("starting workflows on a schedule and on events", () => {
     ]);
   });
 
+  it("an_accepted_event_and_the_starts_it_triggers_are_relayed_in_the_events_own_lane", async () => {
+    const on = { one: { with: { type: "com.example.order.paid" } } };
+    await publish(t, editor, aScheduledDocument({ on }));
+    await turn("on");
+
+    await request(t.server)
+      .post("/api/v1/events")
+      .set(editor)
+      .set("content-type", STRUCTURED)
+      .send(
+        JSON.stringify({
+          specversion: "1.0",
+          id: "order-1",
+          source: "/shop",
+          type: "com.example.order.paid",
+        }),
+      )
+      .expect(202);
+    const accepted = await t.db.execute(
+      sql`select key from nest_outbox.messages where topic = 'event.accepted'`,
+    );
+    await t.app.get(OutboxRelay).runOnce();
+    const triggered = await t.db.execute(
+      sql`select key from nest_outbox.messages where topic = 'trigger.offered'`,
+    );
+
+    expect(accepted.rows).toEqual([{ key: "order-1" }]);
+    expect(triggered.rows).toEqual([{ key: "order-1" }]);
+  });
+
   it("an_event_of_another_type_or_to_a_workflow_that_is_off_starts_nothing", async () => {
     const on = { one: { with: { type: "com.example.order.paid" } } };
     await publish(t, editor, aScheduledDocument({ on }));
@@ -256,7 +286,7 @@ describe("starting workflows on a schedule and on events", () => {
     expect(await instances()).toHaveLength(2);
   });
 
-  it("a_cron_the_engine_cannot_run_is_refused_at_publish", async () => {
+  it("a_cron_that_never_matches_is_refused_at_publish", async () => {
     const response = await publishing(
       t,
       editor,

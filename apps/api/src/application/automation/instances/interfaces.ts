@@ -8,13 +8,13 @@ import type {
 import type {
   EffectAnswer,
   Inbound,
-  RunAgenda,
   RunWait,
 } from "../../../domain/automation/instances/interfaces.js";
 import type {
   JsonObject,
   JsonValue,
 } from "../../../domain/automation/interfaces.js";
+import type { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import type { StartRefusal } from "../../../domain/automation/workflows/interfaces.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { Result } from "../../../domain/interfaces.js";
@@ -65,24 +65,47 @@ export interface RunCommand {
   readonly signal: AbortSignal;
 }
 
-export type AgendaResult = Result<RunAgenda, Missing>;
-
 export interface RespondCommand extends RunCommand {
   readonly answer: EffectAnswer;
+}
+
+export interface EffectReference {
+  readonly instanceId: string;
+  readonly effectId: string;
+}
+
+export interface EffectCommand extends EffectReference {
+  readonly signal: AbortSignal;
+}
+
+export interface ChildCommand extends EffectCommand {
+  readonly childId: string;
+}
+
+export interface TimerCommand extends EffectReference {
+  readonly at: number;
+}
+
+export interface DetachedProcessCommand extends EffectCommand {
+  readonly versionId: string;
+  readonly request: JsonObject;
+}
+
+export interface EffectCall extends EffectReference {
+  readonly signal: AbortSignal;
+  readonly secrets: RunSecrets;
+}
+
+export interface ChildRequest {
+  readonly name: WorkflowName;
+  readonly version: string | null;
+  readonly input: JsonValue;
+  readonly trigger: TriggerKind;
 }
 
 export interface OfferCommand extends RunCommand {
   readonly sequence: number;
   readonly candidates: readonly string[];
-}
-
-export interface StartChildCommand {
-  readonly parentId: string;
-  readonly effectId: string;
-  readonly name: WorkflowName;
-  readonly version: string | null;
-  readonly input: JsonValue;
-  readonly trigger: TriggerKind;
 }
 
 export interface InstanceSummary {

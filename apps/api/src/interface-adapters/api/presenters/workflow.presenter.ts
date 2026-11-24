@@ -8,7 +8,7 @@ import type {
   WorkflowSummary,
 } from "../../../application/automation/workflows/interfaces.js";
 import { ScheduleKind } from "../../../domain/automation/workflows/enums.js";
-import type { Schedule } from "../../../domain/automation/workflows/interfaces.js";
+import type { ScheduleSpec } from "../../../domain/automation/workflows/interfaces.js";
 import {
   type ExpectedStartsResponse,
   type VersionListResponse,
@@ -89,7 +89,7 @@ export class WorkflowPresenter {
     }));
   }
 
-  #scheduleOf(schedule: Schedule | null): WorkflowResponse["schedule"] {
+  #scheduleOf(schedule: ScheduleSpec | null): WorkflowResponse["schedule"] {
     if (schedule?.kind !== ScheduleKind.On) return schedule;
 
     return { kind: schedule.kind, types: schedule.types.slice() };

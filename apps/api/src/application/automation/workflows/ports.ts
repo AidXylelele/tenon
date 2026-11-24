@@ -12,6 +12,10 @@ export abstract class DefinitionCompiler {
   ): Promise<Result<CheckedDefinition, DefinitionFailure>>;
 }
 
+export abstract class WorkflowEvents {
+  abstract dispatch(workflow: Workflow): Promise<void>;
+}
+
 export abstract class WorkflowRepository {
   abstract findByName(name: WorkflowName): Promise<Workflow | null>;
   abstract findById(id: string): Promise<Workflow | null>;

@@ -1,23 +1,29 @@
 import { Injectable } from "@nestjs/common";
-import { MailError, Mailer, type MailSendResult } from "@nestjs/mail";
 import {
   NonRetryableMessageError,
   OnOutboxMessage,
   type OutboxHandlerContext,
 } from "@nestjs/outbox";
-import { type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
+import {
+  type Attributes,
+  type Span,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
+import { SpanAttribute } from "../messaging/enums.js";
 import { MailTopic } from "./enums.js";
-import type {
-  InvitationMailData,
-  PasswordResetMailData,
-  QueuedMail,
+import {
+  type InvitationMailData,
+  type MailDelivery,
+  Mailer,
+  type PasswordResetMailData,
+  type QueuedMail,
 } from "./interfaces.js";
-import { InvitationMail } from "./templates/invitation.mail.js";
-import { PasswordResetMail } from "./templates/password-reset.mail.js";
 
 @Injectable()
 export class MailHandler {
-  readonly #tracer = trace.getTracer("tenon-api");
+  private readonly tracer = trace.getTracer("tenon-api");
 
   constructor(private readonly mailer: Mailer) {}
 
@@ -26,15 +32,16 @@ export class MailHandler {
     mail: QueuedMail<InvitationMailData>,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#delivered(context, () =>
-      this.mailer.send(InvitationMail, {
-        to: mail.to,
-        data: mail.data,
-        idempotencyKey: context.message.id,
-        signal: context.signal,
-        retry: false,
-      }),
-    );
+    const idempotencyKey = context.message.id;
+    const attributes = { [SpanAttribute.MessageId]: idempotencyKey };
+    return this.#traced(MailTopic.Invitation, attributes, async () => {
+      const delivery = await this.mailer.sendInvitation(
+        mail,
+        idempotencyKey,
+        context.signal,
+      );
+      this.#accepted(delivery);
+    });
   }
 
   @OnOutboxMessage(MailTopic.PasswordReset, {
@@ -44,43 +51,52 @@ export class MailHandler {
     mail: QueuedMail<PasswordResetMailData>,
     context: OutboxHandlerContext,
   ): Promise<void> {
-    return this.#delivered(context, () =>
-      this.mailer.send(PasswordResetMail, {
-        to: mail.to,
-        data: mail.data,
-        idempotencyKey: context.message.id,
-        signal: context.signal,
-        retry: false,
-      }),
-    );
+    const idempotencyKey = context.message.id;
+    const attributes = { [SpanAttribute.MessageId]: idempotencyKey };
+    return this.#traced(MailTopic.PasswordReset, attributes, async () => {
+      const delivery = await this.mailer.sendPasswordReset(
+        mail,
+        idempotencyKey,
+        context.signal,
+      );
+      this.#accepted(delivery);
+    });
   }
 
-  #delivered(
-    context: OutboxHandlerContext,
-    send: () => Promise<MailSendResult>,
+  #accepted(delivery: MailDelivery): void {
+    if (delivery.kind === "refused")
+      throw new NonRetryableMessageError(delivery.reason);
+  }
+
+  #traced(
+    topic: MailTopic,
+    attributes: Attributes,
+    work: () => Promise<void>,
   ): Promise<void> {
-    const topic = context.message.topic;
     const name = `process ${topic}`;
     const options = {
       kind: SpanKind.CONSUMER,
       attributes: {
-        "messaging.system": "outbox",
-        "messaging.operation.name": "process",
-        "messaging.operation.type": "process",
-        "messaging.destination.name": topic,
+        [SpanAttribute.System]: "outbox",
+        [SpanAttribute.OperationName]: "process",
+        [SpanAttribute.OperationType]: "process",
+        [SpanAttribute.Destination]: topic,
       },
     };
-    return this.#tracer.startActiveSpan(name, options, (span) =>
-      this.#traced(span, send),
+    return this.tracer.startActiveSpan(name, options, (span) =>
+      this.#ended(span, attributes, work),
     );
   }
 
-  async #traced(
+  async #ended(
     span: Span,
-    send: () => Promise<MailSendResult>,
+    attributes: Attributes,
+    work: () => Promise<void>,
   ): Promise<void> {
+    span.setAttributes(attributes);
+
     try {
-      await this.#sent(send);
+      await work();
     } catch (error) {
       this.#failed(span, error);
       throw error;
@@ -97,16 +113,5 @@ export class MailHandler {
 
     span.recordException(error);
     span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-  }
-
-  async #sent(send: () => Promise<MailSendResult>): Promise<void> {
-    try {
-      await send();
-    } catch (error) {
-      if (error instanceof MailError && error.permanent)
-        throw new NonRetryableMessageError(error.message, { cause: error });
-
-      throw error;
-    }
   }
 }

@@ -7,12 +7,12 @@ import {
 } from "@grpc/grpc-js";
 import { Injectable, type OnApplicationShutdown } from "@nestjs/common";
 import { LRUCache } from "lru-cache";
-import { AddressPolicy } from "../network/address-policy.js";
-import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { ResponseSizeLimit } from "../http/response-size-limit.js";
 import type {
+  ChannelAnswer,
+  ChannelCall,
   FailedAnswer,
-  GrpcAnswer,
-  GrpcCall,
   MessageCheck,
   ServiceAddress,
 } from "./interfaces.js";
@@ -57,9 +57,9 @@ export class GrpcConnection implements OnApplicationShutdown {
 
   unary(
     service: ServiceAddress,
-    call: GrpcCall,
+    call: ChannelCall,
     signal: AbortSignal,
-  ): Promise<GrpcAnswer> {
+  ): Promise<ChannelAnswer> {
     const channel = this.#channelFor(service);
     const method = call.method;
     return new Promise((resolve) => {
@@ -91,10 +91,10 @@ export class GrpcConnection implements OnApplicationShutdown {
 
   streamed(
     service: ServiceAddress,
-    call: GrpcCall,
+    call: ChannelCall,
     signal: AbortSignal,
     admits: MessageCheck,
-  ): Promise<GrpcAnswer> {
+  ): Promise<ChannelAnswer> {
     const channel = this.#channelFor(service);
     const method = call.method;
     const stream = channel.makeServerStreamRequest(

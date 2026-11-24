@@ -13,20 +13,19 @@ import {
   genericGrantRequest,
   None,
 } from "openid-client";
-import {
-  type AuthorizationServer,
-  type ClientAuthentication,
-  HttpConnection,
-  type TokenClient,
-  type TokenEndpoint,
-} from "../../interface-adapters/workflows/effects/interfaces.js";
+import { UndiciHttpClient } from "../http/undici.http-client.js";
+import type {
+  ClientAuthentication,
+  TokenClient,
+  TokenEndpoint,
+} from "./interfaces.js";
 
 @Injectable()
-export class OpenIdAuthorizationServer implements AuthorizationServer {
+export class OpenIdAuthorizationServer {
   private static readonly JWT_BEARER =
     "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
-  constructor(private readonly connection: HttpConnection) {}
+  constructor(private readonly http: UndiciHttpClient) {}
 
   async endpointOf(
     client: TokenClient,
@@ -148,7 +147,7 @@ export class OpenIdAuthorizationServer implements AuthorizationServer {
 
     if (json) headers.set("content-type", encoding);
 
-    return this.connection.fetch(url, {
+    return this.http.fetch(url, {
       method: options.method,
       headers,
       body,

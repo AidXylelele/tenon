@@ -8,9 +8,11 @@ import {
   type RecoveringChannelModel,
   type RecoveryOptions,
 } from "amqplib";
-import { AddressPolicy } from "../network/address-policy.js";
-import { BrokerConnections } from "../network/broker-connections.js";
-import type { BrokerServer, Login, Lost } from "../network/interfaces.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { BrokerConnections } from "../asyncapi/broker-connections.js";
+import type { BrokerServer } from "../../interface-adapters/asyncapi/interfaces.js";
+import type { PasswordCredentials } from "../../interface-adapters/auth/interfaces.js";
+import type { Lost } from "../asyncapi/interfaces.js";
 import { AmqpPublisher } from "./amqp-publisher.js";
 import type { MessageHandler, QueueDeclaration } from "./interfaces.js";
 
@@ -31,7 +33,7 @@ export class AmqpConnection implements OnApplicationShutdown {
 
   async channelOf(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
   ): Promise<ConfirmChannel> {
     const publisher = await this.connections.of(
       server,
@@ -44,7 +46,7 @@ export class AmqpConnection implements OnApplicationShutdown {
 
   async consume(
     server: BrokerServer,
-    login: Login | null,
+    login: PasswordCredentials | null,
     declare: QueueDeclaration,
     handle: MessageHandler,
     lost: Lost,
@@ -89,7 +91,7 @@ export class AmqpConnection implements OnApplicationShutdown {
   async #publisher(
     server: BrokerServer,
     address: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     lost: Lost,
   ): Promise<AmqpPublisher> {
     const model = await this.#recovering(server, address, login, lost);
@@ -101,7 +103,7 @@ export class AmqpConnection implements OnApplicationShutdown {
   async #recovering(
     server: BrokerServer,
     address: string,
-    login: Login | null,
+    login: PasswordCredentials | null,
     lost: Lost,
     setup?: RecoveryOptions["setup"],
   ): Promise<RecoveringChannelModel> {

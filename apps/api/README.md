@@ -1,6 +1,6 @@
 # api
 
-The Tenon API: a NestJS application that publishes Open Workflow definitions and runs their instances on a durable engine.
+The Tenon API: a NestJS application that publishes Open Workflow definitions and runs their instances through transactional outbox messages.
 
 One image runs two processes:
 

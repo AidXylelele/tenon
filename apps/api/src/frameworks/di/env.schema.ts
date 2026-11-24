@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { z } from "zod";
 
 const TRAILING_LINE_BREAKS = /[\r\n]+$/;
@@ -74,6 +75,7 @@ function withSecretFiles(
 const databaseVariables = z.object({
   DATABASE_URL: z.string().min(1),
   DATABASE_POOL_SIZE: z.coerce.number().int().positive().default(20),
+  DATABASE_POOL_MIN: z.coerce.number().int().nonnegative().default(5),
 });
 
 export const loggingEnvSchema = z.object({
@@ -87,7 +89,13 @@ export const loggingEnvSchema = z.object({
 
 export const databaseEnvSchema = z.preprocess(
   (input, context) => withSecretFiles(input, context, ["DATABASE_URL"]),
-  databaseVariables,
+  databaseVariables.refine(
+    (database) => database.DATABASE_POOL_MIN <= database.DATABASE_POOL_SIZE,
+    {
+      path: ["DATABASE_POOL_MIN"],
+      message: "must not exceed DATABASE_POOL_SIZE",
+    },
+  ),
 );
 
 export const secretsEnvSchema = z.preprocess(
@@ -111,8 +119,19 @@ export const outboundEnvSchema = z.object({
   OUTBOUND_ALLOW_LIST: allowedPrivateAddresses,
 });
 
+export const outboxEnvSchema = z.object({
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(100),
+  OUTBOX_CONCURRENCY: z.coerce.number().int().positive().default(32),
+});
+
 export const interpreterEnvSchema = z.object({
   LEGACY_EVENT_TYPES: z.stringbool().default(false),
+  INTERPRETER_RUN_THREADS: z
+    .literal("")
+    .transform(() => availableParallelism())
+    .or(z.coerce.number().int().positive())
+    .default(availableParallelism()),
+  INTERPRETER_CHECK_THREADS: z.coerce.number().int().positive().default(1),
 });
 
 export const sandboxEnvSchema = z.preprocess(

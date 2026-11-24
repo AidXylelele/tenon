@@ -7,7 +7,7 @@ import {
 import type { RunWait } from "../../src/domain/automation/instances/interfaces.js";
 import type { JsonObject } from "../../src/domain/automation/interfaces.js";
 import { WorkflowStatus } from "../../src/domain/automation/workflows/enums.js";
-import type { Schedule } from "../../src/domain/automation/workflows/interfaces.js";
+import type { ScheduleSpec } from "../../src/domain/automation/workflows/interfaces.js";
 import { Role } from "../../src/domain/identity/users/enums.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
 import {
@@ -26,7 +26,7 @@ export interface NewWorkflowRows {
   readonly namespace?: string;
   readonly name: string;
   readonly on?: boolean;
-  readonly schedule?: Schedule | null;
+  readonly schedule?: ScheduleSpec | null;
 }
 
 export interface NewRunRow {

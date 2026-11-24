@@ -1,10 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { UnitOfWork } from "../../unit-of-work.js";
-import { TriggerKind } from "../../../domain/automation/instances/enums.js";
-import {
-  InstanceRuns,
-  WorkflowInstanceRepository,
-} from "../instances/ports.js";
+import { InstanceEvents } from "../instances/instance-events.js";
+import { WorkflowInstanceRepository } from "../instances/ports.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import type { StartScheduledCommand } from "./interfaces.js";
 
@@ -13,7 +10,7 @@ export class StartScheduledInstance {
   constructor(
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
-    private readonly runs: InstanceRuns,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -23,20 +20,16 @@ export class StartScheduledInstance {
     if (existing !== null) return;
 
     const workflow = await this.workflows.findById(command.workflowId);
-    const version = workflow?.scheduledVersion ?? null;
 
-    if (workflow === null || version === null) return;
+    if (workflow === null) return;
 
-    const chainRunning = await this.instances.hasUnendedScheduled(workflow.id);
+    const chainRunning =
+      workflow.chainsSchedule &&
+      (await this.instances.hasUnendedScheduled(workflow.id));
     const now = new Date();
-    const started = workflow.startScheduledInstance({
+    const started = workflow.startFiredInstance({
       instanceId: command.instanceId,
-      version,
-      input: {},
-      trigger: TriggerKind.Schedule,
-      chained: command.chained,
       chainRunning,
-      lifecycleOf: null,
       now,
     });
 
@@ -45,7 +38,7 @@ export class StartScheduledInstance {
     const instance = started.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.events.dispatch(instance);
     });
   }
 }

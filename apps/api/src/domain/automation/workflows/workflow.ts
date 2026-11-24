@@ -4,16 +4,20 @@ import { Control, TriggerKind } from "../instances/enums.js";
 import { WorkflowInstance } from "../instances/workflow-instance.js";
 import { WorkflowEventKind, WorkflowRefusal, WorkflowStatus } from "./enums.js";
 import type {
+  ChildStart,
   InstanceRestart,
   NewInstance,
   NewPublication,
+  FiredStart,
   Publication,
   ScheduledStart,
+  ScheduleFire,
   StartRefusal,
   VersionPublication,
   WorkflowEvent,
   WorkflowProps,
 } from "./interfaces.js";
+import type { Schedule } from "./schedule.js";
 import type { WorkflowName } from "./workflow-name.js";
 import { WorkflowVersion } from "./workflow-version.js";
 
@@ -25,6 +29,8 @@ export class Workflow {
   #on: boolean;
   #currentVersionId: string | null;
   #archivedAt: Date | null;
+  #arming: number;
+  #scheduledSince: Date | null;
   #versions: readonly WorkflowVersion[];
   #publications: VersionPublication[] = [];
   #events: WorkflowEvent[] = [];
@@ -36,6 +42,8 @@ export class Workflow {
     this.#on = props.on;
     this.#currentVersionId = props.currentVersionId;
     this.#archivedAt = props.archivedAt;
+    this.#arming = props.arming;
+    this.#scheduledSince = props.scheduledSince;
     this.#version = props.version;
     this.#versions = props.versions;
   }
@@ -49,6 +57,8 @@ export class Workflow {
       on: false,
       currentVersionId: null,
       archivedAt: null,
+      arming: 0,
+      scheduledSince: null,
       version: 0,
       versions: [],
     });
@@ -76,6 +86,14 @@ export class Workflow {
 
   get archivedAt(): Date | null {
     return this.#archivedAt;
+  }
+
+  get arming(): number {
+    return this.#arming;
+  }
+
+  get scheduledSince(): Date | null {
+    return this.#scheduledSince;
   }
 
   get version(): number {
@@ -116,7 +134,7 @@ export class Workflow {
     this.#add(version, input);
     this.#currentVersionId = version.id;
 
-    if (this.#on) this.#raise(WorkflowEventKind.ScheduleChanged);
+    if (this.#on) this.#applySchedule(input.now);
 
     return { ok: true, value: { version, created: true } };
   }
@@ -169,7 +187,7 @@ export class Workflow {
     return { ok: true, value: true };
   }
 
-  turnOn(): Result<boolean, WorkflowRefusal> {
+  turnOn(now: Date): Result<boolean, WorkflowRefusal> {
     const unpublished = this.#currentVersionId === null;
 
     if (unpublished) return { ok: false, failure: WorkflowRefusal.Unpublished };
@@ -181,7 +199,7 @@ export class Workflow {
     if (this.#on) return { ok: true, value: false };
 
     this.#on = true;
-    this.#raise(WorkflowEventKind.ScheduleChanged);
+    this.#applySchedule(now);
     return { ok: true, value: true };
   }
 
@@ -189,7 +207,55 @@ export class Workflow {
     if (!this.#on) return false;
 
     this.#on = false;
-    this.#raise(WorkflowEventKind.ScheduleChanged);
+    this.#scheduledSince = null;
+    this.#disarm();
+    return true;
+  }
+
+  fireSchedule(fire: ScheduleFire): boolean {
+    const schedule = this.#schedule();
+
+    if (fire.arming !== this.#arming || schedule === null) return false;
+
+    this.#events.push({
+      kind: WorkflowEventKind.ScheduleFired,
+      workflowId: this.#id,
+      at: fire.at,
+    });
+    const following = schedule.followingAt(fire.now);
+    this.#armAt(following);
+    return true;
+  }
+
+  startFiredInstance(
+    start: FiredStart,
+  ): Result<WorkflowInstance, WorkflowRefusal> {
+    const version = this.scheduledVersion;
+
+    if (version === null || version.schedule === null)
+      return { ok: false, failure: WorkflowRefusal.Off };
+
+    return this.startScheduledInstance({
+      instanceId: start.instanceId,
+      version,
+      input: {},
+      trigger: TriggerKind.Schedule,
+      chainRunning: start.chainRunning,
+      lifecycleOf: null,
+      now: start.now,
+    });
+  }
+
+  continueSchedule(instance: WorkflowInstance, now: Date): boolean {
+    const own = instance.workflowId === this.#id;
+
+    if (!own || !instance.continuesSchedule) return false;
+
+    const at = this.#schedule()?.continuedAt(now) ?? null;
+
+    if (at === null) return false;
+
+    this.#armAt(at);
     return true;
   }
 
@@ -205,6 +271,28 @@ export class Workflow {
     const id = input.instanceId ?? randomUUID();
     const instance = WorkflowInstance.start(id, this.#id, input);
     return { ok: true, value: instance };
+  }
+
+  startChild(start: ChildStart): Result<WorkflowInstance, WorkflowRefusal> {
+    const version = this.versionToRun(start.version);
+
+    if (version === null)
+      return { ok: false, failure: WorkflowRefusal.Unpublished };
+
+    return this.startInstance({
+      instanceId: start.instanceId,
+      version,
+      input: start.input,
+      trigger: start.trigger,
+      starterId: null,
+      origin: start.parent,
+      originEffectId: start.effectId,
+      now: start.now,
+    });
+  }
+
+  get chainsSchedule(): boolean {
+    return this.#schedule()?.chained ?? false;
   }
 
   get scheduledVersion(): WorkflowVersion | null {
@@ -225,7 +313,9 @@ export class Workflow {
     if (scheduled?.id !== start.version.id)
       return { ok: false, failure: WorkflowRefusal.Off };
 
-    if (start.chained && start.chainRunning)
+    const chained = start.version.schedule?.chained ?? false;
+
+    if (chained && start.chainRunning)
       return { ok: false, failure: WorkflowRefusal.ChainRunning };
 
     if (start.lifecycleOf === this.#id)
@@ -305,7 +395,30 @@ export class Workflow {
     return this.versionById(id);
   }
 
-  #raise(kind: WorkflowEventKind): void {
-    this.#events.push({ kind, workflowId: this.#id });
+  #schedule(): Schedule | null {
+    return this.scheduledVersion?.schedule ?? null;
+  }
+
+  #applySchedule(now: Date): void {
+    const at = this.#schedule()?.armedAt(now) ?? null;
+    this.#scheduledSince = now;
+    this.#armAt(at);
+  }
+
+  #disarm(): void {
+    this.#arming += 1;
+  }
+
+  #armAt(at: number | null): void {
+    this.#disarm();
+
+    if (at === null) return;
+
+    this.#events.push({
+      kind: WorkflowEventKind.ScheduleArmed,
+      workflowId: this.#id,
+      arming: this.#arming,
+      at,
+    });
   }
 }

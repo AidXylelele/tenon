@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { VersionPublication } from "../../../domain/automation/workflows/interfaces.js";
+import { Schedule } from "../../../domain/automation/workflows/schedule.js";
 import { WorkflowVersion } from "../../../domain/automation/workflows/workflow-version.js";
 import type { VersionCatalogueRow, WorkflowVersionRow } from "../interfaces.js";
 
@@ -19,7 +20,7 @@ export class WorkflowVersionMapper {
       imports: publication.imports,
       digest: version.digest,
       programFingerprint: version.programFingerprint,
-      schedule: version.schedule,
+      schedule: version.schedule?.spec ?? null,
       secrets: version.secrets.slice(),
       source: publication.source,
       publisherId: version.publisherId,
@@ -29,13 +30,15 @@ export class WorkflowVersionMapper {
   }
 
   toEntity(row: VersionCatalogueRow): WorkflowVersion {
+    const spec = row.schedule;
+    const schedule = spec === null ? null : new Schedule(spec);
     return new WorkflowVersion({
       id: row.id,
       semver: row.semver,
       dsl: row.dsl,
       digest: row.digest,
       programFingerprint: row.programFingerprint,
-      schedule: row.schedule,
+      schedule,
       secrets: row.secrets,
       publisherId: row.publisherId,
       publishedAt: row.publishedAt,

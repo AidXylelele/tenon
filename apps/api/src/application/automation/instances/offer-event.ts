@@ -3,11 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { EventStore } from "../events/ports.js";
 import { SecretRepository } from "../secrets/ports.js";
-import {
-  InstanceRuns,
-  WorkflowInstanceRepository,
-  WorkflowRuntime,
-} from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository, WorkflowRuntime } from "./ports.js";
 import type { OfferCommand } from "./interfaces.js";
 
 @Injectable()
@@ -17,7 +14,7 @@ export class OfferEvent {
     private readonly events: EventStore,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
-    private readonly runs: InstanceRuns,
+    private readonly instanceEvents: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -49,7 +46,7 @@ export class OfferEvent {
     instance.advance(turn, secrets, now);
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.wakeOnEvent(instance, command.sequence);
+      await this.instanceEvents.dispatch(instance);
     });
   }
 }

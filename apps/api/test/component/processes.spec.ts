@@ -5,19 +5,17 @@ import { MailTransport } from "@nestjs/mail";
 import { OutboxRelay } from "@nestjs/outbox";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { Test, type TestingModule } from "@nestjs/testing";
-import { sql } from "drizzle-orm";
 import { ApiModule } from "../../src/frameworks/di/api.module.js";
+import { EffectPerformer } from "../../src/application/automation/instances/ports.js";
 import { WorkerModule } from "../../src/frameworks/di/worker.module.js";
-import { IdempotencyJobs } from "../../src/interface-adapters/jobs/idempotency.jobs.js";
-import { AsyncApiHandler } from "../../src/interface-adapters/messaging/asyncapi.handler.js";
-import { AsyncApiGateway } from "../../src/interface-adapters/workflows/effects/asyncapi.gateway.js";
-import { SandboxGateway } from "../../src/interface-adapters/workflows/effects/sandbox.gateway.js";
+import { ReceiverSubscriptions } from "../../src/frameworks/asyncapi/receiver-subscriptions.js";
+import { DeliveryHandler } from "../../src/interface-adapters/messaging/handlers/delivery.handler.js";
+import { EffectHandler } from "../../src/interface-adapters/messaging/handlers/effect.handler.js";
+import { RunHandler } from "../../src/interface-adapters/messaging/handlers/run.handler.js";
+import { ScheduleHandler } from "../../src/interface-adapters/messaging/handlers/schedule.handler.js";
+import { AsyncApiGateway } from "../../src/interface-adapters/asyncapi/asyncapi.gateway.js";
+import { SandboxGateway } from "../../src/interface-adapters/sandbox/sandbox.gateway.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
-import { EffectClient } from "../../src/interface-adapters/workflows/interfaces.js";
-import { DeliveryRun } from "../../src/interface-adapters/workflows/runners/delivery.run.js";
-import { OpenWorkflowRun } from "../../src/interface-adapters/workflows/runners/open-workflow.run.js";
-import { ProcessRun } from "../../src/interface-adapters/workflows/runners/process.run.js";
-import { ScheduleRun } from "../../src/interface-adapters/workflows/runners/schedule.run.js";
 import { truncateAll } from "../support/db.js";
 
 const UNKNOWN = "this provider does not exist in the current context";
@@ -35,18 +33,18 @@ const WORKER_VARIABLES = [
 
 const RETENTION_SCHEDULES = ["0 4 * * *", "30 3 * * *"];
 
-const RUNNERS = new Set<unknown>([
-  OpenWorkflowRun,
-  ProcessRun,
-  ScheduleRun,
-  DeliveryRun,
+const CONSUMERS = new Set<unknown>([
+  RunHandler,
+  EffectHandler,
+  ScheduleHandler,
+  DeliveryHandler,
 ]);
 
-function runnersOf(app: INestApplication | TestingModule): unknown[] {
+function consumersOf(app: INestApplication | TestingModule): unknown[] {
   const providers = app.get(DiscoveryService).getProviders();
   return providers
     .map((provider) => provider.metatype)
-    .filter((metatype) => RUNNERS.has(metatype));
+    .filter((metatype) => CONSUMERS.has(metatype));
 }
 
 describe("the API process, from its root module alone", () => {
@@ -73,10 +71,10 @@ describe("the API process, from its root module alone", () => {
     expect(controllers.length).toBeGreaterThan(0);
   });
 
-  it("registers_no_workflow_runner", () => {
-    const runners = runnersOf(api);
+  it("registers_no_outbox_consumer", () => {
+    const consumers = consumersOf(api);
 
-    expect(runners).toEqual([]);
+    expect(consumers).toEqual([]);
   });
 
   it("runs_no_outbox_relay", () => {
@@ -89,8 +87,8 @@ describe("the API process, from its root module alone", () => {
     expect(() => api.get(MailTransport)).toThrow(UNKNOWN);
     expect(() => api.get(SandboxGateway)).toThrow(UNKNOWN);
     expect(() => api.get(AsyncApiGateway)).toThrow(UNKNOWN);
-    expect(() => api.get(AsyncApiHandler)).toThrow(UNKNOWN);
-    expect(() => api.get(EffectClient)).toThrow(UNKNOWN);
+    expect(() => api.get(ReceiverSubscriptions)).toThrow(UNKNOWN);
+    expect(() => api.get(EffectPerformer)).toThrow(UNKNOWN);
   });
 
   it("schedules_only_the_idempotency_prune", () => {
@@ -99,7 +97,7 @@ describe("the API process, from its root module alone", () => {
     const cronJobs = scheduler.getCronJobs();
     const timeouts = scheduler.getTimeouts();
 
-    expect(intervals).toEqual([IdempotencyJobs.PRUNE]);
+    expect(intervals).toEqual(["idempotency:prune"]);
     expect(cronJobs.size).toBe(0);
     expect(timeouts).toEqual([]);
   });
@@ -115,9 +113,6 @@ describe("the worker process, from its root module alone", () => {
     worker.useLogger(false);
     const db = worker.get<Database>(getDrizzleToken());
     await truncateAll(db);
-    await db.execute(
-      sql`truncate table nest_workflows.instances, nest_workflows.journal, nest_workflows.signals, nest_workflows.waits cascade`,
-    );
     await worker.init();
   });
 
@@ -131,10 +126,10 @@ describe("the worker process, from its root module alone", () => {
     expect(controllers).toEqual([]);
   });
 
-  it("registers_every_workflow_runner", () => {
-    const runners = runnersOf(worker);
+  it("registers_every_outbox_consumer", () => {
+    const consumers = consumersOf(worker);
 
-    expect(runners).toHaveLength(RUNNERS.size);
+    expect(consumers).toHaveLength(CONSUMERS.size);
   });
 
   it("runs_the_outbox_relay_and_the_two_retention_jobs", () => {
@@ -152,6 +147,6 @@ describe("the worker process, from its root module alone", () => {
   it("leaves_the_idempotency_prune_to_the_api", () => {
     const intervals = worker.get(SchedulerRegistry).getIntervals();
 
-    expect(intervals).not.toContain(IdempotencyJobs.PRUNE);
+    expect(intervals).not.toContain("idempotency:prune");
   });
 });

@@ -1,9 +1,6 @@
 import type { JsonObject } from "../interfaces.js";
-import type {
-  CheckedDefinitionProps,
-  ImportTexts,
-  Schedule,
-} from "./interfaces.js";
+import type { CheckedDefinitionProps, ImportTexts } from "./interfaces.js";
+import type { Schedule } from "./schedule.js";
 import type { WorkflowName } from "./workflow-name.js";
 
 export class CheckedDefinition {

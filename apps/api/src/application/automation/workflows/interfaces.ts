@@ -6,7 +6,7 @@ import type {
 } from "../../../domain/automation/workflows/enums.js";
 import type {
   ImportTexts,
-  Schedule,
+  ScheduleSpec,
 } from "../../../domain/automation/workflows/interfaces.js";
 import type { WorkflowName } from "../../../domain/automation/workflows/workflow-name.js";
 import type { Result } from "../../../domain/interfaces.js";
@@ -73,7 +73,7 @@ export interface WorkflowSummary {
   readonly status: WorkflowStatus;
   readonly on: boolean;
   readonly currentVersion: string | null;
-  readonly schedule: Schedule | null;
+  readonly schedule: ScheduleSpec | null;
   readonly week: WeekRuns;
   readonly lastRun: LastRun | null;
 }

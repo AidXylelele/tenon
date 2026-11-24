@@ -18,8 +18,11 @@ import {
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import type { JsonObject, State } from "interpreter";
 import { Piscina } from "piscina";
-import { resiliencePresets } from "../../../../src/frameworks/di/host.presets.js";
+import { interpreterPresetsOf } from "../../../../src/frameworks/di/host.presets.js";
 import { PiscinaInterpreterClient } from "../../../../src/frameworks/interpreter/piscina-interpreter.client.js";
+
+const THREADS = { runs: 10, checks: 2 };
+const PRESETS = interpreterPresetsOf(THREADS);
 
 const waiting: JsonObject = {
   document: {
@@ -95,13 +98,13 @@ describe("the interpreter on its Piscina threads", () => {
     }));
     vi.spyOn(metrics, "getMeter").mockReturnValue(meter);
     const moduleRef = await Test.createTestingModule({
-      imports: [ResilienceModule.forRoot({ presets: resiliencePresets })],
+      imports: [ResilienceModule.forRoot({ presets: PRESETS })],
       providers: [
         {
           provide: PiscinaInterpreterClient,
           inject: [ResilienceService],
           useFactory: (resilience: ResilienceService) =>
-            new PiscinaInterpreterClient(resilience, {}),
+            new PiscinaInterpreterClient(resilience, {}, THREADS),
         },
       ],
     }).compile();
@@ -128,7 +131,7 @@ describe("the interpreter on its Piscina threads", () => {
   });
 
   it("checks_beyond_the_check_threads_wait_in_the_queue_instead_of_being_refused", async () => {
-    const calls = PiscinaInterpreterClient.CHECK_THREADS * 3;
+    const calls = THREADS.checks * 3;
     const compilations = Array.from({ length: calls }, () =>
       client.compile(waiting, [], {}),
     );
@@ -220,9 +223,7 @@ describe("the interpreter on its Piscina threads", () => {
     await client.start(call, {}, { ...moment, instance: "instance-2" });
     await client.start(call, {}, { ...moment, instance: "instance-3" });
 
-    expect(sources - before).toBeLessThanOrEqual(
-      PiscinaInterpreterClient.RUN_THREADS,
-    );
+    expect(sources - before).toBeLessThanOrEqual(THREADS.runs);
     expect(sources - before).toBeGreaterThanOrEqual(1);
   });
 

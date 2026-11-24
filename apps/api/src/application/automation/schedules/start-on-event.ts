@@ -3,8 +3,8 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { TriggerKind } from "../../../domain/automation/instances/enums.js";
 import { EventStore } from "../events/ports.js";
+import { InstanceEvents } from "../instances/instance-events.js";
 import {
-  InstanceRuns,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../instances/ports.js";
@@ -20,11 +20,15 @@ export class StartOnEvent {
     private readonly instances: WorkflowInstanceRepository,
     private readonly runtime: WorkflowRuntime,
     private readonly secrets: SecretRepository,
-    private readonly runs: InstanceRuns,
+    private readonly instanceEvents: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
   async execute(command: TriggerCommand): Promise<void> {
+    const existing = await this.instances.find(command.instanceId);
+
+    if (existing !== null) return;
+
     const event = await this.events.find(command.sequence);
     const workflow = await this.workflows.findById(command.workflowId);
     const version = workflow?.scheduledVersion ?? null;
@@ -46,11 +50,10 @@ export class StartOnEvent {
 
     const consumed = [event.cloudEvent];
     const started = workflow.startScheduledInstance({
-      instanceId: null,
+      instanceId: command.instanceId,
       version,
       input: consumed,
       trigger: TriggerKind.Event,
-      chained: false,
       chainRunning: false,
       lifecycleOf: event.lifecycleOf,
       now,
@@ -61,7 +64,7 @@ export class StartOnEvent {
     const instance = started.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.instanceEvents.dispatch(instance);
     });
   }
 }

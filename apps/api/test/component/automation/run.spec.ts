@@ -12,12 +12,12 @@ import {
   publish,
   relay,
   type RunApp,
-  resetRuns,
   start,
   statusesOf,
   type TaskBody,
   tasksOf,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
 import type { Created, Page, Problem } from "../../support/bodies.js";
 
@@ -92,7 +92,7 @@ describe("running a workflow and following its execution over HTTP", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     const author = await createUser(t, {
       email: "editor@example.com",
       role: Role.Editor,

@@ -1,6 +1,5 @@
 import { Injectable } from "@nestjs/common";
 import { Workflow } from "../../../domain/automation/workflows/workflow.js";
-import { WorkflowSchedules } from "../schedules/ports.js";
 import { SecretRepository } from "../secrets/ports.js";
 import type { CheckDefinitionCommand, CheckResult } from "./interfaces.js";
 import { DefinitionCompiler, WorkflowRepository } from "./ports.js";
@@ -11,7 +10,6 @@ export class CheckDefinition {
     private readonly compiler: DefinitionCompiler,
     private readonly workflows: WorkflowRepository,
     private readonly secrets: SecretRepository,
-    private readonly schedules: WorkflowSchedules,
   ) {}
 
   async execute(command: CheckDefinitionCommand): Promise<CheckResult> {
@@ -22,11 +20,6 @@ export class CheckDefinition {
     if (!compiled.ok) return compiled;
 
     const definition = compiled.value;
-    const refusedSchedule = await this.schedules.check(definition);
-
-    if (refusedSchedule !== null)
-      return { ok: false, failure: [refusedSchedule] };
-
     const found = await this.workflows.findByName(definition.name);
     const workflow = found ?? Workflow.register(definition.name);
     const published = workflow.publish({

@@ -8,10 +8,11 @@ import type {
   WorkflowRefusal,
   WorkflowStatus,
 } from "./enums.js";
+import type { Schedule } from "./schedule.js";
 import type { WorkflowName } from "./workflow-name.js";
 import type { WorkflowVersion } from "./workflow-version.js";
 
-export type Schedule =
+export type ScheduleSpec =
   | { readonly kind: ScheduleKind.Every; readonly interval: number }
   | { readonly kind: ScheduleKind.Cron; readonly cron: string }
   | { readonly kind: ScheduleKind.After; readonly delay: number }
@@ -21,6 +22,12 @@ export type Schedule =
       readonly types: readonly string[];
     };
 
+export interface PassedSlots {
+  readonly from: number;
+  readonly to: number;
+  readonly count: number;
+}
+
 export interface WorkflowProps {
   readonly id: string;
   readonly name: WorkflowName;
@@ -28,6 +35,8 @@ export interface WorkflowProps {
   readonly on: boolean;
   readonly currentVersionId: string | null;
   readonly archivedAt: Date | null;
+  readonly arming: number;
+  readonly scheduledSince: Date | null;
   readonly version: number;
   readonly versions: readonly WorkflowVersion[];
 }
@@ -89,6 +98,16 @@ export interface NewInstance {
   readonly now: Date;
 }
 
+export interface ChildStart {
+  readonly instanceId: string | null;
+  readonly version: string | null;
+  readonly input: JsonValue;
+  readonly trigger: TriggerKind;
+  readonly parent: WorkflowInstance;
+  readonly effectId: string;
+  readonly now: Date;
+}
+
 export interface InstanceRestart {
   readonly previous: WorkflowInstance;
   readonly version: WorkflowVersion;
@@ -103,13 +122,34 @@ export interface ScheduledStart {
   readonly version: WorkflowVersion;
   readonly input: JsonValue;
   readonly trigger: TriggerKind;
-  readonly chained: boolean;
   readonly chainRunning: boolean;
   readonly lifecycleOf: string | null;
   readonly now: Date;
 }
 
-export interface WorkflowEvent {
-  readonly kind: WorkflowEventKind;
+export interface ScheduleArmed {
+  readonly kind: WorkflowEventKind.ScheduleArmed;
   readonly workflowId: string;
+  readonly arming: number;
+  readonly at: number;
+}
+
+export interface ScheduleFired {
+  readonly kind: WorkflowEventKind.ScheduleFired;
+  readonly workflowId: string;
+  readonly at: number;
+}
+
+export type WorkflowEvent = ScheduleArmed | ScheduleFired;
+
+export interface ScheduleFire {
+  readonly arming: number;
+  readonly at: number;
+  readonly now: Date;
+}
+
+export interface FiredStart {
+  readonly instanceId: string;
+  readonly chainRunning: boolean;
+  readonly now: Date;
 }

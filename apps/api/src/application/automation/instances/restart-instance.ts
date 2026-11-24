@@ -3,14 +3,15 @@ import { UnitOfWork } from "../../unit-of-work.js";
 import { Missing } from "../enums.js";
 import { WorkflowRepository } from "../workflows/ports.js";
 import type { RestartInstanceCommand, StartResult } from "./interfaces.js";
-import { InstanceRuns, WorkflowInstanceRepository } from "./ports.js";
+import { InstanceEvents } from "./instance-events.js";
+import { WorkflowInstanceRepository } from "./ports.js";
 
 @Injectable()
 export class RestartInstance {
   constructor(
     private readonly workflows: WorkflowRepository,
     private readonly instances: WorkflowInstanceRepository,
-    private readonly runs: InstanceRuns,
+    private readonly events: InstanceEvents,
     private readonly unitOfWork: UnitOfWork,
   ) {}
 
@@ -40,7 +41,7 @@ export class RestartInstance {
     const instance = restarted.value;
     await this.unitOfWork.run(async () => {
       await this.instances.save(instance);
-      await this.runs.start(instance);
+      await this.events.dispatch(instance);
     });
     return { ok: true, value: { instanceId: instance.id } };
   }

@@ -9,11 +9,11 @@ import {
   instanceOf,
   publish,
   type RunApp,
-  resetRuns,
   start,
   statusesOf,
   tasksOf,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
 
 describe("a run taken over by another application after a crash", () => {
@@ -42,7 +42,7 @@ describe("a run taken over by another application after a crash", () => {
   });
 
   it("a_run_whose_application_closed_during_a_call_completes_on_another_and_the_call_keeps_its_idempotency_key", async () => {
-    await resetRuns(second.t);
+    await truncateAll(second.t.db);
     await createUser(second.t, {
       email: "editor@example.com",
       role: Role.Editor,

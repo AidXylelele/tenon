@@ -97,6 +97,8 @@ CREATE TABLE "workflow" (
 	"turned_on" boolean DEFAULT false NOT NULL,
 	"current_version_id" uuid,
 	"archived_at" timestamp with time zone,
+	"schedule_arming" integer DEFAULT 0 NOT NULL,
+	"scheduled_since" timestamp with time zone,
 	"version" integer DEFAULT 1 NOT NULL
 );
 --> statement-breakpoint

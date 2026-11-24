@@ -16,7 +16,7 @@ import type { Piscina } from "piscina";
 import type {
   NamedFilter,
   VersionStructure,
-} from "../../interface-adapters/workflows/interfaces.js";
+} from "../../interface-adapters/interpreter/interfaces.js";
 import type * as thread from "./interpreter.thread.js";
 
 export interface CompileSource {
@@ -71,6 +71,8 @@ export interface InputCall extends ProgramTaskCall {
 type ThreadTasks = typeof thread;
 
 export type TaskName = keyof ThreadTasks;
+
+export type StepTaskName = "respond" | "suspend" | "resume" | "cancel";
 
 export type TaskCall<N extends TaskName> = Parameters<
   ThreadTasks[N]
@@ -132,4 +134,9 @@ export interface ThreadPool {
   readonly threads: Piscina;
   readonly policy: ResiliencePolicy;
   readonly bulkhead: BulkheadPolicy;
+}
+
+export interface InterpreterThreads {
+  readonly runs: number;
+  readonly checks: number;
 }

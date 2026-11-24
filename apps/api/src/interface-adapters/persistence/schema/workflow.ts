@@ -19,6 +19,8 @@ export const workflow = pgTable(
     on: boolean("turned_on").notNull().default(false),
     currentVersionId: uuid("current_version_id"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
+    arming: integer("schedule_arming").notNull().default(0),
+    scheduledSince: timestamp("scheduled_since", { withTimezone: true }),
     version: integer("version").notNull().default(1),
   },
   (table) => [

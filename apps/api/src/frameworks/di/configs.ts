@@ -7,6 +7,7 @@ import {
   loggingEnvSchema,
   mailEnvSchema,
   outboundEnvSchema,
+  outboxEnvSchema,
   sandboxEnvSchema,
   secretsEnvSchema,
 } from "./env.schema.js";
@@ -33,6 +34,10 @@ export const httpConfig = registerAs("http", () =>
 
 export const outboundConfig = registerAs("outbound", () =>
   outboundEnvSchema.parse(process.env),
+);
+
+export const outboxConfig = registerAs("outbox", () =>
+  outboxEnvSchema.parse(process.env),
 );
 
 export const interpreterConfig = registerAs("interpreter", () =>

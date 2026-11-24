@@ -13,7 +13,8 @@ export enum WorkflowRefusal {
 }
 
 export enum WorkflowEventKind {
-  ScheduleChanged = "workflow.schedule-changed",
+  ScheduleArmed = "workflow.schedule-armed",
+  ScheduleFired = "workflow.schedule-fired",
 }
 
 export enum ScheduleKind {

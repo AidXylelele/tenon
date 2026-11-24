@@ -2,15 +2,21 @@ import { Module } from "@nestjs/common";
 import { ConfigModule, type ConfigType } from "@nestjs/config";
 import { HttpClientModule } from "@nestjs/http-client";
 import { ResilienceService } from "@nestjs/resilience";
-import { EventStore } from "../../application/automation/events/ports.js";
-import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
 import {
+  EventAnnouncements,
+  EventOffers,
+  EventStore,
+} from "../../application/automation/events/ports.js";
+import { CancelInstance } from "../../application/automation/instances/cancel-instance.js";
+import { InstanceEvents } from "../../application/automation/instances/instance-events.js";
+import {
+  ChildCancellations,
+  InstanceMessages,
   InstanceRuns,
+  LifecycleEvents,
   WorkflowInstanceRepository,
   WorkflowRuntime,
 } from "../../application/automation/instances/ports.js";
-import { WorkflowSchedules } from "../../application/automation/schedules/ports.js";
-import { ScheduleQueries } from "../../application/automation/schedules/queries.js";
 import { SecretRepository } from "../../application/automation/secrets/ports.js";
 import { SecretQueries } from "../../application/automation/secrets/queries.js";
 import {
@@ -18,14 +24,21 @@ import {
   SubscriptionFilters,
   SubscriptionRepository,
 } from "../../application/automation/subscriptions/ports.js";
-import { WorkflowRepository } from "../../application/automation/workflows/ports.js";
-import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
-import { EventDeliveryGateway } from "../../interface-adapters/messaging/event-delivery.gateway.js";
-import { HttpDeliveryGateway } from "../../interface-adapters/messaging/http-delivery.gateway.js";
 import {
-  DeliveryAdmission,
-  EventDeliveries,
-} from "../../interface-adapters/messaging/interfaces.js";
+  WorkflowEvents,
+  WorkflowRepository,
+} from "../../application/automation/workflows/ports.js";
+import { WorkflowQueries } from "../../application/automation/workflows/queries.js";
+import { Authenticator } from "../../interface-adapters/auth/authenticator.js";
+import { AccessTokens } from "../../interface-adapters/auth/interfaces.js";
+import { HttpGateway } from "../../interface-adapters/http/http.gateway.js";
+import { HttpClient } from "../../interface-adapters/http/interfaces.js";
+import { ResourceGateway } from "../../interface-adapters/http/resource.gateway.js";
+import { SubscriberDeliveryGateway } from "../../interface-adapters/http/subscriber-delivery.gateway.js";
+import { EventMessagesProducer } from "../../interface-adapters/messaging/producers/event-messages.producer.js";
+import { InstanceMessagesProducer } from "../../interface-adapters/messaging/producers/instance-messages.producer.js";
+import { RunDataMapper } from "../../interface-adapters/messaging/mappers/run-data.mapper.js";
+import { WorkflowMessagesProducer } from "../../interface-adapters/messaging/producers/workflow-messages.producer.js";
 import { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 import { LifecycleEventMapper } from "../../interface-adapters/persistence/mappers/lifecycle-event.mapper.js";
 import { SecretMapper } from "../../interface-adapters/persistence/mappers/secret.mapper.js";
@@ -44,36 +57,23 @@ import { PostgresWorkflowRepository } from "../../interface-adapters/persistence
 import { PostgresEventStore } from "../../interface-adapters/persistence/stores/postgres-event.store.js";
 import { PostgresLifecycleEventStore } from "../../interface-adapters/persistence/stores/postgres-lifecycle-event.store.js";
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
-import { EngineRunGateway } from "../../interface-adapters/workflows/gateways/engine-run.gateway.js";
-import { EngineScheduleGateway } from "../../interface-adapters/workflows/gateways/engine-schedule.gateway.js";
-import { EngineExpectedStartsQueries } from "../../interface-adapters/workflows/queries/engine-expected-starts.queries.js";
-import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
-import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
-import { AccessTokens } from "../../interface-adapters/workflows/effects/access-tokens.js";
-import { Authenticator } from "../../interface-adapters/workflows/effects/authenticator.js";
-import { HttpGateway } from "../../interface-adapters/workflows/effects/http.gateway.js";
-import {
-  AuthorizationServer,
-  HttpConnection,
-} from "../../interface-adapters/workflows/effects/interfaces.js";
-import { ResourceGateway } from "../../interface-adapters/workflows/effects/resource.gateway.js";
-import { ResponseContent } from "../../interface-adapters/workflows/effects/response-content.js";
-import { TransportFailures } from "../../interface-adapters/workflows/effects/transport-failures.js";
-import {
-  InterpreterClient,
-  ResourceClient,
-} from "../../interface-adapters/workflows/interfaces.js";
-import { DefinitionMapper } from "../../interface-adapters/workflows/mappers/definition.mapper.js";
-import { ProtocolMapper } from "../../interface-adapters/workflows/mappers/protocol.mapper.js";
-import { RunTurnMapper } from "../../interface-adapters/workflows/mappers/run-turn.mapper.js";
-import { ProgramCalls } from "../../interface-adapters/workflows/program-calls.js";
+import { InterpreterFilterGateway } from "../../interface-adapters/interpreter/interpreter-filter.gateway.js";
+import { InterpreterRuntimeGateway } from "../../interface-adapters/interpreter/interpreter-runtime.gateway.js";
+import { InterpreterClient } from "../../interface-adapters/interpreter/interfaces.js";
+import { DefinitionMapper } from "../../interface-adapters/interpreter/mappers/definition.mapper.js";
+import { ProtocolMapper } from "../../interface-adapters/interpreter/mappers/protocol.mapper.js";
+import { RunTurnMapper } from "../../interface-adapters/interpreter/mappers/run-turn.mapper.js";
+import { ProgramCalls } from "../../interface-adapters/interpreter/program-calls.js";
 import { AesGcmCipher } from "../crypto/aes-gcm.cipher.js";
 import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
-import { AddressPolicy } from "../network/address-policy.js";
-import { HttpClientName } from "../network/enums.js";
-import { OutboundHttpConnection } from "../network/outbound.http-connection.js";
-import { ResponseSizeLimit } from "../network/response-size-limit.js";
+import { AddressPolicy } from "../http/address-policy.js";
+import { HttpClientName } from "../http/enums.js";
+import { UndiciHttpClient } from "../http/undici.http-client.js";
+import { ResponseContent } from "../http/response-content.js";
+import { ResponseSizeLimit } from "../http/response-size-limit.js";
+import { TransportFaults } from "../http/transport-faults.js";
+import { OpenIdAccessTokens } from "../oauth/openid.access-tokens.js";
 import { OpenIdAuthorizationServer } from "../oauth/openid.authorization-server.js";
 import { interpreterConfig, linksConfig, secretsConfig } from "./configs.js";
 import { OutboundModule } from "./outbound.module.js";
@@ -104,11 +104,17 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: WorkflowRuntime, useExisting: InterpreterRuntimeGateway },
     InterpreterFilterGateway,
     { provide: SubscriptionFilters, useExisting: InterpreterFilterGateway },
-    EngineRunGateway,
-    { provide: InstanceRuns, useExisting: EngineRunGateway },
-    EngineScheduleGateway,
-    { provide: WorkflowSchedules, useExisting: EngineScheduleGateway },
-    { provide: ScheduleQueries, useClass: EngineExpectedStartsQueries },
+    RunDataMapper,
+    InstanceEvents,
+    InstanceMessagesProducer,
+    { provide: InstanceMessages, useExisting: InstanceMessagesProducer },
+    { provide: InstanceRuns, useExisting: InstanceMessagesProducer },
+    { provide: ChildCancellations, useExisting: InstanceMessagesProducer },
+    EventMessagesProducer,
+    { provide: EventAnnouncements, useExisting: EventMessagesProducer },
+    { provide: EventOffers, useExisting: EventMessagesProducer },
+    WorkflowMessagesProducer,
+    { provide: WorkflowEvents, useExisting: WorkflowMessagesProducer },
     WorkflowMapper,
     WorkflowVersionMapper,
     WorkflowInstanceMapper,
@@ -129,6 +135,7 @@ import { OutboundModule } from "./outbound.module.js";
       useClass: PostgresWorkflowInstanceRepository,
     },
     PostgresLifecycleEventStore,
+    { provide: LifecycleEvents, useExisting: PostgresLifecycleEventStore },
     PostgresTaskValueStore,
     PostgresEventStore,
     { provide: EventStore, useExisting: PostgresEventStore },
@@ -150,31 +157,32 @@ import { OutboundModule } from "./outbound.module.js";
       useFactory: (
         resilience: ResilienceService,
         interpreter: ConfigType<typeof interpreterConfig>,
-      ) =>
-        new PiscinaInterpreterClient(resilience, {
-          legacyEventTypes: interpreter.LEGACY_EVENT_TYPES,
-        }),
+      ) => {
+        const options = { legacyEventTypes: interpreter.LEGACY_EVENT_TYPES };
+        const threads = {
+          runs: interpreter.INTERPRETER_RUN_THREADS,
+          checks: interpreter.INTERPRETER_CHECK_THREADS,
+        };
+        return new PiscinaInterpreterClient(resilience, options, threads);
+      },
     },
     { provide: InterpreterClient, useExisting: PiscinaInterpreterClient },
-    { provide: AuthorizationServer, useClass: OpenIdAuthorizationServer },
-    AccessTokens,
+    TransportFaults,
+    ResponseContent,
+    UndiciHttpClient,
+    { provide: HttpClient, useExisting: UndiciHttpClient },
+    OpenIdAuthorizationServer,
+    { provide: AccessTokens, useClass: OpenIdAccessTokens },
     {
       provide: Authenticator,
       inject: [AccessTokens],
       useFactory: (tokens: AccessTokens) =>
         new Authenticator(tokens, HOST_PROFILE),
     },
-    { provide: HttpConnection, useClass: OutboundHttpConnection },
-    TransportFailures,
-    ResponseContent,
     HttpGateway,
     ResourceGateway,
-    { provide: ResourceClient, useExisting: ResourceGateway },
-    { provide: DeliveryAdmission, useExisting: AddressPolicy },
-    HttpDeliveryGateway,
-    { provide: EventDeliveries, useExisting: HttpDeliveryGateway },
-    EventDeliveryGateway,
-    { provide: EventSender, useExisting: EventDeliveryGateway },
+    SubscriberDeliveryGateway,
+    { provide: EventSender, useExisting: SubscriberDeliveryGateway },
   ],
   exports: [
     CancelInstance,
@@ -183,10 +191,12 @@ import { OutboundModule } from "./outbound.module.js";
     DefinitionMapper,
     WorkflowRuntime,
     SubscriptionFilters,
-    EngineRunGateway,
+    RunDataMapper,
+    InstanceEvents,
     InstanceRuns,
-    WorkflowSchedules,
-    ScheduleQueries,
+    ChildCancellations,
+    EventOffers,
+    WorkflowEvents,
     WorkflowRepository,
     WorkflowQueries,
     WorkflowInstanceRepository,
@@ -200,11 +210,11 @@ import { OutboundModule } from "./outbound.module.js";
     PiscinaInterpreterClient,
     InterpreterClient,
     Authenticator,
-    TransportFailures,
+    TransportFaults,
     ResponseContent,
+    UndiciHttpClient,
     HttpGateway,
     ResourceGateway,
-    ResourceClient,
     EventSender,
   ],
 })

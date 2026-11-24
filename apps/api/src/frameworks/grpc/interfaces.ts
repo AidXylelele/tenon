@@ -1,5 +1,7 @@
 import type { CallOptions, Metadata, ServiceError } from "@grpc/grpc-js";
 import type { MethodDefinition } from "@grpc/proto-loader";
+import type { Message, Root } from "protobufjs";
+import type { GrpcAnswer } from "../../interface-adapters/grpc/interfaces.js";
 
 export interface ServiceAddress {
   readonly target: string;
@@ -8,7 +10,7 @@ export interface ServiceAddress {
   readonly plaintext: boolean;
 }
 
-export interface GrpcCall {
+export interface ChannelCall {
   readonly method: MethodDefinition<object, object>;
   readonly argument: object;
   readonly metadata: Metadata;
@@ -23,8 +25,19 @@ export interface FailedAnswer {
   readonly connected: boolean;
 }
 
-export type GrpcAnswer =
+export type ChannelAnswer =
   | { readonly kind: "message"; readonly message: object | undefined }
   | { readonly kind: "messages"; readonly messages: readonly object[] }
   | { readonly kind: "stopped" }
   | FailedAnswer;
+
+export type Unusable = Extract<GrpcAnswer, { readonly kind: "unusable" }>;
+
+export interface PreparedCall {
+  readonly kind: "call";
+  readonly method: MethodDefinition<object, object>;
+  readonly argument: Message;
+}
+
+export type ParsedProto =
+  { readonly kind: "root"; readonly root: Root } | Unusable;

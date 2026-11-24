@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   context,
   createNoopMeter,
@@ -6,6 +7,7 @@ import {
   trace,
 } from "@opentelemetry/api";
 import { NodeSDK, type NodeSDKConfiguration } from "@opentelemetry/sdk-node";
+import canonicalize from "canonicalize";
 import {
   createInterpreter,
   type Interpreter,
@@ -159,6 +161,44 @@ describe("the interpreter tasks in their thread", () => {
     expect(again).toMatchObject({
       kind: "answered",
       value: { step: { status: "running" } },
+    });
+  });
+  it("a_compiled_document_s_digest_is_the_sha_256_of_its_rfc_8785_form", () => {
+    const tasks = new InterpreterTasks(interpreter);
+
+    const answer = tasks.compile(taskOf(source));
+
+    const compiled = answer.kind === "answered" ? answer.value : null;
+    const document = compiled?.kind === "compiled" ? compiled.document : {};
+    const canonical = canonicalize(document) ?? "";
+    const digest = createHash("sha256").update(canonical).digest("hex");
+    expect(compiled).toMatchObject({ kind: "compiled", digest });
+  });
+
+  it("a_document_with_no_canonical_form_is_refused_as_a_syntax_problem", () => {
+    const tasks = new InterpreterTasks(interpreter);
+    const named = { ...(waiting.document as JsonObject), title: "\ud800" };
+    const unpaired = { ...waiting, document: named };
+    const unreadable = { ...source, document: unpaired };
+
+    const answer = tasks.compile(taskOf(unreadable));
+
+    const anyMessage: unknown = expect.any(String);
+    expect(answer).toEqual({
+      kind: "answered",
+      value: {
+        kind: "refused",
+        diagnostics: [
+          {
+            code: "syntax",
+            message: anyMessage,
+            pointer: "",
+            range: null,
+            subject: null,
+            import: null,
+          },
+        ],
+      },
     });
   });
 });

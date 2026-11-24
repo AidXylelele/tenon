@@ -1,4 +1,3 @@
-import { MailError, type Mailer, type MailSendResult } from "@nestjs/mail";
 import {
   NonRetryableMessageError,
   type OutboxHandlerContext,
@@ -6,21 +5,40 @@ import {
 } from "@nestjs/outbox";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { MailTopic } from "../../../../src/interface-adapters/mailing/enums.js";
-import type {
-  PasswordResetMailData,
-  QueuedMail,
+import {
+  type InvitationMailData,
+  type MailDelivery,
+  Mailer,
+  type PasswordResetMailData,
+  type QueuedMail,
 } from "../../../../src/interface-adapters/mailing/interfaces.js";
 import { MailHandler } from "../../../../src/interface-adapters/mailing/mail.handler.js";
 import { RecordedSpans } from "../../../support/recorded-spans.js";
 
-class ScriptedMailer {
-  failure: Error | null = null;
+class ScriptedMailer extends Mailer {
+  answer: MailDelivery | Error = { kind: "sent" };
+  readonly keys: string[] = [];
 
-  send(): Promise<MailSendResult> {
-    if (this.failure !== null) return Promise.reject(this.failure);
+  sendInvitation(
+    _mail: QueuedMail<InvitationMailData>,
+    idempotencyKey: string,
+  ): Promise<MailDelivery> {
+    return this.#answered(idempotencyKey);
+  }
 
-    const sent = { messageId: "<1@example.com>", accepted: [], rejected: [] };
-    return Promise.resolve(sent as unknown as MailSendResult);
+  sendPasswordReset(
+    _mail: QueuedMail<PasswordResetMailData>,
+    idempotencyKey: string,
+  ): Promise<MailDelivery> {
+    return this.#answered(idempotencyKey);
+  }
+
+  #answered(idempotencyKey: string): Promise<MailDelivery> {
+    this.keys.push(idempotencyKey);
+
+    if (this.answer instanceof Error) return Promise.reject(this.answer);
+
+    return Promise.resolve(this.answer);
   }
 }
 
@@ -60,7 +78,7 @@ describe("the span of a queued mail's delivery", () => {
   beforeEach(() => {
     spans = new RecordedSpans();
     mailer = new ScriptedMailer();
-    handler = new MailHandler(mailer as unknown as Mailer);
+    handler = new MailHandler(mailer);
   });
 
   afterEach(async () => {
@@ -77,12 +95,14 @@ describe("the span of a queued mail's delivery", () => {
       "messaging.operation.name": "process",
       "messaging.operation.type": "process",
       "messaging.destination.name": "mail.password-reset",
+      "messaging.message.id": message.id,
     });
+    expect(mailer.keys).toEqual([message.id]);
     expect(span.status.code).toBe(SpanStatusCode.UNSET);
   });
 
   it("a_permanent_refusal_ends_the_span_as_an_error", async () => {
-    mailer.failure = new MailError("Mailbox unavailable", { permanent: true });
+    mailer.answer = { kind: "refused", reason: "Mailbox unavailable" };
 
     const delivery = handler.sendPasswordReset(mail, context);
 
@@ -96,8 +116,8 @@ describe("the span of a queued mail's delivery", () => {
   });
 
   it("a_transient_failure_is_retried_and_ends_the_span_as_an_error", async () => {
-    const transient = new MailError("Try again later", { permanent: false });
-    mailer.failure = transient;
+    const transient = new Error("Try again later");
+    mailer.answer = transient;
 
     const delivery = handler.sendPasswordReset(mail, context);
 

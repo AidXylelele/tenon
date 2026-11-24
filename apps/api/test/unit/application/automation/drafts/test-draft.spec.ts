@@ -1,6 +1,7 @@
 import { DraftCompilation } from "../../../../../src/application/automation/drafts/draft-compilation.js";
 import { TestDraft } from "../../../../../src/application/automation/drafts/test-draft.js";
 import { Missing } from "../../../../../src/application/automation/enums.js";
+import { InstanceEvents } from "../../../../../src/application/automation/instances/instance-events.js";
 import type { InputProblem } from "../../../../../src/application/automation/instances/interfaces.js";
 import type { WorkflowRuntime } from "../../../../../src/application/automation/instances/ports.js";
 import { Draft } from "../../../../../src/domain/automation/drafts/draft.js";
@@ -10,7 +11,10 @@ import { aDocument } from "../../../../support/builders.js";
 import {
   FakeDefinitionCompiler,
   FakeUnitOfWork,
-  RecordingInstanceRuns,
+  AppendingLifecycleEvents,
+  RecordingAnnouncements,
+  RecordingInstanceMessages,
+  RecordingWorkflowEvents,
   StoredDrafts,
   StoredSecrets,
   StoredWorkflowInstanceRepository,
@@ -31,7 +35,12 @@ async function setUp(problems: readonly InputProblem[] = []) {
   const compiler = new FakeDefinitionCompiler();
   const workflows = new StoredWorkflowRepository();
   const instances = new StoredWorkflowInstanceRepository();
-  const runs = new RecordingInstanceRuns(instances);
+  const messages = new RecordingInstanceMessages(instances);
+  const events = new InstanceEvents(
+    new AppendingLifecycleEvents(),
+    new RecordingAnnouncements(),
+    messages,
+  );
   const source = JSON.stringify(aDocument());
   const draft = Draft.create({
     name,
@@ -50,12 +59,13 @@ async function setUp(problems: readonly InputProblem[] = []) {
   const testDraft = new TestDraft(
     compilation,
     workflows,
+    new RecordingWorkflowEvents(),
     instances,
-    runs,
+    events,
     runtime,
     new FakeUnitOfWork(),
   );
-  return { draft, compiler, workflows, instances, runs, testDraft };
+  return { draft, compiler, workflows, instances, messages, testDraft };
 }
 
 describe("testing a draft", () => {
@@ -69,13 +79,13 @@ describe("testing a draft", () => {
       starterId: tester.id,
     });
 
-    const ran = fixture.runs.started.map((run) => run.instance);
+    const ran = fixture.messages.started.map((run) => run.instance);
     const workflow = await fixture.workflows.findByName(name);
     expect(tested).toEqual({ ok: true, value: { instanceId: ran[0]?.id } });
     expect(ran).toHaveLength(1);
     expect(ran[0]?.test).toBe(true);
     expect(ran[0]?.input).toEqual({ amount: 3 });
-    expect(fixture.runs.started[0]?.stored).toBe(true);
+    expect(fixture.messages.started[0]?.stored).toBe(true);
     expect(workflow?.currentVersionId).toBeNull();
     expect(workflow?.versionToRun(null)).toBeNull();
   });
@@ -93,7 +103,9 @@ describe("testing a draft", () => {
 
     await fixture.testDraft.execute(command);
 
-    const versions = fixture.runs.started.map((run) => run.instance.versionId);
+    const versions = fixture.messages.started.map(
+      (run) => run.instance.versionId,
+    );
     expect(fixture.workflows.saves).toBe(savesAfterFirst);
     expect(fixture.workflows.versions.size).toBe(1);
     expect(versions[0]).toBe(versions[1]);
@@ -113,7 +125,7 @@ describe("testing a draft", () => {
       ok: false,
       failure: { refusal: DraftRefusal.Stale, current: fixture.draft.snapshot },
     });
-    expect(fixture.runs.started).toHaveLength(0);
+    expect(fixture.messages.started).toHaveLength(0);
   });
 
   it("a_workflow_without_a_draft_is_refused_as_missing", async () => {
@@ -170,6 +182,6 @@ describe("testing a draft", () => {
       failure: { inputProblems: problems },
     });
     expect(fixture.instances.rows.size).toBe(0);
-    expect(fixture.runs.started).toHaveLength(0);
+    expect(fixture.messages.started).toHaveLength(0);
   });
 });

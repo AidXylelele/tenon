@@ -10,9 +10,9 @@ import {
   publish,
   type RunApp,
   relay,
-  resetRuns,
   start,
 } from "../../support/run-helpers.js";
+import { truncateAll } from "../../support/db.js";
 import { startStubServer, type StubServer } from "../../support/stub-server.js";
 import type { Created, Problem } from "../../support/bodies.js";
 
@@ -49,7 +49,7 @@ describe("delivering events to other applications", () => {
   });
 
   beforeEach(async () => {
-    await resetRuns(t);
+    await truncateAll(t.db);
     answers.length = 0;
     received.length = 0;
     await createUser(t, { email: "editor@example.com", role: Role.Editor });
