@@ -35,10 +35,10 @@ import { HttpGateway } from "../../interface-adapters/http/http.gateway.js";
 import { HttpClient } from "../../interface-adapters/http/interfaces.js";
 import { ResourceGateway } from "../../interface-adapters/http/resource.gateway.js";
 import { SubscriberDeliveryGateway } from "../../interface-adapters/http/subscriber-delivery.gateway.js";
-import { EventMessagesGateway } from "../../interface-adapters/messaging/event-messages.gateway.js";
-import { InstanceMessagesGateway } from "../../interface-adapters/messaging/instance-messages.gateway.js";
+import { EventMessagesProducer } from "../../interface-adapters/messaging/producers/event-messages.producer.js";
+import { InstanceMessagesProducer } from "../../interface-adapters/messaging/producers/instance-messages.producer.js";
 import { RunDataMapper } from "../../interface-adapters/messaging/mappers/run-data.mapper.js";
-import { WorkflowMessagesGateway } from "../../interface-adapters/messaging/workflow-messages.gateway.js";
+import { WorkflowMessagesProducer } from "../../interface-adapters/messaging/producers/workflow-messages.producer.js";
 import { Cipher } from "../../interface-adapters/persistence/interfaces.js";
 import { LifecycleEventMapper } from "../../interface-adapters/persistence/mappers/lifecycle-event.mapper.js";
 import { SecretMapper } from "../../interface-adapters/persistence/mappers/secret.mapper.js";
@@ -57,13 +57,13 @@ import { PostgresWorkflowRepository } from "../../interface-adapters/persistence
 import { PostgresEventStore } from "../../interface-adapters/persistence/stores/postgres-event.store.js";
 import { PostgresLifecycleEventStore } from "../../interface-adapters/persistence/stores/postgres-lifecycle-event.store.js";
 import { PostgresTaskValueStore } from "../../interface-adapters/persistence/stores/postgres-task-value.store.js";
-import { InterpreterFilterGateway } from "../../interface-adapters/workflows/gateways/interpreter-filter.gateway.js";
-import { InterpreterRuntimeGateway } from "../../interface-adapters/workflows/gateways/interpreter-runtime.gateway.js";
-import { InterpreterClient } from "../../interface-adapters/workflows/interfaces.js";
-import { DefinitionMapper } from "../../interface-adapters/workflows/mappers/definition.mapper.js";
-import { ProtocolMapper } from "../../interface-adapters/workflows/mappers/protocol.mapper.js";
-import { RunTurnMapper } from "../../interface-adapters/workflows/mappers/run-turn.mapper.js";
-import { ProgramCalls } from "../../interface-adapters/workflows/program-calls.js";
+import { InterpreterFilterGateway } from "../../interface-adapters/interpreter/interpreter-filter.gateway.js";
+import { InterpreterRuntimeGateway } from "../../interface-adapters/interpreter/interpreter-runtime.gateway.js";
+import { InterpreterClient } from "../../interface-adapters/interpreter/interfaces.js";
+import { DefinitionMapper } from "../../interface-adapters/interpreter/mappers/definition.mapper.js";
+import { ProtocolMapper } from "../../interface-adapters/interpreter/mappers/protocol.mapper.js";
+import { RunTurnMapper } from "../../interface-adapters/interpreter/mappers/run-turn.mapper.js";
+import { ProgramCalls } from "../../interface-adapters/interpreter/program-calls.js";
 import { AesGcmCipher } from "../crypto/aes-gcm.cipher.js";
 import { HOST_PROFILE } from "../interpreter/host-profile.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
@@ -106,15 +106,15 @@ import { OutboundModule } from "./outbound.module.js";
     { provide: SubscriptionFilters, useExisting: InterpreterFilterGateway },
     RunDataMapper,
     InstanceEvents,
-    InstanceMessagesGateway,
-    { provide: InstanceMessages, useExisting: InstanceMessagesGateway },
-    { provide: InstanceRuns, useExisting: InstanceMessagesGateway },
-    { provide: ChildCancellations, useExisting: InstanceMessagesGateway },
-    EventMessagesGateway,
-    { provide: EventAnnouncements, useExisting: EventMessagesGateway },
-    { provide: EventOffers, useExisting: EventMessagesGateway },
-    WorkflowMessagesGateway,
-    { provide: WorkflowEvents, useExisting: WorkflowMessagesGateway },
+    InstanceMessagesProducer,
+    { provide: InstanceMessages, useExisting: InstanceMessagesProducer },
+    { provide: InstanceRuns, useExisting: InstanceMessagesProducer },
+    { provide: ChildCancellations, useExisting: InstanceMessagesProducer },
+    EventMessagesProducer,
+    { provide: EventAnnouncements, useExisting: EventMessagesProducer },
+    { provide: EventOffers, useExisting: EventMessagesProducer },
+    WorkflowMessagesProducer,
+    { provide: WorkflowEvents, useExisting: WorkflowMessagesProducer },
     WorkflowMapper,
     WorkflowVersionMapper,
     WorkflowInstanceMapper,

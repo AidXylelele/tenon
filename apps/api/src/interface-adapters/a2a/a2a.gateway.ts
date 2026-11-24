@@ -3,7 +3,7 @@ import type { A2aRequest, Endpoint, RpcOutcome } from "interpreter";
 import { Authenticator } from "../auth/authenticator.js";
 import { ResourceGateway } from "../http/resource.gateway.js";
 import { TransportFault } from "../http/transport-fault.error.js";
-import type { CallContext } from "../workflows/effects/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import { AgentCard } from "./agent-card.js";
 import {
   A2aClient,

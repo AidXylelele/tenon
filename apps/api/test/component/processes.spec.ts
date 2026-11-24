@@ -6,13 +6,13 @@ import { OutboxRelay } from "@nestjs/outbox";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { Test, type TestingModule } from "@nestjs/testing";
 import { ApiModule } from "../../src/frameworks/di/api.module.js";
-import { EffectClient } from "../../src/application/automation/instances/ports.js";
+import { EffectPerformer } from "../../src/application/automation/instances/ports.js";
 import { WorkerModule } from "../../src/frameworks/di/worker.module.js";
 import { ReceiverSubscriptions } from "../../src/frameworks/asyncapi/receiver-subscriptions.js";
-import { DeliveryHandler } from "../../src/interface-adapters/messaging/delivery.handler.js";
-import { EffectHandler } from "../../src/interface-adapters/messaging/effect.handler.js";
-import { RunHandler } from "../../src/interface-adapters/messaging/run.handler.js";
-import { ScheduleHandler } from "../../src/interface-adapters/messaging/schedule.handler.js";
+import { DeliveryHandler } from "../../src/interface-adapters/messaging/handlers/delivery.handler.js";
+import { EffectHandler } from "../../src/interface-adapters/messaging/handlers/effect.handler.js";
+import { RunHandler } from "../../src/interface-adapters/messaging/handlers/run.handler.js";
+import { ScheduleHandler } from "../../src/interface-adapters/messaging/handlers/schedule.handler.js";
 import { AsyncApiGateway } from "../../src/interface-adapters/asyncapi/asyncapi.gateway.js";
 import { SandboxGateway } from "../../src/interface-adapters/sandbox/sandbox.gateway.js";
 import type { Database } from "../../src/interface-adapters/persistence/interfaces.js";
@@ -88,7 +88,7 @@ describe("the API process, from its root module alone", () => {
     expect(() => api.get(SandboxGateway)).toThrow(UNKNOWN);
     expect(() => api.get(AsyncApiGateway)).toThrow(UNKNOWN);
     expect(() => api.get(ReceiverSubscriptions)).toThrow(UNKNOWN);
-    expect(() => api.get(EffectClient)).toThrow(UNKNOWN);
+    expect(() => api.get(EffectPerformer)).toThrow(UNKNOWN);
   });
 
   it("schedules_only_the_idempotency_prune", () => {

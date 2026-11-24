@@ -1,11 +1,18 @@
+import { Inject, Injectable } from "@nestjs/common";
+import type { ConfigType } from "@nestjs/config";
 import { html, type Mailable, type MailContent } from "@nestjs/mail";
+import { linksConfig } from "../../../frameworks/di/configs.js";
 import type { InvitationMailData } from "../interfaces.js";
 
+@Injectable()
 export class InvitationMail implements Mailable<InvitationMailData> {
-  constructor(private readonly webBaseUrl: string) {}
+  constructor(
+    @Inject(linksConfig.KEY)
+    private readonly links: ConfigType<typeof linksConfig>,
+  ) {}
 
   render(mail: InvitationMailData): MailContent {
-    const link = new URL(`${this.webBaseUrl}/invitations/accept`);
+    const link = new URL(`${this.links.WEB_BASE_URL}/invitations/accept`);
     link.searchParams.set("token", mail.token);
     const expires = `${mail.expiresAt.replace("T", " ").slice(0, 16)} UTC`;
     return {

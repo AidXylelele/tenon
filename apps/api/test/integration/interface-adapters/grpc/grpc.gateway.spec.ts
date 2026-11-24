@@ -29,7 +29,7 @@ import { ProtoGrpcClient } from "../../../../src/frameworks/grpc/proto.grpc-clie
 import { ProtoSchema } from "../../../../src/frameworks/grpc/proto-schema.js";
 import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
 import { GrpcGateway } from "../../../../src/interface-adapters/grpc/grpc.gateway.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import type { CallContext } from "../../../../src/interface-adapters/interpreter/interfaces.js";
 import {
   closedPort,
   startStubServer,

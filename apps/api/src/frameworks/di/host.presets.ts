@@ -6,7 +6,7 @@ import {
 } from "../../application/automation/host/queries.js";
 import { SandboxLimits } from "../../interface-adapters/sandbox/sandbox-limits.js";
 import shellPlatform from "../go-judge/shell-platform.json" with { type: "json" };
-import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.handler.js";
+import { DeliveryHandler } from "../../interface-adapters/messaging/handlers/delivery.handler.js";
 import { MessageTopic } from "../../interface-adapters/messaging/enums.js";
 import type { InterpreterThreads } from "../interpreter/interfaces.js";
 import { ResponseSizeLimit } from "../http/response-size-limit.js";

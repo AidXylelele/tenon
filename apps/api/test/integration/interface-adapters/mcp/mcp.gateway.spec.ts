@@ -28,7 +28,7 @@ import { TransportFaults } from "../../../../src/frameworks/http/transport-fault
 import { StreamableHttpMcpClient } from "../../../../src/frameworks/mcp/streamable-http.mcp-client.js";
 import type { HttpMcpRequest } from "../../../../src/interface-adapters/mcp/interfaces.js";
 import { McpGateway } from "../../../../src/interface-adapters/mcp/mcp.gateway.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import type { CallContext } from "../../../../src/interface-adapters/interpreter/interfaces.js";
 import { closedPort } from "../../../support/stub-server.js";
 import {
   authenticationOf,

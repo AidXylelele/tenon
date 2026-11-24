@@ -3,7 +3,7 @@ import type { GrpcOutcome, GrpcRequest } from "interpreter";
 import { Authenticator } from "../auth/authenticator.js";
 import { ResourceGateway } from "../http/resource.gateway.js";
 import { TransportFault } from "../http/transport-fault.error.js";
-import type { CallContext } from "../workflows/effects/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import { type GrpcAnswer, GrpcClient } from "./interfaces.js";
 
 @Injectable()

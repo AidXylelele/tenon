@@ -76,9 +76,9 @@ import { PostgresWebhookQueries } from "../../interface-adapters/persistence/que
 import { PostgresDraftRepository } from "../../interface-adapters/persistence/repositories/postgres-draft.repository.js";
 import { PostgresWebhookRepository } from "../../interface-adapters/persistence/repositories/postgres-webhook.repository.js";
 import { ImportGateway } from "../../interface-adapters/http/import.gateway.js";
-import { InterpreterCapabilitiesGateway } from "../../interface-adapters/workflows/gateways/interpreter-capabilities.gateway.js";
-import { InterpreterCompilerGateway } from "../../interface-adapters/workflows/gateways/interpreter-compiler.gateway.js";
-import { StructureClient } from "../../interface-adapters/workflows/interfaces.js";
+import { InterpreterCapabilitiesGateway } from "../../interface-adapters/interpreter/interpreter-capabilities.gateway.js";
+import { InterpreterCompilerGateway } from "../../interface-adapters/interpreter/interpreter-compiler.gateway.js";
+import { StructureClient } from "../../interface-adapters/interpreter/interfaces.js";
 import { PiscinaInterpreterClient } from "../interpreter/piscina-interpreter.client.js";
 import { AutomationModule } from "./automation.module.js";
 import { linksConfig } from "./configs.js";

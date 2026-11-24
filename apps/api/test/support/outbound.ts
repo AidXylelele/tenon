@@ -14,7 +14,7 @@ import { OpenIdAuthorizationServer } from "../../src/frameworks/oauth/openid.aut
 import { Authenticator } from "../../src/interface-adapters/auth/authenticator.js";
 import { HttpGateway } from "../../src/interface-adapters/http/http.gateway.js";
 import { ResourceGateway } from "../../src/interface-adapters/http/resource.gateway.js";
-import type { CallContext } from "../../src/interface-adapters/workflows/effects/interfaces.js";
+import type { CallContext } from "../../src/interface-adapters/interpreter/interfaces.js";
 
 export const SELF_SIGNED = {
   cert: `-----BEGIN CERTIFICATE-----

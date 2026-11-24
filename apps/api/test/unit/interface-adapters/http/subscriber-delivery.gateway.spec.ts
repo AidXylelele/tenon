@@ -13,7 +13,7 @@ import {
 } from "../../../../src/interface-adapters/http/interfaces.js";
 import { SubscriberDeliveryGateway } from "../../../../src/interface-adapters/http/subscriber-delivery.gateway.js";
 import { TransportFault } from "../../../../src/interface-adapters/http/transport-fault.error.js";
-import { ProtocolMapper } from "../../../../src/interface-adapters/workflows/mappers/protocol.mapper.js";
+import { ProtocolMapper } from "../../../../src/interface-adapters/interpreter/mappers/protocol.mapper.js";
 
 class NoTokens extends AccessTokens {
   accessTokenFor(): Promise<string> {

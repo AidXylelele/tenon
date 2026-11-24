@@ -20,7 +20,7 @@ import { TransportFaults } from "../../../../src/frameworks/http/transport-fault
 import type { HttpGateway } from "../../../../src/interface-adapters/http/http.gateway.js";
 import { OpenApiGateway } from "../../../../src/interface-adapters/http/openapi.gateway.js";
 import type { ResourceGateway } from "../../../../src/interface-adapters/http/resource.gateway.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import type { CallContext } from "../../../../src/interface-adapters/interpreter/interfaces.js";
 import {
   closedPort,
   type ReceivedRequest,

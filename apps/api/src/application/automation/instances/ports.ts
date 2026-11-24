@@ -78,7 +78,7 @@ export abstract class InstanceRuns {
   abstract fail(instance: WorkflowInstance): Promise<void>;
 }
 
-export abstract class EffectClient {
+export abstract class EffectPerformer {
   abstract perform(request: JsonObject, call: EffectCall): Promise<JsonObject>;
   abstract performDetached(
     request: JsonObject,

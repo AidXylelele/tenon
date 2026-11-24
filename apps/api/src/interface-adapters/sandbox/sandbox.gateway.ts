@@ -5,7 +5,7 @@ import { TransportFailure } from "../http/enums.js";
 import type { FetchedText } from "../http/interfaces.js";
 import { ResourceGateway } from "../http/resource.gateway.js";
 import { TransportFault } from "../http/transport-fault.error.js";
-import type { CallContext } from "../workflows/effects/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import {
   type BuiltCommand,
   SandboxClient,

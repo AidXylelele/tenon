@@ -10,7 +10,7 @@ import type { Secret } from "../../domain/automation/secrets/secret.js";
 import type { Subscription } from "../../domain/automation/subscriptions/subscription.js";
 import { Authenticator } from "../auth/authenticator.js";
 import type { Authorization } from "../auth/interfaces.js";
-import { ProtocolMapper } from "../workflows/mappers/protocol.mapper.js";
+import { ProtocolMapper } from "../interpreter/mappers/protocol.mapper.js";
 import { HttpClient } from "./interfaces.js";
 
 @Injectable()

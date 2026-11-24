@@ -35,7 +35,7 @@ import {
 import type { Imports } from "interpreter/front-end";
 import { LRUCache } from "lru-cache";
 import { Piscina } from "piscina";
-import { PermanentFault } from "../../interface-adapters/workflows/permanent-fault.error.js";
+import { PermanentFault } from "../../interface-adapters/interpreter/permanent-fault.error.js";
 import type {
   CompilationData,
   FilterCheck,
@@ -48,7 +48,7 @@ import type {
   StartedStep,
   StructureClient,
   VersionStructure,
-} from "../../interface-adapters/workflows/interfaces.js";
+} from "../../interface-adapters/interpreter/interfaces.js";
 import type {
   CompileSource,
   InterpreterThreads,

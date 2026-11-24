@@ -13,7 +13,7 @@ import type {
 import { PerformDetachedProcess } from "../../../../../src/application/automation/instances/perform-detached-process.js";
 import { PerformEffect } from "../../../../../src/application/automation/instances/perform-effect.js";
 import {
-  EffectClient,
+  EffectPerformer,
   type WorkflowRuntime,
 } from "../../../../../src/application/automation/instances/ports.js";
 import { StartChildForEffect } from "../../../../../src/application/automation/instances/start-child-for-effect.js";
@@ -77,7 +77,7 @@ const aClosingReceive = (id: string): AwaitedEffect => ({
   },
 });
 
-class RecordingPerformer extends EffectClient {
+class RecordingPerformer extends EffectPerformer {
   readonly performed: string[] = [];
   readonly detached: string[] = [];
   readonly references: string[] = [];

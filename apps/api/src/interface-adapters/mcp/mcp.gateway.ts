@@ -7,7 +7,7 @@ import type {
 } from "interpreter";
 import { Authenticator } from "../auth/authenticator.js";
 import { TransportFault } from "../http/transport-fault.error.js";
-import type { CallContext } from "../workflows/effects/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import {
   type HttpMcpRequest,
   type McpAnswer,

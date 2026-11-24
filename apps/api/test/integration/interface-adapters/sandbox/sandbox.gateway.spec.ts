@@ -15,7 +15,7 @@ import {
 import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
 import type { ResourceGateway } from "../../../../src/interface-adapters/http/resource.gateway.js";
 import { ResponseSizeLimit } from "../../../../src/frameworks/http/response-size-limit.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import type { CallContext } from "../../../../src/interface-adapters/interpreter/interfaces.js";
 import { GoJudgeSandboxClient } from "../../../../src/frameworks/go-judge/go-judge.sandbox-client.js";
 import { TransportFaults } from "../../../../src/frameworks/http/transport-faults.js";
 import type { SandboxedProcessRequest } from "../../../../src/interface-adapters/sandbox/interfaces.js";

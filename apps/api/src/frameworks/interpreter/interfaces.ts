@@ -16,7 +16,7 @@ import type { Piscina } from "piscina";
 import type {
   NamedFilter,
   VersionStructure,
-} from "../../interface-adapters/workflows/interfaces.js";
+} from "../../interface-adapters/interpreter/interfaces.js";
 import type * as thread from "./interpreter.thread.js";
 
 export interface CompileSource {

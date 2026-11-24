@@ -15,7 +15,7 @@ import { TransportFaults } from "../../../../src/frameworks/http/transport-fault
 import { JsonRpcA2aClient } from "../../../../src/frameworks/a2a/json-rpc.a2a-client.js";
 import { ResponseContent } from "../../../../src/frameworks/http/response-content.js";
 import { A2aGateway } from "../../../../src/interface-adapters/a2a/a2a.gateway.js";
-import type { CallContext } from "../../../../src/interface-adapters/workflows/effects/interfaces.js";
+import type { CallContext } from "../../../../src/interface-adapters/interpreter/interfaces.js";
 import {
   closedPort,
   type ReceivedRequest,

@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { HttpOutcome, OpenApiRequest } from "interpreter";
-import type { CallContext } from "../workflows/effects/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import { HttpGateway } from "./http.gateway.js";
 import { OpenApiClient } from "./interfaces.js";
 import { ResourceGateway } from "./resource.gateway.js";

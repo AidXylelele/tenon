@@ -35,8 +35,8 @@ import type { User } from "../../../domain/identity/users/user.js";
 import {
   StructureClient,
   type VersionStructure,
-} from "../../workflows/interfaces.js";
-import { ProtocolMapper } from "../../workflows/mappers/protocol.mapper.js";
+} from "../../interpreter/interfaces.js";
+import { ProtocolMapper } from "../../interpreter/mappers/protocol.mapper.js";
 import { EntityTagMapper } from "../mappers/entity-tag.mapper.js";
 import { Missing } from "../../../application/automation/enums.js";
 import { ProblemPresenter } from "../presenters/problem.presenter.js";

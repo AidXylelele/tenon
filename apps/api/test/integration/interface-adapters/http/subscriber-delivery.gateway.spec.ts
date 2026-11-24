@@ -11,7 +11,7 @@ import { DeliveryScheme } from "../../../../src/domain/automation/subscriptions/
 import { Subscription } from "../../../../src/domain/automation/subscriptions/subscription.js";
 import { AddressPolicy } from "../../../../src/frameworks/http/address-policy.js";
 import { SubscriberDeliveryGateway } from "../../../../src/interface-adapters/http/subscriber-delivery.gateway.js";
-import { ProtocolMapper } from "../../../../src/interface-adapters/workflows/mappers/protocol.mapper.js";
+import { ProtocolMapper } from "../../../../src/interface-adapters/interpreter/mappers/protocol.mapper.js";
 import { authenticationOf, clientOf } from "../../../support/outbound.js";
 
 describe("a delivery and the outbound address policy", () => {

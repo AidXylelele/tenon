@@ -2,9 +2,14 @@ import { InvitationMail } from "../../../../../src/interface-adapters/mailing/te
 import { PasswordResetMail } from "../../../../../src/interface-adapters/mailing/templates/password-reset.mail.js";
 import { Role } from "../../../../../src/domain/identity/users/enums.js";
 
+const LINKS = {
+  WEB_BASE_URL: "http://web.local",
+  API_BASE_URL: "http://api.local",
+};
+
 describe("mail templates", () => {
   it("the_invitation_mail_links_to_the_web_application_with_the_token_and_names_the_inviter_role_and_expiry", () => {
-    const content = new InvitationMail("http://web.local").render({
+    const content = new InvitationMail(LINKS).render({
       token: "the-token",
       inviterName: "Ada <Admin>",
       role: Role.Editor,

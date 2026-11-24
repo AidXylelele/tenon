@@ -6,7 +6,7 @@ import type {
   ResourceRequest,
 } from "interpreter";
 import { Authenticator } from "../auth/authenticator.js";
-import type { StepCall } from "../workflows/interfaces.js";
+import type { StepCall } from "../interpreter/interfaces.js";
 import { type FetchedText, HttpClient } from "./interfaces.js";
 import { TransportFault } from "./transport-fault.error.js";
 

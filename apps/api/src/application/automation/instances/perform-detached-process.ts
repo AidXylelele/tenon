@@ -2,13 +2,13 @@ import { Injectable } from "@nestjs/common";
 import { RunSecrets } from "../../../domain/automation/secrets/run-secrets.js";
 import { SecretRepository } from "../secrets/ports.js";
 import type { DetachedProcessCommand } from "./interfaces.js";
-import { EffectClient } from "./ports.js";
+import { EffectPerformer } from "./ports.js";
 
 @Injectable()
 export class PerformDetachedProcess {
   constructor(
     private readonly secrets: SecretRepository,
-    private readonly performer: EffectClient,
+    private readonly performer: EffectPerformer,
   ) {}
 
   async execute(command: DetachedProcessCommand): Promise<void> {

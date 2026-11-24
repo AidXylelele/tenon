@@ -10,8 +10,7 @@ import { Authenticator } from "../auth/authenticator.js";
 import type { BasicCredentials, UnusableSecret } from "../auth/interfaces.js";
 import { ResourceGateway } from "../http/resource.gateway.js";
 import { TransportFault } from "../http/transport-fault.error.js";
-import type { CallContext } from "../workflows/effects/interfaces.js";
-import type { StepCall } from "../workflows/interfaces.js";
+import type { CallContext, StepCall } from "../interpreter/interfaces.js";
 import {
   AsyncApiDocuments,
   type AsyncApiInbox,

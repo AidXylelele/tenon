@@ -20,7 +20,7 @@ import { OfferEvent } from "../../application/automation/instances/offer-event.j
 import { PerformDetachedProcess } from "../../application/automation/instances/perform-detached-process.js";
 import { PerformEffect } from "../../application/automation/instances/perform-effect.js";
 import {
-  EffectClient,
+  EffectPerformer,
   ReceivedMessages,
 } from "../../application/automation/instances/ports.js";
 import { ReceiverQueries } from "../../application/automation/instances/queries.js";
@@ -58,21 +58,20 @@ import { SandboxClient } from "../../interface-adapters/sandbox/interfaces.js";
 import { SandboxGateway } from "../../interface-adapters/sandbox/sandbox.gateway.js";
 import { SandboxLimits } from "../../interface-adapters/sandbox/sandbox-limits.js";
 import { RetentionJobs } from "../../interface-adapters/jobs/retention.jobs.js";
-import { AutomationHandler } from "../../interface-adapters/messaging/automation.handler.js";
-import { ConsumerSpan } from "../../interface-adapters/messaging/consumer-span.js";
-import { DeliveryMessagesGateway } from "../../interface-adapters/messaging/delivery-messages.gateway.js";
-import { DeliveryHandler } from "../../interface-adapters/messaging/delivery.handler.js";
-import { EffectHandler } from "../../interface-adapters/messaging/effect.handler.js";
-import { RunHandler } from "../../interface-adapters/messaging/run.handler.js";
-import { ScheduleHandler } from "../../interface-adapters/messaging/schedule.handler.js";
+import { AutomationHandler } from "../../interface-adapters/messaging/handlers/automation.handler.js";
+import { DeliveryMessagesProducer } from "../../interface-adapters/messaging/producers/delivery-messages.producer.js";
+import { DeliveryHandler } from "../../interface-adapters/messaging/handlers/delivery.handler.js";
+import { EffectHandler } from "../../interface-adapters/messaging/handlers/effect.handler.js";
+import { RunHandler } from "../../interface-adapters/messaging/handlers/run.handler.js";
+import { ScheduleHandler } from "../../interface-adapters/messaging/handlers/schedule.handler.js";
 import { InboundMapper } from "../../interface-adapters/persistence/mappers/inbound.mapper.js";
 import { PostgresReceiverQueries } from "../../interface-adapters/persistence/queries/postgres-receiver.queries.js";
 import { PostgresDeliveryLogStore } from "../../interface-adapters/persistence/stores/postgres-delivery-log.store.js";
 import { PostgresEventListenerStore } from "../../interface-adapters/persistence/stores/postgres-event-listener.store.js";
 import { PostgresLockStore } from "../../interface-adapters/persistence/stores/postgres-lock.store.js";
 import { PostgresReceivedMessageStore } from "../../interface-adapters/persistence/stores/postgres-received-message.store.js";
-import { InterpreterRoutingGateway } from "../../interface-adapters/workflows/gateways/interpreter-routing.gateway.js";
-import { EffectDispatcher } from "../../interface-adapters/workflows/effects/effect.dispatcher.js";
+import { InterpreterRoutingGateway } from "../../interface-adapters/interpreter/interpreter-routing.gateway.js";
+import { EffectGateway } from "../../interface-adapters/interpreter/effect.gateway.js";
 import { AmqpBroker } from "../amqp/amqp.broker.js";
 import { AmqpConnection } from "../amqp/amqp.connection.js";
 import { ParserAsyncApiDocuments } from "../asyncapi/parser.asyncapi-documents.js";
@@ -142,11 +141,10 @@ import { OutboundModule } from "./outbound.module.js";
     DeliverEvent,
     FailDelivery,
     ReceiverController,
-    DeliveryMessagesGateway,
-    { provide: Deliveries, useExisting: DeliveryMessagesGateway },
+    DeliveryMessagesProducer,
+    { provide: Deliveries, useExisting: DeliveryMessagesProducer },
     InterpreterRoutingGateway,
     { provide: EventRouting, useExisting: InterpreterRoutingGateway },
-    ConsumerSpan,
     AutomationHandler,
     RunHandler,
     EffectHandler,
@@ -167,8 +165,8 @@ import { OutboundModule } from "./outbound.module.js";
     AsyncApiGateway,
     SandboxGateway,
     { provide: SandboxClient, useClass: GoJudgeSandboxClient },
-    EffectDispatcher,
-    { provide: EffectClient, useExisting: EffectDispatcher },
+    EffectGateway,
+    { provide: EffectPerformer, useExisting: EffectGateway },
     { provide: OpenApiClient, useClass: SwaggerOpenApiClient },
     ProtoSchema,
     GrpcConnection,

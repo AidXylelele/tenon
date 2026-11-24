@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { Authentication, HttpOutcome, HttpRequest } from "interpreter";
 import { Authenticator } from "../auth/authenticator.js";
 import type { Authorization } from "../auth/interfaces.js";
-import type { CallContext } from "../workflows/effects/interfaces.js";
+import type { CallContext } from "../interpreter/interfaces.js";
 import { BodyReading } from "./enums.js";
 import {
   HttpClient,

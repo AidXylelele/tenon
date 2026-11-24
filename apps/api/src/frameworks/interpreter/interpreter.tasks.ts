@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import {
   context,
@@ -6,8 +7,10 @@ import {
   propagation,
   ROOT_CONTEXT,
 } from "@opentelemetry/api";
+import canonicalize from "canonicalize";
 import type {
   CloudEvent,
+  Diagnostic,
   EventFilter,
   InputProblem,
   Interpreter,
@@ -27,7 +30,7 @@ import type {
   RouteMatch,
   StartedStep,
   VersionStructure,
-} from "../../interface-adapters/workflows/interfaces.js";
+} from "../../interface-adapters/interpreter/interfaces.js";
 import { Instrumentation } from "../opentelemetry/enums.js";
 import { durationBoundaries } from "../opentelemetry/histogram.presets.js";
 import type {
@@ -52,6 +55,7 @@ export class InterpreterTasks {
   static readonly INTERPRETER = "interpreter";
   private static readonly KEPT = 1_000;
   private static readonly MILLISECONDS_PER_SECOND = 1_000;
+  private static readonly NOT_JSON = "The value is not a JSON value.";
 
   private readonly programs = new LRUCache<string, KeptProgram, CompileSource>({
     max: InterpreterTasks.KEPT,
@@ -245,6 +249,11 @@ export class InterpreterTasks {
     const program = compilation.program;
     const manifest = program.manifest;
     const document = this.#documentOf(compilation.analysis);
+    const digest = this.#digestOf(document);
+
+    if (typeof digest !== "string")
+      return { kind: "refused", diagnostics: [digest] };
+
     return {
       kind: "compiled",
       manifest: {
@@ -254,7 +263,34 @@ export class InterpreterTasks {
         schedules: manifest.schedules,
       },
       fingerprint: program.fingerprint,
+      digest,
       document,
+    };
+  }
+
+  #digestOf(document: JsonObject): string | Diagnostic {
+    try {
+      const canonical = canonicalize(document);
+
+      if (canonical === undefined)
+        return this.#unreadable(InterpreterTasks.NOT_JSON);
+
+      return createHash("sha256").update(canonical).digest("hex");
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+
+      return this.#unreadable(error.message);
+    }
+  }
+
+  #unreadable(message: string): Diagnostic {
+    return {
+      code: "syntax",
+      message,
+      pointer: "",
+      range: null,
+      subject: null,
+      import: null,
     };
   }
 
